@@ -1,7 +1,7 @@
 // The model's eyes and hands: drives the game in a headless browser that stays alive between calls.
 // Usage: npm run -s eye -- <command> [args]. Prints one JSON object.
 import { execSync, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { connect } from 'node:net'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -32,8 +32,7 @@ async function ensure(name: string, port: number, command: string, args: string[
   if (await portOpen(port)) return
   const child = spawn(command, args, { cwd: APP, detached: true, stdio: 'ignore' })
   child.unref()
-  const pids = existsSync(PIDS) ? JSON.parse(readFileSync(PIDS, 'utf8')) : {}
-  writeFileSync(PIDS, JSON.stringify({ ...pids, [name]: child.pid }))
+  writeFileSync(PIDS, JSON.stringify({ ...readPids(), [name]: child.pid }))
   for (let i = 0; i < 100; i++) {
     if (await portOpen(port)) return
     await new Promise((r) => setTimeout(r, 100))
@@ -41,18 +40,31 @@ async function ensure(name: string, port: number, command: string, args: string[
   throw new Error(`${name} did not open port ${port}`)
 }
 
-function stop(): string[] {
-  if (!existsSync(PIDS)) return []
-  const pids: Record<string, number> = JSON.parse(readFileSync(PIDS, 'utf8'))
-  for (const pid of Object.values(pids)) {
+const readPids = (): Record<string, number> => (existsSync(PIDS) ? JSON.parse(readFileSync(PIDS, 'utf8')) : {})
+
+/** Kills the named processes eye started and returns the names it knew. */
+function stop(names: string[]): string[] {
+  const pids = readPids()
+  const known = names.filter((name) => name in pids)
+  for (const name of known) {
     try {
-      process.kill(pid)
+      process.kill(pids[name])
     } catch {
       // Already gone.
     }
+    delete pids[name]
   }
-  rmSync(PIDS)
-  return Object.keys(pids)
+  writeFileSync(PIDS, JSON.stringify(pids))
+  return known
+}
+
+/** Starts a browser eye can attach to: headless for the model alone, or a window for a human. */
+function ensureBrowser(name: 'browser' | 'window', args: string[]): Promise<void> {
+  return ensure(name, CDP_PORT, chromium.executablePath(), [
+    `--remote-debugging-port=${CDP_PORT}`,
+    `--user-data-dir=${resolve(DIR, 'profile')}`,
+    ...args,
+  ])
 }
 
 type Command = (page: Page, ...args: string[]) => Promise<unknown>
@@ -104,24 +116,27 @@ const commands: Record<string, Command> = {
 
 function run(page: Page, name: string, args: string[]): Promise<unknown> {
   const command = commands[name]
-  if (!command) throw new Error(`unknown command "${name}"; choose from ${Object.keys(commands).join(', ')}, stop`)
+  if (!command) throw new Error(`unknown command "${name}"; choose from ${Object.keys(commands).join(', ')}, launch, stop`)
   return command(page, ...args.map(String))
 }
 
 async function main(name: string, args: string[]): Promise<unknown> {
-  if (name === 'stop') return stop()
   mkdirSync(DIR, { recursive: true })
+  if (name === 'stop') return stop(['vite', 'browser', 'window'])
   await ensure('vite', VITE_PORT, process.execPath, [resolve(APP, 'node_modules/vite/bin/vite.js')])
-  await ensure('browser', CDP_PORT, chromium.executablePath(), [
-    '--headless=new',
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${resolve(DIR, 'profile')}`,
-    'about:blank',
-  ])
+  if (name === 'launch') {
+    // launch [seed]: opens a window for a human to play in real time; later commands attach to it.
+    stop(['browser', 'window'])
+    while (await portOpen(CDP_PORT)) await new Promise((r) => setTimeout(r, 100))
+    await ensureBrowser('window', [`--app=${URL}${args[0] ? `?seed=${args[0]}` : ''}`, `--window-size=${WIDTH},${HEIGHT + 80}`])
+    return 'window open'
+  }
+  await ensureBrowser('browser', ['--headless=new', 'about:blank'])
   const browser = await chromium.connectOverCDP(`http://localhost:${CDP_PORT}`)
   try {
     const page = browser.contexts()[0].pages()[0]
-    await page.setViewportSize({ width: WIDTH, height: HEIGHT })
+    // A human's window keeps its own size.
+    if (!('window' in readPids())) await page.setViewportSize({ width: WIDTH, height: HEIGHT })
     return await run(page, name, args)
   } finally {
     await browser.close()
