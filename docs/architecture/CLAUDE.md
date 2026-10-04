@@ -1,6 +1,6 @@
 # Architecture
 
-TacticalAuto is a web application.
+TacticalAuto is a web application. Layers, simulation, and model harness: [design.md](design.md).
 
 ## Rules
 
