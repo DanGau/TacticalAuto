@@ -1,17 +1,19 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { createState, GRID, MOVE, type State } from './state'
-import { step } from './step'
+import { BASE_STATS, GRID, type Battle } from './battle'
+import { stepBattle as step } from './combat'
+import { createRun } from './run'
 
-function battle(seed: number): State {
-  const state = createState(seed)
+function battle(seed: number): Battle {
+  const run = createRun(seed)
+  apply(run, { type: 'mission', index: 0 })
   // Cover blocks some tiles; a rejected deploy is skipped.
-  for (let x = 0; x < GRID; x++) apply(state, { type: 'deploy', x, y: GRID - 1 })
-  apply(state, { type: 'start' })
-  return state
+  for (let x = 0; x < GRID; x++) apply(run, { type: 'deploy', x, y: GRID - 1 })
+  apply(run, { type: 'start' })
+  return run.battle!
 }
 
-test('the first beat moves every human at most MOVE tiles and no alien', () => {
+test('the first beat moves every human at most its move and no alien', () => {
   const state = battle(1)
   const humans = state.units.filter((u) => u.side === 'human').map((u) => u.id)
   const events = step(state)
@@ -19,7 +21,7 @@ test('the first beat moves every human at most MOVE tiles and no alien', () => {
   for (const e of events) {
     if (e.type !== 'move') continue
     expect(humans).toContain(e.id)
-    expect(e.path.length).toBeLessThanOrEqual(MOVE)
+    expect(e.path.length).toBeLessThanOrEqual(BASE_STATS.move)
   }
 })
 

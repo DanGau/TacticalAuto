@@ -31,10 +31,10 @@ A bot is one function per decision point: observation in, action out, both plain
 
 ## Simulation
 
-`sim/` runs in Node with no browser, in three levels: battle, run, batch.
+`sim/` runs in Node with no browser, in two levels: run and batch.
 
 - Seed = run index. A run's record is its seed and action list; replaying them reproduces it in Node or the browser.
-- Each battle and run yields a typed result. A collector turns results into a report, as text or JSON.
+- Each run yields a typed result. A collector turns results into a report, as text or JSON.
 - The report has health thresholds. A failed threshold sets a non-zero exit code.
 
 ## How the model sees and plays

@@ -1,15 +1,15 @@
 import { expect, test } from 'vitest'
-import { COVER_DEFENSE, createState, FLANK_CRIT, GRID, HIT_CHANCE, type Cover, type State } from './state'
+import { BASE_STATS, COVER_DEFENSE, createBattle, GRID, type Battle, type Cover } from './battle'
 import { coverAgainst, lineOfSight, odds } from './sight'
 
 const at = { x: 10, y: 10 }
 
 /** A map whose only cover is `cover` on the tile north of `at`. */
-function map(cover: Cover): State {
-  const state = createState(1)
-  state.cover.fill(0)
-  state.cover[(at.y - 1) * GRID + at.x] = cover
-  return state
+function map(cover: Cover): Battle {
+  const battle = createBattle(1, [], [])
+  battle.cover.fill(0)
+  battle.cover[(at.y - 1) * GRID + at.x] = cover
+  return battle
 }
 
 test.each([
@@ -23,9 +23,9 @@ test.each([
 
 test('cover lowers the hit chance; no cover lets hits crit', () => {
   const north = { x: 10, y: 5 }
-  expect(odds(map(0), north, at)).toEqual({ hit: HIT_CHANCE, crit: FLANK_CRIT })
-  expect(odds(map(1), north, at)).toEqual({ hit: HIT_CHANCE - COVER_DEFENSE[1], crit: 0 })
-  expect(odds(map(2), north, at)).toEqual({ hit: HIT_CHANCE - COVER_DEFENSE[2], crit: 0 })
+  expect(odds(map(0), north, at, BASE_STATS)).toEqual({ hit: BASE_STATS.aim, crit: BASE_STATS.crit })
+  expect(odds(map(1), north, at, BASE_STATS)).toEqual({ hit: BASE_STATS.aim - COVER_DEFENSE[1], crit: 0 })
+  expect(odds(map(2), north, at, BASE_STATS)).toEqual({ hit: BASE_STATS.aim - COVER_DEFENSE[2], crit: 0 })
 })
 
 test.each([

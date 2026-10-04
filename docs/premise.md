@@ -12,4 +12,13 @@
 
 **Maps.** Post-apocalyptic cities and countryside: houses, trees, terrain.
 
-**Between battles.** A board-game-like strategy layer, as in XCOM: the player decides which resources to spend and acquire.
+**Run.** A fixed number of rounds, then a final assault on the alien ship; winning it saves the world. Each round the aliens strike three regions and the player answers one. The skipped regions gain threat.
+
+**Losing.** A run is lost only in a battle, never on the map, and suddenly rather than slowly. A region at maximum threat forces a last stand there. Losing a last stand or the final assault ends the run; losing a strike costs the soldiers who died and adds threat. Soldiers heal fully between battles.
+
+**Progression.**
+
+- Base: after a won mission the defended region offers three upgrades of differing rarity; the player takes one.
+- Soldiers: survivors gain experience and ranks. Recruits refill the squad for free, so rookies are expendable and veterans precious.
+- Gear: owned by the base, not the soldier, so it survives a death. Not built.
+- Death: should reward the player in a way the fiction supports. Undecided.

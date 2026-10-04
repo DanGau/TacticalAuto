@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, type Ticker } from 'pixi.js'
-import { coverAt, DEPLOY_DEPTH, GRID, UNIT_HP, type State, type Tile, type Unit } from '../core/state'
-import type { GameEvent } from '../core/step'
+import { coverAt, DEPLOY_DEPTH, GRID, type Battle, type Tile, type Unit } from '../core/battle'
+import type { GameEvent } from '../core/combat'
+import { rank, type Run } from '../core/run'
 
 export const WIDTH = 1280
 export const HEIGHT = 720
@@ -51,17 +52,18 @@ const lerp = (a: Tile, b: Tile, t: number): Tile => ({ x: a.x + (b.x - a.x) * t,
 interface Sprite {
   node: Container
   hp: Graphics
-  /** The tile the sprite stands on, which lags the state while a beat animates. */
+  /** The tile the sprite stands on, which lags the battle while a beat animates. */
   tile: Tile
+  maxHp: number
 }
 
 export interface View {
   canvas: HTMLCanvasElement
   /**
-   * Shows `state`, which `events` produced. Animated, it plays the events and resolves when they finish.
-   * Still, it draws the state at once and marks each shot with a line.
+   * Shows the run's battle, which `events` produced. Animated, it plays the events and resolves when they finish.
+   * Still, it draws the battle at once and marks each shot with a line.
    */
-  show(state: State, events: GameEvent[], animate: boolean): Promise<void>
+  show(run: Run, events: GameEvent[], animate: boolean): Promise<void>
 }
 
 export async function createView(): Promise<View> {
@@ -84,15 +86,19 @@ export async function createView(): Promise<View> {
   app.stage.addChild(tiles, units, fx)
 
   const sprites = new Map<number, Sprite>()
-  let coverDrawn = false
+  /** The battle on screen. */
+  let shown: Battle | null = null
 
-  /** Draws each cover tile as a block. Cover never changes, so once is enough. */
-  function drawCover(state: State): void {
+  /** Clears the board and draws the battle's cover blocks, which never change. */
+  function setBattle(battle: Battle): void {
+    shown = battle
+    sprites.clear()
+    units.removeChildren().forEach((child) => child.destroy({ children: true }))
     const w = TILE_W / 2
     const h = TILE_H / 2
     for (let y = 0; y < GRID; y++) {
       for (let x = 0; x < GRID; x++) {
-        const up = COVER_HEIGHT[coverAt(state, x, y)]
+        const up = COVER_HEIGHT[coverAt(battle, x, y)]
         if (up === 0) continue
         const block = new Graphics()
           .poly([-w, 0, 0, h, 0, h - up, -w, -up])
@@ -106,7 +112,6 @@ export async function createView(): Promise<View> {
         units.addChild(block)
       }
     }
-    coverDrawn = true
   }
 
   function place(sprite: Sprite, tile: Tile): void {
@@ -118,12 +123,14 @@ export async function createView(): Promise<View> {
 
   function drawHp(sprite: Sprite, hp: number): void {
     sprite.hp.clear().rect(-12, -38, 24, 4).fill(0x000000)
-    if (hp > 0) sprite.hp.rect(-12, -38, (24 * hp) / UNIT_HP, 4).fill(0xff5555)
+    if (hp > 0) sprite.hp.rect(-12, -38, (24 * hp) / sprite.maxHp, 4).fill(0xff5555)
   }
 
-  function create(unit: Unit): Sprite {
+  /** `pips` marks a soldier's rank above the health bar. */
+  function create(unit: Unit, pips: number): Sprite {
     const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(COLOR[unit.side])
-    const sprite: Sprite = { node: new Container(), hp: new Graphics(), tile: unit }
+    for (let i = 0; i < pips; i++) body.circle(-9 + 6 * i, -44, 2).fill(COLOR.hit)
+    const sprite: Sprite = { node: new Container(), hp: new Graphics(), tile: unit, maxHp: unit.stats.hp }
     sprite.node.addChild(body, sprite.hp)
     units.addChild(sprite.node)
     sprites.set(unit.id, sprite)
@@ -135,12 +142,13 @@ export async function createView(): Promise<View> {
     sprites.delete(id)
   }
 
-  /** Makes the sprites match the state exactly. */
-  function sync(state: State): void {
-    const live = new Set(state.units.map((u) => u.id))
+  /** Makes the sprites match the battle exactly. */
+  function sync(run: Run, battle: Battle): void {
+    const live = new Set(battle.units.map((u) => u.id))
     for (const id of [...sprites.keys()]) if (!live.has(id)) remove(id)
-    for (const unit of state.units) {
-      const sprite = sprites.get(unit.id) ?? create(unit)
+    for (const unit of battle.units) {
+      const soldier = run.soldiers.find((s) => s.id === unit.soldier)
+      const sprite = sprites.get(unit.id) ?? create(unit, soldier ? rank(soldier) : 0)
       place(sprite, { x: unit.x, y: unit.y })
       drawHp(sprite, unit.hp)
     }
@@ -192,7 +200,7 @@ export async function createView(): Promise<View> {
   }
 
   /** Plays a beat: its moves all at once, or its shot and then its death. */
-  async function play(state: State, events: GameEvent[]): Promise<void> {
+  async function play(battle: Battle, events: GameEvent[]): Promise<void> {
     const walks: Promise<void>[] = []
     for (const e of events) {
       const sprite = e.type === 'end' ? undefined : sprites.get(e.id)
@@ -200,7 +208,7 @@ export async function createView(): Promise<View> {
       if (e.type === 'move') walks.push(walk(sprite, e.path))
       if (e.type === 'shot') {
         const target = sprites.get(e.target)
-        if (target) await shoot(sprite, target, e.hit, e.crit, state.units.find((u) => u.id === e.target)?.hp ?? 0)
+        if (target) await shoot(sprite, target, e.hit, e.crit, battle.units.find((u) => u.id === e.target)?.hp ?? 0)
       }
       if (e.type === 'death') {
         await tween(DEATH_MS, (t) => (sprite.node.alpha = 1 - t))
@@ -212,17 +220,19 @@ export async function createView(): Promise<View> {
 
   return {
     canvas: app.canvas,
-    async show(state, events, animate) {
+    async show(run, events, animate) {
       fx.clear()
-      if (!coverDrawn) drawCover(state)
-      if (animate) await play(state, events)
-      sync(state)
+      const battle = run.battle
+      if (!battle) return
+      if (battle !== shown) setBattle(battle)
+      if (animate) await play(battle, events)
+      sync(run, battle)
       if (!animate) {
         for (const e of events) {
           if (e.type !== 'shot') continue
           const from = sprites.get(e.id)
           const to = sprites.get(e.target)
-          // A unit this shot killed has left the state.
+          // A unit this shot killed has left the battle.
           if (!from || !to) continue
           const a = chest(from)
           const b = chest(to)

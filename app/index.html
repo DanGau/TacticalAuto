@@ -5,13 +5,33 @@
     <title>TacticalAuto</title>
     <style>
       body { margin: 0; overflow: hidden; background: #10141c; color: #dde; font: 14px sans-serif; }
+      canvas { display: block; }
       #hud { position: absolute; top: 12px; left: 12px; }
       #start { margin-left: 12px; }
-      canvas { display: block; }
+      #panel { position: absolute; top: 40px; left: 140px; width: 1000px; box-sizing: border-box; padding: 20px 28px; background: #171d29f2; border: 1px solid #3a465c; border-radius: 8px; }
+      #panel[hidden] { display: none; }
+      h1 { margin: 0 0 12px; font-size: 24px; }
+      h2 { margin: 16px 0 8px; font-size: 14px; font-weight: normal; color: #9aa6bd; }
+      ul { margin: 0; padding: 0; list-style: none; line-height: 1.6; }
+      .columns { display: flex; gap: 48px; }
+      .lost { color: #ff6b5e; }
+      .threat { padding-left: 12px; color: #ff6b5e; letter-spacing: 2px; }
+      .choices { display: flex; gap: 16px; }
+      button { font: inherit; color: #dde; background: #263042; border: 1px solid #4a5a78; border-radius: 6px; padding: 10px 16px; cursor: pointer; }
+      button:hover { background: #32405a; }
+      .choices button { flex: 1; text-align: left; line-height: 1.5; }
+      button.lastStand, button.final { border-color: #ff6b5e; }
+      button.card { min-height: 110px; }
+      button.common small { color: #9aa6bd; }
+      button.rare { border-color: #4da3ff; }
+      button.rare small { color: #4da3ff; }
+      button.epic { border-color: #c77dff; }
+      button.epic small { color: #c77dff; }
     </style>
   </head>
   <body>
     <div id="hud"><span id="status"></span><button id="start">Start battle</button></div>
+    <div id="panel"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

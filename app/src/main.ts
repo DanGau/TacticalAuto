@@ -1,14 +1,15 @@
 import { apply, type Action, type Result } from './core/apply'
-import { createState, type State } from './core/state'
-import { step, type GameEvent } from './core/step'
+import type { GameEvent } from './core/combat'
+import { createRun, type Run } from './core/run'
+import { step } from './core/step'
 import { createUi } from './ui/ui'
 import { createView } from './view/view'
 
 export interface Debug {
-  snapshot(): State
+  snapshot(): Run
   apply(action: Action): Result
   /** Advances n beats, shows the result without animation, and returns the state. */
-  step(n: number): State
+  step(n: number): Run
 }
 
 declare global {
@@ -18,7 +19,7 @@ declare global {
 }
 
 const params = new URLSearchParams(location.search)
-const state = createState(params.has('seed') ? Number(params.get('seed')) : Date.now() | 0)
+const state = createRun(params.has('seed') ? Number(params.get('seed')) : Date.now() | 0)
 
 const view = await createView()
 document.body.prepend(view.canvas)
@@ -52,7 +53,7 @@ await show([], false)
 // With ?manual, the battle advances only through debug.step, so the model sees every beat it asks for.
 if (!params.has('manual')) {
   for (;;) {
-    if (state.phase === 'battle') await show(step(state), true)
+    if (state.phase === 'battle' && state.battle?.phase === 'battle') await show(step(state), true)
     else await new Promise(requestAnimationFrame)
   }
 }

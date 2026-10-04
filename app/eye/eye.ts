@@ -7,7 +7,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, type Page } from 'playwright'
 import type { Debug } from '../src/main'
-import { MAX_BEATS } from '../src/core/state'
+import { MAX_BEATS } from '../src/core/battle'
 import { HEIGHT, WIDTH } from '../src/view/view'
 import viteConfig from '../vite.config'
 
