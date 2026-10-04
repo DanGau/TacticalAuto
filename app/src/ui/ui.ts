@@ -23,16 +23,18 @@ const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`
 /**
  * The threat meters. Given a mission, they show what choosing it leads to: threat the skipped regions gain
  * as extra pips, and beside the mission's own region, what a win and a loss do.
+ * `landed` counts, per region, the newest pips to animate in as the aliens' advance.
  */
-function threatTable(run: Run, mission?: Mission): string {
+function threatTable(run: Run, mission?: Mission, landed?: number[]): string {
   const outcome = mission && preview(run, mission)
   const rows = REGIONS.map((name, i) => {
     const now = run.threat[i]
     // A skipped region ends the same won or lost; the mission's own region does not.
     const own = mission?.region === i
     const gained = outcome && !own ? outcome.won[i] - now : 0
-    const meter = `${'■'.repeat(now)}<span class="gained">${'■'.repeat(gained)}</span>${'□'.repeat(THREAT_MAX - now - gained)}`
-    let note = now + gained === THREAT_MAX ? 'last stand' : ''
+    const fresh = landed?.[i] ?? 0
+    const meter = `${'■'.repeat(now - fresh)}<span class="landed">${'■'.repeat(fresh)}</span><span class="gained">${'■'.repeat(gained)}</span>${'□'.repeat(THREAT_MAX - now - gained)}`
+    let note = now + gained === THREAT_MAX ? 'last stand' : fresh > 0 ? signed(fresh) : ''
     if (outcome && own) note = `${signed(outcome.won[i] - now)} won · ${outcome.lost ? `${signed(outcome.lost[i] - now)} lost` : 'run ends if lost'}`
     return `<tr class="${own ? 'own' : ''}"><td>${name}</td><td class="threat">${meter}</td><td class="note">${note}</td></tr>`
   })
@@ -57,7 +59,12 @@ function facilityButton(run: Run, id: FacilityId): string {
   return button({ type: 'build', facility: id }, `<b>${name}</b> ${level(run, id)}/${max}<br>${text}<br><small>${price}</small>`, '', cost !== null && cost <= run.supplies)
 }
 
-function mapPanel(run: Run): string {
+/** `advance` animates the threat the aliens added after the last battle. */
+function mapPanel(run: Run, advance: boolean): string {
+  const report = run.report
+  // Aid taken since may have lowered threat, so no more pips land than the region still has.
+  const landed = advance && report ? run.threat.map((now, i) => Math.min(Math.max(report.threat.afterAliens[i] - report.threat.afterMission[i], 0), now)) : undefined
+  const advanced = landed?.some((n) => n > 0)
   const squad = run.soldiers.map((s) => `<li>${RANK_NAMES[rank(s)]} ${s.name}</li>`)
   const tech = run.aid.filter((id) => AID[id].stats).map((id) => `<li>${AID[id].name}</li>`)
   return `
@@ -65,8 +72,8 @@ function mapPanel(run: Run): string {
     ${run.battle && run.battle.winner !== 'human' ? `<p class="up">Mission lost: ${REGIONS[run.mission!.region]} gained threat.</p>` : ''}
     <div class="columns">
       <div class="side">
-        <h2>Threat</h2>
-        <div class="now">${threatTable(run)}</div>
+        <h2>Threat${advanced ? ' · <span class="up">the aliens advanced</span>' : ''}</h2>
+        <div class="now">${threatTable(run, undefined, landed)}</div>
         ${run.missions.map((mission, index) => `<div class="preview preview-${index}">${threatTable(run, mission)}</div>`).join('')}
         <h2>Squad</h2><ul>${squad.join('')}</ul>
         ${tech.length > 0 ? `<h2>Alien tech</h2><ul>${tech.join('')}</ul>` : ''}
@@ -92,10 +99,9 @@ function threatMoves(from: number[], to: number[]): string {
   return `<table>${rows.join('')}</table>`
 }
 
-/** The step after a battle: first what the squad changed, then what the aliens did meanwhile. */
+/** The step after a battle: what the squad changed in the region it fought in. */
 function debriefPanel(run: Run, report: Report): string {
-  const { before, afterMission, afterAliens } = report.threat
-  const moved = afterAliens.some((t, i) => t !== afterMission[i])
+  const { before, afterMission } = report.threat
   const lines = [
     report.supplies > 0 ? `<li class="supplies">+${report.supplies} supplies</li>` : '',
     ...report.promoted.map((p) => `<li class="down">${p}</li>`),
@@ -108,17 +114,13 @@ function debriefPanel(run: Run, report: Report): string {
       ${threatMoves(before, afterMission)}
       <ul>${lines.join('')}</ul>
     </div>
-    <div class="stage second">
-      <h2>${moved ? 'Meanwhile, the aliens advanced' : 'The aliens made no other moves'}</h2>
-      ${threatMoves(afterMission, afterAliens)}
-    </div>
-    <button id="continue" class="stage third">Continue</button>`
+    <button id="continue" class="stage second">Continue</button>`
 }
 
-function panel(run: Run): string {
+function panel(run: Run, advance: boolean): string {
   switch (run.phase) {
     case 'map':
-      return mapPanel(run)
+      return mapPanel(run, advance)
     case 'reward':
       return `<h1>Mission won</h1><h2>${REGIONS[run.mission!.region]} offers aid. Take one.</h2>
         <div class="choices">${run.offers.map(aidCard).join('')}</div>`
@@ -146,13 +148,16 @@ export function createUi(canvas: HTMLCanvasElement, act: (action: Action) => voi
   const overlay = document.getElementById('panel')!
   /** The report the player has already continued past. */
   let reviewed: Report | null = null
+  /** The report whose alien advance the map has already played. */
+  let advanced: Report | null = null
   let shown: Run | null = null
   let html = ''
 
   function render(run: Run): void {
     shown = run
     const debrief = run.report !== reviewed && run.report && (run.phase === 'map' || run.phase === 'reward')
-    const next = debrief ? debriefPanel(run, run.report!) : panel(run)
+    const next = debrief ? debriefPanel(run, run.report!) : panel(run, run.report !== advanced)
+    if (!debrief && run.phase === 'map') advanced = run.report
     // Rewriting unchanged content would restart its animations.
     if (next !== html) overlay.innerHTML = html = next
     overlay.hidden = run.phase === 'battle'
