@@ -1,6 +1,6 @@
 import { BASE_STATS, createBattle, type Battle, type Stats } from './battle'
 import { random, randomInt } from './rng'
-import { RARITY_CHANCE, UPGRADES, type Rarity, type Upgrade, type UpgradeId } from './upgrades'
+import { AID, FACILITIES, RARITY_CHANCE, type AidId, type FacilityId, type Lasting, type Rarity } from './base'
 
 /** Rounds before the final assault. */
 export const ROUNDS = 20
@@ -18,6 +18,10 @@ export const LOSS_THREAT = 2
 export const WIN_THREAT = 1
 export const BASE_SQUAD = 4
 export const OFFERS = 3
+export const START_SUPPLIES = 3
+/** Supplies a won mission pays; a hard strike pays HARD_SUPPLIES more. */
+export const WIN_SUPPLIES = 2
+export const HARD_SUPPLIES = 1
 
 /** Experience needed for each rank; a soldier earns one per battle survived. */
 export const RANK_XP = [0, 1, 3, 6, 10]
@@ -42,7 +46,7 @@ export interface Mission {
   /** Index into REGIONS; -1 for the final assault. */
   region: number
   aliens: number
-  /** A hard strike has one more alien and guarantees a rare or better offer. */
+  /** A hard strike has one more alien, pays more supplies, and guarantees a rare or better offer. */
   hard: boolean
 }
 
@@ -62,25 +66,52 @@ export interface Run {
   battle: Battle | null
   soldiers: Soldier[]
   nextSoldier: number
-  upgrades: UpgradeId[]
-  /** Upgrades to choose from in the reward phase. */
-  offers: UpgradeId[]
+  supplies: number
+  /** Facilities built, one entry per level. */
+  built: FacilityId[]
+  /** Aid taken. */
+  aid: AidId[]
+  /** Aid to choose from in the reward phase. */
+  offers: AidId[]
 }
 
 export function rank(soldier: Soldier): number {
   return RANK_XP.findLastIndex((xp) => soldier.xp >= xp)
 }
 
-/** The sum over held upgrades of one numeric effect. */
-function total(run: Run, effect: (upgrade: Upgrade) => number | undefined): number {
-  return run.upgrades.reduce((sum, id) => sum + (effect(UPGRADES[id]) ?? 0), 0)
+/** The sum of one lasting effect over every facility level built and aid taken. */
+function total(run: Run, effect: (source: Lasting) => number | undefined): number {
+  const sources: Lasting[] = [...run.built.map((id) => FACILITIES[id]), ...run.aid.map((id) => AID[id])]
+  return sources.reduce((sum, source) => sum + (effect(source) ?? 0), 0)
+}
+
+export function level(run: Run, id: FacilityId): number {
+  return run.built.filter((b) => b === id).length
+}
+
+/** Supplies the facility's next level costs, or null at its maximum. */
+export function buildCost(run: Run, id: FacilityId): number | null {
+  const facility = FACILITIES[id]
+  return level(run, id) < facility.max ? facility.cost * (level(run, id) + 1) : null
+}
+
+/** Builds the facility's next level. The caller checks it is affordable. */
+export function build(run: Run, id: FacilityId): void {
+  run.supplies -= buildCost(run, id)!
+  run.built.push(id)
+  recruit(run)
+}
+
+/** Supplies winning the mission pays. */
+export function payout(mission: Mission): number {
+  return mission.kind === 'final' ? 0 : WIN_SUPPLIES + (mission.hard ? HARD_SUPPLIES : 0)
 }
 
 export function squadSize(run: Run): number {
   return BASE_SQUAD + total(run, (u) => u.squad)
 }
 
-/** A soldier's stats in battle: base, plus rank, plus upgrades. */
+/** A soldier's stats in battle: base, plus rank, plus facilities and aid. */
 export function soldierStats(run: Run, soldier: Soldier): Stats {
   const stats = { ...BASE_STATS }
   for (const key of Object.keys(stats) as (keyof Stats)[]) {
@@ -92,7 +123,7 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
 /** Alien stats grow every four rounds. */
 function alienStats(round: number): Stats {
   const tier = Math.floor((round - 1) / 4)
-  return { ...BASE_STATS, hp: BASE_STATS.hp + 2 * tier, aim: BASE_STATS.aim + 0.03 * tier }
+  return { ...BASE_STATS, hp: BASE_STATS.hp + 3 * tier, aim: BASE_STATS.aim + 0.05 * tier }
 }
 
 function alienCount(round: number, kind: Mission['kind'], hard: boolean): number {
@@ -145,7 +176,9 @@ export function createRun(seed: number): Run {
     battle: null,
     soldiers: [],
     nextSoldier: 1,
-    upgrades: [],
+    supplies: START_SUPPLIES,
+    built: [],
+    aid: [],
     offers: [],
   }
   recruit(run)
@@ -187,16 +220,14 @@ export function startMission(run: Run, mission: Mission): void {
   run.battle = createBattle(randomInt(run, 2 ** 31), aliens, reserve)
 }
 
-/** Three different upgrades the run can still take; a hard mission's first is rare or better. */
-function drawOffers(run: Run, hard: boolean): UpgradeId[] {
-  const held = (id: UpgradeId) => run.upgrades.filter((u) => u === id).length
-  const open = (Object.keys(UPGRADES) as UpgradeId[]).filter((id) => held(id) < ((UPGRADES[id] as Upgrade).max ?? Infinity))
-  const offers: UpgradeId[] = []
+/** Three different aid cards; a hard mission's first is rare or better. */
+function drawOffers(run: Run, hard: boolean): AidId[] {
+  const offers: AidId[] = []
   while (offers.length < OFFERS) {
     let roll = random(run)
     if (hard && offers.length === 0) roll = RARITY_CHANCE.common + roll * (1 - RARITY_CHANCE.common)
     const rarity: Rarity = roll < RARITY_CHANCE.common ? 'common' : roll < RARITY_CHANCE.common + RARITY_CHANCE.rare ? 'rare' : 'epic'
-    const pool = open.filter((id) => UPGRADES[id].rarity === rarity && !offers.includes(id))
+    const pool = (Object.keys(AID) as AidId[]).filter((id) => AID[id].rarity === rarity && !offers.includes(id))
     if (pool.length > 0) offers.push(pool[randomInt(run, pool.length)])
   }
   return offers
@@ -229,6 +260,7 @@ export function endBattle(run: Run): void {
   } else {
     run.threat = threat
     if (won) {
+      run.supplies += payout(mission)
       run.offers = drawOffers(run, mission.hard)
       run.phase = 'reward'
     } else {
@@ -237,12 +269,17 @@ export function endBattle(run: Run): void {
   }
 }
 
-/** Takes an offered upgrade and moves to the next round. */
-export function takeUpgrade(run: Run, id: UpgradeId): void {
-  run.upgrades.push(id)
+/** Takes offered aid, applies what it does at once, and moves to the next round. */
+export function takeAid(run: Run, id: AidId): void {
+  const aid = AID[id]
+  run.aid.push(id)
   run.offers = []
-  const { threat } = UPGRADES[id] as Upgrade
-  if (threat) run.threat = addThreat(run.threat, 'all', threat)
-  recruit(run)
+  run.supplies += aid.supplies ?? 0
+  if (aid.threat) run.threat = addThreat(run.threat, 'all', aid.threat)
+  for (const soldier of run.soldiers) soldier.xp += aid.xp ?? 0
+  if (aid.promote) {
+    const lowest = run.soldiers.reduce((low, soldier) => (soldier.xp < low.xp ? soldier : low))
+    lowest.xp = Math.max(lowest.xp, RANK_XP[aid.promote])
+  }
   nextRound(run)
 }

@@ -1,6 +1,6 @@
 import type { Action } from '../core/apply'
-import { preview, RANK_NAMES, rank, REGIONS, ROUNDS, THREAT_MAX, type Mission, type Run } from '../core/run'
-import { UPGRADES, type UpgradeId } from '../core/upgrades'
+import { AID, FACILITIES, type AidId, type FacilityId } from '../core/base'
+import { buildCost, level, payout, preview, RANK_NAMES, rank, REGIONS, ROUNDS, THREAT_MAX, type Mission, type Run } from '../core/run'
 import { tileAt } from '../view/view'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
@@ -10,7 +10,8 @@ export interface Ui {
   update(run: Run): void
 }
 
-const button = (action: Action, label: string, cls = '') => `<button class="${cls}" data-action='${JSON.stringify(action)}'>${label}</button>`
+const button = (action: Action, label: string, cls = '', enabled = true) =>
+  `<button class="${cls}" data-action='${JSON.stringify(action)}' ${enabled ? '' : 'disabled'}>${label}</button>`
 
 function missionTitle(mission: Mission): string {
   if (mission.kind === 'final') return 'Final assault on the alien ship'
@@ -33,7 +34,7 @@ function threatChanges(run: Run, after: number[]): string {
 /** A mission choice that states everything choosing it leads to. */
 function missionButton(run: Run, mission: Mission, index: number): string {
   const { won, lost } = preview(run, mission)
-  const aid = mission.kind === 'final' ? 'Earth is saved' : `take 1 of 3 upgrades${mission.hard ? ', one rare or better' : ''}`
+  const aid = mission.kind === 'final' ? 'Earth is saved' : `+${payout(mission)} supplies · take 1 of 3 aid${mission.hard ? ', one rare or better' : ''}`
   return button(
     { type: 'mission', index },
     `<b>${missionTitle(mission)}</b><br>${mission.aliens} aliens
@@ -43,24 +44,38 @@ function missionButton(run: Run, mission: Mission, index: number): string {
   )
 }
 
-function upgradeCard(id: UpgradeId, index: number): string {
-  const { name, rarity, text } = UPGRADES[id]
+function aidCard(id: AidId, index: number): string {
+  const { name, rarity, text } = AID[id]
   return button({ type: 'pick', index }, `<small>${rarity}</small><br><b>${name}</b><br>${text}`, `card ${rarity}`)
+}
+
+/** A facility's next level, buyable when the run has the supplies. */
+function facilityButton(run: Run, id: FacilityId): string {
+  const { name, text, max } = FACILITIES[id]
+  const cost = buildCost(run, id)
+  const price = cost === null ? 'fully built' : `${cost} supplies`
+  return button({ type: 'build', facility: id }, `<b>${name}</b> ${level(run, id)}/${max}<br>${text}<br><small>${price}</small>`, '', cost !== null && cost <= run.supplies)
 }
 
 function mapPanel(run: Run): string {
   const threat = REGIONS.map((name, i) => `<tr><td>${name}</td><td>${pips(run.threat[i])}</td></tr>`)
   const squad = run.soldiers.map((s) => `<li>${RANK_NAMES[rank(s)]} ${s.name}</li>`)
-  const held = [...new Set(run.upgrades)].map((id) => `<li>${UPGRADES[id].name} ×${run.upgrades.filter((u) => u === id).length}</li>`)
+  const tech = run.aid.filter((id) => AID[id].stats).map((id) => `<li>${AID[id].name}</li>`)
   return `
     <h1>${run.round > ROUNDS ? 'The final assault' : `Round ${run.round} of ${ROUNDS}`}</h1>
     ${run.battle && run.battle.winner !== 'human' ? `<p class="up">Mission lost: ${REGIONS[run.mission!.region]} gained threat.</p>` : ''}
-    <h2>${run.missions.length > 1 ? 'Aliens strike three regions. Answer one.' : 'One mission. It must be won.'}</h2>
-    <div class="choices">${run.missions.map((mission, index) => missionButton(run, mission, index)).join('')}</div>
     <div class="columns">
-      <div><h2>Threat now</h2><table>${threat.join('')}</table></div>
-      <div><h2>Squad</h2><ul>${squad.join('')}</ul></div>
-      <div><h2>Base</h2><ul>${held.join('') || '<li>No upgrades</li>'}</ul></div>
+      <div class="side">
+        <h2>Threat now</h2><table>${threat.join('')}</table>
+        <h2>Squad</h2><ul>${squad.join('')}</ul>
+        ${tech.length > 0 ? `<h2>Alien tech</h2><ul>${tech.join('')}</ul>` : ''}
+      </div>
+      <div>
+        <h2>1. Build your base · <b class="supplies">${run.supplies} ${run.supplies === 1 ? 'supply' : 'supplies'}</b></h2>
+        <div class="facilities">${(Object.keys(FACILITIES) as FacilityId[]).map((id) => facilityButton(run, id)).join('')}</div>
+        <h2>2. ${run.missions.length > 1 ? 'Aliens strike three regions. Answer one.' : 'One mission. It must be won.'}</h2>
+        <div class="choices">${run.missions.map((mission, index) => missionButton(run, mission, index)).join('')}</div>
+      </div>
     </div>`
 }
 
@@ -70,7 +85,7 @@ function panel(run: Run): string {
       return mapPanel(run)
     case 'reward':
       return `<h1>Mission won</h1><h2>${REGIONS[run.mission!.region]} offers aid. Take one.</h2>
-        <div class="choices">${run.offers.map(upgradeCard).join('')}</div>`
+        <div class="choices">${run.offers.map(aidCard).join('')}</div>`
     case 'won':
       return `<h1>Earth is saved</h1><button id="again">New run</button>`
     case 'lost':
@@ -102,7 +117,7 @@ export function createUi(canvas: HTMLCanvasElement, act: (action: Action) => voi
   overlay.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (target?.id === 'again') location.href = location.pathname
-    else if (target?.dataset.action) act(JSON.parse(target.dataset.action))
+    else if (target?.dataset.action && !target.disabled) act(JSON.parse(target.dataset.action))
   })
 
   return {

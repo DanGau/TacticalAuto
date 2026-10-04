@@ -18,7 +18,8 @@
 
 **Progression.**
 
-- Base: after a won mission the defended region offers three upgrades of differing rarity; the player takes one.
+- Base: won missions pay supplies. Each round, before choosing a mission, the player spends supplies on facilities from a fixed list, each with several levels.
+- Aid: after a won mission the defended region offers three aid cards of differing rarity; the player takes one. Aid is a windfall, not a plan: supplies, training, threat relief, alien tech.
 - Soldiers: survivors gain experience and ranks. Recruits refill the squad for free, so rookies are expendable and veterans precious.
 - Gear: owned by the base, not the soldier, so it survives a death. Not built.
 - Death: should reward the player in a way the fiction supports. Undecided.
