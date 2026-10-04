@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.core.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["src", "eye", "*.ts"],
+  "exclude": []
+}
