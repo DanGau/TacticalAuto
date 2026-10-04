@@ -97,6 +97,10 @@ const commands: Record<string, Command> = {
     await page.mouse.click(Number(x), Number(y))
     return page.evaluate(() => debug.snapshot())
   },
+  /** hover <x> <y>: moves the mouse to a screen point. */
+  async hover(page, x, y) {
+    await page.mouse.move(Number(x), Number(y))
+  },
   /** screenshot <name>: saves a PNG and returns its path. */
   async screenshot(page, name) {
     const commit = execSync('git rev-parse --short HEAD', { cwd: APP, encoding: 'utf8' }).trim()

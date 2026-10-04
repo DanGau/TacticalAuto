@@ -21,7 +21,6 @@
       button:disabled { opacity: 0.45; cursor: default; }
       button:disabled:hover { background: #263042; }
       small { color: #9aa6bd; }
-      h3 { margin: 10px 0 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
       .up { color: #ff6b5e; }
       .down { color: #7ddc5a; }
       .threat { padding: 0 8px; color: #ff6b5e; letter-spacing: 2px; }
@@ -29,6 +28,10 @@
       button { font: inherit; color: #dde; background: #263042; border: 1px solid #4a5a78; border-radius: 6px; padding: 10px 16px; cursor: pointer; }
       button:hover { background: #32405a; }
       .choices button { flex: 1; text-align: left; line-height: 1.5; }
+      .outcome { min-height: 1.5em; }
+      .outcome span.chosen, .outcome span.skipped { display: none; }
+      button:hover .chosen { display: inline; }
+      .choices:has(button:hover) button:not(:hover) .skipped { display: inline; }
       button.lastStand, button.final { border-color: #ff6b5e; }
       button.card { min-height: 110px; }
       button.common small { color: #9aa6bd; }
