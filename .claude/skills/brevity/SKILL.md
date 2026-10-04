@@ -30,5 +30,5 @@ Break any rule above before you write something unclear.
 
 ## In code
 
-- Comments say why, not what the code says.
+- Comments say what code can't: intent, constraints, non-obvious trade-offs. Never what the code says.
 - Names carry no filler: `users`, not `theListOfAllUsers`.
