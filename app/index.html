@@ -14,8 +14,9 @@
       h2 { margin: 16px 0 8px; font-size: 14px; font-weight: normal; color: #9aa6bd; }
       ul { margin: 0; padding: 0; list-style: none; line-height: 1.6; }
       .columns { display: flex; gap: 32px; }
-      .side { flex: 0 0 190px; }
+      .side { flex: 0 0 300px; }
       .facilities { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+      table { border-spacing: 0; }
       .facilities button { text-align: left; padding: 6px 10px; line-height: 1.4; }
       .supplies { color: #ffd84d; }
       button:disabled { opacity: 0.45; cursor: default; }
@@ -23,15 +24,17 @@
       small { color: #9aa6bd; }
       .up { color: #ff6b5e; }
       .down { color: #7ddc5a; }
-      .threat { padding: 0 8px; color: #ff6b5e; letter-spacing: 2px; }
+      .threat { padding: 0 8px; color: #ff6b5e; letter-spacing: 2px; white-space: nowrap; }
       .choices { display: flex; gap: 16px; }
       button { font: inherit; color: #dde; background: #263042; border: 1px solid #4a5a78; border-radius: 6px; padding: 10px 16px; cursor: pointer; }
       button:hover { background: #32405a; }
       .choices button { flex: 1; text-align: left; line-height: 1.5; }
-      .outcome { min-height: 1.5em; }
-      .outcome span.chosen, .outcome span.skipped { display: none; }
-      button:hover .chosen { display: inline; }
-      .choices:has(button:hover) button:not(:hover) .skipped { display: inline; }
+      .preview { display: none; }
+      #panel:has(.mission-0:hover) .preview-0, #panel:has(.mission-1:hover) .preview-1, #panel:has(.mission-2:hover) .preview-2 { display: block; }
+      #panel:has(.mission-0:hover, .mission-1:hover, .mission-2:hover) .now { display: none; }
+      .gained { color: #ffd84d; }
+      .note { font-size: 12px; color: #9aa6bd; white-space: nowrap; }
+      tr.own td:first-child { font-weight: bold; }
       button.lastStand, button.final { border-color: #ff6b5e; }
       button.card { min-height: 110px; }
       button.common small { color: #9aa6bd; }

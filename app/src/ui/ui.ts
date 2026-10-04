@@ -18,33 +18,30 @@ function missionTitle(mission: Mission): string {
   return `${mission.kind === 'lastStand' ? 'Last stand' : 'Strike'}: ${REGIONS[mission.region]}`
 }
 
-const pips = (threat: number) => `<span class="threat">${'■'.repeat(threat)}${'□'.repeat(THREAT_MAX - threat)}</span>`
-
-/** A threat change, marking a region it pushes into a last stand. */
-function change(from: number, to: number): string {
-  const by = to - from
-  const alarm = to === THREAT_MAX ? ' → last stand' : ''
-  return `<span class="${by > 0 ? 'up' : 'down'}">${by > 0 ? '+' : ''}${by} threat${alarm}</span>`
-}
+const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`
 
 /**
- * A mission choice. Hovering it reveals what winning and losing do there,
- * and reveals on each other choice what skipping that one does.
+ * The threat meters. Given a mission, they show what choosing it leads to: threat the skipped regions gain
+ * as extra pips, and beside the mission's own region, what a win and a loss do.
  */
-function missionButton(run: Run, mission: Mission, index: number): string {
-  const now = run.threat[mission.region]
-  const { won, lost } = preview(run, mission)
-  const reward = mission.kind === 'final' ? '' : ` · +${payout(mission)} supplies, 1 of 3 aid${mission.hard ? ' (rare or better)' : ''}`
-  const win = mission.kind === 'final' ? '<span class="down">Earth is saved</span>' : change(now, won[mission.region])
-  const lose = lost ? change(now, lost[mission.region]) : '<span class="up">the run ends</span>'
-  const other = run.missions.find((m) => m !== mission)
-  const skipped = other ? change(now, preview(run, other).won[mission.region]) : ''
-  return button(
-    { type: 'mission', index },
-    `<b>${missionTitle(mission)}</b><br>${mission.aliens} aliens${reward}
-    <div class="outcome"><span class="chosen">Win: ${win} · Lose: ${lose}</span><span class="skipped">Skipped: ${skipped}</span></div>`,
-    mission.kind,
-  )
+function threatTable(run: Run, mission?: Mission): string {
+  const outcome = mission && preview(run, mission)
+  const rows = REGIONS.map((name, i) => {
+    const now = run.threat[i]
+    // A skipped region ends the same won or lost; the mission's own region does not.
+    const own = mission?.region === i
+    const gained = outcome && !own ? outcome.won[i] - now : 0
+    const meter = `${'■'.repeat(now)}<span class="gained">${'■'.repeat(gained)}</span>${'□'.repeat(THREAT_MAX - now - gained)}`
+    let note = now + gained === THREAT_MAX ? 'last stand' : ''
+    if (outcome && own) note = `${signed(outcome.won[i] - now)} won · ${outcome.lost ? `${signed(outcome.lost[i] - now)} lost` : 'run ends if lost'}`
+    return `<tr class="${own ? 'own' : ''}"><td>${name}</td><td class="threat">${meter}</td><td class="note">${note}</td></tr>`
+  })
+  return `<table>${rows.join('')}</table>`
+}
+
+function missionButton(mission: Mission, index: number): string {
+  const reward = mission.kind === 'final' ? 'Lose and the run ends' : `+${payout(mission)} supplies, 1 of 3 aid${mission.hard ? ' (rare or better)' : ''}`
+  return button({ type: 'mission', index }, `<b>${missionTitle(mission)}</b><br>${mission.aliens} aliens<br>${reward}`, `${mission.kind} mission-${index}`)
 }
 
 function aidCard(id: AidId, index: number): string {
@@ -61,7 +58,6 @@ function facilityButton(run: Run, id: FacilityId): string {
 }
 
 function mapPanel(run: Run): string {
-  const threat = REGIONS.map((name, i) => `<tr><td>${name}</td><td>${pips(run.threat[i])}</td></tr>`)
   const squad = run.soldiers.map((s) => `<li>${RANK_NAMES[rank(s)]} ${s.name}</li>`)
   const tech = run.aid.filter((id) => AID[id].stats).map((id) => `<li>${AID[id].name}</li>`)
   return `
@@ -69,15 +65,17 @@ function mapPanel(run: Run): string {
     ${run.battle && run.battle.winner !== 'human' ? `<p class="up">Mission lost: ${REGIONS[run.mission!.region]} gained threat.</p>` : ''}
     <div class="columns">
       <div class="side">
-        <h2>Threat now</h2><table>${threat.join('')}</table>
+        <h2>Threat</h2>
+        <div class="now">${threatTable(run)}</div>
+        ${run.missions.map((mission, index) => `<div class="preview preview-${index}">${threatTable(run, mission)}</div>`).join('')}
         <h2>Squad</h2><ul>${squad.join('')}</ul>
         ${tech.length > 0 ? `<h2>Alien tech</h2><ul>${tech.join('')}</ul>` : ''}
       </div>
       <div>
         <h2>1. Build your base · <b class="supplies">${run.supplies} ${run.supplies === 1 ? 'supply' : 'supplies'}</b></h2>
         <div class="facilities">${(Object.keys(FACILITIES) as FacilityId[]).map((id) => facilityButton(run, id)).join('')}</div>
-        <h2>2. ${run.missions.length > 1 ? 'Aliens strike three regions. Answer one; hover to see what it leads to.' : 'One mission. It must be won.'}</h2>
-        <div class="choices">${run.missions.map((mission, index) => missionButton(run, mission, index)).join('')}</div>
+        <h2>2. ${run.missions.length > 1 ? 'Aliens strike three regions. Answer one; hover to see the threat it leads to.' : 'One mission. It must be won.'}</h2>
+        <div class="choices">${run.missions.map(missionButton).join('')}</div>
       </div>
     </div>`
 }
