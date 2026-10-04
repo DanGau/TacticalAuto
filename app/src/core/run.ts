@@ -57,10 +57,8 @@ export interface Report {
   threat: { before: number[]; afterMission: number[]; afterAliens: number[] }
   /** Supplies the mission paid. */
   supplies: number
-  /** Each promoted soldier, as "name to rank". */
-  promoted: string[]
-  /** Names of the soldiers who died. */
-  fallen: string[]
+  /** Every soldier in the squad when the battle began. */
+  soldiers: { name: string; xpBefore: number; xpAfter: number; died: boolean }[]
 }
 
 export interface Run {
@@ -90,7 +88,7 @@ export interface Run {
   offers: AidId[]
 }
 
-export function rank(soldier: Soldier): number {
+export function rank(soldier: { xp: number }): number {
   return RANK_XP.findLastIndex((xp) => soldier.xp >= xp)
 }
 
@@ -261,15 +259,12 @@ export function endBattle(run: Run): void {
   const mission = run.mission!
   const dead = new Set(run.soldiers.map((s) => s.id))
   for (const survivor of [...battle.units, ...battle.reserve]) if (survivor.soldier !== null) dead.delete(survivor.soldier)
-  const promoted: string[] = []
-  for (const unit of battle.units) {
-    const soldier = run.soldiers.find((s) => s.id === unit.soldier)
-    if (!soldier) continue
-    const before = rank(soldier)
-    soldier.xp++
-    if (rank(soldier) > before) promoted.push(`${soldier.name} to ${RANK_NAMES[rank(soldier)]}`)
-  }
-  const fallen = run.soldiers.filter((s) => dead.has(s.id)).map((s) => s.name)
+  const fought = new Set(battle.units.map((u) => u.soldier))
+  const soldiers = run.soldiers.map((s) => {
+    const xpBefore = s.xp
+    if (fought.has(s.id)) s.xp++
+    return { name: s.name, xpBefore, xpAfter: s.xp, died: dead.has(s.id) }
+  })
   run.soldiers = run.soldiers.filter((s) => !dead.has(s.id))
   recruit(run)
 
@@ -279,7 +274,7 @@ export function endBattle(run: Run): void {
   if (afterMission) run.threat = threatOnSkipping(afterMission, run, mission)
   const supplies = won ? payout(mission) : 0
   run.supplies += supplies
-  run.report = { won, threat: { before, afterMission: afterMission ?? before, afterAliens: run.threat }, supplies, promoted, fallen }
+  run.report = { won, threat: { before, afterMission: afterMission ?? before, afterAliens: run.threat }, supplies, soldiers }
 
   if (!afterMission) {
     run.phase = 'lost'

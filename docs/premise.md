@@ -12,7 +12,7 @@
 
 **Maps.** Post-apocalyptic cities and countryside: houses, trees, terrain.
 
-**Run.** A fixed number of rounds, then a final assault on the alien ship; winning it saves the world. Each round the aliens strike three regions and the player answers one. After the battle a debrief shows what the squad changed in its region; back on the map, the threat the aliens added in the skipped regions lands on the meters.
+**Run.** A fixed number of rounds, then a final assault on the alien ship; winning it saves the world. Each round the aliens strike three regions and the player answers one. After the battle one screen reveals, in order, the region's threat change, supplies, each soldier's experience and promotion, and the aid to choose. A second screen then shows the threat the aliens added in the skipped regions, before the base.
 
 **Losing.** A run is lost only in a battle, never on the map, and suddenly rather than slowly. A region at maximum threat forces a last stand there. Losing a last stand or the final assault ends the run; losing a strike costs the soldiers who died and adds threat. Soldiers heal fully between battles.
 

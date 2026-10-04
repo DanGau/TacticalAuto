@@ -30,11 +30,20 @@
       button:hover { background: #32405a; }
       .choices button { flex: 1; text-align: left; line-height: 1.5; }
       .stage { animation: rise 0.5s both; }
-      .stage.second { margin-top: 16px; animation-delay: 1.6s; }
+      .stage.second { margin-top: 12px; animation-delay: 1.2s; }
+      .stage.third { margin-top: 12px; animation-delay: 2.8s; }
+      .squad { display: flex; gap: 12px; }
+      .soldier { flex: 1; max-width: 220px; padding: 10px 12px; background: #263042; border: 1px solid #4a5a78; border-radius: 6px; line-height: 1.5; }
+      .soldier.died { opacity: 0.6; border-color: #ff6b5e; }
+      .bar { height: 6px; margin: 6px 0; background: #10141c; border-radius: 3px; overflow: hidden; }
+      .bar div { height: 100%; background: #ffd84d; animation: fill 0.9s 1.7s both; }
+      @keyframes fill { from { width: var(--from); } to { width: var(--to); } }
+      .promoted { display: inline-block; animation: land 0.5s 2.5s both; }
+      p { margin: 6px 0; }
       @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
       .cleared { color: #7ddc5a; animation: clear 0.8s 0.7s both; }
       @keyframes clear { to { opacity: 0.25; } }
-      .landed { display: inline-block; color: #ffd84d; animation: land 0.6s 0.5s both; }
+      .landed { display: inline-block; color: #ffd84d; animation: land 0.6s 0.6s both; }
       @keyframes land { from { opacity: 0; transform: scale(3); } }
       .preview { display: none; }
       #panel:has(.mission-0:hover) .preview-0, #panel:has(.mission-1:hover) .preview-1, #panel:has(.mission-2:hover) .preview-2 { display: block; }

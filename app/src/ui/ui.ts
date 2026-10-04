@@ -1,6 +1,6 @@
 import type { Action } from '../core/apply'
 import { AID, FACILITIES, type AidId, type FacilityId } from '../core/base'
-import { buildCost, level, payout, preview, RANK_NAMES, rank, REGIONS, ROUNDS, THREAT_MAX, type Mission, type Report, type Run } from '../core/run'
+import { buildCost, level, payout, preview, RANK_NAMES, RANK_XP, rank, REGIONS, ROUNDS, THREAT_MAX, type Mission, type Report, type Run } from '../core/run'
 import { tileAt } from '../view/view'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
@@ -59,21 +59,15 @@ function facilityButton(run: Run, id: FacilityId): string {
   return button({ type: 'build', facility: id }, `<b>${name}</b> ${level(run, id)}/${max}<br>${text}<br><small>${price}</small>`, '', cost !== null && cost <= run.supplies)
 }
 
-/** `advance` animates the threat the aliens added after the last battle. */
-function mapPanel(run: Run, advance: boolean): string {
-  const report = run.report
-  // Aid taken since may have lowered threat, so no more pips land than the region still has.
-  const landed = advance && report ? run.threat.map((now, i) => Math.min(Math.max(report.threat.afterAliens[i] - report.threat.afterMission[i], 0), now)) : undefined
-  const advanced = landed?.some((n) => n > 0)
+function mapPanel(run: Run): string {
   const squad = run.soldiers.map((s) => `<li>${RANK_NAMES[rank(s)]} ${s.name}</li>`)
   const tech = run.aid.filter((id) => AID[id].stats).map((id) => `<li>${AID[id].name}</li>`)
   return `
     <h1>${run.round > ROUNDS ? 'The final assault' : `Round ${run.round} of ${ROUNDS}`}</h1>
-    ${run.battle && run.battle.winner !== 'human' ? `<p class="up">Mission lost: ${REGIONS[run.mission!.region]} gained threat.</p>` : ''}
     <div class="columns">
       <div class="side">
-        <h2>Threat${advanced ? ' · <span class="up">the aliens advanced</span>' : ''}</h2>
-        <div class="now">${threatTable(run, undefined, landed)}</div>
+        <h2>Threat</h2>
+        <div class="now">${threatTable(run)}</div>
         ${run.missions.map((mission, index) => `<div class="preview preview-${index}">${threatTable(run, mission)}</div>`).join('')}
         <h2>Squad</h2><ul>${squad.join('')}</ul>
         ${tech.length > 0 ? `<h2>Alien tech</h2><ul>${tech.join('')}</ul>` : ''}
@@ -93,44 +87,59 @@ function threatMoves(from: number[], to: number[]): string {
     if (from[i] === to[i]) return []
     const kept = Math.min(from[i], to[i])
     const meter = `${'■'.repeat(kept)}<span class="cleared">${'■'.repeat(from[i] - kept)}</span><span class="landed">${'■'.repeat(to[i] - kept)}</span>${'□'.repeat(THREAT_MAX - Math.max(from[i], to[i]))}`
-    const note = to[i] === THREAT_MAX ? 'last stand next' : signed(to[i] - from[i])
-    return [`<tr><td>${name}</td><td class="threat">${meter}</td><td class="note">${note}</td></tr>`]
+    return [`<tr><td>${name}</td><td class="threat">${meter}</td><td class="note">${signed(to[i] - from[i])} threat</td></tr>`]
   })
   return `<table>${rows.join('')}</table>`
 }
 
-/** The step after a battle: what the squad changed in the region it fought in. */
-function debriefPanel(run: Run, report: Report): string {
-  const { before, afterMission } = report.threat
-  const lines = [
-    report.supplies > 0 ? `<li class="supplies">+${report.supplies} supplies</li>` : '',
-    ...report.promoted.map((p) => `<li class="down">${p}</li>`),
-    ...report.fallen.map((name) => `<li class="up">${name} died</li>`),
-  ]
+/** A soldier's card: rank, an experience bar filling toward the next rank, and a promotion or death. */
+function soldierCard(soldier: Report['soldiers'][number]): string {
+  const before = rank({ xp: soldier.xpBefore })
+  const after = rank({ xp: soldier.xpAfter })
+  const span = RANK_XP[before + 1] - RANK_XP[before]
+  // At the top rank there is no next threshold and the bar stays full.
+  const filled = (xp: number) => (Number.isNaN(span) ? 100 : Math.min(100, (100 * (xp - RANK_XP[before])) / span))
+  const badge = soldier.died ? '<b class="up">Killed in action</b>' : after > before ? `<b class="down promoted">Promoted to ${RANK_NAMES[after]}</b>` : `+${soldier.xpAfter - soldier.xpBefore} experience`
+  return `<div class="soldier ${soldier.died ? 'died' : ''}">
+    <small>${RANK_NAMES[before]}</small><br><b>${soldier.name}</b>
+    <div class="bar"><div style="--from: ${filled(soldier.xpBefore)}%; --to: ${filled(soldier.xpAfter)}%"></div></div>
+    ${badge}
+  </div>`
+}
+
+/** The one screen after a battle, revealed top to bottom: the region, the supplies, the squad, then the aid to take. */
+function missionEndPanel(run: Run, report: Report): string {
+  const last = report.won
+    ? `<h2>${REGIONS[run.mission!.region]} offers aid. Take one.</h2><div class="choices">${run.offers.map(aidCard).join('')}</div>`
+    : '<button data-seen="mission">Continue</button>'
   return `
     <h1 class="${report.won ? 'down' : 'up'}">Mission ${report.won ? 'won' : 'lost'} · ${missionTitle(run.mission!)}</h1>
     <div class="stage">
-      <h2>${report.won ? 'You pushed them back' : 'You lost ground'}</h2>
-      ${threatMoves(before, afterMission)}
-      <ul>${lines.join('')}</ul>
+      ${threatMoves(report.threat.before, report.threat.afterMission)}
+      ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : ''}
     </div>
-    <button id="continue" class="stage second">Continue</button>`
+    <div class="stage second"><h2>Squad</h2><div class="squad">${report.soldiers.map(soldierCard).join('')}</div></div>
+    <div class="stage third">${last}</div>`
 }
 
-function panel(run: Run, advance: boolean): string {
-  switch (run.phase) {
-    case 'map':
-      return mapPanel(run, advance)
-    case 'reward':
-      return `<h1>Mission won</h1><h2>${REGIONS[run.mission!.region]} offers aid. Take one.</h2>
-        <div class="choices">${run.offers.map(aidCard).join('')}</div>`
-    case 'won':
-      return `<h1>Earth is saved</h1><button id="again">New run</button>`
-    case 'lost':
-      return `<h1>Earth has fallen</h1><h2>Lost: ${missionTitle(run.mission!)}, round ${Math.min(run.round, ROUNDS)}</h2><button id="again">New run</button>`
-    case 'battle':
-      return ''
-  }
+/** Threat each region gained from the strikes left unanswered, capped at what aid taken since has left. */
+function alienAdvance(run: Run, report: Report): number[] {
+  return run.threat.map((now, i) => Math.min(Math.max(report.threat.afterAliens[i] - report.threat.afterMission[i], 0), now))
+}
+
+/** The screen between a mission and the base: what the aliens did elsewhere meanwhile. */
+function worldPanel(run: Run, report: Report): string {
+  const lastStand = run.missions[0]?.kind === 'lastStand' ? `<p class="up stage second"><b>${REGIONS[run.missions[0].region]} is overrun. A last stand is next.</b></p>` : ''
+  return `
+    <h1 class="up">Meanwhile, the aliens advanced</h1>
+    ${threatTable(run, undefined, alienAdvance(run, report))}
+    ${lastStand}
+    <button class="stage second" data-seen="world">Continue</button>`
+}
+
+function endPanel(run: Run): string {
+  if (run.phase === 'won') return `<h1 class="down">Earth is saved</h1><button id="again">New run</button>`
+  return `<h1 class="up">Earth has fallen</h1><h2>Lost: ${missionTitle(run.mission!)}, round ${Math.min(run.round, ROUNDS)}</h2><button id="again">New run</button>`
 }
 
 function status(run: Run): string {
@@ -146,18 +155,26 @@ export function createUi(canvas: HTMLCanvasElement, act: (action: Action) => voi
   const statusLine = document.getElementById('status')!
   const start = document.getElementById('start') as HTMLButtonElement
   const overlay = document.getElementById('panel')!
-  /** The report the player has already continued past. */
-  let reviewed: Report | null = null
-  /** The report whose alien advance the map has already played. */
-  let advanced: Report | null = null
+  /** The report whose screen of each kind the player has continued past. */
+  const seen: Record<string, Report | null> = { mission: null, world: null }
   let shown: Run | null = null
   let html = ''
 
+  /** The panel for where the player is: after a battle, the mission's end, then the world, then the base. */
+  function panel(run: Run): string {
+    const report = run.report
+    if (run.phase === 'battle') return ''
+    if (run.phase === 'won' || run.phase === 'lost') return endPanel(run)
+    if (run.phase === 'reward') return missionEndPanel(run, report!)
+    // A won mission's screen ended when its aid was taken.
+    if (report && !report.won && seen.mission !== report) return missionEndPanel(run, report)
+    if (report && seen.world !== report && alienAdvance(run, report).some((n) => n > 0)) return worldPanel(run, report)
+    return mapPanel(run)
+  }
+
   function render(run: Run): void {
     shown = run
-    const debrief = run.report !== reviewed && run.report && (run.phase === 'map' || run.phase === 'reward')
-    const next = debrief ? debriefPanel(run, run.report!) : panel(run, run.report !== advanced)
-    if (!debrief && run.phase === 'map') advanced = run.report
+    const next = panel(run)
     // Rewriting unchanged content would restart its animations.
     if (next !== html) overlay.innerHTML = html = next
     overlay.hidden = run.phase === 'battle'
@@ -171,8 +188,8 @@ export function createUi(canvas: HTMLCanvasElement, act: (action: Action) => voi
   overlay.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (target?.id === 'again') location.href = location.pathname
-    else if (target?.id === 'continue') {
-      reviewed = shown!.report
+    else if (target?.dataset.seen) {
+      seen[target.dataset.seen] = shown!.report
       render(shown!)
     }
     else if (target?.dataset.action && !target.disabled) act(JSON.parse(target.dataset.action))
