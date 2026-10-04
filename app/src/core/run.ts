@@ -153,13 +153,32 @@ export function createRun(seed: number): Run {
   return run
 }
 
-const addThreat = (run: Run, region: number, amount: number) => {
-  run.threat[region] = Math.min(Math.max(run.threat[region] + amount, 0), THREAT_MAX)
+/** `threat` with `amount` added to one region, or to every region when `region` is 'all', kept within bounds. */
+function addThreat(threat: number[], region: number | 'all', amount: number): number[] {
+  return threat.map((t, i) => (region === 'all' || region === i ? Math.min(Math.max(t + amount, 0), THREAT_MAX) : t))
+}
+
+/** Threat once `mission` is chosen: every other mission on offer is skipped. */
+function threatOnChoosing(run: Run, mission: Mission): number[] {
+  return run.missions.reduce((threat, other) => (other === mission ? threat : addThreat(threat, other.region, SKIP_THREAT)), run.threat)
+}
+
+/** Threat once `mission` is fought, or null when losing it ends the run. The final assault leaves threat alone. */
+function threatOnOutcome(threat: number[], mission: Mission, won: boolean): number[] | null {
+  if (mission.kind === 'final') return won ? threat : null
+  if (mission.kind === 'lastStand') return won ? addThreat(threat, mission.region, -THREAT_MAX) : null
+  return addThreat(threat, mission.region, won ? -WIN_THREAT : LOSS_THREAT)
+}
+
+/** What choosing a mission on offer leads to: threat per region after a win and after a loss; null ends the run. */
+export function preview(run: Run, mission: Mission): { won: number[]; lost: number[] | null } {
+  const threat = threatOnChoosing(run, mission)
+  return { won: threatOnOutcome(threat, mission, true)!, lost: threatOnOutcome(threat, mission, false) }
 }
 
 /** Starts the battle for a mission on offer. The strikes passed over gain threat. */
 export function startMission(run: Run, mission: Mission): void {
-  for (const other of run.missions) if (other !== mission) addThreat(run, other.region, SKIP_THREAT)
+  run.threat = threatOnChoosing(run, mission)
   run.mission = mission
   run.missions = []
   run.phase = 'battle'
@@ -202,17 +221,19 @@ export function endBattle(run: Run): void {
   recruit(run)
 
   const won = battle.winner === 'human'
-  if (mission.kind === 'final') {
-    run.phase = won ? 'won' : 'lost'
-  } else if (!won && mission.kind === 'lastStand') {
+  const threat = threatOnOutcome(run.threat, mission, won)
+  if (!threat) {
     run.phase = 'lost'
-  } else if (!won) {
-    addThreat(run, mission.region, LOSS_THREAT)
-    nextRound(run)
+  } else if (mission.kind === 'final') {
+    run.phase = 'won'
   } else {
-    addThreat(run, mission.region, mission.kind === 'lastStand' ? -THREAT_MAX : -WIN_THREAT)
-    run.offers = drawOffers(run, mission.hard)
-    run.phase = 'reward'
+    run.threat = threat
+    if (won) {
+      run.offers = drawOffers(run, mission.hard)
+      run.phase = 'reward'
+    } else {
+      nextRound(run)
+    }
   }
 }
 
@@ -221,7 +242,7 @@ export function takeUpgrade(run: Run, id: UpgradeId): void {
   run.upgrades.push(id)
   run.offers = []
   const { threat } = UPGRADES[id] as Upgrade
-  if (threat) REGIONS.forEach((_, region) => addThreat(run, region, threat))
+  if (threat) run.threat = addThreat(run.threat, 'all', threat)
   recruit(run)
   nextRound(run)
 }

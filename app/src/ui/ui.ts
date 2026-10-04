@@ -1,5 +1,5 @@
 import type { Action } from '../core/apply'
-import { RANK_NAMES, rank, REGIONS, ROUNDS, THREAT_MAX, type Mission, type Run } from '../core/run'
+import { preview, RANK_NAMES, rank, REGIONS, ROUNDS, THREAT_MAX, type Mission, type Run } from '../core/run'
 import { UPGRADES, type UpgradeId } from '../core/upgrades'
 import { tileAt } from '../view/view'
 
@@ -17,9 +17,30 @@ function missionTitle(mission: Mission): string {
   return `${mission.kind === 'lastStand' ? 'Last stand' : 'Strike'}: ${REGIONS[mission.region]}`
 }
 
-function missionButton(mission: Mission, index: number): string {
-  const stakes = mission.kind === 'strike' ? (mission.hard ? 'rare aid guaranteed' : 'common aid likely') : 'lose this and the run ends'
-  return button({ type: 'mission', index }, `<b>${missionTitle(mission)}</b><br>${mission.aliens} aliens · ${stakes}`, mission.kind)
+const pips = (threat: number) => `<span class="threat">${'■'.repeat(threat)}${'□'.repeat(THREAT_MAX - threat)}</span>`
+
+/** One line per region whose threat `after` changes, marking a region pushed into a last stand. */
+function threatChanges(run: Run, after: number[]): string {
+  const lines = REGIONS.flatMap((name, i) => {
+    if (after[i] === run.threat[i]) return []
+    const change = after[i] - run.threat[i]
+    const alarm = after[i] === THREAT_MAX ? ' <b class="up">last stand</b>' : ''
+    return [`<div>${name} ${pips(after[i])} <span class="${change > 0 ? 'up' : 'down'}">${change > 0 ? '+' : ''}${change}</span>${alarm}</div>`]
+  })
+  return lines.join('') || '<div>No threat changes</div>'
+}
+
+/** A mission choice that states everything choosing it leads to. */
+function missionButton(run: Run, mission: Mission, index: number): string {
+  const { won, lost } = preview(run, mission)
+  const aid = mission.kind === 'final' ? 'Earth is saved' : `take 1 of 3 upgrades${mission.hard ? ', one rare or better' : ''}`
+  return button(
+    { type: 'mission', index },
+    `<b>${missionTitle(mission)}</b><br>${mission.aliens} aliens
+    <h3 class="down">If you win</h3>${mission.kind === 'final' ? '' : threatChanges(run, won)}<div>${aid}</div>
+    <h3 class="up">If you lose</h3>${lost ? threatChanges(run, lost) : '<div><b class="up">The run ends</b></div>'}`,
+    mission.kind,
+  )
 }
 
 function upgradeCard(id: UpgradeId, index: number): string {
@@ -28,19 +49,19 @@ function upgradeCard(id: UpgradeId, index: number): string {
 }
 
 function mapPanel(run: Run): string {
-  const threat = REGIONS.map((name, i) => `<tr><td>${name}</td><td class="threat">${'■'.repeat(run.threat[i])}${'□'.repeat(THREAT_MAX - run.threat[i])}</td></tr>`)
+  const threat = REGIONS.map((name, i) => `<tr><td>${name}</td><td>${pips(run.threat[i])}</td></tr>`)
   const squad = run.soldiers.map((s) => `<li>${RANK_NAMES[rank(s)]} ${s.name}</li>`)
   const held = [...new Set(run.upgrades)].map((id) => `<li>${UPGRADES[id].name} ×${run.upgrades.filter((u) => u === id).length}</li>`)
   return `
     <h1>${run.round > ROUNDS ? 'The final assault' : `Round ${run.round} of ${ROUNDS}`}</h1>
-    ${run.battle && run.battle.winner !== 'human' ? `<p class="lost">Mission lost: ${REGIONS[run.mission!.region]} gains threat.</p>` : ''}
+    ${run.battle && run.battle.winner !== 'human' ? `<p class="up">Mission lost: ${REGIONS[run.mission!.region]} gained threat.</p>` : ''}
+    <h2>${run.missions.length > 1 ? 'Aliens strike three regions. Answer one.' : 'One mission. It must be won.'}</h2>
+    <div class="choices">${run.missions.map((mission, index) => missionButton(run, mission, index)).join('')}</div>
     <div class="columns">
-      <div><h2>Threat</h2><table>${threat.join('')}</table></div>
+      <div><h2>Threat now</h2><table>${threat.join('')}</table></div>
       <div><h2>Squad</h2><ul>${squad.join('')}</ul></div>
       <div><h2>Base</h2><ul>${held.join('') || '<li>No upgrades</li>'}</ul></div>
-    </div>
-    <h2>${run.missions.length > 1 ? 'Aliens strike three regions. Answer one; the others gain threat.' : 'One mission. It must be won.'}</h2>
-    <div class="choices">${run.missions.map(missionButton).join('')}</div>`
+    </div>`
 }
 
 function panel(run: Run): string {

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { BASE_STATS, type Side } from './battle'
-import { createRun, endBattle, LOSS_THREAT, rank, ROUNDS, SKIP_THREAT, soldierStats, START_THREAT, STRIKES, THREAT_MAX, WIN_THREAT, type Run } from './run'
+import { createRun, endBattle, LOSS_THREAT, preview, rank, ROUNDS, SKIP_THREAT, soldierStats, START_THREAT, STRIKES, THREAT_MAX, WIN_THREAT, type Run } from './run'
 
 /** Ends the battle being deployed with `winner`: one soldier deployed, and every unit of the other side dead. */
 function finish(run: Run, winner: Side): void {
@@ -20,6 +20,10 @@ test('a round offers strikes in different regions; skipped ones gain threat', ()
   expect(run.missions.map((m) => m.kind)).toEqual(Array(STRIKES).fill('strike'))
   expect(new Set(run.missions.map((m) => m.region)).size).toBe(STRIKES)
   const [chosen, ...skipped] = run.missions
+  const { won, lost } = preview(run, chosen)
+  expect(won[chosen.region]).toBe(START_THREAT - WIN_THREAT)
+  expect(lost![chosen.region]).toBe(START_THREAT + LOSS_THREAT)
+  for (const m of skipped) expect(won[m.region]).toBe(START_THREAT + SKIP_THREAT)
   apply(run, { type: 'mission', index: 0 })
   expect(run.threat[chosen.region]).toBe(START_THREAT)
   for (const m of skipped) expect(run.threat[m.region]).toBe(START_THREAT + SKIP_THREAT)
