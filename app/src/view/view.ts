@@ -1,6 +1,6 @@
 import { Application, Container, Graphics, type Ticker } from 'pixi.js'
-import { DEPLOY_DEPTH, GRID, UNIT_HP, type State, type Unit } from '../core/state'
-import type { GameEvent, Tile } from '../core/step'
+import { coverAt, DEPLOY_DEPTH, GRID, UNIT_HP, type State, type Tile, type Unit } from '../core/state'
+import type { GameEvent } from '../core/step'
 
 export const WIDTH = 1280
 export const HEIGHT = 720
@@ -17,7 +17,22 @@ const SHOT_MS = 160
 const IMPACT_MS = 140
 const DEATH_MS = 260
 
-const COLOR = { human: 0x4da3ff, alien: 0x7ddc5a, tile: 0x263042, zone: 0x2f4a6b, line: 0x10141c, hit: 0xffd84d, miss: 0x77808f }
+/** Screen height of a cover block, indexed by Cover. */
+const COVER_HEIGHT = [0, 14, 34]
+
+const COLOR = {
+  human: 0x4da3ff,
+  alien: 0x7ddc5a,
+  tile: 0x263042,
+  zone: 0x2f4a6b,
+  line: 0x10141c,
+  hit: 0xffd84d,
+  crit: 0xff7a3d,
+  miss: 0x77808f,
+  coverTop: 0x8a93a6,
+  coverLeft: 0x5d6577,
+  coverRight: 0x454c5c,
+}
 
 /** Screen position of a tile's centre. Fractional tiles are allowed. */
 function toScreen(x: number, y: number): Tile {
@@ -69,6 +84,30 @@ export async function createView(): Promise<View> {
   app.stage.addChild(tiles, units, fx)
 
   const sprites = new Map<number, Sprite>()
+  let coverDrawn = false
+
+  /** Draws each cover tile as a block. Cover never changes, so once is enough. */
+  function drawCover(state: State): void {
+    const w = TILE_W / 2
+    const h = TILE_H / 2
+    for (let y = 0; y < GRID; y++) {
+      for (let x = 0; x < GRID; x++) {
+        const up = COVER_HEIGHT[coverAt(state, x, y)]
+        if (up === 0) continue
+        const block = new Graphics()
+          .poly([-w, 0, 0, h, 0, h - up, -w, -up])
+          .fill(COLOR.coverLeft)
+          .poly([w, 0, 0, h, 0, h - up, w, -up])
+          .fill(COLOR.coverRight)
+          .poly([0, -h - up, w, -up, 0, h - up, -w, -up])
+          .fill(COLOR.coverTop)
+        block.position.copyFrom(toScreen(x, y))
+        block.zIndex = x + y
+        units.addChild(block)
+      }
+    }
+    coverDrawn = true
+  }
 
   function place(sprite: Sprite, tile: Tile): void {
     sprite.tile = tile
@@ -134,7 +173,7 @@ export async function createView(): Promise<View> {
     })
   }
 
-  async function shoot(from: Sprite, to: Sprite, hit: boolean, hpAfter: number): Promise<void> {
+  async function shoot(from: Sprite, to: Sprite, hit: boolean, crit: boolean, hpAfter: number): Promise<void> {
     const a = chest(from)
     // A miss flies past above the target.
     const b = hit ? chest(to) : { x: to.node.x + 10, y: to.node.y - CHEST - 26 }
@@ -147,7 +186,7 @@ export async function createView(): Promise<View> {
     if (!hit) return
     drawHp(to, hpAfter)
     await tween(IMPACT_MS, (t) => {
-      fx.clear().circle(b.x, b.y, 4 + 12 * t).fill({ color: COLOR.hit, alpha: 1 - t })
+      fx.clear().circle(b.x, b.y, 4 + (crit ? 26 : 12) * t).fill({ color: crit ? COLOR.crit : COLOR.hit, alpha: 1 - t })
     })
     fx.clear()
   }
@@ -161,7 +200,7 @@ export async function createView(): Promise<View> {
       if (e.type === 'move') walks.push(walk(sprite, e.path))
       if (e.type === 'shot') {
         const target = sprites.get(e.target)
-        if (target) await shoot(sprite, target, e.hit, state.units.find((u) => u.id === e.target)?.hp ?? 0)
+        if (target) await shoot(sprite, target, e.hit, e.crit, state.units.find((u) => u.id === e.target)?.hp ?? 0)
       }
       if (e.type === 'death') {
         await tween(DEATH_MS, (t) => (sprite.node.alpha = 1 - t))
@@ -175,6 +214,7 @@ export async function createView(): Promise<View> {
     canvas: app.canvas,
     async show(state, events, animate) {
       fx.clear()
+      if (!coverDrawn) drawCover(state)
       if (animate) await play(state, events)
       sync(state)
       if (!animate) {
@@ -186,7 +226,7 @@ export async function createView(): Promise<View> {
           if (!from || !to) continue
           const a = chest(from)
           const b = chest(to)
-          fx.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: e.hit ? COLOR.hit : COLOR.miss, width: 3 })
+          fx.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: e.crit ? COLOR.crit : e.hit ? COLOR.hit : COLOR.miss, width: 3 })
         }
       }
       app.render()

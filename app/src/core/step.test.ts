@@ -1,11 +1,12 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { createState, GRID, MOVE, SQUAD, type State } from './state'
+import { createState, GRID, MOVE, type State } from './state'
 import { step } from './step'
 
 function battle(seed: number): State {
   const state = createState(seed)
-  for (let x = 0; x < SQUAD; x++) apply(state, { type: 'deploy', x, y: GRID - 1 })
+  // Cover blocks some tiles; a rejected deploy is skipped.
+  for (let x = 0; x < GRID; x++) apply(state, { type: 'deploy', x, y: GRID - 1 })
   apply(state, { type: 'start' })
   return state
 }

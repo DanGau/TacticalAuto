@@ -1,4 +1,4 @@
-import { addUnit, DEPLOY_DEPTH, GRID, SQUAD, unitAt, type State } from './state'
+import { addUnit, blocked, DEPLOY_DEPTH, GRID, SQUAD, type State } from './state'
 
 export type Action = { type: 'deploy'; x: number; y: number } | { type: 'start' }
 
@@ -19,7 +19,7 @@ export function apply(state: State, action: Action): Result {
   if (humans >= SQUAD) return no('squad is full')
   if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || x >= GRID || y >= GRID) return no('off the grid')
   if (y < GRID - DEPLOY_DEPTH) return no('outside the deployment zone')
-  if (unitAt(state, x, y)) return no('tile occupied')
+  if (blocked(state, x, y)) return no('tile blocked')
   addUnit(state, 'human', x, y)
   return { ok: true }
 }
