@@ -1,22 +1,6 @@
 import { random } from './rng'
-import {
-  blocked,
-  COVER_DEFENSE,
-  coverAt,
-  CRIT_DAMAGE,
-  DAMAGE,
-  FLANK_CRIT,
-  GRID,
-  HIT_CHANCE,
-  MAX_BEATS,
-  MOVE,
-  RANGE,
-  type Cover,
-  type Side,
-  type State,
-  type Tile,
-  type Unit,
-} from './state'
+import { canShoot, coverAgainst, distance, odds } from './sight'
+import { blocked, coverAt, CRIT_DAMAGE, DAMAGE, GRID, MAX_BEATS, MOVE, type Side, type State, type Tile, type Unit } from './state'
 
 export type GameEvent =
   /** `path` lists each tile entered, in order. */
@@ -25,38 +9,13 @@ export type GameEvent =
   | { type: 'death'; id: number }
   | { type: 'end'; winner: Side | null }
 
-/** Tiles between two points, counting a diagonal as one. */
-const distance = (a: Tile, b: Tile) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
+const NEIGHBORS = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]]
 
-const SIDES = [[0, -1], [1, 0], [0, 1], [-1, 0]]
-const NEIGHBORS = [...SIDES, [1, -1], [1, 1], [-1, 1], [-1, -1]]
-
-/**
- * The best cover a unit standing on `at` has against a shot from `from`.
- * Cover on an adjacent tile counts only if the shooter is on that side of the unit; otherwise the unit is flanked.
- */
-export function coverAgainst(state: State, at: Tile, from: Tile): Cover {
-  let best: Cover = 0
-  for (const [dx, dy] of SIDES) {
-    const x = at.x + dx
-    const y = at.y + dy
-    if (x < 0 || y < 0 || x >= GRID || y >= GRID) continue
-    if ((from.x - at.x) * dx + (from.y - at.y) * dy > 0 && coverAt(state, x, y) > best) best = coverAt(state, x, y)
-  }
-  return best
-}
-
-/** Chances for a shot between two tiles: to hit, and for a hit to crit. */
-export function odds(state: State, shooter: Tile, target: Tile): { hit: number; crit: number } {
-  const cover = coverAgainst(state, target, shooter)
-  return { hit: HIT_CHANCE - COVER_DEFENSE[cover], crit: cover === 0 ? FLANK_CRIT : 0 }
-}
-
-/** The enemy nearest to `from`; the lowest id wins a tie. */
-function nearestEnemy(state: State, side: Side, from: Tile): Unit | undefined {
+/** The enemy of `side` nearest to `from` among those `include` accepts; the lowest id wins a tie. */
+function nearestEnemy(state: State, side: Side, from: Tile, include: (enemy: Unit) => boolean = () => true): Unit | undefined {
   let best: Unit | undefined
   for (const other of state.units) {
-    if (other.side === side) continue
+    if (other.side === side || !include(other)) continue
     if (!best || distance(from, other) < distance(from, best)) best = other
   }
   return best
@@ -99,8 +58,8 @@ function paths(state: State, unit: Unit): Tile[][] {
 
 /**
  * The path a unit takes in its move stage. It ends on the tile that, in order of preference:
- * has an enemy in range, gives the best cover against the nearest enemy, and is the fewest steps away.
- * With no enemy reachable, it ends as close to the nearest enemy as it can walk.
+ * has a shot at an enemy, gives the best cover against the nearest such enemy, and is the fewest steps away.
+ * With no shot reachable, it ends as close to the nearest enemy as it can walk.
  */
 function choosePath(state: State, unit: Unit): Tile[] {
   const goal = nearestEnemy(state, unit.side, unit)
@@ -110,9 +69,10 @@ function choosePath(state: State, unit: Unit): Tile[] {
   let bestScore = [Infinity]
   for (const path of paths(state, unit)) {
     const end = path.at(-1) ?? unit
-    const enemy = nearestEnemy(state, unit.side, end)!
-    const cover = coverAgainst(state, end, enemy)
-    const score = distance(end, enemy) <= RANGE ? [0, -cover, path.length] : [1, toGoal[end.y * GRID + end.x], -cover]
+    const target = nearestEnemy(state, unit.side, end, (enemy) => canShoot(state, end, enemy))
+    const score = target
+      ? [0, -coverAgainst(state, end, target), path.length]
+      : [1, toGoal[end.y * GRID + end.x], -coverAgainst(state, end, goal)]
     const differs = score.findIndex((value, i) => value !== bestScore[i])
     if (differs >= 0 && score[differs] < bestScore[differs]) {
       best = path
@@ -137,18 +97,18 @@ function moveSide(state: State): GameEvent[] {
   return events
 }
 
-/** The enemy in range the unit is likeliest to hit; the nearest, then the lowest id, wins a tie. */
+/** The enemy the unit can shoot and is likeliest to hit; the nearest, then the lowest id, wins a tie. */
 function chooseTarget(state: State, unit: Unit): Unit | undefined {
   let best: Unit | undefined
   for (const other of state.units) {
-    if (other.side === unit.side || distance(unit, other) > RANGE) continue
+    if (other.side === unit.side || !canShoot(state, unit, other)) continue
     const gain = best ? odds(state, unit, other).hit - odds(state, unit, best).hit : 1
     if (gain > 0 || (gain === 0 && distance(unit, other) < distance(unit, best!))) best = other
   }
   return best
 }
 
-/** The next unit of the side on turn with an enemy in range shoots. Empty when none is left. */
+/** The next unit of the side on turn that can shoot an enemy does. Empty when none is left. */
 function shootNext(state: State): GameEvent[] {
   for (const unit of state.units) {
     if (unit.side !== state.turn || unit.id <= state.shooter) continue
