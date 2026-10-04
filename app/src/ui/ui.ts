@@ -1,6 +1,6 @@
 import type { Action } from '../core/apply'
 import { AID, FACILITIES, type AidId, type FacilityId } from '../core/base'
-import { buildCost, level, payout, preview, RANK_NAMES, rank, REGIONS, ROUNDS, THREAT_MAX, type Mission, type Run } from '../core/run'
+import { buildCost, level, payout, preview, RANK_NAMES, rank, REGIONS, ROUNDS, THREAT_MAX, type Mission, type Report, type Run } from '../core/run'
 import { tileAt } from '../view/view'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
@@ -80,6 +80,41 @@ function mapPanel(run: Run): string {
     </div>`
 }
 
+/** Meters for the regions whose threat differs between two moments; falling pips are `cleared`, rising ones `landed`. */
+function threatMoves(from: number[], to: number[]): string {
+  const rows = REGIONS.flatMap((name, i) => {
+    if (from[i] === to[i]) return []
+    const kept = Math.min(from[i], to[i])
+    const meter = `${'■'.repeat(kept)}<span class="cleared">${'■'.repeat(from[i] - kept)}</span><span class="landed">${'■'.repeat(to[i] - kept)}</span>${'□'.repeat(THREAT_MAX - Math.max(from[i], to[i]))}`
+    const note = to[i] === THREAT_MAX ? 'last stand next' : signed(to[i] - from[i])
+    return [`<tr><td>${name}</td><td class="threat">${meter}</td><td class="note">${note}</td></tr>`]
+  })
+  return `<table>${rows.join('')}</table>`
+}
+
+/** The step after a battle: first what the squad changed, then what the aliens did meanwhile. */
+function debriefPanel(run: Run, report: Report): string {
+  const { before, afterMission, afterAliens } = report.threat
+  const moved = afterAliens.some((t, i) => t !== afterMission[i])
+  const lines = [
+    report.supplies > 0 ? `<li class="supplies">+${report.supplies} supplies</li>` : '',
+    ...report.promoted.map((p) => `<li class="down">${p}</li>`),
+    ...report.fallen.map((name) => `<li class="up">${name} died</li>`),
+  ]
+  return `
+    <h1 class="${report.won ? 'down' : 'up'}">Mission ${report.won ? 'won' : 'lost'} · ${missionTitle(run.mission!)}</h1>
+    <div class="stage">
+      <h2>${report.won ? 'You pushed them back' : 'You lost ground'}</h2>
+      ${threatMoves(before, afterMission)}
+      <ul>${lines.join('')}</ul>
+    </div>
+    <div class="stage second">
+      <h2>${moved ? 'Meanwhile, the aliens advanced' : 'The aliens made no other moves'}</h2>
+      ${threatMoves(afterMission, afterAliens)}
+    </div>
+    <button id="continue" class="stage third">Continue</button>`
+}
+
 function panel(run: Run): string {
   switch (run.phase) {
     case 'map':
@@ -109,6 +144,19 @@ export function createUi(canvas: HTMLCanvasElement, act: (action: Action) => voi
   const statusLine = document.getElementById('status')!
   const start = document.getElementById('start') as HTMLButtonElement
   const overlay = document.getElementById('panel')!
+  /** The report the player has already continued past. */
+  let reviewed: Report | null = null
+  let shown: Run | null = null
+  let html = ''
+
+  function render(run: Run): void {
+    shown = run
+    const debrief = run.report !== reviewed && run.report && (run.phase === 'map' || run.phase === 'reward')
+    const next = debrief ? debriefPanel(run, run.report!) : panel(run)
+    // Rewriting unchanged content would restart its animations.
+    if (next !== html) overlay.innerHTML = html = next
+    overlay.hidden = run.phase === 'battle'
+  }
 
   canvas.addEventListener('click', (e) => {
     const box = canvas.getBoundingClientRect()
@@ -118,6 +166,10 @@ export function createUi(canvas: HTMLCanvasElement, act: (action: Action) => voi
   overlay.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (target?.id === 'again') location.href = location.pathname
+    else if (target?.id === 'continue') {
+      reviewed = shown!.report
+      render(shown!)
+    }
     else if (target?.dataset.action && !target.disabled) act(JSON.parse(target.dataset.action))
   })
 
@@ -125,8 +177,7 @@ export function createUi(canvas: HTMLCanvasElement, act: (action: Action) => voi
     update(run) {
       statusLine.textContent = status(run)
       start.hidden = run.phase !== 'battle' || run.battle?.phase !== 'deploy'
-      overlay.innerHTML = panel(run)
-      overlay.hidden = run.phase === 'battle'
+      render(run)
     },
   }
 }

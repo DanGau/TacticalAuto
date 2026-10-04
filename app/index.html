@@ -29,6 +29,14 @@
       button { font: inherit; color: #dde; background: #263042; border: 1px solid #4a5a78; border-radius: 6px; padding: 10px 16px; cursor: pointer; }
       button:hover { background: #32405a; }
       .choices button { flex: 1; text-align: left; line-height: 1.5; }
+      .stage { animation: rise 0.5s both; }
+      .stage.second { animation-delay: 1.6s; }
+      .stage.third { margin-top: 16px; animation-delay: 3s; }
+      @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+      .cleared { color: #7ddc5a; animation: clear 0.8s 0.7s both; }
+      @keyframes clear { to { opacity: 0.25; } }
+      .landed { display: inline-block; color: #ffd84d; animation: land 0.5s 2.2s both; }
+      @keyframes land { from { opacity: 0; transform: scale(3); } }
       .preview { display: none; }
       #panel:has(.mission-0:hover) .preview-0, #panel:has(.mission-1:hover) .preview-1, #panel:has(.mission-2:hover) .preview-2 { display: block; }
       #panel:has(.mission-0:hover, .mission-1:hover, .mission-2:hover) .now { display: none; }

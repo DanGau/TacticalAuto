@@ -50,6 +50,19 @@ export interface Mission {
   hard: boolean
 }
 
+/** What the last battle changed, for the player to review. */
+export interface Report {
+  won: boolean
+  /** Threat before the mission, after its outcome, and after the skipped strikes then landed. */
+  threat: { before: number[]; afterMission: number[]; afterAliens: number[] }
+  /** Supplies the mission paid. */
+  supplies: number
+  /** Each promoted soldier, as "name to rank". */
+  promoted: string[]
+  /** Names of the soldiers who died. */
+  fallen: string[]
+}
+
 export interface Run {
   seed: number
   rng: number
@@ -58,12 +71,14 @@ export interface Run {
   phase: 'map' | 'battle' | 'reward' | 'won' | 'lost'
   /** Threat per region, in REGIONS order. */
   threat: number[]
-  /** Missions to choose from in the map phase. */
+  /** Missions on offer this round. */
   missions: Mission[]
   /** The mission being fought or last fought. */
   mission: Mission | null
   /** The battle being fought or last fought. */
   battle: Battle | null
+  /** Null until a battle ends. */
+  report: Report | null
   soldiers: Soldier[]
   nextSoldier: number
   supplies: number
@@ -174,6 +189,7 @@ export function createRun(seed: number): Run {
     missions: [],
     mission: null,
     battle: null,
+    report: null,
     soldiers: [],
     nextSoldier: 1,
     supplies: START_SUPPLIES,
@@ -191,9 +207,9 @@ function addThreat(threat: number[], region: number | 'all', amount: number): nu
   return threat.map((t, i) => (region === 'all' || region === i ? Math.min(Math.max(t + amount, 0), THREAT_MAX) : t))
 }
 
-/** Threat once `mission` is chosen: every other mission on offer is skipped. */
-function threatOnChoosing(run: Run, mission: Mission): number[] {
-  return run.missions.reduce((threat, other) => (other === mission ? threat : addThreat(threat, other.region, SKIP_THREAT)), run.threat)
+/** `threat` once every mission on offer other than `mission` has gone unanswered. */
+function threatOnSkipping(threat: number[], run: Run, mission: Mission): number[] {
+  return run.missions.reduce((t, other) => (other === mission ? t : addThreat(t, other.region, SKIP_THREAT)), threat)
 }
 
 /** Threat once `mission` is fought, or null when losing it ends the run. The final assault leaves threat alone. */
@@ -205,15 +221,16 @@ function threatOnOutcome(threat: number[], mission: Mission, won: boolean): numb
 
 /** What choosing a mission on offer leads to: threat per region after a win and after a loss; null ends the run. */
 export function preview(run: Run, mission: Mission): { won: number[]; lost: number[] | null } {
-  const threat = threatOnChoosing(run, mission)
-  return { won: threatOnOutcome(threat, mission, true)!, lost: threatOnOutcome(threat, mission, false) }
+  const after = (won: boolean) => {
+    const threat = threatOnOutcome(run.threat, mission, won)
+    return threat && threatOnSkipping(threat, run, mission)
+  }
+  return { won: after(true)!, lost: after(false) }
 }
 
-/** Starts the battle for a mission on offer. The strikes passed over gain threat. */
+/** Starts the battle for a mission on offer. */
 export function startMission(run: Run, mission: Mission): void {
-  run.threat = threatOnChoosing(run, mission)
   run.mission = mission
-  run.missions = []
   run.phase = 'battle'
   const aliens = Array.from({ length: mission.aliens }, () => alienStats(run.round))
   const reserve = run.soldiers.map((s) => ({ soldier: s.id, stats: soldierStats(run, s) }))
@@ -238,34 +255,41 @@ function nextRound(run: Run): void {
   beginRound(run)
 }
 
-/** Settles a finished battle: experience, casualties, threat, and what comes next. */
+/** Settles a finished battle: experience, casualties, threat, the strikes left unanswered, and what comes next. */
 export function endBattle(run: Run): void {
   const battle = run.battle!
   const mission = run.mission!
   const dead = new Set(run.soldiers.map((s) => s.id))
   for (const survivor of [...battle.units, ...battle.reserve]) if (survivor.soldier !== null) dead.delete(survivor.soldier)
+  const promoted: string[] = []
   for (const unit of battle.units) {
     const soldier = run.soldiers.find((s) => s.id === unit.soldier)
-    if (soldier) soldier.xp++
+    if (!soldier) continue
+    const before = rank(soldier)
+    soldier.xp++
+    if (rank(soldier) > before) promoted.push(`${soldier.name} to ${RANK_NAMES[rank(soldier)]}`)
   }
+  const fallen = run.soldiers.filter((s) => dead.has(s.id)).map((s) => s.name)
   run.soldiers = run.soldiers.filter((s) => !dead.has(s.id))
   recruit(run)
 
   const won = battle.winner === 'human'
-  const threat = threatOnOutcome(run.threat, mission, won)
-  if (!threat) {
+  const before = run.threat
+  const afterMission = threatOnOutcome(before, mission, won)
+  if (afterMission) run.threat = threatOnSkipping(afterMission, run, mission)
+  const supplies = won ? payout(mission) : 0
+  run.supplies += supplies
+  run.report = { won, threat: { before, afterMission: afterMission ?? before, afterAliens: run.threat }, supplies, promoted, fallen }
+
+  if (!afterMission) {
     run.phase = 'lost'
   } else if (mission.kind === 'final') {
     run.phase = 'won'
+  } else if (won) {
+    run.offers = drawOffers(run, mission.hard)
+    run.phase = 'reward'
   } else {
-    run.threat = threat
-    if (won) {
-      run.supplies += payout(mission)
-      run.offers = drawOffers(run, mission.hard)
-      run.phase = 'reward'
-    } else {
-      nextRound(run)
-    }
+    nextRound(run)
   }
 }
 

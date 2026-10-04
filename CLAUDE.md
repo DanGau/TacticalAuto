@@ -1,6 +1,6 @@
 # TacticalAuto
 
-An isometric roguelike auto battler. Premise: [docs/premise.md](docs/premise.md).
+An isometric roguelike auto battler. Premise: [docs/premise.md](docs/premise.md). Design principles for new mechanics: [docs/game-design.md](docs/game-design.md).
 
 Architecture rules: [docs/architecture/CLAUDE.md](docs/architecture/CLAUDE.md). Read before designing or writing code.
 

@@ -33,7 +33,7 @@ function finish(run: Run, winner: Side): void {
   endBattle(run)
 }
 
-test('a round offers strikes in different regions; skipped ones gain threat', () => {
+test('a round offers strikes in different regions; skipped ones gain threat once the battle ends', () => {
   const run = createRun(1)
   expect(run.missions.map((m) => m.kind)).toEqual(Array(STRIKES).fill('strike'))
   expect(new Set(run.missions.map((m) => m.region)).size).toBe(STRIKES)
@@ -43,8 +43,13 @@ test('a round offers strikes in different regions; skipped ones gain threat', ()
   expect(lost![chosen.region]).toBe(START_THREAT + LOSS_THREAT)
   for (const m of skipped) expect(won[m.region]).toBe(START_THREAT + SKIP_THREAT)
   apply(run, { type: 'mission', index: 0 })
-  expect(run.threat[chosen.region]).toBe(START_THREAT)
-  for (const m of skipped) expect(run.threat[m.region]).toBe(START_THREAT + SKIP_THREAT)
+  expect(run.threat).toEqual(Array(6).fill(START_THREAT))
+  finish(run, 'human')
+  expect(run.threat).toEqual(won)
+  expect(run.report!.threat.before).toEqual(Array(6).fill(START_THREAT))
+  expect(run.report!.threat.afterMission[chosen.region]).toBe(START_THREAT - WIN_THREAT)
+  for (const m of skipped) expect(run.report!.threat.afterMission[m.region]).toBe(START_THREAT)
+  expect(run.report!.threat.afterAliens).toEqual(won)
 })
 
 test('a won strike lowers threat, pays supplies, promotes the survivor, and offers three different aid cards', () => {
@@ -58,6 +63,8 @@ test('a won strike lowers threat, pays supplies, promotes the survivor, and offe
   expect(run.supplies).toBe(START_SUPPLIES + pay)
   expect(new Set(run.offers).size).toBe(3)
   expect(run.soldiers.filter((s) => rank(s) === 1)).toHaveLength(1)
+  expect(run.report).toMatchObject({ won: true, supplies: pay, fallen: [] })
+  expect(run.report!.promoted).toHaveLength(1)
   apply(run, { type: 'pick', index: 0 })
   expect(run.aid).toHaveLength(1)
   expect(run).toMatchObject({ phase: 'map', round: 2 })
@@ -72,6 +79,8 @@ test('a lost strike raises threat, replaces the dead, and the run goes on', () =
   expect(run.threat[region]).toBe(START_THREAT + LOSS_THREAT)
   expect(run.soldiers).toHaveLength(before.length)
   expect(run.soldiers.some((s) => before.includes(s.id))).toBe(false)
+  expect(run.report).toMatchObject({ won: false, supplies: 0 })
+  expect(run.report!.fallen).toHaveLength(before.length)
   expect(run).toMatchObject({ phase: 'map', round: 2 })
 })
 
