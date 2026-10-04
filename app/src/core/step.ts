@@ -1,22 +1,23 @@
 import { random } from './rng'
-import { ATTACK_TICKS, DAMAGE, GRID, HIT_CHANCE, MAX_TICKS, MOVE_TICKS, unitAt, type Side, type State, type Unit } from './state'
+import { DAMAGE, GRID, HIT_CHANCE, MAX_BEATS, MOVE, RANGE, unitAt, type Side, type State, type Unit } from './state'
+
+export type Tile = { x: number; y: number }
 
 export type GameEvent =
-  | { type: 'move'; id: number; x: number; y: number }
-  | { type: 'attack'; id: number; target: number; hit: boolean }
+  /** `path` lists each tile entered, in order. */
+  | { type: 'move'; id: number; path: Tile[] }
+  | { type: 'shot'; id: number; target: number; hit: boolean }
   | { type: 'death'; id: number }
   | { type: 'end'; winner: Side | null }
-
-type Tile = { x: number; y: number }
 
 /** Tiles between two points, counting a diagonal as one. */
 const distance = (a: Tile, b: Tile) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
 
-/** Nearest living enemy; the lowest id wins a tie. */
+/** Nearest enemy; the lowest id wins a tie. */
 function nearestEnemy(state: State, unit: Unit): Unit | undefined {
   let best: Unit | undefined
   for (const other of state.units) {
-    if (other.side === unit.side || other.hp <= 0) continue
+    if (other.side === unit.side) continue
     if (!best || distance(unit, other) < distance(unit, best)) best = other
   }
   return best
@@ -45,37 +46,69 @@ function moveToward(state: State, unit: Unit, to: Tile): boolean {
   return true
 }
 
-/** Advances a battle one tick. Does nothing outside the battle phase. */
+/** Every unit of the side on turn walks toward its nearest enemy until in range or out of movement. */
+function moveSide(state: State): GameEvent[] {
+  const events: GameEvent[] = []
+  for (const unit of state.units) {
+    if (unit.side !== state.turn) continue
+    const path: Tile[] = []
+    while (path.length < MOVE) {
+      const enemy = nearestEnemy(state, unit)
+      if (!enemy || distance(unit, enemy) <= RANGE || !moveToward(state, unit, enemy)) break
+      path.push({ x: unit.x, y: unit.y })
+    }
+    if (path.length > 0) events.push({ type: 'move', id: unit.id, path })
+  }
+  return events
+}
+
+/** The next unit of the side on turn with an enemy in range shoots it. Empty when none is left. */
+function shootNext(state: State): GameEvent[] {
+  for (const unit of state.units) {
+    if (unit.side !== state.turn || unit.id <= state.shooter) continue
+    const enemy = nearestEnemy(state, unit)
+    if (!enemy || distance(unit, enemy) > RANGE) continue
+    state.shooter = unit.id
+    const hit = random(state) < HIT_CHANCE
+    const events: GameEvent[] = [{ type: 'shot', id: unit.id, target: enemy.id, hit }]
+    if (hit) {
+      enemy.hp -= DAMAGE
+      if (enemy.hp <= 0) {
+        state.units = state.units.filter((u) => u !== enemy)
+        events.push({ type: 'death', id: enemy.id })
+      }
+    }
+    return events
+  }
+  return []
+}
+
+/** The next move stage or shot, passing the turn when a side has nothing left to do. */
+function act(state: State): GameEvent[] {
+  // After each side has passed once, nobody can act this beat.
+  for (let passes = 0; passes < 2; passes++) {
+    if (state.stage === 'move') {
+      const moves = moveSide(state)
+      state.stage = 'shoot'
+      state.shooter = 0
+      if (moves.length > 0) return moves
+    }
+    const shot = shootNext(state)
+    if (shot.length > 0) return shot
+    state.turn = state.turn === 'human' ? 'alien' : 'human'
+    state.stage = 'move'
+  }
+  return []
+}
+
+/** Advances a battle one beat: a side's simultaneous move, or one unit's shot. Does nothing outside the battle phase. */
 export function step(state: State): GameEvent[] {
   if (state.phase !== 'battle') return []
-  const events: GameEvent[] = []
-  state.tick++
-  for (const unit of state.units) {
-    if (unit.hp <= 0) continue
-    if (unit.wait > 0) {
-      unit.wait--
-      continue
-    }
-    const enemy = nearestEnemy(state, unit)
-    if (!enemy) break
-    if (distance(unit, enemy) <= 1) {
-      const hit = random(state) < HIT_CHANCE
-      events.push({ type: 'attack', id: unit.id, target: enemy.id, hit })
-      unit.wait = ATTACK_TICKS
-      if (hit) {
-        enemy.hp -= DAMAGE
-        if (enemy.hp <= 0) events.push({ type: 'death', id: enemy.id })
-      }
-    } else if (moveToward(state, unit, enemy)) {
-      events.push({ type: 'move', id: unit.id, x: unit.x, y: unit.y })
-      unit.wait = MOVE_TICKS
-    }
-  }
-  state.units = state.units.filter((u) => u.hp > 0)
-
+  state.beat++
+  const events = act(state)
   const humans = state.units.some((u) => u.side === 'human')
   const aliens = state.units.some((u) => u.side === 'alien')
-  if (!humans || !aliens || state.tick >= MAX_TICKS) {
+  if (!humans || !aliens || state.beat >= MAX_BEATS) {
     state.phase = 'over'
     state.winner = humans === aliens ? null : humans ? 'human' : 'alien'
     events.push({ type: 'end', winner: state.winner })

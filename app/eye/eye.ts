@@ -7,7 +7,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, type Page } from 'playwright'
 import type { Debug } from '../src/main'
-import { MAX_TICKS } from '../src/core/state'
+import { MAX_BEATS } from '../src/core/state'
 import { HEIGHT, WIDTH } from '../src/view/view'
 import viteConfig from '../vite.config'
 
@@ -81,8 +81,8 @@ const commands: Record<string, Command> = {
   apply: (page, action) => page.evaluate((a) => debug.apply(a), JSON.parse(action)),
   /** step [n] */
   step: (page, n = '1') => page.evaluate((n) => debug.step(n), Number(n)),
-  /** step-until <expression over `state`> [max ticks] */
-  'step-until': (page, expression, max = String(MAX_TICKS)) =>
+  /** step-until <expression over `state`> [max beats] */
+  'step-until': (page, expression, max = String(MAX_BEATS)) =>
     page.evaluate(
       ([expression, max]) => {
         const done = new Function('state', `return ${expression}`)

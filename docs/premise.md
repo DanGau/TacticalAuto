@@ -6,6 +6,6 @@
 
 **Loop.** Roguelike. A won run saves the world; then more aliens arrive and the next run begins.
 
-**Battle.** A square grid about half the size of an XCOM: Enemy Unknown map. The player's only decision is where each unit deploys; the battle then plays out. Unit AI is predictable, so the player can foresee what a deployment will do.
+**Battle.** A square grid about half the size of an XCOM: Enemy Unknown map. The player's only decision is where each unit deploys; the battle then plays out in alternating turns, humans first. In a turn every unit of the side moves at once, then each shoots, one after another. Unit AI is predictable, so the player can foresee what a deployment will do.
 
 **Between battles.** A board-game-like strategy layer, as in XCOM: the player decides which resources to spend and acquire.

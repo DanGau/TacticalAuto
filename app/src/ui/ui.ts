@@ -2,6 +2,8 @@ import type { Action } from '../core/apply'
 import { SQUAD, type State } from '../core/state'
 import { tileAt } from '../view/view'
 
+const NAME = { human: 'Humans', alien: 'Aliens' }
+
 export interface Ui {
   /** Shows `state` in the status line. */
   update(state: State): void
@@ -26,10 +28,10 @@ export function createUi(canvas: HTMLCanvasElement, act: (action: Action) => voi
         state.phase === 'deploy'
           ? `Click the blue zone to deploy: ${humans}/${SQUAD}`
           : state.phase === 'battle'
-            ? `Tick ${state.tick}`
+            ? `${NAME[state.turn]}' turn`
             : state.winner
-              ? `${state.winner === 'human' ? 'Humans' : 'Aliens'} win at tick ${state.tick}`
-              : `Draw at tick ${state.tick}`
+              ? `${NAME[state.winner]} win`
+              : 'Draw'
     },
   }
 }

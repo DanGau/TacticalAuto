@@ -6,7 +6,7 @@ import { step } from '../core/step'
 export interface BattleResult {
   seed: number
   winner: Side | null
-  ticks: number
+  beats: number
   /** With the seed, enough to replay the battle. */
   actions: Action[]
 }
@@ -34,5 +34,5 @@ export function runBattle(seed: number, bot: Bot): BattleResult {
     actions.push(action)
   }
   finish(state)
-  return { seed, winner: state.winner, ticks: state.tick, actions }
+  return { seed, winner: state.winner, beats: state.beat, actions }
 }

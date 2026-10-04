@@ -5,7 +5,7 @@ export interface Report {
   humanWins: number
   alienWins: number
   draws: number
-  meanTicks: number
+  meanBeats: number
   /** Failed health thresholds. Any entry fails the batch. */
   failures: string[]
 }
@@ -16,14 +16,14 @@ export function report(results: BattleResult[]): Report {
   const failures: string[] = []
   if (draws > 0) {
     const seeds = results.filter((r) => r.winner === null).map((r) => r.seed)
-    failures.push(`${draws} battles ended undecided (seeds ${seeds.join(', ')})`)
+    failures.push(`${draws} battles hit the beat limit undecided (seeds ${seeds.join(', ')})`)
   }
   return {
     runs: results.length,
     humanWins: count('human'),
     alienWins: count('alien'),
     draws,
-    meanTicks: Math.round(results.reduce((sum, r) => sum + r.ticks, 0) / results.length),
+    meanBeats: Math.round(results.reduce((sum, r) => sum + r.beats, 0) / results.length),
     failures,
   }
 }
@@ -35,7 +35,7 @@ export function formatReport(r: Report): string {
     `human wins  ${percent(r.humanWins)}`,
     `alien wins  ${percent(r.alienWins)}`,
     `draws       ${percent(r.draws)}`,
-    `mean ticks  ${r.meanTicks}`,
+    `mean beats  ${r.meanBeats}`,
     ...r.failures.map((f) => `FAIL        ${f}`),
   ].join('\n')
 }
