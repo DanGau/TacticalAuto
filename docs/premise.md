@@ -16,12 +16,14 @@
 
 **Run.** A fixed number of rounds, then a final assault on the alien ship; winning it saves the world. Each round the aliens strike three regions and the player answers one. After the battle one screen reveals, in order, the region's threat change, supplies, each soldier's experience and promotion, and the aid to choose. A second screen then shows the threat the aliens added in the skipped regions, before the base.
 
+**Overworld.** Between battles the player moves among three views: the Map, a board of the world's regions where a mission is chosen; the Base, where facilities are built; and the Barracks, which shows each soldier.
+
 **Losing.** A run is lost only in a battle, never on the map, and suddenly rather than slowly. A region at maximum threat forces a last stand there. Losing a last stand or the final assault ends the run; losing a strike costs the soldiers who died and adds threat. Soldiers heal fully between battles.
 
 **Progression.**
 
-- Base: won missions pay supplies. Each round, before choosing a mission, the player spends supplies on facilities from a fixed list, each with several levels.
+- Base: won missions pay supplies. The player spends supplies on facilities from a fixed list, each with several levels.
 - Aid: after a won mission the defended region offers three aid cards of differing rarity; the player takes one. Aid is a windfall, not a plan: supplies, training, threat relief, alien tech.
-- Soldiers: survivors gain experience and ranks. Recruits refill the squad for free, so rookies are expendable and veterans precious.
+- Soldiers: survivors gain experience and ranks. Recruits refill the squad for free, so rookies are expendable and veterans precious. On first promotion a soldier draws one of four classes at random, after XCOM's: Assault, Heavy, Sniper, Support. A class is a weapon, which changes the soldier's stats, and one ability the soldier uses unprompted.
 - Gear: owned by the base, not the soldier, so it survives a death. Not built.
 - Death: should reward the player in a way the fiction supports. Undecided.

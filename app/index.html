@@ -11,52 +11,70 @@
       #panel[hidden] { display: none; }
       h1 { margin: 0 0 4px; font-size: 22px; }
       h2 { margin: 16px 0 8px; font-size: 14px; font-weight: normal; color: #9aa6bd; }
+      p { margin: 6px 0; }
       ul { margin: 0; padding: 0; list-style: none; line-height: 1.6; }
-      .columns { display: flex; gap: 32px; }
-      .side { flex: 0 0 300px; }
-      .facilities { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
       table { border-spacing: 0; }
-      .facilities button { text-align: left; padding: 6px 10px; line-height: 1.4; }
-      .supplies { color: #ffd84d; }
-      button:disabled { opacity: 0.45; cursor: default; }
-      button:disabled:hover { background: #263042; }
       small { color: #9aa6bd; }
       .up { color: #ff6b5e; }
       .down { color: #7ddc5a; }
-      .threat { padding: 0 8px; color: #ff6b5e; letter-spacing: 2px; white-space: nowrap; }
-      .choices { display: flex; gap: 16px; }
+      .supplies { color: #ffd84d; }
+
       button { font: inherit; color: #dde; background: #263042; border: 1px solid #4a5a78; border-radius: 6px; padding: 10px 16px; cursor: pointer; }
       button:hover { background: #32405a; }
-      .choices button { flex: 1; text-align: left; line-height: 1.5; }
-      .stage { animation: rise 0.5s both; }
-      .stage.second { margin-top: 12px; animation-delay: 1.2s; }
-      .stage.third { margin-top: 12px; animation-delay: 2.8s; }
+      button:disabled { opacity: 0.45; cursor: default; }
+      button:disabled:hover { background: #263042; }
+      button.lastStand, button.final { border-color: #ff6b5e; }
+
+      .header { display: flex; align-items: center; gap: 24px; }
+      .header h1 { margin: 0; }
+      .tabs { display: flex; gap: 4px; flex: 1; }
+      .tab { padding: 6px 18px; background: none; border-color: transparent; color: #9aa6bd; }
+      .tab.active { background: #263042; border-color: #4a5a78; color: #dde; }
+
+      .board { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 120px); gap: 12px; }
+      .region { padding: 12px 16px; text-align: left; line-height: 1.6; background: #1d2433; border: 1px solid #323c50; border-radius: 6px; }
+      button.region { background: #2a3a55; border-color: #4da3ff; }
+      button.region:hover { background: #35496b; }
+      button.region.lastStand { border-color: #ff6b5e; }
+      .mission { margin-top: 6px; }
+      .threat { padding-right: 8px; color: #ff6b5e; letter-spacing: 2px; white-space: nowrap; }
+      .note { font-size: 12px; color: #9aa6bd; white-space: nowrap; }
+      .gained { color: #ffd84d; }
+      .preview { display: none; }
+      .board:has(.mission-0:hover) .preview-0, .board:has(.mission-1:hover) .preview-1, .board:has(.mission-2:hover) .preview-2 { display: inline; }
+      .board:has(.mission-0:hover, .mission-1:hover, .mission-2:hover) .now { display: none; }
+
+      .facilities { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+      .facilities button { text-align: left; padding: 10px 14px; line-height: 1.5; }
+
       .squad { display: flex; gap: 12px; }
       .soldier { flex: 1; max-width: 220px; padding: 10px 12px; background: #263042; border: 1px solid #4a5a78; border-radius: 6px; line-height: 1.5; }
       .soldier.died { opacity: 0.6; border-color: #ff6b5e; }
       .bar { height: 6px; margin: 6px 0; background: #10141c; border-radius: 3px; overflow: hidden; }
-      .bar div { height: 100%; background: #ffd84d; animation: fill 0.9s 1.7s both; }
+      .bar div { height: 100%; background: #ffd84d; }
+      .bar .fill { animation: fill 0.9s 1.7s both; }
       @keyframes fill { from { width: var(--from); } to { width: var(--to); } }
+      .stats { width: 100%; margin: 8px 0; font-size: 13px; }
+      .stats td:nth-child(odd) { color: #9aa6bd; }
+      .stats td:nth-child(even) { text-align: right; padding-right: 12px; }
       .promoted { display: inline-block; animation: land 0.5s 2.5s both; }
-      p { margin: 6px 0; }
+
+      .choices { display: flex; gap: 16px; }
+      .choices button { flex: 1; text-align: left; line-height: 1.5; }
+      button.card { min-height: 110px; }
+      button.rare { border-color: #4da3ff; }
+      button.rare small { color: #4da3ff; }
+      button.epic { border-color: #c77dff; }
+      button.epic small { color: #c77dff; }
+
+      .stage { animation: rise 0.5s both; }
+      .stage.second { margin-top: 12px; animation-delay: 1.2s; }
+      .stage.third { margin-top: 12px; animation-delay: 2.8s; }
       @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
       .cleared { color: #7ddc5a; animation: clear 0.8s 0.7s both; }
       @keyframes clear { to { opacity: 0.25; } }
       .landed { display: inline-block; color: #ffd84d; animation: land 0.6s 0.6s both; }
       @keyframes land { from { opacity: 0; transform: scale(3); } }
-      .preview { display: none; }
-      #panel:has(.mission-0:hover) .preview-0, #panel:has(.mission-1:hover) .preview-1, #panel:has(.mission-2:hover) .preview-2 { display: block; }
-      #panel:has(.mission-0:hover, .mission-1:hover, .mission-2:hover) .now { display: none; }
-      .gained { color: #ffd84d; }
-      .note { font-size: 12px; color: #9aa6bd; white-space: nowrap; }
-      tr.own td:first-child { font-weight: bold; }
-      button.lastStand, button.final { border-color: #ff6b5e; }
-      button.card { min-height: 110px; }
-      button.common small { color: #9aa6bd; }
-      button.rare { border-color: #4da3ff; }
-      button.rare small { color: #4da3ff; }
-      button.epic { border-color: #c77dff; }
-      button.epic small { color: #c77dff; }
     </style>
   </head>
   <body>

@@ -5,8 +5,6 @@ export const GRID = 32
 export const MAX_BEATS = 1000
 /** Damage a crit adds. */
 export const CRIT_BONUS = 2
-/** Hit chance a shot gains for each tile the target is nearer than the shooter's range. */
-export const CLOSE_AIM = 0.06
 /** Hit chance a target's cover removes, indexed by Cover. */
 export const COVER_DEFENSE = [0, 0.2, 0.4]
 /** Patches of dense cover on the map; the ground between them is nearly open. */
@@ -20,6 +18,12 @@ export const SIGHT = 8
 export const POD_SIZE = 3
 /** Tiles an alien moves per turn before its pod is revealed. */
 export const PATROL_MOVE = 2
+/** Damage a rocket does to every unit within BLAST_RADIUS tiles of where it lands. */
+export const ROCKET_DAMAGE = 4
+export const BLAST_RADIUS = 1
+/** Health a medic restores, to a soldier within MEDIC_REACH tiles. */
+export const MEDIC_HEAL = 4
+export const MEDIC_REACH = 2
 /** Landing zones offered to the squad. */
 export const ZONES = 3
 /** Tiles around a landing zone's centre that count as the zone. */
@@ -45,14 +49,21 @@ export interface Stats {
   move: number
   /** Chance a hit crits when the target has no cover against the shooter. */
   crit: number
+  /** Hit chance a shot gains for each tile the target is nearer than the range. */
+  close: number
 }
 
-export const BASE_STATS: Stats = { hp: 10, aim: 0.75, damage: 3, range: 5, move: 4, crit: 0.5 }
+export const BASE_STATS: Stats = { hp: 10, aim: 0.75, damage: 3, range: 5, move: 4, crit: 0.5, close: 0.06 }
+
+/** Something a unit does unprompted beyond moving and shooting; each is described where combat applies it. */
+export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic'
 
 /** A soldier waiting to land. */
 export interface Reserve {
   soldier: number
   stats: Stats
+  ability: Ability | null
+  charges: number
 }
 
 export interface Unit {
@@ -66,6 +77,9 @@ export interface Unit {
   soldier: number | null
   /** Index of the alien's pod; null for humans. */
   pod: number | null
+  ability: Ability | null
+  /** Uses of the ability left this battle. */
+  charges: number
 }
 
 /** A group of aliens. It patrols toward its waypoint, unseen, until a soldier sights a member; then it fights. */
@@ -170,7 +184,7 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 export function land(battle: Battle, zone: Tile): void {
   const tiles = freeTilesNear(battle, zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
-    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, stats: soldier.stats, soldier: soldier.soldier, pod: null })
+    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, pod: null, ...soldier })
   })
   battle.reserve = []
   battle.phase = 'battle'
@@ -236,7 +250,7 @@ export function createBattle(seed: number, aliens: Stats[], reserve: Reserve[]):
     centres.push(centre)
     const members = aliens.filter((_, i) => i % podCount === pod)
     freeTilesNear(battle, centre, members.length).forEach((tile, i) => {
-      battle.units.push({ id: battle.nextId++, side: 'alien', ...tile, hp: members[i].hp, stats: members[i], soldier: null, pod: battle.pods.length })
+      battle.units.push({ id: battle.nextId++, side: 'alien', ...tile, hp: members[i].hp, stats: members[i], soldier: null, pod: battle.pods.length, ability: null, charges: 0 })
     })
     battle.pods.push({ revealed: false, surprised: false, waypoint: randomTile(battle) })
   }

@@ -1,4 +1,4 @@
-import { CLOSE_AIM, COVER_DEFENSE, coverAt, distance, GRID, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile } from './battle'
+import { COVER_DEFENSE, coverAt, distance, GRID, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile } from './battle'
 
 const SIDES = [[0, -1], [1, 0], [0, 1], [-1, 0]]
 
@@ -23,7 +23,7 @@ export function coverAgainst(battle: Battle, at: Tile, from: Tile): Cover {
  */
 export function odds(battle: Battle, shooter: Tile, target: Tile, stats: Stats): { hit: number; crit: number } {
   const cover = coverAgainst(battle, target, shooter)
-  const hit = stats.aim - COVER_DEFENSE[cover] + CLOSE_AIM * Math.max(0, stats.range - distance(shooter, target))
+  const hit = stats.aim - COVER_DEFENSE[cover] + stats.close * Math.max(0, stats.range - distance(shooter, target))
   return { hit: Math.min(Math.max(hit, 0), 1), crit: cover === 0 ? stats.crit : 0 }
 }
 

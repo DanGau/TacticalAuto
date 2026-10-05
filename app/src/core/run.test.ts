@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { BASE_STATS, type Side } from './battle'
 import { FACILITIES } from './base'
+import { CLASSES } from './classes'
 import {
   BASE_SQUAD,
   createRun,
@@ -26,7 +27,7 @@ function finish(run: Run, winner: Side): void {
   const battle = run.battle!
   apply(run, { type: 'land', zone: 0 })
   const [fighter, ...rest] = battle.units.filter((u) => u.side === 'human')
-  battle.reserve = winner === 'human' ? rest.map((u) => ({ soldier: u.soldier!, stats: u.stats })) : []
+  battle.reserve = winner === 'human' ? rest.map((u) => ({ soldier: u.soldier!, stats: u.stats, ability: u.ability, charges: u.charges })) : []
   battle.units = battle.units.filter((u) => u.side === winner && (u.side === 'alien' || u === fighter))
   battle.phase = 'over'
   battle.winner = winner
@@ -63,6 +64,7 @@ test('a won strike lowers threat, pays supplies, promotes the survivor, and offe
   expect(run.supplies).toBe(START_SUPPLIES + pay)
   expect(new Set(run.offers).size).toBe(3)
   expect(run.soldiers.filter((s) => rank(s) === 1)).toHaveLength(1)
+  expect(run.soldiers.map((s) => s.cls !== null)).toEqual(run.soldiers.map((s) => rank(s) > 0))
   expect(run.report).toMatchObject({ won: true, supplies: pay })
   expect(run.report!.soldiers.map((s) => s.xpAfter - s.xpBefore).sort()).toEqual([0, 0, 0, 1])
   expect(run.report!.soldiers.some((s) => s.died)).toBe(false)
@@ -112,7 +114,7 @@ test('stats add rank, facilities and aid to the base', () => {
   const run = createRun(1)
   run.built = ['workshop', 'workshop']
   run.aid = ['plasma']
-  const stats = soldierStats(run, { id: 0, name: '', xp: 3 })
+  const stats = soldierStats(run, { id: 0, name: '', xp: 3, cls: null })
   expect(stats.hp).toBe(BASE_STATS.hp + 2 + 2 + 2)
   expect(stats.damage).toBe(BASE_STATS.damage + 1)
   expect(stats.aim).toBeCloseTo(BASE_STATS.aim + 0.06)
@@ -144,4 +146,16 @@ test('aid applies at once: supplies, threat, experience, promotion', () => {
   expect(take('satellite').threat).toEqual(Array(6).fill(START_THREAT - 1))
   expect(take('training').soldiers.every((s) => s.xp === 1)).toBe(true)
   expect(take('veteran').soldiers.map(rank).sort()).toEqual([0, 0, 0, 3])
+})
+
+test('a class changes stats and gives the unit its ability', () => {
+  const run = createRun(1)
+  run.soldiers[0].xp = 1
+  run.soldiers[0].cls = 'heavy'
+  expect(soldierStats(run, run.soldiers[0]).hp).toBe(BASE_STATS.hp + 1 + CLASSES.heavy.stats.hp!)
+  apply(run, { type: 'mission', index: 0 })
+  apply(run, { type: 'land', zone: 0 })
+  const units = run.battle!.units.filter((u) => u.side === 'human')
+  expect(units[0]).toMatchObject({ ability: 'rocket', charges: 1 })
+  expect(units[1]).toMatchObject({ ability: null, charges: 0 })
 })

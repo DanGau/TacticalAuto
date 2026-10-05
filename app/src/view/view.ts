@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js'
-import { coverAt, distance, GRID, revealed, ZONE_RADIUS, zoneInfo, type Battle, type Tile, type Unit } from '../core/battle'
+import { BLAST_RADIUS, coverAt, distance, GRID, revealed, ZONE_RADIUS, zoneInfo, type Battle, type Tile, type Unit } from '../core/battle'
+import { CLASSES } from '../core/classes'
 import type { GameEvent } from '../core/combat'
 import { rank, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
@@ -25,6 +26,8 @@ const SHOT_MS = 160
 const IMPACT_MS = 140
 const DEATH_MS = 260
 const CALLOUT_MS = 900
+const ROCKET_MS = 320
+const BLAST_MS = 380
 
 const COLOR = {
   human: 0x4da3ff,
@@ -39,6 +42,7 @@ const COLOR = {
   hit: 0xffd84d,
   crit: 0xff7a3d,
   miss: 0x77808f,
+  heal: 0x7ddc5a,
   contact: 0xff6b5e,
   coverTop: 0x8a93a6,
   coverLeft: 0x5d6577,
@@ -110,6 +114,8 @@ export async function createView(): Promise<View> {
   const fx = new Graphics()
   const world = new Container()
   world.addChild(tiles, zones, fog, units, fx, marks, labels)
+  // Nothing shows until a battle exists.
+  world.visible = false
   app.stage.addChild(world)
 
   const sprites = new Map<number, Sprite>()
@@ -167,12 +173,18 @@ export async function createView(): Promise<View> {
     if (hp > 0) sprite.hp.rect(-12, -38, (24 * hp) / sprite.maxHp, 4).fill(0xff5555)
   }
 
-  /** `pips` marks a soldier's rank above the health bar. */
-  function create(unit: Unit, pips: number): Sprite {
+  /** `pips` marks a soldier's rank above the health bar; `letter` is the initial of its class. */
+  function create(unit: Unit, pips: number, letter = ''): Sprite {
     const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(COLOR[unit.side])
     for (let i = 0; i < pips; i++) body.circle(-9 + 6 * i, -44, 2).fill(COLOR.hit)
     const sprite: Sprite = { node: new Container(), hp: new Graphics(), tile: unit, maxHp: unit.stats.hp }
     sprite.node.addChild(body, sprite.hp)
+    if (letter) {
+      const mark = new Text({ text: letter, style: { fill: 0x10141c, fontSize: 13, fontWeight: 'bold', fontFamily: 'sans-serif' } })
+      mark.anchor.set(0.5)
+      mark.position.set(0, -17)
+      sprite.node.addChild(mark)
+    }
     units.addChild(sprite.node)
     sprites.set(unit.id, sprite)
     place(sprite, { x: unit.x, y: unit.y })
@@ -252,10 +264,6 @@ export async function createView(): Promise<View> {
     for (const sprite of sprites.values()) sprite.node.tint = tint(Math.round(sprite.tile.y) * GRID + Math.round(sprite.tile.x))
   }
 
-  const pips = (run: Run, unit: Unit) => {
-    const soldier = run.soldiers.find((s) => s.id === unit.soldier)
-    return soldier ? rank(soldier) : 0
-  }
 
   /** Makes the sprites match the battle exactly. */
   function sync(run: Run, battle: Battle): void {
@@ -263,7 +271,8 @@ export async function createView(): Promise<View> {
     const live = new Set(visible.map((u) => u.id))
     for (const id of [...sprites.keys()]) if (!live.has(id)) remove(id)
     for (const unit of visible) {
-      const sprite = sprites.get(unit.id) ?? create(unit, pips(run, unit))
+      const soldier = run.soldiers.find((s) => s.id === unit.soldier)
+      const sprite = sprites.get(unit.id) ?? create(unit, soldier ? rank(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : '')
       place(sprite, { x: unit.x, y: unit.y })
       sprite.node.alpha = 1
       drawHp(sprite, unit.hp)
@@ -298,17 +307,19 @@ export async function createView(): Promise<View> {
 
   const chest = (sprite: Sprite): Tile => ({ x: sprite.node.x, y: sprite.node.y - CHEST })
 
-  /** The shot's result in words, over the target: a miss, or a hit or crit with its damage. */
-  function callout(e: Extract<GameEvent, { type: 'shot' }>, over: Sprite): Text {
-    const text = e.hit ? `${e.crit ? 'CRIT' : 'HIT'} -${e.damage}` : 'MISS'
-    const mark = new Text({
-      text,
-      style: { fill: e.crit ? COLOR.crit : e.hit ? COLOR.hit : COLOR.miss, fontSize: e.crit ? 18 : 13, fontWeight: 'bold', fontFamily: 'sans-serif', stroke: { color: 0x10141c, width: 3 } },
-    })
+  /** Words over a unit saying what just happened to it. */
+  function callout(text: string, color: number, over: Sprite, size = 13): Text {
+    const mark = new Text({ text, style: { fill: color, fontSize: size, fontWeight: 'bold', fontFamily: 'sans-serif', stroke: { color: 0x10141c, width: 3 } } })
     mark.anchor.set(0.5, 1)
     mark.position.set(over.node.x, over.node.y - 48)
     labels.addChild(mark)
     return mark
+  }
+
+  /** A shot's result: a miss, or a hit or crit with its damage. */
+  function shotCallout(e: Extract<GameEvent, { type: 'shot' }>, over: Sprite): Text {
+    if (!e.hit) return callout('MISS', COLOR.miss, over)
+    return e.crit ? callout(`CRIT -${e.damage}`, COLOR.crit, over, 18) : callout(`HIT -${e.damage}`, COLOR.hit, over)
   }
 
   /** Floats a callout up and away. It does not hold up the next beat. */
@@ -340,11 +351,31 @@ export async function createView(): Promise<View> {
       fx.clear().moveTo(tail.x, tail.y).lineTo(head.x, head.y).stroke({ color: hit ? COLOR.hit : COLOR.miss, width: 3 })
     })
     fx.clear()
-    float(callout(e, to))
+    float(shotCallout(e, to))
     if (!hit) return
     drawHp(to, hpAfter)
     await tween(IMPACT_MS, (t) => {
       fx.clear().circle(b.x, b.y, 4 + (crit ? 26 : 12) * t).fill({ color: crit ? COLOR.crit : COLOR.hit, alpha: 1 - t })
+    })
+    fx.clear()
+  }
+
+  /** A rocket flies to its tile and bursts, wounding every unit it caught. */
+  async function fireRocket(battle: Battle, from: Sprite, e: Extract<GameEvent, { type: 'rocket' }>): Promise<void> {
+    const a = chest(from)
+    const b = toWorld(e.x, e.y)
+    await tween(ROCKET_MS, (t) => {
+      const at = lerp(a, b, t)
+      fx.clear().circle(at.x, at.y, 5).fill(COLOR.crit)
+    })
+    for (const hit of e.hits) {
+      const sprite = sprites.get(hit.target)
+      if (!sprite) continue
+      drawHp(sprite, battle.units.find((u) => u.id === hit.target)?.hp ?? 0)
+      float(callout(`ROCKET -${hit.damage}`, COLOR.crit, sprite))
+    }
+    await tween(BLAST_MS, (t) => {
+      fx.clear().ellipse(b.x, b.y, (BLAST_RADIUS + 0.7) * TILE_W * t, (BLAST_RADIUS + 0.7) * TILE_H * t).fill({ color: COLOR.crit, alpha: 0.8 * (1 - t) })
     })
     fx.clear()
   }
@@ -376,6 +407,17 @@ export async function createView(): Promise<View> {
         if (!from || !to) continue
         await follow([from.tile, to.tile])
         await shoot(from, to, e, battle.units.find((u) => u.id === e.target)?.hp ?? 0)
+      } else if (e.type === 'rocket') {
+        const from = sprites.get(e.id)
+        if (!from) continue
+        await follow([from.tile, e])
+        await fireRocket(battle, from, e)
+      } else if (e.type === 'heal') {
+        const to = sprites.get(e.target)
+        if (!to) continue
+        await follow([to.tile])
+        drawHp(to, battle.units.find((u) => u.id === e.target)?.hp ?? 0)
+        float(callout(`HEAL +${e.amount}`, COLOR.heal, to))
       } else if (e.type === 'death') {
         const sprite = sprites.get(e.id)
         if (!sprite) continue
@@ -400,6 +442,7 @@ export async function createView(): Promise<View> {
       fx.clear()
       const battle = run.battle
       if (!battle) return
+      world.visible = true
       if (battle !== shown) setBattle(battle)
       drawMarks(battle)
       if (animate) await play(battle, events)
@@ -409,6 +452,11 @@ export async function createView(): Promise<View> {
         look(WHOLE_MAP)
         labels.removeChildren().forEach((child) => child.destroy())
         for (const e of events) {
+          if (e.type === 'heal' && sprites.has(e.target)) callout(`HEAL +${e.amount}`, COLOR.heal, sprites.get(e.target)!)
+          if (e.type === 'rocket') {
+            const c = toWorld(e.x, e.y)
+            fx.ellipse(c.x, c.y, (BLAST_RADIUS + 0.7) * TILE_W, (BLAST_RADIUS + 0.7) * TILE_H).fill({ color: COLOR.crit, alpha: 0.4 })
+          }
           if (e.type !== 'shot') continue
           const from = sprites.get(e.id)
           const to = sprites.get(e.target)
@@ -417,7 +465,7 @@ export async function createView(): Promise<View> {
           const a = chest(from)
           const b = chest(to)
           fx.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: e.crit ? COLOR.crit : e.hit ? COLOR.hit : COLOR.miss, width: 3 })
-          callout(e, to)
+          shotCallout(e, to)
         }
       }
       app.render()

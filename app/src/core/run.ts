@@ -1,4 +1,5 @@
 import { BASE_STATS, createBattle, type Battle, type Stats } from './battle'
+import { CLASSES, type ClassId } from './classes'
 import { random, randomInt } from './rng'
 import { AID, FACILITIES, RARITY_CHANCE, type AidId, type FacilityId, type Lasting, type Rarity } from './base'
 
@@ -35,6 +36,8 @@ export interface Soldier {
   id: number
   name: string
   xp: number
+  /** Null for a rookie; drawn at random on first promotion. */
+  cls: ClassId | null
 }
 
 /**
@@ -58,7 +61,8 @@ export interface Report {
   /** Supplies the mission paid. */
   supplies: number
   /** Every soldier in the squad when the battle began. */
-  soldiers: { name: string; xpBefore: number; xpAfter: number; died: boolean }[]
+  /** `cls` is the class after the battle. */
+  soldiers: { name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; died: boolean }[]
 }
 
 export interface Run {
@@ -124,18 +128,19 @@ export function squadSize(run: Run): number {
   return BASE_SQUAD + total(run, (u) => u.squad)
 }
 
-/** A soldier's stats in battle: base, plus rank, plus facilities and aid. */
+/** A soldier's stats in battle: base, plus class, plus rank, plus facilities and aid. */
 export function soldierStats(run: Run, soldier: Soldier): Stats {
   const stats = { ...BASE_STATS }
   for (const key of Object.keys(stats) as (keyof Stats)[]) {
-    stats[key] += rank(soldier) * (RANK_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
+    const fromClass = soldier.cls ? (CLASSES[soldier.cls].stats[key] ?? 0) : 0
+    stats[key] += fromClass + rank(soldier) * (RANK_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
   }
   return stats
 }
 
-/** Alien stats grow every four rounds. */
+/** Alien stats grow every three rounds. */
 function alienStats(round: number): Stats {
-  const tier = Math.floor((round - 1) / 4)
+  const tier = Math.floor((round - 1) / 3)
   return { ...BASE_STATS, hp: BASE_STATS.hp + 3 * tier, aim: BASE_STATS.aim + 0.05 * tier }
 }
 
@@ -144,13 +149,22 @@ function alienCount(round: number, kind: Mission['kind'], hard: boolean): number
   return 4 + Math.floor((round - 1) / 3) + extra + (hard ? 1 : 0)
 }
 
+/** Gives every promoted soldier still without a class one at random. */
+function assignClasses(run: Run): void {
+  const ids = Object.keys(CLASSES) as ClassId[]
+  for (const soldier of run.soldiers) {
+    if (soldier.cls === null && rank(soldier) > 0) soldier.cls = ids[randomInt(run, ids.length)]
+  }
+}
+
 /** Fills the squad with recruits, each named unlike the living. */
 function recruit(run: Run): void {
   const xp = RANK_XP[Math.min(total(run, (u) => u.recruitRank), RANK_XP.length - 1)]
   while (run.soldiers.length < squadSize(run)) {
     const free = NAMES.filter((name) => !run.soldiers.some((s) => s.name === name))
-    run.soldiers.push({ id: run.nextSoldier++, name: free[randomInt(run, free.length)], xp })
+    run.soldiers.push({ id: run.nextSoldier++, name: free[randomInt(run, free.length)], xp, cls: null })
   }
+  assignClasses(run)
 }
 
 /** Sets the missions for the current round and opens the map. */
@@ -231,7 +245,12 @@ export function startMission(run: Run, mission: Mission): void {
   run.mission = mission
   run.phase = 'battle'
   const aliens = Array.from({ length: mission.aliens }, () => alienStats(run.round))
-  const reserve = run.soldiers.map((s) => ({ soldier: s.id, stats: soldierStats(run, s) }))
+  const reserve = run.soldiers.map((s) => ({
+    soldier: s.id,
+    stats: soldierStats(run, s),
+    ability: s.cls && CLASSES[s.cls].ability,
+    charges: s.cls ? CLASSES[s.cls].charges : 0,
+  }))
   run.battle = createBattle(randomInt(run, 2 ** 31), aliens, reserve)
 }
 
@@ -260,11 +279,10 @@ export function endBattle(run: Run): void {
   const dead = new Set(run.soldiers.map((s) => s.id))
   for (const survivor of [...battle.units, ...battle.reserve]) if (survivor.soldier !== null) dead.delete(survivor.soldier)
   const fought = new Set(battle.units.map((u) => u.soldier))
-  const soldiers = run.soldiers.map((s) => {
-    const xpBefore = s.xp
-    if (fought.has(s.id)) s.xp++
-    return { name: s.name, xpBefore, xpAfter: s.xp, died: dead.has(s.id) }
-  })
+  const xpBefore = run.soldiers.map((s) => s.xp)
+  for (const s of run.soldiers) if (fought.has(s.id)) s.xp++
+  assignClasses(run)
+  const soldiers = run.soldiers.map((s, i) => ({ name: s.name, cls: s.cls, xpBefore: xpBefore[i], xpAfter: s.xp, died: dead.has(s.id) }))
   run.soldiers = run.soldiers.filter((s) => !dead.has(s.id))
   recruit(run)
 
@@ -300,5 +318,6 @@ export function takeAid(run: Run, id: AidId): void {
     const lowest = run.soldiers.reduce((low, soldier) => (soldier.xp < low.xp ? soldier : low))
     lowest.xp = Math.max(lowest.xp, RANK_XP[aid.promote])
   }
+  assignClasses(run)
   nextRound(run)
 }

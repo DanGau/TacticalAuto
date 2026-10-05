@@ -1,6 +1,25 @@
-import { blocked, coverAt, CRIT_BONUS, distance, GRID, MAX_BEATS, NEIGHBORS, onGrid, PATROL_MOVE, revealed, type Battle, type Side, type Tile, type Unit } from './battle'
+import {
+  blocked,
+  BLAST_RADIUS,
+  coverAt,
+  CRIT_BONUS,
+  distance,
+  GRID,
+  MAX_BEATS,
+  MEDIC_HEAL,
+  MEDIC_REACH,
+  NEIGHBORS,
+  onGrid,
+  PATROL_MOVE,
+  revealed,
+  ROCKET_DAMAGE,
+  type Battle,
+  type Side,
+  type Tile,
+  type Unit,
+} from './battle'
 import { random, randomInt } from './rng'
-import { canShoot, odds, sees } from './sight'
+import { canShoot, lineOfSight, odds, sees } from './sight'
 
 export type GameEvent =
   /** `path` lists each tile entered, in order. */
@@ -9,6 +28,9 @@ export type GameEvent =
   | { type: 'reveal'; units: { id: number; x: number; y: number }[] }
   /** `damage` is 0 for a miss. */
   | { type: 'shot'; id: number; target: number; hit: boolean; crit: boolean; damage: number }
+  /** A rocket lands on a tile and damages every unit in `hits`. */
+  | { type: 'rocket'; id: number; x: number; y: number; hits: { target: number; damage: number }[] }
+  | { type: 'heal'; id: number; target: number; amount: number }
   | { type: 'death'; id: number }
   | { type: 'end'; winner: Side | null }
 
@@ -27,6 +49,18 @@ function nearest(units: Unit[], from: Tile): Unit | undefined {
   let best: Unit | undefined
   for (const unit of units) if (!best || distance(from, unit) < distance(from, best)) best = unit
   return best
+}
+
+/** Ids of the aliens some soldier sees now. */
+function spotted(battle: Battle): Set<number> {
+  const soldiers = battle.units.filter((u) => u.side === 'human')
+  return new Set(battle.units.filter((u) => u.side === 'alien' && soldiers.some((s) => sees(battle, s, u))).map((u) => u.id))
+}
+
+/** Whether `unit`, standing on `from`, may shoot `target`. Squadsight reaches any spotted alien in a clear line. */
+function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: Set<number>): boolean {
+  if (canShoot(battle, from, target, unit.stats.range)) return true
+  return unit.ability === 'squadsight' && seen.has(target.id) && lineOfSight(battle, from, target)
 }
 
 /** Walking distance from every tile to `goal`, row by row, ignoring units. Infinity where no path exists. */
@@ -79,27 +113,33 @@ function bestPath(candidates: Tile[][], unit: Unit, score: (end: Tile, steps: nu
   return best
 }
 
-/** The best hit chance, in whole percent, among shots from `from` at each of `targets` with the given stats; 0 with no shot. */
-function bestShot(battle: Battle, from: Tile, targets: Tile[], stats: Unit['stats']): number {
-  const chances = targets.filter((target) => canShoot(battle, from, target, stats.range)).map((target) => odds(battle, from, target, stats).hit)
-  return Math.round(100 * Math.max(0, ...chances))
-}
-
 /**
  * The path a fighting unit takes in its move stage. Among tiles with a shot at an enemy, it ends on the one where
  * its best shot most outweighs the best shot any enemy has back at it; the fewest steps wins a tie.
  * With no shot reachable, it ends as close to the nearest enemy as it can walk, on the least exposed such tile.
+ * Run and Gun doubles the move when the normal move reaches no shot.
  */
 function fightPath(battle: Battle, unit: Unit): Tile[] {
   const enemies = enemiesOf(battle, unit)
   const goal = nearest(enemies, unit)
   if (!goal) return []
   const toGoal = walkingDistances(battle, goal)
-  return bestPath(paths(battle, unit, unit.stats.move), unit, (end, steps) => {
-    const mine = bestShot(battle, end, enemies, unit.stats)
-    const theirs = Math.max(0, ...enemies.map((enemy) => bestShot(battle, enemy, [end], enemy.stats)))
-    return mine > 0 ? [0, theirs - mine, steps] : [1, toGoal[end.y * GRID + end.x], theirs]
-  })
+  const seen = spotted(battle)
+  /** The best hit chance from `end`, in whole percent; 0 with no shot. */
+  const mine = (end: Tile) => {
+    const chances = enemies.filter((enemy) => shootable(battle, unit, end, enemy, seen)).map((enemy) => odds(battle, end, enemy, unit.stats).hit)
+    return Math.round(100 * Math.max(0, ...chances))
+  }
+  /** The best hit chance any enemy has on `end` from where it stands, in whole percent. */
+  const theirs = (end: Tile) => {
+    const chances = enemies.filter((enemy) => canShoot(battle, enemy, end, enemy.stats.range)).map((enemy) => odds(battle, enemy, end, enemy.stats).hit)
+    return Math.round(100 * Math.max(0, ...chances))
+  }
+  const choose = (move: number) =>
+    bestPath(paths(battle, unit, move), unit, (end, steps) => (mine(end) > 0 ? [0, theirs(end) - mine(end), steps] : [1, toGoal[end.y * GRID + end.x], theirs(end)]))
+  const path = choose(unit.stats.move)
+  if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * unit.stats.move)
+  return path
 }
 
 /** The path an alien takes while its pod is unseen: toward the pod's waypoint, slowly. */
@@ -151,47 +191,88 @@ function moveSide(battle: Battle): GameEvent[] {
   return [...events, ...sight(battle)]
 }
 
-/** The enemy the unit can shoot and is likeliest to hit; the nearest, then the lowest id, wins a tie. */
-function chooseTarget(battle: Battle, unit: Unit): Unit | undefined {
-  let best: Unit | undefined
-  for (const other of battle.units) {
-    if (other.side === unit.side || !canShoot(battle, unit, other, unit.stats.range)) continue
-    const gain = best ? odds(battle, unit, other, unit.stats).hit - odds(battle, unit, best, unit.stats).hit : 1
-    if (gain > 0 || (gain === 0 && distance(unit, other) < distance(unit, best!))) best = other
-  }
-  return best
+/** Removes `damage` health from a unit, removing the unit and reporting its death at zero. */
+function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[]): void {
+  target.hp -= damage
+  if (target.hp > 0) return
+  battle.units = battle.units.filter((u) => u !== target)
+  events.push({ type: 'death', id: target.id })
 }
 
-/** Whether the unit may shoot this turn: an alien may not while its pod is unseen or surprised. */
+/** Medic: heals the most wounded other soldier at half health or less within reach. */
+function heal(battle: Battle, unit: Unit): GameEvent[] {
+  const wounded = battle.units
+    .filter((u) => u.side === unit.side && u !== unit && u.hp <= u.stats.hp / 2 && distance(unit, u) <= MEDIC_REACH)
+    .reduce<Unit | undefined>((worst, u) => (!worst || u.hp < worst.hp ? u : worst), undefined)
+  if (!wounded) return []
+  const amount = Math.min(MEDIC_HEAL, wounded.stats.hp - wounded.hp)
+  wounded.hp += amount
+  return [{ type: 'heal', id: unit.id, target: wounded.id, amount }]
+}
+
+/** Rocket: blasts the shootable enemy with the most enemies around it, if at least two are caught and no ally is. */
+function rocket(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
+  const inBlast = (centre: Tile) => battle.units.filter((u) => distance(centre, u) <= BLAST_RADIUS)
+  let best: Unit[] = []
+  let centre: Unit | undefined
+  for (const enemy of battle.units) {
+    if (enemy.side === unit.side || !shootable(battle, unit, unit, enemy, seen)) continue
+    const caught = inBlast(enemy)
+    if (caught.every((u) => u.side !== unit.side) && caught.length > Math.max(1, best.length)) {
+      best = caught
+      centre = enemy
+    }
+  }
+  if (!centre) return []
+  const events: GameEvent[] = [{ type: 'rocket', id: unit.id, x: centre.x, y: centre.y, hits: best.map((u) => ({ target: u.id, damage: ROCKET_DAMAGE })) }]
+  for (const target of best) wound(battle, target, ROCKET_DAMAGE, events)
+  return events
+}
+
+/** A shot at the enemy the unit can shoot and is likeliest to hit; the nearest, then the lowest id, wins a tie. */
+function shoot(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
+  let enemy: Unit | undefined
+  for (const other of battle.units) {
+    if (other.side === unit.side || !shootable(battle, unit, unit, other, seen)) continue
+    const gain = enemy ? odds(battle, unit, other, unit.stats).hit - odds(battle, unit, enemy, unit.stats).hit : 1
+    if (gain > 0 || (gain === 0 && distance(unit, other) < distance(unit, enemy!))) enemy = other
+  }
+  if (!enemy) return []
+  const chance = odds(battle, unit, enemy, unit.stats)
+  const hit = random(battle) < chance.hit
+  const crit = hit && random(battle) < chance.crit
+  const damage = hit ? unit.stats.damage + (crit ? CRIT_BONUS : 0) : 0
+  const events: GameEvent[] = [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage }]
+  if (hit) wound(battle, enemy, damage, events)
+  return events
+}
+
+/** Whether the unit may act this turn: an alien may not while its pod is unseen or surprised. */
 function armed(battle: Battle, unit: Unit): boolean {
   return unit.pod === null || (battle.pods[unit.pod].revealed && !battle.pods[unit.pod].surprised)
 }
 
-/** The next unit of the side on turn that can shoot an enemy does. Empty when none is left. */
-function shootNext(battle: Battle): GameEvent[] {
+/**
+ * The next unit of the side on turn with something to do acts once: a charged ability if its moment has come,
+ * otherwise a shot. Empty when no unit is left.
+ */
+function actNext(battle: Battle): GameEvent[] {
+  const seen = spotted(battle)
   for (const unit of battle.units) {
     if (unit.side !== battle.turn || unit.id <= battle.shooter || !armed(battle, unit)) continue
-    const enemy = chooseTarget(battle, unit)
-    if (!enemy) continue
+    let events: GameEvent[] = []
+    if (unit.charges > 0 && unit.ability === 'medic') events = heal(battle, unit)
+    if (unit.charges > 0 && unit.ability === 'rocket') events = rocket(battle, unit, seen)
+    if (events.length > 0) unit.charges--
+    else events = shoot(battle, unit, seen)
+    if (events.length === 0) continue
     battle.shooter = unit.id
-    const chance = odds(battle, unit, enemy, unit.stats)
-    const hit = random(battle) < chance.hit
-    const crit = hit && random(battle) < chance.crit
-    const damage = hit ? unit.stats.damage + (crit ? CRIT_BONUS : 0) : 0
-    const events: GameEvent[] = [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage }]
-    if (hit) {
-      enemy.hp -= damage
-      if (enemy.hp <= 0) {
-        battle.units = battle.units.filter((u) => u !== enemy)
-        events.push({ type: 'death', id: enemy.id })
-      }
-    }
     return events
   }
   return []
 }
 
-/** The next move stage or shot, passing the turn when a side has nothing left to do. */
+/** The next move stage or action, passing the turn when a side has nothing left to do. */
 function act(battle: Battle): GameEvent[] {
   // After each side has passed once, nobody can act this beat.
   for (let passes = 0; passes < 2; passes++) {
@@ -201,15 +282,15 @@ function act(battle: Battle): GameEvent[] {
       battle.shooter = 0
       if (moves.length > 0) return moves
     }
-    const shot = shootNext(battle)
-    if (shot.length > 0) return shot
+    const action = actNext(battle)
+    if (action.length > 0) return action
     battle.turn = battle.turn === 'human' ? 'alien' : 'human'
     battle.stage = 'move'
   }
   return []
 }
 
-/** Advances a battle one beat: a side's simultaneous move, or one unit's shot. Does nothing outside the battle phase. */
+/** Advances a battle one beat: a side's simultaneous move, or one unit's action. Does nothing outside the battle phase. */
 export function stepBattle(battle: Battle): GameEvent[] {
   if (battle.phase !== 'battle') return []
   battle.beat++

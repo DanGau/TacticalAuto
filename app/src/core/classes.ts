@@ -1,0 +1,56 @@
+import type { Ability, Stats } from './battle'
+
+/** What a soldier becomes at first promotion: a weapon's stat changes and one ability the soldier uses unprompted. */
+export interface SoldierClass {
+  name: string
+  weapon: string
+  /** Added to the soldier's stats. */
+  stats: Partial<Stats>
+  ability: Ability
+  abilityName: string
+  abilityText: string
+  /** Times per battle the ability can be used; 0 for one always in effect. */
+  charges: number
+}
+
+const classes = {
+  assault: {
+    name: 'Assault',
+    weapon: 'Shotgun',
+    stats: { range: -2, damage: 1, close: 0.06, hp: 1 },
+    ability: 'runAndGun',
+    abilityName: 'Run and Gun',
+    abilityText: 'Moves twice as far when that is the only way to reach a shot',
+    charges: 0,
+  },
+  heavy: {
+    name: 'Heavy',
+    weapon: 'Machine gun',
+    stats: { move: -1, hp: 3, damage: 1, aim: -0.05 },
+    ability: 'rocket',
+    abilityName: 'Rocket',
+    abilityText: 'Once per battle, blasts two or more aliens standing together',
+    charges: 1,
+  },
+  sniper: {
+    name: 'Sniper',
+    weapon: 'Sniper rifle',
+    stats: { range: 2, move: -1, damage: 1, crit: 0.25, close: -0.06, hp: -1 },
+    ability: 'squadsight',
+    abilityName: 'Squadsight',
+    abilityText: 'Shoots any alien a squadmate sees, at any distance, given a clear line',
+    charges: 0,
+  },
+  support: {
+    name: 'Support',
+    weapon: 'Rifle',
+    stats: { move: 1 },
+    ability: 'medic',
+    abilityName: 'Medic',
+    abilityText: 'Twice per battle, heals a badly wounded soldier nearby instead of shooting',
+    charges: 2,
+  },
+} satisfies Record<string, SoldierClass>
+
+export type ClassId = keyof typeof classes
+export const CLASSES: Record<ClassId, SoldierClass> = classes
