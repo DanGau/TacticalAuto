@@ -1,40 +1,34 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { BASE_STATS, GRID, type Battle } from './battle'
-import { stepBattle as step } from './combat'
+import { distance, revealed, SIGHT, type Battle } from './battle'
+import { stepBattle, type GameEvent } from './combat'
 import { createRun } from './run'
+import { lineOfSight } from './sight'
 
 function battle(seed: number): Battle {
   const run = createRun(seed)
   apply(run, { type: 'mission', index: 0 })
-  // Cover blocks some tiles; a rejected deploy is skipped.
-  for (let x = 0; x < GRID; x++) apply(run, { type: 'deploy', x, y: GRID - 1 })
-  apply(run, { type: 'start' })
+  apply(run, { type: 'land', zone: 0 })
   return run.battle!
 }
 
-test('the first beat moves every human at most its move and no alien', () => {
-  const state = battle(1)
-  const humans = state.units.filter((u) => u.side === 'human').map((u) => u.id)
-  const events = step(state)
-  expect(events.map((e) => e.type)).toEqual(humans.map(() => 'move'))
-  for (const e of events) {
-    if (e.type !== 'move') continue
-    expect(humans).toContain(e.id)
-    expect(e.path.length).toBeLessThanOrEqual(BASE_STATS.move)
+/** Plays a battle to its end, calling `check` with each beat's events and the units as they stood before it. */
+function play(seed: number, check: (events: GameEvent[], before: Battle, after: Battle) => void): Battle {
+  const state = battle(seed)
+  while (state.phase === 'battle') {
+    const before = structuredClone(state)
+    check(stepBattle(state), before, state)
   }
-})
+  return state
+}
 
 test('a turn is one move beat, then one shot per beat in id order, then the other side', () => {
-  const state = battle(1)
-  let turn = state.turn
+  let turn = 'human'
   let stage = 'move'
   let shooter = 0
-  while (state.phase === 'battle') {
-    const before = structuredClone(state.units)
-    const [first] = step(state)
-    if (!first || first.type === 'end') continue
-    const side = before.find((u) => u.id === first.id)!.side
+  const end = play(1, ([first], before) => {
+    if (!first || first.type === 'end' || first.type === 'reveal' || first.type === 'death') return
+    const side = before.units.find((u) => u.id === first.id)!.side
     if (side !== turn) {
       turn = side
       stage = 'move'
@@ -48,6 +42,33 @@ test('a turn is one move beat, then one shot per beat in id order, then the othe
       expect(first.id).toBeGreaterThan(shooter)
       shooter = first.id
     }
-  }
-  expect(state.winner).not.toBeNull()
+  })
+  expect(end.winner).not.toBeNull()
+})
+
+test('no unit moves farther than its move', () => {
+  play(2, (events, before) => {
+    for (const e of events) {
+      if (e.type === 'move') expect(e.path.length).toBeLessThanOrEqual(before.units.find((u) => u.id === e.id)!.stats.move)
+    }
+  })
+})
+
+test('an alien shoots only after its pod is revealed', () => {
+  play(3, (events, before) => {
+    for (const e of events) {
+      const shooter = e.type === 'shot' ? before.units.find((u) => u.id === e.id)! : null
+      if (shooter?.side === 'alien') expect(revealed(before, shooter)).toBe(true)
+    }
+  })
+})
+
+test('a pod is revealed exactly when a soldier first has it in sight', () => {
+  play(4, (_, __, after) => {
+    const soldiers = after.units.filter((u) => u.side === 'human')
+    for (const alien of after.units.filter((u) => u.side === 'alien')) {
+      const seen = soldiers.some((s) => distance(s, alien) <= SIGHT && lineOfSight(after, s, alien))
+      if (seen) expect(revealed(after, alien)).toBe(true)
+    }
+  })
 })

@@ -1,7 +1,8 @@
 import type { Action } from '../core/apply'
 import { AID, FACILITIES, type AidId, type FacilityId } from '../core/base'
 import { buildCost, level, payout, preview, RANK_NAMES, RANK_XP, rank, REGIONS, ROUNDS, THREAT_MAX, type Mission, type Report, type Run } from '../core/run'
-import { tileAt } from '../view/view'
+import { zoneInfo, type Battle } from '../core/battle'
+import { ZONE_NAMES } from '../view/view'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
 
@@ -142,18 +143,29 @@ function endPanel(run: Run): string {
   return `<h1 class="up">Earth has fallen</h1><h2>Lost: ${missionTitle(run.mission!)}, round ${Math.min(run.round, ROUNDS)}</h2><button id="again">New run</button>`
 }
 
+/** One button per landing zone, saying what the squad lands in and how near the aliens are. */
+function zoneButtons(battle: Battle): string {
+  return battle.zones
+    .map((zone, index) => {
+      const { cover, contact } = zoneInfo(battle, zone)
+      const ground = cover >= 12 ? 'heavy cover' : cover >= 5 ? 'some cover' : 'open ground'
+      return button({ type: 'land', zone: index }, `<b>Zone ${ZONE_NAMES[index]}</b><br>${ground}<br>nearest contact ${contact} tiles`)
+    })
+    .join('')
+}
+
 function status(run: Run): string {
   const battle = run.battle
   if (run.phase !== 'battle' || !battle) return ''
   const title = missionTitle(run.mission!)
-  if (battle.phase === 'deploy') return `${title} · click the blue zone to deploy, ${battle.reserve.length} left`
+  if (battle.phase === 'deploy') return `${title} · ${run.mission!.aliens} aliens · choose where the squad lands`
   return `${title} · ${SIDE[battle.turn]}' turn`
 }
 
 /** Turns clicks into actions and hands them to `act`. */
-export function createUi(canvas: HTMLCanvasElement, act: (action: Action) => void): Ui {
+export function createUi(act: (action: Action) => void): Ui {
   const statusLine = document.getElementById('status')!
-  const start = document.getElementById('start') as HTMLButtonElement
+  const zones = document.getElementById('zones')!
   const overlay = document.getElementById('panel')!
   /** The report whose screen of each kind the player has continued past. */
   const seen: Record<string, Report | null> = { mission: null, world: null }
@@ -180,12 +192,7 @@ export function createUi(canvas: HTMLCanvasElement, act: (action: Action) => voi
     overlay.hidden = run.phase === 'battle'
   }
 
-  canvas.addEventListener('click', (e) => {
-    const box = canvas.getBoundingClientRect()
-    act({ type: 'deploy', ...tileAt(e.clientX - box.left, e.clientY - box.top) })
-  })
-  start.addEventListener('click', () => act({ type: 'start' }))
-  overlay.addEventListener('click', (e) => {
+  document.body.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (target?.id === 'again') location.href = location.pathname
     else if (target?.dataset.seen) {
@@ -198,7 +205,8 @@ export function createUi(canvas: HTMLCanvasElement, act: (action: Action) => voi
   return {
     update(run) {
       statusLine.textContent = status(run)
-      start.hidden = run.phase !== 'battle' || run.battle?.phase !== 'deploy'
+      const landing = run.phase === 'battle' && run.battle?.phase === 'deploy'
+      zones.innerHTML = landing ? zoneButtons(run.battle!) : ''
       render(run)
     },
   }

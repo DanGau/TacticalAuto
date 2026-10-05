@@ -18,6 +18,8 @@ const DIR = resolve(APP, '.eye')
 const PIDS = resolve(DIR, 'pids.json')
 const VITE_PORT = viteConfig.server!.port!
 const CDP_PORT = 9333
+// Without these a window behind others stops drawing frames, and the battle the model is watching stalls.
+const KEEP_ANIMATING = ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling']
 const URL = `http://localhost:${VITE_PORT}/`
 
 const portOpen = (port: number) =>
@@ -132,7 +134,7 @@ async function main(name: string, args: string[]): Promise<unknown> {
     // launch [seed]: opens a window for a human to play in real time; later commands attach to it.
     stop(['browser', 'window'])
     while (await portOpen(CDP_PORT)) await new Promise((r) => setTimeout(r, 100))
-    await ensureBrowser('window', [`--app=${URL}${args[0] ? `?seed=${args[0]}` : ''}`, `--window-size=${WIDTH},${HEIGHT + 80}`])
+    await ensureBrowser('window', [`--app=${URL}${args[0] ? `?seed=${args[0]}` : ''}`, `--window-size=${WIDTH},${HEIGHT + 80}`, ...KEEP_ANIMATING])
     return 'window open'
   }
   await ensureBrowser('browser', ['--headless=new', 'about:blank'])

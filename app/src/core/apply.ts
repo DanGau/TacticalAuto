@@ -1,4 +1,4 @@
-import { addUnit, blocked, DEPLOY_DEPTH, GRID } from './battle'
+import { land } from './battle'
 import { FACILITIES, type FacilityId } from './base'
 import { build, buildCost, startMission, takeAid, type Run } from './run'
 
@@ -7,10 +7,8 @@ export type Action =
   | { type: 'build'; facility: FacilityId }
   /** Map phase: fight the mission at `index` of run.missions. */
   | { type: 'mission'; index: number }
-  /** Deploy phase: place the next soldier in reserve. */
-  | { type: 'deploy'; x: number; y: number }
-  /** Deploy phase: begin the battle. */
-  | { type: 'start' }
+  /** Deploy phase: land the squad on the zone at `zone` of battle.zones and begin the battle. */
+  | { type: 'land'; zone: number }
   /** Reward phase: take the aid at `index` of run.offers. */
   | { type: 'pick'; index: number }
 
@@ -45,19 +43,9 @@ export function apply(run: Run, action: Action): Result {
     return ok
   }
   const battle = run.battle
-  if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not deploying')
-  if (action.type === 'start') {
-    if (!battle.units.some((u) => u.side === 'human')) return no('deploy at least one soldier')
-    battle.phase = 'battle'
-    return ok
-  }
-  const { x, y } = action
-  const next = battle.reserve[0]
-  if (!next) return no('squad is deployed')
-  if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || x >= GRID || y >= GRID) return no('off the grid')
-  if (y < GRID - DEPLOY_DEPTH) return no('outside the deployment zone')
-  if (blocked(battle, x, y)) return no('tile blocked')
-  battle.reserve.shift()
-  addUnit(battle, 'human', x, y, next.stats, next.soldier)
+  if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not landing')
+  const zone = battle.zones[action.zone]
+  if (!zone) return no('no such landing zone')
+  land(battle, zone)
   return ok
 }

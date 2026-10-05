@@ -141,7 +141,7 @@ function alienStats(round: number): Stats {
 
 function alienCount(round: number, kind: Mission['kind'], hard: boolean): number {
   const extra = { strike: 0, lastStand: 2, final: 3 }[kind]
-  return 3 + Math.floor((round - 1) / 4) + extra + (hard ? 1 : 0)
+  return 4 + Math.floor((round - 1) / 3) + extra + (hard ? 1 : 0)
 }
 
 /** Fills the squad with recruits, each named unlike the living. */

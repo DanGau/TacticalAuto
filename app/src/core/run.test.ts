@@ -21,13 +21,13 @@ import {
   type Run,
 } from './run'
 
-/** Ends the battle being deployed with `winner`: one soldier deployed, and every unit of the other side dead. */
+/** Ends the battle awaiting a landing with `winner`: one soldier fought, the rest stayed in reserve, and the losing side is dead. */
 function finish(run: Run, winner: Side): void {
   const battle = run.battle!
-  battle.cover.fill(0)
-  apply(run, { type: 'deploy', x: 0, y: 19 })
-  battle.units = battle.units.filter((u) => u.side === winner)
-  battle.reserve = winner === 'human' ? battle.reserve : []
+  apply(run, { type: 'land', zone: 0 })
+  const [fighter, ...rest] = battle.units.filter((u) => u.side === 'human')
+  battle.reserve = winner === 'human' ? rest.map((u) => ({ soldier: u.soldier!, stats: u.stats })) : []
+  battle.units = battle.units.filter((u) => u.side === winner && (u.side === 'alien' || u === fighter))
   battle.phase = 'over'
   battle.winner = winner
   endBattle(run)

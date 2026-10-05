@@ -1,59 +1,48 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { GRID } from './battle'
+import { coverAt, distance, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
 import { BASE_SQUAD, createRun, type Run } from './run'
 
-const y = GRID - 1
-
-/** A run deploying for its first mission, on a map with no cover, so every zone tile is free. */
-function deploying(): Run {
+/** A run choosing where to land for its first mission. */
+function landing(): Run & { battle: Battle } {
   const run = createRun(1)
   apply(run, { type: 'mission', index: 0 })
-  run.battle!.cover.fill(0)
-  return run
+  return run as Run & { battle: Battle }
 }
 
-test('deploy places the next soldier in the zone', () => {
-  const run = deploying()
-  expect(apply(run, { type: 'deploy', x: 0, y })).toEqual({ ok: true })
-  expect(run.battle!.units.at(-1)).toMatchObject({ side: 'human', x: 0, y, soldier: run.soldiers[0].id })
+test('a battle offers landing zones clear of every alien', () => {
+  const { battle } = landing()
+  expect(battle.zones).toHaveLength(ZONES)
+  for (const zone of battle.zones) {
+    for (const alien of battle.units) expect(distance(zone, alien)).toBeGreaterThanOrEqual(ZONE_CLEARANCE)
+  }
 })
 
-test.each([
-  ['outside the deployment zone', { x: 0, y: 0 }],
-  ['off the grid', { x: GRID, y }],
-  ['off the grid', { x: 0.5, y }],
-])('deploy rejects: %s', (reason, at) => {
-  const run = deploying()
-  const before = structuredClone(run)
-  expect(apply(run, { type: 'deploy', ...at })).toEqual({ ok: false, reason })
-  expect(run).toEqual(before)
+test('landing puts the whole squad on open tiles by the zone and begins the battle', () => {
+  const run = landing()
+  const zone = run.battle.zones[1]
+  expect(apply(run, { type: 'land', zone: 1 })).toEqual({ ok: true })
+  const squad = run.battle.units.filter((u) => u.side === 'human')
+  expect(squad.map((u) => u.soldier)).toEqual(run.soldiers.map((s) => s.id))
+  expect(squad).toHaveLength(BASE_SQUAD)
+  for (const unit of squad) {
+    expect(distance(unit, zone)).toBeLessThanOrEqual(3)
+    expect(coverAt(run.battle, unit.x, unit.y)).toBe(0)
+  }
+  expect(new Set(squad.map((u) => `${u.x},${u.y}`)).size).toBe(BASE_SQUAD)
+  expect(run.battle).toMatchObject({ phase: 'battle', reserve: [] })
 })
 
-test('deploy rejects a blocked tile and a deployed squad', () => {
-  const run = deploying()
-  apply(run, { type: 'deploy', x: 0, y })
-  expect(apply(run, { type: 'deploy', x: 0, y })).toEqual({ ok: false, reason: 'tile blocked' })
-  run.battle!.cover[y * GRID + 1] = 1
-  expect(apply(run, { type: 'deploy', x: 1, y })).toEqual({ ok: false, reason: 'tile blocked' })
-  run.battle!.cover[y * GRID + 1] = 0
-  for (let x = 1; x < BASE_SQUAD; x++) apply(run, { type: 'deploy', x, y })
-  expect(apply(run, { type: 'deploy', x: BASE_SQUAD, y })).toEqual({ ok: false, reason: 'squad is deployed' })
-})
-
-test('start needs a deployed soldier and happens once', () => {
-  const run = deploying()
-  expect(apply(run, { type: 'start' }).ok).toBe(false)
-  apply(run, { type: 'deploy', x: 0, y })
-  expect(apply(run, { type: 'start' })).toEqual({ ok: true })
-  expect(apply(run, { type: 'start' }).ok).toBe(false)
-})
-
-test('actions outside their phase are rejected', () => {
+test('actions outside their phase are rejected and change nothing', () => {
   const run = createRun(1)
+  const before = structuredClone(run)
   expect(apply(run, { type: 'pick', index: 0 }).ok).toBe(false)
-  expect(apply(run, { type: 'deploy', x: 0, y }).ok).toBe(false)
+  expect(apply(run, { type: 'land', zone: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'mission', index: 9 }).ok).toBe(false)
+  expect(run).toEqual(before)
   apply(run, { type: 'mission', index: 0 })
   expect(apply(run, { type: 'mission', index: 0 }).ok).toBe(false)
+  expect(apply(run, { type: 'land', zone: 9 }).ok).toBe(false)
+  apply(run, { type: 'land', zone: 0 })
+  expect(apply(run, { type: 'land', zone: 0 }).ok).toBe(false)
 })

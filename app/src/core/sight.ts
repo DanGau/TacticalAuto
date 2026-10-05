@@ -1,7 +1,4 @@
-import { COVER_DEFENSE, coverAt, GRID, type Battle, type Cover, type Stats, type Tile } from './battle'
-
-/** Tiles between two points, counting a diagonal as one. */
-export const distance = (a: Tile, b: Tile) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
+import { COVER_DEFENSE, coverAt, distance, onGrid, type Battle, type Cover, type Stats, type Tile } from './battle'
 
 const SIDES = [[0, -1], [1, 0], [0, 1], [-1, 0]]
 
@@ -14,7 +11,7 @@ export function coverAgainst(battle: Battle, at: Tile, from: Tile): Cover {
   for (const [dx, dy] of SIDES) {
     const x = at.x + dx
     const y = at.y + dy
-    if (x < 0 || y < 0 || x >= GRID || y >= GRID) continue
+    if (!onGrid(x, y)) continue
     if ((from.x - at.x) * dx + (from.y - at.y) * dy > 0 && coverAt(battle, x, y) > best) best = coverAt(battle, x, y)
   }
   return best

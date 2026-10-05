@@ -1,6 +1,6 @@
 import type { Action } from '../core/apply'
 import { AID, FACILITIES, type FacilityId } from '../core/base'
-import { blocked, DEPLOY_DEPTH, GRID, type Battle } from '../core/battle'
+import { zoneInfo } from '../core/battle'
 import { randomInt } from '../core/rng'
 import { buildCost, type Run } from '../core/run'
 
@@ -18,27 +18,7 @@ const randomBot: Bot = (run, rng) => {
     return { type: 'mission', index: randomInt(rng, run.missions.length) }
   }
   if (run.phase === 'reward') return { type: 'pick', index: randomInt(rng, run.offers.length) }
-  const battle = run.battle!
-  if (battle.reserve.length === 0) return { type: 'start' }
-  for (;;) {
-    const x = randomInt(rng, GRID)
-    const y = GRID - 1 - randomInt(rng, DEPLOY_DEPTH)
-    if (!blocked(battle, x, y)) return { type: 'deploy', x, y }
-  }
-}
-
-/** The free zone tile nearest the alien centre, front row first, so the squad arrives together. */
-function deployTile(battle: Battle): { x: number; y: number } {
-  const aliens = battle.units.filter((u) => u.side === 'alien')
-  const centre = Math.round(aliens.reduce((sum, u) => sum + u.x, 0) / aliens.length)
-  for (let y = GRID - DEPLOY_DEPTH; y < GRID; y++) {
-    for (let offset = 0; offset < GRID; offset++) {
-      for (const x of [centre - offset, centre + offset]) {
-        if (!blocked(battle, x, y)) return { x, y }
-      }
-    }
-  }
-  throw new Error('the deployment zone is full')
+  return { type: 'land', zone: randomInt(rng, run.battle!.zones.length) }
 }
 
 const RARITY_ORDER = ['common', 'rare', 'epic']
@@ -46,7 +26,7 @@ const RARITY_ORDER = ['common', 'rare', 'epic']
 /** What the heuristic bot builds first. */
 const BUILD_ORDER: FacilityId[] = ['barracks', 'firingRange', 'workshop', 'optics', 'drills', 'academy', 'course']
 
-/** Builds the first facility in BUILD_ORDER it can afford, answers the strike in the most threatened region, deploys together, and takes the rarest aid. */
+/** Builds the first facility in BUILD_ORDER it can afford, answers the strike in the most threatened region, lands in the most cover, and takes the rarest aid. */
 const heuristicBot: Bot = (run) => {
   const best = <T>(options: T[], value: (option: T) => number) =>
     options.reduce((top, option, index) => (value(option) > value(options[top]) ? index : top), 0)
@@ -57,8 +37,7 @@ const heuristicBot: Bot = (run) => {
   }
   if (run.phase === 'reward') return { type: 'pick', index: best(run.offers, (id) => RARITY_ORDER.indexOf(AID[id].rarity)) }
   const battle = run.battle!
-  if (battle.reserve.length === 0) return { type: 'start' }
-  return { type: 'deploy', ...deployTile(battle) }
+  return { type: 'land', zone: best(battle.zones, (zone) => zoneInfo(battle, zone).cover) }
 }
 
 export const bots: Record<string, Bot> = { random: randomBot, heuristic: heuristicBot }
