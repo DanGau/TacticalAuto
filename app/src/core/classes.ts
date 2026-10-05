@@ -35,7 +35,7 @@ const classes = {
     stanceText: 'Fights from the best cover it can find',
     ability: 'rocket',
     abilityName: 'Rocket',
-    abilityText: 'Once per battle, blasts two or more aliens standing together',
+    abilityText: 'Once per battle, in place of a shot, blasts two or more aliens standing together',
     charges: 1,
   },
   sniper: {
@@ -57,7 +57,7 @@ const classes = {
     stanceText: 'Stays within reach of a squadmate',
     ability: 'medic',
     abilityName: 'Medic',
-    abilityText: 'Twice per battle, heals a badly wounded soldier nearby instead of shooting',
+    abilityText: 'Twice per battle, heals a badly wounded soldier nearby, and still shoots',
     charges: 2,
   },
 } satisfies Record<string, SoldierClass>

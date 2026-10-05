@@ -121,6 +121,12 @@ interface Spot {
   mine: number
   /** The best hit chance any enemy has on the tile from where it stands, in percent. */
   theirs: number
+  /** `theirs` weighted by the unit's health: halved at full health, tripled near death. */
+  risk: number
+  /** The share of its health the unit has lost, 0 to 1. */
+  hurt: number
+  /** Whether the unit is wary; see WARY. */
+  wary: boolean
   /** Tiles the nearest squadmate is beyond a medic's reach. */
   apart: number
   /** Tiles the nearest enemy is inside STANDOFF. */
@@ -131,28 +137,41 @@ interface Spot {
   toGoal: number
 }
 
-/** How each stance ranks a tile it can shoot from, lowest first. */
+/**
+ * How each stance ranks a tile it can shoot from, lowest first. Weighing `risk` makes a healthy unit bold
+ * and a wounded one careful.
+ */
 const WITH_SHOT: Record<Stance, (spot: Spot) => number[]> = {
   // The exchange of fire that most favours the unit.
-  balanced: ({ mine, theirs }) => [theirs - mine],
-  // The surest shot, whatever comes back.
-  rush: ({ mine, theirs }) => [-mine, theirs],
+  balanced: ({ mine, risk }) => [risk - mine],
+  // The surest shot; what comes back counts only as wounds mount.
+  rush: ({ mine, risk, hurt }) => [Math.round(hurt * risk) - mine],
   // The same exchange, with safety counted double.
-  anchor: ({ mine, theirs }) => [2 * theirs - mine],
+  anchor: ({ mine, risk }) => [2 * risk - mine],
   // Out of every enemy's reach, then at a distance, then the best shot.
   standoff: ({ mine, theirs, crowded }) => [theirs, crowded, -mine],
   // A good exchange that keeps a squadmate within reach.
-  escort: ({ mine, theirs, apart }) => [theirs - mine + 10 * apart],
+  escort: ({ mine, risk, apart }) => [risk - mine + 10 * apart],
 }
+
+/**
+ * A soldier that has lost this share of its health is wary while a healthier squadmate fights on: it gives up a shot
+ * for a tile where less comes back, and stops advancing through tiles an enemy can shoot. With no healthier
+ * squadmate it fights as normal, so a battle always ends. Aliens are never wary; they press the attack.
+ */
+const WARY = 0.5
+
+/** Closing on the nearest enemy: by the shortest walk, or, once wary, only through tiles no enemy can shoot. */
+const advance = ({ toGoal, theirs, wary }: Spot) => (wary ? [theirs, toGoal] : [toGoal, theirs])
 
 /** How each stance ranks a tile with no shot, lowest first. */
 const NO_SHOT: Record<Stance, (spot: Spot) => number[]> = {
-  balanced: ({ toGoal, theirs }) => [toGoal, theirs],
-  rush: ({ toGoal, theirs }) => [toGoal, theirs],
-  anchor: ({ toGoal, theirs }) => [toGoal, theirs],
+  balanced: advance,
+  rush: advance,
+  anchor: advance,
   // Holds at a distance, out of reach, and from there looks for a clear line before walking nearer.
   standoff: ({ toGoal, theirs, crowded, blind }) => [theirs, crowded, blind, toGoal],
-  escort: ({ toGoal, theirs, apart }) => [toGoal + apart, theirs],
+  escort: (spot) => advance({ ...spot, toGoal: spot.toGoal + spot.apart }),
 }
 
 /**
@@ -176,19 +195,30 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
     return Math.round(100 * Math.max(0, ...chances))
   }
   const squadmates = battle.units.filter((u) => u.side === unit.side && u !== unit)
+  const hurt = 1 - unit.hp / unit.stats.hp
+  const wary = unit.side === 'human' && hurt >= WARY && squadmates.some((u) => u.hp / u.stats.hp > 1 - WARY)
   const apart = (end: Tile) => Math.max(0, Math.min(MEDIC_REACH, ...squadmates.map((u) => distance(end, u) - MEDIC_REACH)))
-  const choose = (move: number) =>
-    bestPath(paths(battle, unit, move), unit, (end, steps) => {
+  const choose = (move: number) => {
+    const reach = paths(battle, unit, move)
+    /** Whether some tile in reach has a shot; out of contact, even a wary unit keeps advancing. */
+    const inContact = reach.some((path) => mine(path.at(-1) ?? unit) > 0)
+    return bestPath(reach, unit, (end, steps) => {
       const spot: Spot = {
         mine: mine(end),
         theirs: theirs(end),
+        risk: Math.round(theirs(end) * (0.5 + 2.5 * hurt)),
+        hurt,
+        wary,
         apart: apart(end),
         crowded: Math.max(0, STANDOFF - Math.min(...enemies.map((enemy) => distance(end, enemy)))),
         blind: enemies.some((enemy) => lineOfSight(battle, end, enemy)) ? 0 : 1,
         toGoal: toGoal[end.y * GRID + end.x],
       }
+      // A wary unit ranks every tile by the exchange of fire, so one with no shot and no risk can win.
+      if (wary && unit.stance !== 'standoff' && inContact) return [0, ...WITH_SHOT[unit.stance](spot), spot.toGoal]
       return spot.mine > 0 ? [0, ...WITH_SHOT[unit.stance](spot), steps] : [1, ...NO_SHOT[unit.stance](spot)]
     })
+  }
   const path = choose(unit.stats.move)
   if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * unit.stats.move)
   return path
@@ -251,7 +281,7 @@ function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[]
   events.push({ type: 'death', id: target.id })
 }
 
-/** Medic: heals the most wounded other soldier at half health or less within reach. */
+/** Medic: heals the most wounded other soldier at half health or less within reach. It does not cost the medic's shot. */
 function heal(battle: Battle, unit: Unit): GameEvent[] {
   const wounded = battle.units
     .filter((u) => u.side === unit.side && u !== unit && u.hp <= u.stats.hp / 2 && distance(unit, u) <= MEDIC_REACH)
@@ -262,7 +292,7 @@ function heal(battle: Battle, unit: Unit): GameEvent[] {
   return [{ type: 'heal', id: unit.id, target: wounded.id, amount }]
 }
 
-/** Rocket: blasts the shootable enemy with the most enemies around it, if at least two are caught and no ally is. */
+/** Rocket: blasts the shootable enemy with the most enemies around it, if at least two are caught and no ally is. It replaces the shot. */
 function rocket(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
   const inBlast = (centre: Tile) => battle.units.filter((u) => distance(centre, u) <= BLAST_RADIUS)
   let best: Unit[] = []
@@ -305,18 +335,17 @@ function armed(battle: Battle, unit: Unit): boolean {
 }
 
 /**
- * The next unit of the side on turn with something to do acts once: a charged ability if its moment has come,
- * otherwise a shot. Empty when no unit is left.
+ * The next unit of the side on turn with something to do acts once. A medic first heals if someone needs it,
+ * and still shoots. A rocket, when its moment has come, takes the place of the shot. Empty when no unit is left.
  */
 function actNext(battle: Battle): GameEvent[] {
   const seen = spotted(battle)
   for (const unit of battle.units) {
     if (unit.side !== battle.turn || unit.id <= battle.shooter || !armed(battle, unit)) continue
-    let events: GameEvent[] = []
-    if (unit.charges > 0 && unit.ability === 'medic') events = heal(battle, unit)
-    if (unit.charges > 0 && unit.ability === 'rocket') events = rocket(battle, unit, seen)
-    if (events.length > 0) unit.charges--
-    else events = shoot(battle, unit, seen)
+    const healed = unit.charges > 0 && unit.ability === 'medic' ? heal(battle, unit) : []
+    const fired = unit.charges > 0 && unit.ability === 'rocket' ? rocket(battle, unit, seen) : []
+    if (healed.length + fired.length > 0) unit.charges--
+    const events = [...healed, ...(fired.length > 0 ? fired : shoot(battle, unit, seen))]
     if (events.length === 0) continue
     battle.shooter = unit.id
     return events
