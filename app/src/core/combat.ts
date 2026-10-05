@@ -13,8 +13,10 @@ import {
   PATROL_MOVE,
   revealed,
   ROCKET_DAMAGE,
+  STANDOFF,
   type Battle,
   type Side,
+  type Stance,
   type Tile,
   type Unit,
 } from './battle'
@@ -113,11 +115,49 @@ function bestPath(candidates: Tile[][], unit: Unit, score: (end: Tile, steps: nu
   return best
 }
 
+/** What a stance weighs about a tile a unit could end its move on. */
+interface Spot {
+  /** The unit's best hit chance from the tile, in percent; 0 with no shot. */
+  mine: number
+  /** The best hit chance any enemy has on the tile from where it stands, in percent. */
+  theirs: number
+  /** Tiles the nearest squadmate is beyond a medic's reach. */
+  apart: number
+  /** Tiles the nearest enemy is inside STANDOFF. */
+  crowded: number
+  /** 0 with a clear line to some enemy, else 1. */
+  blind: number
+  /** The walk to the nearest enemy. */
+  toGoal: number
+}
+
+/** How each stance ranks a tile it can shoot from, lowest first. */
+const WITH_SHOT: Record<Stance, (spot: Spot) => number[]> = {
+  // The exchange of fire that most favours the unit.
+  balanced: ({ mine, theirs }) => [theirs - mine],
+  // The surest shot, whatever comes back.
+  rush: ({ mine, theirs }) => [-mine, theirs],
+  // The same exchange, with safety counted double.
+  anchor: ({ mine, theirs }) => [2 * theirs - mine],
+  // Out of every enemy's reach, then at a distance, then the best shot.
+  standoff: ({ mine, theirs, crowded }) => [theirs, crowded, -mine],
+  // A good exchange that keeps a squadmate within reach.
+  escort: ({ mine, theirs, apart }) => [theirs - mine + 10 * apart],
+}
+
+/** How each stance ranks a tile with no shot, lowest first. */
+const NO_SHOT: Record<Stance, (spot: Spot) => number[]> = {
+  balanced: ({ toGoal, theirs }) => [toGoal, theirs],
+  rush: ({ toGoal, theirs }) => [toGoal, theirs],
+  anchor: ({ toGoal, theirs }) => [toGoal, theirs],
+  // Holds at a distance, out of reach, and from there looks for a clear line before walking nearer.
+  standoff: ({ toGoal, theirs, crowded, blind }) => [theirs, crowded, blind, toGoal],
+  escort: ({ toGoal, theirs, apart }) => [toGoal + apart, theirs],
+}
+
 /**
- * The path a fighting unit takes in its move stage. Among tiles with a shot at an enemy, it ends on the one where
- * its best shot most outweighs the best shot any enemy has back at it; the fewest steps wins a tie.
- * With no shot reachable, it ends as close to the nearest enemy as it can walk, on the least exposed such tile.
- * Run and Gun doubles the move when the normal move reaches no shot.
+ * The path a fighting unit takes in its move stage: to the tile its stance ranks best, preferring any tile with a
+ * shot over any without; the fewest steps wins a tie. Run and Gun doubles the move when the normal move reaches no shot.
  */
 function fightPath(battle: Battle, unit: Unit): Tile[] {
   const enemies = enemiesOf(battle, unit)
@@ -135,8 +175,20 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
     const chances = enemies.filter((enemy) => canShoot(battle, enemy, end, enemy.stats.range)).map((enemy) => odds(battle, enemy, end, enemy.stats).hit)
     return Math.round(100 * Math.max(0, ...chances))
   }
+  const squadmates = battle.units.filter((u) => u.side === unit.side && u !== unit)
+  const apart = (end: Tile) => Math.max(0, Math.min(MEDIC_REACH, ...squadmates.map((u) => distance(end, u) - MEDIC_REACH)))
   const choose = (move: number) =>
-    bestPath(paths(battle, unit, move), unit, (end, steps) => (mine(end) > 0 ? [0, theirs(end) - mine(end), steps] : [1, toGoal[end.y * GRID + end.x], theirs(end)]))
+    bestPath(paths(battle, unit, move), unit, (end, steps) => {
+      const spot: Spot = {
+        mine: mine(end),
+        theirs: theirs(end),
+        apart: apart(end),
+        crowded: Math.max(0, STANDOFF - Math.min(...enemies.map((enemy) => distance(end, enemy)))),
+        blind: enemies.some((enemy) => lineOfSight(battle, end, enemy)) ? 0 : 1,
+        toGoal: toGoal[end.y * GRID + end.x],
+      }
+      return spot.mine > 0 ? [0, ...WITH_SHOT[unit.stance](spot), steps] : [1, ...NO_SHOT[unit.stance](spot)]
+    })
   const path = choose(unit.stats.move)
   if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * unit.stats.move)
   return path

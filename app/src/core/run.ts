@@ -250,6 +250,7 @@ export function startMission(run: Run, mission: Mission): void {
     stats: soldierStats(run, s),
     ability: s.cls && CLASSES[s.cls].ability,
     charges: s.cls ? CLASSES[s.cls].charges : 0,
+    stance: s.cls ? CLASSES[s.cls].stance : ('balanced' as const),
   }))
   run.battle = createBattle(randomInt(run, 2 ** 31), aliens, reserve)
 }

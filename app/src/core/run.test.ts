@@ -27,7 +27,7 @@ function finish(run: Run, winner: Side): void {
   const battle = run.battle!
   apply(run, { type: 'land', zone: 0 })
   const [fighter, ...rest] = battle.units.filter((u) => u.side === 'human')
-  battle.reserve = winner === 'human' ? rest.map((u) => ({ soldier: u.soldier!, stats: u.stats, ability: u.ability, charges: u.charges })) : []
+  battle.reserve = winner === 'human' ? rest.map((u) => ({ soldier: u.soldier!, stats: u.stats, ability: u.ability, charges: u.charges, stance: u.stance })) : []
   battle.units = battle.units.filter((u) => u.side === winner && (u.side === 'alien' || u === fighter))
   battle.phase = 'over'
   battle.winner = winner
@@ -156,6 +156,6 @@ test('a class changes stats and gives the unit its ability', () => {
   apply(run, { type: 'mission', index: 0 })
   apply(run, { type: 'land', zone: 0 })
   const units = run.battle!.units.filter((u) => u.side === 'human')
-  expect(units[0]).toMatchObject({ ability: 'rocket', charges: 1 })
-  expect(units[1]).toMatchObject({ ability: null, charges: 0 })
+  expect(units[0]).toMatchObject({ ability: 'rocket', charges: 1, stance: 'anchor' })
+  expect(units[1]).toMatchObject({ ability: null, charges: 0, stance: 'balanced' })
 })

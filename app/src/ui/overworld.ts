@@ -72,7 +72,7 @@ function soldierCard(run: Run, soldier: Soldier): string {
       <tr><td>Damage</td><td>${stats.damage}</td><td>Range</td><td>${stats.range}</td></tr>
       <tr><td>Move</td><td>${stats.move}</td><td>Crit</td><td>${Math.round(100 * stats.crit)}%</td></tr>
     </table>
-    ${cls ? `<p><b>${cls.weapon}</b></p><p><b>${cls.abilityName}.</b> ${cls.abilityText}.</p>` : '<p>A rookie gets a class, at random, on first promotion.</p>'}
+    ${cls ? `<p><b>${cls.weapon}.</b> ${cls.stanceText}.</p><p><b>${cls.abilityName}.</b> ${cls.abilityText}.</p>` : '<p>A rookie gets a class, at random, on first promotion.</p>'}
   </div>`
 }
 

@@ -10,7 +10,7 @@
 
 **Pods.** As in XCOM: Enemy Unknown, aliens roam in small groups, unseen. Before the landing the map marks where each pod is. Once the squad lands, fog darkens every tile no soldier sees. A pod is revealed when a soldier sights one of its members; it then moves to fighting positions at once and fights from its next turn. The squad heads for the nearest pod, so a landing decides which pods it meets first and on what ground.
 
-**Cover.** Cover is real objects and follows reality: nothing shoots through a wall. High cover blocks movement and shots; a unit behind it can be hit only from an angle that sees past it. Low cover blocks movement and makes a unit beside it harder to hit. Cover counts only against a shooter on its far side; a shot from any other side flanks, ignores the cover, and can crit. Hit and crit numbers follow XCOM: Enemy Unknown. A shot is likelier to hit the closer the target, so a flanked enemy at point-blank is a near-certain hit. Every unit moves to where its best shot most outweighs the best shot coming back.
+**Cover.** Cover is real objects and follows reality: nothing shoots through a wall. High cover blocks movement and shots; a unit behind it can be hit only from an angle that sees past it. Low cover blocks movement and makes a unit beside it harder to hit. Cover counts only against a shooter on its far side; a shot from any other side flanks, ignores the cover, and can crit. Hit and crit numbers follow XCOM: Enemy Unknown. A shot is likelier to hit the closer the target, so a flanked enemy at point-blank is a near-certain hit. By default a unit moves to where its best shot most outweighs the best shot coming back.
 
 **Maps.** Post-apocalyptic cities and countryside: houses, trees, terrain.
 
@@ -24,6 +24,6 @@
 
 - Base: won missions pay supplies. The player spends supplies on facilities from a fixed list, each with several levels.
 - Aid: after a won mission the defended region offers three aid cards of differing rarity; the player takes one. Aid is a windfall, not a plan: supplies, training, threat relief, alien tech.
-- Soldiers: survivors gain experience and ranks. Recruits refill the squad for free, so rookies are expendable and veterans precious. On first promotion a soldier draws one of four classes at random, after XCOM's: Assault, Heavy, Sniper, Support. A class is a weapon, which changes the soldier's stats, and one ability the soldier uses unprompted.
+- Soldiers: survivors gain experience and ranks. Recruits refill the squad for free, so rookies are expendable and veterans precious. On first promotion a soldier draws one of four classes at random, after XCOM's: Assault, Heavy, Sniper, Support. A class is a weapon, which changes the soldier's stats; a way of positioning, such as a Sniper keeping out of reach; and one ability the soldier uses unprompted.
 - Gear: owned by the base, not the soldier, so it survives a death. Not built.
 - Death: should reward the player in a way the fiction supports. Undecided.

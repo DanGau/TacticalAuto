@@ -24,6 +24,8 @@ export const BLAST_RADIUS = 1
 /** Health a medic restores, to a soldier within MEDIC_REACH tiles. */
 export const MEDIC_HEAL = 4
 export const MEDIC_REACH = 2
+/** Tiles a unit in the standoff stance keeps from every enemy. */
+export const STANDOFF = 7
 /** Landing zones offered to the squad. */
 export const ZONES = 3
 /** Tiles around a landing zone's centre that count as the zone. */
@@ -58,12 +60,16 @@ export const BASE_STATS: Stats = { hp: 10, aim: 0.75, damage: 3, range: 5, move:
 /** Something a unit does unprompted beyond moving and shooting; each is described where combat applies it. */
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic'
 
+/** How a unit chooses where to stand; each is described where combat applies it. */
+export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
+
 /** A soldier waiting to land. */
 export interface Reserve {
   soldier: number
   stats: Stats
   ability: Ability | null
   charges: number
+  stance: Stance
 }
 
 export interface Unit {
@@ -80,6 +86,7 @@ export interface Unit {
   ability: Ability | null
   /** Uses of the ability left this battle. */
   charges: number
+  stance: Stance
 }
 
 /** A group of aliens. It patrols toward its waypoint, unseen, until a soldier sights a member; then it fights. */
@@ -250,7 +257,7 @@ export function createBattle(seed: number, aliens: Stats[], reserve: Reserve[]):
     centres.push(centre)
     const members = aliens.filter((_, i) => i % podCount === pod)
     freeTilesNear(battle, centre, members.length).forEach((tile, i) => {
-      battle.units.push({ id: battle.nextId++, side: 'alien', ...tile, hp: members[i].hp, stats: members[i], soldier: null, pod: battle.pods.length, ability: null, charges: 0 })
+      battle.units.push({ id: battle.nextId++, side: 'alien', ...tile, hp: members[i].hp, stats: members[i], soldier: null, pod: battle.pods.length, ability: null, charges: 0, stance: 'balanced' })
     })
     battle.pods.push({ revealed: false, surprised: false, waypoint: randomTile(battle) })
   }
