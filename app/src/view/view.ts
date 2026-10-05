@@ -303,7 +303,7 @@ export async function createView(): Promise<View> {
     const text = e.hit ? `${e.crit ? 'CRIT' : 'HIT'} -${e.damage}` : 'MISS'
     const mark = new Text({
       text,
-      style: { fill: e.crit ? COLOR.crit : e.hit ? COLOR.hit : COLOR.miss, fontSize: e.crit ? 30 : 22, fontWeight: 'bold', fontFamily: 'sans-serif', stroke: { color: 0x10141c, width: 5 } },
+      style: { fill: e.crit ? COLOR.crit : e.hit ? COLOR.hit : COLOR.miss, fontSize: e.crit ? 18 : 13, fontWeight: 'bold', fontFamily: 'sans-serif', stroke: { color: 0x10141c, width: 3 } },
     })
     mark.anchor.set(0.5, 1)
     mark.position.set(over.node.x, over.node.y - 48)
