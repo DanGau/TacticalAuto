@@ -24,6 +24,7 @@ const REVEAL_MS = 450
 const SHOT_MS = 160
 const IMPACT_MS = 140
 const DEATH_MS = 260
+const CALLOUT_MS = 900
 
 const COLOR = {
   human: 0x4da3ff,
@@ -32,6 +33,8 @@ const COLOR = {
   zone: 0x2f6fb0,
   zoneHover: 0x4d9be6,
   fog: 0x05070b,
+  /** Tint of a cover block or unit standing in fog. */
+  dim: 0x5a5f6b,
   line: 0x10141c,
   hit: 0xffd84d,
   crit: 0xff7a3d,
@@ -98,16 +101,20 @@ export async function createView(): Promise<View> {
   }
   /** Shown before the landing: the landing zones' tint under the units, and their names and the contact markers over them. */
   const zones = new Graphics()
+  const marks = new Container()
+  /** Shot callouts. */
   const labels = new Container()
   const units = new Container()
   units.sortableChildren = true
   const fog = new Graphics()
   const fx = new Graphics()
   const world = new Container()
-  world.addChild(tiles, zones, units, fog, fx, labels)
+  world.addChild(tiles, zones, fog, units, fx, marks, labels)
   app.stage.addChild(world)
 
   const sprites = new Map<number, Sprite>()
+  /** Cover blocks by tile index, row by row. */
+  const blocks = new Map<number, Graphics>()
   /** The battle on screen. */
   let shown: Battle | null = null
   let camera = WHOLE_MAP
@@ -182,6 +189,7 @@ export async function createView(): Promise<View> {
   function setBattle(battle: Battle): void {
     shown = battle
     sprites.clear()
+    blocks.clear()
     units.removeChildren().forEach((child) => child.destroy({ children: true }))
     const w = TILE_W / 2
     const h = TILE_H / 2
@@ -199,6 +207,7 @@ export async function createView(): Promise<View> {
         block.position.copyFrom(toWorld(x, y))
         block.zIndex = x + y
         units.addChild(block)
+        blocks.set(y * GRID + x, block)
       }
     }
   }
@@ -213,7 +222,7 @@ export async function createView(): Promise<View> {
   /** Before the landing: tints, names and describes each landing zone, and marks where each pod is. */
   function drawMarks(battle: Battle): void {
     zones.clear()
-    labels.removeChildren().forEach((child) => child.destroy())
+    marks.removeChildren().forEach((child) => child.destroy())
     if (battle.phase !== 'deploy') return
     battle.zones.forEach((zone, i) => {
       for (let y = 0; y < GRID; y++) {
@@ -223,21 +232,24 @@ export async function createView(): Promise<View> {
       }
       const { cover, contact } = zoneInfo(battle, zone)
       const ground = cover >= 12 ? 'heavy cover' : cover >= 5 ? 'some cover' : 'open ground'
-      labels.addChild(label(ZONE_NAMES[i], zone, 0xffffff), label(`${ground}\ncontact ${contact} tiles`, zone, 0xffffff, 20))
+      marks.addChild(label(ZONE_NAMES[i], zone, 0xffffff), label(`${ground}\ncontact ${contact} tiles`, zone, 0xffffff, 20))
     })
     battle.pods.forEach((_, pod) => {
       const members = battle.units.filter((u) => u.pod === pod)
-      if (members.length > 0) labels.addChild(label('?', members[0], COLOR.contact))
+      if (members.length > 0) marks.addChild(label('?', members[0], COLOR.contact))
     })
   }
 
-  /** Darkens every tile no soldier sees. Before the landing nothing is fogged. */
+  /** Darkens every tile no soldier sees, and whatever stands on it. Before the landing nothing is fogged. */
   function drawFog(battle: Battle): void {
     fog.clear()
-    if (battle.phase === 'deploy') return
-    visibleTiles(battle).forEach((seen, i) => {
-      if (!seen) diamond(fog, i % GRID, Math.floor(i / GRID)).fill({ color: COLOR.fog, alpha: 0.55 })
+    const seen = battle.phase === 'deploy' ? null : visibleTiles(battle)
+    const tint = (tile: number) => (!seen || seen[tile] ? 0xffffff : COLOR.dim)
+    seen?.forEach((lit, i) => {
+      if (!lit) diamond(fog, i % GRID, Math.floor(i / GRID)).fill({ color: COLOR.fog, alpha: 0.55 })
     })
+    for (const [tile, block] of blocks) block.tint = tint(tile)
+    for (const sprite of sprites.values()) sprite.node.tint = tint(Math.round(sprite.tile.y) * GRID + Math.round(sprite.tile.x))
   }
 
   const pips = (run: Run, unit: Unit) => {
@@ -286,6 +298,28 @@ export async function createView(): Promise<View> {
 
   const chest = (sprite: Sprite): Tile => ({ x: sprite.node.x, y: sprite.node.y - CHEST })
 
+  /** The shot's result in words, over the target: a miss, or a hit or crit with its damage. */
+  function callout(e: Extract<GameEvent, { type: 'shot' }>, over: Sprite): Text {
+    const text = e.hit ? `${e.crit ? 'CRIT' : 'HIT'} -${e.damage}` : 'MISS'
+    const mark = new Text({
+      text,
+      style: { fill: e.crit ? COLOR.crit : e.hit ? COLOR.hit : COLOR.miss, fontSize: e.crit ? 30 : 22, fontWeight: 'bold', fontFamily: 'sans-serif', stroke: { color: 0x10141c, width: 5 } },
+    })
+    mark.anchor.set(0.5, 1)
+    mark.position.set(over.node.x, over.node.y - 48)
+    labels.addChild(mark)
+    return mark
+  }
+
+  /** Floats a callout up and away. It does not hold up the next beat. */
+  function float(mark: Text): void {
+    const from = mark.y
+    void tween(CALLOUT_MS, (t) => {
+      mark.y = from - 34 * t
+      mark.alpha = Math.min(1, 3 * (1 - t))
+    }).then(() => mark.destroy())
+  }
+
   function walk(sprite: Sprite, path: Tile[]): Promise<void> {
     const points = [sprite.tile, ...path]
     return tween(MS_PER_TILE * path.length, (t) => {
@@ -295,7 +329,8 @@ export async function createView(): Promise<View> {
     })
   }
 
-  async function shoot(from: Sprite, to: Sprite, hit: boolean, crit: boolean, hpAfter: number): Promise<void> {
+  async function shoot(from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, hpAfter: number): Promise<void> {
+    const { hit, crit } = e
     const a = chest(from)
     // A miss flies past above the target.
     const b = hit ? chest(to) : { x: to.node.x + 10, y: to.node.y - CHEST - 26 }
@@ -305,6 +340,7 @@ export async function createView(): Promise<View> {
       fx.clear().moveTo(tail.x, tail.y).lineTo(head.x, head.y).stroke({ color: hit ? COLOR.hit : COLOR.miss, width: 3 })
     })
     fx.clear()
+    float(callout(e, to))
     if (!hit) return
     drawHp(to, hpAfter)
     await tween(IMPACT_MS, (t) => {
@@ -339,7 +375,7 @@ export async function createView(): Promise<View> {
         const to = sprites.get(e.target)
         if (!from || !to) continue
         await follow([from.tile, to.tile])
-        await shoot(from, to, e.hit, e.crit, battle.units.find((u) => u.id === e.target)?.hp ?? 0)
+        await shoot(from, to, e, battle.units.find((u) => u.id === e.target)?.hp ?? 0)
       } else if (e.type === 'death') {
         const sprite = sprites.get(e.id)
         if (!sprite) continue
@@ -371,6 +407,7 @@ export async function createView(): Promise<View> {
       drawFog(battle)
       if (!animate) {
         look(WHOLE_MAP)
+        labels.removeChildren().forEach((child) => child.destroy())
         for (const e of events) {
           if (e.type !== 'shot') continue
           const from = sprites.get(e.id)
@@ -380,6 +417,7 @@ export async function createView(): Promise<View> {
           const a = chest(from)
           const b = chest(to)
           fx.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: e.crit ? COLOR.crit : e.hit ? COLOR.hit : COLOR.miss, width: 3 })
+          callout(e, to)
         }
       }
       app.render()

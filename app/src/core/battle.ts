@@ -5,6 +5,8 @@ export const GRID = 32
 export const MAX_BEATS = 1000
 /** Damage a crit adds. */
 export const CRIT_BONUS = 2
+/** Hit chance a shot gains for each tile the target is nearer than the shooter's range. */
+export const CLOSE_AIM = 0.06
 /** Hit chance a target's cover removes, indexed by Cover. */
 export const COVER_DEFENSE = [0, 0.2, 0.4]
 /** Patches of dense cover on the map; the ground between them is nearly open. */
@@ -34,7 +36,7 @@ export type Tile = { x: number; y: number }
 
 export interface Stats {
   hp: number
-  /** Chance to hit a target with no cover against the shooter. */
+  /** Chance to hit a target at full range with no cover against the shooter. */
   aim: number
   damage: number
   /** Tiles a shot reaches, counting a diagonal as one. */

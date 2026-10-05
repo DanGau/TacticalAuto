@@ -1,4 +1,4 @@
-import { COVER_DEFENSE, coverAt, distance, GRID, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile } from './battle'
+import { CLOSE_AIM, COVER_DEFENSE, coverAt, distance, GRID, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile } from './battle'
 
 const SIDES = [[0, -1], [1, 0], [0, 1], [-1, 0]]
 
@@ -17,10 +17,14 @@ export function coverAgainst(battle: Battle, at: Tile, from: Tile): Cover {
   return best
 }
 
-/** Chances for a shot by a unit with `stats` standing on `shooter`: to hit, and for a hit to crit. */
+/**
+ * Chances for a shot by a unit with `stats` standing on `shooter`: to hit, and for a hit to crit.
+ * Cover lowers the hit chance and closeness raises it, so a flanked target at point-blank is a near-certain hit.
+ */
 export function odds(battle: Battle, shooter: Tile, target: Tile, stats: Stats): { hit: number; crit: number } {
   const cover = coverAgainst(battle, target, shooter)
-  return { hit: stats.aim - COVER_DEFENSE[cover], crit: cover === 0 ? stats.crit : 0 }
+  const hit = stats.aim - COVER_DEFENSE[cover] + CLOSE_AIM * Math.max(0, stats.range - distance(shooter, target))
+  return { hit: Math.min(Math.max(hit, 0), 1), crit: cover === 0 ? stats.crit : 0 }
 }
 
 /**

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { BASE_STATS, COVER_DEFENSE, createBattle, GRID, type Battle, type Cover } from './battle'
+import { BASE_STATS, CLOSE_AIM, COVER_DEFENSE, createBattle, GRID, type Battle, type Cover } from './battle'
 import { coverAgainst, lineOfSight, odds } from './sight'
 
 const at = { x: 10, y: 10 }
@@ -21,7 +21,7 @@ test.each([
   expect(coverAgainst(map(2), at, from)).toBe(expected)
 })
 
-test('cover lowers the hit chance; no cover lets hits crit', () => {
+test('at full range, cover lowers the hit chance; no cover lets hits crit', () => {
   const north = { x: 10, y: 5 }
   expect(odds(map(0), north, at, BASE_STATS)).toEqual({ hit: BASE_STATS.aim, crit: BASE_STATS.crit })
   expect(odds(map(1), north, at, BASE_STATS)).toEqual({ hit: BASE_STATS.aim - COVER_DEFENSE[1], crit: 0 })
@@ -40,4 +40,12 @@ test.each([
 
 test('low cover does not block line of sight', () => {
   expect(lineOfSight(map(1), { x: 10, y: 5 }, at)).toBe(true)
+})
+
+test('each tile closer adds to the hit chance, up to certainty', () => {
+  const from = (tiles: number) => odds(map(0), { x: at.x, y: at.y + tiles }, at, BASE_STATS).hit
+  expect(from(BASE_STATS.range)).toBe(BASE_STATS.aim)
+  expect(from(3)).toBeCloseTo(BASE_STATS.aim + CLOSE_AIM * (BASE_STATS.range - 3))
+  expect(from(1)).toBeGreaterThan(from(3))
+  expect(odds(map(0), { x: at.x, y: at.y + 1 }, at, { ...BASE_STATS, aim: 0.95 }).hit).toBe(1)
 })

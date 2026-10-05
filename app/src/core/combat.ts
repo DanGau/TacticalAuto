@@ -1,13 +1,14 @@
 import { blocked, coverAt, CRIT_BONUS, distance, GRID, MAX_BEATS, NEIGHBORS, onGrid, PATROL_MOVE, revealed, type Battle, type Side, type Tile, type Unit } from './battle'
 import { random, randomInt } from './rng'
-import { canShoot, coverAgainst, odds, sees } from './sight'
+import { canShoot, odds, sees } from './sight'
 
 export type GameEvent =
   /** `path` lists each tile entered, in order. */
   | { type: 'move'; id: number; path: Tile[] }
   /** A pod is sighted. `units` gives each member's tile at that moment; its moves to cover follow. */
   | { type: 'reveal'; units: { id: number; x: number; y: number }[] }
-  | { type: 'shot'; id: number; target: number; hit: boolean; crit: boolean }
+  /** `damage` is 0 for a miss. */
+  | { type: 'shot'; id: number; target: number; hit: boolean; crit: boolean; damage: number }
   | { type: 'death'; id: number }
   | { type: 'end'; winner: Side | null }
 
@@ -78,10 +79,16 @@ function bestPath(candidates: Tile[][], unit: Unit, score: (end: Tile, steps: nu
   return best
 }
 
+/** The best hit chance, in whole percent, among shots from `from` at each of `targets` with the given stats; 0 with no shot. */
+function bestShot(battle: Battle, from: Tile, targets: Tile[], stats: Unit['stats']): number {
+  const chances = targets.filter((target) => canShoot(battle, from, target, stats.range)).map((target) => odds(battle, from, target, stats).hit)
+  return Math.round(100 * Math.max(0, ...chances))
+}
+
 /**
- * The path a fighting unit takes in its move stage. It ends on the tile that, in order of preference:
- * has a shot at an enemy, gives the best cover against the nearest such enemy, and is the fewest steps away.
- * With no shot reachable, it ends as close to the nearest enemy as it can walk.
+ * The path a fighting unit takes in its move stage. Among tiles with a shot at an enemy, it ends on the one where
+ * its best shot most outweighs the best shot any enemy has back at it; the fewest steps wins a tie.
+ * With no shot reachable, it ends as close to the nearest enemy as it can walk, on the least exposed such tile.
  */
 function fightPath(battle: Battle, unit: Unit): Tile[] {
   const enemies = enemiesOf(battle, unit)
@@ -89,11 +96,9 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   if (!goal) return []
   const toGoal = walkingDistances(battle, goal)
   return bestPath(paths(battle, unit, unit.stats.move), unit, (end, steps) => {
-    const target = nearest(
-      enemies.filter((enemy) => canShoot(battle, end, enemy, unit.stats.range)),
-      end,
-    )
-    return target ? [0, -coverAgainst(battle, end, target), steps] : [1, toGoal[end.y * GRID + end.x], -coverAgainst(battle, end, goal)]
+    const mine = bestShot(battle, end, enemies, unit.stats)
+    const theirs = Math.max(0, ...enemies.map((enemy) => bestShot(battle, enemy, [end], enemy.stats)))
+    return mine > 0 ? [0, theirs - mine, steps] : [1, toGoal[end.y * GRID + end.x], theirs]
   })
 }
 
@@ -172,9 +177,10 @@ function shootNext(battle: Battle): GameEvent[] {
     const chance = odds(battle, unit, enemy, unit.stats)
     const hit = random(battle) < chance.hit
     const crit = hit && random(battle) < chance.crit
-    const events: GameEvent[] = [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit }]
+    const damage = hit ? unit.stats.damage + (crit ? CRIT_BONUS : 0) : 0
+    const events: GameEvent[] = [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage }]
     if (hit) {
-      enemy.hp -= unit.stats.damage + (crit ? CRIT_BONUS : 0)
+      enemy.hp -= damage
       if (enemy.hp <= 0) {
         battle.units = battle.units.filter((u) => u !== enemy)
         events.push({ type: 'death', id: enemy.id })

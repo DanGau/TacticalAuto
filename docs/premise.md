@@ -10,7 +10,7 @@
 
 **Pods.** As in XCOM: Enemy Unknown, aliens roam in small groups, unseen. Before the landing the map marks where each pod is. Once the squad lands, fog darkens every tile no soldier sees. A pod is revealed when a soldier sights one of its members; it then moves to fighting positions at once and fights from its next turn. The squad heads for the nearest pod, so a landing decides which pods it meets first and on what ground.
 
-**Cover.** Cover is real objects and follows reality: nothing shoots through a wall. High cover blocks movement and shots; a unit behind it can be hit only from an angle that sees past it. Low cover blocks movement and makes a unit beside it harder to hit. Cover counts only against a shooter on its far side; a shot from any other side flanks, ignores the cover, and can crit. Units move to cover on their own. Hit and crit numbers follow XCOM: Enemy Unknown.
+**Cover.** Cover is real objects and follows reality: nothing shoots through a wall. High cover blocks movement and shots; a unit behind it can be hit only from an angle that sees past it. Low cover blocks movement and makes a unit beside it harder to hit. Cover counts only against a shooter on its far side; a shot from any other side flanks, ignores the cover, and can crit. Hit and crit numbers follow XCOM: Enemy Unknown. A shot is likelier to hit the closer the target, so a flanked enemy at point-blank is a near-certain hit. Every unit moves to where its best shot most outweighs the best shot coming back.
 
 **Maps.** Post-apocalyptic cities and countryside: houses, trees, terrain.
 
