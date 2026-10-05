@@ -155,6 +155,12 @@ const WITH_SHOT: Record<Stance, (spot: Spot) => number[]> = {
 }
 
 /**
+ * Tiles a standoff soldier keeps behind the foremost squadmate while no soldier sees an alien, so the squad's
+ * front line meets the enemy first.
+ */
+const REAR_GAP = 2
+
+/**
  * A soldier that has lost this share of its health is wary while a healthier squadmate fights on: it gives up a shot
  * for a tile where less comes back, and stops advancing through tiles an enemy can shoot. With no healthier
  * squadmate it fights as normal, so a battle always ends. Aliens are never wary; they press the attack.
@@ -198,6 +204,12 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const hurt = 1 - unit.hp / unit.stats.hp
   const wary = unit.side === 'human' && hurt >= WARY && squadmates.some((u) => u.hp / u.stats.hp > 1 - WARY)
   const apart = (end: Tile) => Math.max(0, Math.min(MEDIC_REACH, ...squadmates.map((u) => distance(end, u) - MEDIC_REACH)))
+  const marching = unit.side === 'human' && seen.size === 0
+  const leaders = unit.stance === 'standoff' ? squadmates.filter((u) => u.stance !== 'standoff') : []
+  /** The nearest to the enemy this unit may walk while marching: REAR_GAP behind the foremost leader. */
+  const slot = marching && leaders.length > 0 ? Math.min(...leaders.map((u) => toGoal[u.y * GRID + u.x])) + REAR_GAP : 0
+  /** Tiles `end` is ahead of the unit's place in the formation. */
+  const ahead = (end: Tile) => Math.max(0, slot - toGoal[end.y * GRID + end.x])
   const choose = (move: number) => {
     const reach = paths(battle, unit, move)
     /** Whether some tile in reach has a shot; out of contact, even a wary unit keeps advancing. */
@@ -216,7 +228,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
       }
       // A wary unit ranks every tile by the exchange of fire, so one with no shot and no risk can win.
       if (wary && unit.stance !== 'standoff' && inContact) return [0, ...WITH_SHOT[unit.stance](spot), spot.toGoal]
-      return spot.mine > 0 ? [0, ...WITH_SHOT[unit.stance](spot), steps] : [1, ...NO_SHOT[unit.stance](spot)]
+      return spot.mine > 0 ? [0, ...WITH_SHOT[unit.stance](spot), steps] : [1, ahead(end), ...NO_SHOT[unit.stance](spot)]
     })
   }
   const path = choose(unit.stats.move)
