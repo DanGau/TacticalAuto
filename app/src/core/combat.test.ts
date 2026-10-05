@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { distance, revealed, SIGHT, type Battle } from './battle'
+import { revealed, type Battle } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { createRun } from './run'
-import { lineOfSight } from './sight'
+import { sees } from './sight'
 
 function battle(seed: number): Battle {
   const run = createRun(seed)
@@ -67,7 +67,7 @@ test('a pod is revealed exactly when a soldier first has it in sight', () => {
   play(4, (_, __, after) => {
     const soldiers = after.units.filter((u) => u.side === 'human')
     for (const alien of after.units.filter((u) => u.side === 'alien')) {
-      const seen = soldiers.some((s) => distance(s, alien) <= SIGHT && lineOfSight(after, s, alien))
+      const seen = soldiers.some((s) => sees(after, s, alien))
       if (seen) expect(revealed(after, alien)).toBe(true)
     }
   })

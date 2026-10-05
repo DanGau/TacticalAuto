@@ -1,6 +1,6 @@
-import { blocked, coverAt, CRIT_BONUS, distance, GRID, MAX_BEATS, NEIGHBORS, onGrid, PATROL_MOVE, revealed, SIGHT, type Battle, type Side, type Tile, type Unit } from './battle'
+import { blocked, coverAt, CRIT_BONUS, distance, GRID, MAX_BEATS, NEIGHBORS, onGrid, PATROL_MOVE, revealed, type Battle, type Side, type Tile, type Unit } from './battle'
 import { random, randomInt } from './rng'
-import { canShoot, coverAgainst, lineOfSight, odds } from './sight'
+import { canShoot, coverAgainst, odds, sees } from './sight'
 
 export type GameEvent =
   /** `path` lists each tile entered, in order. */
@@ -118,7 +118,7 @@ function sight(battle: Battle): GameEvent[] {
   battle.pods.forEach((pod, index) => {
     if (pod.revealed) return
     const members = battle.units.filter((u) => u.pod === index)
-    const seen = members.some((m) => soldiers.some((s) => distance(s, m) <= SIGHT && lineOfSight(battle, s, m)))
+    const seen = members.some((m) => soldiers.some((s) => sees(battle, s, m)))
     if (!seen) return
     pod.revealed = true
     pod.surprised = battle.turn === 'alien'

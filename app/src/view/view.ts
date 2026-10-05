@@ -1,7 +1,8 @@
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js'
-import { coverAt, distance, GRID, revealed, ZONE_RADIUS, type Battle, type Tile, type Unit } from '../core/battle'
+import { coverAt, distance, GRID, revealed, ZONE_RADIUS, zoneInfo, type Battle, type Tile, type Unit } from '../core/battle'
 import type { GameEvent } from '../core/combat'
 import { rank, type Run } from '../core/run'
+import { visibleTiles } from '../core/sight'
 
 export const WIDTH = 1280
 export const HEIGHT = 720
@@ -29,6 +30,8 @@ const COLOR = {
   alien: 0x7ddc5a,
   tile: 0x263042,
   zone: 0x2f6fb0,
+  zoneHover: 0x4d9be6,
+  fog: 0x05070b,
   line: 0x10141c,
   hit: 0xffd84d,
   crit: 0xff7a3d,
@@ -40,7 +43,7 @@ const COLOR = {
 }
 
 /** Names of the landing zones, in battle.zones order. */
-export const ZONE_NAMES = ['A', 'B', 'C']
+const ZONE_NAMES = ['A', 'B', 'C']
 
 /** Position of a tile's centre in the world the camera looks at. Fractional tiles are allowed. */
 function toWorld(x: number, y: number): Tile {
@@ -72,8 +75,11 @@ export interface View {
    * Shows the run's battle, which `events` produced. Animated, it follows the action with the camera, plays the
    * events, and resolves when they finish. Still, it draws the whole map at once and marks each shot with a line.
    * Aliens in unrevealed pods are never drawn; before the landing, each pod shows as a contact marker.
+   * Once landed, fog darkens every tile no soldier sees.
    */
   show(run: Run, events: GameEvent[], animate: boolean): Promise<void>
+  /** The landing zone under a screen point, as an index into battle.zones; null when there is none to choose. */
+  zoneAt(sx: number, sy: number): number | null
 }
 
 export async function createView(): Promise<View> {
@@ -95,15 +101,32 @@ export async function createView(): Promise<View> {
   const labels = new Container()
   const units = new Container()
   units.sortableChildren = true
+  const fog = new Graphics()
   const fx = new Graphics()
   const world = new Container()
-  world.addChild(tiles, zones, units, fx, labels)
+  world.addChild(tiles, zones, units, fog, fx, labels)
   app.stage.addChild(world)
 
   const sprites = new Map<number, Sprite>()
   /** The battle on screen. */
   let shown: Battle | null = null
   let camera = WHOLE_MAP
+  /** The landing zone under the pointer. */
+  let hovered: number | null = null
+
+  const diamond = (g: Graphics, x: number, y: number) => {
+    const c = toWorld(x, y)
+    return g.poly([c.x, c.y - TILE_H / 2, c.x + TILE_W / 2, c.y, c.x, c.y + TILE_H / 2, c.x - TILE_W / 2, c.y])
+  }
+
+  function zoneAt(sx: number, sy: number): number | null {
+    if (shown?.phase !== 'deploy') return null
+    const a = (sx - world.x) / world.scale.x / (TILE_W / 2)
+    const b = (sy - world.y) / world.scale.y / (TILE_H / 2) + GRID
+    const tile = { x: Math.floor((a + b) / 2), y: Math.floor((b - a) / 2) }
+    const index = shown.zones.findIndex((zone) => distance(zone, tile) <= ZONE_RADIUS)
+    return index < 0 ? null : index
+  }
 
   function look(to: Camera): void {
     camera = to
@@ -180,14 +203,14 @@ export async function createView(): Promise<View> {
     }
   }
 
-  function label(text: string, tile: Tile, color: number): Text {
-    const mark = new Text({ text, style: { fill: color, fontSize: 44, fontWeight: 'bold', fontFamily: 'sans-serif', stroke: { color: 0x10141c, width: 6 } } })
-    mark.anchor.set(0.5, 0.8)
+  function label(text: string, tile: Tile, color: number, size = 44): Text {
+    const mark = new Text({ text, style: { fill: color, fontSize: size, fontWeight: 'bold', fontFamily: 'sans-serif', align: 'center', stroke: { color: 0x10141c, width: 6 } } })
+    mark.anchor.set(0.5, size === 44 ? 0.8 : 0)
     mark.position.copyFrom(toWorld(tile.x, tile.y))
     return mark
   }
 
-  /** Before the landing: tints and names each landing zone, and marks where each pod was last detected. */
+  /** Before the landing: tints, names and describes each landing zone, and marks where each pod is. */
   function drawMarks(battle: Battle): void {
     zones.clear()
     labels.removeChildren().forEach((child) => child.destroy())
@@ -195,16 +218,25 @@ export async function createView(): Promise<View> {
     battle.zones.forEach((zone, i) => {
       for (let y = 0; y < GRID; y++) {
         for (let x = 0; x < GRID; x++) {
-          if (distance(zone, { x, y }) > ZONE_RADIUS) continue
-          const c = toWorld(x, y)
-          zones.poly([c.x, c.y - TILE_H / 2, c.x + TILE_W / 2, c.y, c.x, c.y + TILE_H / 2, c.x - TILE_W / 2, c.y]).fill({ color: COLOR.zone, alpha: 0.7 })
+          if (distance(zone, { x, y }) <= ZONE_RADIUS) diamond(zones, x, y).fill({ color: i === hovered ? COLOR.zoneHover : COLOR.zone, alpha: 0.8 })
         }
       }
-      labels.addChild(label(ZONE_NAMES[i], zone, 0xffffff))
+      const { cover, contact } = zoneInfo(battle, zone)
+      const ground = cover >= 12 ? 'heavy cover' : cover >= 5 ? 'some cover' : 'open ground'
+      labels.addChild(label(ZONE_NAMES[i], zone, 0xffffff), label(`${ground}\ncontact ${contact} tiles`, zone, 0xffffff, 20))
     })
     battle.pods.forEach((_, pod) => {
       const members = battle.units.filter((u) => u.pod === pod)
       if (members.length > 0) labels.addChild(label('?', members[0], COLOR.contact))
+    })
+  }
+
+  /** Darkens every tile no soldier sees. Before the landing nothing is fogged. */
+  function drawFog(battle: Battle): void {
+    fog.clear()
+    if (battle.phase === 'deploy') return
+    visibleTiles(battle).forEach((seen, i) => {
+      if (!seen) diamond(fog, i % GRID, Math.floor(i / GRID)).fill({ color: COLOR.fog, alpha: 0.55 })
     })
   }
 
@@ -293,6 +325,8 @@ export async function createView(): Promise<View> {
         if (seen.length === 0) continue
         await follow(seen.flatMap((m) => [sprites.get(m.id)!.tile, m.path.at(-1)!]))
         await Promise.all(seen.map((m) => walk(sprites.get(m.id)!, m.path)))
+        // The fog lifts where the squad arrived, before any pod it uncovered appears.
+        drawFog(battle)
       } else if (e.type === 'reveal') {
         await follow(e.units)
         const appeared = e.units.flatMap((at) => {
@@ -315,8 +349,17 @@ export async function createView(): Promise<View> {
     }
   }
 
+  app.canvas.addEventListener('pointermove', (e) => {
+    const zone = zoneAt(e.offsetX, e.offsetY)
+    app.canvas.style.cursor = zone === null ? 'default' : 'pointer'
+    if (zone === hovered || !shown) return
+    hovered = zone
+    drawMarks(shown)
+  })
+
   return {
     canvas: app.canvas,
+    zoneAt,
     async show(run, events, animate) {
       fx.clear()
       const battle = run.battle
@@ -325,6 +368,7 @@ export async function createView(): Promise<View> {
       drawMarks(battle)
       if (animate) await play(battle, events)
       sync(run, battle)
+      drawFog(battle)
       if (!animate) {
         look(WHOLE_MAP)
         for (const e of events) {

@@ -1,8 +1,7 @@
 import type { Action } from '../core/apply'
 import { AID, FACILITIES, type AidId, type FacilityId } from '../core/base'
 import { buildCost, level, payout, preview, RANK_NAMES, RANK_XP, rank, REGIONS, ROUNDS, THREAT_MAX, type Mission, type Report, type Run } from '../core/run'
-import { zoneInfo, type Battle } from '../core/battle'
-import { ZONE_NAMES } from '../view/view'
+import type { View } from '../view/view'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
 
@@ -143,29 +142,17 @@ function endPanel(run: Run): string {
   return `<h1 class="up">Earth has fallen</h1><h2>Lost: ${missionTitle(run.mission!)}, round ${Math.min(run.round, ROUNDS)}</h2><button id="again">New run</button>`
 }
 
-/** One button per landing zone, saying what the squad lands in and how near the aliens are. */
-function zoneButtons(battle: Battle): string {
-  return battle.zones
-    .map((zone, index) => {
-      const { cover, contact } = zoneInfo(battle, zone)
-      const ground = cover >= 12 ? 'heavy cover' : cover >= 5 ? 'some cover' : 'open ground'
-      return button({ type: 'land', zone: index }, `<b>Zone ${ZONE_NAMES[index]}</b><br>${ground}<br>nearest contact ${contact} tiles`)
-    })
-    .join('')
-}
-
 function status(run: Run): string {
   const battle = run.battle
   if (run.phase !== 'battle' || !battle) return ''
   const title = missionTitle(run.mission!)
-  if (battle.phase === 'deploy') return `${title} · ${run.mission!.aliens} aliens · choose where the squad lands`
+  if (battle.phase === 'deploy') return `${title} · ${run.mission!.aliens} aliens · click a landing zone`
   return `${title} · ${SIDE[battle.turn]}' turn`
 }
 
 /** Turns clicks into actions and hands them to `act`. */
-export function createUi(act: (action: Action) => void): Ui {
+export function createUi(view: View, act: (action: Action) => void): Ui {
   const statusLine = document.getElementById('status')!
-  const zones = document.getElementById('zones')!
   const overlay = document.getElementById('panel')!
   /** The report whose screen of each kind the player has continued past. */
   const seen: Record<string, Report | null> = { mission: null, world: null }
@@ -192,7 +179,11 @@ export function createUi(act: (action: Action) => void): Ui {
     overlay.hidden = run.phase === 'battle'
   }
 
-  document.body.addEventListener('click', (e) => {
+  view.canvas.addEventListener('click', (e) => {
+    const zone = view.zoneAt(e.offsetX, e.offsetY)
+    if (zone !== null) act({ type: 'land', zone })
+  })
+  overlay.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (target?.id === 'again') location.href = location.pathname
     else if (target?.dataset.seen) {
@@ -205,8 +196,6 @@ export function createUi(act: (action: Action) => void): Ui {
   return {
     update(run) {
       statusLine.textContent = status(run)
-      const landing = run.phase === 'battle' && run.battle?.phase === 'deploy'
-      zones.innerHTML = landing ? zoneButtons(run.battle!) : ''
       render(run)
     },
   }

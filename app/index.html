@@ -7,8 +7,6 @@
       body { margin: 0; overflow: hidden; background: #10141c; color: #dde; font: 14px sans-serif; }
       canvas { display: block; }
       #hud { position: absolute; top: 12px; left: 12px; }
-      #zones { display: flex; gap: 12px; margin-top: 10px; }
-      #zones button { text-align: left; line-height: 1.5; }
       #panel { position: absolute; top: 24px; left: 40px; width: 1200px; box-sizing: border-box; padding: 14px 24px 18px; background: #171d29f2; border: 1px solid #3a465c; border-radius: 8px; }
       #panel[hidden] { display: none; }
       h1 { margin: 0 0 4px; font-size: 22px; }
@@ -62,7 +60,7 @@
     </style>
   </head>
   <body>
-    <div id="hud"><span id="status"></span><div id="zones"></div></div>
+    <div id="hud"><span id="status"></span></div>
     <div id="panel"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

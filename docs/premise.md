@@ -8,7 +8,7 @@
 
 **Battle.** A square grid larger than the screen; the camera follows the action. The player's only decision is which of three landing zones the squad drops into, chosen for its cover and its distance from the aliens. The battle then plays out in alternating turns, humans first. In a turn every unit of the side moves at once, then each shoots, one after another. Unit AI is predictable, so the player can foresee what a landing will do.
 
-**Pods.** As in XCOM: Enemy Unknown, aliens roam in small groups, unseen. Before the landing the map marks where each pod is. A pod is revealed when a soldier sights one of its members; it then moves to fighting positions at once and fights from its next turn. The squad heads for the nearest pod, so a landing decides which pods it meets first and on what ground.
+**Pods.** As in XCOM: Enemy Unknown, aliens roam in small groups, unseen. Before the landing the map marks where each pod is. Once the squad lands, fog darkens every tile no soldier sees. A pod is revealed when a soldier sights one of its members; it then moves to fighting positions at once and fights from its next turn. The squad heads for the nearest pod, so a landing decides which pods it meets first and on what ground.
 
 **Cover.** Cover is real objects and follows reality: nothing shoots through a wall. High cover blocks movement and shots; a unit behind it can be hit only from an angle that sees past it. Low cover blocks movement and makes a unit beside it harder to hit. Cover counts only against a shooter on its far side; a shot from any other side flanks, ignores the cover, and can crit. Units move to cover on their own. Hit and crit numbers follow XCOM: Enemy Unknown.
 

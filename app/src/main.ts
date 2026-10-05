@@ -35,7 +35,7 @@ function act(action: Action): Result {
   return result
 }
 
-const ui = createUi(act)
+const ui = createUi(view, act)
 
 window.debug = {
   snapshot: () => structuredClone(state),
