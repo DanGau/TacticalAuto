@@ -20,9 +20,10 @@ export function coverAgainst(battle: Battle, at: Tile, from: Tile): Cover {
 /**
  * Chances for a shot by a unit with `stats` standing on `shooter`: to hit, and for a hit to crit.
  * Cover lowers the hit chance and closeness raises it, so a flanked target at point-blank is a near-certain hit.
+ * A piercing shot treats the target as having no cover.
  */
-export function odds(battle: Battle, shooter: Tile, target: Tile, stats: Stats): { hit: number; crit: number } {
-  const cover = coverAgainst(battle, target, shooter)
+export function odds(battle: Battle, shooter: Tile, target: Tile, stats: Stats, piercing = false): { hit: number; crit: number } {
+  const cover = piercing ? 0 : coverAgainst(battle, target, shooter)
   const hit = stats.aim - COVER_DEFENSE[cover] + stats.close * Math.max(0, stats.range - distance(shooter, target))
   return { hit: Math.min(Math.max(hit, 0), 1), crit: cover === 0 ? stats.crit : 0 }
 }

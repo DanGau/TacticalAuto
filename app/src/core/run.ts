@@ -1,5 +1,6 @@
 import { BASE_STATS, createBattle, type Battle, type Stats } from './battle'
 import { CLASSES, type ClassId } from './classes'
+import { generateGear, SLOTS, type Gear, type Slot } from './gear'
 import { random, randomInt } from './rng'
 import { AID, FACILITIES, RARITY_CHANCE, type AidId, type FacilityId, type Lasting, type Rarity } from './base'
 
@@ -38,6 +39,8 @@ export interface Soldier {
   xp: number
   /** Null for a rookie; drawn at random on first promotion. */
   cls: ClassId | null
+  /** The id of the gear in each slot. */
+  gear: Record<Slot, number | null>
 }
 
 /**
@@ -60,6 +63,8 @@ export interface Report {
   threat: { before: number[]; afterMission: number[]; afterAliens: number[] }
   /** Supplies the mission paid. */
   supplies: number
+  /** Gear the mission dropped. */
+  gear: Gear | null
   /** Every soldier in the squad when the battle began. */
   /** `cls` is the class after the battle. */
   soldiers: { name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; died: boolean }[]
@@ -84,6 +89,9 @@ export interface Run {
   soldiers: Soldier[]
   nextSoldier: number
   supplies: number
+  /** Every piece of gear the base owns. A piece no living soldier holds is in the stash. */
+  gear: Gear[]
+  nextGear: number
   /** Facilities built, one entry per level. */
   built: FacilityId[]
   /** Aid taken. */
@@ -128,20 +136,38 @@ export function squadSize(run: Run): number {
   return BASE_SQUAD + total(run, (u) => u.squad)
 }
 
-/** A soldier's stats in battle: base, plus class, plus rank, plus facilities and aid. */
+/** The gear a soldier has equipped. */
+export function equipped(run: Run, soldier: Soldier): Gear[] {
+  return SLOTS.flatMap((slot) => run.gear.filter((gear) => gear.id === soldier.gear[slot]))
+}
+
+/** The soldier holding a piece of gear, if any. */
+export function holder(run: Run, gear: Gear): Soldier | undefined {
+  return run.soldiers.find((soldier) => soldier.gear[gear.slot] === gear.id)
+}
+
+/** Gives a piece of gear to a soldier, taking it from whoever held it; what the soldier had in that slot returns to the stash. */
+export function equip(run: Run, soldier: Soldier, gear: Gear): void {
+  const previous = holder(run, gear)
+  if (previous) previous.gear[gear.slot] = null
+  soldier.gear[gear.slot] = gear.id
+}
+
+/** A soldier's stats in battle: base, plus class, plus rank, plus gear, plus facilities and aid. */
 export function soldierStats(run: Run, soldier: Soldier): Stats {
   const stats = { ...BASE_STATS }
   for (const key of Object.keys(stats) as (keyof Stats)[]) {
     const fromClass = soldier.cls ? (CLASSES[soldier.cls].stats[key] ?? 0) : 0
-    stats[key] += fromClass + rank(soldier) * (RANK_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
+    const fromGear = equipped(run, soldier).reduce((sum, gear) => sum + (gear.stats[key] ?? 0), 0)
+    stats[key] += fromClass + fromGear + rank(soldier) * (RANK_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
   }
   return stats
 }
 
-/** Alien stats grow every three rounds. */
+/** Alien health and aim grow every three rounds; from round 10 aliens also hit harder. */
 function alienStats(round: number): Stats {
   const tier = Math.floor((round - 1) / 3)
-  return { ...BASE_STATS, hp: BASE_STATS.hp + 3 * tier, aim: BASE_STATS.aim + 0.05 * tier }
+  return { ...BASE_STATS, hp: BASE_STATS.hp + 3 * tier, aim: BASE_STATS.aim + 0.05 * tier, damage: BASE_STATS.damage + (tier >= 3 ? 1 : 0) }
 }
 
 function alienCount(round: number, kind: Mission['kind'], hard: boolean): number {
@@ -162,7 +188,7 @@ function recruit(run: Run): void {
   const xp = RANK_XP[Math.min(total(run, (u) => u.recruitRank), RANK_XP.length - 1)]
   while (run.soldiers.length < squadSize(run)) {
     const free = NAMES.filter((name) => !run.soldiers.some((s) => s.name === name))
-    run.soldiers.push({ id: run.nextSoldier++, name: free[randomInt(run, free.length)], xp, cls: null })
+    run.soldiers.push({ id: run.nextSoldier++, name: free[randomInt(run, free.length)], xp, cls: null, gear: { weapon: null, armor: null, utility: null } })
   }
   assignClasses(run)
 }
@@ -205,6 +231,8 @@ export function createRun(seed: number): Run {
     soldiers: [],
     nextSoldier: 1,
     supplies: START_SUPPLIES,
+    gear: [],
+    nextGear: 1,
     built: [],
     aid: [],
     offers: [],
@@ -251,17 +279,23 @@ export function startMission(run: Run, mission: Mission): void {
     ability: s.cls && CLASSES[s.cls].ability,
     charges: s.cls ? CLASSES[s.cls].charges : 0,
     stance: s.cls ? CLASSES[s.cls].stance : ('balanced' as const),
+    effects: equipped(run, s).flatMap((gear) => gear.effect ?? []),
   }))
   run.battle = createBattle(randomInt(run, 2 ** 31), aliens, reserve)
+}
+
+/** A random rarity; `lucky` rules out common. */
+function rollRarity(run: Run, lucky: boolean): Rarity {
+  let roll = random(run)
+  if (lucky) roll = RARITY_CHANCE.common + roll * (1 - RARITY_CHANCE.common)
+  return roll < RARITY_CHANCE.common ? 'common' : roll < RARITY_CHANCE.common + RARITY_CHANCE.rare ? 'rare' : 'epic'
 }
 
 /** Three different aid cards; a hard mission's first is rare or better. */
 function drawOffers(run: Run, hard: boolean): AidId[] {
   const offers: AidId[] = []
   while (offers.length < OFFERS) {
-    let roll = random(run)
-    if (hard && offers.length === 0) roll = RARITY_CHANCE.common + roll * (1 - RARITY_CHANCE.common)
-    const rarity: Rarity = roll < RARITY_CHANCE.common ? 'common' : roll < RARITY_CHANCE.common + RARITY_CHANCE.rare ? 'rare' : 'epic'
+    const rarity = rollRarity(run, hard && offers.length === 0)
     const pool = (Object.keys(AID) as AidId[]).filter((id) => AID[id].rarity === rarity && !offers.includes(id))
     if (pool.length > 0) offers.push(pool[randomInt(run, pool.length)])
   }
@@ -293,7 +327,10 @@ export function endBattle(run: Run): void {
   if (afterMission) run.threat = threatOnSkipping(afterMission, run, mission)
   const supplies = won ? payout(mission) : 0
   run.supplies += supplies
-  run.report = { won, threat: { before, afterMission: afterMission ?? before, afterAliens: run.threat }, supplies, soldiers }
+  // A won mission drops one piece of gear; a last stand's is rare or better.
+  const gear = won && mission.kind !== 'final' ? generateGear(run, run.nextGear++, rollRarity(run, mission.kind === 'lastStand')) : null
+  if (gear) run.gear.push(gear)
+  run.report = { won, threat: { before, afterMission: afterMission ?? before, afterAliens: run.threat }, supplies, gear, soldiers }
 
   if (!afterMission) {
     run.phase = 'lost'

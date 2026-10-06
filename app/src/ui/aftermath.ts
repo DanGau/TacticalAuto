@@ -1,7 +1,7 @@
 import { AID, type AidId } from '../core/base'
 import { CLASSES } from '../core/classes'
 import { RANK_NAMES, RANK_XP, rank, REGIONS, ROUNDS, THREAT_MAX, type Report, type Run } from '../core/run'
-import { button, missionTitle, signed } from './html'
+import { button, gearCard, missionTitle, signed } from './html'
 import { board } from './overworld'
 
 function aidCard(id: AidId, index: number): string {
@@ -38,7 +38,7 @@ function soldierCard(soldier: Report['soldiers'][number]): string {
   </div>`
 }
 
-/** The one screen after a battle, revealed top to bottom: the region, the supplies, the squad, then the aid to take. */
+/** The one screen after a battle, revealed top to bottom: the region, the supplies and gear, the squad, then the aid to take. */
 export function missionEnd(run: Run, report: Report): string {
   const last = report.won
     ? `<h2>${REGIONS[run.mission!.region]} offers aid. Take one.</h2><div class="choices">${run.offers.map(aidCard).join('')}</div>`
@@ -48,6 +48,7 @@ export function missionEnd(run: Run, report: Report): string {
     <div class="stage">
       ${threatMoves(report.threat.before, report.threat.afterMission)}
       ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : ''}
+      ${report.gear ? `<h2>Recovered from the field. Equip it in the Barracks.</h2><div class="gear ${report.gear.rarity} drop">${gearCard(report.gear)}</div>` : ''}
     </div>
     <div class="stage second"><h2>Squad</h2><div class="squad">${report.soldiers.map(soldierCard).join('')}</div></div>
     <div class="stage third">${last}</div>`

@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js'
 import { BLAST_RADIUS, coverAt, distance, GRID, revealed, ZONE_RADIUS, zoneInfo, type Battle, type Tile, type Unit } from '../core/battle'
 import { CLASSES } from '../core/classes'
+import { EFFECTS } from '../core/gear'
 import type { GameEvent } from '../core/combat'
 import { rank, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
@@ -360,6 +361,12 @@ export async function createView(): Promise<View> {
     fx.clear()
   }
 
+  /** What a gear effect did to a unit, in a word: the effect's name, and the health it gave or took. */
+  function effectCallout(e: Extract<GameEvent, { type: 'effect' }>, over: Sprite): Text {
+    const word = EFFECTS[e.effect].prefix.replace(/'s$/, '').toUpperCase()
+    return callout(e.amount === 0 ? word : `${word} ${e.amount > 0 ? '+' : ''}${e.amount}`, e.amount > 0 ? COLOR.heal : e.amount < 0 ? COLOR.crit : COLOR.hit, over)
+  }
+
   /** A rocket flies to its tile and bursts, wounding every unit it caught. */
   async function fireRocket(battle: Battle, from: Sprite, e: Extract<GameEvent, { type: 'rocket' }>): Promise<void> {
     const a = chest(from)
@@ -412,6 +419,11 @@ export async function createView(): Promise<View> {
         if (!from) continue
         await follow([from.tile, e])
         await fireRocket(battle, from, e)
+      } else if (e.type === 'effect') {
+        const on = sprites.get(e.id)
+        if (!on) continue
+        drawHp(on, battle.units.find((u) => u.id === e.id)?.hp ?? 0)
+        float(effectCallout(e, on))
       } else if (e.type === 'heal') {
         const to = sprites.get(e.target)
         if (!to) continue
@@ -452,6 +464,7 @@ export async function createView(): Promise<View> {
         look(WHOLE_MAP)
         labels.removeChildren().forEach((child) => child.destroy())
         for (const e of events) {
+          if (e.type === 'effect' && sprites.has(e.id)) effectCallout(e, sprites.get(e.id)!)
           if (e.type === 'heal' && sprites.has(e.target)) callout(`HEAL +${e.amount}`, COLOR.heal, sprites.get(e.target)!)
           if (e.type === 'rocket') {
             const c = toWorld(e.x, e.y)

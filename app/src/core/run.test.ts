@@ -27,7 +27,7 @@ function finish(run: Run, winner: Side): void {
   const battle = run.battle!
   apply(run, { type: 'land', zone: 0 })
   const [fighter, ...rest] = battle.units.filter((u) => u.side === 'human')
-  battle.reserve = winner === 'human' ? rest.map((u) => ({ soldier: u.soldier!, stats: u.stats, ability: u.ability, charges: u.charges, stance: u.stance })) : []
+  battle.reserve = winner === 'human' ? rest.map((u) => ({ soldier: u.soldier!, stats: u.stats, ability: u.ability, charges: u.charges, stance: u.stance, effects: u.effects })) : []
   battle.units = battle.units.filter((u) => u.side === winner && (u.side === 'alien' || u === fighter))
   battle.phase = 'over'
   battle.winner = winner
@@ -114,7 +114,7 @@ test('stats add rank, facilities and aid to the base', () => {
   const run = createRun(1)
   run.built = ['workshop', 'workshop']
   run.aid = ['plasma']
-  const stats = soldierStats(run, { id: 0, name: '', xp: 3, cls: null })
+  const stats = soldierStats(run, { id: 0, name: '', xp: 3, cls: null, gear: { weapon: null, armor: null, utility: null } })
   expect(stats.hp).toBe(BASE_STATS.hp + 2 + 2 + 2)
   expect(stats.damage).toBe(BASE_STATS.damage + 1)
   expect(stats.aim).toBeCloseTo(BASE_STATS.aim + 0.06)

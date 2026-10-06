@@ -3,7 +3,7 @@ import type { Report, Run } from '../core/run'
 import type { View } from '../view/view'
 import { alienAdvance, missionEnd, runEnd, world } from './aftermath'
 import { missionTitle } from './html'
-import { overworld, type Tab } from './overworld'
+import { overworld, type Picking, type Tab } from './overworld'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
 
@@ -29,6 +29,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   /** The report after which the player has already been brought back to the base. */
   let returned: Report | null = null
   let tab: Tab = 'Map'
+  let picking: Picking | null = null
   let shown: Run | null = null
   let html = ''
 
@@ -49,7 +50,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     }
     const news = report !== null && seen.world !== report && alienAdvance(run, report).some((n) => n > 0)
     if (news && tab === 'Map') return world(run, report)
-    return overworld(run, tab, news)
+    return overworld(run, tab, news, picking)
   }
 
   function render(run: Run): void {
@@ -70,7 +71,12 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (target.id === 'again') location.href = location.pathname
     else if (target.dataset.seen) seen[target.dataset.seen] = shown!.report
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
-    else if (target.dataset.action) {
+    else if (target.dataset.pick) {
+      const pick: Picking = JSON.parse(target.dataset.pick)
+      // Clicking the chosen slot again closes it.
+      picking = picking?.soldier === pick.soldier && picking.slot === pick.slot ? null : pick
+    } else if (target.dataset.action) {
+      picking = null
       act(JSON.parse(target.dataset.action))
       return
     }

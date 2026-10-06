@@ -1,13 +1,18 @@
 import {
   blocked,
   BLAST_RADIUS,
+  BURN_DAMAGE,
+  BURN_TURNS,
   coverAt,
   CRIT_BONUS,
   distance,
+  EXECUTE_BONUS,
+  GRENADE_DAMAGE,
   GRID,
   MAX_BEATS,
   MEDIC_HEAL,
   MEDIC_REACH,
+  MEDKIT_HEAL,
   NEIGHBORS,
   onGrid,
   PATROL_MOVE,
@@ -15,6 +20,7 @@ import {
   ROCKET_DAMAGE,
   STANDOFF,
   type Battle,
+  type Effect,
   type Side,
   type Stance,
   type Tile,
@@ -30,9 +36,11 @@ export type GameEvent =
   | { type: 'reveal'; units: { id: number; x: number; y: number }[] }
   /** `damage` is 0 for a miss. */
   | { type: 'shot'; id: number; target: number; hit: boolean; crit: boolean; damage: number }
-  /** A rocket lands on a tile and damages every unit in `hits`. */
+  /** A rocket or grenade lands on a tile and damages every unit in `hits`. */
   | { type: 'rocket'; id: number; x: number; y: number; hits: { target: number; damage: number }[] }
   | { type: 'heal'; id: number; target: number; amount: number }
+  /** A gear effect acts on the unit `id`. `amount` is the health it gained, or lost if negative; 0 when neither. */
+  | { type: 'effect'; id: number; effect: Effect; amount: number }
   | { type: 'death'; id: number }
   | { type: 'end'; winner: Side | null }
 
@@ -51,6 +59,15 @@ function nearest(units: Unit[], from: Tile): Unit | undefined {
   let best: Unit | undefined
   for (const unit of units) if (!best || distance(from, unit) < distance(from, best)) best = unit
   return best
+}
+
+const has = (unit: Unit, effect: Effect) => unit.effects.includes(effect)
+
+/** Uses a once-per-battle effect. False if the unit lacks it or has used it. */
+function spend(unit: Unit, effect: Effect): boolean {
+  if (!has(unit, effect) || unit.spent.includes(effect)) return false
+  unit.spent.push(effect)
+  return true
 }
 
 /** Ids of the aliens some soldier sees now. */
@@ -192,7 +209,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const seen = spotted(battle)
   /** The best hit chance from `end`, in whole percent; 0 with no shot. */
   const mine = (end: Tile) => {
-    const chances = enemies.filter((enemy) => shootable(battle, unit, end, enemy, seen)).map((enemy) => odds(battle, end, enemy, unit.stats).hit)
+    const chances = enemies.filter((enemy) => shootable(battle, unit, end, enemy, seen)).map((enemy) => odds(battle, end, enemy, unit.stats, has(unit, 'piercing')).hit)
     return Math.round(100 * Math.max(0, ...chances))
   }
   /** The best hit chance any enemy has on `end` from where it stands, in whole percent. */
@@ -267,9 +284,26 @@ function sight(battle: Battle): GameEvent[] {
   return events
 }
 
-/** Every unit of the side on turn walks its path, lowest id first; then newly sighted pods are revealed. */
-function moveSide(battle: Battle): GameEvent[] {
+/** What happens to each unit of the side on turn as its turn begins: burning hurts, mending armor heals. */
+function upkeep(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
+  for (const unit of battle.units.filter((u) => u.side === battle.turn)) {
+    if (unit.burning > 0) {
+      unit.burning--
+      events.push({ type: 'effect', id: unit.id, effect: 'incendiary', amount: -BURN_DAMAGE })
+      wound(battle, unit, BURN_DAMAGE, events)
+    }
+    if (unit.hp > 0 && unit.hp < unit.stats.hp && has(unit, 'regen')) {
+      unit.hp++
+      events.push({ type: 'effect', id: unit.id, effect: 'regen', amount: 1 })
+    }
+  }
+  return events
+}
+
+/** The side on turn has its upkeep; each of its units walks its path, lowest id first; then newly sighted pods are revealed. */
+function moveSide(battle: Battle): GameEvent[] {
+  const events = upkeep(battle)
   if (battle.turn === 'alien') {
     for (const pod of battle.pods) {
       pod.surprised = false
@@ -304,8 +338,11 @@ function heal(battle: Battle, unit: Unit): GameEvent[] {
   return [{ type: 'heal', id: unit.id, target: wounded.id, amount }]
 }
 
-/** Rocket: blasts the shootable enemy with the most enemies around it, if at least two are caught and no ally is. It replaces the shot. */
-function rocket(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
+/**
+ * A blast on the shootable enemy with the most enemies around it, if at least two are caught and no ally is.
+ * A rocket replaces the shot; a grenade does not.
+ */
+function blast(battle: Battle, unit: Unit, seen: Set<number>, damage: number): GameEvent[] {
   const inBlast = (centre: Tile) => battle.units.filter((u) => distance(centre, u) <= BLAST_RADIUS)
   let best: Unit[] = []
   let centre: Unit | undefined
@@ -318,27 +355,64 @@ function rocket(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
     }
   }
   if (!centre) return []
-  const events: GameEvent[] = [{ type: 'rocket', id: unit.id, x: centre.x, y: centre.y, hits: best.map((u) => ({ target: u.id, damage: ROCKET_DAMAGE })) }]
-  for (const target of best) wound(battle, target, ROCKET_DAMAGE, events)
+  const events: GameEvent[] = [{ type: 'rocket', id: unit.id, x: centre.x, y: centre.y, hits: best.map((u) => ({ target: u.id, damage })) }]
+  for (const target of best) wound(battle, target, damage, events)
   return events
 }
 
-/** A shot at the enemy the unit can shoot and is likeliest to hit; the nearest, then the lowest id, wins a tie. */
-function shoot(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
+/**
+ * A shot at the enemy the unit can shoot and is likeliest to hit; the nearest, then the lowest id, wins a tie.
+ * Gear effects of both units apply. `chained` marks the extra shot a kill grants, which grants no further one.
+ */
+function shoot(battle: Battle, unit: Unit, seen: Set<number>, chained = false): GameEvent[] {
+  const chanceAt = (target: Unit) => odds(battle, unit, target, unit.stats, has(unit, 'piercing'))
   let enemy: Unit | undefined
   for (const other of battle.units) {
     if (other.side === unit.side || !shootable(battle, unit, unit, other, seen)) continue
-    const gain = enemy ? odds(battle, unit, other, unit.stats).hit - odds(battle, unit, enemy, unit.stats).hit : 1
+    const gain = enemy ? chanceAt(other).hit - chanceAt(enemy).hit : 1
     if (gain > 0 || (gain === 0 && distance(unit, other) < distance(unit, enemy!))) enemy = other
   }
   if (!enemy) return []
-  const chance = odds(battle, unit, enemy, unit.stats)
+  const chance = chanceAt(enemy)
   const hit = random(battle) < chance.hit
   const crit = hit && random(battle) < chance.crit
-  const damage = hit ? unit.stats.damage + (crit ? CRIT_BONUS : 0) : 0
-  const events: GameEvent[] = [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage }]
-  if (hit) wound(battle, enemy, damage, events)
+  const events: GameEvent[] = []
+  if (!hit) return [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage: 0 }]
+
+  const executes = has(unit, 'executioner') && enemy.hp <= enemy.stats.hp / 2
+  let damage = unit.stats.damage + (crit ? CRIT_BONUS : 0) + (executes ? EXECUTE_BONUS : 0)
+  const after: GameEvent[] = []
+  if (spend(enemy, 'shield')) {
+    damage = 0
+    after.push({ type: 'effect', id: enemy.id, effect: 'shield', amount: 0 })
+  } else if (damage >= enemy.hp && spend(enemy, 'lastStand')) {
+    damage = enemy.hp - 1
+    after.push({ type: 'effect', id: enemy.id, effect: 'lastStand', amount: 0 })
+  }
+  events.push({ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage }, ...after)
+  wound(battle, enemy, damage, events)
+  if (enemy.hp > 0 && damage > 0 && has(unit, 'incendiary')) {
+    enemy.burning = BURN_TURNS
+    events.push({ type: 'effect', id: enemy.id, effect: 'incendiary', amount: 0 })
+  }
+  if (damage > 0 && has(unit, 'vampiric') && unit.hp < unit.stats.hp) {
+    unit.hp++
+    events.push({ type: 'effect', id: unit.id, effect: 'vampiric', amount: 1 })
+  }
+  if (has(enemy, 'thorns')) {
+    events.push({ type: 'effect', id: unit.id, effect: 'thorns', amount: -1 })
+    wound(battle, unit, 1, events)
+  }
+  if (enemy.hp <= 0 && unit.hp > 0 && has(unit, 'chain') && !chained) events.push(...shoot(battle, unit, seen, true))
   return events
+}
+
+/** Medkit: heals its carrier at half health or less. */
+function medkit(unit: Unit): GameEvent[] {
+  if (unit.hp > unit.stats.hp / 2 || !spend(unit, 'medkit')) return []
+  const amount = Math.min(MEDKIT_HEAL, unit.stats.hp - unit.hp)
+  unit.hp += amount
+  return [{ type: 'effect', id: unit.id, effect: 'medkit', amount }]
 }
 
 /** Whether the unit may act this turn: an alien may not while its pod is unseen or surprised. */
@@ -347,17 +421,20 @@ function armed(battle: Battle, unit: Unit): boolean {
 }
 
 /**
- * The next unit of the side on turn with something to do acts once. A medic first heals if someone needs it,
- * and still shoots. A rocket, when its moment has come, takes the place of the shot. Empty when no unit is left.
+ * The next unit of the side on turn with something to do acts once. First come what does not cost the shot:
+ * a medkit, a medic's heal, a grenade. Then a rocket, when its moment has come, or else a shot.
+ * Empty when no unit is left.
  */
 function actNext(battle: Battle): GameEvent[] {
   const seen = spotted(battle)
   for (const unit of battle.units) {
     if (unit.side !== battle.turn || unit.id <= battle.shooter || !armed(battle, unit)) continue
     const healed = unit.charges > 0 && unit.ability === 'medic' ? heal(battle, unit) : []
-    const fired = unit.charges > 0 && unit.ability === 'rocket' ? rocket(battle, unit, seen) : []
+    const thrown = has(unit, 'grenade') && !unit.spent.includes('grenade') ? blast(battle, unit, seen, GRENADE_DAMAGE) : []
+    if (thrown.length > 0) unit.spent.push('grenade')
+    const fired = unit.charges > 0 && unit.ability === 'rocket' ? blast(battle, unit, seen, ROCKET_DAMAGE) : []
     if (healed.length + fired.length > 0) unit.charges--
-    const events = [...healed, ...(fired.length > 0 ? fired : shoot(battle, unit, seen))]
+    const events = [...medkit(unit), ...healed, ...thrown, ...(fired.length > 0 ? fired : shoot(battle, unit, seen))]
     if (events.length === 0) continue
     battle.shooter = unit.id
     return events

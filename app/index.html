@@ -48,16 +48,29 @@
       .facilities button { text-align: left; padding: 10px 14px; line-height: 1.5; }
 
       .squad { display: flex; gap: 12px; }
-      .soldier { flex: 1; max-width: 220px; padding: 10px 12px; background: #263042; border: 1px solid #4a5a78; border-radius: 6px; line-height: 1.5; }
+      .soldier { flex: 1; max-width: 220px; padding: 8px 12px; background: #263042; border: 1px solid #4a5a78; border-radius: 6px; line-height: 1.5; }
       .soldier.died { opacity: 0.6; border-color: #ff6b5e; }
       .bar { height: 6px; margin: 6px 0; background: #10141c; border-radius: 3px; overflow: hidden; }
       .bar div { height: 100%; background: #ffd84d; }
       .bar .fill { animation: fill 0.9s 1.7s both; }
       @keyframes fill { from { width: var(--from); } to { width: var(--to); } }
-      .stats { width: 100%; margin: 8px 0; font-size: 13px; }
+      .stats { width: 100%; margin: 4px 0; font-size: 13px; }
+      .soldier p { font-size: 12px; margin: 3px 0; }
       .stats td:nth-child(odd) { color: #9aa6bd; }
       .stats td:nth-child(even) { text-align: right; padding-right: 12px; }
       .promoted { display: inline-block; animation: land 0.5s 2.5s both; }
+
+      .gear { border-color: #4a5a78; }
+      .gear.rare { border-color: #4da3ff; }
+      .gear.rare > small:first-child, .slot.rare b { color: #4da3ff; }
+      .gear.epic { border-color: #c77dff; }
+      .gear.epic > small:first-child, .slot.epic b { color: #c77dff; }
+      div.gear { padding: 8px 12px; border: 1px solid; border-radius: 6px; background: #263042; line-height: 1.5; }
+      .drop { display: inline-block; min-width: 260px; }
+      .slot { display: block; width: 100%; margin-top: 6px; padding: 5px 10px; text-align: left; background: #1d2433; }
+      .slot.chosen { background: #35496b; outline: 2px solid #ffd84d; }
+      .stash { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-height: 190px; overflow-y: auto; }
+      .stash button { text-align: left; padding: 8px 12px; line-height: 1.5; }
 
       .choices { display: flex; gap: 16px; }
       .choices button { flex: 1; text-align: left; line-height: 1.5; }

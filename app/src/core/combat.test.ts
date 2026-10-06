@@ -26,8 +26,9 @@ test('a turn is one move beat, then one shot per beat in id order, then the othe
   let turn = 'human'
   let stage = 'move'
   let shooter = 0
-  const end = play(1, ([first], before) => {
-    if (!first || first.type === 'end' || first.type === 'reveal' || first.type === 'death') return
+  const end = play(1, (events, before) => {
+    const first = events.find((e) => e.type === 'move' || e.type === 'shot' || e.type === 'rocket' || e.type === 'heal')
+    if (!first) return
     const side = before.units.find((u) => u.id === first.id)!.side
     if (side !== turn) {
       turn = side
