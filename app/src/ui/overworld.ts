@@ -81,10 +81,13 @@ function barracksView(run: Run): string {
     <div class="squad">${run.soldiers.map((s) => soldierCard(run, s)).join('')}</div>`
 }
 
-/** The screen between battles: a header with the round, supplies and tabs, over the chosen tab's view. */
-export function overworld(run: Run, tab: Tab): string {
+/**
+ * The screen between battles: a header with the round, supplies and tabs, over the chosen tab's view.
+ * `mapNews` marks the Map tab while the aliens' latest advance waits there unseen.
+ */
+export function overworld(run: Run, tab: Tab, mapNews: boolean): string {
   const views = { Map: mapView, Base: baseView, Barracks: barracksView }
-  const tabs = TABS.map((name) => `<button class="tab ${name === tab ? 'active' : ''}" data-tab="${name}">${name}</button>`)
+  const tabs = TABS.map((name) => `<button class="tab ${name === tab ? 'active' : ''}" data-tab="${name}">${name}${name === 'Map' && mapNews ? ' <b class="up">●</b>' : ''}</button>`)
   return `
     <div class="header">
       <h1>${run.round > ROUNDS ? 'The final assault' : `Round ${run.round} of ${ROUNDS}`}</h1>

@@ -14,7 +14,7 @@
 
 **Maps.** Post-apocalyptic cities and countryside: houses, trees, terrain.
 
-**Run.** A fixed number of rounds, then a final assault on the alien ship; winning it saves the world. Each round the aliens strike three regions and the player answers one. After the battle one screen reveals, in order, the region's threat change, supplies, each soldier's experience and promotion, and the aid to choose. A second screen then shows the threat the aliens added in the skipped regions, before the base.
+**Run.** A fixed number of rounds, then a final assault on the alien ship; winning it saves the world. Each round the aliens strike three regions and the player answers one. After the battle one screen reveals, in order, the region's threat change, supplies, each soldier's experience and promotion, and the aid to choose. The player returns to the Base; the threat the aliens added in the skipped regions shows when the Map is first opened.
 
 **Overworld.** Between battles the player moves among three views: the Map, a board of the world's regions where a mission is chosen; the Base, where facilities are built; and the Barracks, which shows each soldier.
 

@@ -26,11 +26,16 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   const overlay = document.getElementById('panel')!
   /** The report whose screen of each kind the player has continued past. */
   const seen: Record<string, Report | null> = { mission: null, world: null }
+  /** The report after which the player has already been brought back to the base. */
+  let returned: Report | null = null
   let tab: Tab = 'Map'
   let shown: Run | null = null
   let html = ''
 
-  /** The panel for where the player is: after a battle, the mission's end, then the world, then the overworld. */
+  /**
+   * The panel for where the player is. After a battle comes the mission's end, then the overworld, opened on the
+   * base. What the aliens did meanwhile shows when the player first opens the map.
+   */
   function panel(run: Run): string {
     const report = run.report
     if (run.phase === 'battle') return ''
@@ -38,8 +43,13 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (run.phase === 'reward') return missionEnd(run, report!)
     // A won mission's screen ended when its aid was taken.
     if (report && !report.won && seen.mission !== report) return missionEnd(run, report)
-    if (report && seen.world !== report && alienAdvance(run, report).some((n) => n > 0)) return world(run, report)
-    return overworld(run, tab)
+    if (report && returned !== report) {
+      returned = report
+      tab = 'Base'
+    }
+    const news = report !== null && seen.world !== report && alienAdvance(run, report).some((n) => n > 0)
+    if (news && tab === 'Map') return world(run, report)
+    return overworld(run, tab, news)
   }
 
   function render(run: Run): void {
@@ -61,10 +71,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     else if (target.dataset.seen) seen[target.dataset.seen] = shown!.report
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
     else if (target.dataset.action) {
-      const action: Action = JSON.parse(target.dataset.action)
-      // Each round opens on the map.
-      if (action.type === 'mission') tab = 'Map'
-      act(action)
+      act(JSON.parse(target.dataset.action))
       return
     }
     render(shown!)
