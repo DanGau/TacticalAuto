@@ -40,7 +40,7 @@ export interface Aid extends Lasting {
   rarity: Rarity
   text: string
   supplies?: number
-  /** Added to every region's threat. */
+  /** Added to the threat. */
   threat?: number
   /** Experience added to every soldier. */
   xp?: number
@@ -53,7 +53,7 @@ const aid = {
   training: { name: 'Field Training', rarity: 'common', text: '+1 experience for every soldier', xp: 1 },
   convoy: { name: 'Supply Convoy', rarity: 'rare', text: '+6 supplies', supplies: 6 },
   veteran: { name: 'Veteran Transfer', rarity: 'rare', text: 'Your lowest-ranked soldier becomes a Sergeant', promote: 3 },
-  satellite: { name: 'Satellite Uplink', rarity: 'rare', text: '-1 threat in every region', threat: -1 },
+  jammer: { name: 'Signal Jammer', rarity: 'rare', text: '-2 threat', threat: -2 },
   plasma: { name: 'Plasma Rifles', rarity: 'epic', text: '+1 damage, for the run', stats: { damage: 1 } },
   alloys: { name: 'Alien Alloys', rarity: 'epic', text: '+4 health, for the run', stats: { hp: 4 } },
 } satisfies Record<string, Aid>

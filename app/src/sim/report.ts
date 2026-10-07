@@ -1,4 +1,4 @@
-import { ROUNDS } from '../core/run'
+import { KEYS } from '../core/run'
 import type { RunResult } from './run'
 
 export interface Report {
@@ -6,8 +6,8 @@ export interface Report {
   wins: number
   lostToLastStand: number
   lostToFinal: number
-  /** Mean round a run ended in; ROUNDS + 1 is the final assault. */
-  meanRound: number
+  /** Mean access keys won, of KEYS. */
+  meanKeys: number
   meanBattles: number
   /** Failed health thresholds. Any entry fails the batch. */
   failures: string[]
@@ -24,7 +24,7 @@ export function report(results: RunResult[]): Report {
     wins: results.filter((r) => r.won).length,
     lostToLastStand: lost('lastStand'),
     lostToFinal: lost('final'),
-    meanRound: mean((r) => r.round),
+    meanKeys: mean((r) => r.keys),
     meanBattles: mean((r) => r.battles),
     failures,
   }
@@ -36,8 +36,8 @@ export function formatReport(r: Report): string {
     `runs                ${r.runs}`,
     `wins                ${percent(r.wins)}`,
     `lost a last stand   ${percent(r.lostToLastStand)}`,
-    `lost final assault  ${percent(r.lostToFinal)}`,
-    `mean round reached  ${r.meanRound} of ${ROUNDS + 1}`,
+    `lost final mission  ${percent(r.lostToFinal)}`,
+    `mean keys won       ${r.meanKeys} of ${KEYS}`,
     `mean battles        ${r.meanBattles}`,
     ...r.failures.map((f) => `FAIL                ${f}`),
   ].join('\n')

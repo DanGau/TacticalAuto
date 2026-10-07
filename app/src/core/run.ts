@@ -1,29 +1,23 @@
-import { BASE_STATS, createBattle, type Battle, type Stats } from './battle'
+import { AID, FACILITIES, RARITY_CHANCE, type AidId, type FacilityId, type Lasting, type Rarity } from './base'
+import { BASE_STATS, createBattle, type Alien, type Battle, type Stats } from './battle'
 import { CLASSES, type ClassId } from './classes'
 import { generateGear, SLOTS, type Gear, type Slot } from './gear'
 import { random, randomInt } from './rng'
-import { AID, FACILITIES, RARITY_CHANCE, type AidId, type FacilityId, type Lasting, type Rarity } from './base'
 
-/** Rounds before the final assault. */
-export const ROUNDS = 20
-export const REGIONS = ['North America', 'South America', 'Europe', 'Africa', 'Asia', 'Oceania']
-/** A region at this threat forces a last stand. */
-export const THREAT_MAX = 5
-export const START_THREAT = 1
-/** Regions the aliens strike each round; the player answers one. */
-export const STRIKES = 3
-/** Threat a skipped strike adds to its region. */
-export const SKIP_THREAT = 1
-/** Threat a lost strike adds to its region. */
-export const LOSS_THREAT = 2
-/** Threat a won strike removes from its region. */
-export const WIN_THREAT = 1
+/** Access keys needed to find the alien source; each is won at a satellite, at the end of a leg. */
+export const KEYS = 3
+/** Forks in the road on each leg, before its satellite. */
+export const FORKS = 2
+/** Threat at which the next stop becomes a last stand. */
+export const THREAT_MAX = 6
+/** Threat each stop adds, and what losing a battle adds on top. */
+export const STOP_THREAT = 1
+export const LOSS_THREAT = 1
 export const BASE_SQUAD = 4
 export const OFFERS = 3
 export const START_SUPPLIES = 3
-/** Supplies a won mission pays; a hard strike pays HARD_SUPPLIES more. */
-export const WIN_SUPPLIES = 2
-export const HARD_SUPPLIES = 1
+/** Supplies a supply drop gives. */
+export const DROP_SUPPLIES = 4
 
 /** Experience needed for each rank; a soldier earns one per battle survived. */
 export const RANK_XP = [0, 1, 3, 6, 10]
@@ -32,6 +26,34 @@ export const RANK_NAMES = ['Rookie', 'Squaddie', 'Corporal', 'Sergeant', 'Captai
 export const RANK_STATS: Partial<Stats> = { hp: 1, aim: 0.03 }
 
 const NAMES = ['Vega', 'Okafor', 'Lindqvist', 'Tanaka', 'Reyes', 'Novak', 'Haddad', 'Brandt', 'Silva', 'Kowalski', 'Mbeki', 'Dufour', 'Ivanov', 'Castillo', 'Ng', 'Shaw']
+
+export type Risk = 'safe' | 'standard' | 'dangerous'
+
+/** What each risk means for a zone: how its battles differ and what they pay. Its stops are set where zones are drawn. */
+export const RISKS: Record<Risk, { name: string; aliens: number; supplies: number; drops: number; rareGear: boolean; text: string }> = {
+  safe: { name: 'Quiet', aliens: -1, supplies: 1, drops: 0, rareGear: false, text: 'Fewer aliens and no gear, by the long way round' },
+  standard: { name: 'Contested', aliens: 0, supplies: 2, drops: 1, rareGear: false, text: 'A fair fight' },
+  dangerous: { name: 'Overrun', aliens: 1, supplies: 4, drops: 2, rareGear: true, text: 'More aliens; one fight, and two pieces of rare or better gear' },
+}
+
+/**
+ * A stop on the road. A battle must be fought. A supply drop gives supplies and a cache gives gear, with no fight.
+ * A key mission, at a satellite, wins an access key; the final mission strikes the alien source. Both have a boss.
+ */
+export type StopKind = 'battle' | 'supply' | 'cache' | 'key' | 'final'
+
+/** A stretch of road the squad commits to: its risk and its stops, in order. */
+export interface Zone {
+  risk: Risk
+  stops: StopKind[]
+}
+
+/** A battle to fight. A last stand comes when threat is full, in place of the next stop; losing it loses the run, as does losing the final mission. */
+export interface Mission {
+  kind: 'battle' | 'key' | 'final' | 'lastStand'
+  risk: Risk
+  aliens: number
+}
 
 export interface Soldier {
   id: number
@@ -43,48 +65,43 @@ export interface Soldier {
   gear: Record<Slot, number | null>
 }
 
-/**
- * A battle on offer. A strike is optional; a last stand or the final assault is the round's only mission,
- * and losing it loses the run.
- */
-export interface Mission {
-  kind: 'strike' | 'lastStand' | 'final'
-  /** Index into REGIONS; -1 for the final assault. */
-  region: number
-  aliens: number
-  /** A hard strike has one more alien, pays more supplies, and guarantees a rare or better offer. */
-  hard: boolean
-}
-
-/** What the last battle changed, for the player to review. */
+/** What the last stop changed, for the player to review. */
 export interface Report {
+  /** The stop: a mission fought, or an event met on the road. */
+  stop: Mission['kind'] | 'supply' | 'cache'
+  /** False only for a lost battle. */
   won: boolean
-  /** Threat before the mission, after its outcome, and after the skipped strikes then landed. */
-  threat: { before: number[]; afterMission: number[]; afterAliens: number[] }
-  /** Supplies the mission paid. */
+  /** Threat before the stop and after it. */
+  threat: { before: number; after: number }
   supplies: number
-  /** Gear the mission dropped. */
-  gear: Gear | null
-  /** Every soldier in the squad when the battle began. */
-  /** `cls` is the class after the battle. */
+  gear: Gear[]
+  /** Whether an access key was won. */
+  key: boolean
+  /** Every soldier in the squad when a battle began, with the class each has after it; empty for an event. */
   soldiers: { name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; died: boolean }[]
 }
 
 export interface Run {
   seed: number
   rng: number
-  /** Starts at 1; past ROUNDS, the round is the final assault. */
-  round: number
-  phase: 'map' | 'battle' | 'reward' | 'won' | 'lost'
-  /** Threat per region, in REGIONS order. */
-  threat: number[]
-  /** Missions on offer this round. */
-  missions: Mission[]
+  /** Access keys won; also the number of the leg under way, from 0. At KEYS, the final mission is all that remains. */
+  keys: number
+  /** Forks passed on this leg. */
+  fork: number
+  /** Zones to choose from at a fork; empty while travelling. */
+  zones: Zone[]
+  /** The zone being travelled; null at a fork. */
+  zone: Zone | null
+  /** Index of the next stop in the zone. */
+  stop: number
+  threat: number
+  /** In the overworld the player builds, equips, and chooses a zone or travels on. */
+  phase: 'overworld' | 'battle' | 'reward' | 'won' | 'lost'
   /** The mission being fought or last fought. */
   mission: Mission | null
   /** The battle being fought or last fought. */
   battle: Battle | null
-  /** Null until a battle ends. */
+  /** Null until the first stop is done. */
   report: Report | null
   soldiers: Soldier[]
   nextSoldier: number
@@ -127,11 +144,6 @@ export function build(run: Run, id: FacilityId): void {
   recruit(run)
 }
 
-/** Supplies winning the mission pays. */
-export function payout(mission: Mission): number {
-  return mission.kind === 'final' ? 0 : WIN_SUPPLIES + (mission.hard ? HARD_SUPPLIES : 0)
-}
-
 export function squadSize(run: Run): number {
   return BASE_SQUAD + total(run, (u) => u.squad)
 }
@@ -164,17 +176,6 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
   return stats
 }
 
-/** Alien health and aim grow every three rounds; from round 10 aliens also hit harder. */
-function alienStats(round: number): Stats {
-  const tier = Math.floor((round - 1) / 3)
-  return { ...BASE_STATS, hp: BASE_STATS.hp + 3 * tier, aim: BASE_STATS.aim + 0.05 * tier, damage: BASE_STATS.damage + (tier >= 3 ? 1 : 0) }
-}
-
-function alienCount(round: number, kind: Mission['kind'], hard: boolean): number {
-  const extra = { strike: 0, lastStand: 2, final: 3 }[kind]
-  return 4 + Math.floor((round - 1) / 3) + extra + (hard ? 1 : 0)
-}
-
 /** Gives every promoted soldier still without a class one at random. */
 function assignClasses(run: Run): void {
   const ids = Object.keys(CLASSES) as ClassId[]
@@ -193,38 +194,64 @@ function recruit(run: Run): void {
   assignClasses(run)
 }
 
-/** Sets the missions for the current round and opens the map. */
-function beginRound(run: Run): void {
-  run.phase = 'map'
-  const mission = (kind: Mission['kind'], region: number, hard: boolean): Mission => ({
-    kind,
-    region,
-    hard,
-    aliens: alienCount(run.round, kind, hard),
-  })
-  const overrun = run.threat.indexOf(THREAT_MAX)
-  if (run.round > ROUNDS) {
-    run.missions = [mission('final', -1, false)]
-  } else if (overrun >= 0) {
-    run.missions = [mission('lastStand', overrun, false)]
-  } else {
-    const regions = REGIONS.map((_, i) => i)
-    run.missions = []
-    while (run.missions.length < STRIKES) {
-      const [region] = regions.splice(randomInt(run, regions.length), 1)
-      run.missions.push(mission('strike', region, random(run) < 0.5))
-    }
+/** How far along the road the squad is, which sets how strong the aliens are: two steps a leg, the second at its last fork. */
+function depth(run: Run): number {
+  return run.keys * 2 + (run.fork >= FORKS ? 1 : 0)
+}
+
+/** The mission the squad would fight at a stop of the given kind now. */
+export function missionAt(run: Run, kind: Mission['kind'], risk: Risk): Mission {
+  const extra = { battle: 0, key: 1, final: 2, lastStand: 4 }[kind]
+  return { kind, risk, aliens: 4 + depth(run) + extra + RISKS[risk].aliens }
+}
+
+/** The aliens of a mission. Each step of depth adds health and aim; deep in, damage too. A key or final mission has a boss. */
+function aliensOf(run: Run, mission: Mission): Alien[] {
+  const tier = depth(run)
+  const stats: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + 2 * tier, aim: BASE_STATS.aim + 0.03 * tier, damage: BASE_STATS.damage + (tier >= 5 ? 1 : 0) }
+  const aliens: Alien[] = Array.from({ length: mission.aliens }, () => ({ stats, boss: false }))
+  if (mission.kind === 'key' || mission.kind === 'final') {
+    const scale = mission.kind === 'final' ? 4 : 3
+    aliens[0] = { stats: { ...stats, hp: stats.hp * scale, damage: stats.damage + 1, range: stats.range + 1 }, boss: true }
   }
+  return aliens
+}
+
+/** The three zones at a fork, one of each risk: a quiet one is long, an overrun one is a single hard fight. */
+function drawZones(run: Run): Zone[] {
+  const event = (): StopKind => (random(run) < 0.5 ? 'supply' : 'cache')
+  const shuffled = (stops: StopKind[]) => {
+    const [first] = stops.splice(randomInt(run, stops.length), 1)
+    return [first, ...stops]
+  }
+  return [
+    { risk: 'safe', stops: shuffled(['battle', event(), 'battle']) },
+    { risk: 'standard', stops: ['battle', 'battle'] },
+    { risk: 'dangerous', stops: ['battle'] },
+  ]
+}
+
+/** Sets what lies ahead once a zone is done or a run begins: a fork, the leg's satellite, or the alien source. */
+function nextStretch(run: Run): void {
+  run.stop = 0
+  run.zone = null
+  run.zones = []
+  if (run.keys === KEYS) run.zone = { risk: 'standard', stops: ['final'] }
+  else if (run.fork === FORKS) run.zone = { risk: 'standard', stops: ['key'] }
+  else run.zones = drawZones(run)
 }
 
 export function createRun(seed: number): Run {
   const run: Run = {
     seed,
     rng: seed,
-    round: 1,
-    phase: 'map',
-    threat: REGIONS.map(() => START_THREAT),
-    missions: [],
+    keys: 0,
+    fork: 0,
+    zones: [],
+    zone: null,
+    stop: 0,
+    threat: 0,
+    phase: 'overworld',
     mission: null,
     battle: null,
     report: null,
@@ -238,50 +265,21 @@ export function createRun(seed: number): Run {
     offers: [],
   }
   recruit(run)
-  beginRound(run)
+  nextStretch(run)
   return run
 }
 
-/** `threat` with `amount` added to one region, or to every region when `region` is 'all', kept within bounds. */
-function addThreat(threat: number[], region: number | 'all', amount: number): number[] {
-  return threat.map((t, i) => (region === 'all' || region === i ? Math.min(Math.max(t + amount, 0), THREAT_MAX) : t))
+/** Commits the squad to one of the zones at a fork. */
+export function enterZone(run: Run, zone: Zone): void {
+  run.zone = zone
+  run.zones = []
+  run.fork++
 }
 
-/** `threat` once every mission on offer other than `mission` has gone unanswered. */
-function threatOnSkipping(threat: number[], run: Run, mission: Mission): number[] {
-  return run.missions.reduce((t, other) => (other === mission ? t : addThreat(t, other.region, SKIP_THREAT)), threat)
-}
-
-/** Threat once `mission` is fought, or null when losing it ends the run. The final assault leaves threat alone. */
-function threatOnOutcome(threat: number[], mission: Mission, won: boolean): number[] | null {
-  if (mission.kind === 'final') return won ? threat : null
-  if (mission.kind === 'lastStand') return won ? addThreat(threat, mission.region, -THREAT_MAX) : null
-  return addThreat(threat, mission.region, won ? -WIN_THREAT : LOSS_THREAT)
-}
-
-/** What choosing a mission on offer leads to: threat per region after a win and after a loss; null ends the run. */
-export function preview(run: Run, mission: Mission): { won: number[]; lost: number[] | null } {
-  const after = (won: boolean) => {
-    const threat = threatOnOutcome(run.threat, mission, won)
-    return threat && threatOnSkipping(threat, run, mission)
-  }
-  return { won: after(true)!, lost: after(false) }
-}
-
-/** Starts the battle for a mission on offer. */
-export function startMission(run: Run, mission: Mission): void {
-  run.mission = mission
-  run.phase = 'battle'
-  const aliens = Array.from({ length: mission.aliens }, () => alienStats(run.round))
-  const reserve = run.soldiers.map((s) => ({
-    soldier: s.id,
-    stats: soldierStats(run, s),
-    ability: s.cls && CLASSES[s.cls].ability,
-    charges: s.cls ? CLASSES[s.cls].charges : 0,
-    stance: s.cls ? CLASSES[s.cls].stance : ('balanced' as const),
-    effects: equipped(run, s).flatMap((gear) => gear.effect ?? []),
-  }))
-  run.battle = createBattle(randomInt(run, 2 ** 31), aliens, reserve)
+/** The stop the squad travels to next: a last stand if threat is full, else the zone's next stop. Null at a fork. */
+export function nextStop(run: Run): StopKind | 'lastStand' | null {
+  if (!run.zone) return null
+  return run.threat >= THREAT_MAX ? 'lastStand' : run.zone.stops[run.stop]
 }
 
 /** A random rarity; `lucky` rules out common. */
@@ -291,23 +289,58 @@ function rollRarity(run: Run, lucky: boolean): Rarity {
   return roll < RARITY_CHANCE.common ? 'common' : roll < RARITY_CHANCE.common + RARITY_CHANCE.rare ? 'rare' : 'epic'
 }
 
-/** Three different aid cards; a hard mission's first is rare or better. */
-function drawOffers(run: Run, hard: boolean): AidId[] {
+function dropGear(run: Run, lucky: boolean): Gear {
+  const gear = generateGear(run, run.nextGear++, rollRarity(run, lucky))
+  run.gear.push(gear)
+  return gear
+}
+
+/** Moves past the zone's current stop; past its last, sets what lies ahead. */
+function passStop(run: Run): void {
+  run.stop++
+  if (run.stop === run.zone!.stops.length) nextStretch(run)
+}
+
+/** Travels to the next stop. A battle begins; a supply drop or cache is collected at once. */
+export function advance(run: Run): void {
+  const zone = run.zone!
+  const stop = nextStop(run)!
+  if (stop === 'supply' || stop === 'cache') {
+    const before = run.threat
+    run.threat = Math.min(run.threat + STOP_THREAT, THREAT_MAX)
+    const supplies = stop === 'supply' ? DROP_SUPPLIES : 0
+    run.supplies += supplies
+    const gear = stop === 'cache' ? [dropGear(run, RISKS[zone.risk].rareGear)] : []
+    run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, gear, key: false, soldiers: [] }
+    passStop(run)
+    return
+  }
+  const mission = missionAt(run, stop, zone.risk)
+  run.mission = mission
+  run.phase = 'battle'
+  const reserve = run.soldiers.map((s) => ({
+    soldier: s.id,
+    stats: soldierStats(run, s),
+    ability: s.cls && CLASSES[s.cls].ability,
+    charges: s.cls ? CLASSES[s.cls].charges : 0,
+    stance: s.cls ? CLASSES[s.cls].stance : ('balanced' as const),
+    effects: equipped(run, s).flatMap((gear) => gear.effect ?? []),
+  }))
+  run.battle = createBattle(randomInt(run, 2 ** 31), aliensOf(run, mission), reserve)
+}
+
+/** Three different aid cards; the first from an overrun zone is rare or better. */
+function drawOffers(run: Run, lucky: boolean): AidId[] {
   const offers: AidId[] = []
   while (offers.length < OFFERS) {
-    const rarity = rollRarity(run, hard && offers.length === 0)
+    const rarity = rollRarity(run, lucky && offers.length === 0)
     const pool = (Object.keys(AID) as AidId[]).filter((id) => AID[id].rarity === rarity && !offers.includes(id))
     if (pool.length > 0) offers.push(pool[randomInt(run, pool.length)])
   }
   return offers
 }
 
-function nextRound(run: Run): void {
-  run.round++
-  beginRound(run)
-}
-
-/** Settles a finished battle: experience, casualties, threat, the strikes left unanswered, and what comes next. */
+/** Settles a finished battle: experience, casualties, threat, rewards, and where the squad stands on the road. */
 export function endBattle(run: Run): void {
   const battle = run.battle!
   const mission = run.mission!
@@ -323,39 +356,48 @@ export function endBattle(run: Run): void {
 
   const won = battle.winner === 'human'
   const before = run.threat
-  const afterMission = threatOnOutcome(before, mission, won)
-  if (afterMission) run.threat = threatOnSkipping(afterMission, run, mission)
-  const supplies = won ? payout(mission) : 0
+  const risk = RISKS[mission.risk]
+  // A last stand won empties the threat; any other battle is a stop, and adds to it.
+  if (mission.kind === 'lastStand') run.threat = won ? 0 : run.threat
+  else run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT), THREAT_MAX)
+  const supplies = won ? risk.supplies : 0
   run.supplies += supplies
-  // A won mission drops one piece of gear; a last stand's is rare or better.
-  const gear = won && mission.kind !== 'final' ? generateGear(run, run.nextGear++, rollRarity(run, mission.kind === 'lastStand')) : null
-  if (gear) run.gear.push(gear)
-  run.report = { won, threat: { before, afterMission: afterMission ?? before, afterAliens: run.threat }, supplies, gear, soldiers }
+  // A won battle drops gear; a key mission's or a last stand's is rare or better.
+  const drops = won && mission.kind !== 'final' ? (mission.kind === 'battle' ? risk.drops : 1) : 0
+  const gear = Array.from({ length: drops }, () => dropGear(run, risk.rareGear || mission.kind !== 'battle'))
+  const key = won && mission.kind === 'key'
+  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, gear, key, soldiers }
 
-  if (!afterMission) {
-    run.phase = 'lost'
-  } else if (mission.kind === 'final') {
-    run.phase = 'won'
-  } else if (won) {
-    run.offers = drawOffers(run, mission.hard)
+  if (mission.kind === 'final' || (mission.kind === 'lastStand' && !won)) {
+    run.phase = won ? 'won' : 'lost'
+    return
+  }
+  // A key mission lost is fought again; a last stand stands in front of the stop it interrupted.
+  if (key) {
+    run.keys++
+    run.fork = 0
+  }
+  if (mission.kind === 'battle' || key) passStop(run)
+  if (won) {
+    run.offers = drawOffers(run, risk.rareGear)
     run.phase = 'reward'
   } else {
-    nextRound(run)
+    run.phase = 'overworld'
   }
 }
 
-/** Takes offered aid, applies what it does at once, and moves to the next round. */
+/** Takes offered aid, applies what it does at once, and returns to the overworld. */
 export function takeAid(run: Run, id: AidId): void {
   const aid = AID[id]
   run.aid.push(id)
   run.offers = []
   run.supplies += aid.supplies ?? 0
-  if (aid.threat) run.threat = addThreat(run.threat, 'all', aid.threat)
+  run.threat = Math.max(0, run.threat + (aid.threat ?? 0))
   for (const soldier of run.soldiers) soldier.xp += aid.xp ?? 0
   if (aid.promote) {
     const lowest = run.soldiers.reduce((low, soldier) => (soldier.xp < low.xp ? soldier : low))
     lowest.xp = Math.max(lowest.xp, RANK_XP[aid.promote])
   }
   assignClasses(run)
-  nextRound(run)
+  run.phase = 'overworld'
 }

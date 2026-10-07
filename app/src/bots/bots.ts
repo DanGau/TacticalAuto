@@ -2,13 +2,10 @@ import type { Action } from '../core/apply'
 import { AID, FACILITIES, type FacilityId } from '../core/base'
 import { zoneInfo } from '../core/battle'
 import { randomInt } from '../core/rng'
-import { buildCost, holder, rank, type Run } from '../core/run'
+import { buildCost, holder, rank, type Risk, type Run } from '../core/run'
 
 /** Chooses the next action whenever the run waits for the player. `rng` is the bot's own, separate from the run's. */
 export type Bot = (run: Run, rng: { rng: number }) => Action
-
-/** Facilities the run can pay for now. */
-const affordable = (run: Run) => (Object.keys(FACILITIES) as FacilityId[]).filter((id) => (buildCost(run, id) ?? Infinity) <= run.supplies)
 
 const RARITY_ORDER = ['common', 'rare', 'epic']
 
@@ -27,36 +24,48 @@ function equipBest(run: Run): Action | null {
   return null
 }
 
-/** Chooses every option at random; at the base, builds or leaves for a mission on a coin flip. Equips as equipBest says. */
+/** Facilities the run can pay for now. */
+const affordable = (run: Run) => (Object.keys(FACILITIES) as FacilityId[]).filter((id) => (buildCost(run, id) ?? Infinity) <= run.supplies)
+
+/** Chooses every option at random; in the overworld, builds or moves on at a coin flip. Equips as equipBest says. */
 const randomBot: Bot = (run, rng) => {
-  if (run.phase === 'map') {
-    const equip = equipBest(run)
-    if (equip) return equip
-    const options = affordable(run)
-    if (options.length > 0 && randomInt(rng, 2) === 0) return { type: 'build', facility: options[randomInt(rng, options.length)] }
-    return { type: 'mission', index: randomInt(rng, run.missions.length) }
-  }
   if (run.phase === 'reward') return { type: 'pick', index: randomInt(rng, run.offers.length) }
-  return { type: 'land', zone: randomInt(rng, run.battle!.zones.length) }
+  if (run.phase === 'battle') return { type: 'land', zone: randomInt(rng, run.battle!.zones.length) }
+  const options = affordable(run)
+  const gear = equipBest(run)
+  if (gear) return gear
+  if (options.length > 0 && randomInt(rng, 2) === 0) return { type: 'build', facility: options[randomInt(rng, options.length)] }
+  return run.zone ? { type: 'advance' } : { type: 'zone', index: randomInt(rng, run.zones.length) }
 }
 
-/** What the heuristic bot builds first. */
+/** What a planning bot builds first. */
 const BUILD_ORDER: FacilityId[] = ['barracks', 'firingRange', 'workshop', 'optics', 'drills', 'academy', 'course']
 
-/** Equips as equipBest says, builds the first facility in BUILD_ORDER it can afford, answers the strike in the most threatened region, lands in the most cover, and takes the rarest aid. */
-const heuristicBot: Bot = (run) => {
-  const best = <T>(options: T[], value: (option: T) => number) =>
-    options.reduce((top, option, index) => (value(option) > value(options[top]) ? index : top), 0)
-  if (run.phase === 'map') {
-    const equip = equipBest(run)
-    if (equip) return equip
+/**
+ * A bot that equips as equipBest says, builds the first facility in BUILD_ORDER it can afford, at every fork takes
+ * the zone of the risk `risk` names, lands in the most cover, and takes the rarest aid.
+ */
+const planner =
+  (risk: (run: Run) => Risk): Bot =>
+  (run) => {
+    const best = <T>(options: T[], value: (option: T) => number) =>
+      options.reduce((top, option, index) => (value(option) > value(options[top]) ? index : top), 0)
+    if (run.phase === 'reward') return { type: 'pick', index: best(run.offers, (id) => RARITY_ORDER.indexOf(AID[id].rarity)) }
+    if (run.phase === 'battle') return { type: 'land', zone: best(run.battle!.zones, (zone) => zoneInfo(run.battle!, zone).cover) }
+    const gear = equipBest(run)
+    if (gear) return gear
     const facility = BUILD_ORDER.find((id) => affordable(run).includes(id))
     if (facility) return { type: 'build', facility }
-    return { type: 'mission', index: best(run.missions, (m) => run.threat[m.region] ?? 0) }
+    return run.zone ? { type: 'advance' } : { type: 'zone', index: run.zones.findIndex((zone) => zone.risk === risk(run)) }
   }
-  if (run.phase === 'reward') return { type: 'pick', index: best(run.offers, (id) => RARITY_ORDER.indexOf(AID[id].rarity)) }
-  const battle = run.battle!
-  return { type: 'land', zone: best(battle.zones, (zone) => zoneInfo(battle, zone).cover) }
-}
 
-export const bots: Record<string, Bot> = { random: randomBot, heuristic: heuristicBot }
+/** Takes quiet zones until the squad's mean rank reaches 2, then overrun ones. */
+const growing = (run: Run): Risk => (run.soldiers.reduce((sum, s) => sum + rank(s), 0) / run.soldiers.length >= 2 ? 'dangerous' : 'safe')
+
+export const bots: Record<string, Bot> = {
+  random: randomBot,
+  safe: planner(() => 'safe'),
+  standard: planner(() => 'standard'),
+  dangerous: planner(() => 'dangerous'),
+  growing: planner(growing),
+}

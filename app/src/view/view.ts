@@ -33,6 +33,7 @@ const BLAST_MS = 380
 const COLOR = {
   human: 0x4da3ff,
   alien: 0x7ddc5a,
+  boss: 0xc77dff,
   tile: 0x263042,
   zone: 0x2f6fb0,
   zoneHover: 0x4d9be6,
@@ -176,10 +177,11 @@ export async function createView(): Promise<View> {
 
   /** `pips` marks a soldier's rank above the health bar; `letter` is the initial of its class. */
   function create(unit: Unit, pips: number, letter = ''): Sprite {
-    const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(COLOR[unit.side])
+    const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(unit.boss ? COLOR.boss : COLOR[unit.side])
     for (let i = 0; i < pips; i++) body.circle(-9 + 6 * i, -44, 2).fill(COLOR.hit)
     const sprite: Sprite = { node: new Container(), hp: new Graphics(), tile: unit, maxHp: unit.stats.hp }
     sprite.node.addChild(body, sprite.hp)
+    if (unit.boss) sprite.node.scale.set(1.6)
     if (letter) {
       const mark = new Text({ text: letter, style: { fill: 0x10141c, fontSize: 13, fontWeight: 'bold', fontFamily: 'sans-serif' } })
       mark.anchor.set(0.5)

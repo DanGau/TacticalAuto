@@ -43,7 +43,8 @@ test('equipping adds the gear to one soldier, moves it between soldiers, and une
 function duel(gear: Omit<Gear, 'id'>): { soldier: Unit; alien: Unit; step: () => ReturnType<typeof stepBattle> } {
   const run = withGear(gear)
   apply(run, { type: 'equip', soldier: run.soldiers[0].id, gear: 1 })
-  apply(run, { type: 'mission', index: 0 })
+  apply(run, { type: 'zone', index: 1 })
+  apply(run, { type: 'advance' })
   apply(run, { type: 'land', zone: 0 })
   const battle = run.battle!
   battle.cover.fill(0)

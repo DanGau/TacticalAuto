@@ -7,7 +7,7 @@ const { values } = parseArgs({
   options: {
     runs: { type: 'string', default: '100' },
     'seed-start': { type: 'string', default: '0' },
-    bot: { type: 'string', default: 'heuristic' },
+    bot: { type: 'string', default: 'standard' },
     json: { type: 'boolean', default: false },
   },
 })

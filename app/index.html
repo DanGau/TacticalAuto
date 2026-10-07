@@ -26,23 +26,25 @@
       button.lastStand, button.final { border-color: #ff6b5e; }
 
       .header { display: flex; align-items: center; gap: 24px; }
-      .header h1 { margin: 0; }
       .tabs { display: flex; gap: 4px; flex: 1; }
       .tab { padding: 6px 18px; background: none; border-color: transparent; color: #9aa6bd; }
       .tab.active { background: #263042; border-color: #4a5a78; color: #dde; }
 
-      .board { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 120px); gap: 12px; }
-      .region { padding: 12px 16px; text-align: left; line-height: 1.6; background: #1d2433; border: 1px solid #323c50; border-radius: 6px; }
-      button.region { background: #2a3a55; border-color: #4da3ff; }
-      button.region:hover { background: #35496b; }
-      button.region.lastStand { border-color: #ff6b5e; }
-      .mission { margin-top: 6px; }
-      .threat { padding-right: 8px; color: #ff6b5e; letter-spacing: 2px; white-space: nowrap; }
+      .threat { padding: 0 8px; color: #ff6b5e; letter-spacing: 2px; white-space: nowrap; }
+      .keys { color: #ffd84d; letter-spacing: 3px; }
       .note { font-size: 12px; color: #9aa6bd; white-space: nowrap; }
-      .gained { color: #ffd84d; }
-      .preview { display: none; }
-      .board:has(.mission-0:hover) .preview-0, .board:has(.mission-1:hover) .preview-1, .board:has(.mission-2:hover) .preview-2 { display: inline; }
-      .board:has(.mission-0:hover, .mission-1:hover, .mission-2:hover) .now { display: none; }
+      .road { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0; }
+      .arrow { color: #5d6577; }
+      .chip { padding: 4px 10px; border: 1px solid #4a5a78; border-radius: 12px; white-space: nowrap; }
+      .chip.supply, .chip.cache { border-color: #ffd84d; }
+      .chip.key, .chip.final { border-color: #c77dff; }
+      .chip.done { opacity: 0.35; }
+      .chip.here { background: #35496b; }
+      button.zone.safe { border-color: #7ddc5a; }
+      button.zone.dangerous { border-color: #ff6b5e; }
+      button.travel { min-width: 320px; text-align: left; line-height: 1.5; }
+      button.travel.key, button.travel.final { border-color: #c77dff; }
+      .drops { display: flex; gap: 12px; }
 
       .facilities { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
       .facilities button { text-align: left; padding: 10px 14px; line-height: 1.5; }
@@ -73,7 +75,9 @@
       .stash button { text-align: left; padding: 8px 12px; line-height: 1.5; }
 
       .choices { display: flex; gap: 16px; }
-      .choices button { flex: 1; text-align: left; line-height: 1.5; }
+      .choices button { flex: 1; text-align: left; line-height: 1.5; display: flex; flex-direction: column; justify-content: flex-start; }
+      .choices button > * { margin: 0; }
+      .choices button br { display: none; }
       button.card { min-height: 110px; }
       button.rare { border-color: #4da3ff; }
       button.rare small { color: #4da3ff; }

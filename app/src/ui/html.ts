@@ -1,7 +1,7 @@
 import type { Action } from '../core/apply'
 import type { Stats } from '../core/battle'
 import { EFFECTS, type Gear } from '../core/gear'
-import { preview, REGIONS, THREAT_MAX, type Mission, type Run } from '../core/run'
+import { KEYS, THREAT_MAX, type Mission, type StopKind } from '../core/run'
 
 /** A button that performs `action` when clicked. */
 export const button = (action: Action, label: string, cls = '', enabled = true) =>
@@ -9,27 +9,24 @@ export const button = (action: Action, label: string, cls = '', enabled = true) 
 
 export const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`
 
-export function missionTitle(mission: Mission): string {
-  if (mission.kind === 'final') return 'Final assault on the alien ship'
-  return `${mission.kind === 'lastStand' ? 'Last stand' : 'Strike'}: ${REGIONS[mission.region]}`
+/** What each kind of stop is called. */
+export const STOP_NAMES: Record<StopKind | Mission['kind'], string> = {
+  battle: 'Battle',
+  supply: 'Supply drop',
+  cache: 'Gear cache',
+  key: 'Satellite',
+  final: 'The alien source',
+  lastStand: 'Last stand',
 }
 
-/**
- * One region's threat meter and a note beside it. Given a mission, it shows what choosing that mission leads to
- * here: a pip gained if this region is skipped, or what a win and a loss do if the mission is here.
- * `landed` is how many of the newest pips animate in as the aliens' advance.
- */
-export function threatMeter(run: Run, region: number, mission?: Mission, landed = 0): string {
-  const now = run.threat[region]
-  const outcome = mission && preview(run, mission)
-  // A skipped region ends the same won or lost; the mission's own region does not.
-  const own = mission?.region === region
-  const gained = outcome && !own ? outcome.won[region] - now : 0
-  let note = now + gained === THREAT_MAX ? 'last stand' : landed > 0 ? signed(landed) : ''
-  if (outcome && own) note = `${signed(outcome.won[region] - now)} won · ${outcome.lost ? `${signed(outcome.lost[region] - now)} lost` : 'run ends if lost'}`
-  const pips = `${'■'.repeat(now - landed)}<span class="landed">${'■'.repeat(landed)}</span><span class="gained">${'■'.repeat(gained)}</span>${'□'.repeat(THREAT_MAX - now - gained)}`
-  return `<span class="threat">${pips}</span><span class="note">${note}</span>`
+/** The threat bar. `landed` is how many of the newest pips animate in. */
+export function threatBar(threat: number, landed = 0): string {
+  const pips = `${'■'.repeat(threat - landed)}<span class="landed">${'■'.repeat(landed)}</span>${'□'.repeat(THREAT_MAX - threat)}`
+  return `<span class="threat">${pips}</span>${threat === THREAT_MAX ? '<b class="up">last stand next</b>' : ''}`
 }
+
+/** The access keys, won and still to win. */
+export const keyRow = (keys: number) => `<span class="keys">${'◆'.repeat(keys)}${'◇'.repeat(KEYS - keys)}</span>`
 
 const percent = (n: number) => `${signed(Math.round(100 * n))}%`
 

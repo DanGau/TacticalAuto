@@ -3,10 +3,11 @@ import { apply } from './apply'
 import { coverAt, distance, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
 import { BASE_SQUAD, createRun, type Run } from './run'
 
-/** A run choosing where to land for its first mission. */
+/** A run choosing where to land for its first battle. */
 function landing(): Run & { battle: Battle } {
   const run = createRun(1)
-  apply(run, { type: 'mission', index: 0 })
+  apply(run, { type: 'zone', index: 1 })
+  apply(run, { type: 'advance' })
   return run as Run & { battle: Battle }
 }
 
@@ -38,10 +39,13 @@ test('actions outside their phase are rejected and change nothing', () => {
   const before = structuredClone(run)
   expect(apply(run, { type: 'pick', index: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'land', zone: 0 }).ok).toBe(false)
-  expect(apply(run, { type: 'mission', index: 9 }).ok).toBe(false)
+  expect(apply(run, { type: 'zone', index: 9 }).ok).toBe(false)
+  expect(apply(run, { type: 'advance' }).ok).toBe(false)
   expect(run).toEqual(before)
-  apply(run, { type: 'mission', index: 0 })
-  expect(apply(run, { type: 'mission', index: 0 }).ok).toBe(false)
+  apply(run, { type: 'zone', index: 1 })
+  apply(run, { type: 'advance' })
+  expect(apply(run, { type: 'advance' }).ok).toBe(false)
+  expect(apply(run, { type: 'build', facility: 'workshop' }).ok).toBe(false)
   expect(apply(run, { type: 'land', zone: 9 }).ok).toBe(false)
   apply(run, { type: 'land', zone: 0 })
   expect(apply(run, { type: 'land', zone: 0 }).ok).toBe(false)

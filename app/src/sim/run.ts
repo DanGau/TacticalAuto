@@ -6,8 +6,8 @@ import { step } from '../core/step'
 export interface RunResult {
   seed: number
   won: boolean
-  /** The round the run ended in. */
-  round: number
+  /** Access keys won. */
+  keys: number
   /** The kind of mission the run ended on. */
   endedOn: Mission['kind']
   battles: number
@@ -20,7 +20,7 @@ export interface RunResult {
 /** Plays a run to its end, taking each action from `next` when the run waits for the player. */
 function play(seed: number, next: (run: Run) => Action): { run: Run; result: RunResult } {
   const run = createRun(seed)
-  const result: RunResult = { seed, won: false, round: 0, endedOn: 'strike', battles: 0, draws: 0, actions: [] }
+  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, actions: [] }
   while (run.phase !== 'won' && run.phase !== 'lost') {
     if (run.phase === 'battle' && run.battle!.phase === 'battle') {
       for (const event of step(run)) {
@@ -35,7 +35,7 @@ function play(seed: number, next: (run: Run) => Action): { run: Run; result: Run
     if (!applied.ok) throw new Error(`action rejected: ${applied.reason}`)
     result.actions.push(action)
   }
-  return { run, result: { ...result, won: run.phase === 'won', round: run.round, endedOn: run.mission!.kind } }
+  return { run, result: { ...result, won: run.phase === 'won', keys: run.keys, endedOn: run.mission!.kind } }
 }
 
 /** The final state of the run these inputs produce. */

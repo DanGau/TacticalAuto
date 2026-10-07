@@ -14,16 +14,20 @@
 
 **Maps.** Post-apocalyptic cities and countryside: houses, trees, terrain.
 
-**Run.** A fixed number of rounds, then a final assault on the alien ship; winning it saves the world. Each round the aliens strike three regions and the player answers one. After the battle one screen reveals, in order, the region's threat change, supplies, each soldier's experience and promotion, and the aid to choose. The player returns to the Base; the threat the aliens added in the skipped regions shows when the Map is first opened.
+**Run.** Three satellites each hold an access key. With all three the squad can find the alien source and strike it; winning that final mission saves the world. A run is three legs, one per key.
 
-**Overworld.** Between battles the player moves among three views: the Map, a board of the world's regions where a mission is chosen; the Base, where facilities are built; and the Barracks, which shows each soldier.
+**Road.** A leg is two forks in the road, then its satellite. At a fork the player chooses one of three zones and is committed to it; what lies beyond is unknown. A zone is a few stops: battles, and sometimes a supply drop or a gear cache, which need no fight. The zones differ by risk: a quiet one has fewer aliens, pays little and no gear, and is long; an overrun one is a single hard fight that pays rare gear. A satellite and the alien source are each guarded by a boss.
 
-**Losing.** A run is lost only in a battle, never on the map, and suddenly rather than slowly. A region at maximum threat forces a last stand there. Losing a last stand or the final assault ends the run; losing a strike costs the soldiers who died and adds threat. Soldiers heal fully between battles.
+**Threat.** One bar for the whole invasion. Every stop adds to it, and a lost battle adds more, so a longer road costs more. When it is full, the aliens attack before the next stop: a last stand, which empties the bar if won.
+
+**Overworld.** Between stops the player moves among three views: the Map, which shows the fork or the road through the current zone; the Base, where facilities are built; and the Barracks, which shows each soldier. After a battle one screen reveals, in order, the threat, supplies and gear, each soldier's experience and promotion, and the aid to choose; the player then returns to the Base.
+
+**Losing.** A run is lost only in a battle, never on the map, and suddenly rather than slowly. Losing a last stand or the final mission ends the run. Losing any other battle costs the soldiers who died and adds threat; a lost satellite mission is fought again. Soldiers heal fully between battles.
 
 **Progression.**
 
-- Base: won missions pay supplies. The player spends supplies on facilities from a fixed list, each with several levels.
-- Aid: after a won mission the defended region offers three aid cards of differing rarity; the player takes one. Aid is a windfall, not a plan: supplies, training, threat relief, alien tech.
+- Base: won battles and supply drops pay supplies. The player spends supplies on facilities from a fixed list, each with several levels.
+- Aid: after a won battle the survivors offer three aid cards of differing rarity; the player takes one. Aid is a windfall, not a plan: supplies, training, threat relief, alien tech.
 - Soldiers: survivors gain experience and ranks. Recruits refill the squad for free, so rookies are expendable and veterans precious. On first promotion a soldier draws one of four classes at random, after XCOM's: Assault, Heavy, Sniper, Support. A class is a set of stat changes; a way of positioning, such as a Sniper keeping out of reach; and one ability the soldier uses unprompted. An ability either replaces the soldier's shot, as a Heavy's rocket does, or comes on top of it, as a Support's heal does.
-- Gear: each won mission drops one piece, with no choice. Each is built from parts, as Borderlands builds guns: a base, one or two stat mods, some of which trade one stat for another, and on rare and epic gear one effect, such as setting targets burning or absorbing the first hit. A soldier has three slots: weapon, armor, utility. The base owns the gear, so it survives a death; it is equipped in the Barracks by clicking a slot and then the gear.
+- Gear: won battles and caches drop gear, with no choice. Each is built from parts, as Borderlands builds guns: a base, one or two stat mods, some of which trade one stat for another, and on rare and epic gear one effect, such as setting targets burning or absorbing the first hit. A soldier has three slots: weapon, armor, utility. The base owns the gear, so it survives a death; it is equipped in the Barracks by clicking a slot and then the gear.
 - Death: should reward the player in a way the fiction supports. Undecided.

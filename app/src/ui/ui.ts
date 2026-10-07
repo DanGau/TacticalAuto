@@ -1,8 +1,8 @@
 import type { Action } from '../core/apply'
 import type { Report, Run } from '../core/run'
 import type { View } from '../view/view'
-import { alienAdvance, missionEnd, runEnd, world } from './aftermath'
-import { missionTitle } from './html'
+import { runEnd, stopReport } from './aftermath'
+import { STOP_NAMES } from './html'
 import { overworld, type Picking, type Tab } from './overworld'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
@@ -15,7 +15,7 @@ export interface Ui {
 function status(run: Run): string {
   const battle = run.battle
   if (run.phase !== 'battle' || !battle) return ''
-  const title = missionTitle(run.mission!)
+  const title = STOP_NAMES[run.mission!.kind]
   if (battle.phase === 'deploy') return `${title} · ${run.mission!.aliens} aliens · click a landing zone`
   return `${title} · ${SIDE[battle.turn]}' turn`
 }
@@ -24,33 +24,31 @@ function status(run: Run): string {
 export function createUi(view: View, act: (action: Action) => void): Ui {
   const statusLine = document.getElementById('status')!
   const overlay = document.getElementById('panel')!
-  /** The report whose screen of each kind the player has continued past. */
-  const seen: Record<string, Report | null> = { mission: null, world: null }
-  /** The report after which the player has already been brought back to the base. */
-  let returned: Report | null = null
+  /** The report the player has continued past. */
+  let seen: Report | null = null
   let tab: Tab = 'Map'
   let picking: Picking | null = null
   let shown: Run | null = null
   let html = ''
 
   /**
-   * The panel for where the player is. After a battle comes the mission's end, then the overworld, opened on the
-   * base. What the aliens did meanwhile shows when the player first opens the map.
+   * The panel for where the player is. After a stop comes its report: for a won battle it ends when aid is taken,
+   * otherwise at Continue. Then the overworld, opened on the base after a battle.
    */
   function panel(run: Run): string {
     const report = run.report
     if (run.phase === 'battle') return ''
     if (run.phase === 'won' || run.phase === 'lost') return runEnd(run)
-    if (run.phase === 'reward') return missionEnd(run, report!)
-    // A won mission's screen ended when its aid was taken.
-    if (report && !report.won && seen.mission !== report) return missionEnd(run, report)
-    if (report && returned !== report) {
-      returned = report
+    if (run.phase === 'reward') {
+      seen = report
       tab = 'Base'
+      return stopReport(run, report!)
     }
-    const news = report !== null && seen.world !== report && alienAdvance(run, report).some((n) => n > 0)
-    if (news && tab === 'Map') return world(run, report)
-    return overworld(run, tab, news, picking)
+    if (report && seen !== report) {
+      if (report.soldiers.length > 0) tab = 'Base'
+      return stopReport(run, report)
+    }
+    return overworld(run, tab, picking)
   }
 
   function render(run: Run): void {
@@ -69,7 +67,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     const target = (e.target as HTMLElement).closest('button')
     if (!target || target.disabled) return
     if (target.id === 'again') location.href = location.pathname
-    else if (target.dataset.seen) seen[target.dataset.seen] = shown!.report
+    else if (target.dataset.seen) seen = shown!.report
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
     else if (target.dataset.pick) {
       const pick: Picking = JSON.parse(target.dataset.pick)

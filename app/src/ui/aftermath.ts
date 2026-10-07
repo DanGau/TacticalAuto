@@ -1,23 +1,11 @@
 import { AID, type AidId } from '../core/base'
 import { CLASSES } from '../core/classes'
-import { RANK_NAMES, RANK_XP, rank, REGIONS, ROUNDS, THREAT_MAX, type Report, type Run } from '../core/run'
-import { button, gearCard, missionTitle, signed } from './html'
-import { board } from './overworld'
+import { KEYS, RANK_NAMES, RANK_XP, rank, type Report, type Run } from '../core/run'
+import { button, gearCard, keyRow, signed, STOP_NAMES, threatBar } from './html'
 
 function aidCard(id: AidId, index: number): string {
   const { name, rarity, text } = AID[id]
   return button({ type: 'pick', index }, `<small>${rarity}</small><br><b>${name}</b><br>${text}`, `card ${rarity}`)
-}
-
-/** Meters for the regions whose threat differs between two moments; falling pips are `cleared`, rising ones `landed`. */
-function threatMoves(from: number[], to: number[]): string {
-  const rows = REGIONS.flatMap((name, i) => {
-    if (from[i] === to[i]) return []
-    const kept = Math.min(from[i], to[i])
-    const meter = `${'■'.repeat(kept)}<span class="cleared">${'■'.repeat(from[i] - kept)}</span><span class="landed">${'■'.repeat(to[i] - kept)}</span>${'□'.repeat(THREAT_MAX - Math.max(from[i], to[i]))}`
-    return [`<tr><td>${name}</td><td class="threat">${meter}</td><td class="note">${signed(to[i] - from[i])} threat</td></tr>`]
-  })
-  return `<table>${rows.join('')}</table>`
 }
 
 /** A soldier's card: rank, an experience bar filling toward the next rank, and a promotion, new class, or death. */
@@ -38,38 +26,34 @@ function soldierCard(soldier: Report['soldiers'][number]): string {
   </div>`
 }
 
-/** The one screen after a battle, revealed top to bottom: the region, the supplies and gear, the squad, then the aid to take. */
-export function missionEnd(run: Run, report: Report): string {
-  const last = report.won
-    ? `<h2>${REGIONS[run.mission!.region]} offers aid. Take one.</h2><div class="choices">${run.offers.map(aidCard).join('')}</div>`
-    : '<button data-seen="mission">Continue</button>'
+function title(report: Report): string {
+  const name = STOP_NAMES[report.stop]
+  if (report.stop === 'supply' || report.stop === 'cache') return `<h1>${name}</h1>`
+  return `<h1 class="${report.won ? 'down' : 'up'}">${name} ${report.won ? 'won' : 'lost'}</h1>`
+}
+
+/**
+ * The one screen after a stop, revealed top to bottom: the threat, what was gained, the squad if it fought,
+ * then the aid to take after a won battle, or a button to go on.
+ */
+export function stopReport(run: Run, report: Report): string {
+  const { before, after } = report.threat
+  const threat = after === before ? '' : `<span class="note">${signed(after - before)}</span>`
+  const squad = report.soldiers.length > 0 ? `<div class="stage second"><h2>Squad</h2><div class="squad">${report.soldiers.map(soldierCard).join('')}</div></div>` : ''
+  const last = run.phase === 'reward' ? `<h2>The survivors offer aid. Take one.</h2><div class="choices">${run.offers.map(aidCard).join('')}</div>` : '<button data-seen="report">Continue</button>'
   return `
-    <h1 class="${report.won ? 'down' : 'up'}">Mission ${report.won ? 'won' : 'lost'} · ${missionTitle(run.mission!)}</h1>
+    ${title(report)}
     <div class="stage">
-      ${threatMoves(report.threat.before, report.threat.afterMission)}
+      <p>Threat ${threatBar(after, Math.max(0, after - before))}${threat}</p>
+      ${report.key ? `<p class="keys">Access key won ${keyRow(run.keys)} ${run.keys === KEYS ? 'The alien source is found.' : ''}</p>` : ''}
       ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : ''}
-      ${report.gear ? `<h2>Recovered from the field. Equip it in the Barracks.</h2><div class="gear ${report.gear.rarity} drop">${gearCard(report.gear)}</div>` : ''}
+      ${report.gear.length > 0 ? `<h2>Recovered. Equip it in the Barracks.</h2><div class="drops">${report.gear.map((gear) => `<div class="gear ${gear.rarity} drop">${gearCard(gear)}</div>`).join('')}</div>` : ''}
     </div>
-    <div class="stage second"><h2>Squad</h2><div class="squad">${report.soldiers.map(soldierCard).join('')}</div></div>
-    <div class="stage third">${last}</div>`
-}
-
-/** Threat each region gained from the strikes left unanswered, capped at what aid taken since has left. */
-export function alienAdvance(run: Run, report: Report): number[] {
-  return run.threat.map((now, i) => Math.min(Math.max(report.threat.afterAliens[i] - report.threat.afterMission[i], 0), now))
-}
-
-/** The screen between a mission and the overworld: what the aliens did elsewhere meanwhile, on the world board. */
-export function world(run: Run, report: Report): string {
-  const lastStand = run.missions[0]?.kind === 'lastStand' ? `<p class="up stage second"><b>${REGIONS[run.missions[0].region]} is overrun. A last stand is next.</b></p>` : ''
-  return `
-    <h1 class="up">Meanwhile, the aliens advanced</h1>
-    ${board(run, alienAdvance(run, report))}
-    ${lastStand}
-    <button class="stage second" data-seen="world">Continue</button>`
+    ${squad}
+    <div class="stage ${squad ? 'third' : 'second'}">${last}</div>`
 }
 
 export function runEnd(run: Run): string {
-  if (run.phase === 'won') return `<h1 class="down">Earth is saved</h1><button id="again">New run</button>`
-  return `<h1 class="up">Earth has fallen</h1><h2>Lost: ${missionTitle(run.mission!)}, round ${Math.min(run.round, ROUNDS)}</h2><button id="again">New run</button>`
+  if (run.phase === 'won') return `<h1 class="down">The source is destroyed. Earth is saved.</h1><button id="again">New run</button>`
+  return `<h1 class="up">Earth has fallen</h1><h2>Lost: ${STOP_NAMES[run.mission!.kind]}, with ${run.keys} of ${KEYS} keys</h2><button id="again">New run</button>`
 }

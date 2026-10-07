@@ -1,8 +1,8 @@
 import { AID, FACILITIES, type FacilityId } from '../core/base'
 import { CLASSES } from '../core/classes'
 import { SLOTS, type Slot } from '../core/gear'
-import { buildCost, holder, level, payout, RANK_NAMES, RANK_XP, rank, REGIONS, ROUNDS, soldierStats, type Run, type Soldier } from '../core/run'
-import { button, gearCard, gearText, missionTitle, threatMeter } from './html'
+import { buildCost, holder, level, missionAt, nextStop, RANK_NAMES, RANK_XP, rank, RISKS, soldierStats, type Run, type Soldier, type StopKind, type Zone } from '../core/run'
+import { button, gearCard, gearText, keyRow, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
 export const TABS = ['Map', 'Base', 'Barracks'] as const
@@ -14,39 +14,50 @@ export interface Picking {
   slot: Slot
 }
 
-/** Where each region sits on the board, as [column, row], so the board reads as a world map. */
-const PLACE = [[1, 1], [1, 2], [2, 1], [2, 2], [3, 1], [3, 2]]
-
-/**
- * The world as a board of regions, each with its threat. A region with a mission on offer is a button that starts
- * it; hovering one shows on every region what choosing it leads to. `landed` animates the aliens' advance per region.
- */
-export function board(run: Run, landed?: number[]): string {
-  const regions = REGIONS.map((name, region) => {
-    const index = landed ? -1 : run.missions.findIndex((m) => m.region === region)
-    const mission = run.missions[index]
-    const meters = landed
-      ? threatMeter(run, region, undefined, landed[region])
-      : `<span class="now">${threatMeter(run, region)}</span>${run.missions.map((m, i) => `<span class="preview preview-${i}">${threatMeter(run, region, m)}</span>`).join('')}`
-    const body = `<b>${name}</b><div>${meters}</div>`
-    const style = `style="grid-column: ${PLACE[region][0]}; grid-row: ${PLACE[region][1]}"`
-    if (!mission) return `<div class="region" ${style}>${body}</div>`
-    const reward = `+${payout(mission)} supplies, 1 of 3 aid${mission.hard ? ' (rare or better)' : ''}`
-    return `<button class="region ${mission.kind} mission-${index}" ${style} data-action='${JSON.stringify({ type: 'mission', index })}'>
-      ${body}<div class="mission">${mission.kind === 'lastStand' ? 'Last stand' : 'Alien strike'} · ${mission.aliens} aliens<br><small>${reward}</small></div>
-    </button>`
-  })
-  return `<div class="board">${regions.join('')}</div>`
+/** A stop as a chip on the road: its name, and for a fight, how many aliens. */
+function chip(run: Run, zone: Zone, stop: StopKind, state = ''): string {
+  const fight = stop === 'battle' || stop === 'key' || stop === 'final'
+  const aliens = fight ? ` · ${missionAt(run, stop, zone.risk).aliens} aliens${stop === 'battle' ? '' : ' and a boss'}` : ''
+  return `<span class="chip ${stop} ${state}">${STOP_NAMES[stop]}${aliens}</span>`
 }
 
+/** A zone at a fork: its risk, its stops in order, and what it costs and pays. Clicking it commits the squad to it. */
+function zoneCard(run: Run, zone: Zone, index: number): string {
+  const risk = RISKS[zone.risk]
+  // Battles are sized as they will be once the squad has taken this fork.
+  const ahead = { ...run, fork: run.fork + 1 }
+  const gear = risk.drops === 0 ? 'no gear' : `${risk.drops} ${risk.rareGear ? 'rare or better ' : ''}gear`
+  return button(
+    { type: 'zone', index },
+    `<small>${risk.text}</small><br><b>${risk.name} zone</b>
+    <div class="road">${zone.stops.map((stop) => chip(ahead, zone, stop)).join('<span class="arrow">→</span>')}</div>
+    <small>Each battle won: ${risk.supplies} ${risk.supplies === 1 ? 'supply' : 'supplies'}, ${gear}, 1 of 3 aid<br>+${zone.stops.length} threat</small>`,
+    `zone ${zone.risk}`,
+  )
+}
+
+/** The words on the button that travels to the next stop. */
+function travelLabel(run: Run, zone: Zone, stop: NonNullable<ReturnType<typeof nextStop>>): string {
+  if (stop === 'supply' || stop === 'cache') return `Collect the ${STOP_NAMES[stop].toLowerCase()}`
+  const mission = missionAt(run, stop, zone.risk)
+  const stakes = stop === 'lastStand' || stop === 'final' ? ' · lose and the run ends' : ''
+  return `<b>${STOP_NAMES[stop]}</b><br>${mission.aliens} aliens${stop === 'key' || stop === 'final' ? ' and a boss' : ''}${stakes}`
+}
+
+/** The map: at a fork, the three zones to choose from; in a zone, the road through it and a button to travel on. */
 function mapView(run: Run): string {
-  const final = run.missions.find((m) => m.kind === 'final')
-  if (final) {
-    return `<h2>Every region held. One mission remains, and it must be won.</h2>
-      ${button({ type: 'mission', index: 0 }, `<b>${missionTitle(final)}</b><br>${final.aliens} aliens · lose and the run ends`, 'final')}`
+  const zone = run.zone
+  if (!zone) {
+    return `<h2>A fork in the road. Choose a zone; what lies beyond it is unknown.</h2>
+      <div class="choices">${run.zones.map((z, i) => zoneCard(run, z, i)).join('')}</div>`
   }
-  const prompt = run.missions.length > 1 ? 'Aliens strike three regions. Click one to answer it; the others gain threat.' : 'A region is overrun. Its last stand must be won.'
-  return `<h2>${prompt}</h2>${board(run)}`
+  const stop = nextStop(run)!
+  const road = zone.stops.map((s, i) => chip(run, zone, s, i < run.stop ? 'done' : i === run.stop ? 'here' : '')).join('<span class="arrow">→</span>')
+  const where = zone.stops[0] === 'final' ? 'All three keys are won. The alien source is found.' : zone.stops[0] === 'key' ? 'The road ends at a satellite. Its access key is guarded.' : `${RISKS[zone.risk].name} zone`
+  return `<h2>${where}</h2>
+    <div class="road">${road}</div>
+    ${stop === 'lastStand' ? '<p class="up"><b>The threat is full. The aliens attack before the squad can travel on.</b></p>' : ''}
+    <button class="travel ${stop}" data-action='${JSON.stringify({ type: 'advance' })}'>${travelLabel(run, zone, stop)}</button>`
 }
 
 /** A facility's next level, buyable when the run has the supplies. */
@@ -121,18 +132,18 @@ function barracksView(run: Run, picking: Picking | null): string {
 }
 
 /**
- * The screen between battles: a header with the round, supplies and tabs, over the chosen tab's view.
- * `mapNews` marks the Map tab while the aliens' latest advance waits there unseen; the Barracks tab is marked
- * while the stash holds gear. `picking` is the gear slot being filled in the Barracks.
+ * The screen between stops: a header with the keys, threat, supplies and tabs, over the chosen tab's view.
+ * The Barracks tab is marked while the stash holds gear. `picking` is the gear slot being filled in the Barracks.
  */
-export function overworld(run: Run, tab: Tab, mapNews: boolean, picking: Picking | null): string {
+export function overworld(run: Run, tab: Tab, picking: Picking | null): string {
   const views = { Map: mapView, Base: baseView, Barracks: (r: Run) => barracksView(r, picking) }
-  const marked = { Map: mapNews, Base: false, Barracks: run.gear.some((gear) => !holder(run, gear)) }
+  const marked = { Map: false, Base: false, Barracks: run.gear.some((gear) => !holder(run, gear)) }
   const tabs = TABS.map((name) => `<button class="tab ${name === tab ? 'active' : ''}" data-tab="${name}">${name}${marked[name] ? ' <b class="up">●</b>' : ''}</button>`)
   return `
     <div class="header">
-      <h1>${run.round > ROUNDS ? 'The final assault' : `Round ${run.round} of ${ROUNDS}`}</h1>
       <div class="tabs">${tabs.join('')}</div>
+      <span>Keys ${keyRow(run.keys)}</span>
+      <span>Threat ${threatBar(run.threat)}</span>
       <b class="supplies">${run.supplies} ${run.supplies === 1 ? 'supply' : 'supplies'}</b>
     </div>
     ${views[tab](run)}`

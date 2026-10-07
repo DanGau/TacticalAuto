@@ -75,6 +75,12 @@ export type Effect = 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'c
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
 
+/** An alien to place in a battle. A boss is the one a key or final mission is about. */
+export interface Alien {
+  stats: Stats
+  boss: boolean
+}
+
 /** A soldier waiting to land. */
 export interface Reserve {
   soldier: number
@@ -106,6 +112,7 @@ export interface Unit {
   spent: Effect[]
   /** Turns of burning left. */
   burning: number
+  boss: boolean
 }
 
 /** A group of aliens. It patrols toward its waypoint, unseen, until a soldier sights a member; then it fights. */
@@ -210,7 +217,7 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 export function land(battle: Battle, zone: Tile): void {
   const tiles = freeTilesNear(battle, zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
-    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, pod: null, spent: [], burning: 0, ...soldier })
+    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, pod: null, spent: [], burning: 0, boss: false, ...soldier })
   })
   battle.reserve = []
   battle.phase = 'battle'
@@ -242,7 +249,7 @@ function sealPockets(battle: Battle): void {
 }
 
 /** A battle awaiting the squad's landing, with cover, alien pods, and landing zones placed. */
-export function createBattle(seed: number, aliens: Stats[], reserve: Reserve[]): Battle {
+export function createBattle(seed: number, aliens: Alien[], reserve: Reserve[]): Battle {
   const battle: Battle = {
     rng: seed,
     beat: 0,
@@ -276,7 +283,7 @@ export function createBattle(seed: number, aliens: Stats[], reserve: Reserve[]):
     centres.push(centre)
     const members = aliens.filter((_, i) => i % podCount === pod)
     freeTilesNear(battle, centre, members.length).forEach((tile, i) => {
-      battle.units.push({ id: battle.nextId++, side: 'alien', ...tile, hp: members[i].hp, stats: members[i], soldier: null, pod: battle.pods.length, ability: null, charges: 0, stance: 'balanced', effects: [], spent: [], burning: 0 })
+      battle.units.push({ id: battle.nextId++, side: 'alien', ...tile, hp: members[i].stats.hp, ...members[i], soldier: null, pod: battle.pods.length, ability: null, charges: 0, stance: 'balanced', effects: [], spent: [], burning: 0 })
     })
     battle.pods.push({ revealed: false, surprised: false, waypoint: randomTile(battle) })
   }

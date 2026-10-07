@@ -1,31 +1,43 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { BASE_STATS, type Side } from './battle'
 import { FACILITIES } from './base'
+import { BASE_STATS, type Side } from './battle'
 import { CLASSES } from './classes'
 import {
   BASE_SQUAD,
   createRun,
+  DROP_SUPPLIES,
   endBattle,
+  FORKS,
+  KEYS,
   LOSS_THREAT,
-  payout,
-  preview,
+  nextStop,
   rank,
-  ROUNDS,
-  SKIP_THREAT,
+  RISKS,
   soldierStats,
   START_SUPPLIES,
-  START_THREAT,
-  STRIKES,
+  STOP_THREAT,
   THREAT_MAX,
-  WIN_THREAT,
+  type Risk,
   type Run,
+  type StopKind,
 } from './run'
 
-/** Ends the battle awaiting a landing with `winner`: one soldier fought, the rest stayed in reserve, and the losing side is dead. */
-function finish(run: Run, winner: Side): void {
-  const battle = run.battle!
+const enter = (run: Run, risk: Risk) => apply(run, { type: 'zone', index: run.zones.findIndex((zone) => zone.risk === risk) })
+
+/** A run travelling a zone of the given stops. */
+function travelling(stops: StopKind[], risk: Risk = 'standard'): Run {
+  const run = createRun(1)
+  enter(run, risk)
+  run.zone = { risk, stops }
+  return run
+}
+
+/** Travels to the next stop, a battle, and ends it with `winner`: one soldier fought, the rest stayed in reserve, and the losing side is dead. */
+function fight(run: Run, winner: Side): void {
+  apply(run, { type: 'advance' })
   apply(run, { type: 'land', zone: 0 })
+  const battle = run.battle!
   const [fighter, ...rest] = battle.units.filter((u) => u.side === 'human')
   battle.reserve = winner === 'human' ? rest.map((u) => ({ soldier: u.soldier!, stats: u.stats, ability: u.ability, charges: u.charges, stance: u.stance, effects: u.effects })) : []
   battle.units = battle.units.filter((u) => u.side === winner && (u.side === 'alien' || u === fighter))
@@ -34,80 +46,108 @@ function finish(run: Run, winner: Side): void {
   endBattle(run)
 }
 
-test('a round offers strikes in different regions; skipped ones gain threat once the battle ends', () => {
+test('a run begins at a fork offering one zone of each risk, and travel waits for a choice', () => {
   const run = createRun(1)
-  expect(run.missions.map((m) => m.kind)).toEqual(Array(STRIKES).fill('strike'))
-  expect(new Set(run.missions.map((m) => m.region)).size).toBe(STRIKES)
-  const [chosen, ...skipped] = run.missions
-  const { won, lost } = preview(run, chosen)
-  expect(won[chosen.region]).toBe(START_THREAT - WIN_THREAT)
-  expect(lost![chosen.region]).toBe(START_THREAT + LOSS_THREAT)
-  for (const m of skipped) expect(won[m.region]).toBe(START_THREAT + SKIP_THREAT)
-  apply(run, { type: 'mission', index: 0 })
-  expect(run.threat).toEqual(Array(6).fill(START_THREAT))
-  finish(run, 'human')
-  expect(run.threat).toEqual(won)
-  expect(run.report!.threat.before).toEqual(Array(6).fill(START_THREAT))
-  expect(run.report!.threat.afterMission[chosen.region]).toBe(START_THREAT - WIN_THREAT)
-  for (const m of skipped) expect(run.report!.threat.afterMission[m.region]).toBe(START_THREAT)
-  expect(run.report!.threat.afterAliens).toEqual(won)
+  expect(run.zones.map((zone) => zone.risk)).toEqual(['safe', 'standard', 'dangerous'])
+  expect(nextStop(run)).toBeNull()
+  expect(apply(run, { type: 'advance' }).ok).toBe(false)
+  expect(enter(run, 'dangerous')).toEqual({ ok: true })
+  expect(run).toMatchObject({ zones: [], fork: 1, zone: { risk: 'dangerous' } })
+  expect(apply(run, { type: 'zone', index: 0 }).ok).toBe(false)
 })
 
-test('a won strike lowers threat, pays supplies, promotes the survivor, and offers three different aid cards', () => {
-  const run = createRun(1)
-  const region = run.missions[0].region
-  const pay = payout(run.missions[0])
-  apply(run, { type: 'mission', index: 0 })
-  finish(run, 'human')
-  expect(run.threat[region]).toBe(START_THREAT - WIN_THREAT)
-  expect(run.phase).toBe('reward')
-  expect(run.supplies).toBe(START_SUPPLIES + pay)
-  expect(new Set(run.offers).size).toBe(3)
-  expect(run.soldiers.filter((s) => rank(s) === 1)).toHaveLength(1)
-  expect(run.soldiers.map((s) => s.cls !== null)).toEqual(run.soldiers.map((s) => rank(s) > 0))
-  expect(run.report).toMatchObject({ won: true, supplies: pay })
+test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone adds threat, pays by the risk, promotes the survivor, and offers aid', (risk) => {
+  const run = travelling(['battle', 'battle'], risk)
+  fight(run, 'human')
+  expect(run).toMatchObject({ phase: 'reward', threat: STOP_THREAT, supplies: START_SUPPLIES + RISKS[risk].supplies, stop: 1 })
+  expect(run.gear).toHaveLength(RISKS[risk].drops)
+  if (RISKS[risk].rareGear) expect(run.gear.every((gear) => gear.rarity !== 'common')).toBe(true)
+  expect(run.report).toMatchObject({ stop: 'battle', won: true, threat: { before: 0, after: STOP_THREAT }, key: false })
   expect(run.report!.soldiers.map((s) => s.xpAfter - s.xpBefore).sort()).toEqual([0, 0, 0, 1])
-  expect(run.report!.soldiers.some((s) => s.died)).toBe(false)
+  expect(run.soldiers.map((s) => s.cls !== null)).toEqual(run.soldiers.map((s) => rank(s) > 0))
+  expect(new Set(run.offers).size).toBe(3)
   apply(run, { type: 'pick', index: 0 })
   expect(run.aid).toHaveLength(1)
-  expect(run).toMatchObject({ phase: 'map', round: 2 })
+  expect(run.phase).toBe('overworld')
 })
 
-test('a lost strike raises threat, replaces the dead, and the run goes on', () => {
-  const run = createRun(1)
-  const region = run.missions[0].region
+test('a lost battle adds more threat, replaces the dead, pays nothing, and the squad travels on', () => {
+  const run = travelling(['battle', 'battle'])
   const before = run.soldiers.map((s) => s.id)
-  apply(run, { type: 'mission', index: 0 })
-  finish(run, 'alien')
-  expect(run.threat[region]).toBe(START_THREAT + LOSS_THREAT)
+  fight(run, 'alien')
+  expect(run).toMatchObject({ phase: 'overworld', threat: STOP_THREAT + LOSS_THREAT, supplies: START_SUPPLIES, gear: [], stop: 1 })
   expect(run.soldiers).toHaveLength(before.length)
   expect(run.soldiers.some((s) => before.includes(s.id))).toBe(false)
-  expect(run.report).toMatchObject({ won: false, supplies: 0 })
   expect(run.report!.soldiers.every((s) => s.died)).toBe(true)
-  expect(run).toMatchObject({ phase: 'map', round: 2 })
 })
 
-test.each(['human', 'alien'] as const)('a region at maximum threat forces a last stand; %s win', (winner) => {
-  const run = createRun(1)
-  run.threat[2] = THREAT_MAX
-  apply(run, { type: 'mission', index: 0 })
-  finish(run, 'alien')
-  expect(run.missions).toMatchObject([{ kind: 'lastStand', region: 2 }])
-  apply(run, { type: 'mission', index: 0 })
-  finish(run, winner)
-  if (winner === 'human') expect(run.threat[2]).toBe(0)
-  expect(run.phase).toBe(winner === 'human' ? 'reward' : 'lost')
+test('a supply drop and a cache are collected on arrival, each adding threat', () => {
+  const run = travelling(['supply', 'cache', 'battle'])
+  apply(run, { type: 'advance' })
+  expect(run).toMatchObject({ phase: 'overworld', supplies: START_SUPPLIES + DROP_SUPPLIES, threat: STOP_THREAT, stop: 1 })
+  expect(run.report).toMatchObject({ stop: 'supply', supplies: DROP_SUPPLIES, soldiers: [] })
+  apply(run, { type: 'advance' })
+  expect(run.gear).toHaveLength(1)
+  expect(run.report).toMatchObject({ stop: 'cache', gear: run.gear })
+  expect(run.threat).toBe(2 * STOP_THREAT)
 })
 
-test.each(['human', 'alien'] as const)('after the last round comes the final assault, which decides the run; %s win', (winner) => {
+test('after the forks of a leg comes its satellite: winning it wins a key and opens the next leg; losing it means fighting it again', () => {
   const run = createRun(1)
-  run.round = ROUNDS
-  apply(run, { type: 'mission', index: 0 })
-  finish(run, 'alien')
-  expect(run.missions).toMatchObject([{ kind: 'final' }])
-  apply(run, { type: 'mission', index: 0 })
-  finish(run, winner)
+  for (let fork = 0; fork < FORKS; fork++) {
+    enter(run, 'dangerous')
+    fight(run, 'alien')
+  }
+  expect(run.zone).toEqual({ risk: 'standard', stops: ['key'] })
+  fight(run, 'alien')
+  expect(run).toMatchObject({ keys: 0, zone: { stops: ['key'] }, stop: 0 })
+  run.threat = 0
+  fight(run, 'human')
+  expect(run).toMatchObject({ keys: 1, fork: 0, zone: null, phase: 'reward' })
+  expect(run.report).toMatchObject({ stop: 'key', key: true })
+  expect(run.gear.every((gear) => gear.rarity !== 'common')).toBe(true)
+  expect(run.zones).toHaveLength(3)
+})
+
+test.each(['human', 'alien'] as const)('full threat puts a last stand before the next stop; %s win', (winner) => {
+  const run = travelling(['battle', 'battle'])
+  run.threat = THREAT_MAX
+  expect(nextStop(run)).toBe('lastStand')
+  fight(run, winner)
+  expect(run.report!.stop).toBe('lastStand')
+  if (winner === 'alien') return expect(run.phase).toBe('lost')
+  expect(run).toMatchObject({ phase: 'reward', threat: 0, stop: 0 })
+  expect(nextStop(run)).toBe('battle')
+})
+
+test.each(['human', 'alien'] as const)('with every key won, only the final mission remains, and it decides the run; %s win', (winner) => {
+  const run = createRun(1)
+  run.keys = KEYS - 1
+  run.fork = FORKS
+  run.zone = { risk: 'standard', stops: ['key'] }
+  fight(run, 'human')
+  apply(run, { type: 'pick', index: 0 })
+  expect(run.zone).toEqual({ risk: 'standard', stops: ['final'] })
+  run.threat = 0
+  fight(run, winner)
   expect(run.phase).toBe(winner === 'human' ? 'won' : 'lost')
+})
+
+test('aliens grow in number along the road, and a key mission has a boss', () => {
+  const run = createRun(1)
+  const count = () => {
+    apply(run, { type: 'advance' })
+    return run.battle!.units.filter((u) => u.side === 'alien')
+  }
+  enter(run, 'standard')
+  const first = count()
+  expect(first.some((u) => u.boss)).toBe(false)
+  run.phase = 'overworld'
+  run.fork = FORKS
+  run.zone = { risk: 'standard', stops: ['key'] }
+  const key = count()
+  expect(key.length).toBeGreaterThan(first.length)
+  expect(key.filter((u) => u.boss)).toHaveLength(1)
 })
 
 test('stats add rank, facilities and aid to the base', () => {
@@ -138,22 +178,23 @@ test('aid applies at once: supplies, threat, experience, promotion', () => {
   const take = (id: Run['offers'][number]) => {
     const run = createRun(1)
     run.phase = 'reward'
+    run.threat = 3
     run.offers = [id]
     apply(run, { type: 'pick', index: 0 })
     return run
   }
   expect(take('convoy').supplies).toBe(START_SUPPLIES + 6)
-  expect(take('satellite').threat).toEqual(Array(6).fill(START_THREAT - 1))
+  expect(take('jammer').threat).toBe(1)
   expect(take('training').soldiers.every((s) => s.xp === 1)).toBe(true)
   expect(take('veteran').soldiers.map(rank).sort()).toEqual([0, 0, 0, 3])
 })
 
 test('a class changes stats and gives the unit its ability', () => {
-  const run = createRun(1)
+  const run = travelling(['battle'])
   run.soldiers[0].xp = 1
   run.soldiers[0].cls = 'heavy'
   expect(soldierStats(run, run.soldiers[0]).hp).toBe(BASE_STATS.hp + 1 + CLASSES.heavy.stats.hp!)
-  apply(run, { type: 'mission', index: 0 })
+  apply(run, { type: 'advance' })
   apply(run, { type: 'land', zone: 0 })
   const units = run.battle!.units.filter((u) => u.side === 'human')
   expect(units[0]).toMatchObject({ ability: 'rocket', charges: 1, stance: 'anchor' })

@@ -7,7 +7,8 @@ import { sees } from './sight'
 
 function battle(seed: number): Battle {
   const run = createRun(seed)
-  apply(run, { type: 'mission', index: 0 })
+  apply(run, { type: 'zone', index: 1 })
+  apply(run, { type: 'advance' })
   apply(run, { type: 'land', zone: 0 })
   return run.battle!
 }
