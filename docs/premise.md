@@ -12,7 +12,7 @@
 
 **Cover.** Cover is real objects and follows reality: nothing shoots through a wall. High cover blocks movement and shots; a unit behind it can be hit only from an angle that sees past it. Low cover blocks movement and makes a unit beside it harder to hit. Cover counts only against a shooter on its far side; a shot from any other side flanks, ignores the cover, and can crit. Hit and crit numbers follow XCOM: Enemy Unknown. A shot is likelier to hit the closer the target, so a flanked enemy at point-blank is a near-certain hit. By default a unit moves to where its best shot most outweighs the best shot coming back. Every unit is bolder at full health and more careful as it is wounded; a badly wounded soldier pulls back while a healthier squadmate fights on.
 
-**Maps.** Post-apocalyptic cities and countryside: houses, trees, terrain.
+**Maps.** Each battlefield is a town block built from objects, after XCOM 2's plots and parcels: two crossing roads cut it into lots, and each lot is a place: a house with walls, doors, windows and furniture; a park of trees; a car park; a fenced depot of crates. Cars stand on the roads. Walls, trees, trucks and stacks are high cover; cars, crates, fences and windows are low, so soldiers shoot through a window and not through a wall. Post-apocalyptic cities and countryside are the setting.
 
 **Run.** Three satellites each hold an access key. With all three the squad can find the alien source and strike it; winning that final mission saves the world. A run is three legs, one per key.
 

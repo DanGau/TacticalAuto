@@ -1,4 +1,7 @@
-import { random, randomInt } from './rng'
+import { randomInt } from './rng'
+import { generateTerrain, PROP_COVER, type Cover, type Ground, type Prop } from './terrain'
+
+export type { Cover }
 
 export const GRID = 32
 /** A battle still running at this beat ends as a draw. */
@@ -7,11 +10,6 @@ export const MAX_BEATS = 1000
 export const CRIT_BONUS = 2
 /** Hit chance a target's cover removes, indexed by Cover. */
 export const COVER_DEFENSE = [0, 0.2, 0.4]
-/** Patches of dense cover on the map; the ground between them is nearly open. */
-export const COVER_PATCHES = 10
-/** Chance a tile holds cover inside a patch, and outside one. */
-export const PATCH_DENSITY = 0.4
-export const OPEN_DENSITY = 0.02
 /** Tiles within which a soldier with line of sight reveals an alien. */
 export const SIGHT = 8
 /** The most aliens that roam together. */
@@ -43,9 +41,6 @@ export const ZONE_RADIUS = 3
 export const ZONE_CLEARANCE = 9
 
 export type Side = 'human' | 'alien'
-
-/** What stands on a tile: 0 nothing, 1 low cover, 2 high cover. Cover blocks movement. */
-export type Cover = 0 | 1 | 2
 
 export type Tile = { x: number; y: number }
 
@@ -137,8 +132,10 @@ export interface Battle {
   winner: Side | null
   units: Unit[]
   nextId: number
-  /** One entry per tile, row by row; read it with coverAt. */
+  /** One entry per tile, row by row; read it with coverAt. The rules read cover; ground and props are how the map looks. */
   cover: Cover[]
+  ground: Ground[]
+  props: Prop[]
   pods: Pod[]
   /** Centres of the landing zones on offer in the deploy phase. */
   zones: Tile[]
@@ -244,14 +241,18 @@ function sealPockets(battle: Battle): void {
   }
   const largest = sizes.indexOf(Math.max(...sizes))
   area.forEach((id, tile) => {
-    if (id >= 0 && id !== largest) battle.cover[tile] = 2
+    if (id < 0 || id === largest) return
+    battle.cover[tile] = 2
+    battle.props[tile] = 'wall'
   })
 }
 
-/** A battle awaiting the squad's landing, with cover, alien pods, and landing zones placed. */
+/** A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. */
 export function createBattle(seed: number, aliens: Alien[], reserve: Reserve[]): Battle {
+  const holder = { rng: seed }
+  const terrain = generateTerrain(holder, GRID)
   const battle: Battle = {
-    rng: seed,
+    rng: holder.rng,
     beat: 0,
     phase: 'deploy',
     turn: 'human',
@@ -260,19 +261,12 @@ export function createBattle(seed: number, aliens: Alien[], reserve: Reserve[]):
     winner: null,
     units: [],
     nextId: 1,
-    cover: Array<Cover>(GRID * GRID).fill(0),
+    ...terrain,
+    cover: terrain.props.map((prop) => PROP_COVER[prop]),
     pods: [],
     zones: [],
     reserve,
   }
-  const patches = Array.from({ length: COVER_PATCHES }, () => ({ ...randomTile(battle), radius: 2 + randomInt(battle, 3) }))
-  for (let y = 0; y < GRID; y++) {
-    for (let x = 0; x < GRID; x++) {
-      const dense = patches.some((patch) => distance(patch, { x, y }) <= patch.radius)
-      if (random(battle) < (dense ? PATCH_DENSITY : OPEN_DENSITY)) battle.cover[y * GRID + x] = randomInt(battle, 2) === 0 ? 1 : 2
-    }
-  }
-
   sealPockets(battle)
 
   // As few pods as POD_SIZE allows, of sizes as even as possible.

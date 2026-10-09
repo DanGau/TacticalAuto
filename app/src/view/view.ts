@@ -1,10 +1,11 @@
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js'
-import { BLAST_RADIUS, coverAt, distance, GRID, revealed, ZONE_RADIUS, zoneInfo, type Battle, type Tile, type Unit } from '../core/battle'
+import { BLAST_RADIUS, distance, GRID, revealed, ZONE_RADIUS, zoneInfo, type Battle, type Tile, type Unit } from '../core/battle'
 import { CLASSES } from '../core/classes'
 import { EFFECTS } from '../core/gear'
 import type { GameEvent } from '../core/combat'
 import { rank, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
+import type { Ground, Prop } from '../core/terrain'
 
 export const WIDTH = 1280
 export const HEIGHT = 720
@@ -13,8 +14,6 @@ const TILE_W = 56
 const TILE_H = 28
 /** Height above the ground that shots leave and land. */
 const CHEST = 18
-/** Screen height of a cover block, indexed by Cover. */
-const COVER_HEIGHT = [0, 14, 34]
 /** Zoom that shows the whole map. */
 const FIT = Math.min(WIDTH / (GRID * TILE_W), HEIGHT / (GRID * TILE_H + 80))
 /** Screen pixels kept clear around what the camera frames. */
@@ -34,7 +33,6 @@ const COLOR = {
   human: 0x4da3ff,
   alien: 0x7ddc5a,
   boss: 0xc77dff,
-  tile: 0x263042,
   zone: 0x2f6fb0,
   zoneHover: 0x4d9be6,
   fog: 0x05070b,
@@ -46,10 +44,52 @@ const COLOR = {
   miss: 0x77808f,
   heal: 0x7ddc5a,
   contact: 0xff6b5e,
-  coverTop: 0x8a93a6,
-  coverLeft: 0x5d6577,
-  coverRight: 0x454c5c,
 }
+
+const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136 }
+
+/** A box standing on a tile: how much of the tile it covers, how tall it is on screen, and its top colour. */
+interface Box {
+  /** Share of the tile's width it spans along x and along y, 0 to 1. */
+  wide: number
+  deep: number
+  /** Screen pixels from the ground to its underside, and its height above that. */
+  base: number
+  up: number
+  color: number
+}
+
+const CAR_COLORS = [0xb8413a, 0x3f6fb5, 0xc9c9c2, 0x3d8f6b, 0xd0a13a]
+
+/** The boxes each prop is drawn from, bottom first. A tree is drawn separately. */
+const PROP_BOXES: Record<Exclude<Prop, 'none' | 'tree' | 'car'>, Box[]> = {
+  wall: [{ wide: 1, deep: 1, base: 0, up: 30, color: 0xa39a8b }],
+  // A sill, then glass.
+  window: [
+    { wide: 1, deep: 1, base: 0, up: 11, color: 0xa39a8b },
+    { wide: 1, deep: 1, base: 11, up: 3, color: 0x7fc4e8 },
+  ],
+  truck: [{ wide: 1, deep: 0.8, base: 3, up: 26, color: 0x7d8794 }],
+  crate: [{ wide: 0.7, deep: 0.7, base: 0, up: 13, color: 0x9a7742 }],
+  stack: [
+    { wide: 0.85, deep: 0.85, base: 0, up: 16, color: 0x9a7742 },
+    { wide: 0.6, deep: 0.6, base: 16, up: 13, color: 0xb08a4f },
+  ],
+  fence: [{ wide: 1, deep: 0.25, base: 0, up: 12, color: 0x6f7682 }],
+  rubble: [
+    { wide: 0.9, deep: 0.8, base: 0, up: 8, color: 0x6b6f76 },
+    { wide: 0.45, deep: 0.5, base: 8, up: 6, color: 0x7c8087 },
+  ],
+}
+
+/** A car's body and cabin, in the colour `paint` picks. */
+const carBoxes = (paint: number): Box[] => [
+  { wide: 1, deep: 0.7, base: 3, up: 9, color: CAR_COLORS[paint % CAR_COLORS.length] },
+  { wide: 0.7, deep: 0.6, base: 12, up: 6, color: 0x2a3340 },
+]
+
+/** A darker shade of a colour, for a box's sides. */
+const shade = (color: number, by: number) => (((color >> 16) * by) << 16) | ((((color >> 8) & 255) * by) << 8) | ((color & 255) * by)
 
 /** Names of the landing zones, in battle.zones order. */
 const ZONE_NAMES = ['A', 'B', 'C']
@@ -96,15 +136,6 @@ export async function createView(): Promise<View> {
   await app.init({ width: WIDTH, height: HEIGHT, background: 0x10141c, antialias: true })
 
   const tiles = new Graphics()
-  for (let y = 0; y < GRID; y++) {
-    for (let x = 0; x < GRID; x++) {
-      const c = toWorld(x, y)
-      tiles
-        .poly([c.x, c.y - TILE_H / 2, c.x + TILE_W / 2, c.y, c.x, c.y + TILE_H / 2, c.x - TILE_W / 2, c.y])
-        .fill(COLOR.tile)
-        .stroke({ color: COLOR.line, width: 1 })
-    }
-  }
   /** Shown before the landing: the landing zones' tint under the units, and their names and the contact markers over them. */
   const zones = new Graphics()
   const marks = new Container()
@@ -200,30 +231,56 @@ export async function createView(): Promise<View> {
     sprites.delete(id)
   }
 
-  /** Clears the board and draws the battle's cover blocks, which never change. */
+  /** Draws a box, centred on the origin's tile, as its two near sides and its top. */
+  function drawBox(g: Graphics, box: Box): void {
+    const w = (TILE_W / 4) * box.wide
+    const d = (TILE_W / 4) * box.deep
+    // The tile's x axis runs down-right on screen and its y axis down-left; each is half as tall as wide.
+    const corner = (x: number, y: number, lift: number) => [x * w - y * d, (x * w + y * d) / 2 - lift] as const
+    const low = box.base
+    const high = box.base + box.up
+    g.poly([...corner(-1, 1, low), ...corner(1, 1, low), ...corner(1, 1, high), ...corner(-1, 1, high)]).fill(shade(box.color, 0.72))
+    g.poly([...corner(1, -1, low), ...corner(1, 1, low), ...corner(1, 1, high), ...corner(1, -1, high)]).fill(shade(box.color, 0.55))
+    g.poly([...corner(-1, -1, high), ...corner(1, -1, high), ...corner(1, 1, high), ...corner(-1, 1, high)]).fill(box.color)
+  }
+
+  /**
+   * Draws the prop on a tile. A prop that continues onto the tile above or below, such as a car parked along y,
+   * is turned to lie that way; the two halves of a car share a colour.
+   */
+  function drawProp(battle: Battle, tile: number): Graphics {
+    const prop = battle.props[tile] as Exclude<Prop, 'none'>
+    const g = new Graphics()
+    if (prop === 'tree') {
+      g.rect(-2, -16, 4, 16).fill(0x5b4630).circle(0, -24, 14).fill(0x2f6b3c).circle(-4, -28, 8).fill(0x3d8049)
+      return g
+    }
+    const same = (other: number) => other >= 0 && other < GRID * GRID && battle.props[other] === prop
+    const alongX = (tile % GRID > 0 && same(tile - 1)) || (tile % GRID < GRID - 1 && same(tile + 1))
+    const alongY = !alongX && (same(tile - GRID) || same(tile + GRID))
+    // The first tile of the run the prop lies in.
+    const head = alongY ? (same(tile - GRID) ? tile - GRID : tile) : tile % GRID > 0 && same(tile - 1) ? tile - 1 : tile
+    for (const box of prop === 'car' ? carBoxes(head) : PROP_BOXES[prop]) drawBox(g, alongY ? { ...box, wide: box.deep, deep: box.wide } : box)
+    return g
+  }
+
+  /** Clears the board and draws the battle's ground and props, which never change. */
   function setBattle(battle: Battle): void {
     shown = battle
     sprites.clear()
     blocks.clear()
     units.removeChildren().forEach((child) => child.destroy({ children: true }))
-    const w = TILE_W / 2
-    const h = TILE_H / 2
-    for (let y = 0; y < GRID; y++) {
-      for (let x = 0; x < GRID; x++) {
-        const up = COVER_HEIGHT[coverAt(battle, x, y)]
-        if (up === 0) continue
-        const block = new Graphics()
-          .poly([-w, 0, 0, h, 0, h - up, -w, -up])
-          .fill(COLOR.coverLeft)
-          .poly([w, 0, 0, h, 0, h - up, w, -up])
-          .fill(COLOR.coverRight)
-          .poly([0, -h - up, w, -up, 0, h - up, -w, -up])
-          .fill(COLOR.coverTop)
-        block.position.copyFrom(toWorld(x, y))
-        block.zIndex = x + y
-        units.addChild(block)
-        blocks.set(y * GRID + x, block)
-      }
+    tiles.clear()
+    for (let tile = 0; tile < GRID * GRID; tile++) {
+      const x = tile % GRID
+      const y = Math.floor(tile / GRID)
+      diamond(tiles, x, y).fill(GROUND_COLOR[battle.ground[tile]]).stroke({ color: COLOR.line, width: 1, alpha: 0.5 })
+      if (battle.props[tile] === 'none') continue
+      const block = drawProp(battle, tile)
+      block.position.copyFrom(toWorld(x, y))
+      block.zIndex = x + y
+      units.addChild(block)
+      blocks.set(tile, block)
     }
   }
 
