@@ -71,8 +71,8 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
     else if (target.dataset.pick) {
       const pick: Picking = JSON.parse(target.dataset.pick)
-      // Clicking the chosen slot again closes it.
-      picking = picking?.soldier === pick.soldier && picking.slot === pick.slot ? null : pick
+      // Clicking what is open closes it.
+      picking = picking?.soldier === pick.soldier && picking.part === pick.part ? null : pick
     } else if (target.dataset.action) {
       picking = null
       act(JSON.parse(target.dataset.action))

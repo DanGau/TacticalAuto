@@ -9,10 +9,10 @@ import { button, gearCard, gearText, keyRow, STOP_NAMES, threatBar } from './htm
 export const TABS = ['Map', 'Base', 'Barracks'] as const
 export type Tab = (typeof TABS)[number]
 
-/** The gear slot the player is choosing gear for. */
+/** What the player has opened in the Barracks: a soldier's details, or one of the soldier's gear slots. */
 export interface Picking {
   soldier: number
-  slot: Slot
+  part: Slot | 'details'
 }
 
 /** A stop as a chip on the road: its name, and for a fight, how many aliens. */
@@ -77,65 +77,75 @@ function baseView(run: Run): string {
     ${tech.length > 0 ? `<h2>Alien tech</h2><ul>${tech.join('')}</ul>` : ''}`
 }
 
-/** A soldier's three gear slots. Clicking one opens the gear that fits it. An empty slot says what it takes. */
-function slots(run: Run, soldier: Soldier, picking: Picking | null): string {
-  return SLOTS.map((slot) => {
-    const gear = run.gear.find((g) => g.id === soldier.gear[slot])
-    const chosen = picking?.soldier === soldier.id && picking.slot === slot
-    const label = gear ? `<b>${gear.name}</b><br><small>${gearText(gear)}</small>` : `<small>Empty ${slot} slot</small>`
-    return `<button class="slot gear ${gear?.rarity ?? ''} ${chosen ? 'chosen' : ''}" data-pick='${JSON.stringify({ soldier: soldier.id, slot })}'>${label}</button>`
-  }).join('')
-}
-
+/** A soldier's card, kept short: rank, class, name, experience, and three gear slots. The name opens the soldier's details; a slot opens the gear that fits it. */
 function soldierCard(run: Run, soldier: Soldier, picking: Picking | null): string {
   const r = rank(soldier)
   const cls = soldier.cls && CLASSES[soldier.cls]
   const next = RANK_XP[r + 1]
   const filled = next === undefined ? 100 : (100 * (soldier.xp - RANK_XP[r])) / (next - RANK_XP[r])
-  const stats = soldierStats(run, soldier)
+  const chosen = (part: Picking['part']) => (picking?.soldier === soldier.id && picking.part === part ? 'chosen' : '')
+  const pick = (part: Picking['part']) => `data-pick='${JSON.stringify({ soldier: soldier.id, part })}'`
+  const slots = SLOTS.map((slot) => {
+    const gear = run.gear.find((g) => g.id === soldier.gear[slot])
+    const label = gear ? `<b>${gear.name}</b>` : `<small>Empty ${slot} slot</small>`
+    return `<button class="slot gear ${gear?.rarity ?? ''} ${chosen(slot)}" title="${gear ? gearText(gear) : ''}" ${pick(slot)}>${label}</button>`
+  })
   return `<div class="soldier">
-    <small>${RANK_NAMES[r]}${cls ? ` · ${cls.name}` : ''}</small><br><b>${soldier.name}</b>
+    <button class="who ${chosen('details')}" ${pick('details')}><small>${RANK_NAMES[r]}${cls ? ` · ${cls.name}` : ''}</small><br><b>${soldier.name}</b></button>
     <div class="bar"><div style="width: ${filled}%"></div></div>
-    <small>${next === undefined ? 'Top rank' : `${next - soldier.xp} more ${next - soldier.xp === 1 ? 'battle' : 'battles'} to ${RANK_NAMES[r + 1]}`}</small>
-    <table class="stats">
-      <tr><td>Health</td><td>${stats.hp}</td><td>Aim</td><td>${Math.round(100 * stats.aim)}%</td></tr>
-      <tr><td>Damage</td><td>${stats.damage}</td><td>Range</td><td>${stats.range}</td></tr>
-      <tr><td>Move</td><td>${stats.move}</td><td>Crit</td><td>${Math.round(100 * stats.crit)}%</td></tr>
-    </table>
-    ${cls ? `<p>${cls.stanceText}.</p><p><b>${cls.abilityName}.</b> ${cls.abilityText}.</p>` : '<p>A rookie gets a class, at random, on first promotion.</p>'}
-    ${slots(run, soldier, picking)}
+    ${slots.join('')}
   </div>`
 }
 
-/** The gear the player can put in the chosen slot, or, with no slot chosen, the stash. Gear a soldier holds says who. */
-function gearList(run: Run, picking: Picking | null): string {
-  const stash = run.gear.filter((gear) => !holder(run, gear))
-  if (!picking) {
-    const cards = stash.map((gear) => `<div class="gear ${gear.rarity}">${gearCard(gear)}</div>`)
-    return `<h2>Stash: ${stash.length} unequipped. Click a slot on a soldier to fill it.</h2><div class="stash">${cards.join('')}</div>`
-  }
-  const soldier = run.soldiers.find((s) => s.id === picking.soldier)!
-  const fits = run.gear.filter((gear) => gear.slot === picking.slot && gear.id !== soldier.gear[picking.slot])
-  // Stash first, so taking from a squadmate is the later choice.
+/** Everything about one soldier: progress, stats, how the class fights, and what the gear does. */
+function details(run: Run, soldier: Soldier): string {
+  const r = rank(soldier)
+  const cls = soldier.cls && CLASSES[soldier.cls]
+  const next = RANK_XP[r + 1]
+  const stats = soldierStats(run, soldier)
+  const gear = SLOTS.flatMap((slot) => run.gear.filter((g) => g.id === soldier.gear[slot])).map((g) => `<div class="gear ${g.rarity}">${gearCard(g)}</div>`)
+  return `<h2>${soldier.name} · ${next === undefined ? 'top rank' : `${next - soldier.xp} more ${next - soldier.xp === 1 ? 'battle' : 'battles'} to ${RANK_NAMES[r + 1]}`}</h2>
+    <div class="details">
+      <table class="stats">
+        <tr><td>Health</td><td>${stats.hp}</td><td>Aim</td><td>${Math.round(100 * stats.aim)}%</td></tr>
+        <tr><td>Damage</td><td>${stats.damage}</td><td>Range</td><td>${stats.range}</td></tr>
+        <tr><td>Move</td><td>${stats.move}</td><td>Crit</td><td>${Math.round(100 * stats.crit)}%</td></tr>
+      </table>
+      <div>${cls ? `<p>${cls.stanceText}.</p><p><b>${cls.abilityName}.</b> ${cls.abilityText}.</p>` : '<p>A rookie gets a class, at random, on first promotion.</p>'}</div>
+      ${gear.join('')}
+    </div>`
+}
+
+/** The gear that fits the chosen slot: what the soldier has there, then the stash, then what squadmates hold. */
+function gearPicker(run: Run, soldier: Soldier, slot: Slot): string {
+  const worn = run.gear.find((gear) => gear.id === soldier.gear[slot])
+  const fits = run.gear.filter((gear) => gear.slot === slot && gear !== worn)
   fits.sort((a, b) => Number(!!holder(run, a)) - Number(!!holder(run, b)))
   const cards = fits.map((gear) => {
     const held = holder(run, gear)
     return button({ type: 'equip', soldier: soldier.id, gear: gear.id }, `${gearCard(gear)}${held ? `<br><small>Held by ${held.name}</small>` : ''}`, `gear ${gear.rarity}`)
   })
-  const clear = soldier.gear[picking.slot] === null ? '' : button({ type: 'unequip', soldier: soldier.id, slot: picking.slot }, 'Unequip', 'gear')
-  return `<h2>${soldier.name}'s ${picking.slot}: click gear to equip it.${fits.length === 0 ? ' Nothing else fits this slot yet.' : ''}</h2>
-    <div class="stash">${cards.join('')}${clear}</div>`
+  const current = worn ? button({ type: 'unequip', soldier: soldier.id, slot }, `${gearCard(worn)}<br><small>Equipped · click to unequip</small>`, `gear ${worn.rarity} chosen`) : ''
+  return `<h2>${soldier.name}'s ${slot}. ${fits.length > 0 ? 'Click gear to equip it.' : 'Nothing else fits this slot yet.'}</h2>
+    <div class="stash">${current}${cards.join('')}</div>`
 }
 
+/** The squad as short cards, and below them whatever the player has opened: a soldier's details, a slot's gear, or else the stash by name. */
 function barracksView(run: Run, picking: Picking | null): string {
-  return `<h2>The squad. Everyone fights every mission; the dead are replaced by rookies, and their gear returns to the stash.</h2>
-    <div class="squad">${run.soldiers.map((s) => soldierCard(run, s, picking)).join('')}</div>
-    ${gearList(run, picking)}`
+  const soldier = run.soldiers.find((s) => s.id === picking?.soldier)
+  const stash = run.gear.filter((gear) => !holder(run, gear))
+  const names = stash.map((gear) => `<span class="chip gear ${gear.rarity}" title="${gearText(gear)}">${gear.name}</span>`)
+  const opened = !soldier || !picking
+    ? `<h2>Click a soldier for details, or a slot to change its gear. Stash: ${stash.length === 0 ? 'empty' : ''}</h2><div class="road">${names.join('')}</div>`
+    : picking.part === 'details'
+      ? details(run, soldier)
+      : gearPicker(run, soldier, picking.part)
+  return `<div class="squad">${run.soldiers.map((s) => soldierCard(run, s, picking)).join('')}</div>${opened}`
 }
 
 /**
  * The screen between stops: a header with the keys, threat, supplies and tabs, over the chosen tab's view.
- * The Barracks tab is marked while the stash holds gear. `picking` is the gear slot being filled in the Barracks.
+ * The Barracks tab is marked while the stash holds gear. `picking` is what the player has opened in the Barracks.
  */
 export function overworld(run: Run, tab: Tab, picking: Picking | null): string {
   const views = { Map: mapView, Base: baseView, Barracks: (r: Run) => barracksView(r, picking) }
