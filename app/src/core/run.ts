@@ -2,6 +2,7 @@ import { AID, FACILITIES, RARITY_CHANCE, type AidId, type FacilityId, type Lasti
 import { BASE_STATS, createBattle, type Alien, type Battle, type Stats } from './battle'
 import { CLASSES, type ClassId } from './classes'
 import { generateGear, SLOTS, type Gear, type Slot } from './gear'
+import { TERRAIN_KINDS, type TerrainKind } from './terrain'
 import { random, randomInt } from './rng'
 
 /** Access keys needed to find the alien source; each is won at a satellite, at the end of a leg. */
@@ -42,9 +43,10 @@ export const RISKS: Record<Risk, { name: string; aliens: number; supplies: numbe
  */
 export type StopKind = 'battle' | 'supply' | 'cache' | 'key' | 'final'
 
-/** A stretch of road the squad commits to: its risk and its stops, in order. */
+/** A stretch of road the squad commits to: its risk, the kind of place its battles are fought in, and its stops, in order. */
 export interface Zone {
   risk: Risk
+  terrain: TerrainKind
   stops: StopKind[]
 }
 
@@ -208,7 +210,7 @@ export function missionAt(run: Run, kind: Mission['kind'], risk: Risk): Mission 
 /** The aliens of a mission. Each step of depth adds health and aim; deep in, damage too. A key or final mission has a boss. */
 function aliensOf(run: Run, mission: Mission): Alien[] {
   const tier = depth(run)
-  const stats: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + 2 * tier, aim: BASE_STATS.aim + 0.03 * tier, damage: BASE_STATS.damage + (tier >= 5 ? 1 : 0) }
+  const stats: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + Math.round(2.5 * tier), aim: BASE_STATS.aim + 0.03 * tier, damage: BASE_STATS.damage + (tier >= 5 ? 1 : 0) }
   const aliens: Alien[] = Array.from({ length: mission.aliens }, () => ({ stats, boss: false }))
   if (mission.kind === 'key' || mission.kind === 'final') {
     const scale = mission.kind === 'final' ? 4 : 3
@@ -224,10 +226,11 @@ function drawZones(run: Run): Zone[] {
     const [first] = stops.splice(randomInt(run, stops.length), 1)
     return [first, ...stops]
   }
+  const terrain = () => TERRAIN_KINDS[randomInt(run, TERRAIN_KINDS.length)]
   return [
-    { risk: 'safe', stops: shuffled(['battle', event(), 'battle']) },
-    { risk: 'standard', stops: ['battle', 'battle'] },
-    { risk: 'dangerous', stops: ['battle'] },
+    { risk: 'safe', terrain: terrain(), stops: shuffled(['battle', event(), 'battle']) },
+    { risk: 'standard', terrain: terrain(), stops: ['battle', 'battle'] },
+    { risk: 'dangerous', terrain: terrain(), stops: ['battle'] },
   ]
 }
 
@@ -236,8 +239,8 @@ function nextStretch(run: Run): void {
   run.stop = 0
   run.zone = null
   run.zones = []
-  if (run.keys === KEYS) run.zone = { risk: 'standard', stops: ['final'] }
-  else if (run.fork === FORKS) run.zone = { risk: 'standard', stops: ['key'] }
+  if (run.keys === KEYS) run.zone = { risk: 'standard', terrain: 'industrial', stops: ['final'] }
+  else if (run.fork === FORKS) run.zone = { risk: 'standard', terrain: TERRAIN_KINDS[randomInt(run, TERRAIN_KINDS.length)], stops: ['key'] }
   else run.zones = drawZones(run)
 }
 
@@ -326,7 +329,7 @@ export function advance(run: Run): void {
     stance: s.cls ? CLASSES[s.cls].stance : ('balanced' as const),
     effects: equipped(run, s).flatMap((gear) => gear.effect ?? []),
   }))
-  run.battle = createBattle(randomInt(run, 2 ** 31), aliensOf(run, mission), reserve)
+  run.battle = createBattle(randomInt(run, 2 ** 31), zone.terrain, aliensOf(run, mission), reserve)
 }
 
 /** Three different aid cards; the first from an overrun zone is rare or better. */

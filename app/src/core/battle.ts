@@ -1,5 +1,5 @@
 import { randomInt } from './rng'
-import { generateTerrain, PROP_COVER, type Cover, type Ground, type Prop } from './terrain'
+import { generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Prop, type TerrainKind } from './terrain'
 
 export type { Cover }
 
@@ -132,10 +132,13 @@ export interface Battle {
   winner: Side | null
   units: Unit[]
   nextId: number
-  /** One entry per tile, row by row; read it with coverAt. The rules read cover; ground and props are how the map looks. */
+  /** The cover each tile's prop gives, one entry per tile, row by row; read it with coverAt. */
   cover: Cover[]
   ground: Ground[]
   props: Prop[]
+  /** What stands on each tile's north edge and west edge; read them with edgeBetween. */
+  north: Edge[]
+  west: Edge[]
   pods: Pod[]
   /** Centres of the landing zones on offer in the deploy phase. */
   zones: Tile[]
@@ -156,6 +159,35 @@ export function coverAt(battle: Battle, x: number, y: number): Cover {
 
 export function unitAt(battle: Battle, x: number, y: number): Unit | undefined {
   return battle.units.find((u) => u.x === x && u.y === y)
+}
+
+/** Removes everything a blast catches: the props on tiles within BLAST_RADIUS of `centre`, and the walls and windows around those tiles. */
+export function wreck(battle: Battle, centre: Tile): void {
+  for (let y = centre.y - BLAST_RADIUS; y <= centre.y + BLAST_RADIUS; y++) {
+    for (let x = centre.x - BLAST_RADIUS; x <= centre.x + BLAST_RADIUS; x++) {
+      if (!onGrid(x, y)) continue
+      const tile = y * GRID + x
+      battle.props[tile] = 'none'
+      battle.cover[tile] = 0
+      battle.ground[tile] = 'scorched'
+      battle.north[tile] = battle.west[tile] = 'none'
+      if (onGrid(x, y + 1)) battle.north[tile + GRID] = 'none'
+      if (onGrid(x + 1, y)) battle.west[tile + 1] = 'none'
+    }
+  }
+}
+
+/** What stands on the line between two tiles that share a side. */
+export function edgeBetween(battle: Battle, a: Tile, b: Tile): Edge {
+  return a.y === b.y ? battle.west[a.y * GRID + Math.max(a.x, b.x)] : battle.north[Math.max(a.y, b.y) * GRID + a.x]
+}
+
+/** Whether a unit may step between two neighbouring tiles: no wall or window in the way, and on a diagonal, none at the corner it turns. */
+export function passable(battle: Battle, from: Tile, to: Tile): boolean {
+  if (from.x === to.x || from.y === to.y) return edgeBetween(battle, from, to) === 'none'
+  const viaX = { x: to.x, y: from.y }
+  const viaY = { x: from.x, y: to.y }
+  return [viaX, viaY].every((via) => passable(battle, from, via) && passable(battle, via, to))
 }
 
 /** Whether nothing may stand on the tile: it is off the grid, cover, or occupied. */
@@ -179,7 +211,7 @@ function freeTilesNear(battle: Battle, centre: Tile, count: number): Tile[] {
     for (const [dx, dy] of NEIGHBORS) {
       const x = tile.x + dx
       const y = tile.y + dy
-      if (!onGrid(x, y) || coverAt(battle, x, y) > 0 || seen.has(y * GRID + x)) continue
+      if (!onGrid(x, y) || coverAt(battle, x, y) > 0 || seen.has(y * GRID + x) || !passable(battle, tile, { x, y })) continue
       seen.add(y * GRID + x)
       queue.push({ x, y })
     }
@@ -220,7 +252,7 @@ export function land(battle: Battle, zone: Tile): void {
   battle.phase = 'battle'
 }
 
-/** Fills every open tile outside the largest walkable area with high cover, so any open tile can reach any other. */
+/** Fills every open tile outside the largest walkable area with stacks, so any open tile can reach any other. */
 function sealPockets(battle: Battle): void {
   const area = Array<number>(GRID * GRID).fill(-1)
   const sizes: number[] = []
@@ -232,7 +264,8 @@ function sealPockets(battle: Battle): void {
       for (const [dx, dy] of NEIGHBORS) {
         const x = (tile % GRID) + dx
         const y = Math.floor(tile / GRID) + dy
-        if (!onGrid(x, y) || battle.cover[y * GRID + x] > 0 || area[y * GRID + x] >= 0) continue
+        const from = { x: tile % GRID, y: Math.floor(tile / GRID) }
+        if (!onGrid(x, y) || battle.cover[y * GRID + x] > 0 || area[y * GRID + x] >= 0 || !passable(battle, from, { x, y })) continue
         area[y * GRID + x] = sizes.length
         queue.push(y * GRID + x)
       }
@@ -243,14 +276,14 @@ function sealPockets(battle: Battle): void {
   area.forEach((id, tile) => {
     if (id < 0 || id === largest) return
     battle.cover[tile] = 2
-    battle.props[tile] = 'wall'
+    battle.props[tile] = 'stack'
   })
 }
 
 /** A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. */
-export function createBattle(seed: number, aliens: Alien[], reserve: Reserve[]): Battle {
+export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[]): Battle {
   const holder = { rng: seed }
-  const terrain = generateTerrain(holder, GRID)
+  const terrain = generateTerrain(holder, GRID, kind)
   const battle: Battle = {
     rng: holder.rng,
     beat: 0,

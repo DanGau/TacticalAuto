@@ -2,6 +2,7 @@ import { AID, FACILITIES, type FacilityId } from '../core/base'
 import { CLASSES } from '../core/classes'
 import { SLOTS, type Slot } from '../core/gear'
 import { buildCost, holder, level, missionAt, nextStop, RANK_NAMES, RANK_XP, rank, RISKS, soldierStats, type Run, type Soldier, type StopKind, type Zone } from '../core/run'
+import { TERRAIN_TEXT } from '../core/terrain'
 import { button, gearCard, gearText, keyRow, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
@@ -29,7 +30,8 @@ function zoneCard(run: Run, zone: Zone, index: number): string {
   const gear = risk.drops === 0 ? 'no gear' : `${risk.drops} ${risk.rareGear ? 'rare or better ' : ''}gear`
   return button(
     { type: 'zone', index },
-    `<small>${risk.text}</small><br><b>${risk.name} zone</b>
+    `<small>${risk.text}</small><br><b>${risk.name} ${TERRAIN_TEXT[zone.terrain].name.toLowerCase()}</b>
+    <small>${TERRAIN_TEXT[zone.terrain].text}</small>
     <div class="road">${zone.stops.map((stop) => chip(ahead, zone, stop)).join('<span class="arrow">→</span>')}</div>
     <small>Each battle won: ${risk.supplies} ${risk.supplies === 1 ? 'supply' : 'supplies'}, ${gear}, 1 of 3 aid<br>+${zone.stops.length} threat</small>`,
     `zone ${zone.risk}`,
@@ -53,7 +55,7 @@ function mapView(run: Run): string {
   }
   const stop = nextStop(run)!
   const road = zone.stops.map((s, i) => chip(run, zone, s, i < run.stop ? 'done' : i === run.stop ? 'here' : '')).join('<span class="arrow">→</span>')
-  const where = zone.stops[0] === 'final' ? 'All three keys are won. The alien source is found.' : zone.stops[0] === 'key' ? 'The road ends at a satellite. Its access key is guarded.' : `${RISKS[zone.risk].name} zone`
+  const where = zone.stops[0] === 'final' ? 'All three keys are won. The alien source is found.' : zone.stops[0] === 'key' ? 'The road ends at a satellite. Its access key is guarded.' : `${RISKS[zone.risk].name} ${TERRAIN_TEXT[zone.terrain].name.toLowerCase()}: ${TERRAIN_TEXT[zone.terrain].text}`
   return `<h2>${where}</h2>
     <div class="road">${road}</div>
     ${stop === 'lastStand' ? '<p class="up"><b>The threat is full. The aliens attack before the squad can travel on.</b></p>' : ''}

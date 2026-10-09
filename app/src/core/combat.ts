@@ -15,6 +15,7 @@ import {
   MEDKIT_HEAL,
   NEIGHBORS,
   onGrid,
+  passable,
   PATROL_MOVE,
   revealed,
   ROCKET_DAMAGE,
@@ -25,6 +26,7 @@ import {
   type Stance,
   type Tile,
   type Unit,
+  wreck,
 } from './battle'
 import { random, randomInt } from './rng'
 import { canShoot, lineOfSight, odds, sees } from './sight'
@@ -36,7 +38,7 @@ export type GameEvent =
   | { type: 'reveal'; units: { id: number; x: number; y: number }[] }
   /** `damage` is 0 for a miss. */
   | { type: 'shot'; id: number; target: number; hit: boolean; crit: boolean; damage: number }
-  /** A rocket or grenade lands on a tile and damages every unit in `hits`. */
+  /** A rocket or grenade lands on a tile, damages every unit in `hits`, and wrecks the terrain around it. */
   | { type: 'rocket'; id: number; x: number; y: number; hits: { target: number; damage: number }[] }
   | { type: 'heal'; id: number; target: number; amount: number }
   /** A gear effect acts on the unit `id`. `amount` is the health it gained, or lost if negative; 0 when neither. */
@@ -91,7 +93,7 @@ function walkingDistances(battle: Battle, goal: Tile): number[] {
     for (const [dx, dy] of NEIGHBORS) {
       const x = tile.x + dx
       const y = tile.y + dy
-      if (!onGrid(x, y) || coverAt(battle, x, y) > 0 || field[y * GRID + x] !== Infinity) continue
+      if (!onGrid(x, y) || coverAt(battle, x, y) > 0 || field[y * GRID + x] !== Infinity || !passable(battle, tile, { x, y })) continue
       field[y * GRID + x] = field[tile.y * GRID + tile.x] + 1
       queue.push({ x, y })
     }
@@ -109,7 +111,7 @@ function paths(battle: Battle, unit: Unit, move: number): Tile[][] {
     for (const [dx, dy] of NEIGHBORS) {
       const x = from.x + dx
       const y = from.y + dy
-      if (blocked(battle, x, y) || seen.has(y * GRID + x)) continue
+      if (blocked(battle, x, y) || seen.has(y * GRID + x) || !passable(battle, from, { x, y })) continue
       seen.add(y * GRID + x)
       found.push([...path, { x, y }])
     }
@@ -340,7 +342,7 @@ function heal(battle: Battle, unit: Unit): GameEvent[] {
 
 /**
  * A blast on the shootable enemy with the most enemies around it, if at least two are caught and no ally is.
- * A rocket replaces the shot; a grenade does not.
+ * It wrecks the props and walls it catches. A rocket replaces the shot; a grenade does not.
  */
 function blast(battle: Battle, unit: Unit, seen: Set<number>, damage: number): GameEvent[] {
   const inBlast = (centre: Tile) => battle.units.filter((u) => distance(centre, u) <= BLAST_RADIUS)
@@ -357,6 +359,7 @@ function blast(battle: Battle, unit: Unit, seen: Set<number>, damage: number): G
   if (!centre) return []
   const events: GameEvent[] = [{ type: 'rocket', id: unit.id, x: centre.x, y: centre.y, hits: best.map((u) => ({ target: u.id, damage })) }]
   for (const target of best) wound(battle, target, damage, events)
+  wreck(battle, centre)
   return events
 }
 

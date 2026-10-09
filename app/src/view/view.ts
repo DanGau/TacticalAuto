@@ -5,7 +5,7 @@ import { EFFECTS } from '../core/gear'
 import type { GameEvent } from '../core/combat'
 import { rank, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
-import type { Ground, Prop } from '../core/terrain'
+import type { Edge, Ground, Prop } from '../core/terrain'
 
 export const WIDTH = 1280
 export const HEIGHT = 720
@@ -46,7 +46,7 @@ const COLOR = {
   contact: 0xff6b5e,
 }
 
-const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136 }
+const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x15161a }
 
 /** A box standing on a tile: how much of the tile it covers, how tall it is on screen, and its top colour. */
 interface Box {
@@ -57,18 +57,14 @@ interface Box {
   base: number
   up: number
   color: number
+  /** How solid it looks, 0 to 1; solid when absent. */
+  alpha?: number
 }
 
 const CAR_COLORS = [0xb8413a, 0x3f6fb5, 0xc9c9c2, 0x3d8f6b, 0xd0a13a]
 
 /** The boxes each prop is drawn from, bottom first. A tree is drawn separately. */
 const PROP_BOXES: Record<Exclude<Prop, 'none' | 'tree' | 'car'>, Box[]> = {
-  wall: [{ wide: 1, deep: 1, base: 0, up: 30, color: 0xa39a8b }],
-  // A sill, then glass.
-  window: [
-    { wide: 1, deep: 1, base: 0, up: 11, color: 0xa39a8b },
-    { wide: 1, deep: 1, base: 11, up: 3, color: 0x7fc4e8 },
-  ],
   truck: [{ wide: 1, deep: 0.8, base: 3, up: 26, color: 0x7d8794 }],
   crate: [{ wide: 0.7, deep: 0.7, base: 0, up: 13, color: 0x9a7742 }],
   stack: [
@@ -79,6 +75,20 @@ const PROP_BOXES: Record<Exclude<Prop, 'none' | 'tree' | 'car'>, Box[]> = {
   rubble: [
     { wide: 0.9, deep: 0.8, base: 0, up: 8, color: 0x6b6f76 },
     { wide: 0.45, deep: 0.5, base: 8, up: 6, color: 0x7c8087 },
+  ],
+}
+
+/** How thick a wall is, as a share of a tile. */
+const WALL_THICK = 0.14
+
+/** The boxes a wall or window on a tile's north edge is drawn from; one on a west edge is the same, turned. */
+const EDGE_BOXES: Record<Exclude<Edge, 'none'>, Box[]> = {
+  wall: [{ wide: 1, deep: WALL_THICK, base: 0, up: 28, color: 0xa39a8b }],
+  // A sill, glass, and a lintel.
+  window: [
+    { wide: 1, deep: WALL_THICK, base: 0, up: 10, color: 0xa39a8b },
+    { wide: 1, deep: WALL_THICK / 2, base: 10, up: 13, color: 0x7fc4e8, alpha: 0.45 },
+    { wide: 1, deep: WALL_THICK, base: 23, up: 5, color: 0xa39a8b },
   ],
 }
 
@@ -152,8 +162,8 @@ export async function createView(): Promise<View> {
   app.stage.addChild(world)
 
   const sprites = new Map<number, Sprite>()
-  /** Cover blocks by tile index, row by row. */
-  const blocks = new Map<number, Graphics>()
+  /** Each prop, wall and window on the board, with the tiles that light it: it is lit when a soldier sees any of them. */
+  const scenery: { node: Graphics; tiles: number[] }[] = []
   /** The battle on screen. */
   let shown: Battle | null = null
   let camera = WHOLE_MAP
@@ -239,9 +249,10 @@ export async function createView(): Promise<View> {
     const corner = (x: number, y: number, lift: number) => [x * w - y * d, (x * w + y * d) / 2 - lift] as const
     const low = box.base
     const high = box.base + box.up
-    g.poly([...corner(-1, 1, low), ...corner(1, 1, low), ...corner(1, 1, high), ...corner(-1, 1, high)]).fill(shade(box.color, 0.72))
-    g.poly([...corner(1, -1, low), ...corner(1, 1, low), ...corner(1, 1, high), ...corner(1, -1, high)]).fill(shade(box.color, 0.55))
-    g.poly([...corner(-1, -1, high), ...corner(1, -1, high), ...corner(1, 1, high), ...corner(-1, 1, high)]).fill(box.color)
+    const alpha = box.alpha ?? 1
+    g.poly([...corner(-1, 1, low), ...corner(1, 1, low), ...corner(1, 1, high), ...corner(-1, 1, high)]).fill({ color: shade(box.color, 0.72), alpha })
+    g.poly([...corner(1, -1, low), ...corner(1, 1, low), ...corner(1, 1, high), ...corner(1, -1, high)]).fill({ color: shade(box.color, 0.55), alpha })
+    g.poly([...corner(-1, -1, high), ...corner(1, -1, high), ...corner(1, 1, high), ...corner(-1, 1, high)]).fill({ color: box.color, alpha })
   }
 
   /**
@@ -264,24 +275,44 @@ export async function createView(): Promise<View> {
     return g
   }
 
-  /** Clears the board and draws the battle's ground and props, which never change. */
-  function setBattle(battle: Battle): void {
-    shown = battle
-    sprites.clear()
-    blocks.clear()
-    units.removeChildren().forEach((child) => child.destroy({ children: true }))
+  /** Draws the battle's ground, props, walls and windows afresh. They change only when a blast wrecks them. */
+  function drawTerrain(battle: Battle): void {
+    for (const { node } of scenery.splice(0)) node.destroy()
     tiles.clear()
+    const stand = (node: Graphics, x: number, y: number, lit: number[]) => {
+      node.position.copyFrom(toWorld(x, y))
+      node.zIndex = x + y
+      units.addChild(node)
+      scenery.push({ node, tiles: lit })
+    }
     for (let tile = 0; tile < GRID * GRID; tile++) {
       const x = tile % GRID
       const y = Math.floor(tile / GRID)
       diamond(tiles, x, y).fill(GROUND_COLOR[battle.ground[tile]]).stroke({ color: COLOR.line, width: 1, alpha: 0.5 })
-      if (battle.props[tile] === 'none') continue
-      const block = drawProp(battle, tile)
-      block.position.copyFrom(toWorld(x, y))
-      block.zIndex = x + y
-      units.addChild(block)
-      blocks.set(tile, block)
+      if (battle.props[tile] !== 'none') stand(drawProp(battle, tile), x, y, [tile])
+      // A wall stands half a tile toward the neighbour it divides this tile from.
+      const north = battle.north[tile]
+      const west = battle.west[tile]
+      if (north !== 'none') {
+        const node = new Graphics()
+        for (const box of EDGE_BOXES[north]) drawBox(node, box)
+        stand(node, x, y - 0.5, [tile, tile - GRID])
+      }
+      if (west !== 'none') {
+        const node = new Graphics()
+        for (const box of EDGE_BOXES[west]) drawBox(node, { ...box, wide: box.deep, deep: box.wide })
+        stand(node, x - 0.5, y, [tile, tile - 1])
+      }
     }
+  }
+
+  /** Clears the board for a new battle. */
+  function setBattle(battle: Battle): void {
+    shown = battle
+    sprites.clear()
+    scenery.length = 0
+    units.removeChildren().forEach((child) => child.destroy({ children: true }))
+    drawTerrain(battle)
   }
 
   function label(text: string, tile: Tile, color: number, size = 44): Text {
@@ -320,7 +351,7 @@ export async function createView(): Promise<View> {
     seen?.forEach((lit, i) => {
       if (!lit) diamond(fog, i % GRID, Math.floor(i / GRID)).fill({ color: COLOR.fog, alpha: 0.55 })
     })
-    for (const [tile, block] of blocks) block.tint = tint(tile)
+    for (const { node, tiles: lit } of scenery) node.tint = !seen || lit.some((tile) => seen[tile]) ? 0xffffff : COLOR.dim
     for (const sprite of sprites.values()) sprite.node.tint = tint(Math.round(sprite.tile.y) * GRID + Math.round(sprite.tile.x))
   }
 
@@ -434,6 +465,9 @@ export async function createView(): Promise<View> {
       const at = lerp(a, b, t)
       fx.clear().circle(at.x, at.y, 5).fill(COLOR.crit)
     })
+    // The blast has already wrecked the terrain in the battle; show it as the rocket lands.
+    drawTerrain(battle)
+    drawFog(battle)
     for (const hit of e.hits) {
       const sprite = sprites.get(hit.target)
       if (!sprite) continue
@@ -518,6 +552,7 @@ export async function createView(): Promise<View> {
       drawMarks(battle)
       if (animate) await play(battle, events)
       sync(run, battle)
+      if (events.some((e) => e.type === 'rocket')) drawTerrain(battle)
       drawFog(battle)
       if (!animate) {
         look(WHOLE_MAP)

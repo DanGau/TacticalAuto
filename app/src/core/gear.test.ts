@@ -48,6 +48,8 @@ function duel(gear: Omit<Gear, 'id'>): { soldier: Unit; alien: Unit; step: () =>
   apply(run, { type: 'land', zone: 0 })
   const battle = run.battle!
   battle.cover.fill(0)
+  battle.north.fill('none')
+  battle.west.fill('none')
   const soldier = battle.units.find((u) => u.soldier === run.soldiers[0].id)!
   const alien = battle.units.find((u) => u.side === 'alien')!
   battle.units = [soldier, alien]

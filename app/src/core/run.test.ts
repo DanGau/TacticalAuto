@@ -29,7 +29,7 @@ const enter = (run: Run, risk: Risk) => apply(run, { type: 'zone', index: run.zo
 function travelling(stops: StopKind[], risk: Risk = 'standard'): Run {
   const run = createRun(1)
   enter(run, risk)
-  run.zone = { risk, stops }
+  run.zone = { risk, terrain: 'town', stops }
   return run
 }
 
@@ -98,7 +98,7 @@ test('after the forks of a leg comes its satellite: winning it wins a key and op
     enter(run, 'dangerous')
     fight(run, 'alien')
   }
-  expect(run.zone).toEqual({ risk: 'standard', stops: ['key'] })
+  expect(run.zone).toMatchObject({ risk: 'standard', stops: ['key'] })
   fight(run, 'alien')
   expect(run).toMatchObject({ keys: 0, zone: { stops: ['key'] }, stop: 0 })
   run.threat = 0
@@ -124,10 +124,10 @@ test.each(['human', 'alien'] as const)('with every key won, only the final missi
   const run = createRun(1)
   run.keys = KEYS - 1
   run.fork = FORKS
-  run.zone = { risk: 'standard', stops: ['key'] }
+  run.zone = { risk: 'standard', terrain: 'town', stops: ['key'] }
   fight(run, 'human')
   apply(run, { type: 'pick', index: 0 })
-  expect(run.zone).toEqual({ risk: 'standard', stops: ['final'] })
+  expect(run.zone).toMatchObject({ risk: 'standard', stops: ['final'] })
   run.threat = 0
   fight(run, winner)
   expect(run.phase).toBe(winner === 'human' ? 'won' : 'lost')
@@ -144,7 +144,7 @@ test('aliens grow in number along the road, and a key mission has a boss', () =>
   expect(first.some((u) => u.boss)).toBe(false)
   run.phase = 'overworld'
   run.fork = FORKS
-  run.zone = { risk: 'standard', stops: ['key'] }
+  run.zone = { risk: 'standard', terrain: 'town', stops: ['key'] }
   const key = count()
   expect(key.length).toBeGreaterThan(first.length)
   expect(key.filter((u) => u.boss)).toHaveLength(1)
