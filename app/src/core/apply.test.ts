@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { coverAt, distance, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
-import { BASE_SQUAD, createRun, type Run } from './run'
+import { createRun, type Run } from './run'
 
 /** A run choosing where to land for its first battle. */
 function landing(): Run & { battle: Battle } {
@@ -25,12 +25,12 @@ test('landing puts the whole squad on open tiles by the zone and begins the batt
   expect(apply(run, { type: 'land', zone: 1 })).toEqual({ ok: true })
   const squad = run.battle.units.filter((u) => u.side === 'human')
   expect(squad.map((u) => u.soldier)).toEqual(run.soldiers.map((s) => s.id))
-  expect(squad).toHaveLength(BASE_SQUAD)
+  expect(squad).toHaveLength(run.soldiers.length)
   for (const unit of squad) {
     expect(distance(unit, zone)).toBeLessThanOrEqual(3)
     expect(coverAt(run.battle, unit.x, unit.y)).toBe(0)
   }
-  expect(new Set(squad.map((u) => `${u.x},${u.y}`)).size).toBe(BASE_SQUAD)
+  expect(new Set(squad.map((u) => `${u.x},${u.y}`)).size).toBe(run.soldiers.length)
   expect(run.battle).toMatchObject({ phase: 'battle', reserve: [] })
 })
 

@@ -4,9 +4,7 @@ import type { Stats } from './battle'
 export interface Lasting {
   /** Added to every soldier's stats. */
   stats?: Partial<Stats>
-  /** Added to the squad size. */
-  squad?: number
-  /** Ranks a recruit arrives with. */
+  /** Ranks a new clone arrives above the squad's lowest. */
   recruitRank?: number
 }
 
@@ -24,9 +22,8 @@ const facilities = {
   workshop: { name: 'Armor Workshop', text: '+2 health', cost: 2, max: 4, stats: { hp: 2 } },
   drills: { name: 'Flanking Drills', text: '+15% crit on flanked targets', cost: 2, max: 3, stats: { crit: 0.15 } },
   course: { name: 'Obstacle Course', text: '+1 move', cost: 3, max: 2, stats: { move: 1 } },
-  academy: { name: 'Officer Academy', text: 'Recruits arrive one rank higher', cost: 3, max: 3, recruitRank: 1 },
+  academy: { name: 'Officer Academy', text: 'A new clone arrives one rank higher', cost: 3, max: 2, recruitRank: 1 },
   optics: { name: 'Optics Lab', text: '+1 range', cost: 4, max: 2, stats: { range: 1 } },
-  barracks: { name: 'Barracks', text: '+1 soldier in the squad', cost: 5, max: 2, squad: 1 },
 } satisfies Record<string, Facility>
 
 export type FacilityId = keyof typeof facilities

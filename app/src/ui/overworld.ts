@@ -107,11 +107,12 @@ function details(run: Run, soldier: Soldier): string {
   return `<h2>${soldier.name} · ${next === undefined ? 'top rank' : `${next - soldier.xp} more ${next - soldier.xp === 1 ? 'battle' : 'battles'} to ${RANK_NAMES[r + 1]}`}</h2>
     <div class="details">
       <table class="stats">
-        <tr><td>Health</td><td>${stats.hp}</td><td>Aim</td><td>${Math.round(100 * stats.aim)}%</td></tr>
+        <tr><td>Health</td><td>${stats.hp}</td><td>Armor</td><td>${stats.armor}</td></tr>
+        <tr><td>Aim</td><td>${Math.round(100 * stats.aim)}%</td><td>Crit</td><td>${Math.round(100 * stats.crit)}%</td></tr>
         <tr><td>Damage</td><td>${stats.damage}</td><td>Range</td><td>${stats.range}</td></tr>
-        <tr><td>Move</td><td>${stats.move}</td><td>Crit</td><td>${Math.round(100 * stats.crit)}%</td></tr>
+        <tr><td>Move</td><td>${stats.move}</td><td></td><td></td></tr>
       </table>
-      <div>${cls ? `<p>${cls.stanceText}.</p><p><b>${cls.abilityName}.</b> ${cls.abilityText}.</p>` : '<p>A rookie gets a class, at random, on first promotion.</p>'}</div>
+      <div>${cls ? `<p>${cls.stanceText}.</p><p><b>${cls.abilityName}.</b> ${cls.abilityText}.</p>` : ''}</div>
       ${gear.join('')}
     </div>`
 }

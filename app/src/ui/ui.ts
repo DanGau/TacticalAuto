@@ -28,7 +28,7 @@ function roster(run: Run): string {
   })
   const kinds = [...new Set(aliens.filter((u) => !u.boss).map((u) => u.kind!))] as AlienKind[]
   const rules = kinds.map((kind) => `<div><b>${ALIENS[kind].name}.</b> ${ALIENS[kind].text}.</div>`)
-  if (aliens.some((u) => u.boss)) rules.unshift('<div><b>Boss.</b> Tough, hits hard and far, and spawns swarmlings.</div>')
+  if (aliens.some((u) => u.boss)) rules.unshift('<div><b>Boss.</b> Tough and armored, hits hard and far, and spawns swarmlings.</div>')
   return `${pods.join('')}<hr>${rules.join('')}<hr><div>The squad lands unseen. The first pod it sights is ambushed: caught in the open, and easier to hit.</div>`
 }
 

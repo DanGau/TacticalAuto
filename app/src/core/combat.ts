@@ -394,12 +394,11 @@ function upkeep(battle: Battle): GameEvent[] {
   battle.acid = battle.acid.map((pool) => ({ ...pool, turns: pool.turns - 1 })).filter((pool) => pool.turns > 0)
   for (const unit of battle.units.filter((u) => u.side === 'alien')) {
     if (unit.cooldown > 0) unit.cooldown--
-    if (!unit.boss || unit.cooldown > 0 || !revealed(battle, unit)) continue
+    if (!unit.spawns || unit.cooldown > 0 || !revealed(battle, unit)) continue
     const [tile] = freeTilesNear(battle, unit, 1)
     if (!tile) continue
     unit.cooldown = SPAWN_EVERY
-    const base = { ...unit.stats, hp: Math.round(unit.stats.hp / 3) }
-    const spawn = alienUnit(battle, { kind: 'swarmling', stats: alienStats('swarmling', base), stance: ALIENS.swarmling.stance, boss: false }, tile, unit.pod!)
+    const spawn = alienUnit(battle, { kind: 'swarmling', stats: alienStats('swarmling', 0, 0), stance: ALIENS.swarmling.stance, boss: false, spawns: false }, tile, unit.pod!)
     battle.units.push(spawn)
     events.push({ type: 'spawn', id: unit.id, unit: { id: spawn.id, x: spawn.x, y: spawn.y } })
   }
@@ -433,12 +432,14 @@ function moveSide(battle: Battle): GameEvent[] {
 }
 
 /**
- * Removes `damage` health from a unit, removing the unit and reporting its death at zero.
- * A burster that dies explodes, and a psion that dies hurts the other aliens of its pod.
+ * Deals `damage` to a unit: its armor takes it first, then its health. At zero health the unit is removed and its
+ * death reported. A burster that dies explodes, and a psion that dies hurts the other aliens of its pod.
  */
 function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[]): void {
   if (target.hp <= 0) return
-  target.hp -= damage
+  const absorbed = Math.min(target.armor, damage)
+  target.armor -= absorbed
+  target.hp -= damage - absorbed
   if (target.hp > 0) return
   battle.units = battle.units.filter((u) => u !== target)
   events.push({ type: 'death', id: target.id })
@@ -560,8 +561,8 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, chained = false): 
   if (spend(enemy, 'shield')) {
     damage = 0
     after.push({ type: 'effect', id: enemy.id, effect: 'shield', amount: 0 })
-  } else if (damage >= enemy.hp && spend(enemy, 'lastStand')) {
-    damage = enemy.hp - 1
+  } else if (damage >= enemy.hp + enemy.armor && spend(enemy, 'lastStand')) {
+    damage = enemy.hp + enemy.armor - 1
     after.push({ type: 'effect', id: enemy.id, effect: 'lastStand', amount: 0 })
   }
   events.push({ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage }, ...after)

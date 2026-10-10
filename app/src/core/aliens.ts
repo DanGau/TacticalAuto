@@ -1,4 +1,4 @@
-import type { Stance, Stats } from './battle'
+import { BASE_STATS, type Stance, type Stats } from './battle'
 import { randomInt } from './rng'
 
 /** The kinds of alien. Each fights by a rule no soldier has; combat applies the rules, and `text` states them. */
@@ -7,9 +7,9 @@ export type AlienKind = 'trooper' | 'swarmling' | 'spitter' | 'burster' | 'brute
 export interface AlienType {
   name: string
   text: string
-  /** Its health as a multiple of an alien's base health. */
+  /** Its health as a multiple of a soldier's base health. It never grows. */
   hp: number
-  /** Stats it has in place of an alien's base stats. */
+  /** Stats it has in place of the base stats. */
   stats: Partial<Stats>
   stance: Stance
 }
@@ -53,10 +53,13 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
 }
 
-/** An alien's stats: the base for its depth, with its kind's health and stats. */
-export function alienStats(kind: AlienKind, base: Stats): Stats {
-  const type = ALIENS[kind]
-  return { ...base, ...type.stats, hp: Math.max(1, Math.round(base.hp * type.hp)) }
+/**
+ * An alien's stats: its kind's, with the equipment given. A kind's health and aim are the same all game; what grows
+ * is its armor, which shows as armor pips, and its weapon, which adds damage. A burster has no weapon to improve.
+ */
+export function alienStats(kind: AlienKind, armor: number, weapon: number): Stats {
+  const stats = { ...BASE_STATS, ...ALIENS[kind].stats }
+  return { ...stats, hp: Math.max(1, Math.round(BASE_STATS.hp * ALIENS[kind].hp)), armor, damage: stats.damage + (kind === 'burster' ? 0 : weapon) }
 }
 
 /** A themed group of aliens that roams and fights as one pod. */

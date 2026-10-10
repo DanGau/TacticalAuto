@@ -39,7 +39,7 @@ const randomBot: Bot = (run, rng) => {
 }
 
 /** What a planning bot builds first. */
-const BUILD_ORDER: FacilityId[] = ['barracks', 'firingRange', 'workshop', 'optics', 'drills', 'academy', 'course']
+const BUILD_ORDER: FacilityId[] = ['firingRange', 'workshop', 'optics', 'drills', 'academy', 'course']
 
 /**
  * A bot that equips as equipBest says, builds the first facility in BUILD_ORDER it can afford, at every fork takes

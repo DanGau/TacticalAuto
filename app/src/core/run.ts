@@ -15,7 +15,8 @@ export const THREAT_MAX = 6
 /** Threat each stop adds, and what losing a battle adds on top. */
 export const STOP_THREAT = 1
 export const LOSS_THREAT = 1
-export const BASE_SQUAD = 4
+/** The alien force a battle has in each leg, before its risk and kind are counted; the squad grows by one clone a leg. */
+export const LEG_FORCE = [1, 3, 6, 10]
 export const OFFERS = 3
 export const START_SUPPLIES = 3
 /** Supplies a supply drop gives. */
@@ -84,8 +85,10 @@ export interface Report {
   gear: Gear[]
   /** Whether an access key was won. */
   key: boolean
-  /** Every soldier in the squad when a battle began, with the class each has after it; empty for an event. */
-  soldiers: { name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; died: boolean }[]
+  /** Every soldier in the squad when a battle began, with the class each has after it; empty for an event. A downed soldier fell in the battle and is cloned anew. */
+  soldiers: { name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; downed: boolean }[]
+  /** The name of a clone the stop added to the squad. */
+  hired: string | null
 }
 
 export interface Run {
@@ -148,11 +151,6 @@ export function buildCost(run: Run, id: FacilityId): number | null {
 export function build(run: Run, id: FacilityId): void {
   run.supplies -= buildCost(run, id)!
   run.built.push(id)
-  recruit(run)
-}
-
-export function squadSize(run: Run): number {
-  return BASE_SQUAD + total(run, (u) => u.squad)
 }
 
 /** The gear a soldier has equipped. */
@@ -183,50 +181,58 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
   return stats
 }
 
-/** Gives every promoted soldier still without a class one at random. */
+/** Gives every soldier still without a class one at random. Every clone is trained, so every soldier has one. */
 function assignClasses(run: Run): void {
   const ids = Object.keys(CLASSES) as ClassId[]
   for (const soldier of run.soldiers) {
-    if (soldier.cls === null && rank(soldier) > 0) soldier.cls = ids[randomInt(run, ids.length)]
+    if (soldier.cls === null) soldier.cls = ids[randomInt(run, ids.length)]
   }
 }
 
-/** Fills the squad with recruits, each named unlike the living. */
-function recruit(run: Run): void {
-  const xp = RANK_XP[Math.min(total(run, (u) => u.recruitRank), RANK_XP.length - 1)]
-  while (run.soldiers.length < squadSize(run)) {
-    const free = NAMES.filter((name) => !run.soldiers.some((s) => s.name === name))
-    run.soldiers.push({ id: run.nextSoldier++, name: free[randomInt(run, free.length)], xp, cls: null, gear: { weapon: null, armor: null, utility: null } })
-  }
+/**
+ * Adds a clone to the squad and returns it. It arrives a Squaddie, or at the rank of the squad's lowest if that is
+ * higher, plus what the academy adds, so a late arrival is not left behind.
+ */
+function hire(run: Run): Soldier {
+  const lowest = Math.min(...run.soldiers.map(rank), RANK_XP.length - 1)
+  const arrives = Math.min(Math.max(1, run.soldiers.length > 0 ? lowest : 1) + total(run, (u) => u.recruitRank), RANK_XP.length - 1)
+  const free = NAMES.filter((name) => !run.soldiers.some((s) => s.name === name))
+  const soldier: Soldier = { id: run.nextSoldier++, name: free[randomInt(run, free.length)], xp: RANK_XP[arrives], cls: null, gear: { weapon: null, armor: null, utility: null } }
+  run.soldiers.push(soldier)
   assignClasses(run)
+  return soldier
 }
 
-/** How far along the road the squad is, which sets how strong the aliens are: two steps a leg, the second at its last fork. */
+/** How far along the road the squad is, which sets which packs appear and how much armor aliens wear: two steps a leg, the second at its last fork. */
 function depth(run: Run): number {
   return run.keys * 2 + (run.fork >= FORKS ? 1 : 0)
 }
 
-/** The mission the squad would fight at a stop of the given kind now. */
+/** The mission the squad would fight at a stop of the given kind now. Its force follows the leg, and so the size of the squad. */
 export function missionAt(run: Run, kind: Mission['kind'], risk: Risk): Mission {
-  const extra = { battle: 0, key: 1, final: 2, lastStand: 4 }[kind]
-  return { kind, risk, force: 5 + depth(run) + extra + RISKS[risk].aliens }
+  const extra = { battle: 0, key: 1, final: 3, lastStand: 1 + run.keys }[kind]
+  return { kind, risk, force: Math.max(1, LEG_FORCE[run.keys] + (run.fork >= FORKS ? 1 : 0) + extra + RISKS[risk].aliens) }
 }
 
 /**
- * The aliens of a mission, in pods: packs mustered at random for its force. Each step of depth adds health and aim;
- * deep in, damage too. A key or final mission adds a boss with an escort: a trooper of several times the health,
- * that hits harder and farther.
+ * The aliens of a mission, in pods: packs mustered at random for its force. A kind's health and aim never change;
+ * deeper along the road aliens are better equipped: a point of armor each step, a point of damage every third. A key or final mission adds a boss, a trooper built up by the keys
+ * already won: each adds health, armor and an escorting trooper; from the second satellite on it hits harder and
+ * spawns swarmlings, and from the third it shoots farther.
  */
 function packsOf(run: Run, mission: Mission): { name: string; aliens: Alien[] }[] {
   const tier = depth(run)
-  const base: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + 3 * tier, aim: BASE_STATS.aim + 0.03 * tier, damage: BASE_STATS.damage + (tier >= 5 ? 1 : 0) }
-  const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, base), stance: ALIENS[kind].stance, boss: false })
+  const armor = tier
+  const weapon = Math.floor(tier / 3)
+  const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, armor, weapon), stance: ALIENS[kind].stance, boss: false, spawns: false })
   const boss = mission.kind === 'key' || mission.kind === 'final'
-  const packs = muster(run, mission.force - (boss ? 3 : 0), tier).map((pack) => ({ name: pack.name, aliens: pack.kinds.map(alien) }))
+  const escort = boss ? run.keys : 0
+  const packs = muster(run, Math.max(0, mission.force - (boss ? 2 + escort : 0)), tier).map((pack) => ({ name: pack.name, aliens: pack.kinds.map(alien) }))
   if (boss) {
-    const scale = mission.kind === 'final' ? 4 : 3
-    const stats = { ...base, hp: base.hp * scale, damage: base.damage + 1, range: base.range + 1 }
-    packs.unshift({ name: mission.kind === 'final' ? 'The source' : 'Guardian', aliens: [{ kind: 'trooper', stats, stance: 'balanced', boss: true }, alien('trooper'), alien('trooper')] })
+    const k = run.keys
+    const stats: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + 5 * k, armor: 2 + k, damage: BASE_STATS.damage + (k >= 1 ? 1 : 0), range: BASE_STATS.range + (k >= 2 ? 1 : 0) }
+    const escorts = Array.from({ length: escort }, () => alien('trooper'))
+    packs.unshift({ name: mission.kind === 'final' ? 'The source' : 'Guardian', aliens: [{ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: k >= 1 }, ...escorts] })
   }
   return packs
 }
@@ -279,7 +285,7 @@ export function createRun(seed: number): Run {
     aid: [],
     offers: [],
   }
-  recruit(run)
+  hire(run)
   nextStretch(run)
   return run
 }
@@ -326,7 +332,7 @@ export function advance(run: Run): void {
     const supplies = stop === 'supply' ? DROP_SUPPLIES : 0
     run.supplies += supplies
     const gear = stop === 'cache' ? [dropGear(run, RISKS[zone.risk].rareGear)] : []
-    run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, gear, key: false, soldiers: [] }
+    run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, gear, key: false, soldiers: [], hired: null }
     passStop(run)
     return
   }
@@ -355,19 +361,18 @@ function drawOffers(run: Run, lucky: boolean): AidId[] {
   return offers
 }
 
-/** Settles a finished battle: experience, casualties, threat, rewards, and where the squad stands on the road. */
+/**
+ * Settles a finished battle: experience, threat, rewards, and where the squad stands on the road.
+ * A soldier who fell is cloned anew and stays in the squad with everything they had; only those still standing
+ * gain experience.
+ */
 export function endBattle(run: Run): void {
   const battle = run.battle!
   const mission = run.mission!
-  const dead = new Set(run.soldiers.map((s) => s.id))
-  for (const survivor of [...battle.units, ...battle.reserve]) if (survivor.soldier !== null) dead.delete(survivor.soldier)
-  const fought = new Set(battle.units.map((u) => u.soldier))
+  const standing = new Set(battle.units.map((u) => u.soldier))
   const xpBefore = run.soldiers.map((s) => s.xp)
-  for (const s of run.soldiers) if (fought.has(s.id)) s.xp++
-  assignClasses(run)
-  const soldiers = run.soldiers.map((s, i) => ({ name: s.name, cls: s.cls, xpBefore: xpBefore[i], xpAfter: s.xp, died: dead.has(s.id) }))
-  run.soldiers = run.soldiers.filter((s) => !dead.has(s.id))
-  recruit(run)
+  for (const s of run.soldiers) if (standing.has(s.id)) s.xp++
+  const soldiers = run.soldiers.map((s, i) => ({ name: s.name, cls: s.cls, xpBefore: xpBefore[i], xpAfter: s.xp, downed: !standing.has(s.id) }))
 
   const won = battle.winner === 'human'
   const before = run.threat
@@ -381,7 +386,9 @@ export function endBattle(run: Run): void {
   const drops = won && mission.kind !== 'final' ? (mission.kind === 'battle' ? risk.drops : 1) : 0
   const gear = Array.from({ length: drops }, () => dropGear(run, risk.rareGear || mission.kind !== 'battle'))
   const key = won && mission.kind === 'key'
-  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, gear, key, soldiers }
+  // Each key won brings a new clone to the squad.
+  const hired = key ? hire(run).name : null
+  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, gear, key, soldiers, hired }
 
   if (mission.kind === 'final' || (mission.kind === 'lastStand' && !won)) {
     run.phase = won ? 'won' : 'lost'
@@ -413,6 +420,5 @@ export function takeAid(run: Run, id: AidId): void {
     const lowest = run.soldiers.reduce((low, soldier) => (soldier.xp < low.xp ? soldier : low))
     lowest.xp = Math.max(lowest.xp, RANK_XP[aid.promote])
   }
-  assignClasses(run)
   run.phase = 'overworld'
 }

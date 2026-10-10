@@ -27,6 +27,10 @@ const SHOT_MS = 160
 const IMPACT_MS = 140
 const DEATH_MS = 260
 const CALLOUT_MS = 900
+/** A health pip's size on screen, the step from one pip to the next, and the width of a row of ten. */
+const PIP = 5
+const PIP_STEP = 6
+const PIP_ROW = 10 * PIP_STEP - 1
 const PSI_MS = 320
 const ROCKET_MS = 320
 const BLAST_MS = 380
@@ -231,15 +235,30 @@ export async function createView(): Promise<View> {
     sprite.node.zIndex = tile.x + tile.y
   }
 
-  function drawHp(sprite: Sprite, hp: number): void {
-    sprite.hp.clear().rect(-12, -38, 24, 4).fill(0x000000)
-    if (hp > 0) sprite.hp.rect(-12, -38, (24 * hp) / sprite.maxHp, 4).fill(0xff5555)
+  /**
+   * Draws a unit's health and armor as pips, one each, ten to a row, rows stacking upward: health left in red, health
+   * lost in dark, then armor in yellow.
+   */
+  function drawHp(sprite: Sprite, hp: number, armor: number): void {
+    sprite.hp.clear()
+    const lost = sprite.maxHp - Math.max(hp, 0)
+    const colors = [...Array(Math.max(hp, 0)).fill(0xff5555), ...Array(lost).fill(0x3a2226), ...Array(armor).fill(COLOR.hit)]
+    colors.forEach((color, i) => {
+      sprite.hp.rect(-PIP_ROW / 2 + (i % 10) * PIP_STEP, -38 - Math.floor(i / 10) * PIP_STEP, PIP, PIP).fill(color)
+    })
   }
 
-  /** `pips` marks a soldier's rank above the health bar; `letter` is the initial of its class. */
+  /** A unit's health and armor in the battle; none of either once it is gone. */
+  const vitals = (battle: Battle, id: number): [number, number] => {
+    const unit = battle.units.find((u) => u.id === id)
+    return [unit?.hp ?? 0, unit?.armor ?? 0]
+  }
+
+  /** `pips` marks a soldier's rank above the health pips; `letter` is the initial of its class. */
   function create(unit: Unit, pips: number, letter = ''): Sprite {
     const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(unit.boss ? COLOR.boss : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human)
-    for (let i = 0; i < pips; i++) body.circle(-9 + 6 * i, -44, 2).fill(COLOR.hit)
+    const rows = Math.ceil((unit.stats.hp + unit.stats.armor) / 10)
+    for (let i = 0; i < pips; i++) body.circle(-9 + 6 * i, -40 - rows * PIP_STEP, 2).fill(COLOR.human)
     const sprite: Sprite = { node: new Container(), hp: new Graphics(), tile: unit, maxHp: unit.stats.hp }
     sprite.node.addChild(body, sprite.hp)
     sprite.node.scale.set(unit.boss ? 1.6 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1)
@@ -252,7 +271,7 @@ export async function createView(): Promise<View> {
     units.addChild(sprite.node)
     sprites.set(unit.id, sprite)
     place(sprite, { x: unit.x, y: unit.y })
-    drawHp(sprite, unit.hp)
+    drawHp(sprite, unit.hp, unit.armor)
     return sprite
   }
 
@@ -393,7 +412,7 @@ export async function createView(): Promise<View> {
       const sprite = sprites.get(unit.id) ?? create(unit, soldier ? rank(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : unit.kind && !unit.boss ? ALIENS[unit.kind].name[0] : '')
       place(sprite, { x: unit.x, y: unit.y })
       sprite.node.alpha = 1
-      drawHp(sprite, unit.hp)
+      drawHp(sprite, unit.hp, unit.armor)
     }
   }
 
@@ -458,7 +477,7 @@ export async function createView(): Promise<View> {
     })
   }
 
-  async function shoot(from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, hpAfter: number): Promise<void> {
+  async function shoot(from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: [number, number]): Promise<void> {
     const { hit, crit } = e
     const a = chest(from)
     // A miss flies past above the target.
@@ -471,7 +490,7 @@ export async function createView(): Promise<View> {
     fx.clear()
     float(shotCallout(e, to))
     if (!hit) return
-    drawHp(to, hpAfter)
+    drawHp(to, ...after)
     await tween(IMPACT_MS, (t) => {
       fx.clear().circle(b.x, b.y, 4 + (crit ? 26 : 12) * t).fill({ color: crit ? COLOR.crit : COLOR.hit, alpha: 1 - t })
     })
@@ -500,7 +519,7 @@ export async function createView(): Promise<View> {
     for (const hit of e.hits) {
       const sprite = sprites.get(hit.target)
       if (!sprite) continue
-      drawHp(sprite, battle.units.find((u) => u.id === hit.target)?.hp ?? 0)
+      drawHp(sprite, ...vitals(battle, hit.target))
       float(callout(`ROCKET -${hit.damage}`, COLOR.crit, sprite))
     }
     await tween(BLAST_MS, (t) => {
@@ -536,7 +555,7 @@ export async function createView(): Promise<View> {
         const to = sprites.get(e.target)
         if (!from || !to) continue
         await follow([from.tile, to.tile])
-        await shoot(from, to, e, battle.units.find((u) => u.id === e.target)?.hp ?? 0)
+        await shoot(from, to, e, vitals(battle, e.target))
       } else if (e.type === 'rocket') {
         const from = sprites.get(e.id)
         if (!from && !e.hits.some((hit) => sprites.has(hit.target))) continue
@@ -558,7 +577,7 @@ export async function createView(): Promise<View> {
         })
         fx.clear()
         if (e.type === 'spit') {
-          drawHp(to, battle.units.find((u) => u.id === e.target)?.hp ?? 0)
+          drawHp(to, ...vitals(battle, e.target))
           drawAcid(battle)
           float(callout(`ACID -${e.damage}`, COLOR.acid, to))
         } else float(callout('PANICKED', COLOR.psi, to))
@@ -566,7 +585,7 @@ export async function createView(): Promise<View> {
         const on = sprites.get(e.id)
         if (!on) continue
         await follow([on.tile])
-        if (e.type === 'hurt') drawHp(on, battle.units.find((u) => u.id === e.id)?.hp ?? 0)
+        if (e.type === 'hurt') drawHp(on, ...vitals(battle, e.id))
         float(e.type === 'frozen' ? callout('TOO SHAKEN TO ACT', COLOR.psi, on) : callout(`${e.cause.toUpperCase()} -${e.amount}`, e.cause === 'acid' ? COLOR.acid : COLOR.psi, on))
       } else if (e.type === 'spawn') {
         const unit = battle.units.find((u) => u.id === e.unit.id)
@@ -577,13 +596,13 @@ export async function createView(): Promise<View> {
       } else if (e.type === 'effect') {
         const on = sprites.get(e.id)
         if (!on) continue
-        drawHp(on, battle.units.find((u) => u.id === e.id)?.hp ?? 0)
+        drawHp(on, ...vitals(battle, e.id))
         float(effectCallout(e, on))
       } else if (e.type === 'heal') {
         const to = sprites.get(e.target)
         if (!to) continue
         await follow([to.tile])
-        drawHp(to, battle.units.find((u) => u.id === e.target)?.hp ?? 0)
+        drawHp(to, ...vitals(battle, e.target))
         float(callout(`HEAL +${e.amount}`, COLOR.heal, to))
       } else if (e.type === 'death') {
         const sprite = sprites.get(e.id)

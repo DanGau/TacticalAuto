@@ -8,7 +8,7 @@ function aidCard(id: AidId, index: number): string {
   return button({ type: 'pick', index }, `<small>${rarity}</small><br><b>${name}</b><br>${text}`, `card ${rarity}`)
 }
 
-/** A soldier's card: rank, an experience bar filling toward the next rank, and a promotion, new class, or death. */
+/** A soldier's card: rank, an experience bar filling toward the next rank, and a promotion, or that the soldier fell. */
 function soldierCard(soldier: Report['soldiers'][number]): string {
   const before = rank({ xp: soldier.xpBefore })
   const after = rank({ xp: soldier.xpAfter })
@@ -16,11 +16,9 @@ function soldierCard(soldier: Report['soldiers'][number]): string {
   // At the top rank there is no next threshold and the bar stays full.
   const filled = (xp: number) => (Number.isNaN(span) ? 100 : Math.min(100, (100 * (xp - RANK_XP[before])) / span))
   const cls = soldier.cls && CLASSES[soldier.cls].name
-  // A soldier leaves the rookie rank with a class just drawn.
-  const promotion = before === 0 && cls ? `Promoted: ${cls}` : `Promoted to ${RANK_NAMES[after]}`
-  const badge = soldier.died ? '<b class="up">Killed in action</b>' : after > before ? `<b class="down promoted">${promotion}</b>` : `+${soldier.xpAfter - soldier.xpBefore} experience`
-  return `<div class="soldier ${soldier.died ? 'died' : ''}">
-    <small>${RANK_NAMES[before]}${before > 0 && cls ? ` · ${cls}` : ''}</small><br><b>${soldier.name}</b>
+  const badge = soldier.downed ? '<b class="up">Downed · cloned anew</b>' : after > before ? `<b class="down promoted">Promoted to ${RANK_NAMES[after]}</b>` : `+${soldier.xpAfter - soldier.xpBefore} experience`
+  return `<div class="soldier ${soldier.downed ? 'died' : ''}">
+    <small>${RANK_NAMES[before]}${cls ? ` · ${cls}` : ''}</small><br><b>${soldier.name}</b>
     <div class="bar"><div class="fill" style="--from: ${filled(soldier.xpBefore)}%; --to: ${filled(soldier.xpAfter)}%"></div></div>
     ${badge}
   </div>`
@@ -46,6 +44,7 @@ export function stopReport(run: Run, report: Report): string {
     <div class="stage">
       <p>Threat ${threatBar(after, Math.max(0, after - before))}${threat}</p>
       ${report.key ? `<p class="keys">Access key won ${keyRow(run.keys)} ${run.keys === KEYS ? 'The alien source is found.' : ''}</p>` : ''}
+      ${report.hired ? `<p class="down"><b>A new clone joins the squad: ${report.hired}.</b></p>` : ''}
       ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : ''}
       ${report.gear.length > 0 ? `<h2>Recovered. Equip it in the Barracks.</h2><div class="drops">${report.gear.map((gear) => `<div class="gear ${gear.rarity} drop">${gearCard(gear)}</div>`).join('')}</div>` : ''}
     </div>

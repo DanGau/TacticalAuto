@@ -60,6 +60,8 @@ export type Tile = { x: number; y: number }
 
 export interface Stats {
   hp: number
+  /** Points that take damage before health does. */
+  armor: number
   /** Chance to hit a target at full range with no cover against the shooter. */
   aim: number
   damage: number
@@ -73,7 +75,7 @@ export interface Stats {
   close: number
 }
 
-export const BASE_STATS: Stats = { hp: 10, aim: 0.75, damage: 3, range: 5, move: 4, crit: 0.5, close: 0.06 }
+export const BASE_STATS: Stats = { hp: 10, armor: 0, aim: 0.75, damage: 3, range: 5, move: 4, crit: 0.5, close: 0.06 }
 
 /** Something a unit does unprompted beyond moving and shooting; each is described where combat applies it. */
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic'
@@ -90,6 +92,8 @@ export interface Alien {
   stats: Stats
   stance: Stance
   boss: boolean
+  /** Whether it spawns swarmlings. */
+  spawns: boolean
 }
 
 /** A soldier waiting to land. */
@@ -108,6 +112,8 @@ export interface Unit {
   x: number
   y: number
   hp: number
+  /** Armor left. */
+  armor: number
   stats: Stats
   /** The soldier this unit is; null for aliens. */
   soldier: number | null
@@ -125,11 +131,12 @@ export interface Unit {
   burning: number
   /** The kind of alien; null for humans. */
   kind: AlienKind | null
-  /** A boss spawns swarmlings. */
   boss: boolean
+  /** Whether it spawns swarmlings; false for humans. */
+  spawns: boolean
   /** Whether the unit loses its next action. */
   panicked: boolean
-  /** Alien turns until the unit's recurring ability is ready: a psion's panic, a boss's spawn. */
+  /** Alien turns until the unit's recurring ability is ready: a psion's panic, a spawner's spawn. */
   cooldown: number
 }
 
@@ -277,7 +284,7 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 export function land(battle: Battle, zone: Tile): void {
   const tiles = freeTilesNear(battle, zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
-    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, pod: null, spent: [], burning: 0, kind: null, boss: false, panicked: false, cooldown: 0, ...soldier })
+    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, kind: null, boss: false, spawns: false, panicked: false, cooldown: 0, ...soldier })
   })
   battle.reserve = []
   battle.phase = 'battle'
@@ -318,6 +325,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     side: 'alien',
     ...tile,
     hp: alien.stats.hp,
+    armor: alien.stats.armor,
     ...alien,
     soldier: null,
     pod,
@@ -327,7 +335,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     spent: [],
     burning: 0,
     panicked: false,
-    cooldown: alien.boss ? SPAWN_EVERY : 0,
+    cooldown: alien.spawns ? SPAWN_EVERY : 0,
   }
 }
 

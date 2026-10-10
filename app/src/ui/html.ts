@@ -33,6 +33,7 @@ const percent = (n: number) => `${signed(Math.round(100 * n))}%`
 /** How each stat change reads on a piece of gear. */
 const STAT_TEXT: Record<keyof Stats, (n: number) => string> = {
   hp: (n) => `${signed(n)} health`,
+  armor: (n) => `${signed(n)} armor`,
   aim: (n) => `${percent(n)} aim`,
   damage: (n) => `${signed(n)} damage`,
   range: (n) => `${signed(n)} range`,

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { ALIENS, alienStats, muster, PACKS, type AlienKind } from './aliens'
 import { apply } from './apply'
-import { ACID_DAMAGE, alienUnit, AMBUSH_AIM, BASE_STATS, BURST_DAMAGE, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, type Battle, type Unit } from './battle'
+import { ACID_DAMAGE, alienUnit, AMBUSH_AIM, BURST_DAMAGE, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, type Battle, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { createRun } from './run'
 
@@ -34,7 +34,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   battle.west.fill('none')
   const soldier = battle.units.find((u) => u.side === 'human')!
   Object.assign(soldier, { x: 10, y: 10, hp: 30, stats: { ...soldier.stats, hp: 30, aim: 2, crit: 0, damage: 3 } })
-  const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, BASE_STATS), stance: ALIENS[kind].stance, boss }, { x, y }, 0))
+  const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss }, { x, y }, 0))
   battle.units = [soldier, ...units]
   battle.pods = [{ name: 'Test', revealed: true, ambushed: false, surprised: false, waypoint: { x: 0, y: 0 } }]
   battle.concealed = false
@@ -127,7 +127,7 @@ test('a psion panics a soldier, who loses its next action, and hurts its pod whe
   expect(after).toContainEqual({ type: 'hurt', id: aliens[1].id, amount: PSI_BACKLASH, cause: 'backlash' })
 })
 
-test('a boss spawns a swarmling every few alien turns', () => {
+test('a spawner spawns a swarmling every few alien turns', () => {
   const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 25, boss: true }])
   soldier.stats = { ...soldier.stats, move: 0, range: 0 }
   aliens[0].stats = { ...aliens[0].stats, move: 0, range: 0 }

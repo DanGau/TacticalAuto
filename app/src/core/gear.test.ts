@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { BASE_STATS, type Unit } from './battle'
+import type { Unit } from './battle'
 import { stepBattle } from './combat'
 import { EFFECTS, generateGear, type Gear } from './gear'
 import { createRun, equipped, holder, soldierStats, type Run } from './run'
@@ -26,10 +26,12 @@ function withGear(gear: Omit<Gear, 'id'>): Run {
 }
 
 test('equipping adds the gear to one soldier, moves it between soldiers, and unequipping returns it to the stash', () => {
-  const run = withGear({ slot: 'armor', rarity: 'common', name: 'Sturdy Vest', stats: { hp: 2 }, effect: null })
+  const run = withGear({ slot: 'armor', rarity: 'common', name: 'Sturdy Vest', stats: { armor: 2 }, effect: null })
+  run.soldiers.push({ ...run.soldiers[0], id: 99, name: 'Second', gear: { weapon: null, armor: null, utility: null } })
   const [first, second] = run.soldiers
+  expect(soldierStats(run, first).armor).toBe(0)
   expect(apply(run, { type: 'equip', soldier: first.id, gear: 1 })).toEqual({ ok: true })
-  expect(soldierStats(run, first).hp).toBe(BASE_STATS.hp + 2)
+  expect(soldierStats(run, first).armor).toBe(2)
   expect(apply(run, { type: 'equip', soldier: first.id, gear: 1 })).toEqual({ ok: false, reason: 'already equipped' })
   apply(run, { type: 'equip', soldier: second.id, gear: 1 })
   expect(equipped(run, first)).toEqual([])

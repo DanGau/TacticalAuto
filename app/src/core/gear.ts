@@ -40,9 +40,9 @@ const MODS: Record<Slot, Mod[]> = {
     { prefix: 'Snub', stats: { close: 0.04, range: -1 } },
   ],
   armor: [
-    { prefix: 'Sturdy', stats: { hp: 2 } },
-    { prefix: 'Plated', stats: { hp: 5, move: -1 } },
-    { prefix: 'Light', stats: { move: 1, hp: -1 } },
+    { prefix: 'Sturdy', stats: { armor: 2 } },
+    { prefix: 'Plated', stats: { armor: 4, move: -1 } },
+    { prefix: 'Light', stats: { armor: 1, move: 1 } },
   ],
   utility: [
     { prefix: 'Fleet', stats: { move: 1 } },
