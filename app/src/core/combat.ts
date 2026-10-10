@@ -1,12 +1,18 @@
+import { ALIENS, alienStats } from './aliens'
 import {
+  ACID_DAMAGE,
+  ACID_TURNS,
+  alienUnit,
   blocked,
   BLAST_RADIUS,
+  BURST_DAMAGE,
   BURN_DAMAGE,
   BURN_TURNS,
   coverAt,
   CRIT_BONUS,
   distance,
   EXECUTE_BONUS,
+  freeTilesNear,
   GRENADE_DAMAGE,
   GRID,
   MAX_BEATS,
@@ -17,8 +23,13 @@ import {
   onGrid,
   passable,
   PATROL_MOVE,
+  PSI_BACKLASH,
+  PSI_COOLDOWN,
+  PSI_RANGE,
   revealed,
   ROCKET_DAMAGE,
+  SPAWN_EVERY,
+  SPIT_DAMAGE,
   STANDOFF,
   type Battle,
   type Effect,
@@ -38,11 +49,21 @@ export type GameEvent =
   | { type: 'reveal'; units: { id: number; x: number; y: number }[] }
   /** `damage` is 0 for a miss. */
   | { type: 'shot'; id: number; target: number; hit: boolean; crit: boolean; damage: number }
-  /** A rocket or grenade lands on a tile, damages every unit in `hits`, and wrecks the terrain around it. */
+  /** A rocket or grenade lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */
   | { type: 'rocket'; id: number; x: number; y: number; hits: { target: number; damage: number }[] }
   | { type: 'heal'; id: number; target: number; amount: number }
   /** A gear effect acts on the unit `id`. `amount` is the health it gained, or lost if negative; 0 when neither. */
   | { type: 'effect'; id: number; effect: Effect; amount: number }
+  /** A spitter's spit lands on its target, which takes `damage`, and leaves acid on the tile. */
+  | { type: 'spit'; id: number; target: number; damage: number }
+  /** A psion panics a soldier, who loses its next action. */
+  | { type: 'panic'; id: number; target: number }
+  /** A panicked soldier loses its action. */
+  | { type: 'frozen'; id: number }
+  /** A unit is hurt by acid underfoot, or by the death of the psion of its pod. */
+  | { type: 'hurt'; id: number; amount: number; cause: 'acid' | 'backlash' }
+  /** A boss spawns a swarmling. */
+  | { type: 'spawn'; id: number; unit: { id: number; x: number; y: number } }
   | { type: 'death'; id: number }
   | { type: 'end'; winner: Side | null }
 
@@ -268,6 +289,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const engaged = unit.side === 'human' && seen.size > 0
   /** Whether a soldier on `end` would sight a pod not yet revealed, while the squad is in a fight. */
   const provokes = (end: Tile) => (engaged && unseen.some((alien) => sees(battle, end, alien)) ? 1 : 0)
+  const acid = (end: Tile) => (battle.acid.some((pool) => pool.x === end.x && pool.y === end.y) ? 1 : 0)
   const marching = unit.side === 'human' && seen.size === 0
   const leaders = unit.stance === 'standoff' ? squadmates.filter((u) => u.stance !== 'standoff') : []
   /** The nearest to the enemy this unit may walk while marching: REAR_GAP behind the foremost leader. */
@@ -294,8 +316,10 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
         careful: unit.side === 'human',
       }
       // A wary unit ranks every tile by the exchange of fire, so one with no shot and no risk can win.
-      if (wary && unit.stance !== 'standoff' && inContact) return [provokes(end), 0, ...WITH_SHOT[unit.stance](spot), spot.toGoal]
-      return spot.mine > 0 ? [provokes(end), 0, ...WITH_SHOT[unit.stance](spot), steps] : [provokes(end), 1, ahead(end), ...NO_SHOT[unit.stance](spot)]
+      // No unit ends its move in acid if it can help it.
+      const first = [acid(end), provokes(end)]
+      if (wary && unit.stance !== 'standoff' && inContact) return [...first, 0, ...WITH_SHOT[unit.stance](spot), spot.toGoal]
+      return spot.mine > 0 ? [...first, 0, ...WITH_SHOT[unit.stance](spot), steps] : [...first, 1, ahead(end), ...NO_SHOT[unit.stance](spot)]
     })
   }
   const path = choose(unit.stats.move)
@@ -334,10 +358,20 @@ function sight(battle: Battle): GameEvent[] {
   return events
 }
 
-/** What happens to each unit of the side on turn as its turn begins: burning hurts, mending armor heals. */
+/**
+ * What happens as a side's turn begins. Acid hurts each of its units standing in it; burning hurts; mending armor
+ * heals. On the aliens' turn acid wears off, cooldowns run down, and a boss whose spawn is ready spawns a swarmling.
+ */
 function upkeep(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
   for (const unit of battle.units.filter((u) => u.side === battle.turn)) {
+    // An explosion earlier in this upkeep may have killed it.
+    if (unit.hp <= 0) continue
+    if (battle.acid.some((pool) => pool.x === unit.x && pool.y === unit.y)) {
+      events.push({ type: 'hurt', id: unit.id, amount: ACID_DAMAGE, cause: 'acid' })
+      wound(battle, unit, ACID_DAMAGE, events)
+      if (unit.hp <= 0) continue
+    }
     if (unit.burning > 0) {
       unit.burning--
       events.push({ type: 'effect', id: unit.id, effect: 'incendiary', amount: -BURN_DAMAGE })
@@ -347,6 +381,19 @@ function upkeep(battle: Battle): GameEvent[] {
       unit.hp++
       events.push({ type: 'effect', id: unit.id, effect: 'regen', amount: 1 })
     }
+  }
+  if (battle.turn !== 'alien') return events
+  battle.acid = battle.acid.map((pool) => ({ ...pool, turns: pool.turns - 1 })).filter((pool) => pool.turns > 0)
+  for (const unit of battle.units.filter((u) => u.side === 'alien')) {
+    if (unit.cooldown > 0) unit.cooldown--
+    if (!unit.boss || unit.cooldown > 0 || !revealed(battle, unit)) continue
+    const [tile] = freeTilesNear(battle, unit, 1)
+    if (!tile) continue
+    unit.cooldown = SPAWN_EVERY
+    const base = { ...unit.stats, hp: Math.round(unit.stats.hp / 3) }
+    const spawn = alienUnit(battle, { kind: 'swarmling', stats: alienStats('swarmling', base), stance: ALIENS.swarmling.stance, boss: false }, tile, unit.pod!)
+    battle.units.push(spawn)
+    events.push({ type: 'spawn', id: unit.id, unit: { id: spawn.id, x: spawn.x, y: spawn.y } })
   }
   return events
 }
@@ -377,12 +424,72 @@ function moveSide(battle: Battle): GameEvent[] {
   return [...events, ...sight(battle)]
 }
 
-/** Removes `damage` health from a unit, removing the unit and reporting its death at zero. */
+/**
+ * Removes `damage` health from a unit, removing the unit and reporting its death at zero.
+ * A burster that dies explodes, and a psion that dies hurts the other aliens of its pod.
+ */
 function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[]): void {
+  if (target.hp <= 0) return
   target.hp -= damage
   if (target.hp > 0) return
   battle.units = battle.units.filter((u) => u !== target)
   events.push({ type: 'death', id: target.id })
+  if (target.kind === 'burster') {
+    const caught = battle.units.filter((u) => distance(target, u) <= BLAST_RADIUS)
+    events.push({ type: 'rocket', id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: BURST_DAMAGE })) })
+    wreck(battle, target)
+    for (const unit of caught) wound(battle, unit, BURST_DAMAGE, events)
+  }
+  if (target.kind === 'psion') {
+    for (const unit of battle.units.filter((u) => u.pod === target.pod)) {
+      events.push({ type: 'hurt', id: unit.id, amount: PSI_BACKLASH, cause: 'backlash' })
+      wound(battle, unit, PSI_BACKLASH, events)
+    }
+  }
+}
+
+/** A brute that survives a hit charges: it moves at once as near the shooter as its move allows. */
+function charge(battle: Battle, brute: Unit, shooter: Unit, events: GameEvent[]): void {
+  const toShooter = walkingDistances(battle, shooter)
+  walk(brute, bestPath(paths(battle, brute, brute.stats.move), brute, (end) => [toShooter[end.y * GRID + end.x]]), events)
+}
+
+/** Spit: the nearest soldier the spitter can shoot is hit without a roll, and acid is left on its tile. */
+function spit(battle: Battle, unit: Unit): GameEvent[] {
+  const target = nearest(
+    battle.units.filter((u) => u.side !== unit.side && canShoot(battle, unit, u, unit.stats.range)),
+    unit,
+  )
+  if (!target) return []
+  const events: GameEvent[] = [{ type: 'spit', id: unit.id, target: target.id, damage: SPIT_DAMAGE }]
+  battle.acid = [...battle.acid.filter((pool) => pool.x !== target.x || pool.y !== target.y), { x: target.x, y: target.y, turns: ACID_TURNS }]
+  wound(battle, target, SPIT_DAMAGE, events)
+  return events
+}
+
+/** Panic: when ready, the psion panics the soldier in reach and sight with the best aim not already panicked. */
+function panic(battle: Battle, unit: Unit): GameEvent[] {
+  if (unit.cooldown > 0) return []
+  const targets = battle.units.filter((u) => u.side !== unit.side && !u.panicked && distance(unit, u) <= PSI_RANGE && lineOfSight(battle, unit, u))
+  const target = targets.reduce<Unit | undefined>((best, u) => (!best || u.stats.aim > best.stats.aim ? u : best), undefined)
+  if (!target) return []
+  target.panicked = true
+  unit.cooldown = PSI_COOLDOWN
+  return [{ type: 'panic', id: unit.id, target: target.id }]
+}
+
+/** What an alien does in place of a shot, by its kind; empty if it shoots, or has nothing to do. */
+function alienAction(battle: Battle, unit: Unit): GameEvent[] | null {
+  if (unit.kind === 'spitter') return spit(battle, unit)
+  if (unit.kind === 'psion') {
+    const events = panic(battle, unit)
+    return events.length > 0 ? events : null
+  }
+  if (unit.kind !== 'burster') return null
+  // A burster beside a soldier blows itself up.
+  const events: GameEvent[] = []
+  if (battle.units.some((u) => u.side !== unit.side && distance(unit, u) <= 1)) wound(battle, unit, unit.hp, events)
+  return events
 }
 
 /** Medic: heals the most wounded other soldier at half health or less within reach. It does not cost the medic's shot. */
@@ -462,6 +569,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, chained = false): 
     events.push({ type: 'effect', id: unit.id, effect: 'thorns', amount: -1 })
     wound(battle, unit, 1, events)
   }
+  if (enemy.kind === 'brute' && enemy.hp > 0 && unit.hp > 0) charge(battle, enemy, unit, events)
   if (enemy.hp <= 0 && unit.hp > 0 && has(unit, 'chain') && !chained) events.push(...shoot(battle, unit, seen, true))
   return events
 }
@@ -480,14 +588,26 @@ function armed(battle: Battle, unit: Unit): boolean {
 }
 
 /**
- * The next unit of the side on turn with something to do acts once. First come what does not cost the shot:
- * a medkit, a medic's heal, a grenade. Then a rocket, when its moment has come, or else a shot.
+ * The next unit of the side on turn with something to do acts once. A panicked soldier loses the action.
+ * An alien does what its kind does in place of a shot, if anything. Otherwise, first come what does not cost the
+ * shot: a medkit, a medic's heal, a grenade. Then a rocket, when its moment has come, or else a shot.
  * Empty when no unit is left.
  */
 function actNext(battle: Battle): GameEvent[] {
   const seen = spotted(battle)
   for (const unit of battle.units) {
     if (unit.side !== battle.turn || unit.id <= battle.shooter || !armed(battle, unit)) continue
+    if (unit.panicked) {
+      unit.panicked = false
+      battle.shooter = unit.id
+      return [{ type: 'frozen', id: unit.id }]
+    }
+    const special = alienAction(battle, unit)
+    if (special) {
+      if (special.length === 0) continue
+      battle.shooter = unit.id
+      return special
+    }
     const healed = unit.charges > 0 && unit.ability === 'medic' ? heal(battle, unit) : []
     const thrown = has(unit, 'grenade') && !unit.spent.includes('grenade') ? blast(battle, unit, seen, GRENADE_DAMAGE) : []
     if (thrown.length > 0) unit.spent.push('grenade')

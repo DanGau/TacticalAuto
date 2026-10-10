@@ -18,7 +18,7 @@ export interface Picking {
 /** A stop as a chip on the road: its name, and for a fight, how many aliens. */
 function chip(run: Run, zone: Zone, stop: StopKind, state = ''): string {
   const fight = stop === 'battle' || stop === 'key' || stop === 'final'
-  const aliens = fight ? ` · ${missionAt(run, stop, zone.risk).aliens} aliens${stop === 'battle' ? '' : ' and a boss'}` : ''
+  const aliens = fight ? ` · force ${missionAt(run, stop, zone.risk).force}${stop === 'battle' ? '' : ', with a boss'}` : ''
   return `<span class="chip ${stop} ${state}">${STOP_NAMES[stop]}${aliens}</span>`
 }
 
@@ -43,7 +43,7 @@ function travelLabel(run: Run, zone: Zone, stop: NonNullable<ReturnType<typeof n
   if (stop === 'supply' || stop === 'cache') return `Collect the ${STOP_NAMES[stop].toLowerCase()}`
   const mission = missionAt(run, stop, zone.risk)
   const stakes = stop === 'lastStand' || stop === 'final' ? ' · lose and the run ends' : ''
-  return `<b>${STOP_NAMES[stop]}</b><br>${mission.aliens} aliens${stop === 'key' || stop === 'final' ? ' and a boss' : ''}${stakes}`
+  return `<b>${STOP_NAMES[stop]}</b><br>Alien force ${mission.force}${stop === 'key' || stop === 'final' ? ', with a boss' : ''}${stakes}`
 }
 
 /** The map: at a fork, the three zones to choose from; in a zone, the road through it and a button to travel on. */

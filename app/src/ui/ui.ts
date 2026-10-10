@@ -2,6 +2,7 @@ import type { Action } from '../core/apply'
 import type { Report, Run } from '../core/run'
 import type { View } from '../view/view'
 import { runEnd, stopReport } from './aftermath'
+import { ALIENS, type AlienKind } from '../core/aliens'
 import { STOP_NAMES } from './html'
 import { overworld, type Picking, type Tab } from './overworld'
 
@@ -12,11 +13,23 @@ export interface Ui {
   update(run: Run): void
 }
 
+/** The aliens of a battle by kind, as "2 Troopers, 4 Swarmlings", with what each kind does. */
+function roster(run: Run): string {
+  const aliens = run.battle!.units.filter((u) => u.side === 'alien')
+  const kinds = [...new Set(aliens.filter((u) => !u.boss).map((u) => u.kind!))] as AlienKind[]
+  const lines = kinds.map((kind) => {
+    const count = aliens.filter((u) => u.kind === kind && !u.boss).length
+    return `<div><b>${count} ${ALIENS[kind].name}${count === 1 ? '' : 's'}.</b> ${ALIENS[kind].text}.</div>`
+  })
+  if (aliens.some((u) => u.boss)) lines.unshift('<div><b>A boss.</b> Tough, hits hard and far, and spawns swarmlings.</div>')
+  return lines.join('')
+}
+
 function status(run: Run): string {
   const battle = run.battle
   if (run.phase !== 'battle' || !battle) return ''
   const title = STOP_NAMES[run.mission!.kind]
-  if (battle.phase === 'deploy') return `${title} · ${run.mission!.aliens} aliens · click a landing zone`
+  if (battle.phase === 'deploy') return `${title} · click a landing zone<div class="roster">${roster(run)}</div>`
   return `${title} · ${SIDE[battle.turn]}' turn`
 }
 
@@ -83,7 +96,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
 
   return {
     update(run) {
-      statusLine.textContent = status(run)
+      statusLine.innerHTML = status(run)
       render(run)
     },
   }

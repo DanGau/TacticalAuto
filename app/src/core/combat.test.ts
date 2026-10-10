@@ -28,7 +28,7 @@ test('a turn is one move beat, then one shot per beat in id order, then the othe
   let stage = 'move'
   let shooter = 0
   const end = play(1, (events, before) => {
-    const first = events.find((e) => e.type === 'move' || e.type === 'shot' || e.type === 'rocket' || e.type === 'heal')
+    const first = events.find((e) => ['move', 'shot', 'rocket', 'heal', 'spit', 'panic', 'frozen'].includes(e.type)) as Extract<GameEvent, { id: number }> | undefined
     if (!first) return
     const side = before.units.find((u) => u.id === first.id)!.side
     if (side !== turn) {

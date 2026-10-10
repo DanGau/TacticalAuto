@@ -1,4 +1,5 @@
 import { AID, FACILITIES, RARITY_CHANCE, type AidId, type FacilityId, type Lasting, type Rarity } from './base'
+import { ALIENS, alienStats, muster } from './aliens'
 import { BASE_STATS, createBattle, type Alien, type Battle, type Stats } from './battle'
 import { CLASSES, type ClassId } from './classes'
 import { generateGear, SLOTS, type Gear, type Slot } from './gear'
@@ -50,11 +51,15 @@ export interface Zone {
   stops: StopKind[]
 }
 
-/** A battle to fight. A last stand comes when threat is full, in place of the next stop; losing it loses the run, as does losing the final mission. */
+/**
+ * A battle to fight. A last stand comes when threat is full, in place of the next stop; losing it loses the run,
+ * as does losing the final mission. `force` is what the aliens can muster: a trooper costs one, and some kinds
+ * cost two or come in pairs.
+ */
 export interface Mission {
   kind: 'battle' | 'key' | 'final' | 'lastStand'
   risk: Risk
-  aliens: number
+  force: number
 }
 
 export interface Soldier {
@@ -204,17 +209,21 @@ function depth(run: Run): number {
 /** The mission the squad would fight at a stop of the given kind now. */
 export function missionAt(run: Run, kind: Mission['kind'], risk: Risk): Mission {
   const extra = { battle: 0, key: 1, final: 2, lastStand: 4 }[kind]
-  return { kind, risk, aliens: 4 + depth(run) + extra + RISKS[risk].aliens }
+  return { kind, risk, force: 6 + depth(run) + extra + RISKS[risk].aliens }
 }
 
-/** The aliens of a mission. Each step of depth adds health and aim; deep in, damage too. A key or final mission has a boss. */
+/**
+ * The aliens of a mission: kinds mustered at random for its force. Each step of depth adds health and aim; deep in,
+ * damage too. A key or final mission adds a boss: a trooper of several times the health, that hits harder and farther.
+ */
 function aliensOf(run: Run, mission: Mission): Alien[] {
   const tier = depth(run)
-  const stats: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + 3 * tier, aim: BASE_STATS.aim + 0.03 * tier, damage: BASE_STATS.damage + (tier >= 5 ? 1 : 0) }
-  const aliens: Alien[] = Array.from({ length: mission.aliens }, () => ({ stats, boss: false }))
-  if (mission.kind === 'key' || mission.kind === 'final') {
+  const base: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + 3 * tier, aim: BASE_STATS.aim + 0.03 * tier, damage: BASE_STATS.damage + (tier >= 5 ? 1 : 0) }
+  const boss = mission.kind === 'key' || mission.kind === 'final'
+  const aliens: Alien[] = muster(run, mission.force - (boss ? 1 : 0), tier).map((kind) => ({ kind, stats: alienStats(kind, base), stance: ALIENS[kind].stance, boss: false }))
+  if (boss) {
     const scale = mission.kind === 'final' ? 4 : 3
-    aliens[0] = { stats: { ...stats, hp: stats.hp * scale, damage: stats.damage + 1, range: stats.range + 1 }, boss: true }
+    aliens.unshift({ kind: 'trooper', stats: { ...base, hp: base.hp * scale, damage: base.damage + 1, range: base.range + 1 }, stance: 'balanced', boss: true })
   }
   return aliens
 }

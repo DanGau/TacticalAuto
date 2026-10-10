@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js'
 import { BLAST_RADIUS, distance, GRID, revealed, ZONE_RADIUS, zoneInfo, type Battle, type Tile, type Unit } from '../core/battle'
+import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { EFFECTS } from '../core/gear'
 import type { GameEvent } from '../core/combat'
@@ -26,6 +27,7 @@ const SHOT_MS = 160
 const IMPACT_MS = 140
 const DEATH_MS = 260
 const CALLOUT_MS = 900
+const PSI_MS = 320
 const ROCKET_MS = 320
 const BLAST_MS = 380
 
@@ -43,6 +45,8 @@ const COLOR = {
   crit: 0xff7a3d,
   miss: 0x77808f,
   heal: 0x7ddc5a,
+  acid: 0xa6e22e,
+  psi: 0xff6bd6,
   contact: 0xff6b5e,
 }
 
@@ -98,6 +102,16 @@ const carBoxes = (paint: number): Box[] => [
   { wide: 0.7, deep: 0.6, base: 12, up: 6, color: 0x2a3340 },
 ]
 
+/** How each kind of alien is drawn: its colour, and its size against a soldier's. */
+const ALIEN_LOOK: Record<AlienKind, { color: number; scale: number }> = {
+  trooper: { color: 0x7ddc5a, scale: 1 },
+  swarmling: { color: 0x3f8f4a, scale: 0.6 },
+  spitter: { color: 0xa6e22e, scale: 0.9 },
+  burster: { color: 0xff9a3d, scale: 0.8 },
+  brute: { color: 0xb5533c, scale: 1.4 },
+  psion: { color: 0xff6bd6, scale: 1 },
+}
+
 /** A darker shade of a colour, for a box's sides. */
 const shade = (color: number, by: number) => (((color >> 16) * by) << 16) | ((((color >> 8) & 255) * by) << 8) | ((color & 255) * by)
 
@@ -148,6 +162,7 @@ export async function createView(): Promise<View> {
   const tiles = new Graphics()
   /** Shown before the landing: the landing zones' tint under the units, and their names and the contact markers over them. */
   const zones = new Graphics()
+  const acid = new Graphics()
   const marks = new Container()
   /** Shot callouts. */
   const labels = new Container()
@@ -156,7 +171,7 @@ export async function createView(): Promise<View> {
   const fog = new Graphics()
   const fx = new Graphics()
   const world = new Container()
-  world.addChild(tiles, zones, fog, units, fx, marks, labels)
+  world.addChild(tiles, zones, acid, fog, units, fx, marks, labels)
   // Nothing shows until a battle exists.
   world.visible = false
   app.stage.addChild(world)
@@ -218,11 +233,11 @@ export async function createView(): Promise<View> {
 
   /** `pips` marks a soldier's rank above the health bar; `letter` is the initial of its class. */
   function create(unit: Unit, pips: number, letter = ''): Sprite {
-    const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(unit.boss ? COLOR.boss : COLOR[unit.side])
+    const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(unit.boss ? COLOR.boss : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human)
     for (let i = 0; i < pips; i++) body.circle(-9 + 6 * i, -44, 2).fill(COLOR.hit)
     const sprite: Sprite = { node: new Container(), hp: new Graphics(), tile: unit, maxHp: unit.stats.hp }
     sprite.node.addChild(body, sprite.hp)
-    if (unit.boss) sprite.node.scale.set(1.6)
+    sprite.node.scale.set(unit.boss ? 1.6 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1)
     if (letter) {
       const mark = new Text({ text: letter, style: { fill: 0x10141c, fontSize: 13, fontWeight: 'bold', fontFamily: 'sans-serif' } })
       mark.anchor.set(0.5)
@@ -356,14 +371,21 @@ export async function createView(): Promise<View> {
   }
 
 
+  /** Tints every tile of acid. */
+  function drawAcid(battle: Battle): void {
+    acid.clear()
+    for (const pool of battle.acid) diamond(acid, pool.x, pool.y).fill({ color: COLOR.acid, alpha: 0.45 })
+  }
+
   /** Makes the sprites match the battle exactly. */
   function sync(run: Run, battle: Battle): void {
+    drawAcid(battle)
     const visible = battle.units.filter((u) => revealed(battle, u))
     const live = new Set(visible.map((u) => u.id))
     for (const id of [...sprites.keys()]) if (!live.has(id)) remove(id)
     for (const unit of visible) {
       const soldier = run.soldiers.find((s) => s.id === unit.soldier)
-      const sprite = sprites.get(unit.id) ?? create(unit, soldier ? rank(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : '')
+      const sprite = sprites.get(unit.id) ?? create(unit, soldier ? rank(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : unit.kind && !unit.boss ? ALIENS[unit.kind].name[0] : '')
       place(sprite, { x: unit.x, y: unit.y })
       sprite.node.alpha = 1
       drawHp(sprite, unit.hp)
@@ -457,14 +479,16 @@ export async function createView(): Promise<View> {
     return callout(e.amount === 0 ? word : `${word} ${e.amount > 0 ? '+' : ''}${e.amount}`, e.amount > 0 ? COLOR.heal : e.amount < 0 ? COLOR.crit : COLOR.hit, over)
   }
 
-  /** A rocket flies to its tile and bursts, wounding every unit it caught. */
-  async function fireRocket(battle: Battle, from: Sprite, e: Extract<GameEvent, { type: 'rocket' }>): Promise<void> {
-    const a = chest(from)
+  /** A rocket flies from `from` to its tile and bursts, wounding every unit it caught. With no `from`, something burst where it stood. */
+  async function fireRocket(battle: Battle, from: Sprite | undefined, e: Extract<GameEvent, { type: 'rocket' }>): Promise<void> {
     const b = toWorld(e.x, e.y)
-    await tween(ROCKET_MS, (t) => {
-      const at = lerp(a, b, t)
-      fx.clear().circle(at.x, at.y, 5).fill(COLOR.crit)
-    })
+    if (from) {
+      const a = chest(from)
+      await tween(ROCKET_MS, (t) => {
+        const at = lerp(a, b, t)
+        fx.clear().circle(at.x, at.y, 5).fill(COLOR.crit)
+      })
+    }
     // The blast has already wrecked the terrain in the battle; show it as the rocket lands.
     drawTerrain(battle)
     drawFog(battle)
@@ -498,7 +522,7 @@ export async function createView(): Promise<View> {
         await follow(e.units)
         const appeared = e.units.flatMap((at) => {
           const unit = battle.units.find((u) => u.id === at.id)
-          return unit ? [create({ ...unit, x: at.x, y: at.y }, 0)] : []
+          return unit ? [create({ ...unit, x: at.x, y: at.y }, 0, unit.boss ? '' : ALIENS[unit.kind!].name[0])] : []
         })
         await tween(REVEAL_MS, (t) => appeared.forEach((sprite) => (sprite.node.alpha = t)))
       } else if (e.type === 'shot') {
@@ -509,9 +533,41 @@ export async function createView(): Promise<View> {
         await shoot(from, to, e, battle.units.find((u) => u.id === e.target)?.hp ?? 0)
       } else if (e.type === 'rocket') {
         const from = sprites.get(e.id)
-        if (!from) continue
-        await follow([from.tile, e])
+        if (!from && !e.hits.some((hit) => sprites.has(hit.target))) continue
+        await follow(from ? [from.tile, e] : [e])
         await fireRocket(battle, from, e)
+      } else if (e.type === 'spit' || e.type === 'panic') {
+        const from = sprites.get(e.id)
+        const to = sprites.get(e.target)
+        if (!from || !to) continue
+        await follow([from.tile, to.tile])
+        const a = chest(from)
+        const b = chest(to)
+        const color = e.type === 'spit' ? COLOR.acid : COLOR.psi
+        await tween(PSI_MS, (t) => {
+          const head = lerp(a, b, t)
+          // Spit arcs as a blob; panic reaches out as a beam.
+          if (e.type === 'spit') fx.clear().circle(head.x, head.y - 30 * Math.sin(Math.PI * t), 5).fill(color)
+          else fx.clear().moveTo(a.x, a.y).lineTo(head.x, head.y).stroke({ color, width: 2, alpha: 0.8 })
+        })
+        fx.clear()
+        if (e.type === 'spit') {
+          drawHp(to, battle.units.find((u) => u.id === e.target)?.hp ?? 0)
+          drawAcid(battle)
+          float(callout(`ACID -${e.damage}`, COLOR.acid, to))
+        } else float(callout('PANICKED', COLOR.psi, to))
+      } else if (e.type === 'frozen' || e.type === 'hurt') {
+        const on = sprites.get(e.id)
+        if (!on) continue
+        await follow([on.tile])
+        if (e.type === 'hurt') drawHp(on, battle.units.find((u) => u.id === e.id)?.hp ?? 0)
+        float(e.type === 'frozen' ? callout('TOO SHAKEN TO ACT', COLOR.psi, on) : callout(`${e.cause.toUpperCase()} -${e.amount}`, e.cause === 'acid' ? COLOR.acid : COLOR.psi, on))
+      } else if (e.type === 'spawn') {
+        const unit = battle.units.find((u) => u.id === e.unit.id)
+        if (!unit || !revealed(battle, unit)) continue
+        await follow([e.unit])
+        const born = create({ ...unit, x: e.unit.x, y: e.unit.y }, 0, ALIENS[unit.kind!].name[0])
+        await tween(REVEAL_MS, (t) => (born.node.alpha = t))
       } else if (e.type === 'effect') {
         const on = sprites.get(e.id)
         if (!on) continue

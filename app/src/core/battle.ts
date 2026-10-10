@@ -1,3 +1,4 @@
+import type { AlienKind } from './aliens'
 import { randomInt } from './rng'
 import { generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Prop, type TerrainKind } from './terrain'
 
@@ -33,6 +34,18 @@ export const BURN_TURNS = 2
 export const BURN_DAMAGE = 1
 /** Damage the executioner effect adds against a target at half health or less. */
 export const EXECUTE_BONUS = 2
+/** Damage a burster's explosion does within BLAST_RADIUS. */
+export const BURST_DAMAGE = 4
+/** Damage a spitter's spit does, the turns its acid lies on the tile, and the damage acid does to a unit that starts a turn in it. */
+export const SPIT_DAMAGE = 1
+export const ACID_TURNS = 2
+export const ACID_DAMAGE = 2
+/** Tiles a psion's panic reaches, the alien turns between its uses, and the damage its death does to its pod. */
+export const PSI_RANGE = 7
+export const PSI_COOLDOWN = 3
+export const PSI_BACKLASH = 2
+/** Alien turns between the swarmlings a boss spawns. */
+export const SPAWN_EVERY = 2
 /** Landing zones offered to the squad. */
 export const ZONES = 3
 /** Tiles around a landing zone's centre that count as the zone. */
@@ -72,7 +85,9 @@ export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
 
 /** An alien to place in a battle. A boss is the one a key or final mission is about. */
 export interface Alien {
+  kind: AlienKind
   stats: Stats
+  stance: Stance
   boss: boolean
 }
 
@@ -107,7 +122,14 @@ export interface Unit {
   spent: Effect[]
   /** Turns of burning left. */
   burning: number
+  /** The kind of alien; null for humans. */
+  kind: AlienKind | null
+  /** A boss spawns swarmlings. */
   boss: boolean
+  /** Whether the unit loses its next action. */
+  panicked: boolean
+  /** Alien turns until the unit's recurring ability is ready: a psion's panic, a boss's spawn. */
+  cooldown: number
 }
 
 /** A group of aliens. It patrols toward its waypoint, unseen, until a soldier sights a member; then it fights. */
@@ -140,6 +162,8 @@ export interface Battle {
   north: Edge[]
   west: Edge[]
   pods: Pod[]
+  /** Tiles of acid, each with the alien turns it has left. */
+  acid: { x: number; y: number; turns: number }[]
   /** Centres of the landing zones on offer in the deploy phase. */
   zones: Tile[]
   /** Soldiers not yet landed. */
@@ -201,7 +225,7 @@ export function revealed(battle: Battle, unit: Unit): boolean {
 }
 
 /** The `count` free tiles nearest `centre` by walking, nearest first. */
-function freeTilesNear(battle: Battle, centre: Tile, count: number): Tile[] {
+export function freeTilesNear(battle: Battle, centre: Tile, count: number): Tile[] {
   const found: Tile[] = []
   const seen = new Set([centre.y * GRID + centre.x])
   const queue = [centre]
@@ -246,7 +270,7 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 export function land(battle: Battle, zone: Tile): void {
   const tiles = freeTilesNear(battle, zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
-    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, pod: null, spent: [], burning: 0, boss: false, ...soldier })
+    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, pod: null, spent: [], burning: 0, kind: null, boss: false, panicked: false, cooldown: 0, ...soldier })
   })
   battle.reserve = []
   battle.phase = 'battle'
@@ -280,6 +304,26 @@ function sealPockets(battle: Battle): void {
   })
 }
 
+/** A new alien unit on a tile, in a pod. */
+export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number): Unit {
+  return {
+    id: battle.nextId++,
+    side: 'alien',
+    ...tile,
+    hp: alien.stats.hp,
+    ...alien,
+    soldier: null,
+    pod,
+    ability: null,
+    charges: 0,
+    effects: [],
+    spent: [],
+    burning: 0,
+    panicked: false,
+    cooldown: alien.boss ? SPAWN_EVERY : 0,
+  }
+}
+
 /** A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. */
 export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[]): Battle {
   const holder = { rng: seed }
@@ -297,6 +341,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     ...terrain,
     cover: terrain.props.map((prop) => PROP_COVER[prop]),
     pods: [],
+    acid: [],
     zones: [],
     reserve,
   }
@@ -310,7 +355,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     centres.push(centre)
     const members = aliens.filter((_, i) => i % podCount === pod)
     freeTilesNear(battle, centre, members.length).forEach((tile, i) => {
-      battle.units.push({ id: battle.nextId++, side: 'alien', ...tile, hp: members[i].stats.hp, ...members[i], soldier: null, pod: battle.pods.length, ability: null, charges: 0, stance: 'balanced', effects: [], spent: [], burning: 0 })
+      battle.units.push(alienUnit(battle, members[i], tile, battle.pods.length))
     })
     battle.pods.push({ revealed: false, surprised: false, waypoint: randomTile(battle) })
   }
