@@ -4,7 +4,7 @@ import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { EFFECTS } from '../core/gear'
 import type { GameEvent } from '../core/combat'
-import { rank, type Run } from '../core/run'
+import { level, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
 import type { Edge, Ground, Prop } from '../core/terrain'
 
@@ -254,7 +254,7 @@ export async function createView(): Promise<View> {
     return [unit?.hp ?? 0, unit?.armor ?? 0]
   }
 
-  /** `pips` marks a soldier's rank above the health pips; `letter` is the initial of its class. */
+  /** `pips` marks a soldier's level above the health pips; `letter` is the initial of its class. */
   function create(unit: Unit, pips: number, letter = ''): Sprite {
     const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(unit.boss ? COLOR.boss : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human)
     const rows = Math.ceil((unit.stats.hp + unit.stats.armor) / 10)
@@ -409,7 +409,7 @@ export async function createView(): Promise<View> {
     for (const id of [...sprites.keys()]) if (!live.has(id)) remove(id)
     for (const unit of visible) {
       const soldier = run.soldiers.find((s) => s.id === unit.soldier)
-      const sprite = sprites.get(unit.id) ?? create(unit, soldier ? rank(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : unit.kind && !unit.boss ? ALIENS[unit.kind].name[0] : '')
+      const sprite = sprites.get(unit.id) ?? create(unit, soldier ? level(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : unit.kind && !unit.boss ? ALIENS[unit.kind].name[0] : '')
       place(sprite, { x: unit.x, y: unit.y })
       sprite.node.alpha = 1
       drawHp(sprite, unit.hp, unit.armor)
@@ -499,7 +499,8 @@ export async function createView(): Promise<View> {
 
   /** What a gear effect did to a unit, in a word: the effect's name, and the health it gave or took. */
   function effectCallout(e: Extract<GameEvent, { type: 'effect' }>, over: Sprite): Text {
-    const word = EFFECTS[e.effect].prefix.replace(/'s$/, '').toUpperCase()
+    // A gear effect is called by the word it adds to the gear's name; any other, by its own name.
+    const word = (e.effect in EFFECTS ? EFFECTS[e.effect as keyof typeof EFFECTS].prefix.replace(/'s$/, '') : e.effect).toUpperCase()
     return callout(e.amount === 0 ? word : `${word} ${e.amount > 0 ? '+' : ''}${e.amount}`, e.amount > 0 ? COLOR.heal : e.amount < 0 ? COLOR.crit : COLOR.hit, over)
   }
 

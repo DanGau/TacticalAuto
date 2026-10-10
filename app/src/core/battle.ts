@@ -47,6 +47,22 @@ export const PSI_COOLDOWN = 3
 export const PSI_BACKLASH = 2
 /** Alien turns between the swarmlings a boss spawns. */
 export const SPAWN_EVERY = 2
+/** What skills and relics are worth. Each name says the effect; skills.ts and relics.ts say what the effect does. */
+export const BACKSTAB_DAMAGE = 2
+export const RAGE_DAMAGE = 2
+export const DODGE_CHANCE = 0.25
+export const SUPPRESS_AIM = 0.25
+export const AURA_REACH = 2
+export const BULWARK_DEFENSE = 0.1
+export const INSPIRE_AIM = 0.1
+export const HEADSHOT_DAMAGE = 2
+export const MARK_DAMAGE = 1
+export const REVIVE_REACH = 3
+export const REVIVE_HEALTH = 3
+export const BARRIER_ARMOR = 2
+export const SURGEON_HEAL = 3
+export const FEAST_HEAL = 2
+export const PHOENIX_HEALTH = 5
 /** Landing zones offered to the squad. */
 export const ZONES = 3
 /** Tiles around a landing zone's centre that count as the zone. */
@@ -80,8 +96,31 @@ export const BASE_STATS: Stats = { hp: 10, armor: 0, aim: 0.75, damage: 3, range
 /** Something a unit does unprompted beyond moving and shooting; each is described where combat applies it. */
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic'
 
-/** Something a unit's gear does; gear.ts says what each does and combat applies it. */
-export type Effect = 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'thorns' | 'shield' | 'regen' | 'lastStand' | 'medkit' | 'grenade'
+/** Something a piece of gear does; gear.ts says what each does. */
+export type GearEffect = 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'thorns' | 'shield' | 'regen' | 'lastStand' | 'medkit' | 'grenade'
+/** Something a skill does; skills.ts says what each does. */
+export type SkillEffect =
+  | 'frenzy'
+  | 'backstab'
+  | 'rage'
+  | 'dodge'
+  | 'shred'
+  | 'suppress'
+  | 'bulwark'
+  | 'overwatch'
+  | 'steady'
+  | 'headshot'
+  | 'mark'
+  | 'doubleTap'
+  | 'pierce'
+  | 'revive'
+  | 'inspire'
+  | 'barrier'
+  | 'surgeon'
+/** Something a relic does; relics.ts says what each does. */
+export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix'
+/** Anything a unit's gear, skills or the squad's relics do. Combat applies them. */
+export type Effect = GearEffect | SkillEffect | RelicEffect
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
@@ -136,6 +175,12 @@ export interface Unit {
   spawns: boolean
   /** Whether the unit loses its next action. */
   panicked: boolean
+  /** Whether the unit has moved this turn. */
+  moved: boolean
+  /** Own turns for which its aim is suppressed. */
+  suppressed: number
+  /** Whether every hit on it does 1 more damage. */
+  marked: boolean
   /** Alien turns until the unit's recurring ability is ready: a psion's panic, a spawner's spawn. */
   cooldown: number
 }
@@ -174,6 +219,8 @@ export interface Battle {
   north: Edge[]
   west: Edge[]
   pods: Pod[]
+  /** Once-per-battle effects of the whole squad already used. */
+  used: Effect[]
   /** True from the landing until the first pod is sighted. That pod is ambushed. */
   concealed: boolean
   /** Tiles of acid, each with the alien turns it has left. */
@@ -284,10 +331,15 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 export function land(battle: Battle, zone: Tile): void {
   const tiles = freeTilesNear(battle, zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
-    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, kind: null, boss: false, spawns: false, panicked: false, cooldown: 0, ...soldier })
+    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, kind: null, boss: false, spawns: false, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
   })
   battle.reserve = []
   battle.phase = 'battle'
+  // A barrier projector armors every squadmate of its carrier.
+  const squad = battle.units.filter((u) => u.side === 'human')
+  for (const carrier of squad.filter((u) => u.effects.includes('barrier'))) {
+    for (const mate of squad) if (mate !== carrier) mate.armor += BARRIER_ARMOR
+  }
 }
 
 /** Fills every open tile outside the largest walkable area with stacks, so any open tile can reach any other. */
@@ -335,6 +387,9 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     spent: [],
     burning: 0,
     panicked: false,
+    moved: false,
+    suppressed: 0,
+    marked: false,
     cooldown: alien.spawns ? SPAWN_EVERY : 0,
   }
 }
@@ -356,6 +411,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     ...terrain,
     cover: terrain.props.map((prop) => PROP_COVER[prop]),
     pods: [],
+    used: [],
     concealed: true,
     acid: [],
     zones: [],

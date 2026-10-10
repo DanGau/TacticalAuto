@@ -1,4 +1,4 @@
-import type { Effect, Stats } from './battle'
+import type { GearEffect, Stats } from './battle'
 import type { Rarity } from './base'
 import { randomInt } from './rng'
 
@@ -16,7 +16,7 @@ export interface Gear {
   name: string
   /** Added to the stats of the soldier it is equipped to. */
   stats: Partial<Stats>
-  effect: Effect | null
+  effect: GearEffect | null
 }
 
 /** A stat mod and the word it adds to a name. Some trade one stat for another. */
@@ -53,7 +53,7 @@ const MODS: Record<Slot, Mod[]> = {
 }
 
 /** Each effect: the slot it appears on, the word it adds to a name, and what it does. Combat applies them. */
-export const EFFECTS: Record<Effect, { slot: Slot; prefix: string; text: string }> = {
+export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: string }> = {
   incendiary: { slot: 'weapon', prefix: 'Scorching', text: 'Hits set the target burning: 1 damage at the start of its next 2 turns' },
   piercing: { slot: 'weapon', prefix: 'Piercing', text: "Ignores the target's cover" },
   vampiric: { slot: 'weapon', prefix: 'Leeching', text: 'Each hit heals the shooter 1' },
@@ -73,7 +73,7 @@ export function generateGear(rng: { rng: number }, id: number, rarity: Rarity): 
   const slot = pick([...SLOTS])
   const mods = [pick(MODS[slot])]
   if (rarity === 'epic') mods.push(pick(MODS[slot].filter((mod) => mod !== mods[0])))
-  const effects = (Object.keys(EFFECTS) as Effect[]).filter((effect) => EFFECTS[effect].slot === slot)
+  const effects = (Object.keys(EFFECTS) as GearEffect[]).filter((effect) => EFFECTS[effect].slot === slot)
   const effect = rarity === 'common' ? null : pick(effects)
   const stats: Partial<Stats> = {}
   for (const mod of mods) {

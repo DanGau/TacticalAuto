@@ -4,6 +4,8 @@
 
 **Story.** Aliens invade Earth. The player commands the humans defending it.
 
+**Tone.** Science fantasy more than XCOM's grit: cloned super soldiers, powers and alien artifacts are welcome; magic by that name is not.
+
 **Loop.** Roguelike. A won run saves the world; then more aliens arrive and the next run begins.
 
 **Battle.** A square grid larger than the screen; the camera follows the action. The player's only decision is which of three landing zones the squad drops into, chosen for its cover and its distance from the aliens. The battle then plays out in alternating turns, humans first. In a turn every unit of the side moves at once, then each shoots, one after another. Unit AI is predictable, so the player can foresee what a landing will do.
@@ -41,7 +43,9 @@
 **Progression.**
 
 - Base: won battles and supply drops pay supplies. The player spends supplies on facilities from a fixed list, each with several levels.
-- Aid: after a won battle the survivors offer three aid cards of differing rarity; the player takes one. Aid is a windfall, not a plan: supplies, training, threat relief, alien tech.
-- Squad: the run begins with one clone. Each satellite won adds another, to four for the final mission; a new clone arrives at the rank of the squad's lowest. A soldier who falls in battle is cloned anew, with rank, class and gear intact, so the player keeps investing in the same few soldiers. Only soldiers still standing at a battle's end gain experience. Every clone has one of four classes, drawn at random, after XCOM's: Assault, Heavy, Sniper, Support. A class is a set of stat changes; a way of positioning, such as a Sniper keeping aliens at its rifle's full range; and one ability the soldier uses unprompted. An ability either replaces the soldier's shot, as a Heavy's rocket does, or comes on top of it, as a Support's heal does.
+- Aid: after a won battle the survivors offer three aid cards of differing rarity; the player takes one. Aid is a windfall, not a plan: supplies, training, threat relief.
+- Squad: the run begins with one clone. Each satellite won adds another, to four for the final mission; a new clone arrives at the level of the squad's lowest. A soldier who falls in battle is cloned anew, with level, class, skills and gear intact, so the player keeps investing in the same few soldiers. Only soldiers still standing at a battle's end gain experience. Every clone has one of four classes, drawn at random, after XCOM's: Assault, Heavy, Sniper, Support. A class is a set of stat changes; a way of positioning, such as a Sniper keeping aliens at its rifle's full range; and one ability the soldier uses unprompted. An ability either replaces the soldier's shot, as a Heavy's rocket does, or comes on top of it, as a Support's heal does.
+- Levels and skills: levels never stop; each takes one more battle than the last. At each level the soldier is offered three skills drawn from its class's own, and learns one, so two soldiers of a class differ from run to run. Skills borrow from tabletop role-playing: a reaction shot on the enemy's turn, rolling twice to hit, bonus damage on an exposed target, auras that help squadmates nearby, marking a target, getting a fallen squadmate up.
+- Relics: winning a satellite or a last stand offers three relics, and the squad keeps one for the run. A relic changes every soldier or how the run pays, as Slay the Spire's do, so each run is built around what it found.
 - Gear: won battles and caches drop gear, with no choice. Each is built from parts, as Borderlands builds guns: a base, one or two stat mods, some of which trade one stat for another, and on rare and epic gear one effect, such as setting targets burning or absorbing the first hit. A soldier has three slots: weapon, armor, utility. The base owns the gear, so it survives a death; it is equipped in the Barracks by clicking a slot and then the gear.
 - Death: should reward the player in a way the fiction supports. Undecided.

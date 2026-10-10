@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { ALIENS, alienStats, muster, PACKS, type AlienKind } from './aliens'
 import { apply } from './apply'
-import { ACID_DAMAGE, alienUnit, AMBUSH_AIM, BURST_DAMAGE, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, type Battle, type Unit } from './battle'
+import { ACID_DAMAGE, alienUnit, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, type Battle, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { createRun } from './run'
 
@@ -156,4 +156,43 @@ test("the first pod a concealed squad sights is ambushed: it does not move to co
   expect(battle.pods[0].ambushed).toBe(true)
   until((all) => all.some((e) => e.type === 'shot' && e.id === aliens[0].id) || all.some((e) => e.type === 'move' && e.id === aliens[0].id))
   expect(battle.pods[0].ambushed).toBe(false)
+})
+
+test('backstab adds damage against a target with no cover; shredder destroys armor before the damage lands', () => {
+  for (const [effect, expected] of [['backstab', 3 + BACKSTAB_DAMAGE], ['shred', 3 + 2]] as const) {
+    const { soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
+    soldier.effects = [effect]
+    soldier.stats = { ...soldier.stats, move: 0 }
+    aliens[0].stats = { ...aliens[0].stats, move: 0 }
+    aliens[0].armor = 2
+    until((all) => all.some((e) => e.type === 'shot' && e.id === soldier.id))
+    // Armor takes the first two points unless it is shredded.
+    expect(aliens[0].stats.hp - aliens[0].hp + (2 - aliens[0].armor)).toBe(expected)
+  }
+})
+
+test('a soldier on overwatch shoots an alien that moves in its sights on the alien turn', () => {
+  const { soldier, aliens, until } = arena([{ kind: 'swarmling', x: 10, y: 22 }])
+  soldier.effects = ['overwatch']
+  soldier.stats = { ...soldier.stats, move: 0, range: 4 }
+  aliens[0].hp = aliens[0].stats.hp = 99
+  const events = until((all) => all.some((e) => e.type === 'shot' && e.id === soldier.id))
+  const shot = events.findIndex((e) => e.type === 'shot' && e.id === soldier.id)
+  // The shot comes in the beat the alien moved, not in the soldier's own turn.
+  expect(events[shot - 1]).toMatchObject({ type: 'move', id: aliens[0].id })
+})
+
+test('revive gets a fallen squadmate back up, once', () => {
+  const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
+  const medic: Unit = { ...structuredClone(soldier), id: 900, x: 11, y: 10, effects: ['revive'] }
+  battle.units.push(medic)
+  for (const unit of [soldier, medic]) unit.stats = { ...unit.stats, move: 0, range: 0 }
+  soldier.hp = 1
+  medic.hp = 500
+  aliens[0].stats = { ...aliens[0].stats, move: 0, aim: 2, crit: 0 }
+  const events = until((all) => all.some((e) => e.type === 'effect' && e.effect === 'revive'))
+  expect(events).toContainEqual({ type: 'effect', id: soldier.id, effect: 'revive', amount: REVIVE_HEALTH })
+  expect(battle.units).toContain(soldier)
+  until((all) => all.some((e) => e.type === 'death' && e.id === soldier.id))
+  expect(battle.units).not.toContain(soldier)
 })

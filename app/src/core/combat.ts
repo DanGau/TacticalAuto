@@ -5,6 +5,20 @@ import {
   alienUnit,
   AMBUSH_AIM,
   AMBUSH_CRIT,
+  AURA_REACH,
+  BACKSTAB_DAMAGE,
+  BULWARK_DEFENSE,
+  DODGE_CHANCE,
+  FEAST_HEAL,
+  HEADSHOT_DAMAGE,
+  INSPIRE_AIM,
+  MARK_DAMAGE,
+  PHOENIX_HEALTH,
+  RAGE_DAMAGE,
+  REVIVE_HEALTH,
+  REVIVE_REACH,
+  SUPPRESS_AIM,
+  SURGEON_HEAL,
   blocked,
   BLAST_RADIUS,
   BURST_DAMAGE,
@@ -340,6 +354,7 @@ function walk(unit: Unit, path: Tile[], events: GameEvent[]): void {
   if (!end) return
   unit.x = end.x
   unit.y = end.y
+  unit.moved = true
   events.push({ type: 'move', id: unit.id, path })
 }
 
@@ -375,6 +390,12 @@ function upkeep(battle: Battle): GameEvent[] {
   for (const unit of battle.units.filter((u) => u.side === battle.turn)) {
     // An explosion earlier in this upkeep may have killed it.
     if (unit.hp <= 0) continue
+    unit.moved = false
+    if (unit.suppressed > 0) unit.suppressed--
+    if (has(unit, 'rearm') && unit.armor < unit.stats.armor) {
+      unit.armor++
+      events.push({ type: 'effect', id: unit.id, effect: 'rearm', amount: 0 })
+    }
     if (battle.acid.some((pool) => pool.x === unit.x && pool.y === unit.y)) {
       events.push({ type: 'hurt', id: unit.id, amount: ACID_DAMAGE, cause: 'acid' })
       wound(battle, unit, ACID_DAMAGE, events)
@@ -420,6 +441,9 @@ function moveSide(battle: Battle): GameEvent[] {
     if (unit.side !== battle.turn) continue
     walk(unit, revealed(battle, unit) ? fightPath(battle, unit) : patrolPath(battle, unit), events)
   }
+  const sighted = sight(battle)
+  // Soldiers on overwatch fire once the aliens have moved and any pod sighted has taken its place.
+  if (battle.turn === 'alien') sighted.push(...overwatch(battle, [...events, ...sighted].flatMap((e) => (e.type === 'move' ? [e.id] : []))))
   // A patrolling pod that could not move, hemmed in by others, tries for somewhere else next turn.
   if (battle.turn === 'alien') {
     battle.pods.forEach((pod, index) => {
@@ -428,7 +452,7 @@ function moveSide(battle: Battle): GameEvent[] {
       if (!pod.revealed && members.length > 0 && !moved) pod.waypoint = { x: randomInt(battle, GRID), y: randomInt(battle, GRID) }
     })
   }
-  return [...events, ...sight(battle)]
+  return [...events, ...sighted]
 }
 
 /**
@@ -441,6 +465,16 @@ function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[]
   target.armor -= absorbed
   target.hp -= damage - absorbed
   if (target.hp > 0) return
+  // A soldier who would fall may be got back up: by a squadmate's revive, or once by the squad's phoenix protocol.
+  const reviver = battle.units.find((u) => u.side === target.side && u !== target && u.hp > 0 && distance(u, target) <= REVIVE_REACH && has(u, 'revive') && !u.spent.includes('revive'))
+  const rises = reviver ? 'revive' : has(target, 'phoenix') && !battle.used.includes('phoenix') ? 'phoenix' : null
+  if (rises) {
+    if (reviver) reviver.spent.push('revive')
+    else battle.used.push('phoenix')
+    target.hp = rises === 'revive' ? REVIVE_HEALTH : PHOENIX_HEALTH
+    events.push({ type: 'effect', id: target.id, effect: rises, amount: target.hp })
+    return
+  }
   battle.units = battle.units.filter((u) => u !== target)
   events.push({ type: 'death', id: target.id })
   if (target.kind === 'burster') {
@@ -507,7 +541,7 @@ function heal(battle: Battle, unit: Unit): GameEvent[] {
     .filter((u) => u.side === unit.side && u !== unit && u.hp <= u.stats.hp / 2 && distance(unit, u) <= MEDIC_REACH)
     .reduce<Unit | undefined>((worst, u) => (!worst || u.hp < worst.hp ? u : worst), undefined)
   if (!wounded) return []
-  const amount = Math.min(MEDIC_HEAL, wounded.stats.hp - wounded.hp)
+  const amount = Math.min(MEDIC_HEAL + (has(unit, 'surgeon') ? SURGEON_HEAL : 0), wounded.stats.hp - wounded.hp)
   wounded.hp += amount
   return [{ type: 'heal', id: unit.id, target: wounded.id, amount }]
 }
@@ -535,14 +569,21 @@ function blast(battle: Battle, unit: Unit, seen: Set<number>, damage: number): G
   return events
 }
 
+/** Whether a squadmate of `unit` with the aura `effect` stands within its reach. */
+function inAura(battle: Battle, unit: Unit, effect: Effect): boolean {
+  return battle.units.some((u) => u.side === unit.side && u !== unit && has(u, effect) && distance(u, unit) <= AURA_REACH)
+}
+
 /**
  * A shot at the enemy the unit can shoot and is likeliest to hit; the nearest, then the lowest id, wins a tie.
- * Gear effects of both units apply. `chained` marks the extra shot a kill grants, which grants no further one.
+ * With `only`, the shot is at that enemy or not at all. The effects of both units' gear and skills, and of relics,
+ * apply. `extra` marks a shot granted by another shot, which grants no further one.
  */
-function shoot(battle: Battle, unit: Unit, seen: Set<number>, chained = false): GameEvent[] {
-  const chanceAt = (target: Unit) => odds(battle, unit, target, unit.stats, has(unit, 'piercing'))
+function shoot(battle: Battle, unit: Unit, seen: Set<number>, extra = false, only?: Unit): GameEvent[] {
+  const piercing = has(unit, 'piercing') || has(unit, 'pierce')
+  const chanceAt = (target: Unit) => odds(battle, unit, target, unit.stats, piercing)
   let enemy: Unit | undefined
-  for (const other of battle.units) {
+  for (const other of only ? [only] : battle.units) {
     if (other.side === unit.side || !shootable(battle, unit, unit, other, seen)) continue
     const gain = enemy ? chanceAt(other).hit - chanceAt(enemy).hit : 1
     if (gain > 0 || (gain === 0 && distance(unit, other) < distance(unit, enemy!))) enemy = other
@@ -550,37 +591,81 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, chained = false): 
   if (!enemy) return []
   const chance = chanceAt(enemy)
   const ambushed = enemy.pod !== null && battle.pods[enemy.pod].ambushed
-  const hit = random(battle) < chance.hit + (ambushed ? AMBUSH_AIM : 0)
-  const crit = hit && random(battle) < chance.crit + (ambushed ? AMBUSH_CRIT : 0)
+  const toHit =
+    chance.hit +
+    (ambushed ? AMBUSH_AIM : 0) +
+    (inAura(battle, unit, 'inspire') ? INSPIRE_AIM : 0) -
+    (inAura(battle, enemy, 'bulwark') ? BULWARK_DEFENSE : 0) -
+    (unit.suppressed > 0 ? SUPPRESS_AIM : 0)
+  // Steady aim rolls twice and takes the better.
+  const rolls = has(unit, 'steady') && !unit.moved ? 2 : 1
+  let hit = Array.from({ length: rolls }, () => random(battle) < toHit).some(Boolean)
   const events: GameEvent[] = []
-  if (!hit) return [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage: 0 }]
+  if (hit && has(enemy, 'dodge') && random(battle) < DODGE_CHANCE) {
+    hit = false
+    events.push({ type: 'effect', id: enemy.id, effect: 'dodge', amount: 0 })
+  }
+  if (!hit) return [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit: false, damage: 0 }, ...events, ...again(battle, unit, seen, extra, false)]
 
-  const executes = has(unit, 'executioner') && enemy.hp <= enemy.stats.hp / 2
-  let damage = unit.stats.damage + (crit ? CRIT_BONUS : 0) + (executes ? EXECUTE_BONUS : 0)
-  const after: GameEvent[] = []
+  const crit = spend(unit, 'opener') || random(battle) < chance.crit + (ambushed ? AMBUSH_CRIT : 0)
+  const exposed = coverAgainst(battle, enemy, unit) === 0
+  let damage =
+    unit.stats.damage +
+    (crit ? CRIT_BONUS + (has(unit, 'headshot') ? HEADSHOT_DAMAGE : 0) : 0) +
+    (has(unit, 'executioner') && enemy.hp <= enemy.stats.hp / 2 ? EXECUTE_BONUS : 0) +
+    (has(unit, 'backstab') && exposed ? BACKSTAB_DAMAGE : 0) +
+    (has(unit, 'rage') && unit.hp <= unit.stats.hp / 2 ? RAGE_DAMAGE : 0) +
+    (enemy.marked ? MARK_DAMAGE : 0)
+  if (has(unit, 'shred')) enemy.armor = 0
   if (spend(enemy, 'shield')) {
     damage = 0
-    after.push({ type: 'effect', id: enemy.id, effect: 'shield', amount: 0 })
+    events.push({ type: 'effect', id: enemy.id, effect: 'shield', amount: 0 })
   } else if (damage >= enemy.hp + enemy.armor && spend(enemy, 'lastStand')) {
     damage = enemy.hp + enemy.armor - 1
-    after.push({ type: 'effect', id: enemy.id, effect: 'lastStand', amount: 0 })
+    events.push({ type: 'effect', id: enemy.id, effect: 'lastStand', amount: 0 })
   }
-  events.push({ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage }, ...after)
+  events.unshift({ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage })
   wound(battle, enemy, damage, events)
+  if (enemy.hp > 0 && has(unit, 'mark')) enemy.marked = true
+  if (enemy.hp > 0 && has(unit, 'suppress')) enemy.suppressed = 2
   if (enemy.hp > 0 && damage > 0 && has(unit, 'incendiary')) {
     enemy.burning = BURN_TURNS
     events.push({ type: 'effect', id: enemy.id, effect: 'incendiary', amount: 0 })
   }
-  if (damage > 0 && has(unit, 'vampiric') && unit.hp < unit.stats.hp) {
-    unit.hp++
-    events.push({ type: 'effect', id: unit.id, effect: 'vampiric', amount: 1 })
+  const healing = (damage > 0 && has(unit, 'vampiric') ? 1 : 0) + (enemy.hp <= 0 && has(unit, 'feast') ? FEAST_HEAL : 0)
+  const healed = Math.min(healing, unit.stats.hp - unit.hp)
+  if (healed > 0) {
+    unit.hp += healed
+    events.push({ type: 'effect', id: unit.id, effect: enemy.hp <= 0 && has(unit, 'feast') ? 'feast' : 'vampiric', amount: healed })
   }
   if (has(enemy, 'thorns')) {
     events.push({ type: 'effect', id: unit.id, effect: 'thorns', amount: -1 })
     wound(battle, unit, 1, events)
   }
   if (enemy.kind === 'brute' && enemy.hp > 0 && unit.hp > 0) charge(battle, enemy, unit, events)
-  if (enemy.hp <= 0 && unit.hp > 0 && has(unit, 'chain') && !chained) events.push(...shoot(battle, unit, seen, true))
+  return [...events, ...again(battle, unit, seen, extra, enemy.hp <= 0)]
+}
+
+/** The one more shot a shot may grant: after a kill, to a soldier with frenzy or a frenzied weapon; after any shot, to one with double tap who did not move. */
+function again(battle: Battle, unit: Unit, seen: Set<number>, extra: boolean, killed: boolean): GameEvent[] {
+  if (extra || unit.hp <= 0) return []
+  const earned = (killed && (has(unit, 'chain') || has(unit, 'frenzy'))) || (has(unit, 'doubleTap') && !unit.moved)
+  return earned ? shoot(battle, unit, seen, true) : []
+}
+
+/** Overwatch: each soldier with it shoots at the first alien that moved this turn and that it can now shoot. */
+function overwatch(battle: Battle, moved: number[]): GameEvent[] {
+  const events: GameEvent[] = []
+  for (const unit of battle.units.filter((u) => u.side === 'human' && has(u, 'overwatch'))) {
+    const seen = spotted(battle)
+    for (const id of moved) {
+      const alien = battle.units.find((u) => u.id === id && revealed(battle, u))
+      const shot = alien && unit.hp > 0 ? shoot(battle, unit, seen, true, alien) : []
+      if (shot.length === 0) continue
+      events.push(...shot)
+      break
+    }
+  }
   return events
 }
 

@@ -53,13 +53,18 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
 }
 
+/** Hit chance each step of an alien's weapon adds. */
+export const WEAPON_AIM = 0.05
+
 /**
- * An alien's stats: its kind's, with the equipment given. A kind's health and aim are the same all game; what grows
- * is its armor, which shows as armor pips, and its weapon, which adds damage. A burster has no weapon to improve.
+ * An alien's stats: its kind's, with the equipment given. A kind's health is the same all game; what grows is its
+ * armor, which shows as armor pips, and its weapon, each step of which adds a point of damage and some aim.
+ * A burster has no weapon to improve.
  */
 export function alienStats(kind: AlienKind, armor: number, weapon: number): Stats {
   const stats = { ...BASE_STATS, ...ALIENS[kind].stats }
-  return { ...stats, hp: Math.max(1, Math.round(BASE_STATS.hp * ALIENS[kind].hp)), armor, damage: stats.damage + (kind === 'burster' ? 0 : weapon) }
+  const armed = kind === 'burster' ? 0 : weapon
+  return { ...stats, hp: Math.max(1, Math.round(BASE_STATS.hp * ALIENS[kind].hp)), armor, damage: stats.damage + armed, aim: stats.aim + WEAPON_AIM * armed }
 }
 
 /** A themed group of aliens that roams and fights as one pod. */

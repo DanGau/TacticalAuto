@@ -3,6 +3,8 @@ import { ALIENS, alienStats, muster } from './aliens'
 import { BASE_STATS, createBattle, type Alien, type Battle, type Stats } from './battle'
 import { CLASSES, type ClassId } from './classes'
 import { generateGear, SLOTS, type Gear, type Slot } from './gear'
+import { RELIC_OFFERS, RELICS, type Relic, type RelicId } from './relics'
+import { CLASS_SKILLS, SKILL_OFFERS, SKILLS, type SkillId } from './skills'
 import { ZONE_TERRAINS, type TerrainKind } from './terrain'
 import { random, randomInt } from './rng'
 
@@ -16,17 +18,14 @@ export const THREAT_MAX = 6
 export const STOP_THREAT = 1
 export const LOSS_THREAT = 1
 /** The alien force a battle has in each leg, before its risk and kind are counted; the squad grows by one clone a leg. */
-export const LEG_FORCE = [1, 3, 6, 10]
+export const LEG_FORCE = [1, 4, 9, 15]
 export const OFFERS = 3
 export const START_SUPPLIES = 3
 /** Supplies a supply drop gives. */
 export const DROP_SUPPLIES = 4
 
-/** Experience needed for each rank; a soldier earns one per battle survived. */
-export const RANK_XP = [0, 1, 3, 6, 10]
-export const RANK_NAMES = ['Rookie', 'Squaddie', 'Corporal', 'Sergeant', 'Captain']
-/** What each rank adds to a soldier's stats. */
-export const RANK_STATS: Partial<Stats> = { hp: 1, aim: 0.03 }
+/** What each level adds to a soldier's stats. */
+export const LEVEL_STATS: Partial<Stats> = { hp: 1, aim: 0.02 }
 
 const NAMES = ['Vega', 'Okafor', 'Lindqvist', 'Tanaka', 'Reyes', 'Novak', 'Haddad', 'Brandt', 'Silva', 'Kowalski', 'Mbeki', 'Dufour', 'Ivanov', 'Castillo', 'Ng', 'Shaw']
 
@@ -67,8 +66,13 @@ export interface Soldier {
   id: number
   name: string
   xp: number
-  /** Null for a rookie; drawn at random on first promotion. */
+  /** Drawn at random when the clone is made. */
   cls: ClassId | null
+  skills: SkillId[]
+  /** Skills still to choose, one for each level gained. */
+  picks: number
+  /** The skills to choose the next from; empty with none to choose. */
+  offers: SkillId[]
   /** The id of the gear in each slot. */
   gear: Record<Slot, number | null>
 }
@@ -125,26 +129,59 @@ export interface Run {
   aid: AidId[]
   /** Aid to choose from in the reward phase. */
   offers: AidId[]
+  relics: RelicId[]
+  /** Relics to choose from in the reward phase, before the aid. */
+  relicOffers: RelicId[]
 }
 
-export function rank(soldier: { xp: number }): number {
-  return RANK_XP.findLastIndex((xp) => soldier.xp >= xp)
+/** Experience a soldier needs for a level; each level takes one more battle than the last, without end. */
+export function xpFor(level: number): number {
+  return (level * (level + 1)) / 2
 }
 
-/** The sum of one lasting effect over every facility level built and aid taken. */
+/** A soldier's level, from experience; a soldier earns one experience per battle survived. */
+export function level(soldier: { xp: number }): number {
+  return Math.floor((Math.sqrt(8 * soldier.xp + 1) - 1) / 2)
+}
+
+/** The sum of one lasting effect over every facility level built and relic held. */
 function total(run: Run, effect: (source: Lasting) => number | undefined): number {
-  const sources: Lasting[] = [...run.built.map((id) => FACILITIES[id]), ...run.aid.map((id) => AID[id])]
+  const sources: Lasting[] = [...run.built.map((id) => FACILITIES[id]), ...run.relics.map((id): Relic => RELICS[id])]
   return sources.reduce((sum, source) => sum + (effect(source) ?? 0), 0)
 }
 
-export function level(run: Run, id: FacilityId): number {
+/** Draws the skills a soldier chooses the next from: up to SKILL_OFFERS of its class's that it lacks. */
+function offerSkills(run: Run, soldier: Soldier): void {
+  const pool = CLASS_SKILLS[soldier.cls!].filter((id) => !soldier.skills.includes(id))
+  soldier.offers = []
+  while (soldier.offers.length < SKILL_OFFERS && pool.length > 0) soldier.offers.push(...pool.splice(randomInt(run, pool.length), 1))
+  if (soldier.offers.length === 0) soldier.picks = 0
+}
+
+/** Gives a soldier experience, and a skill to choose for each level it gains. */
+function gainXp(run: Run, soldier: Soldier, xp: number): void {
+  const before = level(soldier)
+  soldier.xp += xp
+  soldier.picks += level(soldier) - before
+  if (soldier.picks > 0 && soldier.offers.length === 0) offerSkills(run, soldier)
+}
+
+/** Learns the offered skill at `index`, and offers the next if more are owed. */
+export function takeSkill(run: Run, soldier: Soldier, index: number): void {
+  soldier.skills.push(soldier.offers[index])
+  soldier.picks--
+  soldier.offers = []
+  if (soldier.picks > 0) offerSkills(run, soldier)
+}
+
+export function built(run: Run, id: FacilityId): number {
   return run.built.filter((b) => b === id).length
 }
 
 /** Supplies the facility's next level costs, or null at its maximum. */
 export function buildCost(run: Run, id: FacilityId): number | null {
   const facility = FACILITIES[id]
-  return level(run, id) < facility.max ? facility.cost * (level(run, id) + 1) : null
+  return built(run, id) < facility.max ? facility.cost * (built(run, id) + 1) : null
 }
 
 /** Builds the facility's next level. The caller checks it is affordable. */
@@ -170,36 +207,45 @@ export function equip(run: Run, soldier: Soldier, gear: Gear): void {
   soldier.gear[gear.slot] = gear.id
 }
 
-/** A soldier's stats in battle: base, plus class, plus rank, plus gear, plus facilities and aid. */
+/** Uses of a soldier's class ability each battle: the class's, plus what skills and relics add to an ability that has uses. */
+export function charges(run: Run, soldier: Soldier): number {
+  const base = soldier.cls ? CLASSES[soldier.cls].charges : 0
+  if (base === 0) return 0
+  return base + soldier.skills.reduce((sum, id) => sum + (SKILLS[id].charges ?? 0), 0) + run.relics.reduce((sum, id) => sum + ((RELICS[id] as Relic).charges ?? 0), 0)
+}
+
+/** A soldier's stats in battle: base, plus class, level, skills and gear, plus facilities and relics. */
 export function soldierStats(run: Run, soldier: Soldier): Stats {
   const stats = { ...BASE_STATS }
   for (const key of Object.keys(stats) as (keyof Stats)[]) {
     const fromClass = soldier.cls ? (CLASSES[soldier.cls].stats[key] ?? 0) : 0
     const fromGear = equipped(run, soldier).reduce((sum, gear) => sum + (gear.stats[key] ?? 0), 0)
-    stats[key] += fromClass + fromGear + rank(soldier) * (RANK_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
+    const fromSkills = soldier.skills.reduce((sum, id) => sum + (SKILLS[id].stats?.[key] ?? 0), 0)
+    stats[key] += fromClass + fromGear + fromSkills + level(soldier) * (LEVEL_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
   }
   return stats
 }
 
-/** Gives every soldier still without a class one at random. Every clone is trained, so every soldier has one. */
-function assignClasses(run: Run): void {
-  const ids = Object.keys(CLASSES) as ClassId[]
-  for (const soldier of run.soldiers) {
-    if (soldier.cls === null) soldier.cls = ids[randomInt(run, ids.length)]
-  }
-}
-
 /**
- * Adds a clone to the squad and returns it. It arrives a Squaddie, or at the rank of the squad's lowest if that is
- * higher, plus what the academy adds, so a late arrival is not left behind.
+ * Adds a clone to the squad and returns it. It arrives at level 1, or at the level of the squad's lowest if that is
+ * higher, plus what the academy adds, so a late arrival is not left behind; it has a skill to choose for each level.
  */
 function hire(run: Run): Soldier {
-  const lowest = Math.min(...run.soldiers.map(rank), RANK_XP.length - 1)
-  const arrives = Math.min(Math.max(1, run.soldiers.length > 0 ? lowest : 1) + total(run, (u) => u.recruitRank), RANK_XP.length - 1)
+  const lowest = run.soldiers.length > 0 ? Math.min(...run.soldiers.map(level)) : 1
+  const classes = Object.keys(CLASSES) as ClassId[]
   const free = NAMES.filter((name) => !run.soldiers.some((s) => s.name === name))
-  const soldier: Soldier = { id: run.nextSoldier++, name: free[randomInt(run, free.length)], xp: RANK_XP[arrives], cls: null, gear: { weapon: null, armor: null, utility: null } }
+  const soldier: Soldier = {
+    id: run.nextSoldier++,
+    name: free[randomInt(run, free.length)],
+    xp: 0,
+    cls: classes[randomInt(run, classes.length)],
+    skills: [],
+    picks: 0,
+    offers: [],
+    gear: { weapon: null, armor: null, utility: null },
+  }
   run.soldiers.push(soldier)
-  assignClasses(run)
+  gainXp(run, soldier, xpFor(Math.max(1, lowest) + total(run, (u) => u.recruitRank)))
   return soldier
 }
 
@@ -216,14 +262,14 @@ export function missionAt(run: Run, kind: Mission['kind'], risk: Risk): Mission 
 
 /**
  * The aliens of a mission, in pods: packs mustered at random for its force. A kind's health and aim never change;
- * deeper along the road aliens are better equipped: a point of armor each step, a point of damage every third. A key or final mission adds a boss, a trooper built up by the keys
+ * deeper along the road aliens are better equipped: a point of armor each step, a point of damage every second. A key or final mission adds a boss, a trooper built up by the keys
  * already won: each adds health, armor and an escorting trooper; from the second satellite on it hits harder and
  * spawns swarmlings, and from the third it shoots farther.
  */
 function packsOf(run: Run, mission: Mission): { name: string; aliens: Alien[] }[] {
   const tier = depth(run)
   const armor = tier
-  const weapon = Math.floor(tier / 3)
+  const weapon = Math.floor(tier / 2)
   const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, armor, weapon), stance: ALIENS[kind].stance, boss: false, spawns: false })
   const boss = mission.kind === 'key' || mission.kind === 'final'
   const escort = boss ? run.keys : 0
@@ -284,6 +330,8 @@ export function createRun(seed: number): Run {
     built: [],
     aid: [],
     offers: [],
+    relics: [],
+    relicOffers: [],
   }
   hire(run)
   nextStretch(run)
@@ -331,7 +379,7 @@ export function advance(run: Run): void {
     run.threat = Math.min(run.threat + STOP_THREAT, THREAT_MAX)
     const supplies = stop === 'supply' ? DROP_SUPPLIES : 0
     run.supplies += supplies
-    const gear = stop === 'cache' ? [dropGear(run, RISKS[zone.risk].rareGear)] : []
+    const gear = stop === 'cache' ? [dropGear(run, RISKS[zone.risk].rareGear || run.relics.some((id) => (RELICS[id] as Relic).rareGear))] : []
     run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, gear, key: false, soldiers: [], hired: null }
     passStop(run)
     return
@@ -343,9 +391,9 @@ export function advance(run: Run): void {
     soldier: s.id,
     stats: soldierStats(run, s),
     ability: s.cls && CLASSES[s.cls].ability,
-    charges: s.cls ? CLASSES[s.cls].charges : 0,
+    charges: charges(run, s),
     stance: s.cls ? CLASSES[s.cls].stance : ('balanced' as const),
-    effects: equipped(run, s).flatMap((gear) => gear.effect ?? []),
+    effects: [...equipped(run, s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))
   run.battle = createBattle(randomInt(run, 2 ** 31), zone.terrain, packsOf(run, mission), reserve)
 }
@@ -371,7 +419,7 @@ export function endBattle(run: Run): void {
   const mission = run.mission!
   const standing = new Set(battle.units.map((u) => u.soldier))
   const xpBefore = run.soldiers.map((s) => s.xp)
-  for (const s of run.soldiers) if (standing.has(s.id)) s.xp++
+  for (const s of run.soldiers) if (standing.has(s.id)) gainXp(run, s, 1)
   const soldiers = run.soldiers.map((s, i) => ({ name: s.name, cls: s.cls, xpBefore: xpBefore[i], xpAfter: s.xp, downed: !standing.has(s.id) }))
 
   const won = battle.winner === 'human'
@@ -380,11 +428,12 @@ export function endBattle(run: Run): void {
   // A last stand won empties the threat; any other battle is a stop, and adds to it.
   if (mission.kind === 'lastStand') run.threat = won ? 0 : run.threat
   else run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT), THREAT_MAX)
-  const supplies = won ? risk.supplies : 0
+  const held = run.relics.map((id): Relic => RELICS[id])
+  const supplies = won ? risk.supplies + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
   run.supplies += supplies
   // A won battle drops gear; a key mission's or a last stand's is rare or better.
   const drops = won && mission.kind !== 'final' ? (mission.kind === 'battle' ? risk.drops : 1) : 0
-  const gear = Array.from({ length: drops }, () => dropGear(run, risk.rareGear || mission.kind !== 'battle'))
+  const gear = Array.from({ length: drops }, () => dropGear(run, risk.rareGear || mission.kind !== 'battle' || held.some((relic) => relic.rareGear)))
   const key = won && mission.kind === 'key'
   // Each key won brings a new clone to the squad.
   const hired = key ? hire(run).name : null
@@ -402,10 +451,21 @@ export function endBattle(run: Run): void {
   if (mission.kind === 'battle' || key) passStop(run)
   if (won) {
     run.offers = drawOffers(run, risk.rareGear)
+    // A satellite or a last stand won also offers relics.
+    if (mission.kind !== 'battle') {
+      const pool = (Object.keys(RELICS) as RelicId[]).filter((id) => !run.relics.includes(id))
+      while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(...pool.splice(randomInt(run, pool.length), 1))
+    }
     run.phase = 'reward'
   } else {
     run.phase = 'overworld'
   }
+}
+
+/** Takes an offered relic. */
+export function takeRelic(run: Run, id: RelicId): void {
+  run.relics.push(id)
+  run.relicOffers = []
 }
 
 /** Takes offered aid, applies what it does at once, and returns to the overworld. */
@@ -415,10 +475,10 @@ export function takeAid(run: Run, id: AidId): void {
   run.offers = []
   run.supplies += aid.supplies ?? 0
   run.threat = Math.max(0, run.threat + (aid.threat ?? 0))
-  for (const soldier of run.soldiers) soldier.xp += aid.xp ?? 0
+  for (const soldier of run.soldiers) gainXp(run, soldier, aid.xp ?? 0)
   if (aid.promote) {
     const lowest = run.soldiers.reduce((low, soldier) => (soldier.xp < low.xp ? soldier : low))
-    lowest.xp = Math.max(lowest.xp, RANK_XP[aid.promote])
+    gainXp(run, lowest, Math.max(0, xpFor(level(lowest) + aid.promote) - lowest.xp))
   }
   run.phase = 'overworld'
 }

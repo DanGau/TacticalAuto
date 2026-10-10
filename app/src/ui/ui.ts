@@ -94,8 +94,10 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
       // Clicking what is open closes it.
       picking = picking?.soldier === pick.soldier && picking.part === pick.part ? null : pick
     } else if (target.dataset.action) {
-      picking = null
-      act(JSON.parse(target.dataset.action))
+      const action: Action = JSON.parse(target.dataset.action)
+      // Choosing a skill keeps the soldier's details open, to show it learned and the next choice if one is owed.
+      if (action.type !== 'skill') picking = null
+      act(action)
       return
     }
     render(shown!)

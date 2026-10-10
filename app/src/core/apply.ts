@@ -1,7 +1,7 @@
 import { land } from './battle'
 import { FACILITIES, type FacilityId } from './base'
 import { SLOTS, type Slot } from './gear'
-import { advance, build, buildCost, enterZone, equip, takeAid, type Run } from './run'
+import { advance, build, buildCost, enterZone, equip, takeAid, takeRelic, takeSkill, type Run } from './run'
 
 export type Action =
   /** Overworld: build the facility's next level. */
@@ -16,6 +16,10 @@ export type Action =
   | { type: 'advance' }
   /** Deploy phase: land the squad on the zone at `zone` of battle.zones and begin the battle. */
   | { type: 'land'; zone: number }
+  /** Overworld: the soldier with id `soldier` learns the skill at `index` of its offers. */
+  | { type: 'skill'; soldier: number; index: number }
+  /** Reward phase: take the relic at `index` of run.relicOffers. It comes before the aid. */
+  | { type: 'relic'; index: number }
   /** Reward phase: take the aid at `index` of run.offers. */
   | { type: 'pick'; index: number }
 
@@ -34,8 +38,16 @@ export function apply(run: Run, action: Action): Result {
     land(battle, zone)
     return ok
   }
+  if (action.type === 'relic') {
+    if (run.phase !== 'reward') return no('not choosing a relic')
+    const id = run.relicOffers[action.index]
+    if (!id) return no('no such relic')
+    takeRelic(run, id)
+    return ok
+  }
   if (action.type === 'pick') {
     if (run.phase !== 'reward') return no('not choosing aid')
+    if (run.relicOffers.length > 0) return no('choose a relic first')
     const id = run.offers[action.index]
     if (!id) return no('no such aid')
     takeAid(run, id)
@@ -63,6 +75,11 @@ export function apply(run: Run, action: Action): Result {
   }
   const soldier = run.soldiers.find((s) => s.id === action.soldier)
   if (!soldier) return no('no such soldier')
+  if (action.type === 'skill') {
+    if (!soldier.offers[action.index]) return no('no such skill on offer')
+    takeSkill(run, soldier, action.index)
+    return ok
+  }
   if (action.type === 'unequip') {
     if (!SLOTS.includes(action.slot) || soldier.gear[action.slot] === null) return no('nothing equipped there')
     soldier.gear[action.slot] = null
