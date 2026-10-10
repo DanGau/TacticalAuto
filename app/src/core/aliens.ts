@@ -12,24 +12,16 @@ export interface AlienType {
   /** Stats it has in place of an alien's base stats. */
   stats: Partial<Stats>
   stance: Stance
-  /** What it costs of a mission's force, and how many arrive for that cost. */
-  cost: number
-  pack: number
-  /** The depth along the road at which it first appears. */
-  from: number
 }
 
 export const ALIENS: Record<AlienKind, AlienType> = {
-  trooper: { name: 'Trooper', text: 'Shoots from cover, as a soldier does', hp: 1, stats: {}, stance: 'balanced', cost: 1, pack: 1, from: 0 },
+  trooper: { name: 'Trooper', text: 'Shoots from cover, as a soldier does', hp: 1, stats: {}, stance: 'balanced' },
   swarmling: {
     name: 'Swarmling',
-    text: 'Weak and fast; attacks only up close, and comes in pairs',
+    text: 'Weak and fast; attacks only up close, and comes in numbers',
     hp: 0.4,
     stats: { range: 1, move: 6, damage: 2, aim: 0.85, close: 0 },
     stance: 'rush',
-    cost: 1,
-    pack: 2,
-    from: 0,
   },
   spitter: {
     name: 'Spitter',
@@ -37,9 +29,6 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     hp: 0.8,
     stats: { range: 6 },
     stance: 'balanced',
-    cost: 1,
-    pack: 1,
-    from: 1,
   },
   burster: {
     name: 'Burster',
@@ -47,9 +36,6 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     hp: 0.6,
     stats: { range: 0, move: 5 },
     stance: 'rush',
-    cost: 1,
-    pack: 1,
-    from: 2,
   },
   brute: {
     name: 'Brute',
@@ -57,9 +43,6 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     hp: 2,
     stats: { range: 1, move: 3, damage: 5, aim: 0.85, close: 0 },
     stance: 'rush',
-    cost: 2,
-    pack: 1,
-    from: 2,
   },
   psion: {
     name: 'Psion',
@@ -67,9 +50,6 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     hp: 0.8,
     stats: { damage: 2 },
     stance: 'standoff',
-    cost: 2,
-    pack: 1,
-    from: 3,
   },
 }
 
@@ -79,16 +59,40 @@ export function alienStats(kind: AlienKind, base: Stats): Stats {
   return { ...base, ...type.stats, hp: Math.max(1, Math.round(base.hp * type.hp)) }
 }
 
-/** The kinds of alien a mission of the given force sends, at the given depth: random picks that the force can pay for. */
-export function muster(rng: { rng: number }, force: number, depth: number): AlienKind[] {
-  const kinds: AlienKind[] = []
-  const open = (Object.keys(ALIENS) as AlienKind[]).filter((kind) => ALIENS[kind].from <= depth)
+/** A themed group of aliens that roams and fights as one pod. */
+export interface Pack {
+  name: string
+  kinds: AlienKind[]
+  /** What it costs of a mission's force. */
+  cost: number
+  /** The depth along the road at which it first appears. */
+  from: number
+}
+
+export const PACKS: Pack[] = [
+  { name: 'Scout', kinds: ['trooper'], cost: 1, from: 0 },
+  { name: 'Patrol', kinds: ['trooper', 'trooper'], cost: 2, from: 0 },
+  { name: 'Swarm', kinds: ['swarmling', 'swarmling', 'swarmling', 'swarmling'], cost: 2, from: 0 },
+  { name: 'Acid team', kinds: ['spitter', 'spitter', 'trooper'], cost: 3, from: 1 },
+  { name: 'Hunting pack', kinds: ['spitter', 'swarmling', 'swarmling'], cost: 2, from: 1 },
+  { name: 'Brood', kinds: ['burster', 'burster', 'swarmling', 'swarmling'], cost: 3, from: 2 },
+  { name: 'Shock troop', kinds: ['brute', 'swarmling', 'swarmling'], cost: 3, from: 2 },
+  { name: 'Siege team', kinds: ['brute', 'spitter'], cost: 3, from: 3 },
+  { name: 'Psi cell', kinds: ['psion', 'trooper', 'trooper'], cost: 4, from: 3 },
+  { name: 'Warband', kinds: ['brute', 'brute', 'burster'], cost: 5, from: 4 },
+]
+
+/** The packs a mission of the given force sends, at the given depth: random picks that the force can pay for. */
+export function muster(rng: { rng: number }, force: number, depth: number): Pack[] {
+  const packs: Pack[] = []
+  const open = PACKS.filter((pack) => pack.from <= depth)
   let left = force
   while (left > 0) {
-    const affordable = open.filter((kind) => ALIENS[kind].cost <= left)
-    const kind = affordable[randomInt(rng, affordable.length)]
-    left -= ALIENS[kind].cost
-    for (let i = 0; i < ALIENS[kind].pack; i++) kinds.push(kind)
+    // A lone scout is the last resort, so a force is mostly themed packs.
+    const affordable = open.filter((pack) => pack.cost <= left && (pack.cost > 1 || left === 1))
+    const pack = affordable[randomInt(rng, affordable.length)]
+    left -= pack.cost
+    packs.push(pack)
   }
-  return kinds
+  return packs
 }

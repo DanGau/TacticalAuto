@@ -1,20 +1,21 @@
 import { expect, test } from 'vitest'
-import { ALIENS, alienStats, muster, type AlienKind } from './aliens'
+import { ALIENS, alienStats, muster, PACKS, type AlienKind } from './aliens'
 import { apply } from './apply'
-import { ACID_DAMAGE, alienUnit, BASE_STATS, BURST_DAMAGE, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, type Battle, type Unit } from './battle'
+import { ACID_DAMAGE, alienUnit, AMBUSH_AIM, BASE_STATS, BURST_DAMAGE, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, type Battle, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { createRun } from './run'
 
-test('a mission musters kinds its depth allows, for exactly its force', () => {
+test('a mission musters packs its depth allows, for exactly its force, and a lone scout only to use up the last of it', () => {
   const rng = { rng: 5 }
   for (let depth = 0; depth < 6; depth++) {
     for (let force = 1; force < 12; force++) {
-      const kinds = muster(rng, force, depth)
-      for (const kind of kinds) expect(ALIENS[kind].from).toBeLessThanOrEqual(depth)
-      const cost = (Object.keys(ALIENS) as AlienKind[]).reduce((sum, kind) => sum + (kinds.filter((k) => k === kind).length / ALIENS[kind].pack) * ALIENS[kind].cost, 0)
-      expect(cost).toBe(force)
+      const packs = muster(rng, force, depth)
+      for (const pack of packs) expect(pack.from).toBeLessThanOrEqual(depth)
+      expect(packs.reduce((sum, pack) => sum + pack.cost, 0)).toBe(force)
+      expect(packs.filter((pack) => pack.cost === 1).length).toBeLessThanOrEqual(1)
     }
   }
+  expect(new Set(PACKS.map((pack) => pack.name)).size).toBe(PACKS.length)
 })
 
 /**
@@ -35,7 +36,8 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   Object.assign(soldier, { x: 10, y: 10, hp: 30, stats: { ...soldier.stats, hp: 30, aim: 2, crit: 0, damage: 3 } })
   const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, BASE_STATS), stance: ALIENS[kind].stance, boss }, { x, y }, 0))
   battle.units = [soldier, ...units]
-  battle.pods = [{ revealed: true, surprised: false, waypoint: { x: 0, y: 0 } }]
+  battle.pods = [{ name: 'Test', revealed: true, ambushed: false, surprised: false, waypoint: { x: 0, y: 0 } }]
+  battle.concealed = false
   const until = (done: (events: GameEvent[]) => boolean) => {
     const all: GameEvent[] = []
     for (let beats = 0; beats < 60; beats++) {
@@ -132,4 +134,26 @@ test('a boss spawns a swarmling every few alien turns', () => {
   expect(aliens[0].cooldown).toBe(SPAWN_EVERY)
   until(has('spawn'))
   expect(battle.units.filter((u) => u.kind === 'swarmling')).toHaveLength(1)
+})
+
+test("the first pod a concealed squad sights is ambushed: it does not move to cover, and is easier to hit until the squad's turn ends", () => {
+  const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
+  battle.concealed = true
+  battle.pods[0].revealed = false
+  // An aim that hits only with the ambush bonus, against an alien that would otherwise walk to cover.
+  soldier.stats = { ...soldier.stats, move: 0, aim: 1 - AMBUSH_AIM, close: 0, range: 3 }
+  aliens[0].hp = aliens[0].stats.hp = 99
+  battle.props[14 * 32 + 10] = 'stack'
+  battle.cover[14 * 32 + 10] = 2
+  soldier.x = 10
+  soldier.y = 4
+  soldier.stats = { ...soldier.stats, move: 6 }
+  const events = until((all) => all.some((e) => e.type === 'shot' && e.id === soldier.id))
+  const reveal = events.find((e) => e.type === 'reveal')
+  expect(reveal).toMatchObject({ ambush: true })
+  expect(events.some((e) => e.type === 'move' && e.id === aliens[0].id)).toBe(false)
+  expect(battle.concealed).toBe(false)
+  expect(battle.pods[0].ambushed).toBe(true)
+  until((all) => all.some((e) => e.type === 'shot' && e.id === aliens[0].id) || all.some((e) => e.type === 'move' && e.id === aliens[0].id))
+  expect(battle.pods[0].ambushed).toBe(false)
 })

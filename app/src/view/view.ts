@@ -50,7 +50,7 @@ const COLOR = {
   contact: 0xff6b5e,
 }
 
-const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x15161a }
+const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x15161a, hive: 0x2a1838 }
 
 /** A box standing on a tile: how much of the tile it covers, how tall it is on screen, and its top colour. */
 interface Box {
@@ -80,6 +80,11 @@ const PROP_BOXES: Record<Exclude<Prop, 'none' | 'tree' | 'car'>, Box[]> = {
     { wide: 0.9, deep: 0.8, base: 0, up: 8, color: 0x6b6f76 },
     { wide: 0.45, deep: 0.5, base: 8, up: 6, color: 0x7c8087 },
   ],
+  spire: [
+    { wide: 0.7, deep: 0.7, base: 0, up: 20, color: 0x7a3fa0 },
+    { wide: 0.4, deep: 0.4, base: 20, up: 18, color: 0x9a55c4 },
+  ],
+  growth: [{ wide: 0.8, deep: 0.8, base: 0, up: 9, color: 0x8f4fb5 }],
 }
 
 /** How thick a wall is, as a share of a tile. */
@@ -354,7 +359,7 @@ export async function createView(): Promise<View> {
     })
     battle.pods.forEach((_, pod) => {
       const members = battle.units.filter((u) => u.pod === pod)
-      if (members.length > 0) marks.addChild(label('?', members[0], COLOR.contact))
+      if (members.length > 0) marks.addChild(label('?', members[0], COLOR.contact), label(battle.pods[pod].name, members[0], COLOR.contact, 20))
     })
   }
 
@@ -525,6 +530,7 @@ export async function createView(): Promise<View> {
           return unit ? [create({ ...unit, x: at.x, y: at.y }, 0, unit.boss ? '' : ALIENS[unit.kind!].name[0])] : []
         })
         await tween(REVEAL_MS, (t) => appeared.forEach((sprite) => (sprite.node.alpha = t)))
+        if (e.ambush && appeared.length > 0) float(callout('AMBUSHED', COLOR.hit, appeared[0], 18))
       } else if (e.type === 'shot') {
         const from = sprites.get(e.id)
         const to = sprites.get(e.target)

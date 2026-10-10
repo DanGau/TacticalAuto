@@ -13,8 +13,9 @@ export const CRIT_BONUS = 2
 export const COVER_DEFENSE = [0, 0.2, 0.4]
 /** Tiles within which a soldier with line of sight reveals an alien. */
 export const SIGHT = 8
-/** The most aliens that roam together. */
-export const POD_SIZE = 3
+/** What a soldier's shots gain against an ambushed pod: hit chance, and chance for a hit to crit. */
+export const AMBUSH_AIM = 0.2
+export const AMBUSH_CRIT = 0.25
 /** Tiles an alien moves per turn before its pod is revealed. */
 export const PATROL_MOVE = 2
 /** Damage a rocket does to every unit within BLAST_RADIUS tiles of where it lands. */
@@ -134,7 +135,11 @@ export interface Unit {
 
 /** A group of aliens. It patrols toward its waypoint, unseen, until a soldier sights a member; then it fights. */
 export interface Pod {
+  /** The name of its pack. */
+  name: string
   revealed: boolean
+  /** Caught unaware by a concealed squad: until the squad's turn ends, shots at its members gain the ambush bonus. */
+  ambushed: boolean
   /** Revealed during the current alien turn, so its members do not shoot until the next. */
   surprised: boolean
   waypoint: Tile
@@ -162,6 +167,8 @@ export interface Battle {
   north: Edge[]
   west: Edge[]
   pods: Pod[]
+  /** True from the landing until the first pod is sighted. That pod is ambushed. */
+  concealed: boolean
   /** Tiles of acid, each with the alien turns it has left. */
   acid: { x: number; y: number; turns: number }[]
   /** Centres of the landing zones on offer in the deploy phase. */
@@ -325,7 +332,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
 }
 
 /** A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. */
-export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[]): Battle {
+export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[]): Battle {
   const holder = { rng: seed }
   const terrain = generateTerrain(holder, GRID, kind)
   const battle: Battle = {
@@ -341,23 +348,21 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     ...terrain,
     cover: terrain.props.map((prop) => PROP_COVER[prop]),
     pods: [],
+    concealed: true,
     acid: [],
     zones: [],
     reserve,
   }
   sealPockets(battle)
 
-  // As few pods as POD_SIZE allows, of sizes as even as possible.
-  const podCount = Math.ceil(aliens.length / POD_SIZE)
   const centres: Tile[] = []
-  for (let pod = 0; pod < podCount; pod++) {
+  for (const { name, aliens: members } of packs) {
     const centre = spacedTile(battle, centres, ZONE_CLEARANCE)
     centres.push(centre)
-    const members = aliens.filter((_, i) => i % podCount === pod)
     freeTilesNear(battle, centre, members.length).forEach((tile, i) => {
       battle.units.push(alienUnit(battle, members[i], tile, battle.pods.length))
     })
-    battle.pods.push({ revealed: false, surprised: false, waypoint: randomTile(battle) })
+    battle.pods.push({ name, revealed: false, ambushed: false, surprised: false, waypoint: randomTile(battle) })
   }
   while (battle.zones.length < ZONES) battle.zones.push(spacedTile(battle, [...battle.units, ...battle.zones], ZONE_CLEARANCE))
   return battle

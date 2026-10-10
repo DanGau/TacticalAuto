@@ -1,10 +1,10 @@
 import { random, randomInt } from './rng'
 
 /** What the ground of a tile is. It changes only how the tile looks. */
-export type Ground = 'pavement' | 'road' | 'grass' | 'floor' | 'scorched'
+export type Ground = 'pavement' | 'road' | 'grass' | 'floor' | 'scorched' | 'hive'
 
-/** The object standing on a tile. */
-export type Prop = 'none' | 'car' | 'truck' | 'tree' | 'crate' | 'stack' | 'fence' | 'rubble'
+/** The object standing on a tile. A spire and a growth are what the aliens build. */
+export type Prop = 'none' | 'car' | 'truck' | 'tree' | 'crate' | 'stack' | 'fence' | 'rubble' | 'spire' | 'growth'
 
 /** What stands on the line between two tiles. A window blocks movement, but soldiers shoot through it. */
 export type Edge = 'none' | 'wall' | 'window'
@@ -12,7 +12,7 @@ export type Edge = 'none' | 'wall' | 'window'
 /** Cover: 0 nothing, 1 low, 2 high. Both kinds block movement; high cover blocks shots. */
 export type Cover = 0 | 1 | 2
 
-export const PROP_COVER: Record<Prop, Cover> = { none: 0, car: 1, truck: 2, tree: 2, crate: 1, stack: 2, fence: 1, rubble: 1 }
+export const PROP_COVER: Record<Prop, Cover> = { none: 0, car: 1, truck: 2, tree: 2, crate: 1, stack: 2, fence: 1, rubble: 1, spire: 2, growth: 1 }
 export const EDGE_COVER: Record<Edge, Cover> = { none: 0, window: 1, wall: 2 }
 
 /**
@@ -26,15 +26,21 @@ export interface Terrain {
   west: Edge[]
 }
 
-/** The kind of place a battle is fought in. */
-export type TerrainKind = 'town' | 'city' | 'countryside' | 'industrial'
+/** The kinds of place a zone's battles may be fought in. */
+export const ZONE_TERRAINS = ['town', 'city', 'countryside', 'industrial', 'ruins'] as const
+
+/** The kind of place a battle is fought in. A satellite stands in a compound; the alien source is a hive. */
+export type TerrainKind = (typeof ZONE_TERRAINS)[number] | 'compound' | 'hive'
 
 /** What the player is told about each kind of place. */
 export const TERRAIN_TEXT: Record<TerrainKind, { name: string; text: string }> = {
-  town: { name: 'Town', text: 'houses, parks and parked cars' },
+  town: { name: 'Town', text: 'houses, parks, a market or a square' },
   city: { name: 'City', text: 'buildings close together; cover everywhere' },
-  countryside: { name: 'Countryside', text: 'open fields; cover is scarce' },
+  countryside: { name: 'Countryside', text: 'open fields and orchards; cover is scarce' },
   industrial: { name: 'Industrial yard', text: 'warehouses, crates and trucks' },
+  ruins: { name: 'Ruins', text: 'fallen buildings; broken walls and rubble' },
+  compound: { name: 'Satellite compound', text: 'a walled yard around the dish' },
+  hive: { name: 'Alien hive', text: 'spires and growths; nothing human' },
 }
 
 export const TERRAIN_KINDS = Object.keys(TERRAIN_TEXT) as TerrainKind[]
@@ -47,14 +53,15 @@ interface Rect {
   y2: number
 }
 
-type Place = 'house' | 'warehouse' | 'park' | 'carPark' | 'depot' | 'field'
+type Place = 'house' | 'warehouse' | 'ruin' | 'park' | 'orchard' | 'graveyard' | 'plaza' | 'market' | 'carPark' | 'depot' | 'field'
 
-/** Each kind of place as a plot: how many roads cross it each way, and what its lots may hold, likelier if listed more. */
-const PLOTS: Record<TerrainKind, { roads: [number, number]; places: Place[] }> = {
-  town: { roads: [1, 1], places: ['house', 'house', 'park', 'carPark', 'depot'] },
-  city: { roads: [2, 2], places: ['house', 'house', 'house', 'carPark'] },
-  countryside: { roads: [1, 0], places: ['field', 'field', 'field', 'park', 'house'] },
+/** Each kind of zone place as a plot: how many roads cross it each way, and what its lots may hold, likelier if listed more. */
+const PLOTS: Record<(typeof ZONE_TERRAINS)[number], { roads: [number, number]; places: Place[] }> = {
+  town: { roads: [1, 1], places: ['house', 'house', 'park', 'carPark', 'plaza', 'market'] },
+  city: { roads: [2, 2], places: ['house', 'house', 'house', 'carPark', 'plaza'] },
+  countryside: { roads: [1, 0], places: ['field', 'field', 'orchard', 'graveyard', 'park', 'house'] },
   industrial: { roads: [1, 1], places: ['warehouse', 'depot', 'depot', 'carPark'] },
+  ruins: { roads: [1, 1], places: ['ruin', 'ruin', 'ruin', 'graveyard', 'park'] },
 }
 
 /** Width of a road. */
@@ -142,6 +149,53 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     })
   }
 
+  /** A building fallen in: about half its walls gone, rubble where they stood. */
+  function ruin(lot: Rect): void {
+    const w = between(MIN_BUILDING, Math.min(MAX_HOUSE, lot.x2 - lot.x1 - 1))
+    const h = between(MIN_BUILDING, Math.min(MAX_HOUSE, lot.y2 - lot.y1 - 1))
+    const x1 = between(lot.x1 + 1, lot.x2 - w)
+    const y1 = between(lot.y1 + 1, lot.y2 - h)
+    building({ x1, y1, x2: x1 + w - 1, y2: y1 + h - 1 }, 4, ['rubble'])
+    for (let y = y1; y <= y1 + h; y++) {
+      for (let x = x1; x <= x1 + w; x++) {
+        for (const edges of [north, west]) {
+          if (edges[y * size + x] === 'none' || !chance(0.5)) continue
+          edges[y * size + x] = 'none'
+          if (chance(0.6)) put(x, y, 'rubble')
+        }
+      }
+    }
+  }
+
+  /** Trees in rows, with lanes to shoot down between them. */
+  function orchard(lot: Rect): void {
+    pave(lot, 'grass')
+    for (let y = lot.y1; y <= lot.y2; y += 3) for (let x = lot.x1; x <= lot.x2; x += 2) if (chance(0.85)) put(x, y, 'tree')
+  }
+
+  /** Rows of headstones, low enough to shoot over, and a tree or two. */
+  function graveyard(lot: Rect): void {
+    pave(lot, 'grass')
+    for (let y = lot.y1 + 1; y < lot.y2; y += 3) for (let x = lot.x1 + 1; x < lot.x2; x += 2) if (chance(0.8)) put(x, y, 'rubble')
+    each(lot, (x, y) => void (chance(0.02) && put(x, y, 'tree')))
+  }
+
+  /** A paved square: a monument in the middle, benches around it, a tree at each corner. */
+  function plaza(lot: Rect): void {
+    const cx = Math.floor((lot.x1 + lot.x2) / 2)
+    const cy = Math.floor((lot.y1 + lot.y2) / 2)
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) put(cx + dx, cy + dy, 'stack')
+    for (const [dx, dy] of [[-2, 0], [-2, 1], [3, 0], [3, 1], [0, -2], [1, -2], [0, 3], [1, 3]]) put(cx + dx, cy + dy, 'fence')
+    for (const [x, y] of [[lot.x1 + 1, lot.y1 + 1], [lot.x2 - 1, lot.y1 + 1], [lot.x1 + 1, lot.y2 - 1], [lot.x2 - 1, lot.y2 - 1]]) put(x, y, 'tree')
+  }
+
+  /** Market stalls: short rows of crates with gaps to walk through. */
+  function market(lot: Rect): void {
+    for (let y = lot.y1 + 1; y < lot.y2; y += 3) {
+      for (let x = lot.x1 + 1; x < lot.x2; x++) if ((x - lot.x1) % 4 !== 0) put(x, y, chance(0.15) ? 'stack' : 'crate')
+    }
+  }
+
   /** One large building with few windows, full of crates and stacks. */
   function warehouse(lot: Rect): void {
     building({ x1: lot.x1 + 1, y1: lot.y1 + 1, x2: lot.x2 - 1, y2: lot.y2 - 1 }, 7, ['crate', 'crate', 'stack'])
@@ -185,11 +239,11 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     })
   }
 
-  const build: Record<Place, (lot: Rect) => void> = { house, warehouse, park, carPark, depot, field }
+  const build: Record<Place, (lot: Rect) => void> = { house, warehouse, ruin, park, orchard, graveyard, plaza, market, carPark, depot, field }
 
   function fill(lot: Rect): void {
     const roomy = lot.x2 - lot.x1 >= MIN_BUILDING + 1 && lot.y2 - lot.y1 >= MIN_BUILDING + 1
-    const places = PLOTS[kind].places.filter((place) => roomy || (place !== 'house' && place !== 'warehouse'))
+    const places = plot.places.filter((place) => roomy || (place !== 'house' && place !== 'warehouse' && place !== 'ruin'))
     build[places[randomInt(rng, places.length)] ?? 'park'](lot)
   }
 
@@ -210,6 +264,48 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     }
   }
 
+  /** A satellite compound: a walled yard with gates, a control room, the dish, and stores; scrub outside. */
+  function compound(): void {
+    const yard: Rect = { x1: 7, y1: 6, x2: size - 9, y2: size - 10 }
+    building(yard, 6, ['crate', 'crate', 'stack'])
+    pave(yard, 'pavement')
+    // More gates than a house has doors, one on each side.
+    const midX = Math.floor((yard.x1 + yard.x2) / 2)
+    const midY = Math.floor((yard.y1 + yard.y2) / 2)
+    open(north, yard.y1 * size + midX)
+    open(north, (yard.y2 + 1) * size + midX)
+    open(west, midY * size + yard.x1)
+    open(west, midY * size + yard.x2 + 1)
+    building({ x1: yard.x1 + 2, y1: yard.y1 + 2, x2: yard.x1 + 6, y2: yard.y1 + 5 }, 3, ['crate'])
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1], [2, 0], [2, 1]]) put(yard.x2 - 5 + dx, yard.y2 - 4 + dy, 'stack')
+    put(yard.x2 - 2, yard.y1 + 2, 'truck')
+    put(yard.x2 - 1, yard.y1 + 2, 'truck')
+    pave({ x1: midX, y1: yard.y2 + 1, x2: midX + 1, y2: size - 1 }, 'road')
+    each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => {
+      const inside = x >= yard.x1 && x <= yard.x2 && y >= yard.y1 && y <= yard.y2
+      if (inside || ground[y * size + x] === 'road') return
+      ground[y * size + x] = 'grass'
+      if (chance(0.05)) put(x, y, chance(0.6) ? 'tree' : 'rubble')
+    })
+  }
+
+  /** The alien hive: clusters of spires and growths on ground nothing human made. */
+  function hive(): void {
+    ground.fill('hive')
+    const clusters = Array.from({ length: 14 }, () => ({ x: between(0, size - 1), y: between(0, size - 1), reach: between(2, 4) }))
+    each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => {
+      const dense = clusters.some((c) => Math.max(Math.abs(c.x - x), Math.abs(c.y - y)) <= c.reach)
+      if (chance(dense ? 0.33 : 0.03)) put(x, y, chance(0.45) ? 'spire' : 'growth')
+    })
+  }
+
+  if (kind === 'compound' || kind === 'hive') {
+    if (kind === 'compound') compound()
+    else hive()
+    return { ground, props, north, west }
+  }
+  const plot = PLOTS[kind]
+
   /** Where `count` roads cross the map, spread evenly with some drift. */
   const roadsAt = (count: number) => Array.from({ length: count }, (_, i) => Math.round(((i + 1) * size) / (count + 1)) - 1 + between(-3, 3))
   /** The stretches the roads leave between them, each one tile back from a road. */
@@ -219,7 +315,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     return starts.map((start, i) => [start, ends[i]])
   }
 
-  const [roadsX, roadsY] = PLOTS[kind].roads.map(roadsAt)
+  const [roadsX, roadsY] = plot.roads.map(roadsAt)
   for (const x of roadsX) pave({ x1: x, y1: 0, x2: x + ROAD - 1, y2: size - 1 }, 'road')
   for (const y of roadsY) pave({ x1: 0, y1: y, x2: size - 1, y2: y + ROAD - 1 }, 'road')
   // Vehicles on the roads, lying along them.
@@ -238,6 +334,8 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
       put(i + 1, lane, vehicle)
     }
   }
+  // In ruins, rubble lies across the roads.
+  if (kind === 'ruins') each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => void (ground[y * size + x] === 'road' && chance(0.08) && put(x, y, 'rubble')))
   for (const [x1, x2] of stretches(roadsX)) {
     for (const [y1, y2] of stretches(roadsY)) block({ x1, y1, x2, y2 })
   }

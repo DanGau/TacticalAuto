@@ -13,16 +13,23 @@ export interface Ui {
   update(run: Run): void
 }
 
-/** The aliens of a battle by kind, as "2 Troopers, 4 Swarmlings", with what each kind does. */
+/** What the squad faces: each pod by name with its members, then what each kind present does. */
 function roster(run: Run): string {
-  const aliens = run.battle!.units.filter((u) => u.side === 'alien')
-  const kinds = [...new Set(aliens.filter((u) => !u.boss).map((u) => u.kind!))] as AlienKind[]
-  const lines = kinds.map((kind) => {
-    const count = aliens.filter((u) => u.kind === kind && !u.boss).length
-    return `<div><b>${count} ${ALIENS[kind].name}${count === 1 ? '' : 's'}.</b> ${ALIENS[kind].text}.</div>`
+  const battle = run.battle!
+  const aliens = battle.units.filter((u) => u.side === 'alien')
+  const pods = battle.pods.map((pod, index) => {
+    const members = aliens.filter((u) => u.pod === index)
+    const names = [...new Set(members.map((u) => (u.boss ? 'Boss' : ALIENS[u.kind!].name)))]
+    const counted = names.map((name) => {
+      const count = members.filter((u) => (u.boss ? 'Boss' : ALIENS[u.kind!].name) === name).length
+      return count === 1 ? name : `${count} ${name}s`
+    })
+    return `<div><b>${pod.name}:</b> ${counted.join(', ')}</div>`
   })
-  if (aliens.some((u) => u.boss)) lines.unshift('<div><b>A boss.</b> Tough, hits hard and far, and spawns swarmlings.</div>')
-  return lines.join('')
+  const kinds = [...new Set(aliens.filter((u) => !u.boss).map((u) => u.kind!))] as AlienKind[]
+  const rules = kinds.map((kind) => `<div><b>${ALIENS[kind].name}.</b> ${ALIENS[kind].text}.</div>`)
+  if (aliens.some((u) => u.boss)) rules.unshift('<div><b>Boss.</b> Tough, hits hard and far, and spawns swarmlings.</div>')
+  return `${pods.join('')}<hr>${rules.join('')}<hr><div>The squad lands unseen. The first pod it sights is ambushed: caught in the open, and easier to hit.</div>`
 }
 
 function status(run: Run): string {
@@ -30,7 +37,7 @@ function status(run: Run): string {
   if (run.phase !== 'battle' || !battle) return ''
   const title = STOP_NAMES[run.mission!.kind]
   if (battle.phase === 'deploy') return `${title} · click a landing zone<div class="roster">${roster(run)}</div>`
-  return `${title} · ${SIDE[battle.turn]}' turn`
+  return `${title} · ${SIDE[battle.turn]}' turn${battle.concealed ? ' · unseen' : ''}`
 }
 
 /** Turns clicks into actions and hands them to `act`. */

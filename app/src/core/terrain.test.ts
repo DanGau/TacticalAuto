@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { createBattle, GRID, NEIGHBORS, onGrid, passable } from './battle'
-import { PROP_COVER, TERRAIN_KINDS } from './terrain'
+import { PROP_COVER, TERRAIN_KINDS, ZONE_TERRAINS } from './terrain'
 
 const cases = TERRAIN_KINDS.flatMap((kind) => [1, 2, 3, 4].map((seed) => [kind, seed] as const))
 
@@ -34,7 +34,7 @@ test('each kind of place is itself: the countryside is the most open, a city is 
   const cover = (kind: (typeof TERRAIN_KINDS)[number]) => share(kind, (b, t) => b.cover[t] > 0 || b.north[t] !== 'none' || b.west[t] !== 'none')
   const floor = (kind: (typeof TERRAIN_KINDS)[number]) => share(kind, (b, t) => b.ground[t] === 'floor')
   const crates = (kind: (typeof TERRAIN_KINDS)[number]) => share(kind, (b, t) => b.props[t] === 'crate' || b.props[t] === 'stack')
-  for (const kind of TERRAIN_KINDS) {
+  for (const kind of ZONE_TERRAINS) {
     if (kind !== 'countryside') expect(cover('countryside')).toBeLessThan(cover(kind))
     if (kind === 'town' || kind === 'countryside') expect(floor('city')).toBeGreaterThan(floor(kind))
     if (kind !== 'industrial') expect(crates('industrial')).toBeGreaterThan(crates(kind))
@@ -47,4 +47,13 @@ test('a building has walls with windows and a way in', () => {
   expect(edges).toContain('wall')
   expect(edges).toContain('window')
   expect(battle.ground.some((g, i) => g === 'floor' && battle.cover[i] === 0)).toBe(true)
+})
+
+test('a satellite stands in a walled compound with a gate on every side, and the hive has nothing human in it', () => {
+  const compound = createBattle(2, 'compound', [], [])
+  expect([...compound.north, ...compound.west].filter((edge) => edge === 'wall').length).toBeGreaterThan(40)
+  const hive = createBattle(2, 'hive', [], [])
+  expect(hive.ground.every((ground) => ground === 'hive')).toBe(true)
+  expect(hive.props.every((prop) => prop === 'none' || prop === 'spire' || prop === 'growth')).toBe(true)
+  expect([...hive.north, ...hive.west].every((edge) => edge === 'none')).toBe(true)
 })

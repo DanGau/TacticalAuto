@@ -3,6 +3,8 @@ import {
   ACID_DAMAGE,
   ACID_TURNS,
   alienUnit,
+  AMBUSH_AIM,
+  AMBUSH_CRIT,
   blocked,
   BLAST_RADIUS,
   BURST_DAMAGE,
@@ -45,8 +47,8 @@ import { canShoot, coverAgainst, lineOfSight, odds, sees } from './sight'
 export type GameEvent =
   /** `path` lists each tile entered, in order. */
   | { type: 'move'; id: number; path: Tile[] }
-  /** A pod is sighted. `units` gives each member's tile at that moment; its moves to cover follow. */
-  | { type: 'reveal'; units: { id: number; x: number; y: number }[] }
+  /** A pod is sighted. `units` gives each member's tile at that moment. Unless it is ambushed, its moves to cover follow. */
+  | { type: 'reveal'; ambush: boolean; units: { id: number; x: number; y: number }[] }
   /** `damage` is 0 for a miss. */
   | { type: 'shot'; id: number; target: number; hit: boolean; crit: boolean; damage: number }
   /** A rocket or grenade lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */
@@ -341,10 +343,14 @@ function walk(unit: Unit, path: Tile[], events: GameEvent[]): void {
   events.push({ type: 'move', id: unit.id, path })
 }
 
-/** Reveals each unseen pod a soldier now sights. A revealed pod at once moves to fighting positions. */
+/**
+ * Reveals each unseen pod a soldier now sights. A revealed pod at once moves to fighting positions, unless the squad
+ * was concealed: then the pod is ambushed, caught where it stands, and the squad's concealment is over.
+ */
 function sight(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
   const soldiers = battle.units.filter((u) => u.side === 'human')
+  const ambush = battle.concealed
   battle.pods.forEach((pod, index) => {
     if (pod.revealed) return
     const members = battle.units.filter((u) => u.pod === index)
@@ -352,8 +358,10 @@ function sight(battle: Battle): GameEvent[] {
     if (!seen) return
     pod.revealed = true
     pod.surprised = battle.turn === 'alien'
-    events.push({ type: 'reveal', units: members.map(({ id, x, y }) => ({ id, x, y })) })
-    for (const member of members) walk(member, fightPath(battle, member), events)
+    pod.ambushed = ambush
+    battle.concealed = false
+    events.push({ type: 'reveal', ambush, units: members.map(({ id, x, y }) => ({ id, x, y })) })
+    if (!ambush) for (const member of members) walk(member, fightPath(battle, member), events)
   })
   return events
 }
@@ -540,8 +548,9 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, chained = false): 
   }
   if (!enemy) return []
   const chance = chanceAt(enemy)
-  const hit = random(battle) < chance.hit
-  const crit = hit && random(battle) < chance.crit
+  const ambushed = enemy.pod !== null && battle.pods[enemy.pod].ambushed
+  const hit = random(battle) < chance.hit + (ambushed ? AMBUSH_AIM : 0)
+  const crit = hit && random(battle) < chance.crit + (ambushed ? AMBUSH_CRIT : 0)
   const events: GameEvent[] = []
   if (!hit) return [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage: 0 }]
 
@@ -633,6 +642,8 @@ function act(battle: Battle): GameEvent[] {
     }
     const action = actNext(battle)
     if (action.length > 0) return action
+    // An ambush lasts until the squad's turn ends.
+    if (battle.turn === 'human') for (const pod of battle.pods) pod.ambushed = false
     battle.turn = battle.turn === 'human' ? 'alien' : 'human'
     battle.stage = 'move'
   }
