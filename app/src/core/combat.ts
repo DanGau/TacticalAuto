@@ -29,7 +29,7 @@ import {
   wreck,
 } from './battle'
 import { random, randomInt } from './rng'
-import { canShoot, lineOfSight, odds, sees } from './sight'
+import { canShoot, coverAgainst, lineOfSight, odds, sees } from './sight'
 
 export type GameEvent =
   /** `path` lists each tile entered, in order. */
@@ -48,7 +48,7 @@ export type GameEvent =
 
 /**
  * The enemies a unit acts against. Aliens know every soldier. Soldiers know the revealed aliens;
- * with none revealed they track every alien, which leads the squad to the nearest contact.
+ * with none revealed they track every alien, which leads the squad to a contact.
  */
 function enemiesOf(battle: Battle, unit: Unit): Unit[] {
   const others = battle.units.filter((u) => u.side !== unit.side)
@@ -152,8 +152,14 @@ interface Spot {
   crowded: number
   /** 0 with a clear line to some enemy, else 1. */
   blind: number
-  /** The walk to the nearest enemy. */
+  /** The walk to the unit's goal: for a soldier the squad's, for an alien the nearest soldier. */
   toGoal: number
+  /** Tiles the squad's centre is beyond COHESION. */
+  stray: number
+  /** The cover the tile gives against the goal. */
+  shelter: number
+  /** Whether the unit is a soldier. Soldiers pick their way forward; aliens press the attack. */
+  careful: boolean
 }
 
 /**
@@ -161,17 +167,22 @@ interface Spot {
  * and a wounded one careful.
  */
 const WITH_SHOT: Record<Stance, (spot: Spot) => number[]> = {
-  // The exchange of fire that most favours the unit.
-  balanced: ({ mine, risk }) => [risk - mine],
+  // The exchange of fire that most favours the unit, short of straying from the squad.
+  balanced: ({ mine, risk, stray }) => [risk - mine + STRAY_COST * stray],
   // The surest shot; what comes back counts only as wounds mount.
-  rush: ({ mine, risk, hurt }) => [Math.round(hurt * risk) - mine],
+  rush: ({ mine, risk, hurt, stray }) => [Math.round(hurt * risk) - mine + STRAY_COST * stray],
   // The same exchange, with safety counted double.
-  anchor: ({ mine, risk }) => [2 * risk - mine],
+  anchor: ({ mine, risk, stray }) => [2 * risk - mine + STRAY_COST * stray],
   // Out of every enemy's reach, then at a distance, then the best shot.
   standoff: ({ mine, theirs, crowded }) => [theirs, crowded, -mine],
   // A good exchange that keeps a squadmate within reach.
-  escort: ({ mine, risk, apart }) => [risk - mine + 10 * apart],
+  escort: ({ mine, risk, apart, stray }) => [risk - mine + 10 * apart + STRAY_COST * stray],
 }
+
+/** Tiles a soldier may be from the squad's centre before it counts as straying. */
+const COHESION = 4
+/** What each tile of straying costs a firing position, in points of hit chance. */
+const STRAY_COST = 8
 
 /**
  * Tiles a standoff soldier keeps behind the foremost squadmate while no soldier sees an alien, so the squad's
@@ -186,8 +197,17 @@ const REAR_GAP = 2
  */
 const WARY = 0.5
 
-/** Closing on the nearest enemy: by the shortest walk, or, once wary, only through tiles no enemy can shoot. */
-const advance = ({ toGoal, theirs, wary }: Spot) => (wary ? [theirs, toGoal] : [toGoal, theirs])
+/**
+ * Closing on the goal with no shot to take. An alien takes the shortest walk. A soldier gives up some of the walk to
+ * stay with the squad, to stay out of an enemy's sights, and to end behind cover facing the goal; a wary one walks
+ * only through tiles no enemy can shoot. A soldier's costs are in tenths of a tile: a tile of straying costs two
+ * tiles of progress, a certain hit coming back five, and high cover is worth one.
+ */
+const advance = ({ toGoal, theirs, wary, stray, shelter, careful }: Spot) => {
+  if (!careful) return [toGoal, theirs]
+  const cost = 10 * toGoal + 20 * stray + Math.round(theirs / 2) - 5 * shelter
+  return wary ? [theirs, cost] : [cost]
+}
 
 /** How each stance ranks a tile with no shot, lowest first. */
 const NO_SHOT: Record<Stance, (spot: Spot) => number[]> = {
@@ -195,17 +215,34 @@ const NO_SHOT: Record<Stance, (spot: Spot) => number[]> = {
   rush: advance,
   anchor: advance,
   // Holds at a distance, out of reach, and from there looks for a clear line before walking nearer.
-  standoff: ({ toGoal, theirs, crowded, blind }) => [theirs, crowded, blind, toGoal],
+  standoff: ({ toGoal, theirs, crowded, blind, stray }) => [theirs, crowded, blind, toGoal + 2 * stray],
   escort: (spot) => advance({ ...spot, toGoal: spot.toGoal + spot.apart }),
+}
+
+/**
+ * The enemy a side's units close on when they have no shot. Soldiers share one, so the squad moves together:
+ * the revealed alien nearest the squad's centre, or with none revealed, the nearest alien of any pod.
+ * An alien closes on the soldier nearest itself.
+ */
+function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Unit | undefined {
+  return nearest(enemies, unit.side === 'human' ? centreOf(battle.units.filter((u) => u.side === 'human')) : unit)
+}
+
+/** The tile at the middle of some units. */
+function centreOf(units: Unit[]): Tile {
+  const mean = (pick: (unit: Unit) => number) => Math.round(units.reduce((sum, unit) => sum + pick(unit), 0) / units.length)
+  return { x: mean((u) => u.x), y: mean((u) => u.y) }
 }
 
 /**
  * The path a fighting unit takes in its move stage: to the tile its stance ranks best, preferring any tile with a
  * shot over any without; the fewest steps wins a tie. Run and Gun doubles the move when the normal move reaches no shot.
+ * While some soldier has an alien in sight, a soldier first avoids any tile from which it would sight another pod,
+ * so one engagement ends before the next begins.
  */
 function fightPath(battle: Battle, unit: Unit): Tile[] {
   const enemies = enemiesOf(battle, unit)
-  const goal = nearest(enemies, unit)
+  const goal = goalOf(battle, unit, enemies)
   if (!goal) return []
   const toGoal = walkingDistances(battle, goal)
   const seen = spotted(battle)
@@ -223,6 +260,14 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const hurt = 1 - unit.hp / unit.stats.hp
   const wary = unit.side === 'human' && hurt >= WARY && squadmates.some((u) => u.hp / u.stats.hp > 1 - WARY)
   const apart = (end: Tile) => Math.max(0, Math.min(MEDIC_REACH, ...squadmates.map((u) => distance(end, u) - MEDIC_REACH)))
+  const centre = squadmates.length > 0 ? centreOf(squadmates) : unit
+  /** Tiles `end` is beyond COHESION from the middle of the unit's squadmates. Aliens fight as they find themselves. */
+  const stray = (end: Tile) => (unit.side === 'human' ? Math.max(0, distance(end, centre) - COHESION) : 0)
+  const unseen = battle.units.filter((u) => u.side !== unit.side && !revealed(battle, u))
+  // The squad is in a fight while some soldier has an alien in sight.
+  const engaged = unit.side === 'human' && seen.size > 0
+  /** Whether a soldier on `end` would sight a pod not yet revealed, while the squad is in a fight. */
+  const provokes = (end: Tile) => (engaged && unseen.some((alien) => sees(battle, end, alien)) ? 1 : 0)
   const marching = unit.side === 'human' && seen.size === 0
   const leaders = unit.stance === 'standoff' ? squadmates.filter((u) => u.stance !== 'standoff') : []
   /** The nearest to the enemy this unit may walk while marching: REAR_GAP behind the foremost leader. */
@@ -244,10 +289,13 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
         crowded: Math.max(0, STANDOFF - Math.min(...enemies.map((enemy) => distance(end, enemy)))),
         blind: enemies.some((enemy) => lineOfSight(battle, end, enemy)) ? 0 : 1,
         toGoal: toGoal[end.y * GRID + end.x],
+        stray: stray(end),
+        shelter: coverAgainst(battle, end, goal),
+        careful: unit.side === 'human',
       }
       // A wary unit ranks every tile by the exchange of fire, so one with no shot and no risk can win.
-      if (wary && unit.stance !== 'standoff' && inContact) return [0, ...WITH_SHOT[unit.stance](spot), spot.toGoal]
-      return spot.mine > 0 ? [0, ...WITH_SHOT[unit.stance](spot), steps] : [1, ahead(end), ...NO_SHOT[unit.stance](spot)]
+      if (wary && unit.stance !== 'standoff' && inContact) return [provokes(end), 0, ...WITH_SHOT[unit.stance](spot), spot.toGoal]
+      return spot.mine > 0 ? [provokes(end), 0, ...WITH_SHOT[unit.stance](spot), steps] : [provokes(end), 1, ahead(end), ...NO_SHOT[unit.stance](spot)]
     })
   }
   const path = choose(unit.stats.move)
@@ -317,6 +365,14 @@ function moveSide(battle: Battle): GameEvent[] {
   for (const unit of battle.units) {
     if (unit.side !== battle.turn) continue
     walk(unit, revealed(battle, unit) ? fightPath(battle, unit) : patrolPath(battle, unit), events)
+  }
+  // A patrolling pod that could not move, hemmed in by others, tries for somewhere else next turn.
+  if (battle.turn === 'alien') {
+    battle.pods.forEach((pod, index) => {
+      const members = battle.units.filter((u) => u.pod === index)
+      const moved = events.some((e) => e.type === 'move' && members.some((u) => u.id === e.id))
+      if (!pod.revealed && members.length > 0 && !moved) pod.waypoint = { x: randomInt(battle, GRID), y: randomInt(battle, GRID) }
+    })
   }
   return [...events, ...sight(battle)]
 }

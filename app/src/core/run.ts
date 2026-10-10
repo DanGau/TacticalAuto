@@ -210,7 +210,7 @@ export function missionAt(run: Run, kind: Mission['kind'], risk: Risk): Mission 
 /** The aliens of a mission. Each step of depth adds health and aim; deep in, damage too. A key or final mission has a boss. */
 function aliensOf(run: Run, mission: Mission): Alien[] {
   const tier = depth(run)
-  const stats: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + Math.round(2.5 * tier), aim: BASE_STATS.aim + 0.03 * tier, damage: BASE_STATS.damage + (tier >= 5 ? 1 : 0) }
+  const stats: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + 3 * tier, aim: BASE_STATS.aim + 0.03 * tier, damage: BASE_STATS.damage + (tier >= 5 ? 1 : 0) }
   const aliens: Alien[] = Array.from({ length: mission.aliens }, () => ({ stats, boss: false }))
   if (mission.kind === 'key' || mission.kind === 'final') {
     const scale = mission.kind === 'final' ? 4 : 3
