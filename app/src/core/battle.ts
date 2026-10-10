@@ -37,7 +37,7 @@ export const BURN_DAMAGE = 1
 export const EXECUTE_BONUS = 2
 /** Damage a burster's explosion does within BLAST_RADIUS. */
 export const BURST_DAMAGE = 4
-/** Damage a spitter's spit does, the turns its acid lies on the tile, and the damage acid does to a unit that starts a turn in it. */
+/** Damage a spitter's spit does, the turns its acid lies on the tile, and the damage acid does to a unit still in it after its side moves. */
 export const SPIT_DAMAGE = 1
 export const ACID_TURNS = 2
 export const ACID_DAMAGE = 2

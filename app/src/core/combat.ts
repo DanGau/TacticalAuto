@@ -382,8 +382,8 @@ function sight(battle: Battle): GameEvent[] {
 }
 
 /**
- * What happens as a side's turn begins. Acid hurts each of its units standing in it; burning hurts; mending armor
- * heals. On the aliens' turn acid wears off, cooldowns run down, and a boss whose spawn is ready spawns a swarmling.
+ * What happens as a side's turn begins: burning hurts and mending armor heals. On the aliens' turn acid wears off,
+ * cooldowns run down, and a boss whose spawn is ready spawns a swarmling.
  */
 function upkeep(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
@@ -395,11 +395,6 @@ function upkeep(battle: Battle): GameEvent[] {
     if (has(unit, 'rearm') && unit.armor < unit.stats.armor) {
       unit.armor++
       events.push({ type: 'effect', id: unit.id, effect: 'rearm', amount: 0 })
-    }
-    if (battle.acid.some((pool) => pool.x === unit.x && pool.y === unit.y)) {
-      events.push({ type: 'hurt', id: unit.id, amount: ACID_DAMAGE, cause: 'acid' })
-      wound(battle, unit, ACID_DAMAGE, events)
-      if (unit.hp <= 0) continue
     }
     if (unit.burning > 0) {
       unit.burning--
@@ -426,7 +421,7 @@ function upkeep(battle: Battle): GameEvent[] {
   return events
 }
 
-/** The side on turn has its upkeep; each of its units walks its path, lowest id first; then newly sighted pods are revealed. */
+/** The side on turn has its upkeep; each of its units walks its path, lowest id first; acid burns those still in it; then newly sighted pods are revealed. */
 function moveSide(battle: Battle): GameEvent[] {
   const events = upkeep(battle)
   if (battle.turn === 'alien') {
@@ -440,6 +435,12 @@ function moveSide(battle: Battle): GameEvent[] {
   for (const unit of battle.units) {
     if (unit.side !== battle.turn) continue
     walk(unit, revealed(battle, unit) ? fightPath(battle, unit) : patrolPath(battle, unit), events)
+  }
+  // Acid burns each unit of the side still standing in it once the side has moved, so a unit free to move can step out.
+  for (const unit of battle.units.filter((u) => u.side === battle.turn)) {
+    if (!battle.acid.some((pool) => pool.x === unit.x && pool.y === unit.y)) continue
+    events.push({ type: 'hurt', id: unit.id, amount: ACID_DAMAGE, cause: 'acid' })
+    wound(battle, unit, ACID_DAMAGE, events)
   }
   const sighted = sight(battle)
   // Soldiers on overwatch fire once the aliens have moved and any pod sighted has taken its place.

@@ -60,10 +60,10 @@ test('a swarmling attacks only from the next tile', () => {
   expect(Math.max(Math.abs(aliens[0].x - 10), Math.abs(aliens[0].y - 10))).toBe(1)
 })
 
-test("a spitter's spit always lands and leaves acid that burns whoever starts a turn in it", () => {
+test("a spitter's spit always lands and leaves acid that burns a unit that stays in it", () => {
   const { battle, soldier, aliens, until } = arena([{ kind: 'spitter', x: 10, y: 16 }])
   aliens[0].hp = aliens[0].stats.hp = 99
-  // Hold the soldier still, so it starts its next turn in the acid.
+  // Hold the soldier still, so it is in the acid after its side moves.
   soldier.stats = { ...soldier.stats, move: 0, range: 0 }
   const events = until(has('hurt'))
   expect(events).toContainEqual({ type: 'spit', id: aliens[0].id, target: soldier.id, damage: SPIT_DAMAGE })
@@ -71,12 +71,14 @@ test("a spitter's spit always lands and leaves acid that burns whoever starts a 
   expect(battle.acid).toMatchObject([{ x: 10, y: 10 }])
 })
 
-test('a soldier free to move steps out of acid', () => {
+test('a soldier free to move steps out of acid and is not burned by it', () => {
   const { soldier, aliens, until } = arena([{ kind: 'spitter', x: 10, y: 16 }])
   aliens[0].hp = aliens[0].stats.hp = 99
-  const events = until((all) => all.filter((e) => e.type === 'spit').length >= 1 && all.at(-1)?.type === 'move')
-  expect(events.some((e) => e.type === 'move' && e.id === soldier.id)).toBe(true)
-  expect([soldier.x, soldier.y]).not.toEqual([10, 10])
+  const events = until((all) => all.filter((e) => e.type === 'spit').length >= 2)
+  const spat = events.findIndex((e) => e.type === 'spit')
+  expect(events.slice(spat).some((e) => e.type === 'move' && e.id === soldier.id)).toBe(true)
+  // Stepping out each time, it takes the spit and never the acid.
+  expect(events.some((e) => e.type === 'hurt')).toBe(false)
 })
 
 test('a burster explodes where it dies, hurting everything beside it', () => {

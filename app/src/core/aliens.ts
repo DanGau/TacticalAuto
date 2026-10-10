@@ -25,7 +25,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   spitter: {
     name: 'Spitter',
-    text: 'Its spit never misses and leaves acid on the tile, which burns whoever starts a turn in it',
+    text: 'Its spit never misses and leaves acid on the tile, which burns whoever is still in it after their side moves',
     hp: 0.8,
     stats: { range: 6 },
     stance: 'balanced',

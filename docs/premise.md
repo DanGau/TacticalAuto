@@ -20,7 +20,7 @@
 
 - Trooper: shoots from cover, as a soldier does.
 - Swarmling: weak, fast, attacks only up close, and comes in numbers.
-- Spitter: its spit never misses, and leaves acid that burns whoever starts a turn in it.
+- Spitter: its spit never misses, and leaves acid that burns whoever is still in it after their side moves.
 - Burster: runs at the squad and explodes, beside a soldier or wherever it dies.
 - Brute: tough, attacks only up close, and charges whoever hits it.
 - Psion: panics a soldier, who loses a turn of action; its death hurts its pod.
