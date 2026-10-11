@@ -63,6 +63,19 @@ export const BARRIER_ARMOR = 2
 export const SURGEON_HEAL = 3
 export const FEAST_HEAL = 2
 export const PHOENIX_HEALTH = 5
+export const SECOND_WIND_HEAL = 5
+export const SKIRMISH_MOVE = 2
+export const RECKLESS_AIM = 0.2
+export const CLEAVE_DAMAGE = 2
+export const THICK_ARMOR = 1
+export const BIG_BLAST_RADIUS = 2
+export const SLAYER_DAMAGE = 2
+export const GHOST_REACH = 4
+export const HASTE_MOVE = 2
+export const BANE_REACH = 3
+export const BANE_AIM = 0.1
+export const DRONE_DAMAGE = 2
+export const DRONE_REACH = 5
 /** Landing zones offered to the squad. */
 export const ZONES = 3
 /** Tiles around a landing zone's centre that count as the zone. */
@@ -117,6 +130,25 @@ export type SkillEffect =
   | 'inspire'
   | 'barrier'
   | 'surgeon'
+  | 'surge'
+  | 'secondWind'
+  | 'skirmish'
+  | 'reckless'
+  | 'cleave'
+  | 'taunt'
+  | 'thick'
+  | 'steadfast'
+  | 'bigBlast'
+  | 'concussion'
+  | 'assassinate'
+  | 'slayer'
+  | 'volley'
+  | 'ghost'
+  | 'haste'
+  | 'vitality'
+  | 'bane'
+  | 'ward'
+  | 'drone'
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix'
 /** Anything a unit's gear, skills or the squad's relics do. Combat applies them. */
@@ -246,10 +278,10 @@ export function unitAt(battle: Battle, x: number, y: number): Unit | undefined {
   return battle.units.find((u) => u.x === x && u.y === y)
 }
 
-/** Removes everything a blast catches: the props on tiles within BLAST_RADIUS of `centre`, and the walls and windows around those tiles. */
-export function wreck(battle: Battle, centre: Tile): void {
-  for (let y = centre.y - BLAST_RADIUS; y <= centre.y + BLAST_RADIUS; y++) {
-    for (let x = centre.x - BLAST_RADIUS; x <= centre.x + BLAST_RADIUS; x++) {
+/** Removes everything a blast catches: the props on tiles within `radius` of `centre`, and the walls and windows around those tiles. */
+export function wreck(battle: Battle, centre: Tile, radius = BLAST_RADIUS): void {
+  for (let y = centre.y - radius; y <= centre.y + radius; y++) {
+    for (let x = centre.x - radius; x <= centre.x + radius; x++) {
       if (!onGrid(x, y)) continue
       const tile = y * GRID + x
       battle.props[tile] = 'none'

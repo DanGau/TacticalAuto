@@ -198,3 +198,46 @@ test('revive gets a fallen squadmate back up, once', () => {
   until((all) => all.some((e) => e.type === 'death' && e.id === soldier.id))
   expect(battle.units).not.toContain(soldier)
 })
+
+test('a shot names the skills that shaped it, and an extra shot names the skill that granted it', () => {
+  const { soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
+  soldier.effects = ['backstab', 'doubleTap']
+  soldier.stats = { ...soldier.stats, move: 0 }
+  aliens[0].hp = aliens[0].stats.hp = 99
+  aliens[0].stats = { ...aliens[0].stats, move: 0 }
+  const shots = until((all) => all.filter((e) => e.type === 'shot' && e.id === soldier.id).length >= 2).filter((e) => e.type === 'shot' && e.id === soldier.id)
+  expect(shots[0]).toMatchObject({ with: ['backstab'] })
+  expect(shots[1]).toMatchObject({ with: ['doubleTap', 'backstab'] })
+})
+
+test('an alien that can shoot a taunting soldier must, and cannot shoot a ghost from far off', () => {
+  for (const [effect, shot] of [['taunt', true], ['ghost', false]] as const) {
+    const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 15 }])
+    // A decoy nearer the alien than the soldier with the skill.
+    const decoy: Unit = { ...structuredClone(soldier), id: 900, x: 11, y: 12, hp: 500 }
+    battle.units.push(decoy)
+    soldier.effects = [effect]
+    soldier.hp = 500
+    for (const unit of [soldier, decoy]) unit.stats = { ...unit.stats, move: 0, range: 0 }
+    aliens[0].stats = { ...aliens[0].stats, move: 0 }
+    const events = until((all) => all.filter((e) => e.type === 'shot').length >= 3)
+    expect(events.some((e) => e.type === 'shot' && e.target === soldier.id)).toBe(shot)
+    if (shot) expect(events.every((e) => e.type !== 'shot' || e.target === soldier.id)).toBe(true)
+  }
+})
+
+test('cleave hurts the aliens beside a kill; a skirmisher steps away after it acts', () => {
+  const { soldier, aliens, until } = arena([
+    { kind: 'swarmling', x: 10, y: 13 },
+    { kind: 'trooper', x: 11, y: 13 },
+  ])
+  soldier.effects = ['cleave', 'skirmish']
+  soldier.stats = { ...soldier.stats, damage: 50, move: 0 }
+  aliens[0].stats = { ...aliens[0].stats, move: 0, range: 0 }
+  aliens[1].stats = { ...aliens[1].stats, move: 0, range: 5 }
+  aliens[1].hp = aliens[1].stats.hp = 99
+  const events = until((all) => all.some((e) => e.type === 'death'))
+  expect(events).toContainEqual({ type: 'effect', id: aliens[1].id, effect: 'cleave', amount: -2 })
+  expect(aliens[1].hp).toBe(97)
+  expect(events.at(-1)).toMatchObject({ type: 'move', id: soldier.id, with: 'skirmish' })
+})

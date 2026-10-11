@@ -2,7 +2,7 @@ import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js'
 import { BLAST_RADIUS, distance, GRID, revealed, ZONE_RADIUS, zoneInfo, type Battle, type Tile, type Unit } from '../core/battle'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
-import { EFFECTS } from '../core/gear'
+import { effectName } from '../core/effects'
 import type { GameEvent } from '../core/combat'
 import { level, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
@@ -489,6 +489,8 @@ export async function createView(): Promise<View> {
     })
     fx.clear()
     float(shotCallout(e, to))
+    // What of the shooter's shaped the shot, named over the shooter.
+    if (e.with.length > 0) float(callout(e.with.map((effect) => effectName(effect).toUpperCase()).join(' · '), 0xffffff, from))
     if (!hit) return
     drawHp(to, ...after)
     await tween(IMPACT_MS, (t) => {
@@ -499,8 +501,7 @@ export async function createView(): Promise<View> {
 
   /** What a gear effect did to a unit, in a word: the effect's name, and the health it gave or took. */
   function effectCallout(e: Extract<GameEvent, { type: 'effect' }>, over: Sprite): Text {
-    // A gear effect is called by the word it adds to the gear's name; any other, by its own name.
-    const word = (e.effect in EFFECTS ? EFFECTS[e.effect as keyof typeof EFFECTS].prefix.replace(/'s$/, '') : e.effect).toUpperCase()
+    const word = effectName(e.effect).toUpperCase()
     return callout(e.amount === 0 ? word : `${word} ${e.amount > 0 ? '+' : ''}${e.amount}`, e.amount > 0 ? COLOR.heal : e.amount < 0 ? COLOR.crit : COLOR.hit, over)
   }
 
@@ -540,6 +541,7 @@ export async function createView(): Promise<View> {
         const seen = moves.filter((m) => sprites.has(m.id))
         if (seen.length === 0) continue
         await follow(seen.flatMap((m) => [sprites.get(m.id)!.tile, m.path.at(-1)!]))
+        for (const m of seen) if (m.with) float(callout(effectName(m.with).toUpperCase(), 0xffffff, sprites.get(m.id)!))
         await Promise.all(seen.map((m) => walk(sprites.get(m.id)!, m.path)))
         // The fog lifts where the squad arrived, before any pod it uncovered appears.
         drawFog(battle)
@@ -655,6 +657,7 @@ export async function createView(): Promise<View> {
           const b = chest(to)
           fx.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: e.crit ? COLOR.crit : e.hit ? COLOR.hit : COLOR.miss, width: 3 })
           shotCallout(e, to)
+          if (e.with.length > 0) callout(e.with.map((effect) => effectName(effect).toUpperCase()).join(' · '), 0xffffff, from)
         }
       }
       app.render()
