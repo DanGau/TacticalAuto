@@ -459,7 +459,7 @@ function upkeep(battle: Battle): GameEvent[] {
     const [tile] = freeTilesNear(battle, unit, 1)
     if (!tile) continue
     unit.cooldown = SPAWN_EVERY
-    const spawn = alienUnit(battle, { kind: 'swarmling', stats: alienStats('swarmling', 0, 0), stance: ALIENS.swarmling.stance, boss: false, spawns: false, target: false }, tile, unit.pod!)
+    const spawn = alienUnit(battle, { kind: 'swarmling', stats: alienStats('swarmling', 0, 0), stance: ALIENS.swarmling.stance, boss: false, spawns: false, target: false, resists: [] }, tile, unit.pod!)
     battle.units.push(spawn)
     events.push({ type: 'spawn', id: unit.id, unit: { id: spawn.id, x: spawn.x, y: spawn.y } })
   }
@@ -505,15 +505,15 @@ function moveSide(battle: Battle): GameEvent[] {
  * Deals `damage` to a unit: its armor takes it first, then its health. At zero health the unit is removed and its
  * death reported. A burster that dies explodes, and a psion that dies hurts the other aliens of its pod.
  */
-function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[]): void {
+function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[], pierce = false): void {
   if (target.hp <= 0) return
-  const absorbed = Math.min(target.armor, damage)
+  const absorbed = pierce ? 0 : Math.min(target.armor, damage)
   target.armor -= absorbed
   target.hp -= damage - absorbed
   if (target.hp > 0) return
   // An alien that dies burning spreads the fire, if the squad carries wildfire.
   if (target.burning > 0 && battle.units.some((u) => u.side !== target.side && has(u, 'wildfire'))) {
-    for (const other of battle.units.filter((u) => u.side === target.side && u !== target && distance(u, target) <= 1)) {
+    for (const other of battle.units.filter((u) => u.side === target.side && u !== target && distance(u, target) <= 1 && !u.resists.includes('burn'))) {
       other.burning = BURN_TURNS
       events.push({ type: 'effect', id: other.id, effect: 'wildfire', amount: 0 })
     }
@@ -559,7 +559,7 @@ function spit(battle: Battle, unit: Unit): GameEvent[] {
   if (!target) return []
   const events: GameEvent[] = [{ type: 'spit', id: unit.id, target: target.id, damage: SPIT_DAMAGE }]
   battle.acid = [...battle.acid.filter((pool) => pool.x !== target.x || pool.y !== target.y), { x: target.x, y: target.y, turns: ACID_TURNS }]
-  wound(battle, target, SPIT_DAMAGE, events)
+  wound(battle, target, SPIT_DAMAGE, events, unit.resists.includes('ward'))
   return events
 }
 
@@ -712,7 +712,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   if (!hit) return [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit: false, damage: 0, with: used }, ...events, ...again(battle, unit, seen, granted, false)]
 
   const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) > 0
-  const crit = sure || random(battle) < chance.crit + (ambushed ? AMBUSH_CRIT : 0)
+  const crit = !enemy.resists.includes('crit') && (sure || random(battle) < chance.crit + (ambushed ? AMBUSH_CRIT : 0))
   let damage =
     unit.stats.damage +
     (crit ? CRIT_BONUS + when(true, 'headshot', HEADSHOT_DAMAGE) : 0) +
@@ -738,14 +738,14 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   // Those beside the target, for a volley or a cleave, as they stand before the hit.
   const beside = battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1)
   events.unshift({ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage, with: used })
-  wound(battle, enemy, damage, events)
+  wound(battle, enemy, damage, events, unit.resists.includes('ward'))
   const splash = when(damage > 0, 'volley', Math.ceil(damage / 2)) || when(enemy.hp <= 0, 'cleave', CLEAVE_DAMAGE)
   for (const other of splash > 0 ? beside : []) {
     events.push({ type: 'effect', id: other.id, effect: has(unit, 'volley') ? 'volley' : 'cleave', amount: -splash })
     wound(battle, other, splash, events)
   }
-  if (enemy.hp > 0 && (when(true, 'mark', 1) || when(true, 'tracer', 1) || when(crit, 'exploit', 1))) enemy.marked = true
-  if (enemy.hp > 0 && (when(damage > 0, 'frostbite', 1) || when(crit, 'freeze', 1))) {
+  if (enemy.hp > 0 && !enemy.resists.includes('mark') && (when(true, 'mark', 1) || when(true, 'tracer', 1) || when(crit, 'exploit', 1))) enemy.marked = true
+  if (enemy.hp > 0 && !enemy.resists.includes('frost') && (when(damage > 0, 'frostbite', 1) || when(crit, 'freeze', 1))) {
     enemy.chilled = CHILL_TURNS
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'frostbite') ? 'frostbite' : 'freeze', amount: 0 })
   }
@@ -756,7 +756,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     enemy.panicked = true
     events.push({ type: 'effect', id: enemy.id, effect: 'concussion', amount: 0 })
   }
-  if (enemy.hp > 0 && ((damage > 0 && has(unit, 'incendiary')) || when(crit, 'ignite', 1))) {
+  if (enemy.hp > 0 && !enemy.resists.includes('burn') && ((damage > 0 && has(unit, 'incendiary')) || when(crit, 'ignite', 1))) {
     enemy.burning = BURN_TURNS
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'incendiary') ? 'incendiary' : 'ignite', amount: 0 })
   }

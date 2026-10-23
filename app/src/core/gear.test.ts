@@ -118,3 +118,13 @@ test('a rimed weapon chills its target, and a shatterglass edge and thermal shoc
   const [second] = shots()
   expect(second).toMatchObject({ hit: true, damage: 2 + 2 + 3 })
 })
+
+test('an alien that resists frost and burn is neither chilled nor set burning', () => {
+  const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Rimed Steady Carbine', stats: { aim: 2 }, effect: 'frostbite' })
+  d.soldier.stats = { ...d.soldier.stats, damage: 1, crit: 0 }
+  d.soldier.effects.push('incendiary')
+  d.alien.resists = ['frost', 'burn']
+  untilAlienShoots(d)
+  expect(d.alien.chilled).toBe(0)
+  expect(d.alien.burning).toBe(0)
+})

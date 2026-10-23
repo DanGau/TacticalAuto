@@ -4,7 +4,7 @@ import { GOALS, type Goal } from './goals'
 import { BASE_STATS, createBattle, type Alien, type Battle, type Stats } from './battle'
 import { CLASSES, type ClassId } from './classes'
 import { EFFECTS, generateGear, SLOTS, type Gear, type Slot } from './gear'
-import type { Keyword } from './keywords'
+import { RESISTS, type Keyword, type Resist } from './keywords'
 import { RELIC_OFFERS, RELICS, type Relic, type RelicId } from './relics'
 import { PATHS, SKILLS, type SkillId } from './skills'
 import { ZONE_TERRAINS, type TerrainKind } from './terrain'
@@ -150,6 +150,8 @@ export interface Run {
   relics: RelicId[]
   /** Relics to choose from in the reward phase. */
   relicOffers: RelicId[]
+  /** What each leg's boss resists, by keys won; known from the start so the squad can build to beat it. */
+  bosses: Resist[]
 }
 
 /** Experience a soldier needs for a level; each level takes one more battle than the last, without end. */
@@ -289,7 +291,7 @@ function packsOf(run: Run, mission: Mission, mustered?: Muster[]): { name: strin
   const tier = depth(run)
   const armor = tier
   const weapon = Math.floor(tier / 2)
-  const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, armor, weapon), stance: ALIENS[kind].stance, boss: false, spawns: false, target: false })
+  const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, armor, weapon), stance: ALIENS[kind].stance, boss: false, spawns: false, target: false, resists: ALIENS[kind].resists })
   const boss = mission.kind === 'key' || mission.kind === 'final'
   const escort = boss ? run.keys : 0
   const packs = (mustered ?? muster(run, Math.max(0, mission.force - (boss ? 2 + escort : 0)), tier)).map((pack) => ({ name: pack.name, aliens: pack.kinds.map(alien) }))
@@ -303,7 +305,7 @@ function packsOf(run: Run, mission: Mission, mustered?: Muster[]): { name: strin
     const k = run.keys
     const stats: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + 5 * k, armor: 2 + k, damage: BASE_STATS.damage + (k >= 1 ? 1 : 0), range: BASE_STATS.range + (k >= 2 ? 1 : 0) }
     const escorts = Array.from({ length: escort }, () => alien('trooper'))
-    packs.unshift({ name: mission.kind === 'final' ? 'The source' : 'Guardian', aliens: [{ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: k >= 1, target: false }, ...escorts] })
+    packs.unshift({ name: mission.kind === 'final' ? 'The source' : 'Guardian', aliens: [{ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: k >= 1, target: false, resists: [run.bosses[k]] }, ...escorts] })
   }
   return packs
 }
@@ -368,10 +370,13 @@ export function createRun(seed: number): Run {
     built: [],
     relics: [],
     relicOffers: [],
+    bosses: [],
   }
   hire(run)
   nextStretch(run)
   settle(run)
+  const resists = Object.keys(RESISTS) as Resist[]
+  run.bosses = Array.from({ length: KEYS + 1 }, () => resists[randomInt(run, resists.length)])
   return run
 }
 

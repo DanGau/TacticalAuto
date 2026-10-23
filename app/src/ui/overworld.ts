@@ -2,10 +2,10 @@ import { FACILITIES, type FacilityId } from '../core/base'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { GOALS } from '../core/goals'
-import { KEYWORDS } from '../core/keywords'
+import { KEYWORDS, RESISTS } from '../core/keywords'
 import { SLOTS } from '../core/gear'
 import { RELICS } from '../core/relics'
-import { buildCost, built, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type StopKind, type Zone } from '../core/run'
+import { buildCost, built, KEYS, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type StopKind, type Zone } from '../core/run'
 import { PATHS, SKILLS, type SkillId } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
 import { button, gearCard, keywordChips, gearText, keyRow, STOP_NAMES, threatBar } from './html'
@@ -26,7 +26,7 @@ function chip(run: Run, zone: Zone, stop: StopKind, state = ''): string {
 function census(packs: Muster[]): string {
   const counts = new Map<AlienKind, number>()
   for (const kind of packs.flatMap((pack) => pack.kinds)) counts.set(kind, (counts.get(kind) ?? 0) + 1)
-  return [...counts].map(([kind, n]) => `${n} ${ALIENS[kind].name}${n === 1 ? '' : 's'}`).join(', ')
+  return [...counts].map(([kind, n]) => `${n} ${ALIENS[kind].name}${n === 1 ? '' : 's'}${ALIENS[kind].resists.map((r) => ` <span class="kw ${r}" title="${RESISTS[r]}">no ${KEYWORDS[r].name}</span>`).join('')}`).join(', ')
 }
 
 /** A zone at a fork: its goal and risk, each stop with the aliens it holds, and what it costs and pays. Clicking it commits the squad to it. */
@@ -159,6 +159,7 @@ export function overworld(run: Run, tab: Tab, open: number | null): string {
       <div class="tabs">${tabs.join('')}</div>
       <span>Keys ${keyRow(run.keys)}</span>
       <span>Threat ${threatBar(run.threat)}</span>
+      <span title="${RESISTS[run.bosses[run.keys]]}">${run.keys === KEYS ? 'Source' : 'Guardian'} <span class="kw ${run.bosses[run.keys]}">no ${KEYWORDS[run.bosses[run.keys]].name}</span></span>
       <b class="supplies">${run.supplies} ${run.supplies === 1 ? 'supply' : 'supplies'}</b>
     </div>
     ${views[tab](run)}`

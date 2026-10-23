@@ -12,3 +12,14 @@ export const KEYWORDS: Record<Keyword, { name: string; text: string }> = {
   kill: { name: 'Kill', text: 'Pays off when the soldier kills' },
   ward: { name: 'Ward', text: 'Armor, which takes damage before health' },
 }
+
+/** A keyword an alien shrugs off, so a squad built on it must answer that alien some other way. */
+export type Resist = Exclude<Keyword, 'kill'>
+
+export const RESISTS: Record<Resist, string> = {
+  burn: 'Cannot burn',
+  frost: 'Cannot be chilled',
+  mark: 'Cannot be marked',
+  crit: 'Cannot be crit',
+  ward: 'Its attacks ignore armor',
+}

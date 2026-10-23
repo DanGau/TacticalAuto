@@ -1,4 +1,5 @@
 import { BASE_STATS, type Stance, type Stats } from './battle'
+import type { Resist } from './keywords'
 import { randomInt } from './rng'
 
 /** The kinds of alien. Each fights by a rule no soldier has; combat applies the rules, and `text` states them. */
@@ -12,16 +13,18 @@ export interface AlienType {
   /** Stats it has in place of the base stats. */
   stats: Partial<Stats>
   stance: Stance
+  resists: Resist[]
 }
 
 export const ALIENS: Record<AlienKind, AlienType> = {
-  trooper: { name: 'Trooper', text: 'Shoots from cover, as a soldier does', hp: 1, stats: {}, stance: 'balanced' },
+  trooper: { name: 'Trooper', text: 'Shoots from cover, as a soldier does', hp: 1, stats: {}, stance: 'balanced', resists: [] },
   swarmling: {
     name: 'Swarmling',
     text: 'Weak and fast; attacks only up close, and comes in numbers',
     hp: 0.4,
     stats: { range: 1, move: 6, damage: 2, aim: 0.85, close: 0 },
     stance: 'rush',
+    resists: [],
   },
   spitter: {
     name: 'Spitter',
@@ -29,6 +32,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     hp: 0.8,
     stats: { range: 6 },
     stance: 'balanced',
+    resists: ['ward'],
   },
   burster: {
     name: 'Burster',
@@ -36,6 +40,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     hp: 0.6,
     stats: { range: 0, move: 5 },
     stance: 'rush',
+    resists: ['burn'],
   },
   brute: {
     name: 'Brute',
@@ -43,6 +48,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     hp: 2,
     stats: { range: 1, move: 3, damage: 5, aim: 0.85, close: 0 },
     stance: 'rush',
+    resists: ['frost'],
   },
   psion: {
     name: 'Psion',
@@ -50,6 +56,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     hp: 0.8,
     stats: { damage: 2 },
     stance: 'standoff',
+    resists: ['mark'],
   },
 }
 

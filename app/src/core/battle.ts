@@ -1,4 +1,5 @@
 import type { AlienKind } from './aliens'
+import type { Resist } from './keywords'
 import { randomInt } from './rng'
 import { CIVILIAN_HP, CIVILIANS, type Goal } from './goals'
 import { generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Prop, type TerrainKind } from './terrain'
@@ -175,6 +176,7 @@ export interface Alien {
   spawns: boolean
   /** Whether it is the commander an assassination is after. */
   target: boolean
+  resists: Resist[]
 }
 
 /** A soldier waiting to land. */
@@ -221,6 +223,8 @@ export interface Unit {
   spawns: boolean
   /** Whether it is the commander an assassination is after. */
   target: boolean
+  /** Keywords it shrugs off; empty for humans. */
+  resists: Resist[]
   /** A civilian to rescue: on the human side, but never moves or shoots, and is not a soldier. */
   civilian: boolean
   /** Whether the unit loses its next action. */
@@ -389,7 +393,7 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 export function land(battle: Battle, zone: Tile): void {
   const tiles = freeTilesNear(battle, zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
-    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, civilian: false, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
+    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
   })
   battle.reserve = []
   battle.phase = 'battle'
@@ -503,7 +507,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   if (goal === 'rescue') {
     for (const tile of freeTilesNear(battle, spacedTile(battle, battle.units, ZONE_CLEARANCE), CIVILIANS)) {
       const stats = { ...BASE_STATS, hp: CIVILIAN_HP, aim: 0, damage: 0, range: 0, move: 0, crit: 0 }
-      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, civilian: true, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
+      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
     }
   }
   const count = goal === 'hold' ? 1 : ZONES
