@@ -2,14 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TacticalAuto</title>
     <style>
-      body { margin: 0; overflow: hidden; background: #10141c; color: #dde; font: 14px sans-serif; }
-      canvas { display: block; }
+      body { margin: 0; overflow: hidden; height: 100vh; display: flex; align-items: center; background: #10141c; color: #dde; font: 14px sans-serif; }
+      canvas { display: block; width: min(100vw, calc(100vh * 16 / 9)); height: auto; margin: 0 auto; }
       #hud { position: absolute; top: 12px; left: 12px; pointer-events: none; }
       .roster hr { border: 0; border-top: 1px solid #3a465c; margin: 6px 0; }
       .roster { margin-top: 8px; padding: 8px 12px; max-width: 420px; background: #171d29d9; border: 1px solid #3a465c; border-radius: 6px; line-height: 1.5; font-size: 13px; }
-      #panel { position: absolute; top: 24px; left: 40px; width: 1200px; max-height: calc(100vh - 48px); overflow-y: auto; box-sizing: border-box; padding: 14px 24px 18px; background: #171d29f2; border: 1px solid #3a465c; border-radius: 8px; }
+      #panel { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); width: min(1200px, calc(100vw - 16px)); max-height: calc(100vh - 48px); overflow-y: auto; box-sizing: border-box; padding: 14px 24px 18px; background: #171d29f2; border: 1px solid #3a465c; border-radius: 8px; }
       #panel[hidden] { display: none; }
       h1 { margin: 0 0 4px; font-size: 22px; }
       h2 { margin: 16px 0 8px; font-size: 14px; font-weight: normal; color: #9aa6bd; }
@@ -108,6 +109,13 @@
       @keyframes clear { to { opacity: 0.25; } }
       .landed { display: inline-block; color: #ffd84d; animation: land 0.6s 0.6s both; }
       @keyframes land { from { opacity: 0; transform: scale(3); } }
+      @media (max-width: 900px) {
+        body { font-size: 12px; }
+        #panel { top: 8px; max-height: calc(100vh - 16px); padding: 8px 12px; }
+        .choices, .squad, .compare, .details, .header { flex-wrap: wrap; }
+        .facilities, .stash { grid-template-columns: repeat(2, 1fr); }
+        .roster { max-width: 240px; font-size: 11px; padding: 4px 8px; }
+      }
     </style>
   </head>
   <body>

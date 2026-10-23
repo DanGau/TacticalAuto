@@ -160,7 +160,7 @@ export interface View {
    * Once landed, fog darkens every tile no soldier sees.
    */
   show(run: Run, events: GameEvent[], animate: boolean): Promise<void>
-  /** The landing zone under a screen point, as an index into battle.zones; null when there is none to choose. */
+  /** The landing zone under a point on the canvas as displayed, as an index into battle.zones; null when there is none to choose. */
   zoneAt(sx: number, sy: number): number | null
 }
 
@@ -199,8 +199,11 @@ export async function createView(): Promise<View> {
     return g.poly([c.x, c.y - TILE_H / 2, c.x + TILE_W / 2, c.y, c.x, c.y + TILE_H / 2, c.x - TILE_W / 2, c.y])
   }
 
-  function zoneAt(sx: number, sy: number): number | null {
+  function zoneAt(px: number, py: number): number | null {
     if (shown?.phase !== 'deploy') return null
+    // The canvas is scaled to fit the window.
+    const sx = (px * WIDTH) / app.canvas.clientWidth
+    const sy = (py * HEIGHT) / app.canvas.clientHeight
     const a = (sx - world.x) / world.scale.x / (TILE_W / 2)
     const b = (sy - world.y) / world.scale.y / (TILE_H / 2) + GRID
     const tile = { x: Math.floor((a + b) / 2), y: Math.floor((b - a) / 2) }
