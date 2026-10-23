@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { revealed, type Battle } from './battle'
+import { isSoldier, revealed, type Battle } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { createRun } from './run'
 import { sees } from './sight'
@@ -68,7 +68,7 @@ test('an alien shoots only after its pod is revealed', () => {
 
 test('a pod is revealed exactly when a soldier first has it in sight', () => {
   play(4, (_, __, after) => {
-    const soldiers = after.units.filter((u) => u.side === 'human')
+    const soldiers = after.units.filter(isSoldier)
     for (const alien of after.units.filter((u) => u.side === 'alien')) {
       const seen = soldiers.some((s) => sees(after, s, alien))
       if (seen) expect(revealed(after, alien)).toBe(true)

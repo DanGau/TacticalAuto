@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { FACILITIES } from './base'
-import { BASE_STATS, type Side } from './battle'
+import { isSoldier, BASE_STATS, type Side } from './battle'
 import { CLASSES } from './classes'
 import {
   createRun,
@@ -287,7 +287,19 @@ test("a soldier lands with its class's ability and its uses, the effects of its 
   run.relics = ['echo', 'capacitor']
   apply(run, { type: 'advance' })
   apply(run, { type: 'land', zone: 0 })
-  const [unit] = run.battle!.units.filter((u) => u.side === 'human')
+  const [unit] = run.battle!.units.filter(isSoldier)
   expect(unit).toMatchObject({ ability: 'rocket', charges: 3, stance: 'anchor', armor: 2, effects: ['shred', 'opener'] })
   expect(unit.hp).toBe(soldierStats(run, run.soldiers[0]).hp)
+})
+
+test("the first relic offered shares a keyword with the squad's skills, gear or relics", () => {
+  for (let seed = 1; seed <= 5; seed++) {
+    const run = started()
+    run.rng = seed
+    run.soldiers[0].skills = ['mark']
+    run.fork = FORKS
+    run.zone = { risk: 'standard', goal: 'exterminate', terrain: 'compound', stops: ['key'], packs: [[]] }
+    fight(run, 'human')
+    expect(RELICS[run.relicOffers[0]].tags).toContain('mark')
+  }
 })

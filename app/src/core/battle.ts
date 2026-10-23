@@ -34,6 +34,13 @@ export const MEDKIT_HEAL = 4
 /** Turns a burning unit takes BURN_DAMAGE at the start of. */
 export const BURN_TURNS = 2
 export const BURN_DAMAGE = 1
+
+export const CHILL_TURNS = 2
+export const CHILL_MOVE = 2
+export const CHILL_AIM = 0.15
+export const SHATTER_DAMAGE = 2
+export const THERMAL_DAMAGE = 3
+export const SPOTTER_AIM = 0.15
 /** Damage the executioner effect adds against a target at half health or less. */
 export const EXECUTE_BONUS = 2
 /** Damage a burster's explosion does within BLAST_RADIUS. */
@@ -111,7 +118,7 @@ export const BASE_STATS: Stats = { hp: 10, armor: 0, aim: 0.75, damage: 3, range
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic'
 
 /** Something a piece of gear does; gear.ts says what each does. */
-export type GearEffect = 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'thorns' | 'shield' | 'regen' | 'lastStand' | 'medkit' | 'grenade'
+export type GearEffect = 'frostbite' | 'tracer' | 'rime' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'thorns' | 'shield' | 'regen' | 'lastStand' | 'medkit' | 'grenade'
 /** Something a skill does; skills.ts says what each does. */
 export type SkillEffect =
   | 'frenzy'
@@ -151,7 +158,7 @@ export type SkillEffect =
   | 'ward'
   | 'drone'
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix'
+export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored'
 /** Anything a unit's gear, skills or the squad's relics do. Combat applies them. */
 export type Effect = GearEffect | SkillEffect | RelicEffect
 
@@ -203,6 +210,10 @@ export interface Unit {
   spent: Effect[]
   /** Turns of burning left. */
   burning: number
+  /** Own turns for which it is chilled. */
+  chilled: number
+  /** Damage its kills this battle have added, by blood rite. */
+  fury: number
   /** The kind of alien; null for humans. */
   kind: AlienKind | null
   boss: boolean
@@ -378,7 +389,7 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 export function land(battle: Battle, zone: Tile): void {
   const tiles = freeTilesNear(battle, zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
-    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, kind: null, boss: false, spawns: false, target: false, civilian: false, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
+    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, civilian: false, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
   })
   battle.reserve = []
   battle.phase = 'battle'
@@ -433,6 +444,8 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     effects: [],
     spent: [],
     burning: 0,
+    chilled: 0,
+    fury: 0,
     civilian: false,
     panicked: false,
     moved: false,
@@ -490,7 +503,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   if (goal === 'rescue') {
     for (const tile of freeTilesNear(battle, spacedTile(battle, battle.units, ZONE_CLEARANCE), CIVILIANS)) {
       const stats = { ...BASE_STATS, hp: CIVILIAN_HP, aim: 0, damage: 0, range: 0, move: 0, crit: 0 }
-      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, kind: null, boss: false, spawns: false, target: false, civilian: true, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
+      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, civilian: true, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
     }
   }
   const count = goal === 'hold' ? 1 : ZONES

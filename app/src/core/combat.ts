@@ -35,6 +35,12 @@ import {
   BLAST_RADIUS,
   BURST_DAMAGE,
   CLEAVE_DAMAGE,
+  CHILL_AIM,
+  CHILL_MOVE,
+  CHILL_TURNS,
+  SHATTER_DAMAGE,
+  SPOTTER_AIM,
+  THERMAL_DAMAGE,
   BURN_DAMAGE,
   BURN_TURNS,
   coverAt,
@@ -363,7 +369,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
       return spot.mine > 0 ? [...first, 0, ...WITH_SHOT[unit.stance](spot), steps] : [...first, 1, ahead(end), ...NO_SHOT[unit.stance](spot)]
     })
   }
-  const move = unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0)
+  const move = Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0))
   const path = choose(move)
   if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
   return path
@@ -418,6 +424,7 @@ function upkeep(battle: Battle): GameEvent[] {
     if (unit.hp <= 0) continue
     unit.moved = false
     if (unit.suppressed > 0) unit.suppressed--
+    if (unit.chilled > 0) unit.chilled--
     if (has(unit, 'vitality')) {
       for (const mate of battle.units.filter((u) => u.side === unit.side && u !== unit && u.hp < u.stats.hp && distance(u, unit) <= AURA_REACH)) {
         mate.hp++
@@ -504,6 +511,13 @@ function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[]
   target.armor -= absorbed
   target.hp -= damage - absorbed
   if (target.hp > 0) return
+  // An alien that dies burning spreads the fire, if the squad carries wildfire.
+  if (target.burning > 0 && battle.units.some((u) => u.side !== target.side && has(u, 'wildfire'))) {
+    for (const other of battle.units.filter((u) => u.side === target.side && u !== target && distance(u, target) <= 1)) {
+      other.burning = BURN_TURNS
+      events.push({ type: 'effect', id: other.id, effect: 'wildfire', amount: 0 })
+    }
+  }
   // A soldier who would fall may be got back up: by a squadmate's revive, or once by the squad's phoenix protocol.
   const reviver = battle.units.find((u) => u.side === target.side && u !== target && u.hp > 0 && distance(u, target) <= REVIVE_REACH && has(u, 'revive') && !u.spent.includes('revive'))
   const rises = reviver ? 'revive' : has(target, 'phoenix') && !battle.used.includes('phoenix') ? 'phoenix' : null
@@ -682,7 +696,9 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     (ambushed ? AMBUSH_AIM : 0) +
     (inAura(battle, unit, 'inspire') ? INSPIRE_AIM : 0) +
     when(true, 'reckless', RECKLESS_AIM) +
-    (has(enemy, 'reckless') ? RECKLESS_AIM : 0) -
+    (has(enemy, 'reckless') ? RECKLESS_AIM : 0) +
+    when(enemy.marked, 'spotter', SPOTTER_AIM) -
+    (unit.chilled > 0 ? CHILL_AIM : 0) -
     (inAura(battle, enemy, 'bulwark') ? BULWARK_DEFENSE : 0) -
     (baned ? BANE_AIM : 0) -
     (unit.suppressed > 0 ? SUPPRESS_AIM : 0)
@@ -704,7 +720,12 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     when(coverAgainst(battle, enemy, unit) === 0, 'backstab', BACKSTAB_DAMAGE) +
     when(unit.hp <= unit.stats.hp / 2, 'rage', RAGE_DAMAGE) +
     when(enemy.hp < enemy.stats.hp, 'slayer', SLAYER_DAMAGE) +
-    (enemy.marked ? MARK_DAMAGE : 0) -
+    (enemy.marked ? MARK_DAMAGE : 0) +
+    when(enemy.burning > 0, 'accelerant', 1) +
+    when(enemy.chilled > 0, 'shatter', SHATTER_DAMAGE) +
+    when(enemy.burning > 0 && enemy.chilled > 0, 'thermal', THERMAL_DAMAGE) +
+    when(unit.armor > 0, 'armored', 1) +
+    when(unit.fury > 0, 'bloodRite', unit.fury) -
     (has(enemy, 'thick') ? THICK_ARMOR : 0)
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0
   if (spend(enemy, 'shield')) {
@@ -723,21 +744,31 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     events.push({ type: 'effect', id: other.id, effect: has(unit, 'volley') ? 'volley' : 'cleave', amount: -splash })
     wound(battle, other, splash, events)
   }
-  if (enemy.hp > 0 && when(true, 'mark', 1)) enemy.marked = true
+  if (enemy.hp > 0 && (when(true, 'mark', 1) || when(true, 'tracer', 1) || when(crit, 'exploit', 1))) enemy.marked = true
+  if (enemy.hp > 0 && (when(damage > 0, 'frostbite', 1) || when(crit, 'freeze', 1))) {
+    enemy.chilled = CHILL_TURNS
+    events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'frostbite') ? 'frostbite' : 'freeze', amount: 0 })
+  }
+  if (enemy.hp <= 0 && when(true, 'momentum', 1)) unit.armor++
+  if (enemy.hp <= 0 && when(true, 'bloodRite', 1)) unit.fury++
   if (enemy.hp > 0 && when(true, 'suppress', 1)) enemy.suppressed = 2
   if (enemy.hp > 0 && crit && has(unit, 'concussion')) {
     enemy.panicked = true
     events.push({ type: 'effect', id: enemy.id, effect: 'concussion', amount: 0 })
   }
-  if (enemy.hp > 0 && damage > 0 && has(unit, 'incendiary')) {
+  if (enemy.hp > 0 && ((damage > 0 && has(unit, 'incendiary')) || when(crit, 'ignite', 1))) {
     enemy.burning = BURN_TURNS
-    events.push({ type: 'effect', id: enemy.id, effect: 'incendiary', amount: 0 })
+    events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'incendiary') ? 'incendiary' : 'ignite', amount: 0 })
   }
   const healing = (damage > 0 && has(unit, 'vampiric') ? 1 : 0) + (enemy.hp <= 0 && has(unit, 'feast') ? FEAST_HEAL : 0)
   const healed = Math.min(healing, unit.stats.hp - unit.hp)
   if (healed > 0) {
     unit.hp += healed
     events.push({ type: 'effect', id: unit.id, effect: enemy.hp <= 0 && has(unit, 'feast') ? 'feast' : 'vampiric', amount: healed })
+  }
+  if (has(enemy, 'rime')) {
+    unit.chilled = CHILL_TURNS
+    events.push({ type: 'effect', id: unit.id, effect: 'rime', amount: 0 })
   }
   if (has(enemy, 'thorns')) {
     events.push({ type: 'effect', id: unit.id, effect: 'thorns', amount: -1 })

@@ -102,3 +102,19 @@ test('a scorching weapon burns its target at the start of the target\'s turns', 
   expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'incendiary', amount: -1 })
   expect(d.alien.hp).toBe(99 - 1 - 1)
 })
+
+test('a rimed weapon chills its target, and a shatterglass edge and thermal shock core pay off on it', () => {
+  const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Rimed Steady Carbine', stats: { aim: 2 }, effect: 'frostbite' })
+  d.soldier.stats = { ...d.soldier.stats, damage: 2, crit: 0 }
+  d.soldier.effects.push('shatter', 'thermal')
+  const shots = () => {
+    const events = untilAlienShoots(d)
+    return events.filter((e) => e.type === 'shot' && e.id === d.soldier.id)
+  }
+  const [first] = shots()
+  expect(first).toMatchObject({ hit: true, damage: 2 })
+  expect(d.alien.chilled).toBeGreaterThan(0)
+  d.alien.burning = 5
+  const [second] = shots()
+  expect(second).toMatchObject({ hit: true, damage: 2 + 2 + 3 })
+})

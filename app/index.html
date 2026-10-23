@@ -87,6 +87,11 @@
       .compare .stats td { text-align: left; padding: 2px 8px; }
       .compare .arrow, .stats td.down, .stats td.up { font-weight: bold; }
 
+      .keywords { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+      .kw { padding: 1px 8px; border: 1px solid; border-radius: 10px; font-size: 11px; opacity: 0.75; }
+      .kw.held { opacity: 1; font-weight: bold; box-shadow: 0 0 6px currentColor; }
+      .kw.burn { color: #ff8a3d; } .kw.frost { color: #7fd4ff; } .kw.mark { color: #ff6bd6; }
+      .kw.crit { color: #ffd84d; } .kw.kill { color: #ff6b5e; } .kw.ward { color: #9aa6bd; }
       .choices { display: flex; gap: 16px; }
       .choices button { flex: 1; text-align: left; line-height: 1.5; display: flex; flex-direction: column; justify-content: flex-start; }
       .choices button > * { margin: 0; }

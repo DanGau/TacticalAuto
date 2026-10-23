@@ -1,6 +1,7 @@
 import type { Action } from '../core/apply'
 import type { Stats } from '../core/battle'
 import { EFFECTS, type Gear } from '../core/gear'
+import { KEYWORDS, type Keyword } from '../core/keywords'
 import { KEYS, THREAT_MAX, type Mission, type StopKind } from '../core/run'
 
 /** A button that performs `action` when clicked. */
@@ -51,7 +52,11 @@ export function gearText(gear: Gear): string {
   return `${stats.join(', ')}${gear.effect ? `. ${EFFECTS[gear.effect].text}.` : ''}`
 }
 
-/** A piece of gear as a card's contents: rarity and slot, name, and what it changes. */
-export function gearCard(gear: Gear): string {
-  return `<small>${gear.rarity} ${gear.slot}</small><br><b>${gear.name}</b><br>${gearText(gear)}`
+/** Keyword chips; one the squad already has, in `held`, is lit. Each explains itself on hover. */
+export const keywordChips = (tags: Keyword[] = [], held: Keyword[] = []) =>
+  tags.length === 0 ? '' : `<span class="keywords">${tags.map((tag) => `<span class="kw ${tag} ${held.includes(tag) ? 'held' : ''}" title="${KEYWORDS[tag].text}">${KEYWORDS[tag].name}</span>`).join('')}</span>`
+
+/** A piece of gear as a card's contents: rarity and slot, name, what it changes, and its keywords. */
+export function gearCard(gear: Gear, held: Keyword[] = []): string {
+  return `<small>${gear.rarity} ${gear.slot}</small><br><b>${gear.name}</b><br>${gearText(gear)}${keywordChips(gear.effect ? EFFECTS[gear.effect].tags : [], held)}`
 }

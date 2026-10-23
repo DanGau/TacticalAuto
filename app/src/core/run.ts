@@ -3,7 +3,8 @@ import { ALIENS, alienStats, muster, type AlienKind } from './aliens'
 import { GOALS, type Goal } from './goals'
 import { BASE_STATS, createBattle, type Alien, type Battle, type Stats } from './battle'
 import { CLASSES, type ClassId } from './classes'
-import { generateGear, SLOTS, type Gear, type Slot } from './gear'
+import { EFFECTS, generateGear, SLOTS, type Gear, type Slot } from './gear'
+import type { Keyword } from './keywords'
 import { RELIC_OFFERS, RELICS, type Relic, type RelicId } from './relics'
 import { PATHS, SKILLS, type SkillId } from './skills'
 import { ZONE_TERRAINS, type TerrainKind } from './terrain'
@@ -481,9 +482,22 @@ export function endBattle(run: Run): void {
   // A satellite, a last stand or a hold won offers relics.
   if (won && (mission.kind !== 'battle' || mission.goal === 'hold')) {
     const pool = (Object.keys(RELICS) as RelicId[]).filter((id) => !run.relics.includes(id))
+    // The first offer builds on a keyword the squad already has, when one can.
+    const held = squadKeywords(run)
+    const fits = pool.filter((id) => RELICS[id].tags?.some((tag) => held.includes(tag)))
+    if (fits.length > 0) run.relicOffers.push(...pool.splice(pool.indexOf(fits[randomInt(run, fits.length)]), 1))
     while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(...pool.splice(randomInt(run, pool.length), 1))
   }
   settle(run)
+}
+
+/** The keywords of everything the squad has: its soldiers' skills and gear, and its relics. */
+export function squadKeywords(run: Run): Keyword[] {
+  const tags = [
+    ...run.soldiers.flatMap((s) => [...s.skills.map((id) => SKILLS[id].tags ?? []), ...equipped(s).map((gear) => (gear.effect && EFFECTS[gear.effect].tags) || [])]),
+    ...run.relics.map((id) => RELICS[id].tags ?? []),
+  ].flat()
+  return [...new Set(tags)]
 }
 
 /** Takes an offered relic. */

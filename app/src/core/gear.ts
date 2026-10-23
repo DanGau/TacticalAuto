@@ -1,5 +1,6 @@
 import type { GearEffect, Stats } from './battle'
 import type { Rarity } from './base'
+import type { Keyword } from './keywords'
 import { randomInt } from './rng'
 
 export const SLOTS = ['weapon', 'armor', 'utility'] as const
@@ -53,14 +54,17 @@ const MODS: Record<Slot, Mod[]> = {
 }
 
 /** Each effect: the slot it appears on, the word it adds to a name, and what it does. Combat applies them. */
-export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: string }> = {
-  incendiary: { slot: 'weapon', prefix: 'Scorching', text: 'Hits set the target burning: 1 damage at the start of its next 2 turns' },
+export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: string; tags?: Keyword[] }> = {
+  incendiary: { slot: 'weapon', prefix: 'Scorching', text: 'Hits set the target burning', tags: ['burn'] },
+  frostbite: { slot: 'weapon', prefix: 'Rimed', text: 'Hits chill the target', tags: ['frost'] },
+  tracer: { slot: 'weapon', prefix: 'Tracer', text: 'Hits mark the target', tags: ['mark'] },
   piercing: { slot: 'weapon', prefix: 'Piercing', text: "Ignores the target's cover" },
   vampiric: { slot: 'weapon', prefix: 'Leeching', text: 'Each hit heals the shooter 1' },
-  executioner: { slot: 'weapon', prefix: 'Merciless', text: '+2 damage to targets at half health or less' },
-  chain: { slot: 'weapon', prefix: 'Frenzied', text: 'A kill grants one more shot' },
+  executioner: { slot: 'weapon', prefix: 'Merciless', text: '+2 damage to targets at half health or less', tags: ['kill'] },
+  chain: { slot: 'weapon', prefix: 'Frenzied', text: 'A kill grants one more shot', tags: ['kill'] },
   thorns: { slot: 'armor', prefix: 'Barbed', text: 'Whoever hits the wearer takes 1 damage' },
-  shield: { slot: 'armor', prefix: 'Warded', text: 'Absorbs the first hit each battle' },
+  shield: { slot: 'armor', prefix: 'Warded', text: 'Absorbs the first hit each battle', tags: ['ward'] },
+  rime: { slot: 'armor', prefix: 'Rimeguard', text: 'Whoever hits the wearer is chilled', tags: ['frost', 'ward'] },
   regen: { slot: 'armor', prefix: 'Mending', text: 'Heals 1 at the start of each turn' },
   lastStand: { slot: 'armor', prefix: 'Stubborn', text: 'Once per battle, survives a killing hit at 1 health' },
   medkit: { slot: 'utility', prefix: "Medic's", text: 'Once per battle, heals the carrier 4 at half health or less, and the carrier still shoots' },
