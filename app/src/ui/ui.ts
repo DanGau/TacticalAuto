@@ -3,7 +3,7 @@ import type { Report, Run } from '../core/run'
 import type { View } from '../view/view'
 import { choice, runEnd, stopReport } from './aftermath'
 import { ALIENS, type AlienKind } from '../core/aliens'
-import { GOALS } from '../core/goals'
+import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { STOP_NAMES } from './html'
 import { overworld, type Tab } from './overworld'
 
@@ -39,7 +39,8 @@ function status(run: Run): string {
   const mission = run.mission!
   const title = mission.kind === 'battle' ? `${GOALS[mission.goal].name}: ${GOALS[mission.goal].text}` : STOP_NAMES[mission.kind]
   if (battle.phase === 'deploy') return `${title} · click a landing zone<div class="roster">${roster(run)}</div>`
-  return `${title} · ${SIDE[battle.turn]}' turn${battle.concealed ? ' · unseen' : ''}`
+  const rounds = battle.goal === 'hold' ? ` · round ${Math.min(battle.round, HOLD_ROUNDS)} of ${HOLD_ROUNDS}` : ''
+  return `${title}${rounds} · ${SIDE[battle.turn]}' turn${battle.concealed ? ' · unseen' : ''}`
 }
 
 /** Turns clicks into actions and hands them to `act`. */
