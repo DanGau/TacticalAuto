@@ -6,6 +6,7 @@ import { createRun, type Run } from './run'
 /** A run choosing where to land for its first battle. */
 function landing(): Run & { battle: Battle } {
   const run = createRun(1)
+  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
   apply(run, { type: 'zone', index: 1 })
   apply(run, { type: 'advance' })
   return run as Run & { battle: Battle }
@@ -36,8 +37,11 @@ test('landing puts the whole squad on open tiles by the zone and begins the batt
 
 test('actions outside their phase are rejected and change nothing', () => {
   const run = createRun(1)
+  expect(apply(run, { type: 'zone', index: 1 })).toEqual({ ok: false, reason: 'not in the overworld' })
+  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
   const before = structuredClone(run)
-  expect(apply(run, { type: 'pick', index: 0 }).ok).toBe(false)
+  expect(apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 }).ok).toBe(false)
+  expect(apply(run, { type: 'keep' }).ok).toBe(false)
   expect(apply(run, { type: 'land', zone: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'zone', index: 9 }).ok).toBe(false)
   expect(apply(run, { type: 'advance' }).ok).toBe(false)

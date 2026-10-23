@@ -28,6 +28,9 @@ export function threatBar(threat: number, landed = 0): string {
 /** The access keys, won and still to win. */
 export const keyRow = (keys: number) => `<span class="keys">${'◆'.repeat(keys)}${'◇'.repeat(KEYS - keys)}</span>`
 
+/** What each stat is called. */
+export const STAT_NAMES: Record<keyof Stats, string> = { hp: 'Health', armor: 'Armor', aim: 'Aim', damage: 'Damage', range: 'Range', move: 'Move', crit: 'Crit', close: 'Aim per tile closer' }
+
 const percent = (n: number) => `${signed(Math.round(100 * n))}%`
 
 /** How each stat change reads on a piece of gear. */

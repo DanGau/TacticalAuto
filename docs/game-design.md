@@ -10,7 +10,7 @@ Test every new mechanic against these. Each cites where it comes from.
 6. **Breadth early, depth later.** Start with few simple options. Unlock more between runs as "you are ready for this", not as a prize: many new options quickly at first, niche ones later. Not built. [4]
 7. **Show the change.** Players feel feedback, not numbers. After a battle, show the gain first and the aliens' answer second, each as a visible change to the board. [5]
 8. **Squeeze and release.** Tension must be followed by relief the player earned, and the alien advance after a win is the next squeeze. [5]
-9. **Rewards that point a build.** A reward that is strong everywhere makes runs alike; one that pays only if the player builds around it makes them differ. Offer a few at a time and make the choice permanent, so each pick matters for the whole run. Skills and relics here are chosen one of three and kept. [6]
+9. **Rewards that point a build.** A reward that is strong everywhere makes runs alike; one that pays only if the player builds around it makes them differ. Offer a few at a time and make the choice permanent, so each pick matters for the whole run. Relics here are chosen one of three and kept; a skill path, once chosen, shuts the other. [6]
 
 ## Sources
 

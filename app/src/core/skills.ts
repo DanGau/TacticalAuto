@@ -2,7 +2,7 @@ import type { SkillEffect, Stats } from './battle'
 import type { ClassId } from './classes'
 
 /**
- * Something a soldier learns on gaining a level, chosen from three drawn from the class's skills.
+ * Something a soldier learns on gaining one of its first levels, along one of its class's paths.
  * It changes stats, adds uses of the class ability, or gives an effect that combat applies; `text` says which.
  */
 export interface Skill {
@@ -64,13 +64,29 @@ const skills = {
 export type SkillId = keyof typeof skills
 export const SKILLS: Record<SkillId, Skill> = skills
 
-/** The skills each class draws from. */
-export const CLASS_SKILLS: Record<ClassId, SkillId[]> = {
-  assault: ['bloodlust', 'backstab', 'rage', 'reflexes', 'sprinter', 'surge', 'secondWind', 'skirmish', 'reckless', 'cleave'],
-  heavy: ['arsenal', 'shredder', 'suppression', 'bulwark', 'overwatch', 'taunt', 'thick', 'steadfast', 'bigBlast', 'concussion'],
-  sniper: ['steady', 'headshot', 'mark', 'doubleTap', 'hollowPoint', 'assassinate', 'longshot', 'slayer', 'volley', 'ghost'],
-  support: ['fieldKit', 'revive', 'inspire', 'barrier', 'surgeon', 'haste', 'vitality', 'bane', 'ward', 'drone'],
+/** A way to build a soldier: its core skill, learned first, then one skill of each tier's pair, the other lost. */
+export interface Path {
+  name: string
+  core: SkillId
+  tiers: [SkillId, SkillId][]
 }
 
-/** Skills offered at each level gained. */
-export const SKILL_OFFERS = 3
+/** Each class's two paths; choosing one shuts the other. */
+export const PATHS: Record<ClassId, [Path, Path]> = {
+  assault: [
+    { name: 'Berserker', core: 'bloodlust', tiers: [['rage', 'reckless'], ['cleave', 'surge']] },
+    { name: 'Infiltrator', core: 'backstab', tiers: [['reflexes', 'sprinter'], ['skirmish', 'secondWind']] },
+  ],
+  heavy: [
+    { name: 'Demolisher', core: 'arsenal', tiers: [['bigBlast', 'shredder'], ['concussion', 'suppression']] },
+    { name: 'Guardian', core: 'bulwark', tiers: [['taunt', 'thick'], ['steadfast', 'overwatch']] },
+  ],
+  sniper: [
+    { name: 'Marksman', core: 'steady', tiers: [['headshot', 'longshot'], ['doubleTap', 'assassinate']] },
+    { name: 'Hunter', core: 'mark', tiers: [['slayer', 'hollowPoint'], ['volley', 'ghost']] },
+  ],
+  support: [
+    { name: 'Medic', core: 'fieldKit', tiers: [['surgeon', 'vitality'], ['revive', 'ward']] },
+    { name: 'Tactician', core: 'inspire', tiers: [['haste', 'bane'], ['barrier', 'drone']] },
+  ],
+}

@@ -7,6 +7,7 @@ import { sees } from './sight'
 
 function battle(seed: number): Battle {
   const run = createRun(seed)
+  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
   apply(run, { type: 'zone', index: 1 })
   apply(run, { type: 'advance' })
   apply(run, { type: 'land', zone: 0 })

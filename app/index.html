@@ -41,12 +41,13 @@
       .chip.supply, .chip.cache { border-color: #ffd84d; }
       .chip.key, .chip.final { border-color: #c77dff; }
       .chip.done { opacity: 0.35; }
+      .chip.learned { border-color: #7ddc5a; color: #7ddc5a; }
+      .chip.lost, b.lost { opacity: 0.35; text-decoration: line-through; }
       .chip.here { background: #35496b; }
       button.zone.safe { border-color: #7ddc5a; }
       button.zone.dangerous { border-color: #ff6b5e; }
       button.travel { min-width: 320px; text-align: left; line-height: 1.5; }
       button.travel.key, button.travel.final { border-color: #c77dff; }
-      .drops { display: flex; gap: 12px; }
 
       .facilities { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
       .facilities button { text-align: left; padding: 10px 14px; line-height: 1.5; }
@@ -71,29 +72,32 @@
       .gear.epic > small:first-child, .slot.epic b { color: #c77dff; }
       div.gear { padding: 8px 12px; border: 1px solid; border-radius: 6px; background: #263042; line-height: 1.5; }
       .drop { display: inline-block; min-width: 260px; }
-      .slot { display: block; width: 100%; margin-top: 6px; padding: 5px 10px; text-align: left; background: #1d2433; }
-      .slot.chosen { background: #35496b; outline: 2px solid #ffd84d; }
+      .slot { display: block; margin-top: 6px; padding: 5px 10px; border: 1px solid; border-radius: 4px; background: #1d2433; }
       .stash { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
       .who { display: block; width: 100%; padding: 4px 8px; text-align: left; background: none; border-color: transparent; line-height: 1.4; }
       .who.chosen { background: #35496b; outline: 2px solid #ffd84d; }
       .details { display: flex; gap: 24px; align-items: flex-start; }
       .details .stats { width: 260px; flex: none; }
       .details > div { flex: 1; }
-      .chip.gear.rare { color: #4da3ff; }
-      .chip.gear.epic { color: #c77dff; }
-      .stash button { text-align: left; padding: 8px 12px; line-height: 1.5; }
+      .compare { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
+      .compare .gear { width: 260px; }
+      .compare .stats { width: auto; }
+      .compare .stats td { text-align: left; padding: 2px 8px; }
+      .compare .arrow, .stats td.down, .stats td.up { font-weight: bold; }
 
       .choices { display: flex; gap: 16px; }
       .choices button { flex: 1; text-align: left; line-height: 1.5; display: flex; flex-direction: column; justify-content: flex-start; }
       .choices button > * { margin: 0; }
       .choices button br { display: none; }
       button.card { min-height: 110px; }
+      button.decide { padding: 12px 20px; }
       button.rare { border-color: #4da3ff; }
       button.rare small { color: #4da3ff; }
       button.epic { border-color: #c77dff; }
       button.relic, .gear.relic { border-color: #ffd84d; }
       button.relic small, .gear.relic > small:first-child, button.skill small { color: #ffd84d; }
       button.skill { border-color: #7ddc5a; }
+      button.skill small.ahead { margin-top: auto; padding-top: 8px; color: #9aa6bd; }
       button.epic small { color: #c77dff; }
 
       .stage { animation: rise 0.5s both; }

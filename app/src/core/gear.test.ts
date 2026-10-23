@@ -3,7 +3,7 @@ import { apply } from './apply'
 import type { Unit } from './battle'
 import { stepBattle } from './combat'
 import { EFFECTS, generateGear, type Gear } from './gear'
-import { createRun, equipped, holder, soldierStats, type Run } from './run'
+import { createRun, SELL, soldierStats, type Run } from './run'
 
 test('gear is built by rarity: commons have one mod, rares add an effect for their slot, epics add a second mod', () => {
   const rng = { rng: 7 }
@@ -18,33 +18,41 @@ test('gear is built by rarity: commons have one mod, rares add an effect for the
   }
 })
 
-/** A run holding one piece of gear, in the stash. */
-function withGear(gear: Omit<Gear, 'id'>): Run {
+/** A run whose clone has learned its first skill and found `gear`. */
+function withFind(gear: Omit<Gear, 'id'>): Run {
   const run = createRun(1)
-  run.gear.push({ id: 1, ...gear })
+  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
+  run.finds.push({ soldier: run.soldiers[0].id, gear: { id: 1, ...gear } })
+  run.phase = 'reward'
   return run
 }
 
-test('equipping adds the gear to one soldier, moves it between soldiers, and unequipping returns it to the stash', () => {
-  const run = withGear({ slot: 'armor', rarity: 'common', name: 'Sturdy Vest', stats: { armor: 2 }, effect: null })
-  run.soldiers.push({ ...run.soldiers[0], id: 99, name: 'Second', gear: { weapon: null, armor: null, utility: null } })
-  const [first, second] = run.soldiers
-  expect(soldierStats(run, first).armor).toBe(0)
-  expect(apply(run, { type: 'equip', soldier: first.id, gear: 1 })).toEqual({ ok: true })
-  expect(soldierStats(run, first).armor).toBe(2)
-  expect(apply(run, { type: 'equip', soldier: first.id, gear: 1 })).toEqual({ ok: false, reason: 'already equipped' })
-  apply(run, { type: 'equip', soldier: second.id, gear: 1 })
-  expect(equipped(run, first)).toEqual([])
-  expect(holder(run, run.gear[0])).toBe(second)
-  expect(apply(run, { type: 'unequip', soldier: second.id, slot: 'armor' })).toEqual({ ok: true })
-  expect(holder(run, run.gear[0])).toBeUndefined()
-  expect(apply(run, { type: 'unequip', soldier: second.id, slot: 'armor' }).ok).toBe(false)
+test('found gear is equipped on its finder, selling what it replaces, or sold; then the reward phase ends', () => {
+  const vest = { slot: 'armor', rarity: 'common', name: 'Sturdy Vest', stats: { armor: 2 }, effect: null } as const
+  const run = withFind(vest)
+  const [clone] = run.soldiers
+  expect(soldierStats(run, clone).armor).toBe(0)
+  expect(apply(run, { type: 'keep' })).toEqual({ ok: true })
+  expect(soldierStats(run, clone).armor).toBe(2)
+  expect(run).toMatchObject({ finds: [], phase: 'overworld' })
+  const supplies = run.supplies
+  run.finds.push({ soldier: clone.id, gear: { id: 2, ...vest, rarity: 'rare', stats: { armor: 4 } } })
+  run.phase = 'reward'
+  apply(run, { type: 'keep' })
+  expect(run.supplies).toBe(supplies + SELL.common)
+  expect(clone.gear.armor).toMatchObject({ id: 2 })
+  run.finds.push({ soldier: clone.id, gear: { id: 3, ...vest, rarity: 'epic' } })
+  run.phase = 'reward'
+  apply(run, { type: 'sell' })
+  expect(run.supplies).toBe(supplies + SELL.common + SELL.epic)
+  expect(clone.gear.armor).toMatchObject({ id: 2 })
+  expect(apply(run, { type: 'sell' }).ok).toBe(false)
 })
 
 /** A duel on open ground: one soldier wearing `gear`, one alien beside it, and the soldier too weak to win quickly. */
 function duel(gear: Omit<Gear, 'id'>): { soldier: Unit; alien: Unit; step: () => ReturnType<typeof stepBattle> } {
-  const run = withGear(gear)
-  apply(run, { type: 'equip', soldier: run.soldiers[0].id, gear: 1 })
+  const run = withFind(gear)
+  apply(run, { type: 'keep' })
   apply(run, { type: 'zone', index: 1 })
   apply(run, { type: 'advance' })
   apply(run, { type: 'land', zone: 0 })

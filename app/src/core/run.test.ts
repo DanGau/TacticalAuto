@@ -16,6 +16,7 @@ import {
   LEVEL_STATS,
   nextStop,
   RISKS,
+  skillOffers,
   soldierStats,
   START_SUPPLIES,
   STOP_THREAT,
@@ -26,14 +27,21 @@ import {
   type StopKind,
   xpFor,
 } from './run'
-import { CLASS_SKILLS, SKILL_OFFERS, SKILLS } from './skills'
+import { PATHS, SKILLS } from './skills'
 import { RELICS } from './relics'
+
+/** A run whose first clone has learned its first skill, so the overworld waits. */
+function started(): Run {
+  const run = createRun(1)
+  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
+  return run
+}
 
 const enter = (run: Run, risk: Risk) => apply(run, { type: 'zone', index: run.zones.findIndex((zone) => zone.risk === risk) })
 
 /** A run travelling a zone of the given stops. */
 function travelling(stops: StopKind[], risk: Risk = 'standard'): Run {
-  const run = createRun(1)
+  const run = started()
   enter(run, risk)
   run.zone = { risk, terrain: 'town', stops }
   return run
@@ -50,13 +58,13 @@ function fight(run: Run, winner: Side): void {
   endBattle(run)
 }
 
-test('a run begins with one trained clone, at a fork offering one zone of each risk', () => {
+test('a run begins with one trained clone choosing its path, at a fork offering one zone of each risk', () => {
   const run = createRun(1)
   expect(run.soldiers).toHaveLength(1)
   expect(level(run.soldiers[0])).toBe(1)
   expect(run.soldiers[0].cls).not.toBeNull()
-  expect(run.soldiers[0]).toMatchObject({ skills: [], picks: 1 })
-  expect(run.soldiers[0].offers).toHaveLength(SKILL_OFFERS)
+  expect(run).toMatchObject({ phase: 'reward', soldiers: [{ skills: [] }] })
+  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
   expect(run.zones.map((zone) => zone.risk)).toEqual(['safe', 'standard', 'dangerous'])
   expect(nextStop(run)).toBeNull()
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
@@ -65,24 +73,22 @@ test('a run begins with one trained clone, at a fork offering one zone of each r
   expect(apply(run, { type: 'zone', index: 0 }).ok).toBe(false)
 })
 
-test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone adds threat, pays by the risk, gives experience, and offers aid', (risk) => {
+test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone adds threat, pays by the risk, gives experience, and gear its finder decides on', (risk) => {
   const run = travelling(['battle', 'battle'], risk)
   fight(run, 'human')
-  expect(run).toMatchObject({ phase: 'reward', threat: STOP_THREAT, supplies: START_SUPPLIES + RISKS[risk].supplies, stop: 1 })
-  expect(run.gear).toHaveLength(RISKS[risk].drops)
-  if (RISKS[risk].rareGear) expect(run.gear.every((gear) => gear.rarity !== 'common')).toBe(true)
+  expect(run).toMatchObject({ phase: RISKS[risk].drops > 0 ? 'reward' : 'overworld', threat: STOP_THREAT, supplies: START_SUPPLIES + RISKS[risk].supplies, stop: 1 })
+  expect(run.finds).toHaveLength(RISKS[risk].drops)
+  expect(run.finds.every((find) => find.soldier === run.soldiers[0].id)).toBe(true)
+  if (RISKS[risk].rareGear) expect(run.finds.every((find) => find.gear.rarity !== 'common')).toBe(true)
   expect(run.report).toMatchObject({ stop: 'battle', won: true, threat: { before: 0, after: STOP_THREAT }, key: false, hired: null })
   expect(run.report!.soldiers).toMatchObject([{ xpBefore: 1, xpAfter: 2, downed: false }])
-  expect(new Set(run.offers).size).toBe(3)
-  apply(run, { type: 'pick', index: 0 })
-  expect(run.aid).toHaveLength(1)
+  for (let i = 0; i < RISKS[risk].drops; i++) apply(run, { type: 'sell' })
   expect(run.phase).toBe('overworld')
 })
 
 test('a lost battle adds more threat and pays nothing; the fallen soldier is cloned anew with everything they had, but no experience', () => {
   const run = travelling(['battle', 'battle'])
-  run.gear.push({ id: 1, slot: 'armor', rarity: 'common', name: 'Sturdy Vest', stats: { armor: 2 }, effect: null })
-  apply(run, { type: 'equip', soldier: run.soldiers[0].id, gear: 1 })
+  run.soldiers[0].gear.armor = { id: 1, slot: 'armor', rarity: 'common', name: 'Sturdy Vest', stats: { armor: 2 }, effect: null }
   const before = structuredClone(run.soldiers)
   fight(run, 'alien')
   expect(run).toMatchObject({ phase: 'overworld', threat: STOP_THREAT + LOSS_THREAT, supplies: START_SUPPLIES, stop: 1 })
@@ -96,13 +102,13 @@ test('a supply drop and a cache are collected on arrival, each adding threat', (
   expect(run).toMatchObject({ phase: 'overworld', supplies: START_SUPPLIES + DROP_SUPPLIES, threat: STOP_THREAT, stop: 1 })
   expect(run.report).toMatchObject({ stop: 'supply', supplies: DROP_SUPPLIES, soldiers: [] })
   apply(run, { type: 'advance' })
-  expect(run.gear).toHaveLength(1)
-  expect(run.report).toMatchObject({ stop: 'cache', gear: run.gear })
+  expect(run).toMatchObject({ phase: 'reward', report: { stop: 'cache' } })
+  expect(run.finds).toHaveLength(1)
   expect(run.threat).toBe(2 * STOP_THREAT)
 })
 
 test('after the forks of a leg comes its satellite: winning it wins a key, a new clone, and the next leg; losing it means fighting it again', () => {
-  const run = createRun(1)
+  const run = started()
   for (let fork = 0; fork < FORKS; fork++) {
     enter(run, 'dangerous')
     fight(run, 'alien')
@@ -116,13 +122,13 @@ test('after the forks of a leg comes its satellite: winning it wins a key, a new
   expect(run).toMatchObject({ keys: 1, fork: 0, zone: null, phase: 'reward' })
   expect(run.soldiers).toHaveLength(2)
   expect(run.report).toMatchObject({ stop: 'key', key: true, hired: run.soldiers[1].name })
-  expect(run.gear.every((gear) => gear.rarity !== 'common')).toBe(true)
+  expect(run.finds.every((find) => find.gear.rarity !== 'common')).toBe(true)
   expect(run.zones).toHaveLength(3)
 })
 
 test("a new clone arrives at the level of the squad's lowest, and one higher for each academy, with a skill to choose for each level", () => {
   const arrival = (academies: number) => {
-    const run = createRun(1)
+    const run = started()
     run.soldiers[0].xp = xpFor(3)
     run.built = Array(academies).fill('academy')
     run.fork = FORKS
@@ -132,7 +138,7 @@ test("a new clone arrives at the level of the squad's lowest, and one higher for
   }
   expect(level(arrival(0))).toBe(3)
   expect(level(arrival(1))).toBe(4)
-  expect(arrival(0)).toMatchObject({ picks: 3 })
+  expect(skillOffers(arrival(0))).toHaveLength(2)
   expect(arrival(0).cls).not.toBeNull()
 })
 
@@ -148,14 +154,16 @@ test.each(['human', 'alien'] as const)('full threat puts a last stand before the
 })
 
 test.each(['human', 'alien'] as const)('with every key won the squad is four, only the final mission remains, and it decides the run; %s win', (winner) => {
-  const run = createRun(1)
+  const run = started()
   for (let key = 0; key < KEYS; key++) {
     run.fork = FORKS
     run.zone = { risk: 'standard', terrain: 'compound', stops: ['key'] }
     run.threat = 0
     fight(run, 'human')
     apply(run, { type: 'relic', index: 0 })
-    apply(run, { type: 'pick', index: 0 })
+    while (run.finds.length > 0) apply(run, { type: 'keep' })
+    for (const s of run.soldiers) while (skillOffers(s).length > 0) apply(run, { type: 'skill', soldier: s.id, index: 0 })
+    expect(run.phase).toBe('overworld')
   }
   expect(run.soldiers).toHaveLength(KEYS + 1)
   expect(run.relics).toHaveLength(KEYS)
@@ -166,14 +174,14 @@ test.each(['human', 'alien'] as const)('with every key won the squad is four, on
 })
 
 test('alien force follows the leg; an alien\'s health never grows, but deeper aliens wear armor', () => {
-  const run = createRun(1)
+  const run = started()
   enter(run, 'standard')
   expect(missionAt(run, 'battle', 'standard').force).toBe(LEG_FORCE[0])
   apply(run, { type: 'advance' })
   const early = run.battle!.units.filter((u) => u.side === 'alien')
   expect(early.every((u) => u.stats.armor === 0)).toBe(true)
 
-  const late = createRun(1)
+  const late = started()
   late.keys = 2
   enter(late, 'standard')
   expect(missionAt(late, 'battle', 'standard').force).toBe(LEG_FORCE[2])
@@ -186,7 +194,7 @@ test('alien force follows the leg; an alien\'s health never grows, but deeper al
 
 test('a key mission has one boss, with an escort for each key already won', () => {
   for (const keys of [0, 2]) {
-    const run = createRun(1)
+    const run = started()
     run.keys = keys
     run.fork = FORKS
     run.zone = { risk: 'standard', terrain: 'compound', stops: ['key'] }
@@ -199,7 +207,7 @@ test('a key mission has one boss, with an escort for each key already won', () =
   }
 })
 
-const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], picks: 0, offers: [], gear: { weapon: null, armor: null, utility: null }, ...extra })
+const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], gear: { weapon: null, armor: null, utility: null }, ...extra })
 
 test('stats add class, level, skills, facilities and relics to the base', () => {
   const run = createRun(1)
@@ -220,52 +228,35 @@ test('levels never stop: each takes one more battle than the last', () => {
   for (let n = 1; n < 30; n++) expect(level({ xp: xpFor(n) })).toBe(n)
 })
 
-test('each level gained offers three skills of the class; choosing one learns it and offers the next owed', () => {
+test('a soldier first chooses one of its class\'s two paths, then one of each pair along it; past the last, levels add stats only', () => {
   const run = createRun(1)
   const [clone] = run.soldiers
-  const pool = CLASS_SKILLS[clone.cls!]
-  expect(clone.offers.every((id) => pool.includes(id))).toBe(true)
-  expect(new Set(clone.offers).size).toBe(SKILL_OFFERS)
-  const first = clone.offers[1]
+  const [one, other] = PATHS[clone.cls!]
+  expect(skillOffers(clone)).toEqual([one.core, other.core])
   expect(apply(run, { type: 'skill', soldier: clone.id, index: 1 })).toEqual({ ok: true })
-  expect(clone).toMatchObject({ skills: [first], picks: 0, offers: [] })
-  expect(apply(run, { type: 'skill', soldier: clone.id, index: 0 }).ok).toBe(false)
-  // The next level offers again, never a skill already known.
+  expect(run).toMatchObject({ phase: 'overworld', soldiers: [{ skills: [other.core] }] })
+  expect(skillOffers(clone)).toEqual([])
+  // Two levels gained at once are chosen one after the other, along the path taken.
+  clone.xp = xpFor(3)
   run.phase = 'reward'
-  run.offers = ['training']
-  clone.xp = xpFor(3) - 1
-  apply(run, { type: 'pick', index: 0 })
-  expect(level(clone)).toBe(3)
-  expect(clone.picks).toBe(1)
-  expect(clone.offers).not.toContain(first)
-  // Owed two at once, the second is offered when the first is chosen.
-  clone.picks = 2
+  expect(skillOffers(clone)).toEqual(other.tiers[0])
   apply(run, { type: 'skill', soldier: clone.id, index: 0 })
-  expect(clone.picks).toBe(1)
-  expect(clone.offers.length).toBeGreaterThan(0)
-  expect(clone.offers.some((id) => clone.skills.includes(id))).toBe(false)
-  // With every skill of the class known, nothing more is owed.
-  clone.skills = [...pool]
-  clone.picks = 0
-  clone.offers = []
-  clone.xp = xpFor(9) - 1
-  run.phase = 'reward'
-  run.offers = ['training']
-  apply(run, { type: 'pick', index: 0 })
-  expect(clone).toMatchObject({ picks: 0, offers: [] })
+  expect(skillOffers(clone)).toEqual(other.tiers[1])
+  apply(run, { type: 'skill', soldier: clone.id, index: 1 })
+  expect(clone.skills).toEqual([other.core, other.tiers[0][0], other.tiers[1][1]])
+  clone.xp = xpFor(9)
+  expect(skillOffers(clone)).toEqual([])
 })
 
-test('a satellite won offers three relics before the aid; a relic held changes the run', () => {
-  const run = createRun(1)
+test('a satellite won offers three relics; a relic held changes the run', () => {
+  const run = started()
   run.fork = FORKS
   run.zone = { risk: 'standard', terrain: 'compound', stops: ['key'] }
   fight(run, 'human')
   expect(new Set(run.relicOffers).size).toBe(3)
-  expect(apply(run, { type: 'pick', index: 0 })).toEqual({ ok: false, reason: 'choose a relic first' })
   const taken = run.relicOffers[2]
   expect(apply(run, { type: 'relic', index: 2 })).toEqual({ ok: true })
-  expect(run).toMatchObject({ relics: [taken], relicOffers: [], phase: 'reward' })
-  expect(apply(run, { type: 'pick', index: 0 })).toEqual({ ok: true })
+  expect(run).toMatchObject({ relics: [taken], relicOffers: [] })
 
   const paid = (relics: Run['relics']) => {
     const r = travelling(['battle', 'battle'])
@@ -274,11 +265,11 @@ test('a satellite won offers three relics before the aid; a relic held changes t
     return r
   }
   expect(paid(['drones']).supplies).toBe(paid([]).supplies + 1)
-  expect(paid(['contact']).gear.every((gear) => gear.rarity !== 'common')).toBe(true)
+  expect(paid(['contact']).finds.every((find) => find.gear.rarity !== 'common')).toBe(true)
 })
 
 test('building costs more each level, stops at the maximum, and needs supplies', () => {
-  const run = createRun(1)
+  const run = started()
   run.supplies = 100
   const { cost, max } = FACILITIES.optics
   for (let n = 1; n <= max; n++) expect(apply(run, { type: 'build', facility: 'optics' })).toEqual({ ok: true })
@@ -288,26 +279,10 @@ test('building costs more each level, stops at the maximum, and needs supplies',
   expect(apply(run, { type: 'build', facility: 'workshop' })).toEqual({ ok: false, reason: 'not enough supplies' })
 })
 
-test('aid applies at once: supplies, threat, experience, promotion', () => {
-  const take = (id: Run['offers'][number]) => {
-    const run = createRun(1)
-    run.phase = 'reward'
-    run.threat = 3
-    run.offers = [id]
-    apply(run, { type: 'pick', index: 0 })
-    return run
-  }
-  expect(take('convoy').supplies).toBe(START_SUPPLIES + 6)
-  expect(take('jammer').threat).toBe(1)
-  expect(take('training').soldiers[0].xp).toBe(2)
-  expect(level(take('veteran').soldiers[0])).toBe(2)
-})
-
 test("a soldier lands with its class's ability and its uses, the effects of its skills and the squad's relics, and armor from its gear", () => {
   const run = travelling(['battle'])
   run.soldiers[0].cls = 'heavy'
-  run.gear.push({ id: 1, slot: 'armor', rarity: 'common', name: 'Sturdy Vest', stats: { armor: 2 }, effect: null })
-  apply(run, { type: 'equip', soldier: run.soldiers[0].id, gear: 1 })
+  run.soldiers[0].gear.armor = { id: 1, slot: 'armor', rarity: 'common', name: 'Sturdy Vest', stats: { armor: 2 }, effect: null }
   run.soldiers[0].skills = ['arsenal', 'shredder']
   run.relics = ['echo', 'capacitor']
   apply(run, { type: 'advance' })

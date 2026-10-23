@@ -1,10 +1,10 @@
 import type { Action } from '../core/apply'
 import type { Report, Run } from '../core/run'
 import type { View } from '../view/view'
-import { runEnd, stopReport } from './aftermath'
+import { choice, runEnd, stopReport } from './aftermath'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { STOP_NAMES } from './html'
-import { overworld, type Picking, type Tab } from './overworld'
+import { overworld, type Tab } from './overworld'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
 
@@ -47,13 +47,14 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   /** The report the player has continued past. */
   let seen: Report | null = null
   let tab: Tab = 'Map'
-  let picking: Picking | null = null
+  /** The soldier opened in the Barracks. */
+  let open: number | null = null
   let shown: Run | null = null
   let html = ''
 
   /**
-   * The panel for where the player is. After a stop comes its report: for a won battle it ends when aid is taken,
-   * otherwise at Continue. Then the overworld, opened on the base after a battle.
+   * The panel for where the player is. After a stop comes its report: it ends when its last choice is made,
+   * or at Continue if it left none. Then the overworld, opened on the base after a battle.
    */
   function panel(run: Run): string {
     const report = run.report
@@ -62,13 +63,13 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (run.phase === 'reward') {
       seen = report
       tab = 'Base'
-      return stopReport(run, report!)
+      return report ? stopReport(run, report) : choice(run)
     }
     if (report && seen !== report) {
       if (report.soldiers.length > 0) tab = 'Base'
       return stopReport(run, report)
     }
-    return overworld(run, tab, picking)
+    return overworld(run, tab, open)
   }
 
   function render(run: Run): void {
@@ -89,15 +90,12 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (target.id === 'again') location.href = location.pathname
     else if (target.dataset.seen) seen = shown!.report
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
-    else if (target.dataset.pick) {
-      const pick: Picking = JSON.parse(target.dataset.pick)
-      // Clicking what is open closes it.
-      picking = picking?.soldier === pick.soldier && picking.part === pick.part ? null : pick
+    else if (target.dataset.open) {
+      // Clicking the soldier open closes it.
+      const id = Number(target.dataset.open)
+      open = open === id ? null : id
     } else if (target.dataset.action) {
-      const action: Action = JSON.parse(target.dataset.action)
-      // Choosing a skill keeps the soldier's details open, to show it learned and the next choice if one is owed.
-      if (action.type !== 'skill') picking = null
-      act(action)
+      act(JSON.parse(target.dataset.action) as Action)
       return
     }
     render(shown!)

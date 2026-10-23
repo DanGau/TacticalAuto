@@ -24,6 +24,7 @@ test('a mission musters packs its depth allows, for exactly its force, and a lon
  */
 function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }[]): { battle: Battle; soldier: Unit; aliens: Unit[]; until: (done: (events: GameEvent[]) => boolean) => GameEvent[] } {
   const run = createRun(1)
+  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
   apply(run, { type: 'zone', index: 1 })
   apply(run, { type: 'advance' })
   apply(run, { type: 'land', zone: 0 })
