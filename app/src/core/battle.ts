@@ -1,5 +1,6 @@
 import type { AlienKind } from './aliens'
 import { randomInt } from './rng'
+import { CIVILIAN_HP, CIVILIANS, type Goal } from './goals'
 import { generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Prop, type TerrainKind } from './terrain'
 
 export type { Cover }
@@ -165,6 +166,8 @@ export interface Alien {
   boss: boolean
   /** Whether it spawns swarmlings. */
   spawns: boolean
+  /** Whether it is the commander an assassination is after. */
+  target: boolean
 }
 
 /** A soldier waiting to land. */
@@ -205,6 +208,10 @@ export interface Unit {
   boss: boolean
   /** Whether it spawns swarmlings; false for humans. */
   spawns: boolean
+  /** Whether it is the commander an assassination is after. */
+  target: boolean
+  /** A civilian to rescue: on the human side, but never moves or shoots, and is not a soldier. */
+  civilian: boolean
   /** Whether the unit loses its next action. */
   panicked: boolean
   /** Whether the unit has moved this turn. */
@@ -231,6 +238,11 @@ export interface Pod {
 
 export interface Battle {
   rng: number
+  goal: Goal
+  /** Alien turns begun. */
+  round: number
+  /** Packs still to arrive on a hold, one every WAVE_EVERY rounds. */
+  waves: { name: string; aliens: Alien[] }[]
   /** Calls to stepBattle so far. */
   beat: number
   phase: 'deploy' | 'battle' | 'over'
@@ -313,6 +325,9 @@ export function blocked(battle: Battle, x: number, y: number): boolean {
 }
 
 /** Whether the alien fights in the open: humans always do, an alien once its pod is revealed. */
+/** Whether the unit is a soldier: on the human side, and no civilian. */
+export const isSoldier = (unit: Unit) => unit.side === 'human' && !unit.civilian
+
 export function revealed(battle: Battle, unit: Unit): boolean {
   return unit.pod === null || battle.pods[unit.pod].revealed
 }
@@ -339,7 +354,7 @@ export function freeTilesNear(battle: Battle, centre: Tile, count: number): Tile
 const randomTile = (battle: Battle): Tile => ({ x: randomInt(battle, GRID), y: randomInt(battle, GRID) })
 
 /** A random open tile at least `clearance` from every tile in `avoid`; the clearance shrinks if the map is too crowded. */
-function spacedTile(battle: Battle, avoid: Tile[], clearance: number): Tile {
+export function spacedTile(battle: Battle, avoid: Tile[], clearance: number): Tile {
   for (let tries = 0; ; tries++) {
     const tile = randomTile(battle)
     const needed = clearance - Math.floor(tries / 200)
@@ -363,7 +378,7 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 export function land(battle: Battle, zone: Tile): void {
   const tiles = freeTilesNear(battle, zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
-    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, kind: null, boss: false, spawns: false, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
+    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, kind: null, boss: false, spawns: false, target: false, civilian: false, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
   })
   battle.reserve = []
   battle.phase = 'battle'
@@ -418,6 +433,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     effects: [],
     spent: [],
     burning: 0,
+    civilian: false,
     panicked: false,
     moved: false,
     suppressed: 0,
@@ -426,12 +442,26 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
   }
 }
 
-/** A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. */
-export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[]): Battle {
+/** Places a pack as a new pod around `centre`. */
+export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }, centre: Tile, revealed: boolean): Unit[] {
+  const units = freeTilesNear(battle, centre, pack.aliens.length).map((tile, i) => alienUnit(battle, pack.aliens[i], tile, battle.pods.length))
+  battle.units.push(...units)
+  battle.pods.push({ name: pack.name, revealed, ambushed: false, surprised: false, waypoint: randomTile(battle) })
+  return units
+}
+
+/**
+ * A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. A hold keeps half its
+ * packs back as waves and offers one landing zone, the uplink; a rescue places civilians away from the aliens.
+ */
+export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate'): Battle {
   const holder = { rng: seed }
   const terrain = generateTerrain(holder, GRID, kind)
   const battle: Battle = {
     rng: holder.rng,
+    goal,
+    round: 0,
+    waves: goal === 'hold' ? packs.slice(Math.ceil(packs.length / 2)) : [],
     beat: 0,
     phase: 'deploy',
     turn: 'human',
@@ -452,14 +482,18 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   sealPockets(battle)
 
   const centres: Tile[] = []
-  for (const { name, aliens: members } of packs) {
+  for (const pack of packs.slice(0, packs.length - battle.waves.length)) {
     const centre = spacedTile(battle, centres, ZONE_CLEARANCE)
     centres.push(centre)
-    freeTilesNear(battle, centre, members.length).forEach((tile, i) => {
-      battle.units.push(alienUnit(battle, members[i], tile, battle.pods.length))
-    })
-    battle.pods.push({ name, revealed: false, ambushed: false, surprised: false, waypoint: randomTile(battle) })
+    placePod(battle, pack, centre, false)
   }
-  while (battle.zones.length < ZONES) battle.zones.push(spacedTile(battle, [...battle.units, ...battle.zones], ZONE_CLEARANCE))
+  if (goal === 'rescue') {
+    for (const tile of freeTilesNear(battle, spacedTile(battle, battle.units, ZONE_CLEARANCE), CIVILIANS)) {
+      const stats = { ...BASE_STATS, hp: CIVILIAN_HP, aim: 0, damage: 0, range: 0, move: 0, crit: 0 }
+      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, kind: null, boss: false, spawns: false, target: false, civilian: true, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
+    }
+  }
+  const count = goal === 'hold' ? 1 : ZONES
+  while (battle.zones.length < count) battle.zones.push(spacedTile(battle, [...battle.units, ...battle.zones], ZONE_CLEARANCE))
   return battle
 }

@@ -35,7 +35,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   battle.west.fill('none')
   const soldier = battle.units.find((u) => u.side === 'human')!
   Object.assign(soldier, { x: 10, y: 10, hp: 30, stats: { ...soldier.stats, hp: 30, aim: 2, crit: 0, damage: 3 } })
-  const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss }, { x, y }, 0))
+  const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss, target: false }, { x, y }, 0))
   battle.units = [soldier, ...units]
   battle.pods = [{ name: 'Test', revealed: true, ambushed: false, surprised: false, waypoint: { x: 0, y: 0 } }]
   battle.concealed = false

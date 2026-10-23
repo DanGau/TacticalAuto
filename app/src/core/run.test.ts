@@ -43,7 +43,7 @@ const enter = (run: Run, risk: Risk) => apply(run, { type: 'zone', index: run.zo
 function travelling(stops: StopKind[], risk: Risk = 'standard'): Run {
   const run = started()
   enter(run, risk)
-  run.zone = { risk, terrain: 'town', stops }
+  run.zone = { risk, goal: 'exterminate', terrain: 'town', stops, packs: stops.map(() => [{ name: 'Patrol', kinds: ['trooper', 'trooper'] }]) }
   return run
 }
 
@@ -113,7 +113,7 @@ test('after the forks of a leg comes its satellite: winning it wins a key, a new
     enter(run, 'dangerous')
     fight(run, 'alien')
   }
-  expect(run.zone).toMatchObject({ risk: 'standard', terrain: 'compound', stops: ['key'] })
+  expect(run.zone).toMatchObject({ risk: 'standard', goal: 'exterminate', terrain: 'compound', stops: ['key'], packs: [[]] })
   fight(run, 'alien')
   expect(run).toMatchObject({ keys: 0, zone: { stops: ['key'] }, stop: 0 })
   expect(run.soldiers).toHaveLength(1)
@@ -132,7 +132,7 @@ test("a new clone arrives at the level of the squad's lowest, and one higher for
     run.soldiers[0].xp = xpFor(3)
     run.built = Array(academies).fill('academy')
     run.fork = FORKS
-    run.zone = { risk: 'standard', terrain: 'compound', stops: ['key'] }
+    run.zone = { risk: 'standard', goal: 'exterminate', terrain: 'compound', stops: ['key'], packs: [[]] }
     fight(run, 'human')
     return run.soldiers[1]
   }
@@ -157,7 +157,7 @@ test.each(['human', 'alien'] as const)('with every key won the squad is four, on
   const run = started()
   for (let key = 0; key < KEYS; key++) {
     run.fork = FORKS
-    run.zone = { risk: 'standard', terrain: 'compound', stops: ['key'] }
+    run.zone = { risk: 'standard', goal: 'exterminate', terrain: 'compound', stops: ['key'], packs: [[]] }
     run.threat = 0
     fight(run, 'human')
     apply(run, { type: 'relic', index: 0 })
@@ -197,7 +197,7 @@ test('a key mission has one boss, with an escort for each key already won', () =
     const run = started()
     run.keys = keys
     run.fork = FORKS
-    run.zone = { risk: 'standard', terrain: 'compound', stops: ['key'] }
+    run.zone = { risk: 'standard', goal: 'exterminate', terrain: 'compound', stops: ['key'], packs: [[]] }
     apply(run, { type: 'advance' })
     const battle = run.battle!
     const boss = battle.units.filter((u) => u.boss)
@@ -251,7 +251,7 @@ test('a soldier first chooses one of its class\'s two paths, then one of each pa
 test('a satellite won offers three relics; a relic held changes the run', () => {
   const run = started()
   run.fork = FORKS
-  run.zone = { risk: 'standard', terrain: 'compound', stops: ['key'] }
+  run.zone = { risk: 'standard', goal: 'exterminate', terrain: 'compound', stops: ['key'], packs: [[]] }
   fight(run, 'human')
   expect(new Set(run.relicOffers).size).toBe(3)
   const taken = run.relicOffers[2]

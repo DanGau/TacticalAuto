@@ -36,6 +36,7 @@ const ROCKET_MS = 320
 const BLAST_MS = 380
 
 const COLOR = {
+  civilian: 0xe8e2c8,
   human: 0x4da3ff,
   alien: 0x7ddc5a,
   boss: 0xc77dff,
@@ -126,6 +127,9 @@ const shade = (color: number, by: number) => (((color >> 16) * by) << 16) | ((((
 
 /** Names of the landing zones, in battle.zones order. */
 const ZONE_NAMES = ['A', 'B', 'C']
+
+/** The letter over a unit that is no soldier: its kind's initial, C for a commander, nothing for a boss or civilian. */
+const letter = (unit: Unit) => (unit.target ? 'C' : unit.boss || !unit.kind ? '' : ALIENS[unit.kind].name[0])
 
 /** Position of a tile's centre in the world the camera looks at. Fractional tiles are allowed. */
 function toWorld(x: number, y: number): Tile {
@@ -259,12 +263,12 @@ export async function createView(): Promise<View> {
 
   /** `pips` marks a soldier's level above the health pips; `letter` is the initial of its class. */
   function create(unit: Unit, pips: number, letter = ''): Sprite {
-    const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(unit.boss ? COLOR.boss : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human)
+    const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR.civilian : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human)
     const rows = Math.ceil((unit.stats.hp + unit.stats.armor) / 10)
     for (let i = 0; i < pips; i++) body.circle(-9 + 6 * i, -40 - rows * PIP_STEP, 2).fill(COLOR.human)
     const sprite: Sprite = { node: new Container(), hp: new Graphics(), tile: unit, maxHp: unit.stats.hp }
     sprite.node.addChild(body, sprite.hp)
-    sprite.node.scale.set(unit.boss ? 1.6 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1)
+    sprite.node.scale.set(unit.boss ? 1.6 : unit.target ? 1.3 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1)
     if (letter) {
       const mark = new Text({ text: letter, style: { fill: 0x10141c, fontSize: 13, fontWeight: 'bold', fontFamily: 'sans-serif' } })
       mark.anchor.set(0.5)
@@ -377,7 +381,7 @@ export async function createView(): Promise<View> {
       }
       const { cover, contact } = zoneInfo(battle, zone)
       const ground = cover >= 12 ? 'heavy cover' : cover >= 5 ? 'some cover' : 'open ground'
-      marks.addChild(label(ZONE_NAMES[i], zone, 0xffffff), label(`${ground}\ncontact ${contact} tiles`, zone, 0xffffff, 20))
+      marks.addChild(label(battle.goal === 'hold' ? 'UPLINK' : ZONE_NAMES[i], zone, 0xffffff), label(`${ground}\ncontact ${contact} tiles`, zone, 0xffffff, 20))
     })
     battle.pods.forEach((_, pod) => {
       const members = battle.units.filter((u) => u.pod === pod)
@@ -412,7 +416,7 @@ export async function createView(): Promise<View> {
     for (const id of [...sprites.keys()]) if (!live.has(id)) remove(id)
     for (const unit of visible) {
       const soldier = run.soldiers.find((s) => s.id === unit.soldier)
-      const sprite = sprites.get(unit.id) ?? create(unit, soldier ? level(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : unit.kind && !unit.boss ? ALIENS[unit.kind].name[0] : '')
+      const sprite = sprites.get(unit.id) ?? create(unit, soldier ? level(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : letter(unit))
       place(sprite, { x: unit.x, y: unit.y })
       sprite.node.alpha = 1
       drawHp(sprite, unit.hp, unit.armor)
@@ -548,14 +552,15 @@ export async function createView(): Promise<View> {
         await Promise.all(seen.map((m) => walk(sprites.get(m.id)!, m.path)))
         // The fog lifts where the squad arrived, before any pod it uncovered appears.
         drawFog(battle)
-      } else if (e.type === 'reveal') {
+      } else if (e.type === 'reveal' || e.type === 'wave') {
         await follow(e.units)
         const appeared = e.units.flatMap((at) => {
           const unit = battle.units.find((u) => u.id === at.id)
-          return unit ? [create({ ...unit, x: at.x, y: at.y }, 0, unit.boss ? '' : ALIENS[unit.kind!].name[0])] : []
+          return unit ? [create({ ...unit, x: at.x, y: at.y }, 0, letter(unit))] : []
         })
         await tween(REVEAL_MS, (t) => appeared.forEach((sprite) => (sprite.node.alpha = t)))
-        if (e.ambush && appeared.length > 0) float(callout('AMBUSHED', COLOR.hit, appeared[0], 18))
+        if (e.type === 'reveal' && e.ambush && appeared.length > 0) float(callout('AMBUSHED', COLOR.hit, appeared[0], 18))
+        if (e.type === 'wave' && appeared.length > 0) float(callout('REINFORCEMENTS', COLOR.crit, appeared[0], 18))
       } else if (e.type === 'shot') {
         const from = sprites.get(e.id)
         const to = sprites.get(e.target)

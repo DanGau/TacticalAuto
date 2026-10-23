@@ -1,8 +1,10 @@
 import { FACILITIES, type FacilityId } from '../core/base'
+import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
+import { GOALS } from '../core/goals'
 import { SLOTS } from '../core/gear'
 import { RELICS } from '../core/relics'
-import { buildCost, built, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, type Run, type Soldier, type StopKind, type Zone } from '../core/run'
+import { buildCost, built, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, type Muster, type Run, type Soldier, type StopKind, type Zone } from '../core/run'
 import { PATHS, SKILLS, type SkillId } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
 import { button, gearCard, gearText, keyRow, STOP_NAMES, threatBar } from './html'
@@ -19,18 +21,24 @@ function chip(run: Run, zone: Zone, stop: StopKind, state = ''): string {
   return `<span class="chip ${stop} ${state}">${STOP_NAMES[stop]}${aliens}</span>`
 }
 
-/** A zone at a fork: its risk, its stops in order, and what it costs and pays. Clicking it commits the squad to it. */
-function zoneCard(run: Run, zone: Zone, index: number): string {
+/** The aliens of a battle, counted by kind: "3 Troopers, 2 Swarmlings". */
+function census(packs: Muster[]): string {
+  const counts = new Map<AlienKind, number>()
+  for (const kind of packs.flatMap((pack) => pack.kinds)) counts.set(kind, (counts.get(kind) ?? 0) + 1)
+  return [...counts].map(([kind, n]) => `${n} ${ALIENS[kind].name}${n === 1 ? '' : 's'}`).join(', ')
+}
+
+/** A zone at a fork: its goal and risk, each stop with the aliens it holds, and what it costs and pays. Clicking it commits the squad to it. */
+function zoneCard(zone: Zone, index: number): string {
   const risk = RISKS[zone.risk]
-  // Battles are sized as they will be once the squad has taken this fork.
-  const ahead = { ...run, fork: run.fork + 1 }
-  const gear = risk.drops === 0 ? 'no gear' : `${risk.drops} ${risk.rareGear ? 'rare or better ' : ''}gear`
+  const goal = GOALS[zone.goal]
+  const stops = zone.stops.map((stop, i) => `<div>${STOP_NAMES[stop]}${stop === 'battle' ? `: ${census(zone.packs[i])}${zone.goal === 'assassinate' ? ', and a Commander with a Trooper' : ''}` : ''}</div>`)
   return button(
     { type: 'zone', index },
-    `<small>${risk.text}</small><br><b>${risk.name} ${TERRAIN_TEXT[zone.terrain].name.toLowerCase()}</b>
-    <small>${TERRAIN_TEXT[zone.terrain].text}</small>
-    <div class="road">${zone.stops.map((stop) => chip(ahead, zone, stop)).join('<span class="arrow">→</span>')}</div>
-    <small>Each battle won: ${risk.supplies} ${risk.supplies === 1 ? 'supply' : 'supplies'}, ${gear}<br>+${zone.stops.length} threat</small>`,
+    `<small>${risk.name} · ${TERRAIN_TEXT[zone.terrain].name}</small><br><b>${goal.name}</b>
+    <small>${goal.text}</small>
+    <div class="aliens">${stops.join('')}</div>
+    <small>Pays ${goal.reward}${risk.rareGear && (zone.goal === 'exterminate' || zone.goal === 'assassinate') ? ', rare or better' : ''}</small><small>+${zone.stops.length} threat</small>`,
     `zone ${zone.risk}`,
   )
 }
@@ -48,11 +56,11 @@ function mapView(run: Run): string {
   const zone = run.zone
   if (!zone) {
     return `<h2>A fork in the road. Choose a zone; what lies beyond it is unknown.</h2>
-      <div class="choices">${run.zones.map((z, i) => zoneCard(run, z, i)).join('')}</div>`
+      <div class="choices">${run.zones.map((z, i) => zoneCard(z, i)).join('')}</div>`
   }
   const stop = nextStop(run)!
   const road = zone.stops.map((s, i) => chip(run, zone, s, i < run.stop ? 'done' : i === run.stop ? 'here' : '')).join('<span class="arrow">→</span>')
-  const where = zone.stops[0] === 'final' ? 'All three keys are won. The alien source is found.' : zone.stops[0] === 'key' ? 'The road ends at a satellite. Its access key is guarded.' : `${RISKS[zone.risk].name} ${TERRAIN_TEXT[zone.terrain].name.toLowerCase()}: ${TERRAIN_TEXT[zone.terrain].text}`
+  const where = zone.stops[0] === 'final' ? 'All three keys are won. The alien source is found.' : zone.stops[0] === 'key' ? 'The road ends at a satellite. Its access key is guarded.' : `${GOALS[zone.goal].name}, ${RISKS[zone.risk].name.toLowerCase()} ${TERRAIN_TEXT[zone.terrain].name.toLowerCase()}: ${GOALS[zone.goal].text}`
   return `<h2>${where}</h2>
     <div class="road">${road}</div>
     ${stop === 'lastStand' ? '<p class="up"><b>The threat is full. The aliens attack before the squad can travel on.</b></p>' : ''}

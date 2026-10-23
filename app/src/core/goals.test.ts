@@ -1,0 +1,70 @@
+import { expect, test } from 'vitest'
+import { apply } from './apply'
+import { stepBattle } from './combat'
+import { CIVILIANS, HOLD_ROUNDS, type Goal } from './goals'
+import { createRun, endBattle, RISKS, START_SUPPLIES, type Run } from './run'
+
+/** A run about to fight a battle of `goal`, with three packs to muster. */
+function before(goal: Goal): Run {
+  const run = createRun(1)
+  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
+  apply(run, { type: 'zone', index: 1 })
+  const patrol = { name: 'Patrol', kinds: ['trooper', 'trooper'] as const }
+  run.zone = { ...run.zone!, goal, packs: [[patrol, patrol, patrol].map((p) => ({ ...p, kinds: [...p.kinds] })), []] }
+  apply(run, { type: 'advance' })
+  return run
+}
+
+test('every zone at a fork has a goal, and its battles mustered in advance', () => {
+  const run = createRun(1)
+  for (const zone of run.zones) {
+    expect(zone.packs.map((packs) => packs.length > 0)).toEqual(zone.stops.map((stop) => stop === 'battle'))
+  }
+})
+
+test('a hold offers one landing zone, keeps half its packs back as waves, and is won by lasting', () => {
+  const run = before('hold')
+  const battle = run.battle!
+  expect(battle.zones).toHaveLength(1)
+  expect(battle.waves).toHaveLength(1)
+  apply(run, { type: 'land', zone: 0 })
+  battle.round = HOLD_ROUNDS + 1
+  stepBattle(battle)
+  expect(battle).toMatchObject({ phase: 'over', winner: 'human' })
+  endBattle(run)
+  expect(run.relicOffers).toHaveLength(3)
+  expect(run.finds).toEqual([])
+})
+
+test('an assassination is won when the commander falls, though its guard lives', () => {
+  const run = before('assassinate')
+  const battle = run.battle!
+  apply(run, { type: 'land', zone: 0 })
+  const commander = battle.units.filter((u) => u.target)
+  expect(commander).toHaveLength(1)
+  battle.units = battle.units.filter((u) => !u.target)
+  stepBattle(battle)
+  expect(battle.winner).toBe('human')
+  endBattle(run)
+  expect(run.finds.every((find) => find.gear.rarity !== 'common')).toBe(true)
+})
+
+test('a rescue pays experience for each civilian kept alive; a raid pays triple supplies', () => {
+  const rescue = before('rescue')
+  apply(rescue, { type: 'land', zone: 0 })
+  expect(rescue.battle!.units.filter((u) => u.civilian)).toHaveLength(CIVILIANS)
+  // One civilian is lost.
+  const lost = rescue.battle!.units.find((u) => u.civilian)
+  rescue.battle!.units = rescue.battle!.units.filter((u) => u !== lost)
+  const alive = CIVILIANS - 1
+  rescue.battle!.winner = 'human'
+  endBattle(rescue)
+  expect(rescue.report).toMatchObject({ rescued: alive, soldiers: [{ xpBefore: 1, xpAfter: 2 + alive }] })
+
+  const raid = before('raid')
+  apply(raid, { type: 'land', zone: 0 })
+  raid.battle!.winner = 'human'
+  endBattle(raid)
+  expect(raid.supplies).toBe(START_SUPPLIES + 3 * RISKS.standard.supplies)
+  expect(raid.finds).toEqual([])
+})

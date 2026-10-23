@@ -1,5 +1,6 @@
 import type { Stats } from '../core/battle'
 import { CLASSES } from '../core/classes'
+import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { KEYS, level, SELL, skillOffers, soldierStats, xpFor, type Report, type Run, type Soldier } from '../core/run'
 import { PATHS, SKILLS } from '../core/skills'
@@ -87,6 +88,7 @@ export function stopReport(run: Run, report: Report): string {
       <p>Threat ${threatBar(after, Math.max(0, after - before))}${threat}</p>
       ${report.key ? `<p class="keys">Access key won ${keyRow(run.keys)} ${run.keys === KEYS ? 'The alien source is found.' : ''}</p>` : ''}
       ${report.hired ? `<p class="down"><b>A new clone joins the squad: ${report.hired}.</b></p>` : ''}
+      ${report.rescued !== null ? `<p class="down">${report.rescued} of ${CIVILIANS} civilians rescued</p>` : ''}
       ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : ''}
     </div>
     ${squad}

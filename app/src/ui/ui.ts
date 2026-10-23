@@ -3,6 +3,7 @@ import type { Report, Run } from '../core/run'
 import type { View } from '../view/view'
 import { choice, runEnd, stopReport } from './aftermath'
 import { ALIENS, type AlienKind } from '../core/aliens'
+import { GOALS } from '../core/goals'
 import { STOP_NAMES } from './html'
 import { overworld, type Tab } from './overworld'
 
@@ -35,7 +36,8 @@ function roster(run: Run): string {
 function status(run: Run): string {
   const battle = run.battle
   if (run.phase !== 'battle' || !battle) return ''
-  const title = STOP_NAMES[run.mission!.kind]
+  const mission = run.mission!
+  const title = mission.kind === 'battle' ? `${GOALS[mission.goal].name}: ${GOALS[mission.goal].text}` : STOP_NAMES[mission.kind]
   if (battle.phase === 'deploy') return `${title} · click a landing zone<div class="roster">${roster(run)}</div>`
   return `${title} · ${SIDE[battle.turn]}' turn${battle.concealed ? ' · unseen' : ''}`
 }
@@ -62,7 +64,8 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (run.phase === 'won' || run.phase === 'lost') return runEnd(run)
     if (run.phase === 'reward') {
       seen = report
-      tab = 'Base'
+      // After a stop the squad returns to the base; the run's first choice leaves it on the map.
+      if (report) tab = 'Base'
       return report ? stopReport(run, report) : choice(run)
     }
     if (report && seen !== report) {

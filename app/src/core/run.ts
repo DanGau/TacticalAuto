@@ -1,5 +1,6 @@
 import { FACILITIES, RARITY_CHANCE, type FacilityId, type Lasting, type Rarity } from './base'
-import { ALIENS, alienStats, muster } from './aliens'
+import { ALIENS, alienStats, muster, type AlienKind } from './aliens'
+import { GOALS, type Goal } from './goals'
 import { BASE_STATS, createBattle, type Alien, type Battle, type Stats } from './battle'
 import { CLASSES, type ClassId } from './classes'
 import { generateGear, SLOTS, type Gear, type Slot } from './gear'
@@ -20,6 +21,8 @@ export const LOSS_THREAT = 1
 /** The alien force a battle has in each leg, before its risk and kind are counted; the squad grows by one clone a leg. */
 export const LEG_FORCE = [1, 4, 9, 15]
 export const START_SUPPLIES = 3
+/** What an assassination's commander has over a trooper. */
+export const COMMANDER = { hp: 8, armor: 2 }
 /** Supplies a supply drop gives. */
 export const DROP_SUPPLIES = 4
 
@@ -46,11 +49,23 @@ export const RISKS: Record<Risk, { name: string; aliens: number; supplies: numbe
  */
 export type StopKind = 'battle' | 'supply' | 'cache' | 'key' | 'final'
 
-/** A stretch of road the squad commits to: its risk, the kind of place its battles are fought in, and its stops, in order. */
+/** A pack of aliens by name and kinds, mustered before it is equipped. */
+export interface Muster {
+  name: string
+  kinds: AlienKind[]
+}
+
+/**
+ * A stretch of road the squad commits to: its risk, the goal of its battles, the kind of place they are fought in,
+ * and its stops, in order. `packs` holds the aliens each battle stop will send, mustered in advance so a fork can
+ * show them; empty for other stops.
+ */
 export interface Zone {
   risk: Risk
+  goal: Goal
   terrain: TerrainKind
   stops: StopKind[]
+  packs: Muster[][]
 }
 
 /**
@@ -60,6 +75,7 @@ export interface Zone {
  */
 export interface Mission {
   kind: 'battle' | 'key' | 'final' | 'lastStand'
+  goal: Goal
   risk: Risk
   force: number
 }
@@ -96,6 +112,8 @@ export interface Report {
   soldiers: { name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; downed: boolean }[]
   /** The name of a clone the stop added to the squad. */
   hired: string | null
+  /** Civilians kept alive on a rescue; null on any other stop. */
+  rescued: number | null
 }
 
 export interface Run {
@@ -255,9 +273,9 @@ function depth(run: Run): number {
 }
 
 /** The mission the squad would fight at a stop of the given kind now. Its force follows the leg, and so the size of the squad. */
-export function missionAt(run: Run, kind: Mission['kind'], risk: Risk): Mission {
+export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goal = 'exterminate'): Mission {
   const extra = { battle: 0, key: 1, final: 2, lastStand: run.keys }[kind]
-  return { kind, risk, force: Math.max(1, LEG_FORCE[run.keys] + (run.fork >= FORKS ? 1 : 0) + extra + RISKS[risk].aliens) }
+  return { kind, goal, risk, force: Math.max(1, LEG_FORCE[run.keys] + (run.fork >= FORKS ? 1 : 0) + extra + RISKS[risk].aliens + GOALS[goal].force) }
 }
 
 /**
@@ -266,24 +284,40 @@ export function missionAt(run: Run, kind: Mission['kind'], risk: Risk): Mission 
  * already won: each adds health, armor and an escorting trooper; from the second satellite on it hits harder and
  * spawns swarmlings, and from the third it shoots farther.
  */
-function packsOf(run: Run, mission: Mission): { name: string; aliens: Alien[] }[] {
+function packsOf(run: Run, mission: Mission, mustered?: Muster[]): { name: string; aliens: Alien[] }[] {
   const tier = depth(run)
   const armor = tier
   const weapon = Math.floor(tier / 2)
-  const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, armor, weapon), stance: ALIENS[kind].stance, boss: false, spawns: false })
+  const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, armor, weapon), stance: ALIENS[kind].stance, boss: false, spawns: false, target: false })
   const boss = mission.kind === 'key' || mission.kind === 'final'
   const escort = boss ? run.keys : 0
-  const packs = muster(run, Math.max(0, mission.force - (boss ? 2 + escort : 0)), tier).map((pack) => ({ name: pack.name, aliens: pack.kinds.map(alien) }))
+  const packs = (mustered ?? muster(run, Math.max(0, mission.force - (boss ? 2 + escort : 0)), tier)).map((pack) => ({ name: pack.name, aliens: pack.kinds.map(alien) }))
+  // An assassination's commander: a trooper tougher than its kind, with a guard.
+  if (mission.goal === 'assassinate') {
+    const commander = alien('trooper')
+    commander.stats = { ...commander.stats, hp: commander.stats.hp + COMMANDER.hp, armor: commander.stats.armor + COMMANDER.armor, damage: commander.stats.damage + 1 }
+    packs.unshift({ name: 'Commander', aliens: [{ ...commander, target: true, stance: 'anchor' }, alien('trooper')] })
+  }
   if (boss) {
     const k = run.keys
     const stats: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + 5 * k, armor: 2 + k, damage: BASE_STATS.damage + (k >= 1 ? 1 : 0), range: BASE_STATS.range + (k >= 2 ? 1 : 0) }
     const escorts = Array.from({ length: escort }, () => alien('trooper'))
-    packs.unshift({ name: mission.kind === 'final' ? 'The source' : 'Guardian', aliens: [{ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: k >= 1 }, ...escorts] })
+    packs.unshift({ name: mission.kind === 'final' ? 'The source' : 'Guardian', aliens: [{ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: k >= 1, target: false }, ...escorts] })
   }
   return packs
 }
 
-/** The three zones at a fork, one of each risk: a quiet one is long, an overrun one is a single hard fight. */
+/** A goal drawn by GOALS' weights. */
+function drawGoal(run: Run): Goal {
+  const goals = Object.keys(GOALS) as Goal[]
+  let roll = random(run) * goals.reduce((sum, goal) => sum + GOALS[goal].weight, 0)
+  return goals.find((goal) => (roll -= GOALS[goal].weight) < 0) ?? 'exterminate'
+}
+
+/**
+ * The three zones at a fork, one of each risk, each with a goal: a quiet one is long, an overrun one is a single
+ * hard fight. Their battles are mustered as they will be once the squad has taken the fork.
+ */
 function drawZones(run: Run): Zone[] {
   const event = (): StopKind => (random(run) < 0.5 ? 'supply' : 'cache')
   const shuffled = (stops: StopKind[]) => {
@@ -291,11 +325,14 @@ function drawZones(run: Run): Zone[] {
     return [first, ...stops]
   }
   const terrain = () => ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)]
-  return [
-    { risk: 'safe', terrain: terrain(), stops: shuffled(['battle', event(), 'battle']) },
-    { risk: 'standard', terrain: terrain(), stops: ['battle', 'battle'] },
-    { risk: 'dangerous', terrain: terrain(), stops: ['battle'] },
-  ]
+  const ahead = { ...run, fork: run.fork + 1 }
+  const zone = (risk: Risk, stops: StopKind[]): Zone => {
+    const goal = drawGoal(run)
+    const force = missionAt(ahead, 'battle', risk, goal).force
+    const packs = stops.map((stop) => (stop === 'battle' ? muster(run, force, depth(ahead)).map(({ name, kinds }) => ({ name, kinds })) : []))
+    return { risk, goal, terrain: terrain(), stops, packs }
+  }
+  return [zone('safe', shuffled(['battle', event(), 'battle'])), zone('standard', ['battle', 'battle']), zone('dangerous', ['battle'])]
 }
 
 /** Sets what lies ahead once a zone is done or a run begins: a fork, the leg's satellite, or the alien source. */
@@ -303,8 +340,8 @@ function nextStretch(run: Run): void {
   run.stop = 0
   run.zone = null
   run.zones = []
-  if (run.keys === KEYS) run.zone = { risk: 'standard', terrain: 'hive', stops: ['final'] }
-  else if (run.fork === FORKS) run.zone = { risk: 'standard', terrain: 'compound', stops: ['key'] }
+  if (run.keys === KEYS) run.zone = { risk: 'standard', goal: 'exterminate', terrain: 'hive', stops: ['final'], packs: [[]] }
+  else if (run.fork === FORKS) run.zone = { risk: 'standard', goal: 'exterminate', terrain: 'compound', stops: ['key'], packs: [[]] }
   else run.zones = drawZones(run)
 }
 
@@ -379,12 +416,12 @@ export function advance(run: Run): void {
     const supplies = stop === 'supply' ? DROP_SUPPLIES : 0
     run.supplies += supplies
     if (stop === 'cache') dropGear(run, RISKS[zone.risk].rareGear || run.relics.some((id) => (RELICS[id] as Relic).rareGear))
-    run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, key: false, soldiers: [], hired: null }
+    run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, key: false, soldiers: [], hired: null, rescued: null }
     passStop(run)
     settle(run)
     return
   }
-  const mission = missionAt(run, stop, zone.risk)
+  const mission = missionAt(run, stop, zone.risk, stop === 'battle' ? zone.goal : 'exterminate')
   run.mission = mission
   run.phase = 'battle'
   const reserve = run.soldiers.map((s) => ({
@@ -395,7 +432,7 @@ export function advance(run: Run): void {
     stance: s.cls ? CLASSES[s.cls].stance : ('balanced' as const),
     effects: [...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))
-  run.battle = createBattle(randomInt(run, 2 ** 31), zone.terrain, packsOf(run, mission), reserve)
+  run.battle = createBattle(randomInt(run, 2 ** 31), zone.terrain, packsOf(run, mission, stop === 'battle' ? zone.packs[run.stop] : undefined), reserve, mission.goal)
 }
 
 /**
@@ -408,25 +445,28 @@ export function endBattle(run: Run): void {
   const mission = run.mission!
   const standing = new Set(battle.units.map((u) => u.soldier))
   const xpBefore = run.soldiers.map((s) => s.xp)
-  for (const s of run.soldiers) if (standing.has(s.id)) s.xp++
+  const won = battle.winner === 'human'
+  // A rescue won pays each standing soldier a point of experience for each civilian kept alive.
+  const rescued = mission.goal === 'rescue' ? battle.units.filter((u) => u.civilian).length : null
+  for (const s of run.soldiers) if (standing.has(s.id)) s.xp += 1 + (won ? (rescued ?? 0) : 0)
   const soldiers = run.soldiers.map((s, i) => ({ name: s.name, cls: s.cls, xpBefore: xpBefore[i], xpAfter: s.xp, downed: !standing.has(s.id) }))
 
-  const won = battle.winner === 'human'
   const before = run.threat
   const risk = RISKS[mission.risk]
   // A last stand won empties the threat; any other battle is a stop, and adds to it.
   if (mission.kind === 'lastStand') run.threat = won ? 0 : run.threat
   else run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT), THREAT_MAX)
   const held = run.relics.map((id): Relic => RELICS[id])
-  const supplies = won ? risk.supplies + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
+  const supplies = won ? risk.supplies * (mission.goal === 'raid' ? 3 : 1) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
   run.supplies += supplies
-  // A won battle drops gear; a key mission's or a last stand's is rare or better.
-  const drops = won && mission.kind !== 'final' ? (mission.kind === 'battle' ? risk.drops : 1) : 0
-  for (let i = 0; i < drops; i++) dropGear(run, risk.rareGear || mission.kind !== 'battle' || held.some((relic) => relic.rareGear))
+  // A won battle drops gear by its goal; a key mission's, a last stand's or an assassination's is rare or better.
+  const byGoal = { exterminate: risk.drops, assassinate: Math.max(1, risk.drops), hold: 0, rescue: 0, raid: 0 }[mission.goal]
+  const drops = won && mission.kind !== 'final' ? (mission.kind === 'battle' ? byGoal : 1) : 0
+  for (let i = 0; i < drops; i++) dropGear(run, risk.rareGear || mission.kind !== 'battle' || mission.goal === 'assassinate' || held.some((relic) => relic.rareGear))
   const key = won && mission.kind === 'key'
   // Each key won brings a new clone to the squad.
   const hired = key ? hire(run).name : null
-  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, soldiers, hired }
+  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, soldiers, hired, rescued }
 
   if (mission.kind === 'final' || (mission.kind === 'lastStand' && !won)) {
     run.phase = won ? 'won' : 'lost'
@@ -438,8 +478,8 @@ export function endBattle(run: Run): void {
     run.fork = 0
   }
   if (mission.kind === 'battle' || key) passStop(run)
-  // A satellite or a last stand won offers relics.
-  if (won && mission.kind !== 'battle') {
+  // A satellite, a last stand or a hold won offers relics.
+  if (won && (mission.kind !== 'battle' || mission.goal === 'hold')) {
     const pool = (Object.keys(RELICS) as RelicId[]).filter((id) => !run.relics.includes(id))
     while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(...pool.splice(randomInt(run, pool.length), 1))
   }
