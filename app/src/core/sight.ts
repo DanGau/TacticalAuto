@@ -1,4 +1,4 @@
-import { COVER_DEFENSE, coverAt, distance, edgeBetween, GRID, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile } from './battle'
+import { COVER_DEFENSE, coverAt, distance, edgeBetween, GRID, heightAt, HIGH_AIM, HIGH_SIGHT, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile } from './battle'
 import { EDGE_COVER } from './terrain'
 
 const SIDES = [[0, -1], [1, 0], [0, 1], [-1, 0]]
@@ -23,11 +23,11 @@ export function coverAgainst(battle: Battle, at: Tile, from: Tile): Cover {
 /**
  * Chances for a shot by a unit with `stats` standing on `shooter`: to hit, and for a hit to crit.
  * Cover lowers the hit chance and closeness raises it, so a flanked target at point-blank is a near-certain hit.
- * A piercing shot treats the target as having no cover.
+ * A piercing shot treats the target as having no cover. Shooting down from higher ground is easier, and up harder.
  */
 export function odds(battle: Battle, shooter: Tile, target: Tile, stats: Stats, piercing = false): { hit: number; crit: number } {
   const cover = piercing ? 0 : coverAgainst(battle, target, shooter)
-  const hit = stats.aim - COVER_DEFENSE[cover] + stats.close * Math.max(0, stats.range - distance(shooter, target))
+  const hit = stats.aim - COVER_DEFENSE[cover] + stats.close * Math.max(0, stats.range - distance(shooter, target)) + HIGH_AIM * (heightAt(battle, shooter) - heightAt(battle, target))
   return { hit: Math.min(Math.max(hit, 0), 1), crit: cover === 0 ? stats.crit : 0 }
 }
 
@@ -67,9 +67,9 @@ export function canShoot(battle: Battle, from: Tile, target: Tile, range: number
   return distance(from, target) <= range && lineOfSight(battle, from, target)
 }
 
-/** Whether a soldier on `from` sees the tile `to`: within SIGHT, with line of sight. */
+/** Whether a soldier on `from` sees the tile `to`: within its sight, farther from higher ground, with line of sight. */
 export function sees(battle: Battle, from: Tile, to: Tile): boolean {
-  return distance(from, to) <= SIGHT && lineOfSight(battle, from, to)
+  return distance(from, to) <= SIGHT + HIGH_SIGHT * (heightAt(battle, from) - heightAt(battle, to)) && lineOfSight(battle, from, to)
 }
 
 /** For each tile, row by row, whether any soldier sees it. */

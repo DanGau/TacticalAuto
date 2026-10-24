@@ -61,6 +61,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [] })
   battle.cover.fill(0)
+  battle.height.fill(0)
   battle.north.fill('none')
   battle.west.fill('none')
   const soldier = battle.units.find((u) => u.soldier === run.soldiers[0].id)!

@@ -273,6 +273,8 @@ export interface Battle {
   /** The cover each tile's prop gives, one entry per tile, row by row; read it with coverAt. */
   cover: Cover[]
   ground: Ground[]
+  /** How high each tile stands; read it with heightAt. */
+  height: number[]
   props: Prop[]
   /** What stands on each tile's north edge and west edge; read them with edgeBetween. */
   north: Edge[]
@@ -300,6 +302,18 @@ export const distance = (a: Tile, b: Tile) => Math.max(Math.abs(a.x - b.x), Math
 export const NEIGHBORS = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]]
 
 export const onGrid = (x: number, y: number) => x >= 0 && y >= 0 && x < GRID && y < GRID
+
+export const heightAt = (battle: Battle, tile: Tile) => battle.height[tile.y * GRID + tile.x]
+
+/** Tiles of sight a unit gains for each level it stands above what it looks at, and loses for each below. */
+export const HIGH_SIGHT = 2
+/** Aim a shot gains for each level the shooter stands above its target, and loses for each below. */
+export const HIGH_AIM = 0.1
+/** Move a step costs beyond its one tile for each level it climbs. */
+export const CLIMB = 2
+
+/** What a step between neighbouring tiles costs of a unit's move: one tile, and CLIMB more for each level up. */
+export const stepCost = (battle: Battle, from: Tile, to: Tile) => 1 + CLIMB * Math.max(0, heightAt(battle, to) - heightAt(battle, from))
 
 export function coverAt(battle: Battle, x: number, y: number): Cover {
   return battle.cover[y * GRID + x]

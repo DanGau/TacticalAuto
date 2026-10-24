@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
-import { BASE_STATS, COVER_DEFENSE, createBattle, GRID, passable, wreck, type Battle, type Cover } from './battle'
-import { coverAgainst, lineOfSight, odds } from './sight'
+import { BASE_STATS, COVER_DEFENSE, createBattle, GRID, HIGH_AIM, HIGH_SIGHT, passable, SIGHT, wreck, type Battle, type Cover } from './battle'
+import { coverAgainst, lineOfSight, odds, sees } from './sight'
 
 const at = { x: 10, y: 10 }
 
@@ -8,6 +8,7 @@ const at = { x: 10, y: 10 }
 function map(cover: Cover): Battle {
   const battle = createBattle(1, 'town', [], [])
   battle.cover.fill(0)
+  battle.height.fill(0)
   battle.north.fill('none')
   battle.west.fill('none')
   battle.cover[(at.y - 1) * GRID + at.x] = cover
@@ -79,4 +80,15 @@ test('a blast clears the props and walls it catches', () => {
   expect(battle.north[at.y * GRID + at.x]).toBe('none')
   expect(battle.west[at.y * GRID + at.x + 2]).toBe('none')
   expect(lineOfSight(battle, { x: at.x, y: at.y - 3 }, at)).toBe(true)
+})
+
+test('high ground sees farther and shoots truer; low ground the reverse', () => {
+  const battle = map(0)
+  const below = { x: at.x, y: at.y + SIGHT + HIGH_SIGHT }
+  expect(sees(battle, at, below)).toBe(false)
+  battle.height[at.y * GRID + at.x] = 1
+  expect(sees(battle, at, below)).toBe(true)
+  expect(sees(battle, below, at)).toBe(false)
+  const near = { x: at.x, y: at.y + 4 }
+  expect(odds(battle, at, near, BASE_STATS).hit).toBeCloseTo(odds(battle, near, at, BASE_STATS).hit + 2 * HIGH_AIM)
 })

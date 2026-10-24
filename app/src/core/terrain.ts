@@ -21,6 +21,8 @@ export const EDGE_COVER: Record<Edge, Cover> = { none: 0, window: 1, wall: 2 }
  */
 export interface Terrain {
   ground: Ground[]
+  /** How high each tile stands: 0 on the flat, 1 on a hill, 2 on its crest. */
+  height: number[]
   props: Prop[]
   north: Edge[]
   west: Edge[]
@@ -67,6 +69,9 @@ const PLOTS: Record<(typeof ZONE_TERRAINS)[number], { roads: [number, number]; p
   industrial: { roads: [1, 1], places: ['warehouse', 'depot', 'depot', 'carPark'], layouts: ['grid', 'lanes', 'coast', 'river'] },
   ruins: { roads: [1, 1], places: ['ruin', 'ruin', 'ruin', 'graveyard', 'park'], layouts: ['crater', 'crater', 'grid', 'river'] },
 }
+
+/** Hills each kind of place has. */
+const HILLS: Record<TerrainKind, number> = { town: 2, city: 1, countryside: 3, industrial: 1, ruins: 2, compound: 2, hive: 3 }
 
 /** Width of a road. */
 const ROAD = 2
@@ -303,10 +308,44 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     })
   }
 
+  /**
+   * Rolling hills: each a mound, its crest a level higher. Water lies on the flat, and a building stands level,
+   * on the height of its highest floor tile.
+   */
+  function hills(): number[] {
+    const height = Array<number>(size * size).fill(0)
+    for (let i = HILLS[kind]; i > 0; i--) {
+      const c = { x: between(0, size - 1), y: between(0, size - 1) }
+      const reach = between(4, 7)
+      each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => {
+        const d = Math.hypot(x - c.x, y - c.y)
+        const h = d <= reach * 0.45 ? 2 : d <= reach ? 1 : 0
+        height[y * size + x] = Math.max(height[y * size + x], h)
+      })
+    }
+    ground.forEach((g, t) => g === 'water' && (height[t] = 0))
+    const done = new Set<number>()
+    ground.forEach((g, start) => {
+      if (g !== 'floor' || done.has(start)) return
+      const room = [start]
+      done.add(start)
+      for (const t of room) {
+        for (const n of [t - 1, t + 1, t - size, t + size]) {
+          if (n < 0 || n >= size * size || done.has(n) || ground[n] !== 'floor' || Math.abs((n % size) - (t % size)) > 1) continue
+          done.add(n)
+          room.push(n)
+        }
+      }
+      const top = Math.max(...room.map((t) => height[t]))
+      for (const t of room) height[t] = top
+    })
+    return height
+  }
+
   if (kind === 'compound' || kind === 'hive') {
     if (kind === 'compound') compound()
     else hive()
-    return { ground, props, north, west }
+    return { ground, props, north, west, height: hills() }
   }
   const plot = PLOTS[kind]
 
@@ -405,5 +444,5 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
   }
   const layout = plot.layouts[randomInt(rng, plot.layouts.length)]
   layouts[layout]()
-  return { ground, props, north, west }
+  return { ground, props, north, west, height: hills() }
 }

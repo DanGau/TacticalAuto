@@ -125,6 +125,14 @@ const ALIEN_LOOK: Record<AlienKind, { color: number; scale: number }> = {
   psion: { color: 0xff6bd6, scale: 1 },
 }
 
+const onGridTile = (x: number, y: number) => x >= 0 && y >= 0 && x < GRID && y < GRID
+
+/** A colour lightened toward white, a step for each level of height, so high ground reads at a glance. */
+const highland = (color: number, level: number) => {
+  const lift = (c: number) => Math.round(c + (255 - c) * 0.12 * level)
+  return (lift(color >> 16) << 16) | (lift((color >> 8) & 255) << 8) | lift(color & 255)
+}
+
 /** A darker shade of a colour, for a box's sides. */
 const shade = (color: number, by: number) => (((color >> 16) * by) << 16) | ((((color >> 8) & 255) * by) << 8) | ((color & 255) * by)
 
@@ -135,8 +143,15 @@ const ZONE_NAMES = ['A', 'B', 'C']
 const letter = (unit: Unit) => (unit.target ? 'C' : unit.boss || !unit.kind ? '' : ALIENS[unit.kind].name[0])
 
 /** Position of a tile's centre in the world the camera looks at. Fractional tiles are allowed. */
+/** Screen pixels a tile rises for each level of height. */
+const RISE = 16
+
+/** The height of each tile of the battle shown, row by row. */
+let heights: number[] = []
+const riseAt = (x: number, y: number) => RISE * (heights[Math.round(y) * GRID + Math.round(x)] ?? 0)
+
 function toWorld(x: number, y: number): Tile {
-  return { x: ((x - y) * TILE_W) / 2, y: ((x + y + 1 - GRID) * TILE_H) / 2 }
+  return { x: ((x - y) * TILE_W) / 2, y: ((x + y + 1 - GRID) * TILE_H) / 2 - riseAt(x, y) }
 }
 
 const lerp = (a: Tile, b: Tile, t: number): Tile => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
@@ -337,7 +352,14 @@ export async function createView(): Promise<View> {
     for (let tile = 0; tile < GRID * GRID; tile++) {
       const x = tile % GRID
       const y = Math.floor(tile / GRID)
-      diamond(tiles, x, y).fill(GROUND_COLOR[battle.ground[tile]]).stroke({ color: COLOR.line, width: 1, alpha: 0.5 })
+      // The faces a raised tile shows above its lower neighbours toward the viewer, on +y and +x.
+      const c = toWorld(x, y)
+      const drop = (nx: number, ny: number) => (onGridTile(nx, ny) ? Math.max(0, battle.height[tile] - battle.height[ny * GRID + nx]) * RISE : 0)
+      const left = drop(x, y + 1)
+      const right = drop(x + 1, y)
+      if (left > 0) tiles.poly([c.x - TILE_W / 2, c.y, c.x, c.y + TILE_H / 2, c.x, c.y + TILE_H / 2 + left, c.x - TILE_W / 2, c.y + left]).fill(shade(GROUND_COLOR[battle.ground[tile]], 0.6))
+      if (right > 0) tiles.poly([c.x + TILE_W / 2, c.y, c.x, c.y + TILE_H / 2, c.x, c.y + TILE_H / 2 + right, c.x + TILE_W / 2, c.y + right]).fill(shade(GROUND_COLOR[battle.ground[tile]], 0.45))
+      diamond(tiles, x, y).fill(highland(GROUND_COLOR[battle.ground[tile]], battle.height[tile])).stroke({ color: COLOR.line, width: 1, alpha: 0.5 })
       if (battle.props[tile] !== 'none') stand(drawProp(battle, tile), x, y, [tile])
       // A wall stands half a tile toward the neighbour it divides this tile from.
       const north = battle.north[tile]
@@ -358,6 +380,7 @@ export async function createView(): Promise<View> {
   /** Clears the board for a new battle. */
   function setBattle(battle: Battle): void {
     shown = battle
+    heights = battle.height
     sprites.clear()
     scenery.length = 0
     units.removeChildren().forEach((child) => child.destroy({ children: true }))

@@ -3,6 +3,7 @@ import {
   ACID_DAMAGE,
   ACID_TURNS,
   alienUnit,
+  stepCost,
   AMBUSH_AIM,
   AMBUSH_CRIT,
   AURA_REACH,
@@ -152,32 +153,48 @@ function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: S
 function walkingDistances(battle: Battle, goal: Tile): number[] {
   const field = Array<number>(GRID * GRID).fill(Infinity)
   field[goal.y * GRID + goal.x] = 0
-  const queue = [goal]
-  for (const tile of queue) {
-    for (const [dx, dy] of NEIGHBORS) {
-      const x = tile.x + dx
-      const y = tile.y + dy
-      if (!onGrid(x, y) || coverAt(battle, x, y) > 0 || field[y * GRID + x] !== Infinity || !passable(battle, tile, { x, y })) continue
-      field[y * GRID + x] = field[tile.y * GRID + tile.x] + 1
-      queue.push({ x, y })
+  // Tiles by distance found, nearest first: a step costs 1 to 1 + 2 * CLIMB, so each bucket is settled before the next.
+  const buckets: Tile[][] = [[goal]]
+  for (let d = 0; d < buckets.length; d++) {
+    for (const tile of buckets[d] ?? []) {
+      if (field[tile.y * GRID + tile.x] !== d) continue
+      for (const [dx, dy] of NEIGHBORS) {
+        const x = tile.x + dx
+        const y = tile.y + dy
+        if (!onGrid(x, y) || coverAt(battle, x, y) > 0 || !passable(battle, tile, { x, y })) continue
+        // Walking from the neighbour to this tile, as the unit will.
+        const cost = d + stepCost(battle, { x, y }, tile)
+        if (cost >= field[y * GRID + x]) continue
+        field[y * GRID + x] = cost
+        ;(buckets[cost] ??= []).push({ x, y })
+      }
     }
   }
   return field
 }
 
-/** Every path of at most `move` tiles the unit can walk, shortest first, starting with the empty path. */
+/**
+ * The cheapest path to each tile the unit can reach with `move`, climbing costing more, cheapest first,
+ * starting with the empty path.
+ */
 function paths(battle: Battle, unit: Unit, move: number): Tile[][] {
-  const found: Tile[][] = [[]]
-  const seen = new Set([unit.y * GRID + unit.x])
-  for (const path of found) {
-    if (path.length === move) break
-    const from = path.at(-1) ?? unit
-    for (const [dx, dy] of NEIGHBORS) {
-      const x = from.x + dx
-      const y = from.y + dy
-      if (blocked(battle, x, y) || seen.has(y * GRID + x) || !passable(battle, from, { x, y })) continue
-      seen.add(y * GRID + x)
-      found.push([...path, { x, y }])
+  const best = new Map([[unit.y * GRID + unit.x, 0]])
+  const buckets: Tile[][][] = [[[]]]
+  const found: Tile[][] = []
+  for (let cost = 0; cost < buckets.length; cost++) {
+    for (const path of buckets[cost] ?? []) {
+      const from = path.at(-1) ?? unit
+      if (best.get(from.y * GRID + from.x) !== cost) continue
+      found.push(path)
+      for (const [dx, dy] of NEIGHBORS) {
+        const x = from.x + dx
+        const y = from.y + dy
+        if (blocked(battle, x, y) || !passable(battle, from, { x, y })) continue
+        const next = cost + stepCost(battle, from, { x, y })
+        if (next > move || next >= (best.get(y * GRID + x) ?? Infinity)) continue
+        best.set(y * GRID + x, next)
+        ;(buckets[next] ??= []).push([...path, { x, y }])
+      }
     }
   }
   return found
