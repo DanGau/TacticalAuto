@@ -7,7 +7,7 @@ import { RELICS } from '../core/relics'
 import { buildCost, built, KEYS, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type StopKind, type Zone } from '../core/run'
 import { PATHS, SKILLS, type SkillId } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
-import { alienName, button, gearCard, keywordChips, resistChip, tip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
+import { alienName, button, describe, gearCard, keywordChips, resistChip, tip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
 export const TABS = ['Map', 'Base', 'Barracks'] as const
@@ -32,7 +32,7 @@ function census(packs: Muster[]): string {
 function zoneCard(zone: Zone, index: number): string {
   const risk = RISKS[zone.risk]
   const goal = GOALS[zone.goal]
-  const stops = zone.stops.map((stop, i) => `<div>${STOP_NAMES[stop]}${stop === 'battle' ? `: ${census(zone.packs[i])}${zone.goal === 'assassinate' ? ', and a Commander with a Trooper' : ''}` : ''}</div>`)
+  const stops = zone.stops.map((stop, i) => `<div>${STOP_NAMES[stop]}${stop === 'battle' ? `: ${census(zone.packs[i])}${zone.goal === 'assassinate' ? ', and a Commander' : ''}` : ''}</div>`)
   return button(
     { type: 'zone', index },
     `<small>${risk.name} · ${TERRAIN_TEXT[zone.terrain].name}</small><br><b>${tip(goal.name, goal.text)}</b>
@@ -75,7 +75,7 @@ function facilityButton(run: Run, id: FacilityId): string {
 }
 
 function baseView(run: Run): string {
-  const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${RELICS[id].name}</b><br>${RELICS[id].text}${keywordChips(RELICS[id].tags)}</div>`)
+  const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags)}</div>`)
   const held = squadKeywords(run)
   return `<h2>Facilities improve every soldier. Each level costs more.</h2>
     <div class="facilities">${(Object.keys(FACILITIES) as FacilityId[]).map((id) => facilityButton(run, id)).join('')}</div>
@@ -122,7 +122,7 @@ function details(run: Run, soldier: Soldier): string {
   const r = level(soldier)
   const cls = soldier.cls && CLASSES[soldier.cls]
   const stats = soldierStats(run, soldier)
-  const skills = soldier.skills.map((id) => `<p>${tip(`<b>${SKILLS[id].name}</b>`, SKILLS[id].text)} ${keywordChips(SKILLS[id].tags)}</p>`)
+  const skills = soldier.skills.map((id) => `<p class="described"><b>${SKILLS[id].name}.</b> ${describe(SKILLS[id].text, SKILLS[id].tags)}</p>`)
   const uses = charges(run, soldier)
   const gear = equipped(soldier).map((g) => `<div class="gear ${g.rarity}">${gearCard(g)}</div>`)
   const toNext = xpFor(r + 1) - soldier.xp

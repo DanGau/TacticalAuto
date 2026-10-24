@@ -179,15 +179,15 @@ test('alien force follows the leg; an alien\'s health never grows, but deeper al
   expect(missionAt(run, 'battle', 'standard').force).toBe(LEG_FORCE[0])
   apply(run, { type: 'advance' })
   const early = run.battle!.units.filter((u) => u.side === 'alien')
-  expect(early.every((u) => u.stats.armor === 0)).toBe(true)
+  expect(early.filter((u) => !u.target).every((u) => u.stats.armor === 0)).toBe(true)
 
   const late = started()
   late.keys = 2
   enter(late, 'standard')
   expect(missionAt(late, 'battle', 'standard').force).toBe(LEG_FORCE[2])
   apply(late, { type: 'advance' })
-  const troopers = (units: typeof early) => units.filter((u) => u.kind === 'trooper' && !u.boss)
-  for (const alien of late.battle!.units.filter((u) => u.side === 'alien')) expect(alien.stats.armor).toBe(4)
+  const troopers = (units: typeof early) => units.filter((u) => u.kind === 'trooper' && !u.boss && !u.target)
+  for (const alien of late.battle!.units.filter((u) => u.side === 'alien' && !u.target)) expect(alien.stats.armor).toBe(4)
   for (const trooper of troopers(late.battle!.units)) expect(trooper.stats.hp).toBe(BASE_STATS.hp)
   for (const trooper of troopers(early)) expect(trooper.stats.hp).toBe(BASE_STATS.hp)
 })

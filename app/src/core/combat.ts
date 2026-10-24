@@ -291,14 +291,22 @@ function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
 }
 
 /**
- * The enemy a side's units close on when they have no shot. Soldiers share one, so the squad moves together:
- * a revealed commander to assassinate, else the revealed alien nearest the squad's centre, or with none revealed,
- * the nearest alien of any pod. An alien closes on the human nearest itself.
+ * Where a side's units close on when they have no shot, by the battle's goal. Soldiers share one, so the squad moves
+ * together: on a hold, the uplink; on an assassination, the commander once sighted; on a rescue, the alien
+ * nearest the civilians; else the alien nearest the squad's centre. On a hold the aliens close on the uplink;
+ * otherwise an alien closes on the human nearest itself.
  */
-function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Unit | undefined {
+function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
+  if (enemies.length === 0) return undefined
+  if (battle.uplink) return battle.uplink
   if (unit.side === 'alien') return nearest(enemies, unit)
-  return enemies.find((u) => u.target && revealed(battle, u)) ?? nearest(enemies, centreOf(battle.units.filter(isSoldier)))
+  const civilians = battle.units.filter((u) => u.civilian)
+  const guarded = battle.goal === 'rescue' && civilians.length > 0 ? centreOf(civilians) : centreOf(battle.units.filter(isSoldier))
+  return enemies.find((u) => u.target && revealed(battle, u)) ?? nearest(enemies, guarded)
 }
+
+/** On a hold, how far from the uplink a soldier may stand and still defend it. */
+export const UPLINK_REACH = 3
 
 /** The tile at the middle of some units. */
 function centreOf(units: Unit[]): Tile {
@@ -337,6 +345,8 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   /** Whether a soldier on `end` would sight a pod not yet revealed, while the squad is in a fight. */
   const provokes = (end: Tile) => (engaged && unseen.some((alien) => sees(battle, end, alien)) ? 1 : 0)
   const acid = (end: Tile) => (battle.acid.some((pool) => pool.x === end.x && pool.y === end.y) ? 1 : 0)
+  const uplink = battle.uplink
+  const leash = (end: Tile) => (uplink && unit.side === 'human' ? Math.max(0, distance(end, uplink) - UPLINK_REACH) : 0)
   const marching = unit.side === 'human' && seen.size === 0
   const leaders = unit.stance === 'standoff' ? squadmates.filter((u) => u.stance !== 'standoff') : []
   /** The nearest to the enemy this unit may walk while marching: REAR_GAP behind the foremost leader. */
@@ -364,7 +374,8 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
       }
       // A wary unit ranks every tile by the exchange of fire, so one with no shot and no risk can win.
       // No unit ends its move in acid if it can help it.
-      const first = [acid(end), provokes(end)]
+      // On a hold, a soldier stands its ground at the uplink before anything else.
+      const first = [leash(end), acid(end), provokes(end)]
       if (wary && unit.stance !== 'standoff' && inContact) return [...first, 0, ...WITH_SHOT[unit.stance](spot), spot.toGoal]
       return spot.mine > 0 ? [...first, 0, ...WITH_SHOT[unit.stance](spot), steps] : [...first, 1, ahead(end), ...NO_SHOT[unit.stance](spot)]
     })

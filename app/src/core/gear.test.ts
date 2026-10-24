@@ -59,6 +59,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   run.battle!.boons[0] = 'kill'
   apply(run, { type: 'land', zone: 0 })
   const battle = run.battle!
+  Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [] })
   battle.cover.fill(0)
   battle.north.fill('none')
   battle.west.fill('none')
@@ -67,7 +68,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   battle.units = [soldier, alien]
   battle.pods.forEach((pod) => (pod.revealed = true))
   Object.assign(soldier, { x: 10, y: 10 })
-  Object.assign(alien, { x: 10, y: 11, hp: 99, stats: { ...alien.stats, hp: 99, aim: 2, crit: 0 } })
+  Object.assign(alien, { x: 10, y: 11, hp: 99, armor: 0, target: false, stats: { ...alien.stats, hp: 99, armor: 0, aim: 2, crit: 0 } })
   return { battle, soldier, alien, step: () => stepBattle(battle) }
 }
 

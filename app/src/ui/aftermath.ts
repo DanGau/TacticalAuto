@@ -4,7 +4,7 @@ import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { KEYS, level, SELL, skillOffers, soldierStats, xpFor, squadKeywords, type Report, type Run, type Soldier } from '../core/run'
 import { PATHS, SKILLS } from '../core/skills'
-import { button, gearCard, keywordChips, keyRow, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
+import { button, describe, gearCard, keyRow, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
 
 /** A soldier's card: level, an experience bar filling toward the next level, and a level gained, or that the soldier fell. */
 function soldierCard(soldier: Report['soldiers'][number]): string {
@@ -60,7 +60,7 @@ function skillChoice(run: Run, soldier: Soldier): string {
   // A path's card also names what it leads to.
   const ahead = (index: number) => (path ? '' : `<small class="ahead">Then ${paths[index].tiers.map((pair) => pair.map((id) => SKILLS[id].name).join(' or ')).join(', then ')}</small>`)
   const card = (id: (typeof soldier.skills)[number], index: number) =>
-    button({ type: 'skill', soldier: soldier.id, index }, `<small>${(path ?? paths[index]).name} path</small><br><b>${SKILLS[id].name}</b><br>${SKILLS[id].text}${keywordChips(SKILLS[id].tags, held)}${ahead(index)}`, 'card skill')
+    button({ type: 'skill', soldier: soldier.id, index }, `<small>${(path ?? paths[index]).name} path</small><br><b>${SKILLS[id].name}</b><br>${describe(SKILLS[id].text, SKILLS[id].tags, held)}${ahead(index)}`, 'card skill')
   const ask = path ? `Choose one; the other is lost.` : `Choose a path; the other is shut for good.`
   return `<h2><b class="supplies">${soldier.name}, ${CLASSES[soldier.cls!].name}, reached level ${soldier.skills.length + 1}.</b> ${ask}</h2>
     <div class="choices">${skillOffers(soldier).map(card).join('')}</div>`
@@ -69,7 +69,7 @@ function skillChoice(run: Run, soldier: Soldier): string {
 /** The next choice of the reward phase: a relic, then each find, then each skill owed. */
 export function choice(run: Run): string {
   const held = squadKeywords(run)
-  const relic = (id: RelicId, index: number) => button({ type: 'relic', index }, `<small>relic</small><br><b>${RELICS[id].name}</b><br>${RELICS[id].text}${keywordChips(RELICS[id].tags, held)}`, 'card relic')
+  const relic = (id: RelicId, index: number) => button({ type: 'relic', index }, `<small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic')
   if (run.relicOffers.length > 0) return `<h2>Alien artifacts lie in the wreckage. The squad can carry one, and keeps it for the run.</h2><div class="choices">${run.relicOffers.map(relic).join('')}</div>`
   if (run.finds.length > 0) return findChoice(run)
   return skillChoice(run, run.soldiers.find((s) => skillOffers(s).length > 0)!)

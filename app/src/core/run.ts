@@ -23,7 +23,7 @@ export const LOSS_THREAT = 1
 export const LEG_FORCE = [1, 4, 9, 15]
 export const START_SUPPLIES = 3
 /** What an assassination's commander has over a trooper. */
-export const COMMANDER = { hp: 8, armor: 2 }
+export const COMMANDER = { hp: 4, armor: 1 }
 /** Supplies a supply drop gives. */
 export const DROP_SUPPLIES = 4
 
@@ -295,11 +295,11 @@ function packsOf(run: Run, mission: Mission, mustered?: Muster[]): { name: strin
   const boss = mission.kind === 'key' || mission.kind === 'final'
   const escort = boss ? run.keys : 0
   const packs = (mustered ?? muster(run, Math.max(0, mission.force - (boss ? 2 + escort : 0)), tier)).map((pack) => ({ name: pack.name, aliens: pack.kinds.map(alien) }))
-  // An assassination's commander: a trooper tougher than its kind, with a guard.
+  // An assassination's commander: a trooper tougher than its kind.
   if (mission.goal === 'assassinate') {
     const commander = alien('trooper')
     commander.stats = { ...commander.stats, hp: commander.stats.hp + COMMANDER.hp, armor: commander.stats.armor + COMMANDER.armor, damage: commander.stats.damage + 1 }
-    packs.unshift({ name: 'Commander', aliens: [{ ...commander, target: true, stance: 'anchor' }, alien('trooper')] })
+    packs.unshift({ name: 'Commander', aliens: [{ ...commander, target: true, stance: 'anchor' }] })
   }
   if (boss) {
     const k = run.keys
@@ -332,7 +332,8 @@ function drawZones(run: Run): Zone[] {
   const zone = (risk: Risk, stops: StopKind[]): Zone => {
     const goal = drawGoal(run)
     const force = missionAt(ahead, 'battle', risk, goal).force
-    const packs = stops.map((stop) => (stop === 'battle' ? muster(run, force, depth(ahead)).map(({ name, kinds }) => ({ name, kinds })) : []))
+    // Each battle's force varies a little either way, so two zones of one risk are not the same fight.
+    const packs = stops.map((stop) => (stop === 'battle' ? muster(run, Math.max(1, force + randomInt(run, 3) - 1), depth(ahead)).map(({ name, kinds }) => ({ name, kinds })) : []))
     return { risk, goal, terrain: terrain(), stops, packs }
   }
   return [zone('safe', shuffled(['battle', event(), 'battle'])), zone('standard', ['battle', 'battle']), zone('dangerous', ['battle'])]

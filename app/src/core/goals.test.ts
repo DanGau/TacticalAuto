@@ -22,10 +22,11 @@ test('every zone at a fork has a goal, and its battles mustered in advance', () 
   }
 })
 
-test('a hold offers one landing zone, keeps half its packs back as waves, and is won by lasting', () => {
+test('a hold offers three landing zones away from the uplink, keeps half its packs back as waves, and is won by lasting', () => {
   const run = before('hold')
   const battle = run.battle!
-  expect(battle.zones).toHaveLength(1)
+  expect(battle.zones).toHaveLength(3)
+  expect(battle.uplink).not.toBeNull()
   expect(battle.waves).toHaveLength(1)
   apply(run, { type: 'land', zone: 0 })
   battle.round = HOLD_ROUNDS + 1

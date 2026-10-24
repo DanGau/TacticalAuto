@@ -54,6 +54,7 @@ const COLOR = {
   acid: 0xa6e22e,
   psi: 0xff6bd6,
   contact: 0xff6b5e,
+  uplink: 0xffd84d,
 }
 
 const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x15161a, hive: 0x2a1838, water: 0x1d5f5c }
@@ -374,6 +375,7 @@ export async function createView(): Promise<View> {
   function drawMarks(battle: Battle): void {
     zones.clear()
     marks.removeChildren().forEach((child) => child.destroy())
+    if (battle.uplink) marks.addChild(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
     if (battle.phase !== 'deploy') return
     battle.zones.forEach((zone, i) => {
       for (let y = 0; y < GRID; y++) {
@@ -383,7 +385,8 @@ export async function createView(): Promise<View> {
       }
       const { cover, contact } = zoneInfo(battle, zone)
       const ground = cover >= 12 ? 'heavy cover' : cover >= 5 ? 'some cover' : 'open ground'
-      marks.addChild(label(battle.goal === 'hold' ? 'UPLINK' : ZONE_NAMES[i], zone, 0xffffff), label(`${KEYWORDS[battle.boons[i]].icon} ${BOONS[battle.boons[i]].name}\n${ground} · ${contact} tiles`, zone, 0xffffff, 20))
+      const far = battle.uplink ? `uplink ${distance(zone, battle.uplink)} tiles` : `contact ${contact} tiles`
+      marks.addChild(label(ZONE_NAMES[i], zone, 0xffffff), label(`${KEYWORDS[battle.boons[i]].icon} ${BOONS[battle.boons[i]].name}\n${ground} · ${far}`, zone, 0xffffff, 20))
     })
     battle.pods.forEach((_, pod) => {
       const members = battle.units.filter((u) => u.pod === pod)

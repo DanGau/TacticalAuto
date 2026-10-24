@@ -30,6 +30,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   run.battle!.boons[0] = 'kill'
   apply(run, { type: 'land', zone: 0 })
   const battle = run.battle!
+  Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [] })
   battle.cover.fill(0)
   battle.props.fill('none')
   battle.north.fill('none')

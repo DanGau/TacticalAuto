@@ -286,6 +286,8 @@ export interface Battle {
   acid: { x: number; y: number; turns: number }[]
   /** Centres of the landing zones on offer in the deploy phase. */
   zones: Tile[]
+  /** On a hold, the uplink the squad must reach and defend; null otherwise. */
+  uplink: Tile | null
   /** The keyword each landing zone grants the squad for the battle, in zones order. */
   boons: Keyword[]
   /** Soldiers not yet landed. */
@@ -393,12 +395,12 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 
 /** What landing in a zone gives the squad for the battle, by the zone's keyword. */
 export const BOONS: Record<Keyword, { name: string; text: string }> = {
-  burn: { name: 'Fuel depot', text: 'Every hit sets the target burning' },
-  frost: { name: 'Coolant leak', text: 'Every alien starts chilled' },
-  mark: { name: 'Spotter tower', text: 'The nearest pod starts marked' },
-  crit: { name: 'High ground', text: '+15% crit' },
-  kill: { name: 'War drums', text: 'Each kill gives the soldier +1 damage' },
-  ward: { name: 'Supply crates', text: 'Every soldier starts with 2 more armor' },
+  burn: { name: 'Fuel depot', text: "Every soldier's hits this battle set the target burning" },
+  frost: { name: 'Coolant leak', text: 'Every alien starts the battle chilled' },
+  mark: { name: 'Spotter tower', text: 'Every alien of the pod nearest this zone starts marked' },
+  crit: { name: 'Sniper nest', text: 'Every soldier has +15% crit chance this battle' },
+  kill: { name: 'War drums', text: 'Each kill gives the soldier who made it +1 damage for the rest of the battle' },
+  ward: { name: 'Supply crates', text: 'Every soldier lands with +2 armor' },
 }
 
 const BOON_EFFECTS: Partial<Record<Keyword, Effect>> = { burn: 'incendiary', kill: 'bloodRite' }
@@ -523,6 +525,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     concealed: true,
     acid: [],
     zones: [],
+    uplink: null,
     boons: [],
     reserve,
   }
@@ -540,8 +543,8 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
       battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
     }
   }
-  const count = goal === 'hold' ? 1 : ZONES
-  while (battle.zones.length < count) battle.zones.push(spacedTile(battle, [...battle.units, ...battle.zones], ZONE_CLEARANCE))
+  if (goal === 'hold') battle.uplink = spacedTile(battle, battle.units, ZONE_CLEARANCE)
+  while (battle.zones.length < ZONES) battle.zones.push(spacedTile(battle, [...battle.units, ...battle.zones, ...(battle.uplink ? [battle.uplink] : [])], ZONE_CLEARANCE))
   const boons = Object.keys(BOONS) as Keyword[]
   battle.boons = battle.zones.map(() => boons.splice(randomInt(battle, boons.length), 1)[0])
   return battle

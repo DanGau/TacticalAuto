@@ -1,7 +1,7 @@
 import type { Action } from '../core/apply'
 import { EFFECTS, type Gear } from '../core/gear'
 import { ALIENS, type AlienKind } from '../core/aliens'
-import { BOONS, type Stats } from '../core/battle'
+import type { Stats } from '../core/battle'
 import { KEYWORDS, RESISTS, type Keyword, type Resist } from '../core/keywords'
 import { KEYS, THREAT_MAX, type Mission, type StopKind } from '../core/run'
 
@@ -62,6 +62,33 @@ export const keywordChip = (tag: Keyword, held = false) => `<span class="kw ${ta
 /** A keyword something shrugs off: its icon struck through, explained on hover. */
 export const resistChip = (tag: Resist) => `<span class="kw ${tag} resist" title="Resists ${KEYWORDS[tag].name}: ${RESISTS[tag]}">${KEYWORDS[tag].icon}</span>`
 
+/** The words in a description that name a keyword, and which. */
+const KEYWORD_WORDS: [RegExp, Keyword][] = [
+  [/burning|burns?/, 'burn'],
+  [/chilled|chills?/, 'frost'],
+  [/marked|marks?/, 'mark'],
+  [/crits?/, 'crit'],
+  [/kills?/, 'kill'],
+  [/armor/, 'ward'],
+]
+const KEYWORD_PATTERN = new RegExp(`\\b(${KEYWORD_WORDS.map(([re]) => re.source).join('|')})\\b`, 'gi')
+const keywordOf = (word: string) => KEYWORD_WORDS.find(([re]) => new RegExp(`^(${re.source})$`, 'i').test(word))![1]
+
+/**
+ * A description as Slay the Spire writes a card: each keyword in it coloured in place, lit if the squad has it,
+ * and on hover a box beside it defining every keyword it names or carries.
+ */
+export function describe(text: string, tags: Keyword[] = [], held: Keyword[] = []): string {
+  const named = new Set<Keyword>(tags)
+  const rich = text.replace(KEYWORD_PATTERN, (word) => {
+    const tag = keywordOf(word)
+    named.add(tag)
+    return `<span class="kwi ${tag} ${held.includes(tag) ? 'held' : ''}">${KEYWORDS[tag].icon}${word}</span>`
+  })
+  const defs = [...named].map((tag) => `<span class="def"><b class="kwi ${tag}">${KEYWORDS[tag].icon} ${KEYWORDS[tag].name}</b>${KEYWORDS[tag].text}.</span>`)
+  return `${rich}${defs.length > 0 ? `<span class="defs">${defs.join('')}</span>` : ''}`
+}
+
 /** Keyword chips; one the squad already has, in `held`, is lit. */
 export const keywordChips = (tags: Keyword[] = [], held: Keyword[] = []) =>
   tags.length === 0 ? '' : `<span class="keywords">${tags.map((tag) => keywordChip(tag, held.includes(tag))).join('')}</span>`
@@ -69,10 +96,8 @@ export const keywordChips = (tags: Keyword[] = [], held: Keyword[] = []) =>
 /** An alien kind's name, its rules on hover, and what it resists. */
 export const alienName = (kind: AlienKind, label = ALIENS[kind].name) => `${tip(label, ALIENS[kind].text)}${ALIENS[kind].resists.map(resistChip).join('')}`
 
-/** A landing zone's boon: its icon and name, what it does on hover. */
-export const boonChip = (tag: Keyword) => `<span class="kw ${tag}" title="${BOONS[tag].text}">${KEYWORDS[tag].icon} ${BOONS[tag].name}</span>`
 
 /** A piece of gear as a card's contents: rarity and slot, name, what it changes, and its keywords. */
 export function gearCard(gear: Gear, held: Keyword[] = []): string {
-  return `<small>${gear.rarity} ${gear.slot}</small><br><b>${gear.name}</b><br>${gearText(gear)}${keywordChips(gear.effect ? EFFECTS[gear.effect].tags : [], held)}`
+  return `<small>${gear.rarity} ${gear.slot}</small><br><b>${gear.name}</b><br>${describe(gearText(gear), gear.effect ? EFFECTS[gear.effect].tags : [], held)}`
 }

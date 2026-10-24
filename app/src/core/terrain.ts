@@ -375,7 +375,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     },
     // Water takes one side of the map, along a ragged shore.
     coast: () => {
-      const shore = wander().map((at) => Math.min(at, 8))
+      const shore = wander().map((at) => Math.min(at, 6))
       const vertical = chance(0.5)
       for (let i = 0; i < size; i++) for (let d = 0; d < shore[i]; d++) clear(vertical ? d : i, vertical ? i : d, 'water')
     },
