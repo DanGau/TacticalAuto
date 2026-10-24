@@ -395,6 +395,10 @@ export function spacedTile(battle: Battle, avoid: Tile[], clearance: number): Ti
   }
 }
 
+/** The alien nearest a tile, if any. */
+export const nearestAlien = (battle: Battle, tile: Tile): Unit | undefined =>
+  battle.units.filter((u) => u.side === 'alien').reduce<Unit | undefined>((best, u) => (!best || distance(tile, u) < distance(tile, best) ? u : best), undefined)
+
 /** What a landing zone offers: cover tiles in and around it, and the distance to the nearest alien. */
 export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: number } {
   let cover = 0
@@ -403,8 +407,8 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
       if (onGrid(x, y) && coverAt(battle, x, y) > 0) cover++
     }
   }
-  const aliens = battle.units.filter((u) => u.side === 'alien')
-  return { cover, contact: Math.min(...aliens.map((u) => distance(zone, u))) }
+  const alien = nearestAlien(battle, zone)
+  return { cover, contact: alien ? distance(zone, alien) : Infinity }
 }
 
 /** What landing in a zone gives the squad for the battle, by the zone's keyword. */

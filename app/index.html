@@ -11,7 +11,15 @@
       .roster hr { border: 0; border-top: 1px solid #3a465c; margin: 6px 0; }
       .roster { margin-top: 8px; padding: 8px 12px; max-width: 420px; background: #171d29d9; border: 1px solid #3a465c; border-radius: 6px; line-height: 1.5; font-size: 13px; }
       #panel { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); width: min(1200px, calc(100vw - 16px)); max-height: calc(100vh - 48px); overflow-y: auto; box-sizing: border-box; padding: 14px 24px 18px; background: #171d29f2; border: 1px solid #3a465c; border-radius: 8px; }
-      #panel[hidden] { display: none; }
+      #panel[hidden], #drop[hidden] { display: none; }
+      #drop { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); box-sizing: border-box; padding: 10px 14px; background: #171d29ee; border: 1px solid #3a465c; border-radius: 8px; line-height: 1.5; }
+      #drop .zones { display: flex; gap: 8px; align-items: center; }
+      #drop .zones button { flex: 1; white-space: nowrap; padding: 6px 8px; }
+      #drop .zones button.on { outline: 2px solid #ffd166; }
+      #drop .zones .overview { flex: 0 0 auto; }
+      #drop > button { margin-top: 6px; width: 100%; }
+      #drop .pro { color: #7ddc8a; }
+      #drop .con { color: #ff8a7a; }
       h1 { margin: 0 0 4px; font-size: 22px; }
       h2 { margin: 16px 0 8px; font-size: 14px; font-weight: normal; color: #9aa6bd; }
       p { margin: 6px 0; }
@@ -138,6 +146,7 @@
   </head>
   <body>
     <div id="hud"><span id="status"></span></div>
+    <div id="drop" hidden></div>
     <div id="panel"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

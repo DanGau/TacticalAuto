@@ -86,7 +86,8 @@ export function describe(text: string, tags: Keyword[] = [], held: Keyword[] = [
     return `<span class="kwi ${tag} ${held.includes(tag) ? 'held' : ''}">${KEYWORDS[tag].icon}${word}</span>`
   })
   const defs = [...named].map((tag) => `<span class="def"><b class="kwi ${tag}">${KEYWORDS[tag].icon} ${KEYWORDS[tag].name}</b>${KEYWORDS[tag].text}.</span>`)
-  return `${rich}${defs.length > 0 ? `<span class="defs">${defs.join('')}</span>` : ''}`
+  // One span, so a flex card keeps the sentence on one line.
+  return `<span>${rich}</span>${defs.length > 0 ? `<span class="defs">${defs.join('')}</span>` : ''}`
 }
 
 /** Keyword chips; one the squad already has, in `held`, is lit. */

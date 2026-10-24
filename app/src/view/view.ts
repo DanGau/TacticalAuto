@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js'
-import { BLAST_RADIUS, BOONS, distance, GRID, revealed, ZONE_RADIUS, zoneInfo, type Battle, type Tile, type Unit } from '../core/battle'
+import { BLAST_RADIUS, BOONS, distance, GRID, nearestAlien, revealed, ZONE_RADIUS, zoneInfo, type Battle, type Tile, type Unit } from '../core/battle'
 import { KEYWORDS } from '../core/keywords'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
@@ -22,6 +22,11 @@ const FIT = Math.min(WIDTH / (GRID * TILE_W), HEIGHT / (GRID * TILE_H + 80))
 const MARGIN = 220
 
 const CAMERA_MS = 350
+/** How long the camera takes to glide to a landing zone, and to fly in over a new battle. */
+const FOCUS_MS = 700
+const FLY_MS = 1600
+/** Screen pixels the landing panel takes from the bottom of the canvas. */
+const PANEL = 110
 const MS_PER_TILE = 110
 const REVEAL_MS = 450
 const SHOT_MS = 160
@@ -172,6 +177,8 @@ interface Camera {
 }
 
 const WHOLE_MAP: Camera = { x: 0, y: 0, zoom: FIT }
+/** The whole map before the landing, shrunk and raised to clear the landing panel below it. */
+const OVERVIEW: Camera = { x: 0, y: 70, zoom: FIT * 0.82 }
 
 export interface View {
   canvas: HTMLCanvasElement
@@ -184,6 +191,8 @@ export interface View {
   show(run: Run, events: GameEvent[], animate: boolean): Promise<void>
   /** The landing zone under a point on the canvas as displayed, as an index into battle.zones; null when there is none to choose. */
   zoneAt(sx: number, sy: number): number | null
+  /** Before the landing, glides the camera to a landing zone and marks its way in; null pulls back to the whole map. */
+  focus(zone: number | null): void
 }
 
 export async function createView(): Promise<View> {
@@ -215,6 +224,8 @@ export async function createView(): Promise<View> {
   let camera = WHOLE_MAP
   /** The landing zone under the pointer. */
   let hovered: number | null = null
+  /** The landing zone the camera is on before the landing. */
+  let selected: number | null = null
 
   const diamond = (g: Graphics, x: number, y: number) => {
     const c = toWorld(x, y)
@@ -381,6 +392,7 @@ export async function createView(): Promise<View> {
   function setBattle(battle: Battle): void {
     shown = battle
     heights = battle.height
+    selected = null
     sprites.clear()
     scenery.length = 0
     units.removeChildren().forEach((child) => child.destroy({ children: true }))
@@ -403,8 +415,15 @@ export async function createView(): Promise<View> {
     battle.zones.forEach((zone, i) => {
       for (let y = 0; y < GRID; y++) {
         for (let x = 0; x < GRID; x++) {
-          if (distance(zone, { x, y }) <= ZONE_RADIUS) diamond(zones, x, y).fill({ color: i === hovered ? COLOR.zoneHover : COLOR.zone, alpha: 0.8 })
+          if (distance(zone, { x, y }) <= ZONE_RADIUS) diamond(zones, x, y).fill({ color: i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone, alpha: 0.8 })
         }
+      }
+      // The selected zone's way in: a line to the uplink, or to the nearest contact.
+      const toward = i === selected && (battle.uplink ?? nearestAlien(battle, zone))
+      if (toward) {
+        const a = toWorld(zone.x, zone.y)
+        const b = toWorld(toward.x, toward.y)
+        zones.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: battle.uplink ? COLOR.uplink : COLOR.contact, width: 4, alpha: 0.9 })
       }
       const { cover, contact } = zoneInfo(battle, zone)
       const ground = cover >= 12 ? 'heavy cover' : cover >= 5 ? 'some cover' : 'open ground'
@@ -467,11 +486,10 @@ export async function createView(): Promise<View> {
       app.ticker.add(tick)
     })
 
-  /** Glides the camera to frame the given tiles. */
-  function follow(points: Tile[]): Promise<void> {
-    const from = camera
-    const to = framing(points)
-    return tween(CAMERA_MS, (t) => {
+  /** Glides the camera to frame the given tiles, or to the given camera, over `ms`. */
+  function follow(points: Tile[] | Camera, ms = CAMERA_MS, from = camera): Promise<void> {
+    const to = Array.isArray(points) ? framing(points) : points
+    return tween(ms, (t) => {
       const ease = t * (2 - t)
       look({ x: from.x + (to.x - from.x) * ease, y: from.y + (to.y - from.y) * ease, zoom: from.zoom + (to.zoom - from.zoom) * ease })
     })
@@ -660,22 +678,40 @@ export async function createView(): Promise<View> {
     drawMarks(shown)
   })
 
+  /** What the camera frames for a landing zone: the zone, and the uplink or nearest contact it heads for. */
+  function zoneView(battle: Battle, zone: Tile): Tile[] {
+    const reach = ZONE_RADIUS + 2
+    const toward = battle.uplink ?? nearestAlien(battle, zone)
+    return [{ x: zone.x - reach, y: zone.y - reach }, { x: zone.x + reach, y: zone.y + reach }, ...(toward ? [toward] : [])]
+  }
+
   return {
     canvas: app.canvas,
     zoneAt,
+    focus(zone) {
+      if (shown?.phase !== 'deploy') return
+      selected = zone
+      drawMarks(shown)
+      const framed = zone === null ? OVERVIEW : framing(zoneView(shown, shown.zones[zone]))
+      // Raised, so the landing panel below covers none of it.
+      void follow({ ...framed, y: framed.y + (zone === null ? 0 : PANEL / framed.zoom) }, FOCUS_MS)
+    },
     async show(run, events, animate) {
       fx.clear()
       const battle = run.battle
       if (!battle) return
       world.visible = true
-      if (battle !== shown) setBattle(battle)
+      const fresh = battle !== shown
+      if (fresh) setBattle(battle)
       drawMarks(battle)
+      // A new battle opens flying in from high above, down to the whole map.
+      if (fresh && battle.phase === 'deploy') void follow(OVERVIEW, FLY_MS, { x: 0, y: -HEIGHT, zoom: FIT / 4 })
       if (animate) await play(battle, events)
       sync(run, battle)
       if (events.some((e) => e.type === 'rocket')) drawTerrain(battle)
       drawFog(battle)
       if (!animate) {
-        look(WHOLE_MAP)
+        if (battle.phase !== 'deploy') look(WHOLE_MAP)
         labels.removeChildren().forEach((child) => child.destroy())
         for (const e of events) {
           if (e.type === 'effect' && sprites.has(e.id)) effectCallout(e, sprites.get(e.id)!)
