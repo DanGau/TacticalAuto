@@ -1,7 +1,8 @@
 import type { Action } from '../core/apply'
-import type { Stats } from '../core/battle'
 import { EFFECTS, type Gear } from '../core/gear'
-import { KEYWORDS, type Keyword } from '../core/keywords'
+import { ALIENS, type AlienKind } from '../core/aliens'
+import { BOONS, type Stats } from '../core/battle'
+import { KEYWORDS, RESISTS, type Keyword, type Resist } from '../core/keywords'
 import { KEYS, THREAT_MAX, type Mission, type StopKind } from '../core/run'
 
 /** A button that performs `action` when clicked. */
@@ -52,9 +53,24 @@ export function gearText(gear: Gear): string {
   return `${stats.join(', ')}${gear.effect ? `. ${EFFECTS[gear.effect].text}.` : ''}`
 }
 
-/** Keyword chips; one the squad already has, in `held`, is lit. Each explains itself on hover. */
+/** Words that explain themselves on hover. */
+export const tip = (label: string, text: string) => `<span class="tip" title="${text}">${label}</span>`
+
+/** A keyword's chip: its icon and name, lit if the squad has it, explained on hover. */
+export const keywordChip = (tag: Keyword, held = false) => `<span class="kw ${tag} ${held ? 'held' : ''}" title="${KEYWORDS[tag].name}: ${KEYWORDS[tag].text}">${KEYWORDS[tag].icon} ${KEYWORDS[tag].name}</span>`
+
+/** A keyword something shrugs off: its icon struck through, explained on hover. */
+export const resistChip = (tag: Resist) => `<span class="kw ${tag} resist" title="Resists ${KEYWORDS[tag].name}: ${RESISTS[tag]}">${KEYWORDS[tag].icon}</span>`
+
+/** Keyword chips; one the squad already has, in `held`, is lit. */
 export const keywordChips = (tags: Keyword[] = [], held: Keyword[] = []) =>
-  tags.length === 0 ? '' : `<span class="keywords">${tags.map((tag) => `<span class="kw ${tag} ${held.includes(tag) ? 'held' : ''}" title="${KEYWORDS[tag].text}">${KEYWORDS[tag].name}</span>`).join('')}</span>`
+  tags.length === 0 ? '' : `<span class="keywords">${tags.map((tag) => keywordChip(tag, held.includes(tag))).join('')}</span>`
+
+/** An alien kind's name, its rules on hover, and what it resists. */
+export const alienName = (kind: AlienKind, label = ALIENS[kind].name) => `${tip(label, ALIENS[kind].text)}${ALIENS[kind].resists.map(resistChip).join('')}`
+
+/** A landing zone's boon: its icon and name, what it does on hover. */
+export const boonChip = (tag: Keyword) => `<span class="kw ${tag}" title="${BOONS[tag].text}">${KEYWORDS[tag].icon} ${BOONS[tag].name}</span>`
 
 /** A piece of gear as a card's contents: rarity and slot, name, what it changes, and its keywords. */
 export function gearCard(gear: Gear, held: Keyword[] = []): string {

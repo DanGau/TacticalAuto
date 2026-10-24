@@ -2,13 +2,12 @@ import { FACILITIES, type FacilityId } from '../core/base'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { GOALS } from '../core/goals'
-import { KEYWORDS, RESISTS } from '../core/keywords'
 import { SLOTS } from '../core/gear'
 import { RELICS } from '../core/relics'
 import { buildCost, built, KEYS, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type StopKind, type Zone } from '../core/run'
 import { PATHS, SKILLS, type SkillId } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
-import { button, gearCard, keywordChips, gearText, keyRow, STOP_NAMES, threatBar } from './html'
+import { alienName, button, gearCard, keywordChips, resistChip, tip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
 export const TABS = ['Map', 'Base', 'Barracks'] as const
@@ -26,7 +25,7 @@ function chip(run: Run, zone: Zone, stop: StopKind, state = ''): string {
 function census(packs: Muster[]): string {
   const counts = new Map<AlienKind, number>()
   for (const kind of packs.flatMap((pack) => pack.kinds)) counts.set(kind, (counts.get(kind) ?? 0) + 1)
-  return [...counts].map(([kind, n]) => `${n} ${ALIENS[kind].name}${n === 1 ? '' : 's'}${ALIENS[kind].resists.map((r) => ` <span class="kw ${r}" title="${RESISTS[r]}">no ${KEYWORDS[r].name}</span>`).join('')}`).join(', ')
+  return [...counts].map(([kind, n]) => `${n} ${alienName(kind, `${ALIENS[kind].name}${n === 1 ? '' : 's'}`)}`).join(', ')
 }
 
 /** A zone at a fork: its goal and risk, each stop with the aliens it holds, and what it costs and pays. Clicking it commits the squad to it. */
@@ -36,8 +35,7 @@ function zoneCard(zone: Zone, index: number): string {
   const stops = zone.stops.map((stop, i) => `<div>${STOP_NAMES[stop]}${stop === 'battle' ? `: ${census(zone.packs[i])}${zone.goal === 'assassinate' ? ', and a Commander with a Trooper' : ''}` : ''}</div>`)
   return button(
     { type: 'zone', index },
-    `<small>${risk.name} · ${TERRAIN_TEXT[zone.terrain].name}</small><br><b>${goal.name}</b>
-    <small>${goal.text}</small>
+    `<small>${risk.name} · ${TERRAIN_TEXT[zone.terrain].name}</small><br><b>${tip(goal.name, goal.text)}</b>
     <div class="aliens">${stops.join('')}</div>
     <small>Pays ${goal.reward}${risk.rareGear && (zone.goal === 'exterminate' || zone.goal === 'assassinate') ? ', rare or better' : ''}</small><small>+${zone.stops.length} threat</small>`,
     `zone ${zone.risk}`,
@@ -81,7 +79,7 @@ function baseView(run: Run): string {
   const held = squadKeywords(run)
   return `<h2>Facilities improve every soldier. Each level costs more.</h2>
     <div class="facilities">${(Object.keys(FACILITIES) as FacilityId[]).map((id) => facilityButton(run, id)).join('')}</div>
-    ${held.length > 0 ? `<h2>The squad's keywords. Relics, gear and skills that share one work together.</h2>${held.map((k) => `<p>${keywordChips([k], held)} ${KEYWORDS[k].text}.</p>`).join('')}` : ''}
+    ${held.length > 0 ? `<h2>Keywords</h2>${keywordChips(held, held)}` : ''}
     ${relics.length > 0 ? `<h2>Relics</h2><div class="stash">${relics.join('')}</div>` : ''}`
 }
 
@@ -124,7 +122,7 @@ function details(run: Run, soldier: Soldier): string {
   const r = level(soldier)
   const cls = soldier.cls && CLASSES[soldier.cls]
   const stats = soldierStats(run, soldier)
-  const skills = soldier.skills.map((id) => `<p><b>${SKILLS[id].name}.</b> ${SKILLS[id].text}. ${keywordChips(SKILLS[id].tags)}</p>`)
+  const skills = soldier.skills.map((id) => `<p>${tip(`<b>${SKILLS[id].name}</b>`, SKILLS[id].text)} ${keywordChips(SKILLS[id].tags)}</p>`)
   const uses = charges(run, soldier)
   const gear = equipped(soldier).map((g) => `<div class="gear ${g.rarity}">${gearCard(g)}</div>`)
   const toNext = xpFor(r + 1) - soldier.xp
@@ -159,7 +157,7 @@ export function overworld(run: Run, tab: Tab, open: number | null): string {
       <div class="tabs">${tabs.join('')}</div>
       <span>Keys ${keyRow(run.keys)}</span>
       <span>Threat ${threatBar(run.threat)}</span>
-      <span title="${RESISTS[run.bosses[run.keys]]}">${run.keys === KEYS ? 'Source' : 'Guardian'} <span class="kw ${run.bosses[run.keys]}">no ${KEYWORDS[run.bosses[run.keys]].name}</span></span>
+      <span>${run.keys === KEYS ? 'Source' : 'Guardian'} ${resistChip(run.bosses[run.keys])}</span>
       <b class="supplies">${run.supplies} ${run.supplies === 1 ? 'supply' : 'supplies'}</b>
     </div>
     ${views[tab](run)}`

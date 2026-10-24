@@ -4,7 +4,7 @@ import type { View } from '../view/view'
 import { choice, runEnd, stopReport } from './aftermath'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
-import { STOP_NAMES } from './html'
+import { alienName, boonChip, resistChip, STOP_NAMES, tip } from './html'
 import { overworld, type Tab } from './overworld'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
@@ -28,9 +28,10 @@ function roster(run: Run): string {
     return `<div><b>${pod.name}:</b> ${counted.join(', ')}</div>`
   })
   const kinds = [...new Set(aliens.filter((u) => !u.boss).map((u) => u.kind!))] as AlienKind[]
-  const rules = kinds.map((kind) => `<div><b>${ALIENS[kind].name}.</b> ${ALIENS[kind].text}.</div>`)
-  if (aliens.some((u) => u.boss)) rules.unshift('<div><b>Boss.</b> Tough and armored, hits hard and far, and spawns swarmlings.</div>')
-  return `${pods.join('')}<hr>${rules.join('')}<hr><div>The squad lands unseen. The first pod it sights is ambushed: caught in the open, and easier to hit.</div>`
+  const boss = aliens.find((u) => u.boss)
+  const rules = [...(boss ? [`${tip('Boss', 'Tough and armored, hits hard and far, and spawns swarmlings')}${boss.resists.map(resistChip).join('')}`] : []), ...kinds.map((kind) => alienName(kind))]
+  const boons = battle.zones.length > 1 ? `<div>${battle.boons.map((boon, i) => `${'ABC'[i]} ${boonChip(boon)}`).join(' ')}</div>` : ''
+  return `${pods.join('')}<hr><div>${rules.join(' · ')}</div>${boons}<hr><div>${tip('Land unseen', 'The first pod the squad sights is ambushed: caught in the open, and easier to hit')}</div>`
 }
 
 function status(run: Run): string {

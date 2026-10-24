@@ -392,13 +392,13 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 }
 
 /** What landing in a zone gives the squad for the battle, by the zone's keyword. */
-export const BOONS: Record<Keyword, string> = {
-  burn: 'Fuel depot: every hit sets the target burning',
-  frost: 'Coolant leak: every alien starts chilled',
-  mark: 'Spotter tower: the nearest pod starts marked',
-  crit: 'High ground: +15% crit',
-  kill: 'War drums: each kill gives the soldier +1 damage',
-  ward: 'Supply crates: every soldier starts with 2 more armor',
+export const BOONS: Record<Keyword, { name: string; text: string }> = {
+  burn: { name: 'Fuel depot', text: 'Every hit sets the target burning' },
+  frost: { name: 'Coolant leak', text: 'Every alien starts chilled' },
+  mark: { name: 'Spotter tower', text: 'The nearest pod starts marked' },
+  crit: { name: 'High ground', text: '+15% crit' },
+  kill: { name: 'War drums', text: 'Each kill gives the soldier +1 damage' },
+  ward: { name: 'Supply crates', text: 'Every soldier starts with 2 more armor' },
 }
 
 const BOON_EFFECTS: Partial<Record<Keyword, Effect>> = { burn: 'incendiary', kill: 'bloodRite' }

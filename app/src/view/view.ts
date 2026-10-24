@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js'
 import { BLAST_RADIUS, BOONS, distance, GRID, revealed, ZONE_RADIUS, zoneInfo, type Battle, type Tile, type Unit } from '../core/battle'
+import { KEYWORDS } from '../core/keywords'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { effectName } from '../core/effects'
@@ -381,7 +382,7 @@ export async function createView(): Promise<View> {
       }
       const { cover, contact } = zoneInfo(battle, zone)
       const ground = cover >= 12 ? 'heavy cover' : cover >= 5 ? 'some cover' : 'open ground'
-      marks.addChild(label(battle.goal === 'hold' ? 'UPLINK' : ZONE_NAMES[i], zone, 0xffffff), label(`${BOONS[battle.boons[i]]}\n${ground}, contact ${contact} tiles`, zone, 0xffffff, 20))
+      marks.addChild(label(battle.goal === 'hold' ? 'UPLINK' : ZONE_NAMES[i], zone, 0xffffff), label(`${KEYWORDS[battle.boons[i]].icon} ${BOONS[battle.boons[i]].name}\n${ground} · ${contact} tiles`, zone, 0xffffff, 20))
     })
     battle.pods.forEach((_, pod) => {
       const members = battle.units.filter((u) => u.pod === pod)
