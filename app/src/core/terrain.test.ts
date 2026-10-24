@@ -30,8 +30,8 @@ function share(kind: (typeof TERRAIN_KINDS)[number], count: (battle: ReturnType<
   return hits / (battles.length * GRID * GRID)
 }
 
-test('each kind of place is itself: the countryside is the most open, a city is more indoors than a town, a yard has the most crates', () => {
-  const cover = (kind: (typeof TERRAIN_KINDS)[number]) => share(kind, (b, t) => b.cover[t] > 0 || b.north[t] !== 'none' || b.west[t] !== 'none')
+test('each kind of place is itself: the countryside is the most open, a city is more indoors than a town, a yard has the most crates; water is no part of a place', () => {
+  const cover = (kind: (typeof TERRAIN_KINDS)[number]) => share(kind, (b, t) => (b.cover[t] > 0 && b.ground[t] !== 'water') || b.north[t] !== 'none' || b.west[t] !== 'none')
   const floor = (kind: (typeof TERRAIN_KINDS)[number]) => share(kind, (b, t) => b.ground[t] === 'floor')
   const crates = (kind: (typeof TERRAIN_KINDS)[number]) => share(kind, (b, t) => b.props[t] === 'crate' || b.props[t] === 'stack')
   for (const kind of ZONE_TERRAINS) {
@@ -56,4 +56,11 @@ test('a satellite stands in a walled compound with a gate on every side, and the
   expect(hive.ground.every((ground) => ground === 'hive')).toBe(true)
   expect(hive.props.every((prop) => prop === 'none' || prop === 'spire' || prop === 'growth')).toBe(true)
   expect([...hive.north, ...hive.west].every((edge) => edge === 'none')).toBe(true)
+})
+
+test('some battlefields are split by water, which no one can stand in, though shots cross it', () => {
+  const battles = Array.from({ length: 20 }, (_, seed) => createBattle(seed, 'countryside', [], []))
+  const wet = battles.filter((b) => b.ground.includes('water'))
+  expect(wet.length).toBeGreaterThan(0)
+  for (const b of wet) b.ground.forEach((g, t) => g === 'water' && expect(b.cover[t]).toBe(1))
 })

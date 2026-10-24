@@ -1,10 +1,10 @@
 import { random, randomInt } from './rng'
 
 /** What the ground of a tile is. It changes only how the tile looks. */
-export type Ground = 'pavement' | 'road' | 'grass' | 'floor' | 'scorched' | 'hive'
+export type Ground = 'pavement' | 'road' | 'grass' | 'floor' | 'scorched' | 'hive' | 'water'
 
 /** The object standing on a tile. A spire and a growth are what the aliens build. */
-export type Prop = 'none' | 'car' | 'truck' | 'tree' | 'crate' | 'stack' | 'fence' | 'rubble' | 'spire' | 'growth'
+export type Prop = 'none' | 'car' | 'truck' | 'tree' | 'crate' | 'stack' | 'fence' | 'rubble' | 'spire' | 'growth' | 'water'
 
 /** What stands on the line between two tiles. A window blocks movement, but soldiers shoot through it. */
 export type Edge = 'none' | 'wall' | 'window'
@@ -12,7 +12,7 @@ export type Edge = 'none' | 'wall' | 'window'
 /** Cover: 0 nothing, 1 low, 2 high. Both kinds block movement; high cover blocks shots. */
 export type Cover = 0 | 1 | 2
 
-export const PROP_COVER: Record<Prop, Cover> = { none: 0, car: 1, truck: 2, tree: 2, crate: 1, stack: 2, fence: 1, rubble: 1, spire: 2, growth: 1 }
+export const PROP_COVER: Record<Prop, Cover> = { none: 0, car: 1, truck: 2, tree: 2, crate: 1, stack: 2, fence: 1, rubble: 1, spire: 2, growth: 1, water: 1 }
 export const EDGE_COVER: Record<Edge, Cover> = { none: 0, window: 1, wall: 2 }
 
 /**
@@ -56,12 +56,16 @@ interface Rect {
 type Place = 'house' | 'warehouse' | 'ruin' | 'park' | 'orchard' | 'graveyard' | 'plaza' | 'market' | 'carPark' | 'depot' | 'field'
 
 /** Each kind of zone place as a plot: how many roads cross it each way, and what its lots may hold, likelier if listed more. */
-const PLOTS: Record<(typeof ZONE_TERRAINS)[number], { roads: [number, number]; places: Place[] }> = {
-  town: { roads: [1, 1], places: ['house', 'house', 'park', 'carPark', 'plaza', 'market'] },
-  city: { roads: [2, 2], places: ['house', 'house', 'house', 'carPark', 'plaza'] },
-  countryside: { roads: [1, 0], places: ['field', 'field', 'orchard', 'graveyard', 'park', 'house'] },
-  industrial: { roads: [1, 1], places: ['warehouse', 'depot', 'depot', 'carPark'] },
-  ruins: { roads: [1, 1], places: ['ruin', 'ruin', 'ruin', 'graveyard', 'park'] },
+/** The overall shape a plot is laid over, which decides where the fighting funnels: see `layouts` below. */
+export type Layout = 'grid' | 'river' | 'coast' | 'crater' | 'lanes'
+
+/** Each kind of zone place as a plot: how many roads cross it each way, what its lots may hold, and the shapes it may take, likelier if listed more. */
+const PLOTS: Record<(typeof ZONE_TERRAINS)[number], { roads: [number, number]; places: Place[]; layouts: Layout[] }> = {
+  town: { roads: [1, 1], places: ['house', 'house', 'park', 'carPark', 'plaza', 'market'], layouts: ['grid', 'grid', 'river', 'crater', 'lanes'] },
+  city: { roads: [2, 2], places: ['house', 'house', 'house', 'carPark', 'plaza'], layouts: ['grid', 'lanes', 'lanes', 'river'] },
+  countryside: { roads: [1, 0], places: ['field', 'field', 'orchard', 'graveyard', 'park', 'house'], layouts: ['grid', 'river', 'river', 'coast', 'crater'] },
+  industrial: { roads: [1, 1], places: ['warehouse', 'depot', 'depot', 'carPark'], layouts: ['grid', 'lanes', 'coast', 'river'] },
+  ruins: { roads: [1, 1], places: ['ruin', 'ruin', 'ruin', 'graveyard', 'park'], layouts: ['crater', 'crater', 'grid', 'river'] },
 }
 
 /** Width of a road. */
@@ -339,5 +343,67 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
   for (const [x1, x2] of stretches(roadsX)) {
     for (const [y1, y2] of stretches(roadsY)) block({ x1, y1, x2, y2 })
   }
+
+  /** Clears a tile of what stands on it and its walls, and sets its ground; water also fills it. */
+  const clear = (x: number, y: number, with_: Ground) => {
+    if (!inside(x, y)) return
+    const at = y * size + x
+    ground[at] = with_
+    props[at] = with_ === 'water' ? 'water' : 'none'
+    north[at] = west[at] = 'none'
+    if (y + 1 < size) north[at + size] = 'none'
+    if (x + 1 < size) west[at + 1] = 'none'
+  }
+  /** Lays `along` the map, across at `across(i)`, `wide` tiles thick, by tile index along it. */
+  const band = (vertical: boolean, across: (i: number) => number, wide: number, with_: (i: number) => Ground) => {
+    for (let i = 0; i < size; i++) for (let d = 0; d < wide; d++) clear(vertical ? across(i) + d : i, vertical ? i : across(i) + d, with_(i))
+  }
+  /** A path that wanders from near the middle, a tile at a time. */
+  const wander = () => {
+    let at = between(Math.floor(size / 3), Math.floor((2 * size) / 3))
+    return Array.from({ length: size }, () => (at = Math.min(size - 6, Math.max(3, at + (chance(0.3) ? between(-1, 1) : 0)))))
+  }
+
+  const layouts: Record<Layout, () => void> = {
+    grid: () => {},
+    // A river splits the map; a few bridges are the only ways across.
+    river: () => {
+      const path = wander()
+      const bridges = [between(3, 9), between(13, 18), between(22, size - 4)].filter(() => chance(0.8))
+      if (bridges.length === 0) bridges.push(between(12, 19))
+      band(chance(0.5), (i) => path[i], 3, (i) => (bridges.some((b) => i >= b && i < b + ROAD) ? 'road' : 'water'))
+    },
+    // Water takes one side of the map, along a ragged shore.
+    coast: () => {
+      const shore = wander().map((at) => Math.min(at, 8))
+      const vertical = chance(0.5)
+      for (let i = 0; i < size; i++) for (let d = 0; d < shore[i]; d++) clear(vertical ? d : i, vertical ? i : d, 'water')
+    },
+    // A blast crater: an open bowl of scorched ground in the middle, ringed by rubble, where no one has cover.
+    crater: () => {
+      const c = { x: between(12, size - 13), y: between(12, size - 13) }
+      const reach = between(5, 7)
+      each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => {
+        const d = Math.hypot(x - c.x, y - c.y)
+        if (d <= reach) clear(x, y, 'scorched')
+        else if (d <= reach + 1.5 && chance(0.35)) put(x, y, 'rubble')
+      })
+    },
+    // Long walls cut the map into three lanes, joined only at a few gaps.
+    lanes: () => {
+      const vertical = chance(0.5)
+      for (const at of [Math.floor(size / 3) + between(-2, 2), Math.floor((2 * size) / 3) + between(-2, 2)]) {
+        const gaps = [between(2, 8), between(13, 18), between(23, size - 3)]
+        for (let i = 0; i < size; i++) {
+          const edge = gaps.some((g) => i >= g && i < g + 2) ? 'none' : 'wall'
+          if (vertical) west[i * size + at] = edge
+          else north[at * size + i] = edge
+          if (edge === 'none') doorways.add(vertical ? i * size + at : at * size + i)
+        }
+      }
+    },
+  }
+  const layout = plot.layouts[randomInt(rng, plot.layouts.length)]
+  layouts[layout]()
   return { ground, props, north, west }
 }

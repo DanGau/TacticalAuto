@@ -56,7 +56,7 @@ const COLOR = {
   contact: 0xff6b5e,
 }
 
-const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x15161a, hive: 0x2a1838 }
+const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x15161a, hive: 0x2a1838, water: 0x1d5f5c }
 
 /** A box standing on a tile: how much of the tile it covers, how tall it is on screen, and its top colour. */
 interface Box {
@@ -91,6 +91,7 @@ const PROP_BOXES: Record<Exclude<Prop, 'none' | 'tree' | 'car'>, Box[]> = {
     { wide: 0.4, deep: 0.4, base: 20, up: 18, color: 0x9a55c4 },
   ],
   growth: [{ wide: 0.8, deep: 0.8, base: 0, up: 9, color: 0x8f4fb5 }],
+  water: [{ wide: 1, deep: 1, base: 0, up: 2, color: 0x2f9e96, alpha: 0.85 }],
 }
 
 /** How thick a wall is, as a share of a tile. */
