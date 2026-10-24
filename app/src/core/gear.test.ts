@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import type { Unit } from './battle'
+import { alienUnit, type Battle, type Unit } from './battle'
 import { stepBattle } from './combat'
 import { EFFECTS, generateGear, type Gear } from './gear'
 import { createRun, SELL, soldierStats, type Run } from './run'
@@ -50,11 +50,13 @@ test('found gear is equipped on its finder, selling what it replaces, or sold; t
 })
 
 /** A duel on open ground: one soldier wearing `gear`, one alien beside it, and the soldier too weak to win quickly. */
-function duel(gear: Omit<Gear, 'id'>): { soldier: Unit; alien: Unit; step: () => ReturnType<typeof stepBattle> } {
+function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: Unit; step: () => ReturnType<typeof stepBattle> } {
   const run = withFind(gear)
   apply(run, { type: 'keep' })
   apply(run, { type: 'zone', index: 1 })
   apply(run, { type: 'advance' })
+  // War drums pay off only on a kill, so they leave a duel as it is.
+  run.battle!.boons[0] = 'kill'
   apply(run, { type: 'land', zone: 0 })
   const battle = run.battle!
   battle.cover.fill(0)
@@ -66,7 +68,7 @@ function duel(gear: Omit<Gear, 'id'>): { soldier: Unit; alien: Unit; step: () =>
   battle.pods.forEach((pod) => (pod.revealed = true))
   Object.assign(soldier, { x: 10, y: 10 })
   Object.assign(alien, { x: 10, y: 11, hp: 99, stats: { ...alien.stats, hp: 99, aim: 2, crit: 0 } })
-  return { soldier, alien, step: () => stepBattle(battle) }
+  return { battle, soldier, alien, step: () => stepBattle(battle) }
 }
 
 /** Steps until the alien has shot once, returning every event up to then. */
@@ -127,4 +129,19 @@ test('an alien that resists frost and burn is neither chilled nor set burning', 
   untilAlienShoots(d)
   expect(d.alien.chilled).toBe(0)
   expect(d.alien.burning).toBe(0)
+})
+
+test('overkill coils carry damage beyond a kill to the nearest other alien', () => {
+  const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Steady Carbine', stats: { aim: 2 }, effect: null })
+  d.soldier.stats = { ...d.soldier.stats, damage: 10, crit: 0 }
+  d.soldier.effects.push('overkill')
+  d.alien.hp = 4
+  d.alien.armor = 0
+  const other = alienUnit(d.battle, { kind: 'trooper', stats: { ...d.alien.stats, hp: 99, armor: 0 }, stance: 'anchor', boss: false, spawns: false, target: false, resists: [] }, { x: d.alien.x + 1, y: d.alien.y }, 0)
+  d.battle.units.push(other)
+  const events = []
+  while (d.alien.hp > 0) events.push(...d.step())
+  const shot = events.find((e) => e.type === 'shot' && e.target === d.alien.id && e.hit)
+  expect(shot).toBeDefined()
+  expect(events).toContainEqual({ type: 'effect', id: other.id, effect: 'overkill', amount: -(shot!.type === 'shot' ? shot!.damage - 4 : 0) })
 })

@@ -27,6 +27,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
   apply(run, { type: 'zone', index: 1 })
   apply(run, { type: 'advance' })
+  run.battle!.boons[0] = 'kill'
   apply(run, { type: 'land', zone: 0 })
   const battle = run.battle!
   battle.cover.fill(0)

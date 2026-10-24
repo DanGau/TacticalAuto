@@ -44,6 +44,10 @@ const relics = {
   hunt: { name: 'Eye of the Hunt', text: 'Crits mark the target', tags: ['crit', 'mark'], effect: 'exploit' },
   bloodforged: { name: 'Bloodforged Plate', text: 'A kill gives the soldier 1 armor', tags: ['kill', 'ward'], effect: 'momentum' },
   rite: { name: 'Blood Rite', text: 'Each kill gives the soldier +1 damage for the rest of the battle', tags: ['kill'], effect: 'bloodRite' },
+  conductor: { name: 'Cryo Conductor', text: 'Chilling a marked target chills every alien beside it', tags: ['frost', 'mark'], effect: 'conductor' },
+  kindling: { name: 'Kindling Plates', text: 'Whoever hits a soldier who has armor left is set burning', tags: ['ward', 'burn'], effect: 'kindling' },
+  overkill: { name: 'Overkill Coils', text: 'Damage beyond what a kill needs hits the nearest other alien', tags: ['kill', 'crit'], effect: 'overkill' },
+  brittle: { name: 'Brittle Frost', text: 'Hits on a chilled target ignore its armor', tags: ['frost', 'ward'], effect: 'brittle' },
   juggernaut: { name: 'Juggernaut Servos', text: '+1 damage while the soldier has armor left', tags: ['ward'], effect: 'armored' },
 } satisfies Record<string, Relic>
 

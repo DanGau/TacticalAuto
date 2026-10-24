@@ -1,5 +1,5 @@
 import type { AlienKind } from './aliens'
-import type { Resist } from './keywords'
+import type { Keyword, Resist } from './keywords'
 import { randomInt } from './rng'
 import { CIVILIAN_HP, CIVILIANS, type Goal } from './goals'
 import { generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Prop, type TerrainKind } from './terrain'
@@ -159,7 +159,7 @@ export type SkillEffect =
   | 'ward'
   | 'drone'
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored'
+export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle'
 /** Anything a unit's gear, skills or the squad's relics do. Combat applies them. */
 export type Effect = GearEffect | SkillEffect | RelicEffect
 
@@ -286,6 +286,8 @@ export interface Battle {
   acid: { x: number; y: number; turns: number }[]
   /** Centres of the landing zones on offer in the deploy phase. */
   zones: Tile[]
+  /** The keyword each landing zone grants the squad for the battle, in zones order. */
+  boons: Keyword[]
   /** Soldiers not yet landed. */
   reserve: Reserve[]
 }
@@ -389,16 +391,43 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
   return { cover, contact: Math.min(...aliens.map((u) => distance(zone, u))) }
 }
 
-/** Lands the whole squad on the free tiles nearest the zone's centre and begins the battle. */
+/** What landing in a zone gives the squad for the battle, by the zone's keyword. */
+export const BOONS: Record<Keyword, string> = {
+  burn: 'Fuel depot: every hit sets the target burning',
+  frost: 'Coolant leak: every alien starts chilled',
+  mark: 'Spotter tower: the nearest pod starts marked',
+  crit: 'High ground: +15% crit',
+  kill: 'War drums: each kill gives the soldier +1 damage',
+  ward: 'Supply crates: every soldier starts with 2 more armor',
+}
+
+const BOON_EFFECTS: Partial<Record<Keyword, Effect>> = { burn: 'incendiary', kill: 'bloodRite' }
+export const BOON_CRIT = 0.15
+export const BOON_ARMOR = 2
+
+/** Lands the whole squad on the free tiles nearest the zone's centre, grants the zone's boon, and begins the battle. */
 export function land(battle: Battle, zone: Tile): void {
+  const boon = battle.boons[battle.zones.indexOf(zone)]
   const tiles = freeTilesNear(battle, zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
     battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
   })
   battle.reserve = []
   battle.phase = 'battle'
+  const squad = battle.units.filter((u) => u.side === 'human' && !u.civilian)
+  const aliens = battle.units.filter((u) => u.side === 'alien')
+  const effect = BOON_EFFECTS[boon]
+  for (const unit of squad) {
+    if (effect) unit.effects = [...unit.effects, effect]
+    if (boon === 'crit') unit.stats = { ...unit.stats, crit: unit.stats.crit + BOON_CRIT }
+    if (boon === 'ward') unit.armor += BOON_ARMOR
+  }
+  if (boon === 'frost') for (const alien of aliens.filter((u) => !u.resists.includes('frost'))) alien.chilled = CHILL_TURNS
+  if (boon === 'mark' && aliens.length > 0) {
+    const pod = aliens.reduce((a, b) => (distance(zone, a) <= distance(zone, b) ? a : b)).pod
+    for (const alien of aliens.filter((u) => u.pod === pod && !u.resists.includes('mark'))) alien.marked = true
+  }
   // A barrier projector armors every squadmate of its carrier.
-  const squad = battle.units.filter((u) => u.side === 'human')
   for (const carrier of squad.filter((u) => u.effects.includes('barrier'))) {
     for (const mate of squad) if (mate !== carrier) mate.armor += BARRIER_ARMOR
   }
@@ -494,6 +523,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     concealed: true,
     acid: [],
     zones: [],
+    boons: [],
     reserve,
   }
   sealPockets(battle)
@@ -512,5 +542,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   }
   const count = goal === 'hold' ? 1 : ZONES
   while (battle.zones.length < count) battle.zones.push(spacedTile(battle, [...battle.units, ...battle.zones], ZONE_CLEARANCE))
+  const boons = Object.keys(BOONS) as Keyword[]
+  battle.boons = battle.zones.map(() => boons.splice(randomInt(battle, boons.length), 1)[0])
   return battle
 }

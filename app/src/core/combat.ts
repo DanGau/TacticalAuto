@@ -738,7 +738,15 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   // Those beside the target, for a volley or a cleave, as they stand before the hit.
   const beside = battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1)
   events.unshift({ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage, with: used })
-  wound(battle, enemy, damage, events, unit.resists.includes('ward'))
+  const pierced = unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) > 0
+  const left = enemy.hp + (pierced ? 0 : enemy.armor)
+  wound(battle, enemy, damage, events, pierced)
+  const spare = enemy.hp <= 0 ? when(damage > left, 'overkill', damage - left) : 0
+  const next = spare > 0 ? nearest(battle.units.filter((u) => u.side === enemy.side && u.hp > 0), enemy) : undefined
+  if (next) {
+    events.push({ type: 'effect', id: next.id, effect: 'overkill', amount: -spare })
+    wound(battle, next, spare, events)
+  }
   const splash = when(damage > 0, 'volley', Math.ceil(damage / 2)) || when(enemy.hp <= 0, 'cleave', CLEAVE_DAMAGE)
   for (const other of splash > 0 ? beside : []) {
     events.push({ type: 'effect', id: other.id, effect: has(unit, 'volley') ? 'volley' : 'cleave', amount: -splash })
@@ -748,6 +756,12 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   if (enemy.hp > 0 && !enemy.resists.includes('frost') && (when(damage > 0, 'frostbite', 1) || when(crit, 'freeze', 1))) {
     enemy.chilled = CHILL_TURNS
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'frostbite') ? 'frostbite' : 'freeze', amount: 0 })
+    if (enemy.marked && has(unit, 'conductor')) {
+      for (const other of battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1 && !u.resists.includes('frost'))) {
+        other.chilled = CHILL_TURNS
+        events.push({ type: 'effect', id: other.id, effect: 'conductor', amount: 0 })
+      }
+    }
   }
   if (enemy.hp <= 0 && when(true, 'momentum', 1)) unit.armor++
   if (enemy.hp <= 0 && when(true, 'bloodRite', 1)) unit.fury++
@@ -765,6 +779,10 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   if (healed > 0) {
     unit.hp += healed
     events.push({ type: 'effect', id: unit.id, effect: enemy.hp <= 0 && has(unit, 'feast') ? 'feast' : 'vampiric', amount: healed })
+  }
+  if (has(enemy, 'kindling') && enemy.armor > 0 && !unit.resists.includes('burn')) {
+    unit.burning = BURN_TURNS
+    events.push({ type: 'effect', id: unit.id, effect: 'kindling', amount: 0 })
   }
   if (has(enemy, 'rime')) {
     unit.chilled = CHILL_TURNS
