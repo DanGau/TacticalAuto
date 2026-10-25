@@ -1,4 +1,4 @@
-import { COVER_DEFENSE, coverAt, distance, edgeBetween, GRID, heightAt, HIGH_AIM, HIGH_SIGHT, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile } from './battle'
+import { COVER_DEFENSE, coverAt, distance, edgeBetween, GRID, heightAt, HIGH_AIM, HIGH_SIGHT, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile, type Unit } from './battle'
 import { EDGE_COVER } from './terrain'
 
 const SIDES = [[0, -1], [1, 0], [0, 1], [-1, 0]]
@@ -70,6 +70,25 @@ export function canShoot(battle: Battle, from: Tile, target: Tile, range: number
 /** Whether a soldier on `from` sees the tile `to`: within its sight, farther from higher ground, with line of sight. */
 export function sees(battle: Battle, from: Tile, to: Tile): boolean {
   return distance(from, to) <= SIGHT + HIGH_SIGHT * (heightAt(battle, from) - heightAt(battle, to)) && lineOfSight(battle, from, to)
+}
+
+/**
+ * Tiles within which a unit notices an enemy not yet seen, before cover and stillness hide the enemy: a soldier
+ * scouting, or an alien on patrol, idler.
+ */
+export const DETECT = 8
+export const PATROL_DETECT = 6
+/** Tiles of DETECT an enemy in cover against the watcher subtracts, and one that held still since its last turn. */
+export const HIDE_COVER = 2
+export const HIDE_STILL = 1
+
+/**
+ * Whether `from` notices `to`, an enemy not yet seen: within DETECT or PATROL_DETECT, farther from higher ground, nearer when the
+ * enemy hides in cover or holds still, with line of sight. Both sides notice by the same rule.
+ */
+export function detects(battle: Battle, from: Unit, to: Unit): boolean {
+  const range = (from.side === 'human' ? DETECT : PATROL_DETECT) + HIGH_SIGHT * (heightAt(battle, from) - heightAt(battle, to)) - (coverAgainst(battle, to, from) > 0 ? HIDE_COVER : 0) - (to.moved ? 0 : HIDE_STILL)
+  return distance(from, to) <= range && lineOfSight(battle, from, to)
 }
 
 /** For each tile, row by row, whether any soldier sees it. */

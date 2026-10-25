@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { isSoldier, coverAt, distance, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
+import { isSoldier, coverAt, distance, IMPACT_DAMAGE, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
+import { stepBattle } from './combat'
 import { createRun, type Run } from './run'
 
 /** A run choosing where to land for its first battle. */
@@ -12,18 +13,35 @@ function landing(): Run & { battle: Battle } {
   return run as Run & { battle: Battle }
 }
 
-test('a battle offers landing zones clear of every alien', () => {
+test('a battle offers landing zones clear of every alien, but for a hot drop onto a pod', () => {
   const { battle } = landing()
   expect(battle.zones).toHaveLength(ZONES)
-  for (const zone of battle.zones) {
-    for (const alien of battle.units) expect(distance(zone, alien)).toBeGreaterThanOrEqual(ZONE_CLEARANCE)
-  }
+  battle.zones.forEach((zone, i) => {
+    const near = Math.min(...battle.units.map((alien) => distance(zone, alien)))
+    if (i === battle.hot) expect(near).toBeLessThanOrEqual(2)
+    else expect(near).toBeGreaterThanOrEqual(ZONE_CLEARANCE)
+  })
+})
+
+test('a hot drop breaches: the pod beneath is ambushed and cannot shoot, its members take the impact, and the other pods converge', () => {
+  const run = landing()
+  const battle = run.battle
+  const hot = battle.hot!
+  const zone = battle.zones[hot]
+  apply(run, { type: 'land', zone: hot })
+  const under = battle.units.find((u) => u.side === 'alien' && distance(u, zone) <= 2)!
+  expect(battle.pods[under.pod!]).toMatchObject({ revealed: true, ambushed: true, surprised: true })
+  expect(battle.concealed).toBe(false)
+  battle.pods.forEach((pod, i) => i !== under.pod && expect(pod.waypoint).toEqual(zone))
+  const events = stepBattle(battle)
+  expect(events).toContainEqual({ type: 'hurt', id: under.id, amount: IMPACT_DAMAGE, cause: 'impact' })
 })
 
 test('landing puts the whole squad on open tiles by the zone and begins the battle', () => {
   const run = landing()
-  const zone = run.battle.zones[1]
-  expect(apply(run, { type: 'land', zone: 1 })).toEqual({ ok: true })
+  const cold = run.battle.hot === 1 ? 0 : 1
+  const zone = run.battle.zones[cold]
+  expect(apply(run, { type: 'land', zone: cold })).toEqual({ ok: true })
   const squad = run.battle.units.filter(isSoldier)
   expect(squad.map((u) => u.soldier)).toEqual(run.soldiers.map((s) => s.id))
   expect(squad).toHaveLength(run.soldiers.length)

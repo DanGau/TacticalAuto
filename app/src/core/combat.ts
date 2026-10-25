@@ -6,6 +6,8 @@ import {
   stepCost,
   AMBUSH_AIM,
   AMBUSH_CRIT,
+  IMPACT_DAMAGE,
+  IMPACT_REACH,
   AURA_REACH,
   BACKSTAB_DAMAGE,
   BANE_AIM,
@@ -66,6 +68,7 @@ import {
   PSI_BACKLASH,
   PSI_COOLDOWN,
   PSI_RANGE,
+  alert,
   revealed,
   ROCKET_DAMAGE,
   SPAWN_EVERY,
@@ -81,13 +84,16 @@ import {
 } from './battle'
 import { HOLD_ROUNDS, WAVE_EVERY } from './goals'
 import { random, randomInt } from './rng'
-import { canShoot, coverAgainst, lineOfSight, odds, sees } from './sight'
+import { canShoot, coverAgainst, lineOfSight, odds, sees, detects } from './sight'
 
 export type GameEvent =
   /** `path` lists each tile entered, in order. `with` names a skill that granted the move. */
   | { type: 'move'; id: number; path: Tile[]; with?: Effect }
-  /** A pod is sighted. `units` gives each member's tile at that moment. Unless it is ambushed, its moves to cover follow. */
-  | { type: 'reveal'; ambush: boolean; units: { id: number; x: number; y: number }[] }
+  /**
+   * A pod is sighted. `units` gives each member's tile at that moment. Unless it is ambushed, or `stalked` (it
+   * stalked the squad and gave itself away by opening fire), its moves to cover follow.
+   */
+  | { type: 'reveal'; ambush: boolean; stalked: boolean; units: { id: number; x: number; y: number }[] }
   /** `damage` is 0 for a miss. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. */
   | { type: 'shot'; id: number; target: number; hit: boolean; crit: boolean; damage: number; with: Effect[] }
   /** A rocket or grenade lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */
@@ -102,7 +108,7 @@ export type GameEvent =
   /** A panicked soldier loses its action. */
   | { type: 'frozen'; id: number }
   /** A unit is hurt by acid underfoot, or by the death of the psion of its pod. */
-  | { type: 'hurt'; id: number; amount: number; cause: 'acid' | 'backlash' }
+  | { type: 'hurt'; id: number; amount: number; cause: 'acid' | 'backlash' | 'impact' }
   /** A wave arrives on a hold, already in the fight. */
   | { type: 'wave'; units: { id: number; x: number; y: number }[] }
   /** A boss spawns a swarmling. */
@@ -136,10 +142,10 @@ function spend(unit: Unit, effect: Effect): boolean {
   return true
 }
 
-/** Ids of the aliens some soldier sees now. */
+/** Ids of the revealed aliens some soldier sees now. */
 function spotted(battle: Battle): Set<number> {
   const soldiers = battle.units.filter(isSoldier)
-  return new Set(battle.units.filter((u) => u.side === 'alien' && soldiers.some((s) => sees(battle, s, u))).map((u) => u.id))
+  return new Set(battle.units.filter((u) => u.side === 'alien' && revealed(battle, u) && soldiers.some((s) => sees(battle, s, u))).map((u) => u.id))
 }
 
 /** Whether `unit`, standing on `from`, may shoot `target`. Squadsight reaches any spotted alien in a clear line; a ghost is safe from far off. */
@@ -231,7 +237,7 @@ interface Spot {
   apart: number
   /** Tiles the nearest enemy is inside STANDOFF. */
   crowded: number
-  /** 0 with a clear line to some enemy, else 1. */
+  /** 0 with some enemy in sight, else 1. */
   blind: number
   /** The walk to the unit's goal: for a soldier the squad's, for an alien the nearest soldier. */
   toGoal: number
@@ -365,7 +371,8 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const uplink = battle.uplink
   const leash = (end: Tile) => (uplink && unit.side === 'human' ? Math.max(0, distance(end, uplink) - UPLINK_REACH) : 0)
   const marching = unit.side === 'human' && seen.size === 0
-  const leaders = unit.stance === 'standoff' ? squadmates.filter((u) => u.stance !== 'standoff') : []
+  // An escort follows the squad rather than leading it, so it leads no one.
+  const leaders = unit.stance === 'standoff' ? squadmates.filter((u) => u.stance !== 'standoff' && u.stance !== 'escort') : []
   /** The nearest to the enemy this unit may walk while marching: REAR_GAP behind the foremost leader. */
   const slot = marching && leaders.length > 0 ? Math.min(...leaders.map((u) => toGoal[u.y * GRID + u.x])) + REAR_GAP : 0
   /** Tiles `end` is ahead of the unit's place in the formation. */
@@ -383,7 +390,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
         wary,
         apart: apart(end),
         crowded: Math.max(0, STANDOFF - Math.min(...enemies.map((enemy) => distance(end, enemy)))),
-        blind: enemies.some((enemy) => lineOfSight(battle, end, enemy)) ? 0 : 1,
+        blind: enemies.some((enemy) => sees(battle, end, enemy)) ? 0 : 1,
         toGoal: toGoal[end.y * GRID + end.x],
         stray: stray(end),
         shelter: coverAgainst(battle, end, goal),
@@ -419,27 +426,35 @@ function walk(unit: Unit, path: Tile[], events: GameEvent[]): void {
 }
 
 /**
- * Reveals each unseen pod a soldier now sights. A revealed pod at once moves to fighting positions, unless the squad
- * was concealed: then the pod is ambushed, caught where it stands, and the squad's concealment is over.
+ * Soldiers and pods notice each other, both by the same rule. A pod the squad notices first is ambushed: caught where
+ * it stands. A pod that notices the squad first turns alert unseen and stalks it. When both notice at once, the pod
+ * scrambles to fighting positions. A pod caught on its own turn does not shoot until its next.
  */
 function sight(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
   const soldiers = battle.units.filter(isSoldier)
-  const ambush = battle.concealed
   battle.pods.forEach((pod, index) => {
-    if (pod.revealed) return
+    if (pod.revealed && pod.alert) return
     const members = battle.units.filter((u) => u.pod === index)
-    const seen = members.some((m) => soldiers.some((s) => sees(battle, s, m)))
-    if (!seen) return
-    pod.revealed = true
-    pod.surprised = battle.turn === 'alien'
-    pod.ambushed = ambush
-    battle.concealed = false
-    events.push({ type: 'reveal', ambush, units: members.map(({ id, x, y }) => ({ id, x, y })) })
-    if (!ambush) for (const member of members) walk(member, fightPath(battle, member), events)
+    const noticed = !pod.revealed && members.some((m) => soldiers.some((s) => detects(battle, s, m)))
+    const notices = !pod.alert && members.some((m) => soldiers.some((s) => detects(battle, m, s)))
+    const wasAlert = pod.alert
+    if (notices) {
+      pod.alert = true
+      pod.stalking = !noticed
+    }
+    if (!noticed) return
+    const ambush = !wasAlert && !notices
+    Object.assign(pod, { revealed: true, alert: true, ambushed: ambush, surprised: battle.turn === 'alien' && !wasAlert })
+    events.push({ type: 'reveal', ambush, stalked: false, units: members.map(({ id, x, y }) => ({ id, x, y })) })
+    if (!ambush && !wasAlert) for (const member of members) walk(member, fightPath(battle, member), events)
   })
+  battle.concealed = !hunted(battle)
   return events
 }
+
+/** Whether some living alien is alert to the squad. */
+const hunted = (battle: Battle) => battle.units.some((u) => u.side === 'alien' && alert(battle, u))
 
 /**
  * What happens as a side's turn begins: burning hurts and mending armor heals. On the aliens' turn acid wears off,
@@ -494,12 +509,23 @@ function upkeep(battle: Battle): GameEvent[] {
   return events
 }
 
+/** Drop pods' impact after a breach: each alien beside where a soldier landed is hurt. */
+function impact(battle: Battle): GameEvent[] {
+  const events: GameEvent[] = []
+  battle.breach = false
+  const soldiers = battle.units.filter(isSoldier)
+  for (const alien of battle.units.filter((u) => u.side === 'alien' && soldiers.some((s) => distance(s, u) <= IMPACT_REACH))) {
+    events.push({ type: 'hurt', id: alien.id, amount: IMPACT_DAMAGE, cause: 'impact' })
+    wound(battle, alien, IMPACT_DAMAGE, events)
+  }
+  return events
+}
+
 /** The side on turn has its upkeep; each of its units walks its path, lowest id first; acid burns those still in it; then newly sighted pods are revealed. */
 function moveSide(battle: Battle): GameEvent[] {
-  const events = upkeep(battle)
+  const events = [...(battle.breach ? impact(battle) : []), ...upkeep(battle)]
   if (battle.turn === 'alien') {
     for (const pod of battle.pods) {
-      pod.surprised = false
       // A pod that has reached its waypoint picks the next.
       const arrived = battle.units.some((u) => battle.pods[u.pod ?? -1] === pod && distance(u, pod.waypoint) <= PATROL_MOVE)
       if (!pod.revealed && arrived) pod.waypoint = { x: randomInt(battle, GRID), y: randomInt(battle, GRID) }
@@ -507,7 +533,7 @@ function moveSide(battle: Battle): GameEvent[] {
   }
   for (const unit of battle.units) {
     if (unit.side !== battle.turn || unit.civilian) continue
-    walk(unit, revealed(battle, unit) ? fightPath(battle, unit) : patrolPath(battle, unit), events)
+    walk(unit, alert(battle, unit) ? fightPath(battle, unit) : patrolPath(battle, unit), events)
   }
   // Acid burns each unit of the side still standing in it once the side has moved, so a unit free to move can step out.
   for (const unit of battle.units.filter((u) => u.side === battle.turn)) {
@@ -717,7 +743,8 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   const events: GameEvent[] = []
   if (taunting.length > 0 && taunting.length < inReach.length) events.push({ type: 'effect', id: enemy.id, effect: 'taunt', amount: 0 })
   const chance = chanceAt(enemy)
-  const ambushed = enemy.pod !== null && battle.pods[enemy.pod].ambushed
+  // The ambush bonus: against a pod caught unaware, or for a stalking pod's shots.
+  const ambushed = (enemy.pod !== null && battle.pods[enemy.pod].ambushed) || (unit.pod !== null && battle.pods[unit.pod].stalking)
   const baned = battle.units.some((u) => u.side !== unit.side && has(u, 'bane') && distance(u, unit) <= BANE_REACH)
   const toHit =
     chance.hit +
@@ -862,9 +889,9 @@ function medkit(unit: Unit): GameEvent[] {
   return [{ type: 'effect', id: unit.id, effect: 'medkit', amount }]
 }
 
-/** Whether the unit may act this turn: an alien may not while its pod is unseen or surprised. */
+/** Whether the unit may act this turn: an alien may not while its pod is unaware or surprised. */
 function armed(battle: Battle, unit: Unit): boolean {
-  return unit.pod === null || (battle.pods[unit.pod].revealed && !battle.pods[unit.pod].surprised)
+  return unit.pod === null || (battle.pods[unit.pod].alert && !battle.pods[unit.pod].surprised)
 }
 
 /**
@@ -898,6 +925,12 @@ function actNext(battle: Battle): GameEvent[] {
     const events = acted.length > 0 && unit.hp > 0 ? [...acted, ...drone(battle, unit), ...skirmish(battle, unit)] : acted
     if (events.length === 0) continue
     battle.shooter = unit.id
+    // A stalking pod gives itself away when it opens fire.
+    const pod = unit.pod === null ? null : battle.pods[unit.pod]
+    if (pod && !pod.revealed) {
+      pod.revealed = true
+      events.unshift({ type: 'reveal', ambush: false, stalked: true, units: battle.units.filter((u) => u.pod === unit.pod).map(({ id, x, y }) => ({ id, x, y })) })
+    }
     return events
   }
   return []
@@ -915,8 +948,13 @@ function act(battle: Battle): GameEvent[] {
     }
     const action = actNext(battle)
     if (action.length > 0) return action
-    // An ambush lasts until the squad's turn ends.
+    // An ambush lasts until the squad's turn ends; surprise, until the aliens'.
     if (battle.turn === 'human') for (const pod of battle.pods) pod.ambushed = false
+    else {
+      for (const pod of battle.pods) Object.assign(pod, { surprised: false, stalking: false })
+      // With every pod that knew of it dead, the squad slips back into stealth.
+      battle.concealed = !hunted(battle) && battle.waves.length === 0
+    }
     battle.turn = battle.turn === 'human' ? 'alien' : 'human'
     battle.stage = 'move'
   }

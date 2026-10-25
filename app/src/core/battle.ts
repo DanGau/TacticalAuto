@@ -18,6 +18,9 @@ export const SIGHT = 8
 /** What a soldier's shots gain against an ambushed pod: hit chance, and chance for a hit to crit. */
 export const AMBUSH_AIM = 0.2
 export const AMBUSH_CRIT = 0.25
+/** What drop pods do to each alien within IMPACT_REACH tiles of a soldier landing in a breach. */
+export const IMPACT_DAMAGE = 2
+export const IMPACT_REACH = 2
 /** Tiles an alien moves per turn before its pod is revealed. */
 export const PATROL_MOVE = 2
 /** Damage a rocket does to every unit within BLAST_RADIUS tiles of where it lands. */
@@ -243,10 +246,15 @@ export interface Unit {
 export interface Pod {
   /** The name of its pack. */
   name: string
+  /** Seen by the squad: drawn, and shot at. */
   revealed: boolean
+  /** Aware of the squad: it hunts the squad and fights. */
+  alert: boolean
+  /** Noticed the squad unseen: its shots this alien turn gain the ambush bonus. */
+  stalking: boolean
   /** Caught unaware by a concealed squad: until the squad's turn ends, shots at its members gain the ambush bonus. */
   ambushed: boolean
-  /** Revealed during the current alien turn, so its members do not shoot until the next. */
+  /** Revealed during the current alien turn, or crashed onto by drop pods, so its members do not shoot until the next. */
   surprised: boolean
   waypoint: Tile
 }
@@ -282,8 +290,12 @@ export interface Battle {
   pods: Pod[]
   /** Once-per-battle effects of the whole squad already used. */
   used: Effect[]
-  /** True from the landing until the first pod is sighted. That pod is ambushed. */
+  /** True while no living pod is alert to the squad. */
   concealed: boolean
+  /** The landing zone on top of a pod, which the squad can drop onto; null on a hold. */
+  hot: number | null
+  /** Set by a landing on the hot zone until the drop pods' impact lands, as the battle's first beat. */
+  breach: boolean
   /** Tiles of acid, each with the alien turns it has left. */
   acid: { x: number; y: number; turns: number }[]
   /** Centres of the landing zones on offer in the deploy phase. */
@@ -357,6 +369,9 @@ export function blocked(battle: Battle, x: number, y: number): boolean {
   return !onGrid(x, y) || coverAt(battle, x, y) > 0 || unitAt(battle, x, y) !== undefined
 }
 
+/** Whether the unit hunts its enemies: an alien once its pod is alert. Humans always do. */
+export const alert = (battle: Battle, unit: Unit) => unit.pod === null || battle.pods[unit.pod].alert
+
 /** Whether the alien fights in the open: humans always do, an alien once its pod is revealed. */
 /** Whether the unit is a soldier: on the human side, and no civilian. */
 export const isSoldier = (unit: Unit) => unit.side === 'human' && !unit.civilian
@@ -425,9 +440,23 @@ const BOON_EFFECTS: Partial<Record<Keyword, Effect>> = { burn: 'incendiary', kil
 export const BOON_CRIT = 0.15
 export const BOON_ARMOR = 2
 
-/** Lands the whole squad on the free tiles nearest the zone's centre, grants the zone's boon, and begins the battle. */
+/**
+ * Lands the whole squad on the free tiles nearest the zone's centre, grants the zone's boon, and begins the battle.
+ * A drop onto the hot zone breaches: the pod beneath is caught unaware and loses its first alien turn's shots, its
+ * members take the impact in the first beat, and every other pod hears the landing and converges on it.
+ */
 export function land(battle: Battle, zone: Tile): void {
-  const boon = battle.boons[battle.zones.indexOf(zone)]
+  const index = battle.zones.indexOf(zone)
+  const boon = battle.boons[index]
+  if (index === battle.hot) {
+    battle.breach = true
+    battle.concealed = false
+    const under = nearestAlien(battle, zone)!.pod!
+    battle.pods.forEach((pod, i) => {
+      if (i === under) Object.assign(pod, { revealed: true, alert: true, ambushed: true, surprised: true })
+      else pod.waypoint = zone
+    })
+  }
   const tiles = freeTilesNear(battle, zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
     battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
@@ -512,7 +541,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
 export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }, centre: Tile, revealed: boolean): Unit[] {
   const units = freeTilesNear(battle, centre, pack.aliens.length).map((tile, i) => alienUnit(battle, pack.aliens[i], tile, battle.pods.length))
   battle.units.push(...units)
-  battle.pods.push({ name: pack.name, revealed, ambushed: false, surprised: false, waypoint: randomTile(battle) })
+  battle.pods.push({ name: pack.name, revealed, alert: revealed, stalking: false, ambushed: false, surprised: false, waypoint: randomTile(battle) })
   return units
 }
 
@@ -545,6 +574,8 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     zones: [],
     uplink: null,
     boons: [],
+    hot: null,
+    breach: false,
     reserve,
   }
   sealPockets(battle)
@@ -565,5 +596,10 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   while (battle.zones.length < ZONES) battle.zones.push(spacedTile(battle, [...battle.units, ...battle.zones, ...(battle.uplink ? [battle.uplink] : [])], ZONE_CLEARANCE))
   const boons = Object.keys(BOONS) as Keyword[]
   battle.boons = battle.zones.map(() => boons.splice(randomInt(battle, boons.length), 1)[0])
+  // One zone is a hot drop, right on a pod.
+  if (goal !== 'hold' && centres.length > 0) {
+    battle.hot = randomInt(battle, ZONES)
+    battle.zones[battle.hot] = centres[randomInt(battle, centres.length)]
+  }
   return battle
 }

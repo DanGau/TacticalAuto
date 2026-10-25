@@ -40,7 +40,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   Object.assign(soldier, { x: 10, y: 10, hp: 30, stats: { ...soldier.stats, hp: 30, aim: 2, crit: 0, damage: 3 } })
   const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss, target: false, resists: ALIENS[kind].resists }, { x, y }, 0))
   battle.units = [soldier, ...units]
-  battle.pods = [{ name: 'Test', revealed: true, ambushed: false, surprised: false, waypoint: { x: 0, y: 0 } }]
+  battle.pods = [{ name: 'Test', revealed: true, alert: true, stalking: false, ambushed: false, surprised: false, waypoint: { x: 0, y: 0 } }]
   battle.concealed = false
   const until = (done: (events: GameEvent[]) => boolean) => {
     const all: GameEvent[] = []
@@ -145,15 +145,16 @@ test('a spawner spawns a swarmling every few alien turns', () => {
 test("the first pod a concealed squad sights is ambushed: it does not move to cover, and is easier to hit until the squad's turn ends", () => {
   const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
   battle.concealed = true
-  battle.pods[0].revealed = false
+  Object.assign(battle.pods[0], { revealed: false, alert: false })
   // An aim that hits only with the ambush bonus, against an alien that would otherwise walk to cover.
-  soldier.stats = { ...soldier.stats, move: 0, aim: 1 - AMBUSH_AIM, close: 0, range: 3 }
+  soldier.stats = { ...soldier.stats, move: 0, aim: 1 - AMBUSH_AIM, close: 0, range: 7 }
   aliens[0].hp = aliens[0].stats.hp = 99
   battle.props[14 * 32 + 10] = 'stack'
   battle.cover[14 * 32 + 10] = 2
   soldier.x = 10
   soldier.y = 4
-  soldier.stats = { ...soldier.stats, move: 6 }
+  // Stops 7 tiles off: inside the squad's notice, outside the patrol's.
+  soldier.stats = { ...soldier.stats, move: 2 }
   const events = until((all) => all.some((e) => e.type === 'shot' && e.id === soldier.id))
   const reveal = events.find((e) => e.type === 'reveal')
   expect(reveal).toMatchObject({ ambush: true })
@@ -162,6 +163,31 @@ test("the first pod a concealed squad sights is ambushed: it does not move to co
   expect(battle.pods[0].ambushed).toBe(true)
   until((all) => all.some((e) => e.type === 'shot' && e.id === aliens[0].id) || all.some((e) => e.type === 'move' && e.id === aliens[0].id))
   expect(battle.pods[0].ambushed).toBe(false)
+})
+
+test('a pod that notices the squad first stalks it unseen, then gives itself away when it opens fire', () => {
+  const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 15 }])
+  Object.assign(battle.pods[0], { revealed: false, alert: false })
+  battle.concealed = true
+  soldier.stats = { ...soldier.stats, move: 0, range: 0 }
+  // The trooper looks down from a hill: it notices the soldier from farther than the soldier notices it.
+  for (let y = 13; y < 18; y++) for (let x = 8; x < 13; x++) battle.height[y * 32 + x] = 2
+  aliens[0].stats = { ...aliens[0].stats, move: 0, range: 8 }
+  const events = until((all) => all.some((e) => e.type === 'shot' && e.id === aliens[0].id))
+  expect(events.findIndex((e) => e.type === 'reveal')).toBeLessThan(events.findIndex((e) => e.type === 'shot'))
+  expect(events.find((e) => e.type === 'reveal')).toMatchObject({ ambush: false, stalked: true })
+  expect(battle.concealed).toBe(false)
+})
+
+test('once every alert alien is dead, the squad slips back into stealth', () => {
+  const { battle, aliens, until } = arena([{ kind: 'swarmling', x: 10, y: 12 }, { kind: 'trooper', x: 30, y: 30 }])
+  // A second pod, far off and unaware, keeps the battle going.
+  aliens[1].pod = 1
+  battle.pods.push({ name: 'Far', revealed: false, alert: false, stalking: false, ambushed: false, surprised: false, waypoint: { x: 30, y: 30 } })
+  battle.concealed = false
+  until((all) => all.some((e) => e.type === 'death'))
+  until(() => battle.turn === 'human')
+  expect(battle.concealed).toBe(true)
 })
 
 test('backstab adds damage against a target with no cover; shredder destroys armor before the damage lands', () => {

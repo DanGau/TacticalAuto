@@ -427,7 +427,7 @@ export async function createView(): Promise<View> {
       }
       const { cover, contact } = zoneInfo(battle, zone)
       const ground = cover >= 12 ? 'heavy cover' : cover >= 5 ? 'some cover' : 'open ground'
-      const far = battle.uplink ? `uplink ${distance(zone, battle.uplink)} tiles` : `contact ${contact} tiles`
+      const far = i === battle.hot ? '☄️ HOT DROP' : battle.uplink ? `uplink ${distance(zone, battle.uplink)} tiles` : `contact ${contact} tiles`
       marks.addChild(label(ZONE_NAMES[i], zone, 0xffffff), label(`${KEYWORDS[battle.boons[i]].icon} ${BOONS[battle.boons[i]].name}\n${ground} · ${far}`, zone, 0xffffff, 20))
     })
     battle.pods.forEach((_, pod) => {
@@ -606,6 +606,7 @@ export async function createView(): Promise<View> {
         })
         await tween(REVEAL_MS, (t) => appeared.forEach((sprite) => (sprite.node.alpha = t)))
         if (e.type === 'reveal' && e.ambush && appeared.length > 0) float(callout('AMBUSHED', COLOR.hit, appeared[0], 18))
+        if (e.type === 'reveal' && e.stalked && appeared.length > 0) float(callout('AMBUSH!', COLOR.crit, appeared[0], 18))
         if (e.type === 'wave' && appeared.length > 0) float(callout('REINFORCEMENTS', COLOR.crit, appeared[0], 18))
       } else if (e.type === 'shot') {
         const from = sprites.get(e.id)
@@ -643,7 +644,7 @@ export async function createView(): Promise<View> {
         if (!on) continue
         await follow([on.tile])
         if (e.type === 'hurt') drawHp(on, ...vitals(battle, e.id))
-        float(e.type === 'frozen' ? callout('TOO SHAKEN TO ACT', COLOR.psi, on) : callout(`${e.cause.toUpperCase()} -${e.amount}`, e.cause === 'acid' ? COLOR.acid : COLOR.psi, on))
+        float(e.type === 'frozen' ? callout('TOO SHAKEN TO ACT', COLOR.psi, on) : callout(`${e.cause.toUpperCase()} -${e.amount}`, e.cause === 'acid' ? COLOR.acid : e.cause === 'impact' ? COLOR.crit : COLOR.psi, on))
       } else if (e.type === 'spawn') {
         const unit = battle.units.find((u) => u.id === e.unit.id)
         if (!unit || !revealed(battle, unit)) continue

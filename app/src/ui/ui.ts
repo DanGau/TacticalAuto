@@ -3,9 +3,10 @@ import type { Report, Run } from '../core/run'
 import type { View } from '../view/view'
 import { choice, runEnd, stopReport } from './aftermath'
 import { ALIENS, type AlienKind } from '../core/aliens'
-import { BOONS, distance, heightAt, zoneInfo, type Battle } from '../core/battle'
+import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_DAMAGE, IMPACT_REACH, nearestAlien, zoneInfo, type Battle } from '../core/battle'
 import { KEYWORDS } from '../core/keywords'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
+import { DETECT, PATROL_DETECT } from '../core/sight'
 import { alienName, button, describe, resistChip, STOP_NAMES, tip } from './html'
 import { overworld, type Tab } from './overworld'
 
@@ -32,7 +33,7 @@ function roster(run: Run): string {
   const kinds = [...new Set(aliens.filter((u) => !u.boss).map((u) => u.kind!))] as AlienKind[]
   const boss = aliens.find((u) => u.boss)
   const rules = [...(boss ? [`${tip('Boss', 'Tough and armored, hits hard and far, and spawns swarmlings')}${boss.resists.map(resistChip).join('')}`] : []), ...kinds.map((kind) => alienName(kind))]
-  return `${pods.join('')}<hr><div>${rules.join(' · ')}</div><hr><div>${tip('Land unseen', 'The first pod the squad sights is ambushed: caught in the open, and easier to hit')}</div>`
+  return `${pods.join('')}<hr><div>${rules.join(' · ')}</div><hr><div>${tip('Stealth', `Soldiers notice an unseen alien within ${DETECT} tiles; a patrol notices a soldier within ${PATROL_DETECT}. Cover and holding still shrink that reach; high ground stretches it. Whoever notices first ambushes: a caught pod is easier to hit, and a pod that notices the squad first stalks it unseen and opens fire with the same bonus. Once every alert alien is dead, the squad is unseen again`)}</div>`
 }
 
 function status(run: Run): string {
@@ -56,7 +57,14 @@ function tradeoffs(battle: Battle, zone: number): string {
     cover >= 12 ? line(true, 'Heavy cover to land behind') : cover >= 5 ? '' : line(false, 'Open ground: the squad lands exposed'),
     heightAt(battle, tile) > 0 ? line(true, 'High ground: sees farther and shoots down at aliens') : '',
   ]
-  if (battle.uplink) {
+  if (zone === battle.hot) {
+    const pod = battle.pods[nearestAlien(battle, tile)!.pod!].name
+    lines.push(
+      line(true, `Hot drop onto the ${pod}: drop pods deal ${IMPACT_DAMAGE} damage to each alien within ${IMPACT_REACH} tiles`),
+      line(true, `The ${pod} is caught off guard: it can't shoot its first turn, and the squad's first volley gets +${100 * AMBUSH_AIM}% aim and +${100 * AMBUSH_CRIT}% crit`),
+      line(false, 'Every other pod hears the landing and converges on it'),
+    )
+  } else if (battle.uplink) {
     const far = distance(tile, battle.uplink)
     lines.push(far <= 8 ? line(true, `Uplink ${far} tiles away: a short run to hold it`) : line(false, `Uplink ${far} tiles away: a long run before the waves`))
   } else lines.push(contact <= 6 ? line(false, `Aliens ${contact} tiles away: the fight starts at once`) : line(true, `Aliens ${contact} tiles away: time to spread out first`))
@@ -65,7 +73,7 @@ function tradeoffs(battle: Battle, zone: number): string {
 
 /** Before the landing: a button per zone that flies the camera there, one back to the whole map, and the chosen zone's case. */
 function drop(battle: Battle, zone: number | null): string {
-  const zones = battle.boons.map((boon, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}">${ZONE_NAMES[i]} ${KEYWORDS[boon].icon} ${BOONS[boon].name}</button>`)
+  const zones = battle.boons.map((boon, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}">${ZONE_NAMES[i]} ${i === battle.hot ? '☄️ Hot drop' : `${KEYWORDS[boon].icon} ${BOONS[boon].name}`}</button>`)
   const overview = `<button data-zone="" class="overview ${zone === null ? 'on' : ''}" title="Whole map">🗺️</button>`
   const detail =
     zone === null
