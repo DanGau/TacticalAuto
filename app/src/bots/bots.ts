@@ -5,7 +5,8 @@ import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { SKILLS } from '../core/skills'
-import { buildCost, danger, level, skillOffers, squadKeywords, type Risk, type Run } from '../core/run'
+import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
+import { buildCost, danger, level, skillOffers, squadKeywords, THREAT_MAX, type Risk, type Run } from '../core/run'
 
 /** Chooses the next action whenever the run waits for the player. `rng` is the bot's own, separate from the run's. */
 export type Bot = (run: Run, rng: { rng: number }) => Action
@@ -71,22 +72,38 @@ const BUILD_ORDER: FacilityId[] = ['firingRange', 'workshop', 'optics', 'drills'
 /** Takes the safest zones until the squad's mean level reaches 3, then the most dangerous. */
 const growing = (run: Run): Risk => (run.soldiers.reduce((sum, s) => sum + level(s), 0) / run.soldiers.length >= 3 ? 'dangerous' : 'safe')
 
-/** One way to play: how much danger to take at each fork, how to choose offers, where to land, and whether to build. */
+/**
+ * One way to play: how much danger to take at each fork, how to choose offers, where to land, whether to spend at
+ * shops, and how to meet events: boldly, taking the first option the squad can, or cautiously, taking the last.
+ */
 interface Strategy {
   risk: Risk | ((run: Run) => Risk)
   pick: keyof typeof PICKS
   land: keyof typeof LANDS
   build: boolean
+  events: 'bold' | 'cautious'
+}
+
+/** The options of the event under way the squad can take, by index. */
+const takeable = (run: Run) => EVENTS[run.event!].options.flatMap((option, i) => (!option.can || option.can(run) ? [i] : []))
+
+/** A spending bot's next purchase in a shop: facilities in BUILD_ORDER, then the relic, then a bribe once threat builds. */
+function shop(run: Run): Action {
+  const facility = BUILD_ORDER.find((id) => affordable(run).includes(id))
+  if (facility) return { type: 'build', facility }
+  if (run.shop!.relic && run.supplies >= RELIC_PRICE) return { type: 'buy' }
+  if (!run.shop!.bribed && run.supplies >= BRIBE.price && run.threat >= THREAT_MAX / 2) return { type: 'bribe' }
+  return { type: 'leave' }
 }
 
 /** A bot that plays `strategy`, deciding finds as decideFind says. */
 const play =
-  ({ risk, pick, land, build }: Strategy): Bot =>
+  ({ risk, pick, land, build, events }: Strategy): Bot =>
   (run, rng) => {
     if (run.phase === 'reward') return reward(run, rng, PICKS[pick])
     if (run.phase === 'battle') return { type: 'land', zone: LANDS[land](run, run.battle!, rng) }
-    const facility = build ? BUILD_ORDER.find((id) => affordable(run).includes(id)) : undefined
-    if (facility) return { type: 'build', facility }
+    if (run.phase === 'shop') return build ? shop(run) : { type: 'leave' }
+    if (run.phase === 'event') return { type: 'choose', index: events === 'bold' ? takeable(run)[0] : takeable(run).at(-1)! }
     const wanted = typeof risk === 'function' ? risk(run) : risk
     if (run.zone) return { type: 'advance' }
     // Zones by danger, least first: a safe bot takes the first, a standard one the middle, a dangerous one the last.
@@ -94,12 +111,13 @@ const play =
     return { type: 'zone', index: ranked[{ safe: 0, standard: 1, dangerous: 2 }[wanted]].index }
   }
 
-/** Chooses every option at random; in the overworld, builds or moves on at a coin flip. Decides finds as decideFind says. */
+/** Chooses every option at random; in a shop, builds or leaves at a coin flip. Decides finds as decideFind says. */
 const randomBot: Bot = (run, rng) => {
   if (run.phase === 'reward') return reward(run, rng, PICKS.random)
   if (run.phase === 'battle') return { type: 'land', zone: LANDS.random(run, run.battle!, rng) }
+  if (run.phase === 'event') return { type: 'choose', index: takeable(run)[randomInt(rng, takeable(run).length)] }
   const options = affordable(run)
-  if (options.length > 0 && randomInt(rng, 2) === 0) return { type: 'build', facility: options[randomInt(rng, options.length)] }
+  if (run.phase === 'shop') return options.length > 0 && randomInt(rng, 2) === 0 ? { type: 'build', facility: options[randomInt(rng, options.length)] } : { type: 'leave' }
   return run.zone ? { type: 'advance' } : { type: 'zone', index: randomInt(rng, run.zones.length) }
 }
 
@@ -109,12 +127,13 @@ const randomBot: Bot = (run, rng) => {
  */
 export const bots: Record<string, Bot> = {
   random: randomBot,
-  careless: play({ risk: 'standard', pick: 'first', land: 'exposed', build: false }),
-  standard: play({ risk: 'standard', pick: 'first', land: 'cover', build: true }),
-  safe: play({ risk: 'safe', pick: 'first', land: 'cover', build: true }),
-  dangerous: play({ risk: 'dangerous', pick: 'first', land: 'cover', build: true }),
-  growing: play({ risk: growing, pick: 'first', land: 'cover', build: true }),
-  breacher: play({ risk: 'standard', pick: 'first', land: 'hot', build: true }),
-  synergy: play({ risk: 'standard', pick: 'synergy', land: 'boon', build: true }),
-  expert: play({ risk: growing, pick: 'synergy', land: 'hot', build: true }),
+  careless: play({ risk: 'standard', pick: 'first', land: 'exposed', build: false, events: 'cautious' }),
+  standard: play({ risk: 'standard', pick: 'first', land: 'cover', build: true, events: 'cautious' }),
+  bold: play({ risk: 'standard', pick: 'first', land: 'cover', build: true, events: 'bold' }),
+  safe: play({ risk: 'safe', pick: 'first', land: 'cover', build: true, events: 'cautious' }),
+  dangerous: play({ risk: 'dangerous', pick: 'first', land: 'cover', build: true, events: 'cautious' }),
+  growing: play({ risk: growing, pick: 'first', land: 'cover', build: true, events: 'cautious' }),
+  breacher: play({ risk: 'standard', pick: 'first', land: 'hot', build: true, events: 'cautious' }),
+  synergy: play({ risk: 'standard', pick: 'synergy', land: 'boon', build: true, events: 'cautious' }),
+  expert: play({ risk: growing, pick: 'synergy', land: 'hot', build: true, events: 'cautious' }),
 }

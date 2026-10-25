@@ -1,4 +1,5 @@
 import type { AlienKind } from './aliens'
+import type { Rule } from './doctrines'
 import type { Keyword, Resist } from './keywords'
 import { randomInt } from './rng'
 import { CIVILIAN_HP, CIVILIANS, type Goal } from './goals'
@@ -258,6 +259,8 @@ export interface Pod {
 export interface Battle {
   rng: number
   goal: Goal
+  /** Doctrines' changes to how this battle works. */
+  rules: Rule[]
   /** Alien turns begun. */
   round: number
   /** Packs still to arrive on a hold, one every WAVE_EVERY rounds. */
@@ -590,12 +593,13 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
  * A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. A hold keeps half its
  * packs back as waves and offers one landing zone, the uplink; a rescue places civilians away from the aliens.
  */
-export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate'): Battle {
+export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = []): Battle {
   const holder = { rng: seed }
   const terrain = generateTerrain(holder, GRID, kind)
   const battle: Battle = {
     rng: holder.rng,
     goal,
+    rules,
     round: 0,
     waves: goal === 'hold' ? packs.slice(Math.ceil(packs.length / 2)) : [],
     beat: 0,

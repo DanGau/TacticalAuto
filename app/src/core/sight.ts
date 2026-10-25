@@ -1,3 +1,4 @@
+import { FORTIFIED_DEFENSE } from './doctrines'
 import { COVER_DEFENSE, coverAt, distance, edgeBetween, GRID, heightAt, HIGH_AIM, HIGH_SIGHT, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile, type Unit } from './battle'
 import { EDGE_COVER } from './terrain'
 
@@ -25,9 +26,18 @@ export function coverAgainst(battle: Battle, at: Tile, from: Tile): Cover {
  * Cover lowers the hit chance and closeness raises it, so a flanked target at point-blank is a near-certain hit.
  * A piercing shot treats the target as having no cover. Shooting down from higher ground is easier, and up harder.
  */
+/**
+ * What cover takes off a shot's chance to hit: COVER_DEFENSE, or FORTIFIED_DEFENSE under that rule, and nothing for a
+ * soldier in exosuits.
+ */
+function defense(battle: Battle, target: Tile, cover: Cover): number {
+  if (battle.rules.includes('exosuits') && battle.units.some((u) => u.x === target.x && u.y === target.y && u.side === 'human')) return 0
+  return (battle.rules.includes('fortified') ? FORTIFIED_DEFENSE : COVER_DEFENSE)[cover]
+}
+
 export function odds(battle: Battle, shooter: Tile, target: Tile, stats: Stats, piercing = false): { hit: number; crit: number } {
   const cover = piercing ? 0 : coverAgainst(battle, target, shooter)
-  const hit = stats.aim - COVER_DEFENSE[cover] + stats.close * Math.max(0, stats.range - distance(shooter, target)) + HIGH_AIM * (heightAt(battle, shooter) - heightAt(battle, target))
+  const hit = stats.aim - defense(battle, target, cover) + stats.close * Math.max(0, stats.range - distance(shooter, target)) + HIGH_AIM * (heightAt(battle, shooter) - heightAt(battle, target))
   return { hit: Math.min(Math.max(hit, 0), 1), crit: cover === 0 ? stats.crit : 0 }
 }
 

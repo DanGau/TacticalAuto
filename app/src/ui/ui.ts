@@ -99,9 +99,12 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   let shown: Run | null = null
   let html = ''
 
+  /** The run's phase when the panel was last drawn. */
+  let phase: Run['phase'] | null = null
+
   /**
    * The panel for where the player is. After a stop comes its report: it ends when its last choice is made,
-   * or at Continue if it left none. Then the overworld, opened on the base after a battle.
+   * or at Continue if it left none. Then the overworld.
    */
   function panel(run: Run): string {
     const report = run.report
@@ -109,12 +112,16 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (run.phase === 'won' || run.phase === 'lost') return runEnd(run)
     if (run.phase === 'reward') {
       seen = report
-      // After a stop the squad returns to the base; the run's first choice leaves it on the map.
-      if (report) tab = 'Base'
       return report ? stopReport(run, report) : choice(run)
     }
+    if (run.phase === 'shop' || run.phase === 'event') {
+      // Arriving shows the shop or event; the other tabs stay open to the player while they decide.
+      if (phase !== run.phase) tab = 'Map'
+      phase = run.phase
+      return overworld(run, tab, open)
+    }
+    phase = run.phase
     if (report && seen !== report) {
-      if (report.soldiers.length > 0) tab = 'Base'
       return stopReport(run, report)
     }
     return overworld(run, tab, open)

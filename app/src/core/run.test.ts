@@ -4,6 +4,8 @@ import { apply } from './apply'
 import { FACILITIES } from './base'
 import { isSoldier, BASE_STATS, type Side } from './battle'
 import { CLASSES } from './classes'
+import { EVENTS } from './events'
+import { coverAgainst, odds } from './sight'
 import {
   createRun,
   DROP_SUPPLIES,
@@ -28,6 +30,7 @@ import {
   type StopKind,
   xpFor,
   ZONE_STOPS,
+  hire,
 } from './run'
 import { PATHS, SKILLS } from './skills'
 import { RELICS } from './relics'
@@ -288,15 +291,85 @@ test('a satellite won offers three relics; a relic held changes the run', () => 
   expect(paid(['contact']).finds.every((find) => find.gear.rarity !== 'common')).toBe(true)
 })
 
-test('building costs more each level, stops at the maximum, and needs supplies', () => {
-  const run = started()
+test('a shop builds facilities, each level costing more up to a maximum; sells a relic and a bribe once; and is left for the road', () => {
+  const run = travelling(['shop', 'battle'])
+  expect(apply(run, { type: 'build', facility: 'optics' })).toEqual({ ok: false, reason: 'not in a shop' })
+  apply(run, { type: 'advance' })
+  expect(run).toMatchObject({ phase: 'shop', threat: STOP_THREAT })
   run.supplies = 100
   const { cost, max } = FACILITIES.optics
   for (let n = 1; n <= max; n++) expect(apply(run, { type: 'build', facility: 'optics' })).toEqual({ ok: true })
   expect(run.supplies).toBe(100 - cost - 2 * cost)
   expect(apply(run, { type: 'build', facility: 'optics' })).toEqual({ ok: false, reason: 'fully built' })
+  const relic = run.shop!.relic!
+  expect(apply(run, { type: 'buy' })).toEqual({ ok: true })
+  expect(run.relics).toContain(relic)
+  expect(apply(run, { type: 'buy' }).ok).toBe(false)
+  expect(apply(run, { type: 'bribe' })).toEqual({ ok: true })
+  expect(run.threat).toBe(0)
+  expect(apply(run, { type: 'bribe' }).ok).toBe(false)
   run.supplies = 0
   expect(apply(run, { type: 'build', facility: 'workshop' })).toEqual({ ok: false, reason: 'not enough supplies' })
+  apply(run, { type: 'leave' })
+  expect(run).toMatchObject({ phase: 'overworld', shop: null, stop: 1 })
+})
+
+test('an unknown stop turns out a battle, a shop, or an event met once a run, whose options change the run', () => {
+  const kinds = new Set<string>()
+  for (let seed = 0; seed < 40; seed++) {
+    const run = createRun(seed)
+    apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
+    enter(run, 'standard', ['unknown', 'battle'])
+    apply(run, { type: 'advance' })
+    kinds.add(run.phase)
+    if (run.phase === 'event') {
+      expect(run.met).toEqual([run.event])
+      expect(apply(run, { type: 'choose', index: EVENTS[run.event!].options.length - 1 })).toEqual({ ok: true })
+      expect(run).toMatchObject({ event: null, stop: 1 })
+    }
+  }
+  expect([...kinds].sort()).toEqual(['battle', 'event', 'shop'])
+})
+
+test('doctrines change the run: Lone Wolf leaves one soldier and stops recruits; Specialists give every soldier its own class', () => {
+  const run = started()
+  for (let i = 0; i < 3; i++) hire(run)
+  run.event = 'instructor'
+  run.phase = 'event'
+  run.zone = { stops: [stopOf('battle')] }
+  const levels = run.soldiers.map(level)
+  apply(run, { type: 'choose', index: 0 })
+  expect(new Set(run.soldiers.map((s) => s.cls)).size).toBe(4)
+  expect(run.soldiers.map(level)).toEqual(levels.map((l) => l + 1))
+  expect(run.doctrines).toEqual(['specialists'])
+
+  const wolf = started()
+  hire(wolf)
+  const hp = soldierStats(wolf, wolf.soldiers[0]).hp
+  Object.assign(wolf, { event: 'survivor', phase: 'event', zone: { stops: [stopOf('battle')] } })
+  apply(wolf, { type: 'choose', index: 0 })
+  expect(wolf.soldiers).toHaveLength(1)
+  expect(soldierStats(wolf, wolf.soldiers[0]).hp).toBe(hp + 8)
+  wolf.zone = { stops: [stopOf('key')] }
+  fight(wolf, 'human')
+  expect(wolf.soldiers).toHaveLength(1)
+})
+
+test('under exosuits cover shields aliens but not soldiers; fortification makes every cover count for more', () => {
+  const run = travelling(['battle'])
+  apply(run, { type: 'advance' })
+  apply(run, { type: 'land', zone: 0 })
+  const battle = run.battle!
+  const soldier = battle.units.find(isSoldier)!
+  const alien = battle.units.find((u) => u.side === 'alien')!
+  const cover = (unit: typeof soldier) => coverAgainst(battle, unit, unit === soldier ? alien : soldier)
+  const hit = (from: typeof soldier, to: typeof soldier) => odds(battle, from, to, from.stats).hit
+  const plain = [hit(alien, soldier), hit(soldier, alien)]
+  battle.rules = ['fortified']
+  if (cover(soldier) > 0) expect(hit(alien, soldier)).toBeLessThan(plain[0])
+  battle.rules = ['exosuits']
+  expect(hit(alien, soldier)).toBeGreaterThanOrEqual(plain[0])
+  expect(hit(soldier, alien)).toBe(plain[1])
 })
 
 test("a soldier lands with its class's ability and its uses, the effects of its skills and the squad's relics, and armor from its gear", () => {

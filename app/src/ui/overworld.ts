@@ -3,6 +3,8 @@ import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { GOALS } from '../core/goals'
 import { SLOTS } from '../core/gear'
+import { DOCTRINES } from '../core/doctrines'
+import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS } from '../core/relics'
 import { buildCost, built, KEYS, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Mission, type Muster, type Run, type Soldier, type Stop, type Zone } from '../core/run'
 import { PATHS, SKILLS, type SkillId } from '../core/skills'
@@ -46,6 +48,8 @@ function zoneCard(zone: Zone, index: number): string {
 /** The words on the button that travels to the next stop. */
 function travelLabel(run: Run, stop: Stop, next: NonNullable<ReturnType<typeof nextStop>>): string {
   if (next === 'supply' || next === 'cache') return `Collect the ${STOP_NAMES[next].toLowerCase()}`
+  if (next === 'shop') return 'Enter the shop'
+  if (next === 'unknown') return 'Find out what lies ahead'
   const mission = missionAt(run, next, stop.risk, next === 'battle' ? stop.goal : 'exterminate')
   const stakes = next === 'lastStand' || next === 'final' ? ' · lose and the run ends' : ''
   return `<b>${STOP_NAMES[next]}</b><br>Alien force ${mission.force}${next === 'key' || next === 'final' ? ', with a boss' : ''}${stakes}`
@@ -55,12 +59,36 @@ function travelLabel(run: Run, stop: Stop, next: NonNullable<ReturnType<typeof n
 function where(stop: Stop): string {
   if (stop.kind === 'final') return 'All three keys are won. The alien source is found.'
   if (stop.kind === 'key') return 'The road ends at a satellite. Its access key is guarded.'
+  if (stop.kind === 'unknown') return 'The road leads somewhere unknown: a fight, a shop, or something stranger.'
+  if (stop.kind === 'shop') return 'The road leads to a shop, where supplies buy facilities, a relic, or a quieter road.'
   if (stop.kind !== 'battle') return `The road leads to a ${STOP_NAMES[stop.kind].toLowerCase()}.`
   return `${GOALS[stop.goal].name}, ${RISKS[stop.risk].name.toLowerCase()} ${TERRAIN_TEXT[stop.terrain].name.toLowerCase()}: ${GOALS[stop.goal].text}`
 }
 
-/** The map: at a fork, the three zones to choose from; in a zone, the road through it and a button to travel on. */
+/** A shop: facilities to build, a relic, a bribe, and the way out. */
+function shopView(run: Run): string {
+  const shop = run.shop!
+  const relic = shop.relic
+    ? button({ type: 'buy' }, `<small>relic · ${RELIC_PRICE} supplies</small><br><b>${RELICS[shop.relic].name}</b><br>${describe(RELICS[shop.relic].text, RELICS[shop.relic].tags, squadKeywords(run))}`, 'card relic', RELIC_PRICE <= run.supplies)
+    : ''
+  const bribe = button({ type: 'bribe' }, `<b>Bribe the patrols</b><br>-${BRIBE.threat} threat<br><small>${BRIBE.price} supplies, once</small>`, '', !shop.bribed && BRIBE.price <= run.supplies && run.threat > 0)
+  return `<h2>A shop. Facilities improve every soldier for the run; each level costs more.</h2>
+    <div class="facilities">${(Object.keys(FACILITIES) as FacilityId[]).map((id) => facilityButton(run, id)).join('')}</div>
+    <div class="choices">${relic}${bribe}</div>
+    <button class="travel" data-action='${JSON.stringify({ type: 'leave' })}'>Leave the shop</button>`
+}
+
+/** An event: its scene, and the ways to meet it. */
+function eventView(run: Run): string {
+  const event = EVENTS[run.event!]
+  const options = event.options.map((option, index) => button({ type: 'choose', index }, option.text, 'card', !option.can || option.can(run)))
+  return `<h2><b>${event.name}</b></h2><p>${event.text}</p><div class="choices">${options.join('')}</div>`
+}
+
+/** The map: a shop or event being met; at a fork, the three zones to choose from; in a zone, the road through it and a button to travel on. */
 function mapView(run: Run): string {
+  if (run.phase === 'shop') return shopView(run)
+  if (run.phase === 'event') return eventView(run)
   const zone = run.zone
   if (!zone) {
     return `<h2>A fork in the road. Choose a zone; what lies beyond it is unknown.</h2>
@@ -85,10 +113,13 @@ function facilityButton(run: Run, id: FacilityId): string {
 
 function baseView(run: Run): string {
   const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags)}</div>`)
+  const doctrines = run.doctrines.map((id) => `<div class="gear doctrine"><small>doctrine</small><br><b>${DOCTRINES[id].name}</b><br>${DOCTRINES[id].text}</div>`)
+  const facilities = (Object.keys(FACILITIES) as FacilityId[]).filter((id) => built(run, id) > 0).map((id) => `<div class="gear"><b>${FACILITIES[id].name}</b> ${built(run, id)}/${FACILITIES[id].max}<br>${FACILITIES[id].text}</div>`)
   const held = squadKeywords(run)
-  return `<h2>Facilities improve every soldier. Each level costs more.</h2>
-    <div class="facilities">${(Object.keys(FACILITIES) as FacilityId[]).map((id) => facilityButton(run, id)).join('')}</div>
+  return `<h2>Facilities are built at shops on the road.</h2>
+    ${facilities.length > 0 ? `<div class="stash">${facilities.join('')}</div>` : '<p>None built yet.</p>'}
     ${held.length > 0 ? `<h2>Keywords</h2>${keywordChips(held, held)}` : ''}
+    ${doctrines.length > 0 ? `<h2>Doctrines</h2><div class="stash">${doctrines.join('')}</div>` : ''}
     ${relics.length > 0 ? `<h2>Relics</h2><div class="stash">${relics.join('')}</div>` : ''}`
 }
 

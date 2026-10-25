@@ -4,6 +4,8 @@ import { ALIENS, alienStats, muster, type AlienKind } from './aliens'
 import { GOALS, type Goal } from './goals'
 import { BASE_STATS, createBattle, type Alien, type Battle, type Stats } from './battle'
 import { CLASSES, type ClassId } from './classes'
+import { DOCTRINES, type Doctrine, type DoctrineId } from './doctrines'
+import type { EventId } from './events'
 import { EFFECTS, generateGear, SLOTS, type Gear, type Slot } from './gear'
 import { RESISTS, type Keyword, type Resist } from './keywords'
 import { RELIC_OFFERS, RELICS, type Relic, type RelicId } from './relics'
@@ -45,9 +47,10 @@ export const RISKS: Record<Risk, { name: string; aliens: number; supplies: numbe
 
 /**
  * A stop on the road. A battle must be fought. A supply drop gives supplies and a cache gives gear, with no fight.
+ * A shop sells facilities and more. An unknown stop is revealed on arrival as a battle, a shop or an event.
  * A key mission, at a satellite, wins an access key; the final mission strikes the alien source. Both have a boss.
  */
-export type StopKind = 'battle' | 'supply' | 'cache' | 'key' | 'final'
+export type StopKind = 'battle' | 'supply' | 'cache' | 'shop' | 'unknown' | 'key' | 'final'
 
 /** A pack of aliens by name and kinds, mustered before it is equipped. */
 export interface Muster {
@@ -120,6 +123,12 @@ export interface Report {
   rescued: number | null
 }
 
+/** A shop's wares beyond facilities: a relic until it is bought, and whether its bribe is spent. */
+export interface Shop {
+  relic: RelicId | null
+  bribed: boolean
+}
+
 export interface Run {
   seed: number
   rng: number
@@ -134,8 +143,19 @@ export interface Run {
   /** Index of the next stop in the zone. */
   stop: number
   threat: number
-  /** In the overworld the player builds and chooses a zone or travels on; in the reward phase, makes the choices a stop left. */
-  phase: 'overworld' | 'battle' | 'reward' | 'won' | 'lost'
+  /**
+   * In the overworld the player chooses a zone or travels on; in the reward phase, makes the choices a stop left;
+   * in a shop, buys; at an event, chooses how to meet it.
+   */
+  phase: 'overworld' | 'battle' | 'reward' | 'shop' | 'event' | 'won' | 'lost'
+  /** What the shop the squad is in sells; null outside a shop. */
+  shop: Shop | null
+  /** The event the squad is meeting; null outside one. */
+  event: EventId | null
+  /** Events met this run, which are not met again. */
+  met: EventId[]
+  /** Doctrines adopted, in order. */
+  doctrines: DoctrineId[]
   /** The mission being fought or last fought. */
   mission: Mission | null
   /** The battle being fought or last fought. */
@@ -169,7 +189,7 @@ export function level(soldier: { xp: number }): number {
 
 /** The sum of one lasting effect over every facility level built and relic held. */
 function total(run: Run, effect: (source: Lasting) => number | undefined): number {
-  const sources: Lasting[] = [...run.built.map((id) => FACILITIES[id]), ...run.relics.map((id): Relic => RELICS[id])]
+  const sources: Lasting[] = [...run.built.map((id) => FACILITIES[id]), ...run.relics.map((id): Relic => RELICS[id]), ...run.doctrines.map((id): Doctrine => DOCTRINES[id])]
   return sources.reduce((sum, source) => sum + (effect(source) ?? 0), 0)
 }
 
@@ -228,7 +248,7 @@ export function sellFind(run: Run): void {
 }
 
 /** Ends the reward phase once no choice is left: no relic, find or skill. */
-function settle(run: Run): void {
+export function settle(run: Run): void {
   const owed = run.relicOffers.length > 0 || run.finds.length > 0 || run.soldiers.some((s) => skillOffers(s).length > 0)
   run.phase = owed ? 'reward' : 'overworld'
 }
@@ -254,11 +274,14 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
 
 /**
  * Adds a clone to the squad and returns it. It arrives at level 1, or at the level of the squad's lowest if that is
- * higher, plus what the academy adds, so a late arrival is not left behind.
+ * higher, plus what the academy adds, so a late arrival is not left behind. Under a doctrine of unique classes it
+ * takes a class no squadmate has, while one is left.
  */
-function hire(run: Run): Soldier {
+export function hire(run: Run): Soldier {
   const lowest = run.soldiers.length > 0 ? Math.min(...run.soldiers.map(level)) : 1
-  const classes = Object.keys(CLASSES) as ClassId[]
+  const unused = (Object.keys(CLASSES) as ClassId[]).filter((id) => !run.soldiers.some((s) => s.cls === id))
+  const unique = run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).uniqueClasses) && unused.length > 0
+  const classes = unique ? unused : (Object.keys(CLASSES) as ClassId[])
   const free = NAMES.filter((name) => !run.soldiers.some((s) => s.name === name))
   const soldier: Soldier = {
     id: run.nextSoldier++,
@@ -323,8 +346,8 @@ function drawGoal(run: Run): Goal {
 /** Stops in each zone at a fork. */
 export const ZONE_STOPS = 3
 
-/** How likely a stop at a fork is to be each kind; the rest are battles. */
-export const EVENT_CHANCE = { supply: 0.2, cache: 0.2 }
+/** How likely a stop at a fork is to be each kind other than a battle; the rest are battles. */
+export const STOP_CHANCE = { unknown: 0.25, shop: 0.1, supply: 0.1, cache: 0.1 }
 
 /**
  * The three zones at a fork, each of ZONE_STOPS stops drawn at random: a battle of any risk, goal and place, or an
@@ -333,24 +356,25 @@ export const EVENT_CHANCE = { supply: 0.2, cache: 0.2 }
 function drawZones(run: Run): Zone[] {
   const ahead = { ...run, fork: run.fork + 1 }
   const risks = Object.keys(RISKS) as Risk[]
-  const battle = (): Stop => {
-    const risk = risks[randomInt(run, risks.length)]
-    const goal = drawGoal(run)
-    const force = missionAt(ahead, 'battle', risk, goal).force
-    // Each battle's force varies a little either way, so two battles of one risk are not the same fight.
-    const packs = muster(run, Math.max(1, force + randomInt(run, 3) - 1), depth(ahead)).map(({ name, kinds }) => ({ name, kinds }))
-    return { kind: 'battle', risk, goal, terrain: ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)], packs }
-  }
   const stop = (): Stop => {
-    const roll = random(run)
-    const event = roll < EVENT_CHANCE.supply ? 'supply' : roll < EVENT_CHANCE.supply + EVENT_CHANCE.cache ? 'cache' : null
-    return event ? fixed(event, 'town') : battle()
+    let roll = random(run)
+    const kind = (Object.keys(STOP_CHANCE) as (keyof typeof STOP_CHANCE)[]).find((k) => (roll -= STOP_CHANCE[k]) < 0)
+    return kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], ahead)
   }
   return Array.from({ length: 3 }, () => {
     const stops = Array.from({ length: ZONE_STOPS }, stop)
-    if (stops.every((s) => s.kind !== 'battle')) stops[randomInt(run, ZONE_STOPS)] = battle()
+    if (stops.every((s) => s.kind !== 'battle')) stops[randomInt(run, ZONE_STOPS)] = drawBattle(run, risks[randomInt(run, risks.length)], ahead)
     return { stops }
   })
+}
+
+/** A battle of `risk` with a goal and place drawn at random, its aliens mustered for the squad as it will be at `when`. */
+export function drawBattle(run: Run, risk: Risk, when: Run = run): Stop {
+  const goal = drawGoal(run)
+  const force = missionAt(when, 'battle', risk, goal).force
+  // Each battle's force varies a little either way, so two battles of one risk are not the same fight.
+  const packs = muster(run, Math.max(1, force + randomInt(run, 3) - 1), depth(when)).map(({ name, kinds }) => ({ name, kinds }))
+  return { kind: 'battle', risk, goal, terrain: ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)], packs }
 }
 
 /** A stop with no aliens drawn ahead: an event, a key mission or the final mission. */
@@ -392,6 +416,10 @@ export function createRun(seed: number): Run {
     relics: [],
     relicOffers: [],
     bosses: [],
+    shop: null,
+    event: null,
+    met: [],
+    doctrines: [],
   }
   hire(run)
   nextStretch(run)
@@ -428,15 +456,16 @@ function dropGear(run: Run, lucky: boolean): void {
 }
 
 /** Moves past the zone's current stop; past its last, sets what lies ahead. */
-function passStop(run: Run): void {
+export function passStop(run: Run): void {
   run.stop++
   if (run.stop === run.zone!.stops.length) nextStretch(run)
 }
 
-/** Travels to the next stop. A battle begins; a supply drop or cache is collected at once. */
+/** Travels to the next stop, unless it is a shop or unknown. A battle begins; a supply drop or cache is collected at once. */
 export function advance(run: Run): void {
   const here = run.zone!.stops[run.stop]
   const stop = nextStop(run)!
+  if (stop === 'shop' || stop === 'unknown') throw new Error('a shop or unknown stop is arrived at, not advanced to')
   if (stop === 'supply' || stop === 'cache') {
     const before = run.threat
     run.threat = Math.min(run.threat + STOP_THREAT, THREAT_MAX)
@@ -459,7 +488,8 @@ export function advance(run: Run): void {
     stance: s.cls ? CLASSES[s.cls].stance : ('balanced' as const),
     effects: [...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))
-  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, packsOf(run, mission, stop === 'battle' ? here.packs : undefined), reserve, mission.goal)
+  const rules = run.doctrines.flatMap((id) => (DOCTRINES[id] as Doctrine).rule ?? [])
+  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, packsOf(run, mission, stop === 'battle' ? here.packs : undefined), reserve, mission.goal, rules)
 }
 
 /**
@@ -492,7 +522,7 @@ export function endBattle(run: Run): void {
   for (let i = 0; i < drops; i++) dropGear(run, risk.rareGear || mission.kind !== 'battle' || mission.goal === 'assassinate' || held.some((relic) => relic.rareGear))
   const key = won && mission.kind === 'key'
   // Each key won brings a new clone to the squad.
-  const hired = key ? hire(run).name : null
+  const hired = key && !run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).noRecruits) ? hire(run).name : null
   run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, soldiers, hired, rescued }
 
   if (mission.kind === 'final' || (mission.kind === 'lastStand' && !won)) {

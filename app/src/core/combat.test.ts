@@ -3,7 +3,7 @@ import { apply } from './apply'
 import { isSoldier, revealed, type Battle } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { createRun } from './run'
-import { sees } from './sight'
+import { detects } from './sight'
 
 function battle(seed: number): Battle {
   const run = createRun(seed)
@@ -67,11 +67,11 @@ test('an alien shoots only after its pod is revealed', () => {
   })
 })
 
-test('a pod is revealed exactly when a soldier first has it in sight', () => {
+test('a pod is revealed once a soldier notices one of its aliens', () => {
   play(4, (_, __, after) => {
     const soldiers = after.units.filter(isSoldier)
     for (const alien of after.units.filter((u) => u.side === 'alien')) {
-      const seen = soldiers.some((s) => sees(after, s, alien))
+      const seen = soldiers.some((s) => detects(after, s, alien))
       if (seen) expect(revealed(after, alien)).toBe(true)
     }
   })
