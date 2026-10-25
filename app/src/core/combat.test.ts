@@ -9,6 +9,7 @@ function battle(seed: number): Battle {
   const run = createRun(seed)
   apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
   apply(run, { type: 'zone', index: 1 })
+  run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
   apply(run, { type: 'advance' })
   apply(run, { type: 'land', zone: 0 })
   return run.battle!

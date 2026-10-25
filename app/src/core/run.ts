@@ -36,11 +36,11 @@ const NAMES = ['Vega', 'Okafor', 'Lindqvist', 'Tanaka', 'Reyes', 'Novak', 'Hadda
 
 export type Risk = 'safe' | 'standard' | 'dangerous'
 
-/** What each risk means for a zone: how its battles differ and what they pay. Its stops are set where zones are drawn. */
+/** What each risk means for a battle: how many aliens it has and what it pays. */
 export const RISKS: Record<Risk, { name: string; aliens: number; supplies: number; drops: number; rareGear: boolean; text: string }> = {
-  safe: { name: 'Quiet', aliens: -1, supplies: 1, drops: 0, rareGear: false, text: 'Fewer aliens and no gear, by the long way round' },
+  safe: { name: 'Quiet', aliens: -1, supplies: 1, drops: 0, rareGear: false, text: 'Fewer aliens, and no gear' },
   standard: { name: 'Contested', aliens: 0, supplies: 2, drops: 1, rareGear: false, text: 'A fair fight' },
-  dangerous: { name: 'Overrun', aliens: 1, supplies: TUNING.dangerSupplies, drops: 2, rareGear: true, text: 'More aliens; one fight, and two pieces of rare or better gear' },
+  dangerous: { name: 'Overrun', aliens: 1, supplies: TUNING.dangerSupplies, drops: 2, rareGear: true, text: 'More aliens, and two pieces of rare or better gear' },
 }
 
 /**
@@ -56,16 +56,20 @@ export interface Muster {
 }
 
 /**
- * A stretch of road the squad commits to: its risk, the goal of its battles, the kind of place they are fought in,
- * and its stops, in order. `packs` holds the aliens each battle stop will send, mustered in advance so a fork can
- * show them; empty for other stops.
+ * A stop on the road. A battle has its own risk, goal and kind of place, and `packs` holds the aliens it will send,
+ * mustered in advance so a fork can show them. Other stops fight as `standard` exterminations, and have no packs.
  */
-export interface Zone {
+export interface Stop {
+  kind: StopKind
   risk: Risk
   goal: Goal
   terrain: TerrainKind
-  stops: StopKind[]
-  packs: Muster[][]
+  packs: Muster[]
+}
+
+/** A stretch of road the squad commits to at a fork: its stops, in order. */
+export interface Zone {
+  stops: Stop[]
 }
 
 /**
@@ -316,35 +320,52 @@ function drawGoal(run: Run): Goal {
   return goals.find((goal) => (roll -= GOALS[goal].weight) < 0) ?? 'exterminate'
 }
 
+/** Stops in each zone at a fork. */
+export const ZONE_STOPS = 3
+
+/** How likely a stop at a fork is to be each kind; the rest are battles. */
+export const EVENT_CHANCE = { supply: 0.2, cache: 0.2 }
+
 /**
- * The three zones at a fork, one of each risk, each with a goal: a quiet one is long, an overrun one is a single
- * hard fight. Their battles are mustered as they will be once the squad has taken the fork.
+ * The three zones at a fork, each of ZONE_STOPS stops drawn at random: a battle of any risk, goal and place, or an
+ * event. Each zone has at least one battle. Its battles are mustered as they will be once the squad has taken the fork.
  */
 function drawZones(run: Run): Zone[] {
-  const event = (): StopKind => (random(run) < 0.5 ? 'supply' : 'cache')
-  const shuffled = (stops: StopKind[]) => {
-    const [first] = stops.splice(randomInt(run, stops.length), 1)
-    return [first, ...stops]
-  }
-  const terrain = () => ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)]
   const ahead = { ...run, fork: run.fork + 1 }
-  const zone = (risk: Risk, stops: StopKind[]): Zone => {
+  const risks = Object.keys(RISKS) as Risk[]
+  const battle = (): Stop => {
+    const risk = risks[randomInt(run, risks.length)]
     const goal = drawGoal(run)
     const force = missionAt(ahead, 'battle', risk, goal).force
-    // Each battle's force varies a little either way, so two zones of one risk are not the same fight.
-    const packs = stops.map((stop) => (stop === 'battle' ? muster(run, Math.max(1, force + randomInt(run, 3) - 1), depth(ahead)).map(({ name, kinds }) => ({ name, kinds })) : []))
-    return { risk, goal, terrain: terrain(), stops, packs }
+    // Each battle's force varies a little either way, so two battles of one risk are not the same fight.
+    const packs = muster(run, Math.max(1, force + randomInt(run, 3) - 1), depth(ahead)).map(({ name, kinds }) => ({ name, kinds }))
+    return { kind: 'battle', risk, goal, terrain: ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)], packs }
   }
-  return [zone('safe', shuffled(['battle', event(), 'battle'])), zone('standard', ['battle', 'battle']), zone('dangerous', ['battle'])]
+  const stop = (): Stop => {
+    const roll = random(run)
+    const event = roll < EVENT_CHANCE.supply ? 'supply' : roll < EVENT_CHANCE.supply + EVENT_CHANCE.cache ? 'cache' : null
+    return event ? fixed(event, 'town') : battle()
+  }
+  return Array.from({ length: 3 }, () => {
+    const stops = Array.from({ length: ZONE_STOPS }, stop)
+    if (stops.every((s) => s.kind !== 'battle')) stops[randomInt(run, ZONE_STOPS)] = battle()
+    return { stops }
+  })
 }
+
+/** A stop with no aliens drawn ahead: an event, a key mission or the final mission. */
+const fixed = (kind: StopKind, terrain: TerrainKind): Stop => ({ kind, risk: 'standard', goal: 'exterminate', terrain, packs: [] })
+
+/** How hard a zone's battles are in all: each counts one, a quiet one none and an overrun one two. */
+export const danger = (zone: Zone) => zone.stops.reduce((sum, s) => sum + (s.kind === 'battle' ? 1 + RISKS[s.risk].aliens : 0), 0)
 
 /** Sets what lies ahead once a zone is done or a run begins: a fork, the leg's satellite, or the alien source. */
 function nextStretch(run: Run): void {
   run.stop = 0
   run.zone = null
   run.zones = []
-  if (run.keys === KEYS) run.zone = { risk: 'standard', goal: 'exterminate', terrain: 'hive', stops: ['final'], packs: [[]] }
-  else if (run.fork === FORKS) run.zone = { risk: 'standard', goal: 'exterminate', terrain: 'compound', stops: ['key'], packs: [[]] }
+  if (run.keys === KEYS) run.zone = { stops: [fixed('final', 'hive')] }
+  else if (run.fork === FORKS) run.zone = { stops: [fixed('key', 'compound')] }
   else run.zones = drawZones(run)
 }
 
@@ -390,7 +411,7 @@ export function enterZone(run: Run, zone: Zone): void {
 /** The stop the squad travels to next: a last stand if threat is full, else the zone's next stop. Null at a fork. */
 export function nextStop(run: Run): StopKind | 'lastStand' | null {
   if (!run.zone) return null
-  return run.threat >= THREAT_MAX ? 'lastStand' : run.zone.stops[run.stop]
+  return run.threat >= THREAT_MAX ? 'lastStand' : run.zone.stops[run.stop].kind
 }
 
 /** A random rarity; `lucky` rules out common. */
@@ -414,20 +435,20 @@ function passStop(run: Run): void {
 
 /** Travels to the next stop. A battle begins; a supply drop or cache is collected at once. */
 export function advance(run: Run): void {
-  const zone = run.zone!
+  const here = run.zone!.stops[run.stop]
   const stop = nextStop(run)!
   if (stop === 'supply' || stop === 'cache') {
     const before = run.threat
     run.threat = Math.min(run.threat + STOP_THREAT, THREAT_MAX)
     const supplies = stop === 'supply' ? DROP_SUPPLIES : 0
     run.supplies += supplies
-    if (stop === 'cache') dropGear(run, RISKS[zone.risk].rareGear || run.relics.some((id) => (RELICS[id] as Relic).rareGear))
+    if (stop === 'cache') dropGear(run, run.relics.some((id) => (RELICS[id] as Relic).rareGear))
     run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, key: false, soldiers: [], hired: null, rescued: null }
     passStop(run)
     settle(run)
     return
   }
-  const mission = missionAt(run, stop, zone.risk, stop === 'battle' ? zone.goal : 'exterminate')
+  const mission = missionAt(run, stop, here.risk, stop === 'battle' ? here.goal : 'exterminate')
   run.mission = mission
   run.phase = 'battle'
   const reserve = run.soldiers.map((s) => ({
@@ -438,7 +459,7 @@ export function advance(run: Run): void {
     stance: s.cls ? CLASSES[s.cls].stance : ('balanced' as const),
     effects: [...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))
-  run.battle = createBattle(randomInt(run, 2 ** 31), zone.terrain, packsOf(run, mission, stop === 'battle' ? zone.packs[run.stop] : undefined), reserve, mission.goal)
+  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, packsOf(run, mission, stop === 'battle' ? here.packs : undefined), reserve, mission.goal)
 }
 
 /**

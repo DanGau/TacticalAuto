@@ -10,16 +10,14 @@ function before(goal: Goal): Run {
   apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
   apply(run, { type: 'zone', index: 1 })
   const patrol = { name: 'Patrol', kinds: ['trooper', 'trooper'] as const }
-  run.zone = { ...run.zone!, goal, packs: [[patrol, patrol, patrol].map((p) => ({ ...p, kinds: [...p.kinds] })), []] }
+  run.zone = { stops: [{ kind: 'battle', risk: 'standard', goal, terrain: 'town', packs: [patrol, patrol, patrol].map((p) => ({ ...p, kinds: [...p.kinds] })) }] }
   apply(run, { type: 'advance' })
   return run
 }
 
-test('every zone at a fork has a goal, and its battles mustered in advance', () => {
+test('every battle at a fork has its aliens mustered in advance; no other stop has any', () => {
   const run = createRun(1)
-  for (const zone of run.zones) {
-    expect(zone.packs.map((packs) => packs.length > 0)).toEqual(zone.stops.map((stop) => stop === 'battle'))
-  }
+  for (const stop of run.zones.flatMap((zone) => zone.stops)) expect(stop.packs.length > 0).toBe(stop.kind === 'battle')
 })
 
 test('a hold offers three landing zones away from the uplink, keeps half its packs back as waves, and is won by lasting', () => {

@@ -10,6 +10,7 @@ function landing(): Run & { battle: Battle } {
   const run = createRun(1)
   apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
   apply(run, { type: 'zone', index: 1 })
+  run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
   apply(run, { type: 'advance' })
   return run as Run & { battle: Battle }
 }
@@ -66,6 +67,7 @@ test('actions outside their phase are rejected and change nothing', () => {
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
   expect(run).toEqual(before)
   apply(run, { type: 'zone', index: 1 })
+  run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
   apply(run, { type: 'advance' })
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
   expect(apply(run, { type: 'build', facility: 'workshop' }).ok).toBe(false)

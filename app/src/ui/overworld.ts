@@ -4,7 +4,7 @@ import { CLASSES } from '../core/classes'
 import { GOALS } from '../core/goals'
 import { SLOTS } from '../core/gear'
 import { RELICS } from '../core/relics'
-import { buildCost, built, KEYS, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type StopKind, type Zone } from '../core/run'
+import { buildCost, built, KEYS, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Mission, type Muster, type Run, type Soldier, type Stop, type Zone } from '../core/run'
 import { PATHS, SKILLS, type SkillId } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
 import { alienName, button, describe, gearCard, keywordChips, resistChip, tip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
@@ -14,11 +14,12 @@ export const TABS = ['Map', 'Base', 'Barracks'] as const
 export type Tab = (typeof TABS)[number]
 
 
-/** A stop as a chip on the road: its name, and for a fight, how many aliens. */
-function chip(run: Run, zone: Zone, stop: StopKind, state = ''): string {
-  const fight = stop === 'battle' || stop === 'key' || stop === 'final'
-  const aliens = fight ? ` · force ${missionAt(run, stop, zone.risk).force}${stop === 'battle' ? '' : ', with a boss'}` : ''
-  return `<span class="chip ${stop} ${state}">${STOP_NAMES[stop]}${aliens}</span>`
+/** A stop as a chip on the road: its name, and for a fight, its risk and how many aliens. */
+function chip(run: Run, stop: Stop, state = ''): string {
+  const fight = stop.kind === 'battle' || stop.kind === 'key' || stop.kind === 'final'
+  const risk = stop.kind === 'battle' ? `${RISKS[stop.risk].name} ` : ''
+  const aliens = fight ? ` · force ${missionAt(run, stop.kind as Mission['kind'], stop.risk, stop.goal).force}${stop.kind === 'battle' ? '' : ', with a boss'}` : ''
+  return `<span class="chip ${stop.kind} ${stop.risk} ${state}">${risk}${STOP_NAMES[stop.kind]}${aliens}</span>`
 }
 
 /** The aliens of a battle, counted by kind: "3 Troopers, 2 Swarmlings". */
@@ -28,26 +29,34 @@ function census(packs: Muster[]): string {
   return [...counts].map(([kind, n]) => `${n} ${alienName(kind, `${ALIENS[kind].name}${n === 1 ? '' : 's'}`)}`).join(', ')
 }
 
-/** A zone at a fork: its goal and risk, each stop with the aliens it holds, and what it costs and pays. Clicking it commits the squad to it. */
+/** A stop at a fork. A battle shows its risk, goal and place, the aliens it holds, and what it pays. */
+function stopRow(stop: Stop): string {
+  if (stop.kind !== 'battle') return `<div class="stop ${stop.kind}"><b>${STOP_NAMES[stop.kind]}</b></div>`
+  const risk = RISKS[stop.risk]
+  const goal = GOALS[stop.goal]
+  const rare = risk.rareGear && (stop.goal === 'exterminate' || stop.goal === 'assassinate') ? ', rare or better' : ''
+  return `<div class="stop ${stop.risk}"><small>${tip(risk.name, risk.text)} · ${TERRAIN_TEXT[stop.terrain].name}</small><span><b>${tip(goal.name, goal.text)}</b>: ${census(stop.packs)}${stop.goal === 'assassinate' ? ', and a Commander' : ''}</span><small>Pays ${goal.reward}${rare}</small></div>`
+}
+
+/** A zone at a fork: each of its stops, and what it costs. Clicking it commits the squad to it. */
 function zoneCard(zone: Zone, index: number): string {
-  const risk = RISKS[zone.risk]
-  const goal = GOALS[zone.goal]
-  const stops = zone.stops.map((stop, i) => `<div>${STOP_NAMES[stop]}${stop === 'battle' ? `: ${census(zone.packs[i])}${zone.goal === 'assassinate' ? ', and a Commander' : ''}` : ''}</div>`)
-  return button(
-    { type: 'zone', index },
-    `<small>${risk.name} · ${TERRAIN_TEXT[zone.terrain].name}</small><br><b>${tip(goal.name, goal.text)}</b>
-    <div class="aliens">${stops.join('')}</div>
-    <small>Pays ${goal.reward}${risk.rareGear && (zone.goal === 'exterminate' || zone.goal === 'assassinate') ? ', rare or better' : ''}</small><small>+${zone.stops.length} threat</small>`,
-    `zone ${zone.risk}`,
-  )
+  return button({ type: 'zone', index }, `<div class="aliens">${zone.stops.map(stopRow).join('')}</div><small>+${zone.stops.length} threat</small>`, 'zone')
 }
 
 /** The words on the button that travels to the next stop. */
-function travelLabel(run: Run, zone: Zone, stop: NonNullable<ReturnType<typeof nextStop>>): string {
-  if (stop === 'supply' || stop === 'cache') return `Collect the ${STOP_NAMES[stop].toLowerCase()}`
-  const mission = missionAt(run, stop, zone.risk)
-  const stakes = stop === 'lastStand' || stop === 'final' ? ' · lose and the run ends' : ''
-  return `<b>${STOP_NAMES[stop]}</b><br>Alien force ${mission.force}${stop === 'key' || stop === 'final' ? ', with a boss' : ''}${stakes}`
+function travelLabel(run: Run, stop: Stop, next: NonNullable<ReturnType<typeof nextStop>>): string {
+  if (next === 'supply' || next === 'cache') return `Collect the ${STOP_NAMES[next].toLowerCase()}`
+  const mission = missionAt(run, next, stop.risk, next === 'battle' ? stop.goal : 'exterminate')
+  const stakes = next === 'lastStand' || next === 'final' ? ' · lose and the run ends' : ''
+  return `<b>${STOP_NAMES[next]}</b><br>Alien force ${mission.force}${next === 'key' || next === 'final' ? ', with a boss' : ''}${stakes}`
+}
+
+/** What the squad faces at a stop, as the map's heading. */
+function where(stop: Stop): string {
+  if (stop.kind === 'final') return 'All three keys are won. The alien source is found.'
+  if (stop.kind === 'key') return 'The road ends at a satellite. Its access key is guarded.'
+  if (stop.kind !== 'battle') return `The road leads to a ${STOP_NAMES[stop.kind].toLowerCase()}.`
+  return `${GOALS[stop.goal].name}, ${RISKS[stop.risk].name.toLowerCase()} ${TERRAIN_TEXT[stop.terrain].name.toLowerCase()}: ${GOALS[stop.goal].text}`
 }
 
 /** The map: at a fork, the three zones to choose from; in a zone, the road through it and a button to travel on. */
@@ -57,13 +66,13 @@ function mapView(run: Run): string {
     return `<h2>A fork in the road. Choose a zone; what lies beyond it is unknown.</h2>
       <div class="choices">${run.zones.map((z, i) => zoneCard(z, i)).join('')}</div>`
   }
-  const stop = nextStop(run)!
-  const road = zone.stops.map((s, i) => chip(run, zone, s, i < run.stop ? 'done' : i === run.stop ? 'here' : '')).join('<span class="arrow">→</span>')
-  const where = zone.stops[0] === 'final' ? 'All three keys are won. The alien source is found.' : zone.stops[0] === 'key' ? 'The road ends at a satellite. Its access key is guarded.' : `${GOALS[zone.goal].name}, ${RISKS[zone.risk].name.toLowerCase()} ${TERRAIN_TEXT[zone.terrain].name.toLowerCase()}: ${GOALS[zone.goal].text}`
-  return `<h2>${where}</h2>
+  const next = nextStop(run)!
+  const here = zone.stops[run.stop]
+  const road = zone.stops.map((s, i) => chip(run, s, i < run.stop ? 'done' : i === run.stop ? 'here' : '')).join('<span class="arrow">→</span>')
+  return `<h2>${where(here)}</h2>
     <div class="road">${road}</div>
-    ${stop === 'lastStand' ? '<p class="up"><b>The threat is full. The aliens attack before the squad can travel on.</b></p>' : ''}
-    <button class="travel ${stop}" data-action='${JSON.stringify({ type: 'advance' })}'>${travelLabel(run, zone, stop)}</button>`
+    ${next === 'lastStand' ? '<p class="up"><b>The threat is full. The aliens attack before the squad can travel on.</b></p>' : ''}
+    <button class="travel ${next}" data-action='${JSON.stringify({ type: 'advance' })}'>${travelLabel(run, here, next)}</button>`
 }
 
 /** A facility's next level, buyable when the run has the supplies. */

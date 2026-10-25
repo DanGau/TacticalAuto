@@ -26,6 +26,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   const run = createRun(1)
   apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
   apply(run, { type: 'zone', index: 1 })
+  run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
   apply(run, { type: 'advance' })
   run.battle!.boons[0] = 'kill'
   apply(run, { type: 'land', zone: 0 })

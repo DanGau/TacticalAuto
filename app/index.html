@@ -54,8 +54,11 @@
       .chip.lost, b.lost { opacity: 0.35; text-decoration: line-through; }
       .chip.here { background: #35496b; }
       .aliens { margin: 6px 0; padding: 6px 0; border-top: 1px solid #3a465c; border-bottom: 1px solid #3a465c; }
-      button.zone.safe { border-color: #7ddc5a; }
-      button.zone.dangerous { border-color: #ff6b5e; }
+      .stop { border-left: 3px solid #888; padding-left: 6px; margin: 4px 0; }
+      .stop > * { display: block; }
+      .stop.safe { border-color: #7ddc5a; }
+      .stop.dangerous { border-color: #ff6b5e; }
+      .stop.supply, .stop.cache { border-color: #6fb7ff; }
       button.travel { min-width: 320px; text-align: left; line-height: 1.5; }
       button.travel.key, button.travel.final { border-color: #c77dff; }
 

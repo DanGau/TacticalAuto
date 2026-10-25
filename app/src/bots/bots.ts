@@ -5,7 +5,7 @@ import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { SKILLS } from '../core/skills'
-import { buildCost, level, skillOffers, squadKeywords, type Risk, type Run } from '../core/run'
+import { buildCost, danger, level, skillOffers, squadKeywords, type Risk, type Run } from '../core/run'
 
 /** Chooses the next action whenever the run waits for the player. `rng` is the bot's own, separate from the run's. */
 export type Bot = (run: Run, rng: { rng: number }) => Action
@@ -68,10 +68,10 @@ const affordable = (run: Run) => (Object.keys(FACILITIES) as FacilityId[]).filte
 /** What a building bot builds first. */
 const BUILD_ORDER: FacilityId[] = ['firingRange', 'workshop', 'optics', 'drills', 'academy', 'course']
 
-/** Takes quiet zones until the squad's mean level reaches 3, then overrun ones. */
+/** Takes the safest zones until the squad's mean level reaches 3, then the most dangerous. */
 const growing = (run: Run): Risk => (run.soldiers.reduce((sum, s) => sum + level(s), 0) / run.soldiers.length >= 3 ? 'dangerous' : 'safe')
 
-/** One way to play: which risk to take at each fork, how to choose offers, where to land, and whether to build. */
+/** One way to play: how much danger to take at each fork, how to choose offers, where to land, and whether to build. */
 interface Strategy {
   risk: Risk | ((run: Run) => Risk)
   pick: keyof typeof PICKS
@@ -88,7 +88,10 @@ const play =
     const facility = build ? BUILD_ORDER.find((id) => affordable(run).includes(id)) : undefined
     if (facility) return { type: 'build', facility }
     const wanted = typeof risk === 'function' ? risk(run) : risk
-    return run.zone ? { type: 'advance' } : { type: 'zone', index: run.zones.findIndex((zone) => zone.risk === wanted) }
+    if (run.zone) return { type: 'advance' }
+    // Zones by danger, least first: a safe bot takes the first, a standard one the middle, a dangerous one the last.
+    const ranked = run.zones.map((zone, index) => ({ index, danger: danger(zone) })).sort((a, b) => a.danger - b.danger)
+    return { type: 'zone', index: ranked[{ safe: 0, standard: 1, dangerous: 2 }[wanted]].index }
   }
 
 /** Chooses every option at random; in the overworld, builds or moves on at a coin flip. Decides finds as decideFind says. */
