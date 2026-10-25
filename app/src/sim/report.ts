@@ -42,3 +42,25 @@ export function formatReport(r: Report): string {
     ...r.failures.map((f) => `FAIL                ${f}`),
   ].join('\n')
 }
+
+/**
+ * Win-rate bands a healthy game sits in, after roguelikes like Slay the Spire: random play rarely wins but can,
+ * the baseline wins about half its runs, the best play still loses some, and good choices clearly beat random ones.
+ */
+export const BANDS = { floor: [0.03, 0.25], baseline: [0.35, 0.6], ceiling: [0, 0.85], gap: 0.25 } as const
+
+/** Each bot's win rate on the same seeds, best first, and the bands they break. */
+export function compare(rates: Record<string, number>): { table: string; warnings: string[] } {
+  const ranked = Object.entries(rates).sort((a, b) => b[1] - a[1])
+  const pct = (n: number) => `${Math.round(100 * n)}%`
+  const outside = (name: string, rate: number, [low, high]: readonly [number, number]) =>
+    rate < low || rate > high ? [`${name} wins ${pct(rate)}, outside ${pct(low)}–${pct(high)}`] : []
+  const [top, topRate] = ranked[0]
+  const warnings = [
+    ...outside('random (floor)', rates.random, BANDS.floor),
+    ...outside('standard (baseline)', rates.standard, BANDS.baseline),
+    ...outside(`${top} (ceiling)`, topRate, BANDS.ceiling),
+    ...(topRate - rates.random < BANDS.gap ? [`the best play beats random by only ${pct(topRate - rates.random)}; choices matter too little`] : []),
+  ]
+  return { table: ranked.map(([name, rate]) => `${name.padEnd(12)}${pct(rate).padStart(5)}`).join('\n'), warnings }
+}

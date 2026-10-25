@@ -19,5 +19,6 @@ Run in `app/`.
 
 - `npm run check` — lint, typecheck, tests, and a sim batch.
 - `npm run -s sim -- --runs=500 --bot=random` — bots play runs in Node and print a report.
+- `npm run -s sim -- --runs=100 --bot=all` — every bot strategy on the same seeds, ranked, with warnings for win rates outside the balance bands in `app/src/sim/report.ts`.
 - `npm run -s eye -- <command>` — play and screenshot the game in a headless browser. Commands: `app/eye/eye.ts`.
 - `npm run dev` — serve the game for a human. Each push to `main` also deploys it to https://dangau.github.io/TacticalAuto/.
