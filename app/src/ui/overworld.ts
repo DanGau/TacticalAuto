@@ -81,7 +81,7 @@ function shopView(run: Run): string {
 /** An event: its scene, and the ways to meet it. */
 function eventView(run: Run): string {
   const event = EVENTS[run.event!]
-  const options = event.options.map((option, index) => button({ type: 'choose', index }, option.text, 'card', !option.can || option.can(run)))
+  const options = event.options.map((option, index) => button({ type: 'choose', index }, `<i>${option.quip}</i><span>${option.text}</span>`, 'card', !option.can || option.can(run)))
   return `<h2><b>${event.name}</b></h2><p>${event.text}</p><div class="choices">${options.join('')}</div>`
 }
 
