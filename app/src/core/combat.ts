@@ -4,9 +4,11 @@ import {
   ACID_DAMAGE,
   ACID_TURNS,
   alienUnit,
+  walkingDistances,
   stepCost,
   AMBUSH_AIM,
-  AMBUSH_CRIT,
+  AMBUSH_CRIT,
+
   IMPACT_REACH,
   AURA_REACH,
   BACKSTAB_DAMAGE,
@@ -21,7 +23,8 @@ import {
   GHOST_REACH,
   HASTE_MOVE,
   HEADSHOT_DAMAGE,
-  INSPIRE_AIM,
+  INSPIRE_AIM,
+
   PHOENIX_HEALTH,
   RAGE_DAMAGE,
   RECKLESS_AIM,
@@ -39,11 +42,12 @@ import {
   CLEAVE_DAMAGE,
   CHILL_AIM,
   CHILL_MOVE,
-  CHILL_TURNS,
-  SPOTTER_AIM,
+  CHILL_TURNS,
+
+  SPOTTER_AIM,
+
   BURN_DAMAGE,
-  BURN_TURNS,
-  coverAt,
+  BURN_TURNS,
   CRIT_BONUS,
   distance,
   EXECUTE_BONUS,
@@ -58,8 +62,7 @@ import {
   MEDIC_HEAL,
   MEDIC_REACH,
   MEDKIT_HEAL,
-  NEIGHBORS,
-  onGrid,
+  NEIGHBORS,
   passable,
   PATROL_MOVE,
   PSI_BACKLASH,
@@ -150,30 +153,6 @@ function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: S
   if (has(target, 'ghost') && distance(from, target) > GHOST_REACH) return false
   if (canShoot(battle, from, target, unit.stats.range)) return true
   return unit.ability === 'squadsight' && seen.has(target.id) && lineOfSight(battle, from, target)
-}
-
-/** Walking distance from every tile to `goal`, row by row, ignoring units. Infinity where no path exists. */
-function walkingDistances(battle: Battle, goal: Tile): number[] {
-  const field = Array<number>(GRID * GRID).fill(Infinity)
-  field[goal.y * GRID + goal.x] = 0
-  // Tiles by distance found, nearest first: a step costs 1 to 1 + 2 * CLIMB, so each bucket is settled before the next.
-  const buckets: Tile[][] = [[goal]]
-  for (let d = 0; d < buckets.length; d++) {
-    for (const tile of buckets[d] ?? []) {
-      if (field[tile.y * GRID + tile.x] !== d) continue
-      for (const [dx, dy] of NEIGHBORS) {
-        const x = tile.x + dx
-        const y = tile.y + dy
-        if (!onGrid(x, y) || coverAt(battle, x, y) > 0 || !passable(battle, tile, { x, y })) continue
-        // Walking from the neighbour to this tile, as the unit will.
-        const cost = d + stepCost(battle, { x, y }, tile)
-        if (cost >= field[y * GRID + x]) continue
-        field[y * GRID + x] = cost
-        ;(buckets[cost] ??= []).push({ x, y })
-      }
-    }
-  }
-  return field
 }
 
 /**

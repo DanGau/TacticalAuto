@@ -333,6 +333,7 @@ export function unitAt(battle: Battle, x: number, y: number): Unit | undefined {
 
 /** Removes everything a blast catches: the props on tiles within `radius` of `centre`, and the walls and windows around those tiles. */
 export function wreck(battle: Battle, centre: Tile, radius = BLAST_RADIUS): void {
+  walks.delete(battle)
   for (let y = centre.y - radius; y <= centre.y + radius; y++) {
     for (let x = centre.x - radius; x <= centre.x + radius; x++) {
       if (!onGrid(x, y)) continue
@@ -355,9 +356,53 @@ export function edgeBetween(battle: Battle, a: Tile, b: Tile): Edge {
 /** Whether a unit may step between two neighbouring tiles: no wall or window in the way, and on a diagonal, none at the corner it turns. */
 export function passable(battle: Battle, from: Tile, to: Tile): boolean {
   if (from.x === to.x || from.y === to.y) return edgeBetween(battle, from, to) === 'none'
-  const viaX = { x: to.x, y: from.y }
-  const viaY = { x: from.x, y: to.y }
-  return [viaX, viaY].every((via) => passable(battle, from, via) && passable(battle, via, to))
+  // Both ways round the corner: through the tile beside `from` on `to`'s column, and through the one on its row.
+  const open = (ax: number, ay: number, bx: number, by: number) =>
+    (ay === by ? battle.west[ay * GRID + Math.max(ax, bx)] : battle.north[Math.max(ay, by) * GRID + ax]) === 'none'
+  return open(from.x, from.y, to.x, from.y) && open(to.x, from.y, to.x, to.y) && open(from.x, from.y, from.x, to.y) && open(from.x, to.y, to.x, to.y)
+}
+
+/** A battle's walking graph and the distance fields found on it. Both follow from terrain alone, so wreck forgets them. */
+const walks = new WeakMap<Battle, { into: [from: number, cost: number][][]; fields: Map<number, number[]> }>()
+
+/** For each tile, the open tiles a unit can step onto it from, with each step's cost. */
+function walkGraph(battle: Battle) {
+  let walk = walks.get(battle)
+  if (walk) return walk
+  const into = Array.from({ length: GRID * GRID }, (_, t) => {
+    const tile = { x: t % GRID, y: Math.floor(t / GRID) }
+    return NEIGHBORS.flatMap(([dx, dy]): [number, number][] => {
+      const from = { x: tile.x + dx, y: tile.y + dy }
+      return onGrid(from.x, from.y) && coverAt(battle, from.x, from.y) === 0 && passable(battle, tile, from) ? [[from.y * GRID + from.x, stepCost(battle, from, tile)]] : []
+    })
+  })
+  walk = { into, fields: new Map() }
+  walks.set(battle, walk)
+  return walk
+}
+
+/** Walking distance from every tile to `goal`, row by row, ignoring units. Infinity where no path exists. Do not change it: it is shared. */
+export function walkingDistances(battle: Battle, goal: Tile): readonly number[] {
+  const { into, fields } = walkGraph(battle)
+  const start = goal.y * GRID + goal.x
+  const known = fields.get(start)
+  if (known) return known
+  const field = Array<number>(GRID * GRID).fill(Infinity)
+  field[start] = 0
+  // Tiles by distance found, nearest first: a step costs 1 to 1 + 2 * CLIMB, so each bucket is settled before the next.
+  const buckets: number[][] = [[start]]
+  for (let d = 0; d < buckets.length; d++) {
+    for (const tile of buckets[d] ?? []) {
+      if (field[tile] !== d) continue
+      for (const [from, step] of into[tile]) {
+        if (d + step >= field[from]) continue
+        field[from] = d + step
+        ;(buckets[d + step] ??= []).push(from)
+      }
+    }
+  }
+  fields.set(start, field)
+  return field
 }
 
 /** Whether nothing may stand on the tile: it is off the grid, cover, or occupied. */

@@ -1,11 +1,22 @@
-import { availableParallelism } from 'node:os'
+import { buildSync } from 'esbuild'
+import { mkdtempSync } from 'node:fs'
+import { availableParallelism, tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
 import type { TUNING } from '../core/tuning'
 
 export type Tuning = typeof TUNING
 
-/** Starts a worker on worker.ts: a worker thread does not inherit tsx, so it registers tsx itself first. */
-const BOOT = `import(${JSON.stringify(import.meta.resolve('tsx/esm/api'))}).then((tsx) => { tsx.register(); return import(${JSON.stringify(new URL('./worker.ts', import.meta.url).href)}) })`
+/**
+ * worker.ts bundled once into plain JavaScript, so worker threads load it without tsx: no transpiling on start, and no
+ * name-keeping wrappers around every function call.
+ */
+const BUNDLE = (() => {
+  const out = join(mkdtempSync(join(tmpdir(), 'sim-')), 'worker.mjs')
+  buildSync({ entryPoints: [fileURLToPath(new URL('./worker.ts', import.meta.url))], bundle: true, platform: 'node', format: 'esm', outfile: out, logLevel: 'error' })
+  return out
+})()
 
 /** Each bot's win rate over `runs` seeds from `start`, with `tuning` in place, played on `threads` worker threads. */
 export async function winRates(bots: string[], runs: number, start: number, tuning: Tuning, threads = availableParallelism() - 1): Promise<Record<string, number>> {
@@ -15,7 +26,7 @@ export async function winRates(bots: string[], runs: number, start: number, tuni
     slices.map(
       (slice) =>
         new Promise<{ bot: string; won: boolean }[]>((resolve, reject) => {
-          const worker = new Worker(BOOT, { eval: true, workerData: { tuning, jobs: slice } })
+          const worker = new Worker(BUNDLE, { workerData: { tuning, jobs: slice } })
           worker.once('message', resolve)
           worker.once('error', reject)
         }),
