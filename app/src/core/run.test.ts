@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { TUNING } from './tuning'
 import { apply } from './apply'
 import { FACILITIES } from './base'
 import { isSoldier, BASE_STATS, type Side } from './battle'
@@ -9,7 +10,6 @@ import {
   endBattle,
   FORKS,
   KEYS,
-  LEG_FORCE,
   LOSS_THREAT,
   missionAt,
   level,
@@ -176,7 +176,7 @@ test.each(['human', 'alien'] as const)('with every key won the squad is four, on
 test('alien force follows the leg; an alien\'s health never grows, but deeper aliens wear armor', () => {
   const run = started()
   enter(run, 'standard')
-  expect(missionAt(run, 'battle', 'standard').force).toBe(LEG_FORCE[0])
+  expect(missionAt(run, 'battle', 'standard').force).toBe(TUNING.legForce[0])
   apply(run, { type: 'advance' })
   const early = run.battle!.units.filter((u) => u.side === 'alien')
   expect(early.filter((u) => !u.target).every((u) => u.stats.armor === 0)).toBe(true)
@@ -184,7 +184,7 @@ test('alien force follows the leg; an alien\'s health never grows, but deeper al
   const late = started()
   late.keys = 2
   enter(late, 'standard')
-  expect(missionAt(late, 'battle', 'standard').force).toBe(LEG_FORCE[2])
+  expect(missionAt(late, 'battle', 'standard').force).toBe(TUNING.legForce[2])
   apply(late, { type: 'advance' })
   const troopers = (units: typeof early) => units.filter((u) => u.kind === 'trooper' && !u.boss && !u.target)
   for (const alien of late.battle!.units.filter((u) => u.side === 'alien' && !u.target)) expect(alien.stats.armor).toBe(4)

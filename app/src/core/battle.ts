@@ -18,8 +18,7 @@ export const SIGHT = 8
 /** What a soldier's shots gain against an ambushed pod: hit chance, and chance for a hit to crit. */
 export const AMBUSH_AIM = 0.2
 export const AMBUSH_CRIT = 0.25
-/** What drop pods do to each alien within IMPACT_REACH tiles of a soldier landing in a breach. */
-export const IMPACT_DAMAGE = 2
+/** How near a soldier landing in a breach an alien must be to take the drop pods' impact damage. */
 export const IMPACT_REACH = 2
 /** Tiles an alien moves per turn before its pod is revealed. */
 export const PATROL_MOVE = 2
@@ -42,8 +41,6 @@ export const BURN_DAMAGE = 1
 export const CHILL_TURNS = 2
 export const CHILL_MOVE = 2
 export const CHILL_AIM = 0.15
-export const SHATTER_DAMAGE = 2
-export const THERMAL_DAMAGE = 3
 export const SPOTTER_AIM = 0.15
 /** Damage the executioner effect adds against a target at half health or less. */
 export const EXECUTE_BONUS = 2
@@ -68,7 +65,6 @@ export const AURA_REACH = 2
 export const BULWARK_DEFENSE = 0.1
 export const INSPIRE_AIM = 0.1
 export const HEADSHOT_DAMAGE = 2
-export const MARK_DAMAGE = 1
 export const REVIVE_REACH = 3
 export const REVIVE_HEALTH = 3
 export const BARRIER_ARMOR = 2
@@ -236,7 +232,7 @@ export interface Unit {
   moved: boolean
   /** Own turns for which its aim is suppressed. */
   suppressed: number
-  /** Whether every hit on it does 1 more damage. */
+  /** Whether every hit on it does TUNING.markDamage more damage. */
   marked: boolean
   /** Alien turns until the unit's recurring ability is ready: a psion's panic, a spawner's spawn. */
   cooldown: number

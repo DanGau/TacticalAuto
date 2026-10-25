@@ -1,9 +1,10 @@
 import type { Action } from '../core/apply'
+import { TUNING } from '../core/tuning'
 import type { Report, Run } from '../core/run'
 import type { View } from '../view/view'
 import { choice, runEnd, stopReport } from './aftermath'
 import { ALIENS, type AlienKind } from '../core/aliens'
-import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_DAMAGE, IMPACT_REACH, nearestAlien, zoneInfo, type Battle } from '../core/battle'
+import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_REACH, nearestAlien, zoneInfo, type Battle } from '../core/battle'
 import { KEYWORDS } from '../core/keywords'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { DETECT, PATROL_DETECT } from '../core/sight'
@@ -60,7 +61,7 @@ function tradeoffs(battle: Battle, zone: number): string {
   if (zone === battle.hot) {
     const pod = battle.pods[nearestAlien(battle, tile)!.pod!].name
     lines.push(
-      line(true, `Hot drop onto the ${pod}: drop pods deal ${IMPACT_DAMAGE} damage to each alien within ${IMPACT_REACH} tiles`),
+      line(true, `Hot drop onto the ${pod}: drop pods deal ${TUNING.impactDamage} damage to each alien within ${IMPACT_REACH} tiles`),
       line(true, `The ${pod} is caught off guard: it can't shoot its first turn, and the squad's first volley gets +${100 * AMBUSH_AIM}% aim and +${100 * AMBUSH_CRIT}% crit`),
       line(false, 'Every other pod hears the landing and converges on it'),
     )

@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
+import { TUNING } from './tuning'
 import { apply } from './apply'
-import { isSoldier, coverAt, distance, IMPACT_DAMAGE, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
+import { isSoldier, coverAt, distance, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
 import { stepBattle } from './combat'
 import { createRun, type Run } from './run'
 
@@ -34,7 +35,7 @@ test('a hot drop breaches: the pod beneath is ambushed and cannot shoot, its mem
   expect(battle.concealed).toBe(false)
   battle.pods.forEach((pod, i) => i !== under.pod && expect(pod.waypoint).toEqual(zone))
   const events = stepBattle(battle)
-  expect(events).toContainEqual({ type: 'hurt', id: under.id, amount: IMPACT_DAMAGE, cause: 'impact' })
+  expect(events).toContainEqual({ type: 'hurt', id: under.id, amount: TUNING.impactDamage, cause: 'impact' })
 })
 
 test('landing puts the whole squad on open tiles by the zone and begins the battle', () => {

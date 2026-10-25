@@ -1,12 +1,12 @@
 import { ALIENS, alienStats } from './aliens'
+import { TUNING } from './tuning'
 import {
   ACID_DAMAGE,
   ACID_TURNS,
   alienUnit,
   stepCost,
   AMBUSH_AIM,
-  AMBUSH_CRIT,
-  IMPACT_DAMAGE,
+  AMBUSH_CRIT,
   IMPACT_REACH,
   AURA_REACH,
   BACKSTAB_DAMAGE,
@@ -21,8 +21,7 @@ import {
   GHOST_REACH,
   HASTE_MOVE,
   HEADSHOT_DAMAGE,
-  INSPIRE_AIM,
-  MARK_DAMAGE,
+  INSPIRE_AIM,
   PHOENIX_HEALTH,
   RAGE_DAMAGE,
   RECKLESS_AIM,
@@ -40,10 +39,8 @@ import {
   CLEAVE_DAMAGE,
   CHILL_AIM,
   CHILL_MOVE,
-  CHILL_TURNS,
-  SHATTER_DAMAGE,
-  SPOTTER_AIM,
-  THERMAL_DAMAGE,
+  CHILL_TURNS,
+  SPOTTER_AIM,
   BURN_DAMAGE,
   BURN_TURNS,
   coverAt,
@@ -515,8 +512,8 @@ function impact(battle: Battle): GameEvent[] {
   battle.breach = false
   const soldiers = battle.units.filter(isSoldier)
   for (const alien of battle.units.filter((u) => u.side === 'alien' && soldiers.some((s) => distance(s, u) <= IMPACT_REACH))) {
-    events.push({ type: 'hurt', id: alien.id, amount: IMPACT_DAMAGE, cause: 'impact' })
-    wound(battle, alien, IMPACT_DAMAGE, events)
+    events.push({ type: 'hurt', id: alien.id, amount: TUNING.impactDamage, cause: 'impact' })
+    wound(battle, alien, TUNING.impactDamage, events)
   }
   return events
 }
@@ -775,10 +772,10 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     when(coverAgainst(battle, enemy, unit) === 0, 'backstab', BACKSTAB_DAMAGE) +
     when(unit.hp <= unit.stats.hp / 2, 'rage', RAGE_DAMAGE) +
     when(enemy.hp < enemy.stats.hp, 'slayer', SLAYER_DAMAGE) +
-    (enemy.marked ? MARK_DAMAGE : 0) +
-    when(enemy.burning > 0, 'accelerant', 1) +
-    when(enemy.chilled > 0, 'shatter', SHATTER_DAMAGE) +
-    when(enemy.burning > 0 && enemy.chilled > 0, 'thermal', THERMAL_DAMAGE) +
+    (enemy.marked ? TUNING.markDamage : 0) +
+    when(enemy.burning > 0, 'accelerant', TUNING.accelerantDamage) +
+    when(enemy.chilled > 0, 'shatter', TUNING.shatterDamage) +
+    when(enemy.burning > 0 && enemy.chilled > 0, 'thermal', TUNING.thermalDamage) +
     when(unit.armor > 0, 'armored', 1) +
     when(unit.fury > 0, 'bloodRite', unit.fury) -
     (has(enemy, 'thick') ? THICK_ARMOR : 0)

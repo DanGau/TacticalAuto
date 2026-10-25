@@ -1,4 +1,5 @@
 import { FACILITIES, RARITY_CHANCE, type FacilityId, type Lasting, type Rarity } from './base'
+import { TUNING } from './tuning'
 import { ALIENS, alienStats, muster, type AlienKind } from './aliens'
 import { GOALS, type Goal } from './goals'
 import { BASE_STATS, createBattle, type Alien, type Battle, type Stats } from './battle'
@@ -19,8 +20,6 @@ export const THREAT_MAX = 6
 /** Threat each stop adds, and what losing a battle adds on top. */
 export const STOP_THREAT = 1
 export const LOSS_THREAT = 1
-/** The alien force a battle has in each leg, before its risk and kind are counted; the squad grows by one clone a leg. */
-export const LEG_FORCE = [1, 4, 9, 15]
 export const START_SUPPLIES = 3
 /** What an assassination's commander has over a trooper. */
 export const COMMANDER = { hp: 4, armor: 1 }
@@ -41,7 +40,7 @@ export type Risk = 'safe' | 'standard' | 'dangerous'
 export const RISKS: Record<Risk, { name: string; aliens: number; supplies: number; drops: number; rareGear: boolean; text: string }> = {
   safe: { name: 'Quiet', aliens: -1, supplies: 1, drops: 0, rareGear: false, text: 'Fewer aliens and no gear, by the long way round' },
   standard: { name: 'Contested', aliens: 0, supplies: 2, drops: 1, rareGear: false, text: 'A fair fight' },
-  dangerous: { name: 'Overrun', aliens: 1, supplies: 4, drops: 2, rareGear: true, text: 'More aliens; one fight, and two pieces of rare or better gear' },
+  dangerous: { name: 'Overrun', aliens: 1, supplies: TUNING.dangerSupplies, drops: 2, rareGear: true, text: 'More aliens; one fight, and two pieces of rare or better gear' },
 }
 
 /**
@@ -278,7 +277,7 @@ function depth(run: Run): number {
 /** The mission the squad would fight at a stop of the given kind now. Its force follows the leg, and so the size of the squad. */
 export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goal = 'exterminate'): Mission {
   const extra = { battle: 0, key: 1, final: 2, lastStand: run.keys }[kind]
-  return { kind, goal, risk, force: Math.max(1, LEG_FORCE[run.keys] + (run.fork >= FORKS ? 1 : 0) + extra + RISKS[risk].aliens + GOALS[goal].force) }
+  return { kind, goal, risk, force: Math.max(1, TUNING.legForce[run.keys] + (run.fork >= FORKS ? 1 : 0) + extra + RISKS[risk].aliens + GOALS[goal].force) }
 }
 
 /**

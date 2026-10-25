@@ -1,5 +1,7 @@
 import { parseArgs } from 'node:util'
 import { bots } from '../bots/bots'
+import { TUNING } from '../core/tuning'
+import { winRates } from './pool'
 import { runWith } from './run'
 import { compare, formatReport, report } from './report'
 
@@ -17,8 +19,7 @@ const play = (name: string) => Array.from({ length: Number(values.runs) }, (_, i
 
 if (values.bot === 'all') {
   // Every bot on the same seeds, against the win-rate bands.
-  const rates = Object.fromEntries(Object.keys(bots).map((name) => [name, report(play(name)).wins / Number(values.runs)]))
-  const { table, warnings } = compare(rates)
+  const { table, warnings } = compare(await winRates(Object.keys(bots), Number(values.runs), start, TUNING))
   console.log([table, ...warnings.map((w) => `WARN ${w}`)].join('\n'))
 } else {
   if (!bots[values.bot]) throw new Error(`unknown bot "${values.bot}"; choose from all, ${Object.keys(bots).join(', ')}`)

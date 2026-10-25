@@ -1,4 +1,5 @@
 import type { RelicEffect, Stats } from './battle'
+import { TUNING } from './tuning'
 import type { Keyword } from './keywords'
 
 /**
@@ -34,12 +35,12 @@ const relics = {
   echo: { name: 'Echo Chamber', text: 'Every class ability with limited uses has one more', charges: 1 },
   drones: { name: 'Scavenger Drones', text: 'Each won battle pays 1 more supply', supplies: 1 },
   contact: { name: 'Black Market Contact', text: 'Every piece of gear found is rare or better', rareGear: true },
-  accelerant: { name: 'Accelerant Gel', text: 'Hits on a burning target do +1 damage', tags: ['burn'], effect: 'accelerant' },
+  accelerant: { name: 'Accelerant Gel', text: `Hits on a burning target do +${TUNING.accelerantDamage} damage`, tags: ['burn'], effect: 'accelerant' },
   wildfire: { name: 'Wildfire Spores', text: 'An alien that dies burning sets every alien beside it burning', tags: ['burn', 'kill'], effect: 'wildfire' },
   salamander: { name: 'Salamander Sigil', text: 'Crits set the target burning', tags: ['crit', 'burn'], effect: 'ignite' },
   lattice: { name: 'Frost Lattice', text: 'Crits chill the target', tags: ['crit', 'frost'], effect: 'freeze' },
-  shatter: { name: 'Shatterglass Edge', text: 'Hits on a chilled target do +2 damage', tags: ['frost'], effect: 'shatter' },
-  thermal: { name: 'Thermal Shock Core', text: 'Hits on a target both burning and chilled do +3 damage', tags: ['burn', 'frost'], effect: 'thermal' },
+  shatter: { name: 'Shatterglass Edge', text: `Hits on a chilled target do +${TUNING.shatterDamage} damage`, tags: ['frost'], effect: 'shatter' },
+  thermal: { name: 'Thermal Shock Core', text: `Hits on a target both burning and chilled do +${TUNING.thermalDamage} damage`, tags: ['burn', 'frost'], effect: 'thermal' },
   spotter: { name: 'Spotter Network', text: '+15% aim against a marked target', tags: ['mark'], effect: 'spotter' },
   hunt: { name: 'Eye of the Hunt', text: 'Crits mark the target', tags: ['crit', 'mark'], effect: 'exploit' },
   bloodforged: { name: 'Bloodforged Plate', text: 'A kill gives the soldier 1 armor', tags: ['kill', 'ward'], effect: 'momentum' },

@@ -1,4 +1,5 @@
 import { BASE_STATS, type Stance, type Stats } from './battle'
+import { TUNING } from './tuning'
 import type { Resist } from './keywords'
 import { randomInt } from './rng'
 
@@ -71,7 +72,7 @@ export const WEAPON_AIM = 0.05
 export function alienStats(kind: AlienKind, armor: number, weapon: number): Stats {
   const stats = { ...BASE_STATS, ...ALIENS[kind].stats }
   const armed = kind === 'burster' ? 0 : weapon
-  return { ...stats, hp: Math.max(1, Math.round(BASE_STATS.hp * ALIENS[kind].hp)), armor, damage: stats.damage + armed, aim: stats.aim + WEAPON_AIM * armed }
+  return { ...stats, hp: Math.max(1, Math.round(BASE_STATS.hp * ALIENS[kind].hp * TUNING.alienHp)), armor, damage: stats.damage + armed, aim: stats.aim + WEAPON_AIM * armed }
 }
 
 /** A themed group of aliens that roams and fights as one pod. */
