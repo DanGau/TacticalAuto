@@ -7,9 +7,9 @@
     "build": "vite build",
     "lint": "eslint --max-warnings=0 .",
     "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.json",
-    "test": "vitest run",
-    "sim": "tsx src/sim/cli.ts",
-    "tune": "tsx src/sim/tune.ts",
+    "test": "node scripts/deadline.mjs 300 vitest run",
+    "sim": "node scripts/deadline.mjs 1800 tsx src/sim/cli.ts",
+    "tune": "node scripts/deadline.mjs 86400 tsx src/sim/tune.ts",
     "eye": "tsx eye/eye.ts",
     "check": "npm run lint && npm run typecheck && npm run test && npm run sim -- --runs=50",
     "prepare": "git config core.hooksPath .githooks"

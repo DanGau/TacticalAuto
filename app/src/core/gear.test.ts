@@ -4,6 +4,7 @@ import { alienUnit, type Battle, type Unit } from './battle'
 import { stepBattle } from './combat'
 import { EFFECTS, generateGear, type Gear } from './gear'
 import { createRun, SELL, soldierStats, type Run } from './run'
+import { TUNING } from './tuning'
 
 test('gear is built by rarity: commons have one mod, rares add an effect for their slot, epics add a second mod', () => {
   const rng = { rng: 7 }
@@ -120,7 +121,7 @@ test('a rimed weapon chills its target, and a shatterglass edge and thermal shoc
   expect(d.alien.chilled).toBeGreaterThan(0)
   d.alien.burning = 5
   const [second] = shots()
-  expect(second).toMatchObject({ hit: true, damage: 2 + 2 + 3 })
+  expect(second).toMatchObject({ hit: true, damage: 2 + TUNING.shatterDamage + TUNING.thermalDamage })
 })
 
 test('an alien that resists frost and burn is neither chilled nor set burning', () => {

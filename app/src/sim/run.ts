@@ -17,6 +17,9 @@ export interface RunResult {
   actions: Action[]
 }
 
+/** More player actions than any run takes: a run past it is stuck, and fails instead of hanging. */
+export const MAX_ACTIONS = 10000
+
 /** Plays a run to its end, taking each action from `next` when the run waits for the player. */
 function play(seed: number, next: (run: Run) => Action): { run: Run; result: RunResult } {
   const run = createRun(seed)
@@ -30,6 +33,7 @@ function play(seed: number, next: (run: Run) => Action): { run: Run; result: Run
       }
       continue
     }
+    if (result.actions.length >= MAX_ACTIONS) throw new Error(`seed ${seed}: no end after ${MAX_ACTIONS} actions, in phase ${run.phase}`)
     const action = next(run)
     const applied = apply(run, action)
     if (!applied.ok) throw new Error(`action rejected: ${applied.reason}`)
