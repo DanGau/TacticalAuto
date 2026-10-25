@@ -2,6 +2,7 @@ import type { Bot } from '../bots/bots'
 import { apply, type Action } from '../core/apply'
 import { createRun, type Mission, type Run } from '../core/run'
 import { step } from '../core/step'
+import type { DoctrineId } from '../core/doctrines'
 
 export interface RunResult {
   seed: number
@@ -21,8 +22,9 @@ export interface RunResult {
 export const MAX_ACTIONS = 10000
 
 /** Plays a run to its end, taking each action from `next` when the run waits for the player. */
-function play(seed: number, next: (run: Run) => Action): { run: Run; result: RunResult } {
+function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = []): { run: Run; result: RunResult } {
   const run = createRun(seed)
+  run.doctrines.push(...doctrines)
   const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, actions: [] }
   while (run.phase !== 'won' && run.phase !== 'lost') {
     if (run.phase === 'battle' && run.battle!.phase === 'battle') {
@@ -48,7 +50,8 @@ export function replay(seed: number, actions: Action[]): Run {
   return play(seed, () => queue.shift()!).run
 }
 
-export function runWith(seed: number, bot: Bot): RunResult {
+/** Plays a run with `bot`, the squad holding `doctrines` from the start. */
+export function runWith(seed: number, bot: Bot, doctrines: DoctrineId[] = []): RunResult {
   const rng = { rng: seed }
-  return play(seed, (run) => bot(run, rng)).result
+  return play(seed, (run) => bot(run, rng), doctrines).result
 }

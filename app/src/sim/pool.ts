@@ -4,6 +4,7 @@ import { availableParallelism, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
+import type { DoctrineId } from '../core/doctrines'
 import type { TUNING } from '../core/tuning'
 
 export type Tuning = typeof TUNING
@@ -18,15 +19,15 @@ const BUNDLE = (() => {
   return out
 })()
 
-/** Each bot's win rate over `runs` seeds from `start`, with `tuning` in place, played on `threads` worker threads. */
-export async function winRates(bots: string[], runs: number, start: number, tuning: Tuning, threads = availableParallelism() - 1): Promise<Record<string, number>> {
+/** Each bot's win rate over `runs` seeds from `start`, with `tuning` in place and the squad holding `doctrines` from the start, played on `threads` worker threads. */
+export async function winRates(bots: string[], runs: number, start: number, tuning: Tuning, threads = availableParallelism() - 1, doctrines: DoctrineId[] = []): Promise<Record<string, number>> {
   const jobs = bots.flatMap((bot) => Array.from({ length: runs }, (_, i) => ({ bot, seed: start + i })))
   const slices = Array.from({ length: Math.max(1, threads) }, (_, t) => jobs.filter((_, i) => i % Math.max(1, threads) === t)).filter((slice) => slice.length > 0)
   const done = await Promise.all(
     slices.map(
       (slice) =>
         new Promise<{ bot: string; won: boolean }[]>((resolve, reject) => {
-          const worker = new Worker(BUNDLE, { workerData: { tuning, jobs: slice } })
+          const worker = new Worker(BUNDLE, { workerData: { tuning, jobs: slice, doctrines } })
           worker.once('message', resolve)
           worker.once('error', reject)
         }),

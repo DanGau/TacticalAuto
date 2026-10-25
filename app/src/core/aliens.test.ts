@@ -272,3 +272,49 @@ test('cleave hurts the aliens beside a kill; a skirmisher steps away after it ac
   expect(aliens[1].hp).toBe(97)
   expect(events.at(-1)).toMatchObject({ type: 'move', id: soldier.id, with: 'skirmish' })
 })
+
+test("a blademaster charges in and strikes from the next tile; a parry deflects a shot from beyond arm's reach", () => {
+  const { soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 15 }])
+  soldier.stance = 'rush'
+  soldier.stats = { ...soldier.stats, range: 1, move: 6, damage: 1 }
+  aliens[0].hp = aliens[0].stats.hp = 99
+  aliens[0].stats = { ...aliens[0].stats, move: 0 }
+  const events = until((all) => all.some((e) => e.type === 'shot' && e.id === soldier.id))
+  expect(events[0]).toMatchObject({ type: 'move', id: soldier.id })
+  expect(Math.max(Math.abs(soldier.x - aliens[0].x), Math.abs(soldier.y - aliens[0].y))).toBe(1)
+
+  const duel = arena([{ kind: 'trooper', x: 10, y: 14 }])
+  duel.soldier.effects = ['parry']
+  duel.soldier.stats = { ...duel.soldier.stats, range: 1, move: 0, hp: 999 }
+  duel.soldier.hp = 999
+  duel.aliens[0].stats = { ...duel.aliens[0].stats, move: 0, aim: 2 }
+  expect(duel.until((all) => all.some((e) => e.type === 'effect' && e.effect === 'parry'))).toContainEqual({ type: 'effect', id: duel.soldier.id, effect: 'parry', amount: 0 })
+})
+
+test('a psionic attack passes through a wall and ignores cover; a demolishing hit wrecks the cover around its target; twin guns fire twice', () => {
+  const psi = arena([{ kind: 'trooper', x: 10, y: 13 }])
+  psi.battle.cover[12 * 32 + 10] = 2
+  psi.soldier.effects = ['psionic']
+  psi.soldier.stats = { ...psi.soldier.stats, range: 6, move: 0 }
+  psi.aliens[0].stats = { ...psi.aliens[0].stats, move: 0, range: 0 }
+  psi.aliens[0].hp = psi.aliens[0].stats.hp = 99
+  expect(psi.until(has('shot'))).toContainEqual(expect.objectContaining({ type: 'shot', id: psi.soldier.id, hit: true }))
+
+  const demo = arena([{ kind: 'trooper', x: 10, y: 13 }])
+  demo.battle.cover[14 * 32 + 10] = 1
+  demo.soldier.effects = ['demolish']
+  demo.soldier.stats = { ...demo.soldier.stats, move: 0 }
+  demo.aliens[0].stats = { ...demo.aliens[0].stats, move: 0, range: 0 }
+  demo.aliens[0].hp = demo.aliens[0].stats.hp = 99
+  expect(demo.until(has('shot'))).toContainEqual({ type: 'effect', id: demo.aliens[0].id, effect: 'demolish', amount: 0 })
+  expect(demo.battle.cover[14 * 32 + 10]).toBe(0)
+
+  const twin = arena([{ kind: 'trooper', x: 10, y: 13 }])
+  twin.soldier.effects = ['twin']
+  twin.soldier.stats = { ...twin.soldier.stats, move: 0 }
+  twin.aliens[0].stats = { ...twin.aliens[0].stats, move: 0, range: 0 }
+  twin.aliens[0].hp = twin.aliens[0].stats.hp = 99
+  const shots = twin.until(has('shot')).filter((e) => e.type === 'shot' && e.id === twin.soldier.id)
+  expect(shots).toHaveLength(2)
+  expect(shots[1]).toMatchObject({ with: ['twin'] })
+})

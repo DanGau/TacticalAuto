@@ -19,6 +19,7 @@ Run in `app/`.
 
 - `npm run check` — lint, typecheck, tests, and a sim batch.
 - `npm run -s sim -- --runs=500 --bot=random` — bots play runs in Node and print a report.
+- `npm run -s sim -- --runs=100 --bot=all --doctrine=blades` — the same, the squad holding a doctrine from the start.
 - `npm run -s sim -- --runs=100 --bot=all` — every bot strategy on the same seeds, ranked, with warnings for win rates outside the balance bands in `app/src/sim/report.ts`.
 - `npm run -s tune -- --rounds=10 --threads=8` — hill-climbs the numbers in `app/src/core/tuning.ts` toward those bands, and rewrites the file if held-out seeds confirm the gain.
 - `npm run -s eye -- <command>` — play and screenshot the game in a headless browser. Commands: `app/eye/eye.ts`.

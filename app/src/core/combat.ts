@@ -1,5 +1,6 @@
 import { ALIENS, alienStats } from './aliens'
 import { TUNING } from './tuning'
+import { PARRY_CHANCE } from './doctrines'
 import {
   ACID_DAMAGE,
   ACID_TURNS,
@@ -47,7 +48,8 @@ import {
   SPOTTER_AIM,
 
   BURN_DAMAGE,
-  BURN_TURNS,
+  BURN_TURNS,
+
   CRIT_BONUS,
   distance,
   EXECUTE_BONUS,
@@ -62,7 +64,8 @@ import {
   MEDIC_HEAL,
   MEDIC_REACH,
   MEDKIT_HEAL,
-  NEIGHBORS,
+  NEIGHBORS,
+
   passable,
   PATROL_MOVE,
   PSI_BACKLASH,
@@ -151,6 +154,8 @@ function spotted(battle: Battle): Set<number> {
 /** Whether `unit`, standing on `from`, may shoot `target`. Squadsight reaches any spotted alien in a clear line; a ghost is safe from far off. */
 function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: Set<number>): boolean {
   if (has(target, 'ghost') && distance(from, target) > GHOST_REACH) return false
+  // A psionic attack needs no line of sight, only an alien whose pod is revealed.
+  if (has(unit, 'psionic') && revealed(battle, target) && distance(from, target) <= unit.stats.range) return true
   if (canShoot(battle, from, target, unit.stats.range)) return true
   return unit.ability === 'squadsight' && seen.has(target.id) && lineOfSight(battle, from, target)
 }
@@ -699,7 +704,7 @@ function inAura(battle: Battle, unit: Unit, effect: Effect): boolean {
  * beyond the unit's own; such a shot grants no further one.
  */
 function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, only?: Unit): GameEvent[] {
-  const piercing = has(unit, 'piercing') || has(unit, 'pierce')
+  const piercing = has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic')
   const chanceAt = (target: Unit) => odds(battle, unit, target, unit.stats, piercing)
   const inReach = (only ? [only] : battle.units).filter((other) => other.side !== unit.side && shootable(battle, unit, unit, other, seen))
   const taunting = inReach.filter((other) => has(other, 'taunt'))
@@ -739,6 +744,10 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   if (hit && has(enemy, 'dodge') && random(battle) < DODGE_CHANCE) {
     hit = false
     events.push({ type: 'effect', id: enemy.id, effect: 'dodge', amount: 0 })
+  }
+  if (hit && has(enemy, 'parry') && distance(unit, enemy) > 1 && random(battle) < PARRY_CHANCE) {
+    hit = false
+    events.push({ type: 'effect', id: enemy.id, effect: 'parry', amount: 0 })
   }
   if (!hit) return [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit: false, damage: 0, with: used }, ...events, ...again(battle, unit, seen, granted, false)]
 
@@ -823,6 +832,10 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     events.push({ type: 'effect', id: unit.id, effect: 'thorns', amount: -1 })
     wound(battle, unit, 1, events)
   }
+  if (when(true, 'demolish', 1)) {
+    wreck(battle, enemy)
+    events.push({ type: 'effect', id: enemy.id, effect: 'demolish', amount: 0 })
+  }
   if (enemy.kind === 'brute' && enemy.hp > 0 && unit.hp > 0) charge(battle, enemy, unit, events)
   return [...events, ...again(battle, unit, seen, granted, enemy.hp <= 0)]
 }
@@ -834,7 +847,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
 function again(battle: Battle, unit: Unit, seen: Set<number>, granted: Effect | undefined, killed: boolean): GameEvent[] {
   if (granted || unit.hp <= 0) return []
   const by: Effect | null =
-    killed && has(unit, 'frenzy') ? 'frenzy' : killed && has(unit, 'chain') ? 'chain' : has(unit, 'doubleTap') && !unit.moved ? 'doubleTap' : has(unit, 'surge') && !unit.spent.includes('surge') ? 'surge' : null
+    killed && has(unit, 'frenzy') ? 'frenzy' : killed && has(unit, 'chain') ? 'chain' : has(unit, 'twin') ? 'twin' : has(unit, 'doubleTap') && !unit.moved ? 'doubleTap' : has(unit, 'surge') && !unit.spent.includes('surge') ? 'surge' : null
   if (!by) return []
   const shots = shoot(battle, unit, seen, by)
   if (by === 'surge' && shots.length > 0) unit.spent.push('surge')

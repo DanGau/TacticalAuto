@@ -349,7 +349,7 @@ test('doctrines change the run: Lone Wolf leaves one soldier and stops recruits;
   Object.assign(wolf, { event: 'survivor', phase: 'event', zone: { stops: [stopOf('battle')] } })
   apply(wolf, { type: 'choose', index: 0 })
   expect(wolf.soldiers).toHaveLength(1)
-  expect(soldierStats(wolf, wolf.soldiers[0]).hp).toBe(hp + 8)
+  expect(soldierStats(wolf, wolf.soldiers[0]).hp).toBe(hp + 40)
   wolf.zone = { stops: [stopOf('key')] }
   fight(wolf, 'human')
   expect(wolf.soldiers).toHaveLength(1)

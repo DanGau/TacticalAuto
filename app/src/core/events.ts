@@ -1,5 +1,5 @@
 import { CLASSES, type ClassId } from './classes'
-import type { DoctrineId } from './doctrines'
+import { DOCTRINES, type DoctrineId } from './doctrines'
 import { RELICS, type RelicId } from './relics'
 import { random, randomInt } from './rng'
 import { advance, drawBattle, hire, level, nextStop, passStop, settle, STOP_THREAT, THREAT_MAX, xpFor, type Run } from './run'
@@ -26,7 +26,11 @@ export const BRIBE = { price: 3, threat: 2 }
 export const UNKNOWN_CHANCE = { battle: 0.3, shop: 0.3 }
 
 const raise = (run: Run, threat: number) => (run.threat = Math.max(0, Math.min(run.threat + threat, THREAT_MAX)))
-const adopt = (run: Run, id: DoctrineId) => run.doctrines.push(id)
+/** Adopts a doctrine; a weapon doctrine sets aside the one the squad fought with. */
+const adopt = (run: Run, id: DoctrineId) => {
+  if (DOCTRINES[id].weapon) run.doctrines = run.doctrines.filter((held) => !DOCTRINES[held].weapon)
+  run.doctrines.push(id)
+}
 const gain = (supplies: number): Option => ({ text: `Salvage what you can: +${supplies} supplies`, take: (run) => (run.supplies += supplies) })
 const leave: Option = { text: 'Move on', take: () => {} }
 /** Relics the squad does not hold. */
@@ -38,7 +42,7 @@ const encounters = {
     text: 'An abandoned cloning plant still hums. Its vats could be pushed to make clones fast, at a cost to every body they make.',
     options: [
       {
-        text: 'Mass Cloning: two new clones join, and every soldier has 3 less health for the run',
+        text: 'Mass Cloning: two new clones join, and every soldier has 2 less health for the run',
         take: (run) => {
           hire(run)
           hire(run)
@@ -53,7 +57,7 @@ const encounters = {
     text: 'A veteran who outlived their whole unit offers to teach the squad to fight alone.',
     options: [
       {
-        text: 'Lone Wolf: only your highest-level soldier stays. Every soldier has +8 health, +2 damage and +10% aim, and no new clone ever joins',
+        text: `Lone Wolf: only your highest-level soldier stays. ${DOCTRINES.loneWolf.text}`,
         take: (run) => {
           const best = run.soldiers.reduce((top, s) => (level(s) > level(top) ? s : top))
           run.soldiers = [best]
@@ -97,6 +101,26 @@ const encounters = {
     name: 'Smuggled Shotguns',
     text: 'A crate of sawn-off shotguns: brutal up close, useless at range.',
     options: [{ text: 'Scatterguns: every soldier has +2 damage and 2 less range', take: (run) => adopt(run, 'scatterguns') }, gain(4)],
+  },
+  armory: {
+    name: 'Ancient Armory',
+    text: 'A museum hall of blades, untouched. Ammunition runs out; steel does not.',
+    options: [{ text: `Blademasters: ${DOCTRINES.blades.text}`, take: (run) => adopt(run, 'blades') }, gain(4)],
+  },
+  awakening: {
+    name: 'Psionic Awakening',
+    text: "An alien signal stirs something in the clones' minds. It could be trained, or burned out.",
+    options: [{ text: `Psi Operatives: ${DOCTRINES.psionics.text}`, take: (run) => adopt(run, 'psionics') }, leave],
+  },
+  quarry: {
+    name: 'Demolition Crew',
+    text: 'Quarry workers with crates of charges offer to show the squad how to bring the walls down.',
+    options: [{ text: `Demolitions: ${DOCTRINES.demolitions.text}`, take: (run) => adopt(run, 'demolitions') }, gain(4)],
+  },
+  creed: {
+    name: "Gunslinger's Creed",
+    text: 'A drifter with two pistols offers to teach the squad to shoot with both hands.',
+    options: [{ text: `Gunslingers: ${DOCTRINES.gunslingers.text}`, take: (run) => adopt(run, 'gunslingers') }, leave],
   },
   refugees: {
     name: 'Refugees',

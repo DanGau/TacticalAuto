@@ -1,5 +1,5 @@
 import type { AlienKind } from './aliens'
-import type { Rule } from './doctrines'
+import type { DoctrineEffect, Rule } from './doctrines'
 import type { Keyword, Resist } from './keywords'
 import { randomInt } from './rng'
 import { CIVILIAN_HP, CIVILIANS, type Goal } from './goals'
@@ -160,8 +160,8 @@ export type SkillEffect =
   | 'drone'
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle'
-/** Anything a unit's gear, skills or the squad's relics do. Combat applies them. */
-export type Effect = GearEffect | SkillEffect | RelicEffect
+/** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
+export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'

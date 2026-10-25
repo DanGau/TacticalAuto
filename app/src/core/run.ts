@@ -269,6 +269,7 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
     const fromSkills = soldier.skills.reduce((sum, id) => sum + (SKILLS[id].stats?.[key] ?? 0), 0)
     stats[key] += fromClass + fromGear + fromSkills + level(soldier) * (LEVEL_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
   }
+  for (const id of run.doctrines) Object.assign(stats, (DOCTRINES[id] as Doctrine).set)
   return stats
 }
 
@@ -480,15 +481,16 @@ export function advance(run: Run): void {
   const mission = missionAt(run, stop, here.risk, stop === 'battle' ? here.goal : 'exterminate')
   run.mission = mission
   run.phase = 'battle'
+  const doctrines = run.doctrines.map((id): Doctrine => DOCTRINES[id])
   const reserve = run.soldiers.map((s) => ({
     soldier: s.id,
     stats: soldierStats(run, s),
     ability: s.cls && CLASSES[s.cls].ability,
     charges: charges(run, s),
-    stance: s.cls ? CLASSES[s.cls].stance : ('balanced' as const),
-    effects: [...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
+    stance: doctrines.find((d) => d.stance)?.stance ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
+    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))
-  const rules = run.doctrines.flatMap((id) => (DOCTRINES[id] as Doctrine).rule ?? [])
+  const rules = doctrines.flatMap((d) => d.rule ?? [])
   run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, packsOf(run, mission, stop === 'battle' ? here.packs : undefined), reserve, mission.goal, rules)
 }
 

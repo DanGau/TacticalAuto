@@ -655,6 +655,8 @@ export async function createView(): Promise<View> {
         const on = sprites.get(e.id)
         if (!on) continue
         drawHp(on, ...vitals(battle, e.id))
+        // A demolishing hit has already wrecked the cover in the battle; show it as the hit lands.
+        if (e.effect === 'demolish') drawTerrain(battle)
         float(effectCallout(e, on))
       } else if (e.type === 'heal') {
         const to = sprites.get(e.target)
@@ -709,7 +711,7 @@ export async function createView(): Promise<View> {
       if (fresh && battle.phase === 'deploy') void follow(OVERVIEW, FLY_MS, { x: 0, y: -HEIGHT, zoom: FIT / 4 })
       if (animate) await play(battle, events)
       sync(run, battle)
-      if (events.some((e) => e.type === 'rocket')) drawTerrain(battle)
+      if (events.some((e) => e.type === 'rocket' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(battle)
       drawFog(battle)
       if (!animate) {
         if (battle.phase !== 'deploy') look(WHOLE_MAP)
