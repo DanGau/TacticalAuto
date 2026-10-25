@@ -56,16 +56,22 @@ function write(t: Tuning) {
   writeFileSync(new URL('../core/tuning.ts', import.meta.url), `${head}\nexport const TUNING = {\n${lines.join('\n')}\n}\n`)
 }
 
-const { values } = parseArgs({ options: { runs: { type: 'string', default: '100' }, rounds: { type: 'string', default: '10' }, threads: { type: 'string', default: '8' } } })
+const { values } = parseArgs({ options: { runs: { type: 'string', default: '300' }, rounds: { type: 'string', default: '10' }, threads: { type: 'string', default: '8' } } })
 const runs = Number(values.runs)
 const names = Object.keys(bots)
-const score = async (t: Tuning) => {
-  const rates = await winRates(names, runs, 0, t, Number(values.threads))
+const score = async (t: Tuning, start: number) => {
+  const rates = await winRates(names, runs, start, t, Number(values.threads))
   return { rates, miss: miss(rates) }
 }
+/** Seeds the climb never sees, which judge where it ends. */
+const HELD_OUT = 1_000_000
+/** How much less a move must miss by to count, as two standard errors of a win rate near half at this many runs. */
+const MARGIN = 2 * Math.sqrt(0.25 / runs)
 
-// Greedy hill climb: try each knob a step either way on the same seeds, and keep any move that misses the bands less.
-let best = { tuning: structuredClone(TUNING) as Tuning, ...(await score(TUNING)) }
+// Greedy hill climb: try each knob a step either way on the same seeds, and keep a move that misses the bands by
+// clearly less than chance would.
+const start = structuredClone(TUNING) as Tuning
+let best = { tuning: start, ...(await score(start, 0)) }
 console.log(`start  miss ${round(best.miss)}`)
 for (let round_ = 0; round_ < Number(values.rounds) && best.miss > 0; round_++) {
   let improved = false
@@ -73,16 +79,21 @@ for (let round_ = 0; round_ < Number(values.rounds) && best.miss > 0; round_++) 
     for (const by of [knob.step, -knob.step]) {
       const tuning = moved(best.tuning, knob, by)
       if (!tuning) continue
-      const tried = await score(tuning)
-      if (tried.miss >= best.miss) continue
+      const tried = await score(tuning, 0)
+      if (tried.miss > best.miss - MARGIN) continue
       best = { tuning, ...tried }
       improved = true
-      write(tuning)
       console.log(`${knob.key}${knob.index === undefined ? '' : `[${knob.index}]`} → ${get(tuning, knob)}  miss ${round(best.miss)}`)
       break
     }
   }
   if (!improved) break
 }
-const { table, warnings } = compare(best.rates)
+
+// The climb's seeds flatter it, so the held-out seeds decide whether its tuning replaces the old.
+const [before, after] = [await score(start, HELD_OUT), await score(best.tuning, HELD_OUT)]
+const kept = after.miss < before.miss
+if (kept) write(best.tuning)
+console.log(`held-out miss ${round(before.miss)} → ${round(after.miss)}: ${kept ? 'tuning.ts rewritten' : 'tuning.ts unchanged'}`)
+const { table, warnings } = compare((kept ? after : before).rates)
 console.log([table, ...warnings.map((w) => `WARN ${w}`)].join('\n'))
