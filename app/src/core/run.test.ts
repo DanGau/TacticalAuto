@@ -188,8 +188,8 @@ test('alien force follows the leg; an alien\'s health never grows, but deeper al
   apply(late, { type: 'advance' })
   const troopers = (units: typeof early) => units.filter((u) => u.kind === 'trooper' && !u.boss && !u.target)
   for (const alien of late.battle!.units.filter((u) => u.side === 'alien' && !u.target)) expect(alien.stats.armor).toBe(4)
-  for (const trooper of troopers(late.battle!.units)) expect(trooper.stats.hp).toBe(BASE_STATS.hp)
-  for (const trooper of troopers(early)) expect(trooper.stats.hp).toBe(BASE_STATS.hp)
+  for (const trooper of troopers(late.battle!.units)) expect(trooper.stats.hp).toBe(Math.round(BASE_STATS.hp * TUNING.alienHp))
+  for (const trooper of troopers(early)) expect(trooper.stats.hp).toBe(Math.round(BASE_STATS.hp * TUNING.alienHp))
 })
 
 test('a key mission has one boss, with an escort for each key already won', () => {

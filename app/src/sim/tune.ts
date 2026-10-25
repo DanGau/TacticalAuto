@@ -56,11 +56,11 @@ function write(t: Tuning) {
   writeFileSync(new URL('../core/tuning.ts', import.meta.url), `${head}\nexport const TUNING = {\n${lines.join('\n')}\n}\n`)
 }
 
-const { values } = parseArgs({ options: { runs: { type: 'string', default: '100' }, rounds: { type: 'string', default: '10' } } })
+const { values } = parseArgs({ options: { runs: { type: 'string', default: '100' }, rounds: { type: 'string', default: '10' }, threads: { type: 'string', default: '8' } } })
 const runs = Number(values.runs)
 const names = Object.keys(bots)
 const score = async (t: Tuning) => {
-  const rates = await winRates(names, runs, 0, t)
+  const rates = await winRates(names, runs, 0, t, Number(values.threads))
   return { rates, miss: miss(rates) }
 }
 
