@@ -119,7 +119,7 @@ export const BASE_STATS: Stats = { hp: 10, armor: 0, aim: 0.75, damage: 3, range
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic'
 
 /** Something a piece of gear does; gear.ts says what each does. */
-export type GearEffect = 'frostbite' | 'tracer' | 'rime' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'thorns' | 'shield' | 'regen' | 'lastStand' | 'medkit' | 'grenade' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'mirror' | 'bond' | 'guardians' | 'blink' | 'polymorph' | 'null'
+export type GearEffect = 'frostbite' | 'tracer' | 'rime' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'thorns' | 'shield' | 'regen' | 'lastStand' | 'medkit' | 'grenade' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'mirror' | 'bond' | 'guardians' | 'blink' | 'polymorph' | 'null' | 'snare' | 'booming' | 'tether' | 'caltrops'
 /** Something a skill does; skills.ts says what each does. */
 export type SkillEffect =
   | 'frenzy'
@@ -159,7 +159,7 @@ export type SkillEffect =
   | 'ward'
   | 'drone'
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex'
+export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
 export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect
 
@@ -214,6 +214,10 @@ export interface Unit {
   burning: number
   /** Own turns for which it is chilled. */
   chilled: number
+  /** Own turns for which it is rooted and cannot move. */
+  rooted: number
+  /** Own turns for which moving hurts it, by a booming hit. */
+  booming: number
   /** Damage its kills this battle have added, by blood rite. */
   fury: number
   /** The kind of alien; null for humans. */
@@ -299,6 +303,8 @@ export interface Battle {
   acid: { x: number; y: number; turns: number }[]
   /** Tiles of fire, each with the alien turns it has left. */
   fire: { x: number; y: number; turns: number }[]
+  /** Tiles strewn with caltrops: dear to cross, and they hurt an alien that steps on them. */
+  caltrops: Tile[]
   /** Centres of the landing zones on offer in the deploy phase. */
   zones: Tile[]
   /** On a hold, the uplink the squad must reach and defend; null otherwise. */
@@ -325,8 +331,12 @@ export const HIGH_AIM = 0.1
 /** Move a step costs beyond its one tile for each level it climbs. */
 export const CLIMB = 2
 
-/** What a step between neighbouring tiles costs of a unit's move: one tile, and CLIMB more for each level up. */
-export const stepCost = (battle: Battle, from: Tile, to: Tile) => 1 + CLIMB * Math.max(0, heightAt(battle, to) - heightAt(battle, from))
+/** Move a step onto caltrops costs beyond its one tile. */
+export const CALTROP_COST = 2
+
+/** What a step between neighbouring tiles costs of a unit's move: one tile, CLIMB more for each level up, and more onto caltrops. */
+export const stepCost = (battle: Battle, from: Tile, to: Tile) =>
+  1 + CLIMB * Math.max(0, heightAt(battle, to) - heightAt(battle, from)) + (battle.caltrops.some((t) => t.x === to.x && t.y === to.y) ? CALTROP_COST : 0)
 
 export function coverAt(battle: Battle, x: number, y: number): Cover {
   return battle.cover[y * GRID + x]
@@ -505,7 +515,7 @@ export function land(battle: Battle, zone: Tile): void {
   }
   const tiles = freeTilesNear(battle, zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
-    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
+    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
   })
   battle.reserve = []
   battle.phase = 'battle'
@@ -573,6 +583,8 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     spent: [],
     burning: 0,
     chilled: 0,
+    rooted: 0,
+    booming: 0,
     fury: 0,
     civilian: false,
     panicked: false,
@@ -619,6 +631,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     concealed: true,
     acid: [],
     fire: [],
+    caltrops: [],
     zones: [],
     uplink: null,
     boons: [],
@@ -637,7 +650,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   if (goal === 'rescue') {
     for (const tile of freeTilesNear(battle, spacedTile(battle, battle.units, ZONE_CLEARANCE), CIVILIANS)) {
       const stats = { ...BASE_STATS, hp: CIVILIAN_HP, aim: 0, damage: 0, range: 0, move: 0, crit: 0 }
-      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
+      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
     }
   }
   if (goal === 'hold') battle.uplink = spacedTile(battle, battle.units, ZONE_CLEARANCE)

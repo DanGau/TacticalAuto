@@ -483,11 +483,16 @@ export async function createView(): Promise<View> {
   }
 
 
-  /** Tints every tile of acid or fire. */
+  /** Tints every tile of acid or fire, and marks every tile of caltrops. */
   function drawAcid(battle: Battle): void {
     acid.clear()
     for (const pool of battle.acid) diamond(acid, pool.x, pool.y).fill({ color: COLOR.acid, alpha: 0.45 })
     for (const pool of battle.fire) diamond(acid, pool.x, pool.y).fill({ color: COLOR.fire, alpha: 0.5 })
+    // Caltrops: a scatter of spikes across the tile.
+    for (const tile of battle.caltrops) {
+      const c = toWorld(tile.x, tile.y)
+      for (const [dx, dy] of [[-12, -2], [0, -6], [12, -2], [-6, 4], [6, 4]]) acid.poly([c.x + dx, c.y + dy - 4, c.x + dx + 3, c.y + dy + 1, c.x + dx - 3, c.y + dy + 1]).fill(COLOR.miss)
+    }
   }
 
   /** Makes the sprites match the battle exactly. */

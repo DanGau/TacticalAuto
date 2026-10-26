@@ -52,6 +52,9 @@ const relics = {
   pyre: { name: 'Pyre Censer', text: 'A burning alien sets its tile ablaze for 2 turns; an alien that ends its move in fire burns', tags: ['burn'], effect: 'pyre' },
   stasis: { name: 'Stasis Field', text: 'A crit on a chilled alien freezes it solid: it loses its next action', tags: ['frost', 'crit'], effect: 'stasis' },
   hex: { name: "Witch's Hex", text: 'When a marked alien dies, its mark passes to the nearest alien', tags: ['mark', 'kill'], effect: 'hex' },
+  sentinel: { name: 'Sentinel Protocol', text: 'A soldier shoots at once at an alien that walks away from beside it', effect: 'sentinel' },
+  net: { name: "Hunter's Net", text: 'Hits on a rooted alien do +2 damage', effect: 'net' },
+  glacial: { name: 'Glacial Snare', text: 'Chilling an alien roots it too', tags: ['frost'], effect: 'glacial' },
   juggernaut: { name: 'Juggernaut Servos', text: '+1 damage while the soldier has armor left', tags: ['ward'], effect: 'armored' },
 } satisfies Record<string, Relic>
 

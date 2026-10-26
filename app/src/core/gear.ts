@@ -78,6 +78,10 @@ export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: str
   guardians: { slot: 'armor', prefix: 'Haloed', text: 'Spirits strike each alien that ends its move within 2 tiles of the wearer for 1 damage' },
   blink: { slot: 'utility', prefix: 'Blinking', text: 'Once per battle, when hit to half health or less, the carrier blinks to the safest tile within 5' },
   polymorph: { slot: 'utility', prefix: 'Chicken', text: 'Once per battle, turns the toughest alien the carrier can shoot, a boss aside, into a chicken that loses its next action' },
+  snare: { slot: 'weapon', prefix: 'Snaring', text: 'Hits root the target: it cannot move on its next turn' },
+  booming: { slot: 'weapon', prefix: 'Booming', text: 'Hits charge the target: if it moves on its next turn, it takes 3 damage' },
+  tether: { slot: 'weapon', prefix: 'Tethered', text: 'Hits pull the target a tile toward the shooter' },
+  caltrops: { slot: 'utility', prefix: 'Spiked', text: 'Once per battle, strews caltrops across the path of an alien closing in; each tile costs 2 more move to cross and hurts an alien 1' },
   null: { slot: 'utility', prefix: 'Null', text: 'Aliens within 3 tiles of the carrier cannot spit, panic, spawn or burst' },
 }
 
