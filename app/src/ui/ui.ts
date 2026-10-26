@@ -62,7 +62,7 @@ function tradeoffs(battle: Battle, zone: number): string {
     const pod = battle.pods[nearestAlien(battle, tile)!.pod!].name
     chips.push(
       chip(true, '☄️ Impact', `Drop pods deal ${TUNING.impactDamage} damage to each alien within ${IMPACT_REACH} tiles`),
-      chip(true, '😵 Ambush', `The ${pod} can't shoot its first turn, and the squad's first volley gets +${100 * AMBUSH_AIM}% aim and +${100 * AMBUSH_CRIT}% crit`),
+      chip(true, '😵 Surprised', `The ${pod} can't shoot its first turn, and the squad's first volley gets +${100 * AMBUSH_AIM}% aim and +${100 * AMBUSH_CRIT}% crit`),
       chip(false, '📣 Loud', 'Every other pod hears the landing and converges on it'),
     )
   } else if (battle.uplink) {

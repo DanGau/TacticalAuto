@@ -27,6 +27,11 @@ const FOCUS_MS = 700
 const FLY_MS = 1600
 /** Screen pixels the landing panel takes from the bottom of the canvas. */
 const PANEL = 110
+/** A drop pod's fall, the burst of dust as it lands, the gap between pods, and the height it falls from in world pixels. */
+const POD_FALL_MS = 800
+const POD_DUST_MS = 450
+const POD_STAGGER_MS = 160
+const POD_HEIGHT = 400
 const MS_PER_TILE = 110
 const REVEAL_MS = 450
 const SHOT_MS = 160
@@ -222,6 +227,8 @@ export async function createView(): Promise<View> {
   /** The battle on screen. */
   let shown: Battle | null = null
   let camera = WHOLE_MAP
+  /** Whether the battle last shown was waiting for the landing, so the next one shown plays it. */
+  let deploying = false
   /** The landing zone under the pointer. */
   let hovered: number | null = null
   /** The landing zone the camera is on before the landing. */
@@ -580,6 +587,45 @@ export async function createView(): Promise<View> {
     fx.clear()
   }
 
+  /**
+   * The landing: the camera frames the zone, and each soldier's drop pod streaks down one after another on a trail of
+   * fire, slams in with a burst of dust, and opens on the soldier. A hot drop shakes the ground harder.
+   */
+  async function dropPods(battle: Battle): Promise<void> {
+    const soldiers = battle.units.filter((u) => u.side === 'human' && !u.civilian)
+    const hot = battle.breach
+    if (soldiers.length === 0) return
+    for (const unit of soldiers) sprites.get(unit.id)!.node.alpha = 0
+    await follow(soldiers.map((u) => ({ x: u.x, y: u.y })))
+    await Promise.all(
+      soldiers.map(async (unit, i) => {
+        const sprite = sprites.get(unit.id)!
+        const ground = { x: sprite.node.x, y: sprite.node.y }
+        const pod = new Graphics()
+        world.addChildAt(pod, world.getChildIndex(fx))
+        await tween(i * POD_STAGGER_MS, () => {})
+        await tween(POD_FALL_MS, (t) => {
+          const y = ground.y - POD_HEIGHT * (1 - t * t)
+          pod.clear()
+          pod.moveTo(ground.x, y - 160).lineTo(ground.x, y - 30).stroke({ color: COLOR.crit, width: 12, alpha: 0.6 })
+          pod.moveTo(ground.x, y - 90).lineTo(ground.x, y - 30).stroke({ color: 0xffe08a, width: 5 })
+          pod.ellipse(ground.x, ground.y, 16 * t, 8 * t).fill({ color: 0x000000, alpha: 0.4 })
+          pod.roundRect(ground.x - 14, y - 44, 28, 44, 12).fill(0xc9d3e3).stroke({ color: 0x10141c, width: 3 })
+          pod.rect(ground.x - 6, y - 34, 12, 8).fill(0x6fb7ff)
+        })
+        sprite.node.alpha = 1
+        await tween(POD_DUST_MS, (t) => {
+          pod.clear()
+          pod.ellipse(ground.x, ground.y, 14 + (hot ? 70 : 40) * t, 7 + (hot ? 35 : 20) * t).fill({ color: hot ? COLOR.crit : 0xb8a888, alpha: 0.7 * (1 - t) })
+          pod.roundRect(ground.x - 14, ground.y - 44 + 44 * t, 28, 44 * (1 - t), 12).fill({ color: 0xc9d3e3, alpha: 1 - t })
+          if (hot) world.position.x += Math.sin(t * 60) * 3 * (1 - t)
+        })
+        pod.destroy()
+      }),
+    )
+    look(camera)
+  }
+
   /** Plays a beat in order. Moves in a row play together; moves by unseen aliens are skipped. */
   async function play(battle: Battle, events: GameEvent[]): Promise<void> {
     for (let i = 0; i < events.length; i++) {
@@ -602,7 +648,7 @@ export async function createView(): Promise<View> {
           return unit ? [create({ ...unit, x: at.x, y: at.y }, 0, letter(unit))] : []
         })
         await tween(REVEAL_MS, (t) => appeared.forEach((sprite) => (sprite.node.alpha = t)))
-        if (e.type === 'reveal' && e.ambush && appeared.length > 0) float(callout('AMBUSHED', COLOR.hit, appeared[0], 18))
+        if (e.type === 'reveal' && e.ambush && appeared.length > 0) float(callout('SURPRISED', COLOR.hit, appeared[0], 18))
         if (e.type === 'reveal' && e.stalked && appeared.length > 0) float(callout('AMBUSH!', COLOR.crit, appeared[0], 18))
         if (e.type === 'wave' && appeared.length > 0) float(callout('REINFORCEMENTS', COLOR.crit, appeared[0], 18))
       } else if (e.type === 'shot') {
@@ -710,6 +756,9 @@ export async function createView(): Promise<View> {
       sync(run, battle)
       if (events.some((e) => e.type === 'rocket' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(battle)
       drawFog(battle)
+      const landed = deploying && battle.phase !== 'deploy'
+      deploying = battle.phase === 'deploy'
+      if (landed && animate) await dropPods(battle)
       if (!animate) {
         if (battle.phase !== 'deploy') look(WHOLE_MAP)
         labels.removeChildren().forEach((child) => child.destroy())

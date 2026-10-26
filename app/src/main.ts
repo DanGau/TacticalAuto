@@ -29,9 +29,14 @@ async function show(events: GameEvent[], animate: boolean): Promise<void> {
   ui.update(state)
 }
 
+/** What the view is showing outside the battle loop, which the loop waits for: the landing plays before the first beat. */
+let showing = Promise.resolve()
+
 function act(action: Action): Result {
   const result = apply(state, action)
-  void show([], false)
+  // The panels change at once, so the landing panel is gone before the pods fall.
+  ui.update(state)
+  showing = show([], action.type === 'land' && !params.has('manual'))
   return result
 }
 
@@ -53,6 +58,7 @@ await show([], false)
 // With ?manual, the battle advances only through debug.step, so the model sees every beat it asks for.
 if (!params.has('manual')) {
   for (;;) {
+    await showing
     if (state.phase === 'battle' && state.battle?.phase === 'battle') await show(step(state), true)
     else await new Promise(requestAnimationFrame)
   }
