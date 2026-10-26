@@ -8,7 +8,7 @@ import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_REACH, neare
 import { KEYWORDS } from '../core/keywords'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { DETECT, PATROL_DETECT } from '../core/sight'
-import { alienName, button, describe, resistChip, STOP_NAMES, tip } from './html'
+import { alienName, button, resistChip, STOP_NAMES, tip } from './html'
 import { overworld, type Tab } from './overworld'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
@@ -49,27 +49,27 @@ function status(run: Run): string {
 
 const ZONE_NAMES = 'ABC'
 
-/** A landing zone's pros, in green, and cons, in red. */
+/** A landing zone's pros, in green, and cons, in red, as short chips; hovering one tells it in full. */
 function tradeoffs(battle: Battle, zone: number): string {
   const tile = battle.zones[zone]
   const { cover, contact } = zoneInfo(battle, tile)
-  const line = (good: boolean, text: string) => `<div class="${good ? 'pro' : 'con'}">${good ? '+' : '−'} ${text}</div>`
-  const lines = [
-    cover >= 12 ? line(true, 'Heavy cover to land behind') : cover >= 5 ? '' : line(false, 'Open ground: the squad lands exposed'),
-    heightAt(battle, tile) > 0 ? line(true, 'High ground: sees farther and shoots down at aliens') : '',
+  const chip = (good: boolean, label: string, text: string) => `<span class="${good ? 'pro' : 'con'}" title="${text}">${label}</span>`
+  const chips = [
+    cover >= 12 ? chip(true, '🛡️ Cover', 'Heavy cover to land behind') : cover >= 5 ? '' : chip(false, '🎯 Open', 'Open ground: the squad lands exposed'),
+    heightAt(battle, tile) > 0 ? chip(true, '⛰️ High', 'High ground: sees farther and shoots down at aliens') : '',
   ]
   if (zone === battle.hot) {
     const pod = battle.pods[nearestAlien(battle, tile)!.pod!].name
-    lines.push(
-      line(true, `Hot drop onto the ${pod}: drop pods deal ${TUNING.impactDamage} damage to each alien within ${IMPACT_REACH} tiles`),
-      line(true, `The ${pod} is caught off guard: it can't shoot its first turn, and the squad's first volley gets +${100 * AMBUSH_AIM}% aim and +${100 * AMBUSH_CRIT}% crit`),
-      line(false, 'Every other pod hears the landing and converges on it'),
+    chips.push(
+      chip(true, '☄️ Impact', `Drop pods deal ${TUNING.impactDamage} damage to each alien within ${IMPACT_REACH} tiles`),
+      chip(true, '😵 Ambush', `The ${pod} can't shoot its first turn, and the squad's first volley gets +${100 * AMBUSH_AIM}% aim and +${100 * AMBUSH_CRIT}% crit`),
+      chip(false, '📣 Loud', 'Every other pod hears the landing and converges on it'),
     )
   } else if (battle.uplink) {
     const far = distance(tile, battle.uplink)
-    lines.push(far <= 8 ? line(true, `Uplink ${far} tiles away: a short run to hold it`) : line(false, `Uplink ${far} tiles away: a long run before the waves`))
-  } else lines.push(contact <= 6 ? line(false, `Aliens ${contact} tiles away: the fight starts at once`) : line(true, `Aliens ${contact} tiles away: time to spread out first`))
-  return lines.join('')
+    chips.push(chip(far <= 8, `📡 ${far}`, `Uplink ${far} tiles away: ${far <= 8 ? 'a short run to hold it' : 'a long run before the waves'}`))
+  } else chips.push(chip(contact > 6, `👽 ${contact}`, `Aliens ${contact} tiles away: ${contact <= 6 ? 'the fight starts at once' : 'time to spread out first'}`))
+  return chips.join('')
 }
 
 /** Before the landing: a button per zone that flies the camera there, one back to the whole map, and the chosen zone's case. */
@@ -79,7 +79,7 @@ function drop(battle: Battle, zone: number | null): string {
   const detail =
     zone === null
       ? '<small>Pick a landing zone to fly to it.</small>'
-      : `<div class="described"><b>${KEYWORDS[battle.boons[zone]].icon} ${BOONS[battle.boons[zone]].name}:</b> ${describe(BOONS[battle.boons[zone]].text)}</div>${tradeoffs(battle, zone)}${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
+      : `<div class="tradeoffs">${zone === battle.hot ? '' : `<span class="boon" title="${BOONS[battle.boons[zone]].text}">${KEYWORDS[battle.boons[zone]].icon} ${BOONS[battle.boons[zone]].name}</span>`}${tradeoffs(battle, zone)}</div>${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
   return `<div class="zones">${zones.join('')}${overview}</div>${detail}`
 }
 

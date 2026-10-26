@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js'
-import { BLAST_RADIUS, BOONS, distance, GRID, nearestAlien, revealed, ZONE_RADIUS, zoneInfo, type Battle, type Tile, type Unit } from '../core/battle'
+import { BLAST_RADIUS, distance, GRID, nearestAlien, revealed, ZONE_RADIUS, type Battle, type Tile, type Unit } from '../core/battle'
 import { KEYWORDS } from '../core/keywords'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
@@ -425,10 +425,7 @@ export async function createView(): Promise<View> {
         const b = toWorld(toward.x, toward.y)
         zones.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: battle.uplink ? COLOR.uplink : COLOR.contact, width: 4, alpha: 0.9 })
       }
-      const { cover, contact } = zoneInfo(battle, zone)
-      const ground = cover >= 12 ? 'heavy cover' : cover >= 5 ? 'some cover' : 'open ground'
-      const far = i === battle.hot ? '☄️ HOT DROP' : battle.uplink ? `uplink ${distance(zone, battle.uplink)} tiles` : `contact ${contact} tiles`
-      marks.addChild(label(ZONE_NAMES[i], zone, 0xffffff), label(`${KEYWORDS[battle.boons[i]].icon} ${BOONS[battle.boons[i]].name}\n${ground} · ${far}`, zone, 0xffffff, 20))
+      marks.addChild(label(`${ZONE_NAMES[i]} ${i === battle.hot ? '☄️' : KEYWORDS[battle.boons[i]].icon}`, zone, 0xffffff))
     })
     battle.pods.forEach((_, pod) => {
       const members = battle.units.filter((u) => u.pod === pod)
