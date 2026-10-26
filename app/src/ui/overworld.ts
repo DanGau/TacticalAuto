@@ -6,7 +6,8 @@ import { DOCTRINES } from '../core/doctrines'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS } from '../core/relics'
 import { GEAR_PRICE, KEYS, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Mission, type Muster, type Run, type Soldier, type Stop, type Zone } from '../core/run'
-import { PATHS, SKILLS, type SkillId } from '../core/skills'
+import { FEATS } from '../core/feats'
+import { PATHS, SKILLS } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
 import { decisions } from './aftermath'
 import { alienName, button, describe, gearCard, keywordChips, resistChip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
@@ -140,25 +141,7 @@ function soldierCard(soldier: Soldier, open: number | null): string {
   </button>`
 }
 
-/** The class's two paths, each skill marked learned, lost, or still ahead. */
-function pathTree(soldier: Soldier): string {
-  const paths = PATHS[soldier.cls!]
-  const taken = paths.find((p) => p.core === soldier.skills[0])
-  const mark = (id: SkillId, lost: boolean) => {
-    const state = soldier.skills.includes(id) ? 'learned' : lost ? 'lost' : ''
-    return `<span class="chip ${state}" title="${SKILLS[id].text}">${SKILLS[id].name}</span>`
-  }
-  return paths.map((path) => {
-    const shut = !!taken && taken !== path
-    const tiers = path.tiers.map((pair, i) => {
-      const decided = soldier.skills.length > i + 1
-      return pair.map((id) => mark(id, shut || decided)).join(' or ')
-    })
-    return `<p><b class="${shut ? 'lost' : ''}">${path.name}</b> ${[mark(path.core, shut), ...tiers].join('<span class="arrow">→</span>')}</p>`
-  }).join('')
-}
-
-/** Everything about one soldier: progress, stats, how the class fights, its skills and paths, and what the gear does. */
+/** Everything about one soldier: progress, stats, how the class fights, its path and skills, its feats, and what the gear does. */
 function details(run: Run, soldier: Soldier): string {
   const r = level(soldier)
   const cls = soldier.cls && CLASSES[soldier.cls]
@@ -166,8 +149,9 @@ function details(run: Run, soldier: Soldier): string {
   const skills = soldier.skills.map((id) => `<p class="described"><b>${SKILLS[id].name}.</b> ${describe(SKILLS[id].text, SKILLS[id].tags)}</p>`)
   const uses = charges(run, soldier)
   const gear = equipped(soldier).map((g) => `<div class="gear ${g.rarity}">${gearCard(g)}</div>`)
-  const toNext = xpFor(r + 1) - soldier.xp
-  return `<h2>${soldier.name} · ${toNext} more ${toNext === 1 ? 'battle' : 'battles'} to level ${r + 1}</h2>
+  const path = soldier.cls && PATHS[soldier.cls].find((p) => p.core === soldier.skills[0])
+  const feats = soldier.feats.map((id) => `<span class="chip feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</span>`)
+  return `<h2>${soldier.name}${path ? `, ${path.name}` : ''} · ${xpFor(r + 1) - soldier.xp} experience to level ${r + 1}</h2>
     <div class="details">
       <table class="stats">
         <tr><td>Health</td><td>${stats.hp}</td><td>Armor</td><td>${stats.armor}</td></tr>
@@ -175,7 +159,7 @@ function details(run: Run, soldier: Soldier): string {
         <tr><td>Damage</td><td>${stats.damage}</td><td>Range</td><td>${stats.range}</td></tr>
         <tr><td>Move</td><td>${stats.move}</td><td></td><td></td></tr>
       </table>
-      <div>${cls ? `<p>${cls.stanceText}.</p><p><b>${cls.abilityName}${uses > 0 ? ` ×${uses}` : ''}.</b> ${cls.abilityText}.</p>` : ''}${skills.join('')}${cls ? pathTree(soldier) : ''}</div>
+      <div>${cls ? `<p>${cls.stanceText}.</p><p><b>${cls.abilityName}${uses > 0 ? ` ×${uses}` : ''}.</b> ${cls.abilityText}.</p>` : ''}${skills.join('')}${feats.length > 0 ? `<p>${feats.join(' ')}</p>` : ''}</div>
       ${gear.join('')}
     </div>`
 }

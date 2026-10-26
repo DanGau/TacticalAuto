@@ -6,6 +6,7 @@ import { BASE_STATS, createBattle, type Alien, type Battle, type Stats } from '.
 import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type Doctrine, type DoctrineId } from './doctrines'
 import type { EventId } from './events'
+import { FEATS, type FeatId } from './feats'
 import { EFFECTS, generateGear, SLOTS, type Gear, type Slot } from './gear'
 import { RESISTS, type Keyword, type Resist } from './keywords'
 import { RELIC_OFFERS, RELICS, type Relic, type RelicId } from './relics'
@@ -93,8 +94,10 @@ export interface Soldier {
   xp: number
   /** Drawn at random when the clone is made. */
   cls: ClassId | null
-  /** In the order learned; the first sets the soldier's path. */
+  /** In the order learned; the first, drawn at random when the clone is made, sets the soldier's path. */
   skills: SkillId[]
+  /** Feats it has pulled off, each paying experience only the first time. */
+  feats: FeatId[]
   gear: Record<Slot, Gear | null>
 }
 
@@ -123,12 +126,22 @@ export interface Report {
   supplies: number
   /** Whether an access key was won. */
   key: boolean
-  /** Every soldier in the squad when a battle began, with the class each has after it; empty for an event. A downed soldier fell in the battle and is cloned anew. */
-  soldiers: { name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; downed: boolean }[]
+  /**
+   * Every soldier in the squad when a battle began, with the class each has after it; empty for an event. A downed
+   * soldier fell in the battle and is cloned anew. `earned` is what its experience came from; `feats`, those first
+   * pulled off.
+   */
+  soldiers: { id: number; name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; downed: boolean; earned: Earned[]; feats: FeatId[] }[]
   /** The name of a clone the stop added to the squad. */
   hired: string | null
   /** Civilians kept alive on a rescue; null on any other stop. */
   rescued: number | null
+}
+
+/** Experience from one source. */
+export interface Earned {
+  label: string
+  xp: number
 }
 
 /** A piece of gear for sale, and the soldier it is fitted to when bought. */
@@ -192,15 +205,24 @@ export interface Run {
   bosses: Resist[]
 }
 
-/** Experience a soldier needs for a level; each level takes one more battle than the last, without end. */
+/** Experience each level takes beyond the last: level n takes LEVEL_XP × n more. */
+export const LEVEL_XP = 4
+
+/** Experience a soldier needs for a level. */
 export function xpFor(level: number): number {
-  return (level * (level + 1)) / 2
+  return (LEVEL_XP * level * (level + 1)) / 2
 }
 
-/** A soldier's level, from experience; a soldier earns one experience per battle survived. */
+/** A soldier's level, from experience. */
 export function level(soldier: { xp: number }): number {
-  return Math.floor((Math.sqrt(8 * soldier.xp + 1) - 1) / 2)
+  return Math.floor((Math.sqrt((8 * soldier.xp) / LEVEL_XP + 1) - 1) / 2)
 }
+
+/**
+ * Experience a soldier still standing earns from a battle: some shared, for surviving and winning, and the rest its
+ * own: for each kill, each `damage` points done, each civilian a won rescue keeps alive, and each feat the first time.
+ */
+export const XP = { survived: 1, won: 2, kill: 1, damage: 5, civilian: 1, feat: 2 }
 
 /** The sum of one lasting effect over every relic and doctrine held. */
 function total(run: Run, effect: (source: Lasting) => number | undefined): number {
@@ -209,15 +231,14 @@ function total(run: Run, effect: (source: Lasting) => number | undefined): numbe
 }
 
 /**
- * The skills a soldier chooses the next from, or none if no choice is owed. A soldier learns a skill at each of its
- * first levels: first the core of one of its class's two paths, which shuts the other, then one of each tier's pair.
+ * The skills a soldier chooses the next from, or none if no choice is owed. A soldier arrives with the core of one of
+ * its class's two paths; at each next level it learns one of that path's next pair.
  */
 export function skillOffers(soldier: Soldier): SkillId[] {
   if (!soldier.cls) return []
-  const paths = PATHS[soldier.cls]
-  const path = paths.find((p) => p.core === soldier.skills[0])
-  if (soldier.skills.length >= Math.min(level(soldier), 1 + paths[0].tiers.length)) return []
-  return path ? path.tiers[soldier.skills.length - 1] : paths.map((p) => p.core)
+  const path = PATHS[soldier.cls].find((p) => p.core === soldier.skills[0])
+  if (!path || soldier.skills.length >= Math.min(level(soldier), 1 + path.tiers.length)) return []
+  return path.tiers[soldier.skills.length - 1]
 }
 
 /** Learns the offered skill at `index`. */
@@ -312,26 +333,26 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
 }
 
 /**
- * Adds a clone to the squad and returns it. It arrives at level 1, or at the level of the squad's lowest if that is
- * higher, so a late arrival is not left behind. Under a doctrine of unique classes it
- * takes a class no squadmate has, while one is left.
+ * Adds a clone to the squad and returns it: a level 1 recruit set on one of its class's paths at random. Under a
+ * doctrine of unique classes it takes a class no squadmate has, while one is left.
  */
 export function hire(run: Run): Soldier {
-  const lowest = run.soldiers.length > 0 ? Math.min(...run.soldiers.map(level)) : 1
   const unused = (Object.keys(CLASSES) as ClassId[]).filter((id) => !run.soldiers.some((s) => s.cls === id))
   const unique = run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).uniqueClasses) && unused.length > 0
   const classes = unique ? unused : (Object.keys(CLASSES) as ClassId[])
   const free = NAMES.filter((name) => !run.soldiers.some((s) => s.name === name))
+  const name = free[randomInt(run, free.length)]
+  const cls = classes[randomInt(run, classes.length)]
   const soldier: Soldier = {
     id: run.nextSoldier++,
-    name: free[randomInt(run, free.length)],
-    xp: 0,
-    cls: classes[randomInt(run, classes.length)],
-    skills: [],
+    name,
+    xp: xpFor(1),
+    cls,
+    skills: [PATHS[cls][randomInt(run, 2)].core],
+    feats: [],
     gear: { weapon: null, armor: null, utility: null },
   }
   run.soldiers.push(soldier)
-  soldier.xp = xpFor(Math.max(1, lowest))
   return soldier
 }
 
@@ -559,6 +580,26 @@ export function advance(run: Run): void {
   run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, packsOf(run, mission, stop === 'battle' ? here.packs : undefined), reserve, mission.goal, rules)
 }
 
+/** What a soldier still standing earns from a battle, after the feats it ends the battle with are recorded. */
+function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | null): { earned: Earned[]; feats: FeatId[] } {
+  const tally = battle.tally[soldier.id] ?? { dealt: 0, kills: 0, taken: 0, feats: [] }
+  const unit = battle.units.find((u) => u.soldier === soldier.id)!
+  if (won && tally.taken === 0) tally.feats.push('untouched')
+  if (won && unit.hp <= 2) tally.feats.push('lastLegs')
+  const feats = tally.feats.filter((id) => !soldier.feats.includes(id))
+  soldier.feats.push(...feats)
+  const saved = won ? (rescued ?? 0) : 0
+  const earned: Earned[] = [
+    { label: 'survived', xp: XP.survived },
+    { label: 'won', xp: won ? XP.won : 0 },
+    { label: `${tally.kills} kill${tally.kills === 1 ? '' : 's'}`, xp: tally.kills * XP.kill },
+    { label: `${tally.dealt} damage`, xp: Math.floor(tally.dealt / XP.damage) },
+    { label: `${saved} civilians saved`, xp: saved * XP.civilian },
+    ...feats.map((id) => ({ label: FEATS[id].name, xp: XP.feat })),
+  ]
+  return { earned: earned.filter((e) => e.xp > 0), feats }
+}
+
 /**
  * Settles a finished battle: experience, threat, rewards, and where the squad stands on the road.
  * A soldier who fell is cloned anew and stays in the squad with everything they had; only those still standing
@@ -568,12 +609,14 @@ export function endBattle(run: Run): void {
   const battle = run.battle!
   const mission = run.mission!
   const standing = new Set(battle.units.map((u) => u.soldier))
-  const xpBefore = run.soldiers.map((s) => s.xp)
   const won = battle.winner === 'human'
-  // A rescue won pays each standing soldier a point of experience for each civilian kept alive.
   const rescued = mission.goal === 'rescue' ? battle.units.filter((u) => u.civilian).length : null
-  for (const s of run.soldiers) if (standing.has(s.id)) s.xp += 1 + (won ? (rescued ?? 0) : 0)
-  const soldiers = run.soldiers.map((s, i) => ({ name: s.name, cls: s.cls, xpBefore: xpBefore[i], xpAfter: s.xp, downed: !standing.has(s.id) }))
+  const soldiers = run.soldiers.map((s) => {
+    const xpBefore = s.xp
+    const { earned, feats } = standing.has(s.id) ? earn(battle, s, won, rescued) : { earned: [], feats: [] }
+    s.xp += earned.reduce((sum, e) => sum + e.xp, 0)
+    return { id: s.id, name: s.name, cls: s.cls, xpBefore, xpAfter: s.xp, downed: !standing.has(s.id), earned, feats }
+  })
 
   const before = run.threat
   const risk = RISKS[mission.risk]

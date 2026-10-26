@@ -1,7 +1,7 @@
 /** Balance numbers `npm run tune` climbs toward the win-rate bands in sim/report.ts. It rewrites this file. */
 export const TUNING = {
   /** Every alien's health, as a multiple of its kind's. */
-  alienHp: 0.9,
+  alienHp: 0.8,
   /** The alien force a battle has in each leg, before its risk and kind are counted. */
   legForce: [1, 4, 9, 15],
   /** Damage each hit on a marked unit adds. */

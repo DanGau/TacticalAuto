@@ -1,4 +1,5 @@
 import { ALIENS, alienStats } from './aliens'
+import { OVERKILL, type FeatId, type Tally } from './feats'
 import { TUNING } from './tuning'
 import { PARRY_CHANCE } from './doctrines'
 import {
@@ -514,7 +515,9 @@ function sentries(battle: Battle, unit: Unit, watched: Set<number>): GameEvent[]
   const events: GameEvent[] = []
   for (const sentry of battle.units.filter((u) => isSoldier(u) && has(u, 'sentinel') && !watched.has(u.id) && distance(u, unit) <= 1)) {
     if (unit.hp <= 0) break
+    battle.actor = sentry.id
     const shot = shoot(battle, sentry, spotted(battle), 'sentinel', unit)
+    battle.actor = null
     if (shot.length > 0) watched.add(sentry.id)
     events.push(...shot)
   }
@@ -680,11 +683,28 @@ function moveSide(battle: Battle): GameEvent[] {
  * Deals `damage` to a unit: its armor takes it first, then its health. At zero health the unit is removed and its
  * death reported. A burster that dies explodes, and a psion that dies hurts the other aliens of its pod.
  */
+/** A soldier's tally for this battle, begun empty. */
+export function tallyOf(battle: Battle, soldier: number): Tally {
+  return (battle.tally[soldier] ??= { dealt: 0, kills: 0, taken: 0, feats: [] })
+}
+
+const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || tally.feats.push(id)
+
 function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[], pierce = false): void {
   if (target.hp <= 0) return
+  const full = target.hp === target.stats.hp
   const absorbed = pierce ? 0 : Math.min(target.armor, damage)
+  // Health lost: damage past what the target had left is counted for nobody.
+  const lost = Math.min(target.hp, damage - absorbed)
   target.armor -= absorbed
   target.hp -= damage - absorbed
+  if (target.soldier !== null) tallyOf(battle, target.soldier).taken += lost
+  const by = battle.units.find((u) => u.id === battle.actor)
+  const tally = by && by.soldier !== null && by.side !== target.side ? tallyOf(battle, by.soldier) : null
+  if (tally) {
+    tally.dealt += lost
+    if (damage >= OVERKILL) feat(tally, 'overkill')
+  }
   if (target.hp > 0) return
   // An alien that dies burning spreads the fire, if the squad carries wildfire.
   if (target.burning > 0 && battle.units.some((u) => u.side !== target.side && has(u, 'wildfire'))) {
@@ -705,6 +725,12 @@ function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[]
   }
   battle.units = battle.units.filter((u) => u !== target)
   events.push({ type: 'death', id: target.id })
+  if (tally) {
+    tally.kills++
+    if (full) feat(tally, 'oneShot')
+    if (target.boss || target.target) feat(tally, 'giantSlayer')
+    if (tally.kills === 3) feat(tally, 'hatTrick')
+  }
   // A hexed death passes the mark to the nearest unmarked alien.
   const heir = target.marked && foeHas(battle, target, 'hex') ? nearest(battle.units.filter((u) => u.side === target.side && !u.marked && !u.resists.includes('mark')), target) : undefined
   if (heir) {
@@ -1098,7 +1124,9 @@ function overwatch(battle: Battle, moved: number[]): GameEvent[] {
     const seen = spotted(battle)
     for (const id of moved) {
       const alien = battle.units.find((u) => u.id === id && revealed(battle, u))
+      battle.actor = unit.id
       const shot = alien && unit.hp > 0 ? shoot(battle, unit, seen, 'overwatch', alien) : []
+      battle.actor = null
       if (shot.length === 0) continue
       events.push(...shot)
       break
@@ -1141,6 +1169,7 @@ function actNext(battle: Battle): GameEvent[] {
       battle.shooter = unit.id
       return special
     }
+    battle.actor = unit.id
     const healed = unit.charges > 0 && unit.ability === 'medic' ? heal(battle, unit) : []
     const thrown = has(unit, 'grenade') && !unit.spent.includes('grenade') ? blast(battle, unit, seen, GRENADE_DAMAGE) : []
     if (thrown.length > 0) unit.spent.push('grenade')
@@ -1149,6 +1178,7 @@ function actNext(battle: Battle): GameEvent[] {
     const acted = [...medkit(unit), ...secondWind(unit), ...polymorph(battle, unit, seen), ...strew(battle, unit), ...healed, ...thrown, ...(fired.length > 0 ? fired : shoot(battle, unit, seen))]
     // What follows an action: a drone's shot, then a skirmisher's step back.
     const events = acted.length > 0 && unit.hp > 0 ? [...acted, ...drone(battle, unit), ...skirmish(battle, unit)] : acted
+    battle.actor = null
     if (events.length === 0) continue
     battle.shooter = unit.id
     // A stalking pod gives itself away when it opens fire.

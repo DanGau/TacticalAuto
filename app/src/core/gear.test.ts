@@ -1,3 +1,4 @@
+import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { alienUnit, CRIT_BONUS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
@@ -22,7 +23,7 @@ test('gear is built by rarity: commons have one mod, rares add an effect for the
 /** A run whose clone has learned its first skill and found `gear`. */
 function withFind(gear: Omit<Gear, 'id'>): Run {
   const run = createRun(1)
-  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
+  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   run.finds.push({ soldier: run.soldiers[0].id, gear: { id: 1, ...gear } })
   run.phase = 'reward'
   return run
@@ -58,8 +59,10 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
   apply(run, { type: 'advance' })
   // War drums pay off only on a kill, so they leave a duel as it is.
-  run.battle!.boons[0] = 'kill'
-  apply(run, { type: 'land', zone: 0 })
+  // A cold zone, so no drop pod impact lands in the fight.
+  const zone = run.battle!.hot === 0 ? 1 : 0
+  run.battle!.boons[zone] = 'kill'
+  apply(run, { type: 'land', zone })
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [] })
   battle.cover.fill(0)
@@ -340,4 +343,11 @@ test('a snaring soldier shoots the alien closing in over an equal shot at one th
   rusher.stats = { ...rusher.stats, range: 1, move: 0 }
   const [shot] = untilAlienShoots(d).filter((e) => e.type === 'shot' && e.id === d.soldier.id)
   expect(shot).toMatchObject({ target: rusher.id })
+})
+
+test("a soldier's kills, damage and feats are credited to it", () => {
+  const d = duel({ slot: 'armor', rarity: 'common', name: 'Light Vest', stats: {}, effect: null })
+  d.soldier.stats = { ...d.soldier.stats, damage: 120, crit: 0 }
+  while (d.alien.hp > 0) d.step()
+  expect(d.battle.tally[d.soldier.soldier!]).toMatchObject({ kills: 1, dealt: 99, feats: ['overkill', 'oneShot'] })
 })

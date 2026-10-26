@@ -1,4 +1,5 @@
 import type { AlienKind } from './aliens'
+import type { Tally } from './feats'
 import type { DoctrineEffect, Rule } from './doctrines'
 import type { Keyword, Resist } from './keywords'
 import { randomInt } from './rng'
@@ -269,6 +270,10 @@ export interface Battle {
   round: number
   /** Packs still to arrive on a hold, one every WAVE_EVERY rounds. */
   waves: { name: string; aliens: Alien[] }[]
+  /** The unit whose action is under way, credited with the damage it does; null between actions. */
+  actor: number | null
+  /** What each soldier did this battle, by soldier id. */
+  tally: Record<number, Tally>
   /** Calls to stepBattle so far. */
   beat: number
   phase: 'deploy' | 'battle' | 'over'
@@ -632,6 +637,8 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     acid: [],
     fire: [],
     caltrops: [],
+    actor: null,
+    tally: {},
     zones: [],
     uplink: null,
     boons: [],

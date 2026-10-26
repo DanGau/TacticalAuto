@@ -103,17 +103,14 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   let phase: Run['phase'] | null = null
 
   /**
-   * The panel for where the player is. After a stop comes its report: it ends when its last choice is made,
-   * or at Continue if it left none. Then the overworld.
+   * The panel for where the player is. After a stop come its choices, one screen each, then its summary until
+   * Continue. Then the overworld.
    */
   function panel(run: Run): string {
     const report = run.report
     if (run.phase === 'battle') return ''
     if (run.phase === 'won' || run.phase === 'lost') return runEnd(run)
-    if (run.phase === 'reward') {
-      seen = report
-      return report ? stopReport(run, report) : choice(run)
-    }
+    if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run)}`
     if (run.phase === 'shop' || run.phase === 'event') {
       // Arriving shows the shop or event; the other tabs stay open to the player while they decide.
       if (phase !== run.phase) tab = 'Map'

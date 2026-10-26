@@ -1,3 +1,4 @@
+import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { ALIENS, alienStats, muster, PACKS, type AlienKind } from './aliens'
 import { apply } from './apply'
@@ -24,12 +25,14 @@ test('a mission musters packs its depth allows, for exactly its force, and a lon
  */
 function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }[]): { battle: Battle; soldier: Unit; aliens: Unit[]; until: (done: (events: GameEvent[]) => boolean) => GameEvent[] } {
   const run = createRun(1)
-  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
+  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   apply(run, { type: 'zone', index: 1 })
   run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
   apply(run, { type: 'advance' })
-  run.battle!.boons[0] = 'kill'
-  apply(run, { type: 'land', zone: 0 })
+  // A cold zone, so no drop pod impact lands in the fight.
+  const zone = run.battle!.hot === 0 ? 1 : 0
+  run.battle!.boons[zone] = 'kill'
+  apply(run, { type: 'land', zone })
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [] })
   battle.cover.fill(0)

@@ -1,3 +1,4 @@
+import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { TUNING } from './tuning'
 import { apply } from './apply'
@@ -8,7 +9,7 @@ import { createRun, type Run } from './run'
 /** A run choosing where to land for its first battle. */
 function landing(): Run & { battle: Battle } {
   const run = createRun(1)
-  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
+  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   apply(run, { type: 'zone', index: 1 })
   run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
   apply(run, { type: 'advance' })
@@ -57,8 +58,7 @@ test('landing puts the whole squad on open tiles by the zone and begins the batt
 
 test('actions outside their phase are rejected and change nothing', () => {
   const run = createRun(1)
-  expect(apply(run, { type: 'zone', index: 1 })).toEqual({ ok: false, reason: 'not in the overworld' })
-  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
+  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   const before = structuredClone(run)
   expect(apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'keep' }).ok).toBe(false)

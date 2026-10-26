@@ -1,13 +1,14 @@
+import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { stepBattle } from './combat'
 import { CIVILIANS, HOLD_ROUNDS, type Goal } from './goals'
-import { createRun, endBattle, RISKS, START_SUPPLIES, type Run } from './run'
+import { createRun, endBattle, RISKS, START_SUPPLIES, XP, type Run } from './run'
 
 /** A run about to fight a battle of `goal`, with three packs to muster. */
 function before(goal: Goal): Run {
   const run = createRun(1)
-  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
+  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   apply(run, { type: 'zone', index: 1 })
   const patrol = { name: 'Patrol', kinds: ['trooper', 'trooper'] as const }
   run.zone = { stops: [{ kind: 'battle', risk: 'standard', goal, terrain: 'town', packs: [patrol, patrol, patrol].map((p) => ({ ...p, kinds: [...p.kinds] })) }] }
@@ -58,7 +59,8 @@ test('a rescue pays experience for each civilian kept alive; a raid pays triple 
   const alive = CIVILIANS - 1
   rescue.battle!.winner = 'human'
   endBattle(rescue)
-  expect(rescue.report).toMatchObject({ rescued: alive, soldiers: [{ xpBefore: 1, xpAfter: 2 + alive }] })
+  expect(rescue.report!.rescued).toBe(alive)
+  expect(rescue.report!.soldiers[0].earned).toContainEqual({ label: `${alive} civilians saved`, xp: alive * XP.civilian })
 
   const raid = before('raid')
   apply(raid, { type: 'land', zone: 0 })

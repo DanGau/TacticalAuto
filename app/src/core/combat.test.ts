@@ -1,3 +1,4 @@
+import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { isSoldier, revealed, type Battle } from './battle'
@@ -7,7 +8,7 @@ import { detects } from './sight'
 
 function battle(seed: number): Battle {
   const run = createRun(seed)
-  apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
+  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   apply(run, { type: 'zone', index: 1 })
   run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
   apply(run, { type: 'advance' })

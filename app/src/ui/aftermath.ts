@@ -1,22 +1,33 @@
 import type { Stats } from '../core/battle'
 import { CLASSES } from '../core/classes'
+import { FEATS } from '../core/feats'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { KEYS, level, SELL, skillOffers, soldierStats, xpFor, squadKeywords, type Report, type Run, type Soldier } from '../core/run'
 import { PATHS, SKILLS } from '../core/skills'
 import { button, describe, gearCard, gearText, keyRow, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
 
-/** A soldier's card: level, an experience bar filling toward the next level, and a level gained, or that the soldier fell. */
-function soldierCard(soldier: Report['soldiers'][number]): string {
+/**
+ * A soldier's card: level, an experience bar filling toward the next level, and a level gained or that the soldier
+ * fell. Under it, quiet notes: experience gained, gear it decided on, feats first pulled off; hovering one tells it.
+ */
+function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
   const before = level({ xp: soldier.xpBefore })
   const after = level({ xp: soldier.xpAfter })
   const filled = (xp: number) => Math.min(100, (100 * (xp - xpFor(before))) / (xpFor(before + 1) - xpFor(before)))
   const cls = soldier.cls && CLASSES[soldier.cls].name
-  const badge = soldier.downed ? '<b class="up">Downed · cloned anew</b>' : after > before ? `<b class="down promoted">Level ${after}</b>` : `+${soldier.xpAfter - soldier.xpBefore} experience`
+  const gained = soldier.xpAfter - soldier.xpBefore
+  const badge = soldier.downed ? '<b class="up">Downed · cloned anew</b>' : after > before ? `<b class="down promoted">Level ${after}</b>` : ''
+  const notes = [
+    ...(gained > 0 ? [`<li title="${soldier.earned.map((e) => `${e.label}: +${e.xp}`).join('&#10;')}">+${gained} experience</li>`] : []),
+    ...run.decisions.filter((d) => d.soldier === soldier.name).map((d) => `<li class="${d.gear.rarity}" title="${gearText(d.gear)}&#10;${d.line}">${d.kept ? 'wears' : 'sold'} ${d.gear.name}</li>`),
+    ...soldier.feats.map((id) => `<li class="feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</li>`),
+  ]
   return `<div class="soldier ${soldier.downed ? 'died' : ''}">
     <small>Level ${before}${cls ? ` · ${cls}` : ''}</small><br><b>${soldier.name}</b>
     <div class="bar"><div class="fill" style="--from: ${filled(soldier.xpBefore)}%; --to: ${filled(soldier.xpAfter)}%"></div></div>
     ${badge}
+    ${notes.length > 0 ? `<ul class="notes">${notes.join('')}</ul>` : ''}
   </div>`
 }
 
@@ -59,21 +70,16 @@ export function decisions(run: Run): string {
     .join('')
 }
 
-/** A skill for a soldier to learn: at the first, one of the class's two paths; after it, one of the path's next pair. */
+/** A skill for a soldier to learn: one of its path's next pair, each told by what it does now and nothing after. */
 function skillChoice(run: Run, soldier: Soldier): string {
   const held = squadKeywords(run)
-  const paths = PATHS[soldier.cls!]
-  const path = paths.find((p) => p.core === soldier.skills[0])
-  // A path's card also names what it leads to.
-  const ahead = (index: number) => (path ? '' : `<small class="ahead">Then ${paths[index].tiers.map((pair) => pair.map((id) => SKILLS[id].name).join(' or ')).join(', then ')}</small>`)
-  const card = (id: (typeof soldier.skills)[number], index: number) =>
-    button({ type: 'skill', soldier: soldier.id, index }, `<small>${(path ?? paths[index]).name} path</small><br><b>${SKILLS[id].name}</b><br>${describe(SKILLS[id].text, SKILLS[id].tags, held)}${ahead(index)}`, 'card skill')
-  const ask = path ? `Choose one; the other is lost.` : `Choose a path; the other is shut for good.`
-  return `<h2><b class="supplies">${soldier.name}, ${CLASSES[soldier.cls!].name}, reached level ${soldier.skills.length + 1}.</b> ${ask}</h2>
+  const path = PATHS[soldier.cls!].find((p) => p.core === soldier.skills[0])!
+  const card = (id: (typeof soldier.skills)[number], index: number) => button({ type: 'skill', soldier: soldier.id, index }, `<b>${SKILLS[id].name}</b><br>${describe(SKILLS[id].text, SKILLS[id].tags, held)}`, 'card skill')
+  return `<h2><b class="supplies">${soldier.name}</b>, ${path.name} ${CLASSES[soldier.cls!].name}, reached level ${soldier.skills.length + 1}. Choose one; the other is lost.</h2>
     <div class="choices">${skillOffers(soldier).map(card).join('')}</div>`
 }
 
-/** The next choice of the reward phase: a relic, then each find, then each skill owed. */
+/** The next choice of the reward phase, alone on its screen: a relic, then each find, then each skill owed. */
 export function choice(run: Run): string {
   const held = squadKeywords(run)
   const relic = (id: RelicId, index: number) => button({ type: 'relic', index }, `<small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic')
@@ -83,14 +89,13 @@ export function choice(run: Run): string {
 }
 
 /**
- * The one screen after a stop, revealed top to bottom: the threat, what was gained, the squad if it fought,
- * then the next choice it left, or a button to go on.
+ * The summary after a stop, once its choices are made, revealed top to bottom: the threat, what was gained, the squad
+ * if it fought, and a button to go on.
  */
 export function stopReport(run: Run, report: Report): string {
   const { before, after } = report.threat
   const threat = after === before ? '' : `<span class="note">${signed(after - before)}</span>`
-  const squad = report.soldiers.length > 0 ? `<div class="stage second"><h2>Squad</h2><div class="squad">${report.soldiers.map(soldierCard).join('')}</div></div>` : ''
-  const last = run.phase === 'reward' ? choice(run) : '<button data-seen="report">Continue</button>'
+  const squad = report.soldiers.length > 0 ? `<div class="stage second"><h2>Squad</h2><div class="squad">${report.soldiers.map((s) => soldierCard(run, s)).join('')}</div></div>` : ''
   return `
     ${title(report)}
     <div class="stage">
@@ -99,10 +104,10 @@ export function stopReport(run: Run, report: Report): string {
       ${report.hired ? `<p class="down"><b>A new clone joins the squad: ${report.hired}.</b></p>` : ''}
       ${report.rescued !== null ? `<p class="down">${report.rescued} of ${CIVILIANS} civilians rescued</p>` : ''}
       ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : ''}
-      ${decisions(run)}
+      ${squad ? '' : decisions(run)}
     </div>
     ${squad}
-    <div class="stage ${squad ? 'third' : 'second'}">${last}</div>`
+    <div class="stage ${squad ? 'third' : 'second'}"><button data-seen="report">Continue</button></div>`
 }
 
 export function runEnd(run: Run): string {

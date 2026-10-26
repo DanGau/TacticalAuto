@@ -52,8 +52,7 @@
       .chip.supply, .chip.cache { border-color: #ffd84d; }
       .chip.key, .chip.final { border-color: #c77dff; }
       .chip.done { opacity: 0.35; }
-      .chip.learned { border-color: #7ddc5a; color: #7ddc5a; }
-      .chip.lost, b.lost { opacity: 0.35; text-decoration: line-through; }
+      .chip.feat { border-color: #ffd84d; color: #ffd84d; cursor: help; }
       .chip.here { background: #35496b; }
       button.zone { text-align: center; }
       .nodes { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 8px; }
@@ -70,6 +69,9 @@
       .squad { display: flex; gap: 12px; }
       .soldier { flex: 1; max-width: 220px; padding: 8px 12px; background: #263042; border: 1px solid #4a5a78; border-radius: 6px; line-height: 1.5; }
       .soldier.died { opacity: 0.6; border-color: #ff6b5e; }
+      .soldier .notes { list-style: none; margin: 4px 0 0; padding: 0; font-size: 12px; color: #9aa6bd; }
+      .soldier .notes li { cursor: help; }
+      .soldier .notes .feat { color: #ffd84d; }
       .bar { height: 6px; margin: 6px 0; background: #10141c; border-radius: 3px; overflow: hidden; }
       .bar div { height: 100%; background: #ffd84d; }
       .bar .fill { animation: fill 0.9s 1.7s both; }
@@ -130,7 +132,6 @@
       button.relic, .gear.relic { border-color: #ffd84d; }
       button.relic small, .gear.relic > small:first-child, button.skill small { color: #ffd84d; }
       button.skill { border-color: #7ddc5a; }
-      button.skill small.ahead { margin-top: auto; padding-top: 8px; color: #9aa6bd; }
       button.epic small { color: #c77dff; }
 
       .stage { animation: rise 0.5s both; }
