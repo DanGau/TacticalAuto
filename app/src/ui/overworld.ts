@@ -36,7 +36,7 @@ function stopRow(stop: Stop): string {
   if (stop.kind !== 'battle') return `<div class="stop ${stop.kind}"><b>${STOP_NAMES[stop.kind]}</b></div>`
   const risk = RISKS[stop.risk]
   const goal = GOALS[stop.goal]
-  const rare = risk.rareGear && (stop.goal === 'exterminate' || stop.goal === 'assassinate') ? ', rare or better' : ''
+  const rare = risk.rareGear && (stop.goal === 'exterminate' || stop.goal === 'assassinate') ? ', one rare or better' : ''
   return `<div class="stop ${stop.risk}"><small>${tip(risk.name, risk.text)} · ${TERRAIN_TEXT[stop.terrain].name}</small><span><b>${tip(goal.name, goal.text)}</b>: ${census(stop.packs)}${stop.goal === 'assassinate' ? ', and a Commander' : ''}</span><small>Pays ${goal.reward}${rare}</small></div>`
 }
 

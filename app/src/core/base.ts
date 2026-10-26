@@ -32,4 +32,4 @@ export const FACILITIES: Record<FacilityId, Facility> = facilities
 export type Rarity = 'common' | 'rare' | 'epic'
 
 /** Chance each piece of gear found is of a rarity. */
-export const RARITY_CHANCE: Record<Rarity, number> = { common: 0.6, rare: 0.3, epic: 0.1 }
+export const RARITY_CHANCE: Record<Rarity, number> = { common: 0.75, rare: 0.2, epic: 0.05 }

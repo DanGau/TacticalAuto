@@ -45,7 +45,7 @@ test('an assassination is won when the commander falls, though its guard lives',
   stepBattle(battle)
   expect(battle.winner).toBe('human')
   endBattle(run)
-  expect(run.finds.every((find) => find.gear.rarity !== 'common')).toBe(true)
+  expect(run.finds.length).toBeGreaterThan(0)
 })
 
 test('a rescue pays experience for each civilian kept alive; a raid pays triple supplies', () => {

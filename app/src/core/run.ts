@@ -42,7 +42,7 @@ export type Risk = 'safe' | 'standard' | 'dangerous'
 export const RISKS: Record<Risk, { name: string; aliens: number; supplies: number; drops: number; rareGear: boolean; text: string }> = {
   safe: { name: 'Quiet', aliens: -1, supplies: 1, drops: 0, rareGear: false, text: 'Fewer aliens, and no gear' },
   standard: { name: 'Contested', aliens: 0, supplies: 2, drops: 1, rareGear: false, text: 'A fair fight' },
-  dangerous: { name: 'Overrun', aliens: 1, supplies: TUNING.dangerSupplies, drops: 2, rareGear: true, text: 'More aliens, and two pieces of rare or better gear' },
+  dangerous: { name: 'Overrun', aliens: 1, supplies: TUNING.dangerSupplies, drops: 2, rareGear: true, text: 'More aliens, and two pieces of gear, one rare or better' },
 }
 
 /**
@@ -518,10 +518,10 @@ export function endBattle(run: Run): void {
   const held = run.relics.map((id): Relic => RELICS[id])
   const supplies = won ? risk.supplies * (mission.goal === 'raid' ? 3 : 1) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
   run.supplies += supplies
-  // A won battle drops gear by its goal; a key mission's, a last stand's or an assassination's is rare or better.
+  // A won battle drops gear by its goal; a key mission's, a last stand's, and the first of an Overrun battle's is rare or better.
   const byGoal = { exterminate: risk.drops, assassinate: Math.max(1, risk.drops), hold: 0, rescue: 0, raid: 0 }[mission.goal]
   const drops = won && mission.kind !== 'final' ? (mission.kind === 'battle' ? byGoal : 1) : 0
-  for (let i = 0; i < drops; i++) dropGear(run, risk.rareGear || mission.kind !== 'battle' || mission.goal === 'assassinate' || held.some((relic) => relic.rareGear))
+  for (let i = 0; i < drops; i++) dropGear(run, (risk.rareGear && i === 0) || mission.kind !== 'battle' || held.some((relic) => relic.rareGear))
   const key = won && mission.kind === 'key'
   // Each key won brings a new clone to the squad.
   const hired = key && !run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).noRecruits) ? hire(run).name : null

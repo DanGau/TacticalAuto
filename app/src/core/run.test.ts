@@ -102,7 +102,7 @@ test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone
   expect(run).toMatchObject({ phase: RISKS[risk].drops > 0 ? 'reward' : 'overworld', threat: STOP_THREAT, supplies: START_SUPPLIES + RISKS[risk].supplies, stop: 1 })
   expect(run.finds).toHaveLength(RISKS[risk].drops)
   expect(run.finds.every((find) => find.soldier === run.soldiers[0].id)).toBe(true)
-  if (RISKS[risk].rareGear) expect(run.finds.every((find) => find.gear.rarity !== 'common')).toBe(true)
+  if (RISKS[risk].rareGear) expect(run.finds[0].gear.rarity).not.toBe('common')
   expect(run.report).toMatchObject({ stop: 'battle', won: true, threat: { before: 0, after: STOP_THREAT }, key: false, hired: null })
   expect(run.report!.soldiers).toMatchObject([{ xpBefore: 1, xpAfter: 2, downed: false }])
   for (let i = 0; i < RISKS[risk].drops; i++) apply(run, { type: 'sell' })
