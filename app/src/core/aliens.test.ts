@@ -2,7 +2,7 @@ import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { ALIENS, alienStats, muster, PACKS, type AlienKind } from './aliens'
 import { apply } from './apply'
-import { isSoldier, ACID_DAMAGE, alienUnit, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, type Battle, type Unit } from './battle'
+import { isSoldier, ACID_DAMAGE, alienUnit, mechUnit, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, type Battle, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { createRun } from './run'
 
@@ -334,4 +334,42 @@ test('a psionic attack passes through a wall and ignores cover; a demolishing hi
   const shots = twin.until(has('shot')).filter((e) => e.type === 'shot' && e.id === twin.soldier.id)
   expect(shots).toHaveLength(2)
   expect(shots[1]).toMatchObject({ with: ['twin'] })
+})
+
+test('an engineer deploys a mech once aliens are in sight, credited with its kills; a mech alone cannot hold the field', () => {
+  const { battle, soldier, until } = arena([{ kind: 'trooper', x: 10, y: 14 }])
+  Object.assign(soldier, { ability: 'mech', charges: 1, effects: ['titan'] })
+  until((events) => events.some((e) => e.type === 'spawn' && e.id === soldier.id))
+  const mech = battle.units.find((u) => u.summoner === soldier.soldier)!
+  expect(mech).toMatchObject({ side: 'human', stats: { hp: 14, damage: 4 } })
+  expect(soldier.charges).toBe(0)
+  Object.assign(soldier, { stats: { ...soldier.stats, damage: 0 } })
+  until(() => battle.phase === 'over')
+  expect(battle.tally[soldier.soldier!]?.kills).toBe(1)
+
+  const lone = arena([{ kind: 'trooper', x: 10, y: 14 }])
+  lone.battle.units.push(mechUnit(lone.battle, lone.soldier, { ...lone.soldier.stats }, [], { x: 11, y: 10 }))
+  lone.battle.units = lone.battle.units.filter((u) => u !== lone.soldier)
+  stepBattle(lone.battle)
+  expect(lone.battle).toMatchObject({ phase: 'over', winner: 'alien' })
+})
+
+test('a dronemaster deploys drones that carry its skills, and a self-destructing mech blasts the aliens beside it', () => {
+  const { battle, soldier, until } = arena([{ kind: 'trooper', x: 10, y: 14 }])
+  Object.assign(soldier, { ability: 'mech', charges: 1, effects: ['swarm', 'hive', 'shock'] })
+  until((events) => events.filter((e) => e.type === 'spawn').length === 3)
+  const drones = battle.units.filter((u) => u.summoner === soldier.soldier)
+  expect(drones).toHaveLength(3)
+  expect(drones.every((d) => d.stats.hp === 4 && d.effects.includes('snare'))).toBe(true)
+
+  const blast = arena([{ kind: 'trooper', x: 12, y: 10 }])
+  const mech = mechUnit(blast.battle, blast.soldier, { ...blast.soldier.stats, hp: 1 }, ['detonate'], { x: 11, y: 10 })
+  mech.hp = 1
+  blast.battle.units.push(mech)
+  const alien = blast.aliens[0]
+  alien.stats = { ...alien.stats, move: 0 }
+  Object.assign(blast.soldier, { stats: { ...blast.soldier.stats, damage: 0 } })
+  const before = alien.hp
+  blast.until((events) => events.some((e) => e.type === 'death' && e.id === mech.id))
+  expect(alien.hp).toBeLessThanOrEqual(before - 4)
 })

@@ -117,12 +117,21 @@ export interface Stats {
 export const BASE_STATS: Stats = { hp: 10, armor: 0, aim: 0.75, damage: 3, range: 5, move: 4, crit: 0.5, close: 0.06 }
 
 /** Something a unit does unprompted beyond moving and shooting; each is described where combat applies it. */
-export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic'
+export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech'
 
 /** Something a piece of gear does; gear.ts says what each does. */
 export type GearEffect = 'frostbite' | 'tracer' | 'rime' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'thorns' | 'shield' | 'regen' | 'lastStand' | 'medkit' | 'grenade' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'mirror' | 'bond' | 'guardians' | 'blink' | 'polymorph' | 'null' | 'snare' | 'booming' | 'tether' | 'caltrops'
 /** Something a skill does; skills.ts says what each does. */
 export type SkillEffect =
+  | 'titan'
+  | 'plating'
+  | 'servos'
+  | 'detonate'
+  | 'swarm'
+  | 'spotter'
+  | 'linked'
+  | 'hive'
+  | 'shock'
   | 'frenzy'
   | 'backstab'
   | 'rage'
@@ -232,6 +241,8 @@ export interface Unit {
   resists: Resist[]
   /** A civilian to rescue: on the human side, but never moves or shoots, and is not a soldier. */
   civilian: boolean
+  /** For a mech, the soldier id of the engineer who deployed it, credited with what it does; null for any other unit. */
+  summoner: number | null
   /** Whether the unit loses its next action. */
   panicked: boolean
   /** Whether the unit has moved this turn. */
@@ -435,7 +446,8 @@ export const alert = (battle: Battle, unit: Unit) => unit.pod === null || battle
 
 /** Whether the alien fights in the open: humans always do, an alien once its pod is revealed. */
 /** Whether the unit is a soldier: on the human side, and no civilian. */
-export const isSoldier = (unit: Unit) => unit.side === 'human' && !unit.civilian
+/** A soldier of the squad: not a civilian, nor a mech, which fights for the squad but cannot hold the field alone. */
+export const isSoldier = (unit: Unit) => unit.side === 'human' && unit.soldier !== null
 
 export function revealed(battle: Battle, unit: Unit): boolean {
   return unit.pod === null || battle.pods[unit.pod].revealed
@@ -520,7 +532,7 @@ export function land(battle: Battle, zone: Tile): void {
   }
   const tiles = freeTilesNear(battle, zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
-    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
+    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
   })
   battle.reserve = []
   battle.phase = 'battle'
@@ -592,12 +604,18 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     booming: 0,
     fury: 0,
     civilian: false,
+    summoner: null,
     panicked: false,
     moved: false,
     suppressed: 0,
     marked: false,
     cooldown: alien.spawns ? SPAWN_EVERY : 0,
   }
+}
+
+/** A mech built by the engineer `owner`, with `stats` and the `effects` its skills give it, standing on `tile`. */
+export function mechUnit(battle: Battle, owner: Unit, stats: Stats, effects: Effect[], tile: Tile): Unit {
+  return { id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: stats.armor, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'rush', effects, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: owner.soldier, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 }
 }
 
 /** Places a pack as a new pod around `centre`. */
@@ -657,7 +675,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   if (goal === 'rescue') {
     for (const tile of freeTilesNear(battle, spacedTile(battle, battle.units, ZONE_CLEARANCE), CIVILIANS)) {
       const stats = { ...BASE_STATS, hp: CIVILIAN_HP, aim: 0, damage: 0, range: 0, move: 0, crit: 0 }
-      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
+      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
     }
   }
   if (goal === 'hold') battle.uplink = spacedTile(battle, battle.units, ZONE_CLEARANCE)

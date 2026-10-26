@@ -3,6 +3,10 @@ import { OVERKILL, type FeatId, type Tally } from './feats'
 import { TUNING } from './tuning'
 import { PARRY_CHANCE } from './doctrines'
 import {
+  BASE_STATS,
+  mechUnit,
+  type SkillEffect,
+  type Stats,
   ACID_DAMAGE,
   ACID_TURNS,
   alienUnit,
@@ -115,7 +119,7 @@ export type GameEvent =
   | { type: 'hurt'; id: number; amount: number; cause: 'acid' | 'backlash' | 'impact' }
   /** A wave arrives on a hold, already in the fight. */
   | { type: 'wave'; units: { id: number; x: number; y: number }[] }
-  /** A boss spawns a swarmling. */
+  /** A boss spawns a swarmling, or an engineer deploys a mech. */
   | { type: 'spawn'; id: number; unit: { id: number; x: number; y: number } }
   | { type: 'death'; id: number }
   | { type: 'end'; winner: Side | null }
@@ -538,6 +542,35 @@ function moved(battle: Battle, unit: Unit, path: Tile[], events: GameEvent[]): v
   }
 }
 
+/** A mech's stats, and a light drone's, before its engineer's skills. */
+const MECH_STATS: Stats = { ...BASE_STATS, hp: 8, armor: 1, aim: 0.65, crit: 0.1, range: 4 }
+const DRONE_STATS: Stats = { ...BASE_STATS, hp: 4, damage: 2, aim: 0.65, crit: 0.1, range: 4, move: 6 }
+/** Damage a self-destructing mech does to each alien beside it. */
+const DETONATE_DAMAGE = 4
+
+/**
+ * Deploy Mech: once aliens are in sight, an engineer with a deploy left builds a mech beside it, or drones for a swarm,
+ * shaped by its skills. It costs no shot.
+ */
+function deploy(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
+  if (unit.ability !== 'mech' || unit.charges <= 0 || seen.size === 0) return []
+  const swarm = has(unit, 'swarm')
+  const stats: Stats = swarm ? { ...DRONE_STATS } : { ...MECH_STATS }
+  if (has(unit, 'titan')) Object.assign(stats, { hp: stats.hp + 6, damage: stats.damage + 1 })
+  if (has(unit, 'plating')) stats.armor += 2
+  if (has(unit, 'servos')) Object.assign(stats, { move: stats.move + 2, aim: stats.aim + 0.15 })
+  const granted: [SkillEffect, Effect][] = [['plating', 'taunt'], ['spotter', 'mark'], ['linked', 'inspire'], ['shock', 'snare'], ['detonate', 'detonate']]
+  const effects = granted.flatMap(([skill, effect]) => (has(unit, skill) ? [effect] : []))
+  const tiles = freeTilesNear(battle, unit, !swarm ? 1 : has(unit, 'hive') ? 3 : 2)
+  if (tiles.length === 0) return []
+  unit.charges--
+  return tiles.map((tile) => {
+    const mech = mechUnit(battle, unit, { ...stats }, effects, tile)
+    battle.units.push(mech)
+    return { type: 'spawn', id: unit.id, unit: { id: mech.id, x: mech.x, y: mech.y } }
+  })
+}
+
 /** Caltrops: once per battle, an alien closing in finds the tiles between it and the carrier strewn with them. */
 function strew(battle: Battle, unit: Unit): GameEvent[] {
   if (!has(unit, 'caltrops') || unit.spent.includes('caltrops')) return []
@@ -699,8 +732,10 @@ function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[]
   target.armor -= absorbed
   target.hp -= damage - absorbed
   if (target.soldier !== null) tallyOf(battle, target.soldier).taken += lost
+  // A mech's work is its engineer's.
   const by = battle.units.find((u) => u.id === battle.actor)
-  const tally = by && by.soldier !== null && by.side !== target.side ? tallyOf(battle, by.soldier) : null
+  const credited = by && by.side !== target.side ? (by.soldier ?? by.summoner) : null
+  const tally = credited !== null && credited !== undefined ? tallyOf(battle, credited) : null
   if (tally) {
     tally.dealt += lost
     if (damage >= OVERKILL) feat(tally, 'overkill')
@@ -725,6 +760,11 @@ function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[]
   }
   battle.units = battle.units.filter((u) => u !== target)
   events.push({ type: 'death', id: target.id })
+  if (has(target, 'detonate')) {
+    const caught = battle.units.filter((u) => u.side !== target.side && distance(u, target) <= 1)
+    events.push({ type: 'rocket', id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: DETONATE_DAMAGE })) })
+    for (const u of caught) wound(battle, u, DETONATE_DAMAGE, events)
+  }
   if (tally) {
     tally.kills++
     if (full) feat(tally, 'oneShot')
@@ -1175,7 +1215,7 @@ function actNext(battle: Battle): GameEvent[] {
     if (thrown.length > 0) unit.spent.push('grenade')
     const fired = unit.charges > 0 && unit.ability === 'rocket' ? blast(battle, unit, seen, ROCKET_DAMAGE, has(unit, 'bigBlast') ? BIG_BLAST_RADIUS : BLAST_RADIUS) : []
     if (healed.length + fired.length > 0) unit.charges--
-    const acted = [...medkit(unit), ...secondWind(unit), ...polymorph(battle, unit, seen), ...strew(battle, unit), ...healed, ...thrown, ...(fired.length > 0 ? fired : shoot(battle, unit, seen))]
+    const acted = [...medkit(unit), ...secondWind(unit), ...polymorph(battle, unit, seen), ...strew(battle, unit), ...deploy(battle, unit, seen), ...healed, ...thrown, ...(fired.length > 0 ? fired : shoot(battle, unit, seen))]
     // What follows an action: a drone's shot, then a skirmisher's step back.
     const events = acted.length > 0 && unit.hp > 0 ? [...acted, ...drone(battle, unit), ...skirmish(battle, unit)] : acted
     battle.actor = null

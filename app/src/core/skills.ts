@@ -51,6 +51,17 @@ const skills = {
   slayer: { name: 'Colossus Slayer', text: '+2 damage to a target already wounded', effect: 'slayer' },
   volley: { name: 'Volley', text: 'A hit also does half its damage to every alien beside the target', effect: 'volley' },
   ghost: { name: 'Ghost', text: 'Aliens more than 4 tiles away cannot shoot it', effect: 'ghost' },
+  // Engineer
+  titan: { name: 'Titan Frame', text: 'Its mech has +6 health and +1 damage', effect: 'titan' },
+  plating: { name: 'Reactive Plating', text: 'Its mech has +2 armor, and an alien that can shoot the mech must', effect: 'plating' },
+  servos: { name: 'Overclocked Servos', text: 'Its mech has +2 move and +15% aim', effect: 'servos' },
+  detonate: { name: 'Self-Destruct', text: 'A destroyed mech of its explodes for 4 damage on every alien beside it', effect: 'detonate' },
+  rebuild: { name: 'Field Rebuild', text: 'One more deploy each battle', charges: 1 },
+  swarm: { name: 'Drone Swarm', text: 'Deploys two light drones in place of a mech: 4 health and 2 damage each, but +2 move', effect: 'swarm' },
+  spotter: { name: 'Spotter Drones', tags: ['mark'], text: 'A target its drones hit is marked', effect: 'spotter' },
+  linked: { name: 'Linked Targeting', text: 'Squadmates within 2 tiles of one of its drones have +10% aim', effect: 'linked' },
+  hive: { name: 'Hive Mind', text: 'Deploys a third drone', effect: 'hive' },
+  shock: { name: 'Shock Prongs', text: 'A target its drones hit is rooted: it cannot move on its next turn', effect: 'shock' },
   // Support
   fieldKit: { name: 'Field Kit', text: 'Two more heals each battle', charges: 2 },
   revive: { name: 'Revive', text: 'Once per battle, a squadmate who falls within 3 tiles gets up with 3 health', effect: 'revive' },
@@ -87,6 +98,10 @@ export const PATHS: Record<ClassId, [Path, Path]> = {
   sniper: [
     { name: 'Marksman', core: 'steady', tiers: [['headshot', 'longshot'], ['doubleTap', 'assassinate']] },
     { name: 'Hunter', core: 'mark', tiers: [['slayer', 'hollowPoint'], ['volley', 'ghost']] },
+  ],
+  engineer: [
+    { name: 'Mechanic', core: 'titan', tiers: [['plating', 'servos'], ['detonate', 'rebuild']] },
+    { name: 'Dronemaster', core: 'swarm', tiers: [['spotter', 'linked'], ['hive', 'shock']] },
   ],
   support: [
     { name: 'Medic', core: 'fieldKit', tiers: [['surgeon', 'vitality'], ['revive', 'ward']] },

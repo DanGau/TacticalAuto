@@ -48,6 +48,7 @@ const BLAST_MS = 380
 
 const COLOR = {
   civilian: 0xe8e2c8,
+  mech: 0x9aa9bf,
   human: 0x4da3ff,
   alien: 0x7ddc5a,
   boss: 0xc77dff,
@@ -162,7 +163,7 @@ const shade = (color: number, by: number) => (((color >> 16) * by) << 16) | ((((
 const ZONE_NAMES = ['A', 'B', 'C']
 
 /** The letter over a unit that is no soldier: its kind's initial, C for a commander, nothing for a boss or civilian. */
-const letter = (unit: Unit) => (unit.target ? 'C' : unit.boss || !unit.kind ? '' : ALIENS[unit.kind].name[0])
+const letter = (unit: Unit) => (unit.target ? 'C' : unit.summoner !== null ? 'M' : unit.boss || !unit.kind ? '' : ALIENS[unit.kind].name[0])
 
 /** Position of a tile's centre in the world the camera looks at. Fractional tiles are allowed. */
 /** Screen pixels a tile rises for each level of height. */
@@ -318,7 +319,7 @@ export async function createView(): Promise<View> {
 
   /** `pips` marks a soldier's level above the health pips; `letter` is the initial of its class. */
   function create(unit: Unit, pips: number, letter = ''): Sprite {
-    const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR.civilian : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human)
+    const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR.civilian : unit.summoner !== null ? COLOR.mech : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human)
     const rows = Math.ceil((unit.stats.hp + unit.stats.armor) / 10)
     for (let i = 0; i < pips; i++) body.circle(-9 + 6 * i, -40 - rows * PIP_STEP, 2).fill(COLOR.human)
     const sprite: Sprite = { node: new Container(), hp: new Graphics(), tile: unit, maxHp: unit.stats.hp, ally: unit.side === 'human' }
@@ -871,7 +872,7 @@ export async function createView(): Promise<View> {
         const unit = battle.units.find((u) => u.id === e.unit.id)
         if (!unit || !revealed(battle, unit)) continue
         await follow([e.unit])
-        const born = create({ ...unit, x: e.unit.x, y: e.unit.y }, 0, ALIENS[unit.kind!].name[0])
+        const born = create({ ...unit, x: e.unit.x, y: e.unit.y }, 0, letter(unit))
         await tween(REVEAL_MS, (t) => (born.node.alpha = t))
       } else if (e.type === 'effect') {
         const on = sprites.get(e.id)

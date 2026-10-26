@@ -55,6 +55,16 @@ const classes = {
     abilityText: 'Twice per battle, heals a badly wounded soldier nearby, and still shoots',
     charges: 2,
   },
+  engineer: {
+    name: 'Engineer',
+    stats: { hp: -1, damage: -1 },
+    stance: 'anchor',
+    stanceText: 'Fights from cover while its machines take the front',
+    ability: 'mech',
+    abilityName: 'Deploy Mech',
+    abilityText: 'Once per battle, once aliens are in sight, deploys a combat mech beside it that fights for the squad until destroyed, and still shoots',
+    charges: 1,
+  },
 } satisfies Record<string, SoldierClass>
 
 export type ClassId = keyof typeof classes
