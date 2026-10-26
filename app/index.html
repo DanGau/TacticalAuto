@@ -53,14 +53,14 @@
       .chip.learned { border-color: #7ddc5a; color: #7ddc5a; }
       .chip.lost, b.lost { opacity: 0.35; text-decoration: line-through; }
       .chip.here { background: #35496b; }
-      .aliens { margin: 6px 0; padding: 6px 0; border-top: 1px solid #3a465c; border-bottom: 1px solid #3a465c; }
-      .stop { border-left: 3px solid #888; padding-left: 6px; margin: 4px 0; }
-      .stop > * { display: block; }
-      .stop.safe { border-color: #7ddc5a; }
-      .stop.dangerous { border-color: #ff6b5e; }
-      .stop.supply, .stop.cache { border-color: #6fb7ff; }
-      .stop.shop { border-color: #ffd34e; }
-      .stop.unknown { border-color: #c28bff; }
+      button.zone { text-align: center; }
+      .nodes { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 8px; }
+      .node { font-size: 26px; width: 44px; height: 44px; line-height: 44px; text-align: center; border-radius: 50%; border: 3px solid #888; background: #1d2433; }
+      .node.safe { border-color: #7ddc5a; }
+      .node.dangerous { border-color: #ff6b5e; }
+      .node.supply, .node.cache { border-color: #6fb7ff; }
+      .node.shop { border-color: #ffd34e; }
+      .node.unknown { border-color: #c28bff; }
       button.travel { min-width: 320px; text-align: left; line-height: 1.5; }
       button.travel.key, button.travel.final { border-color: #c77dff; }
 

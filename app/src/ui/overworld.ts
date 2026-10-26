@@ -9,7 +9,7 @@ import { RELICS } from '../core/relics'
 import { buildCost, built, KEYS, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Mission, type Muster, type Run, type Soldier, type Stop, type Zone } from '../core/run'
 import { PATHS, SKILLS, type SkillId } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
-import { alienName, button, describe, gearCard, keywordChips, resistChip, tip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
+import { alienName, button, describe, gearCard, keywordChips, resistChip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
 export const TABS = ['Map', 'Base', 'Barracks'] as const
@@ -31,18 +31,22 @@ function census(packs: Muster[]): string {
   return [...counts].map(([kind, n]) => `${n} ${alienName(kind, `${ALIENS[kind].name}${n === 1 ? '' : 's'}`)}`).join(', ')
 }
 
-/** A stop at a fork. A battle shows its risk, goal and place, the aliens it holds, and what it pays. */
-function stopRow(stop: Stop): string {
-  if (stop.kind !== 'battle') return `<div class="stop ${stop.kind}"><b>${STOP_NAMES[stop.kind]}</b></div>`
+const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '📦', cache: '🎁', shop: '🛒', unknown: '❓', key: '🛰️', final: '👁️' }
+
+/** A stop at a fork as an icon; a battle's is coloured by its risk, and hovering tells its goal, place and pay. */
+function stopIcon(stop: Stop): string {
+  if (stop.kind !== 'battle') return `<span class="node ${stop.kind}" title="${STOP_NAMES[stop.kind]}">${STOP_ICONS[stop.kind]}</span>`
   const risk = RISKS[stop.risk]
   const goal = GOALS[stop.goal]
-  const rare = risk.rareGear && (stop.goal === 'exterminate' || stop.goal === 'assassinate') ? ', one rare or better' : ''
-  return `<div class="stop ${stop.risk}"><small>${tip(risk.name, risk.text)} · ${TERRAIN_TEXT[stop.terrain].name}</small><span><b>${tip(goal.name, goal.text)}</b>: ${census(stop.packs)}${stop.goal === 'assassinate' ? ', and a Commander' : ''}</span><small>Pays ${goal.reward}${rare}</small></div>`
+  return `<span class="node ${stop.risk}" title="${risk.name} ${goal.name}, ${TERRAIN_TEXT[stop.terrain].name}: pays ${goal.reward}">${STOP_ICONS.battle}</span>`
 }
 
-/** A zone at a fork: each of its stops, and what it costs. Clicking it commits the squad to it. */
+/** A zone at a fork: its stops as three icons, and every alien in it by count. Clicking it commits the squad to it. */
 function zoneCard(zone: Zone, index: number): string {
-  return button({ type: 'zone', index }, `<div class="aliens">${zone.stops.map(stopRow).join('')}</div><small>+${zone.stops.length} threat</small>`, 'zone')
+  const battles = zone.stops.filter((s) => s.kind === 'battle')
+  const commanders = battles.filter((s) => s.goal === 'assassinate').length
+  const aliens = census(battles.flatMap((s) => s.packs)) + (commanders > 0 ? `, ${commanders} Commander${commanders === 1 ? '' : 's'}` : '')
+  return button({ type: 'zone', index }, `<div class="nodes">${zone.stops.map(stopIcon).join('<span class="arrow">→</span>')}</div><span>${aliens}</span>`, 'zone')
 }
 
 /** The words on the button that travels to the next stop. */
