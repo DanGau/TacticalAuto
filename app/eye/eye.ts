@@ -81,6 +81,8 @@ const commands: Record<string, Command> = {
   snapshot: (page) => page.evaluate(() => debug.snapshot()),
   /** apply <action json> */
   apply: (page, action) => page.evaluate((a) => debug.apply(a), JSON.parse(action)),
+  /** edit <js over `state`>: changes the live run, to set up a scene. */
+  edit: (page, code) => page.evaluate((c) => debug.edit(c), code),
   /** step [n] */
   step: (page, n = '1') => page.evaluate((n) => debug.step(n), Number(n)),
   /** step-until <expression over `state`> [max beats] */

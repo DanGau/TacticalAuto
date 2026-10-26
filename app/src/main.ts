@@ -10,6 +10,8 @@ export interface Debug {
   apply(action: Action): Result
   /** Advances n beats, shows the result without animation, and returns the state. */
   step(n: number): Run
+  /** Runs `code` with `state` bound to the live run, shows the result, and returns the state. */
+  edit(code: string): Run
 }
 
 declare global {
@@ -49,6 +51,11 @@ window.debug = {
     let events: GameEvent[] = []
     for (let i = 0; i < n; i++) events = step(state)
     void show(events, false)
+    return structuredClone(state)
+  },
+  edit(code) {
+    new Function('state', code)(state)
+    void show([], false)
     return structuredClone(state)
   },
 }

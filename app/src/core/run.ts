@@ -258,7 +258,8 @@ export function stockShop(run: Run): Shop {
     const gear = generateGear(run, run.nextGear, random(run) < SHOP_EPIC ? 'epic' : 'rare')
     if (wares.some((w) => w.gear.effect === gear.effect)) continue
     run.nextGear++
-    const rank = (s: Soldier) => (s.gear[gear.slot] ? RARITY_RANK[s.gear[gear.slot]!.rarity] + 1 : 0)
+    // The soldier worst equipped in its slot, spread across the squad: each ware already fitted to one counts as a rank.
+    const rank = (s: Soldier) => (s.gear[gear.slot] ? RARITY_RANK[s.gear[gear.slot]!.rarity] + 1 : 0) + wares.filter((w) => w.soldier === s.id).length
     const fits = run.soldiers.filter((s) => rank(s) === Math.min(...run.soldiers.map(rank)))
     wares.push({ gear, soldier: fits[randomInt(run, fits.length)].id })
   }

@@ -65,6 +65,10 @@ const COLOR = {
   heal: 0x7ddc5a,
   acid: 0xa6e22e,
   fire: 0xff6a1f,
+  spike: 0xc9d1dc,
+  /** Ring under a rooted unit, and under one charged by a booming hit. */
+  rooted: 0x8fd14f,
+  booming: 0xff9a3d,
   psi: 0xff6bd6,
   contact: 0xff6b5e,
   uplink: 0xffd84d,
@@ -483,7 +487,7 @@ export async function createView(): Promise<View> {
   }
 
 
-  /** Tints every tile of acid or fire, and marks every tile of caltrops. */
+  /** Tints every tile of acid or fire, marks every tile of caltrops, and rings each unit rooted or charged. */
   function drawAcid(battle: Battle): void {
     acid.clear()
     for (const pool of battle.acid) diamond(acid, pool.x, pool.y).fill({ color: COLOR.acid, alpha: 0.45 })
@@ -491,7 +495,11 @@ export async function createView(): Promise<View> {
     // Caltrops: a scatter of spikes across the tile.
     for (const tile of battle.caltrops) {
       const c = toWorld(tile.x, tile.y)
-      for (const [dx, dy] of [[-12, -2], [0, -6], [12, -2], [-6, 4], [6, 4]]) acid.poly([c.x + dx, c.y + dy - 4, c.x + dx + 3, c.y + dy + 1, c.x + dx - 3, c.y + dy + 1]).fill(COLOR.miss)
+      for (const [dx, dy] of [[-12, -2], [0, -6], [12, -2], [-6, 4], [6, 4]]) acid.poly([c.x + dx, c.y + dy - 4, c.x + dx + 3, c.y + dy + 1, c.x + dx - 3, c.y + dy + 1]).fill(COLOR.spike)
+    }
+    for (const unit of battle.units.filter((u) => u.hp > 0 && revealed(battle, u))) {
+      if (unit.rooted > 0) diamond(acid, unit.x, unit.y).stroke({ color: COLOR.rooted, width: 3, alpha: 0.9 })
+      if (unit.booming > 0) diamond(acid, unit.x, unit.y).stroke({ color: COLOR.booming, width: 2, alpha: 0.9 })
     }
   }
 
