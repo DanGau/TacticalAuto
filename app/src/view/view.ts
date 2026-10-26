@@ -216,14 +216,17 @@ export async function createView(): Promise<View> {
   const units = new Container()
   units.sortableChildren = true
   const fog = new Graphics()
+  const lurk = new Container()
   const fx = new Graphics()
   const world = new Container()
-  world.addChild(tiles, zones, acid, fog, units, fx, marks, labels)
+  world.addChild(tiles, zones, acid, fog, lurk, units, fx, marks, labels)
   // Nothing shows until a battle exists.
   world.visible = false
   app.stage.addChild(world)
 
   const sprites = new Map<number, Sprite>()
+  /** A red glow under each alien the squad hasn't found, by unit id. */
+  const glows = new Map<number, { node: Graphics; tile: Tile }>()
   /** Each prop, wall and window on the board, with the tiles that light it: it is lit when a soldier sees any of them. */
   const scenery: { node: Graphics; tiles: number[] }[] = []
   /** The battle on screen. */
@@ -403,6 +406,8 @@ export async function createView(): Promise<View> {
     heights = battle.height
     selected = null
     sprites.clear()
+    glows.clear()
+    lurk.removeChildren().forEach((child) => child.destroy())
     scenery.length = 0
     units.removeChildren().forEach((child) => child.destroy({ children: true }))
     drawTerrain(battle)
@@ -443,19 +448,32 @@ export async function createView(): Promise<View> {
   }
 
   /** Darkens every tile no soldier sees, and whatever stands on it. Before the landing nothing is fogged. */
-  function drawFog(battle: Battle): void {
+  function drawFog(battle: Battle, snap = false): void {
     fog.clear()
     const seen = battle.phase === 'deploy' ? null : visibleTiles(battle)
     const tint = (tile: number) => (!seen || seen[tile] ? 0xffffff : COLOR.dim)
     seen?.forEach((lit, i) => {
       if (!lit) diamond(fog, i % GRID, Math.floor(i / GRID)).fill({ color: COLOR.fog, alpha: 0.55 })
     })
-    if (seen) {
-      for (const unit of battle.units) {
-        if (unit.hp <= 0 || revealed(battle, unit)) continue
-        const c = toWorld(unit.x, unit.y)
-        for (const [scale, alpha] of [[1, 0.12], [0.65, 0.14], [0.35, 0.16]]) fog.ellipse(c.x, c.y, (TILE_W / 2) * scale, (TILE_H / 2) * scale).fill({ color: COLOR.lurk, alpha })
-      }
+    // Mid-beat, a glow stays where its slide left it; the battle already holds where the alien ends up.
+    const lurking = seen ? battle.units.filter((u) => u.hp > 0 && !revealed(battle, u)) : []
+    const ids = new Set(lurking.map((u) => u.id))
+    for (const [id, glow] of glows) {
+      if (ids.has(id)) continue
+      glow.node.destroy()
+      glows.delete(id)
+    }
+    for (const unit of lurking) {
+      let glow = glows.get(unit.id)
+      if (!glow) {
+        const node = new Graphics()
+        for (const [scale, alpha] of [[1, 0.12], [0.65, 0.14], [0.35, 0.16]]) node.ellipse(0, 0, (TILE_W / 2) * scale, (TILE_H / 2) * scale).fill({ color: COLOR.lurk, alpha })
+        lurk.addChild(node)
+        glow = { node, tile: unit }
+        glows.set(unit.id, glow)
+      } else if (!snap) continue
+      glow.tile = { x: unit.x, y: unit.y }
+      glow.node.position.copyFrom(toWorld(unit.x, unit.y))
     }
     for (const { node, tiles: lit } of scenery) node.tint = !seen || lit.some((tile) => seen[tile]) ? 0xffffff : COLOR.dim
     for (const sprite of sprites.values()) sprite.node.tint = tint(Math.round(sprite.tile.y) * GRID + Math.round(sprite.tile.x))
@@ -540,6 +558,18 @@ export async function createView(): Promise<View> {
       const along = t * path.length
       const i = Math.min(Math.floor(along), path.length - 1)
       place(sprite, lerp(points[i], points[i + 1], along - i))
+    })
+  }
+
+  /** Slides an unfound alien's glow along its path through the fog. */
+  function glide(glow: { node: Graphics; tile: Tile }, path: Tile[]): Promise<void> {
+    const points = [glow.tile, ...path]
+    glow.tile = path.at(-1)!
+    return tween(MS_PER_TILE * path.length, (t) => {
+      const along = t * path.length
+      const i = Math.min(Math.floor(along), path.length - 1)
+      const at = lerp(points[i], points[i + 1], along - i)
+      glow.node.position.copyFrom(toWorld(at.x, at.y))
     })
   }
 
@@ -644,10 +674,14 @@ export async function createView(): Promise<View> {
         for (; events[i]?.type === 'move'; i++) moves.push(events[i] as Extract<GameEvent, { type: 'move' }>)
         i--
         const seen = moves.filter((m) => sprites.has(m.id))
-        if (seen.length === 0) continue
+        const glides = moves.filter((m) => glows.has(m.id)).map((m) => glide(glows.get(m.id)!, m.path))
+        if (seen.length === 0) {
+          await Promise.all(glides)
+          continue
+        }
         await follow(seen.flatMap((m) => [sprites.get(m.id)!.tile, m.path.at(-1)!]))
         for (const m of seen) if (m.with) float(callout(effectName(m.with).toUpperCase(), 0xffffff, sprites.get(m.id)!))
-        await Promise.all(seen.map((m) => walk(sprites.get(m.id)!, m.path)))
+        await Promise.all([...glides, ...seen.map((m) => walk(sprites.get(m.id)!, m.path))])
         // The fog lifts where the squad arrived, before any pod it uncovered appears.
         drawFog(battle)
       } else if (e.type === 'reveal' || e.type === 'wave') {
@@ -764,7 +798,7 @@ export async function createView(): Promise<View> {
       if (animate) await play(battle, events)
       sync(run, battle)
       if (events.some((e) => e.type === 'rocket' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(battle)
-      drawFog(battle)
+      drawFog(battle, true)
       const landed = deploying && battle.phase !== 'deploy'
       deploying = battle.phase === 'deploy'
       if (landed && animate) await dropPods(battle)
