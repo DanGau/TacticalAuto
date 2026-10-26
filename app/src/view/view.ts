@@ -54,6 +54,8 @@ const COLOR = {
   zone: 0x2f6fb0,
   zoneHover: 0x4d9be6,
   fog: 0x05070b,
+  /** Glow under an alien the squad hasn't found, so the player sees trouble coming. */
+  lurk: 0xff3030,
   /** Tint of a cover block or unit standing in fog. */
   dim: 0x5a5f6b,
   line: 0x10141c,
@@ -448,6 +450,13 @@ export async function createView(): Promise<View> {
     seen?.forEach((lit, i) => {
       if (!lit) diamond(fog, i % GRID, Math.floor(i / GRID)).fill({ color: COLOR.fog, alpha: 0.55 })
     })
+    if (seen) {
+      for (const unit of battle.units) {
+        if (unit.hp <= 0 || revealed(battle, unit)) continue
+        const c = toWorld(unit.x, unit.y)
+        for (const [scale, alpha] of [[1, 0.12], [0.65, 0.14], [0.35, 0.16]]) fog.ellipse(c.x, c.y, (TILE_W / 2) * scale, (TILE_H / 2) * scale).fill({ color: COLOR.lurk, alpha })
+      }
+    }
     for (const { node, tiles: lit } of scenery) node.tint = !seen || lit.some((tile) => seen[tile]) ? 0xffffff : COLOR.dim
     for (const sprite of sprites.values()) sprite.node.tint = tint(Math.round(sprite.tile.y) * GRID + Math.round(sprite.tile.x))
   }
