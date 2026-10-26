@@ -8,6 +8,7 @@ import type { GameEvent } from '../core/combat'
 import { level, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
 import type { Edge, Ground, Prop } from '../core/terrain'
+import { weaponOf, type Weapon } from './weapons'
 
 export const WIDTH = 1280
 export const HEIGHT = 720
@@ -34,7 +35,6 @@ const POD_STAGGER_MS = 160
 const POD_HEIGHT = 400
 const MS_PER_TILE = 110
 const REVEAL_MS = 450
-const SHOT_MS = 160
 const IMPACT_MS = 140
 const DEATH_MS = 260
 const CALLOUT_MS = 900
@@ -225,6 +225,8 @@ export async function createView(): Promise<View> {
   app.stage.addChild(world)
 
   const sprites = new Map<number, Sprite>()
+  /** The squad of the run shown, for each soldier's class. */
+  let soldiers: Run['soldiers'] = []
   /** A red glow under each alien the squad hasn't found, by unit id. */
   const glows = new Map<number, { node: Graphics; tile: Tile }>()
   /** Each prop, wall and window on the board, with the tiles that light it: it is lit when a soldier sees any of them. */
@@ -573,25 +575,136 @@ export async function createView(): Promise<View> {
     })
   }
 
-  async function shoot(from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: [number, number]): Promise<void> {
+  /** Jolts the camera, fading out over `ms`. */
+  function shake(power: number, ms = 240): Promise<void> {
+    if (power === 0) return Promise.resolve()
+    const at = camera
+    return tween(ms, (t) => {
+      look(at)
+      world.position.x += (Math.random() * 2 - 1) * power * (1 - t)
+      world.position.y += (Math.random() * 2 - 1) * power * (1 - t)
+    }).then(() => look(at))
+  }
+
+  /** Projectiles fly from the muzzle at `a` to each of `ends`. */
+  function fire(a: Tile, ends: Tile[], gun: Weapon): Promise<void> {
+    const total = gun.ms + gun.stagger * (ends.length - 1)
+    return tween(total, (t) => {
+      fx.clear()
+      ends.forEach((b, i) => {
+        const local = Math.min(1, Math.max(0, (t * total - i * gun.stagger) / gun.ms))
+        if (local === 0) return
+        // The muzzle flash: a burst at the barrel that dies as the round leaves.
+        if (local < 0.3) fx.circle(a.x, a.y, gun.flash * (1 - local / 0.3)).fill({ color: gun.core, alpha: 0.9 })
+        if (gun.style === 'bolt') {
+          const head = lerp(a, b, local)
+          const tail = lerp(a, b, Math.max(0, local - 0.35))
+          const glint = lerp(a, b, Math.max(0, local - 0.12))
+          fx.moveTo(tail.x, tail.y).lineTo(head.x, head.y).stroke({ color: gun.color, width: gun.width })
+          fx.moveTo(glint.x, glint.y).lineTo(head.x, head.y).stroke({ color: gun.core, width: 1 })
+        } else if (gun.style === 'orb') {
+          for (let k = 4; k >= 0; k--) {
+            const at = lerp(a, b, Math.max(0, local - k * 0.05))
+            fx.circle(at.x, at.y, gun.width * 2 * (1 - k * 0.15)).fill({ color: gun.color, alpha: 0.07 * (5 - k) })
+          }
+          const head = lerp(a, b, local)
+          fx.circle(head.x, head.y, gun.width).fill(gun.color).circle(head.x, head.y, gun.width / 2).fill(gun.core)
+        } else {
+          // A beam charges at the muzzle, then fires all at once and thins away.
+          const charge = 0.4
+          if (local < charge) fx.circle(a.x, a.y, (gun.flash * local) / charge).fill({ color: gun.color, alpha: 0.5 }).circle(a.x, a.y, (gun.flash * local) / charge / 2).fill(gun.core)
+          else {
+            const fade = 1 - (local - charge) / (1 - charge)
+            fx.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: gun.color, width: gun.width * 2 * fade, alpha: 0.4 })
+            fx.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: gun.core, width: Math.max(1, gun.width * fade) })
+          }
+        }
+      })
+    })
+  }
+
+  /** The attacker winds back, lunges in, rakes the target with a slash per bolt, and steps back. */
+  async function strike(from: Sprite, to: Sprite, gun: Weapon, ends: Tile[], hit: boolean): Promise<void> {
+    const home = toWorld(from.tile.x, from.tile.y)
+    const dx = to.node.x - home.x
+    const dy = to.node.y - home.y
+    const len = Math.hypot(dx, dy) || 1
+    const reach = Math.min(len * 0.55, 40)
+    const nudge = (d: number) => from.node.position.set(home.x + (dx / len) * d, home.y + (dy / len) * d)
+    await tween(gun.ms, (t) => nudge(-gun.flash * t))
+    await tween(gun.ms * 0.6, (t) => nudge(-gun.flash + (reach + gun.flash) * t * t))
+    await tween(gun.ms * 1.5, (t) => {
+      fx.clear()
+      if (!hit) return
+      ends.forEach((b, i) => {
+        const local = Math.min(1, Math.max(0, t * ends.length - i * 0.6))
+        if (local === 0) return
+        const lean = (i - (ends.length - 1) / 2) * 7
+        const start = { x: b.x - 14 + lean, y: b.y - 14 }
+        const head = lerp(start, { x: b.x + 14 + lean, y: b.y + 12 }, Math.min(1, local * 1.6))
+        fx.moveTo(start.x, start.y).lineTo(head.x, head.y).stroke({ color: gun.color, width: gun.width * (1 - local * 0.6), alpha: 1 - local * 0.5 })
+      })
+    })
+    void tween(gun.ms * 2, (t) => nudge(reach * (1 - t)))
+  }
+
+  /** Sparks fly off the impact point, onward from the shot, and a ring spreads. */
+  function burst(at: Tile, dir: Tile, color: number, count: number, size: number): Promise<void> {
+    const sparks = Array.from({ length: count }, () => {
+      const angle = Math.atan2(dir.y, dir.x) + (Math.random() - 0.5) * 2.2
+      const speed = (20 + Math.random() * 30) * size
+      return { vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 10 }
+    })
+    return tween(IMPACT_MS * 1.6, (t) => {
+      fx.clear().circle(at.x, at.y, (4 + 14 * size) * t).stroke({ color, width: 3 * (1 - t), alpha: 1 - t })
+      for (const s of sparks) fx.circle(at.x + s.vx * t, at.y + s.vy * t + 30 * t * t, 2 * (1 - t) + 0.5).fill({ color, alpha: 1 - t })
+    })
+  }
+
+  /**
+   * A shot plays as its weapon: the projectile or lunge, then on a hit a freeze on the blow with the target squashed and
+   * flashing, a camera jolt, a knockback and sparks, all harder on a crit. A miss sails past and ricochets.
+   */
+  async function shoot(from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: [number, number], gun: Weapon): Promise<void> {
     const { hit, crit } = e
     const a = chest(from)
     // A miss flies past above the target.
-    const b = hit ? chest(to) : { x: to.node.x + 10, y: to.node.y - CHEST - 26 }
-    await tween(SHOT_MS, (t) => {
-      const head = lerp(a, b, t)
-      const tail = lerp(a, b, Math.max(0, t - 0.35))
-      fx.clear().moveTo(tail.x, tail.y).lineTo(head.x, head.y).stroke({ color: hit ? COLOR.hit : COLOR.miss, width: 3 })
+    const aim = hit ? chest(to) : { x: to.node.x + 10, y: to.node.y - CHEST - 26 }
+    const len = Math.hypot(aim.x - a.x, aim.y - a.y) || 1
+    const dir = { x: (aim.x - a.x) / len, y: (aim.y - a.y) / len }
+    const ends = Array.from({ length: gun.bolts }, (_, i) => {
+      const off = gun.bolts === 1 ? 0 : (i / (gun.bolts - 1) - 0.5) * gun.spread + (Math.random() - 0.5) * gun.spread * 0.3
+      return { x: aim.x - dir.y * off, y: aim.y + dir.x * off }
     })
+    if (gun.style === 'strike') await strike(from, to, gun, ends, hit)
+    else await fire(a, ends, gun)
     fx.clear()
     float(shotCallout(e, to))
     // What of the shooter's shaped the shot, named over the shooter.
     if (e.with.length > 0) float(callout(e.with.map((effect) => effectName(effect).toUpperCase()).join(' · '), 0xffffff, from))
-    if (!hit) return
+    if (!hit) {
+      if (gun.style !== 'strike') await burst(aim, dir, COLOR.miss, 3, 0.5)
+      fx.clear()
+      return
+    }
     drawHp(to, ...after)
-    await tween(IMPACT_MS, (t) => {
-      fx.clear().circle(b.x, b.y, 4 + (crit ? 26 : 12) * t).fill({ color: crit ? COLOR.crit : COLOR.hit, alpha: 1 - t })
+    const power = crit ? 2 : 1
+    const home = toWorld(to.tile.x, to.tile.y)
+    const scale = to.node.scale.x
+    to.node.scale.set(scale * 1.2, scale * 0.8)
+    await tween(gun.hitstop * power, () => {
+      fx.clear().circle(aim.x, aim.y, 10 * power).fill({ color: 0xffffff, alpha: 0.9 })
     })
+    void shake(gun.shake * power)
+    const kick = gun.kick * power
+    void tween(IMPACT_MS * 1.6, (t) => {
+      const push = kick * Math.sin(Math.PI * Math.min(1, t * 1.4)) * (1 - t)
+      to.node.position.set(home.x + dir.x * push, home.y + dir.y * push)
+      to.node.scale.set(scale * (1.2 - 0.2 * t), scale * (0.8 + 0.2 * t))
+    })
+    await burst(aim, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, power)
+    to.node.position.copyFrom(home)
+    to.node.scale.set(scale)
     fx.clear()
   }
 
@@ -699,7 +812,8 @@ export async function createView(): Promise<View> {
         const to = sprites.get(e.target)
         if (!from || !to) continue
         await follow([from.tile, to.tile])
-        await shoot(from, to, e, vitals(battle, e.target))
+        const shooter = battle.units.find((u) => u.id === e.id)!
+        await shoot(from, to, e, vitals(battle, e.target), weaponOf(shooter, soldiers.find((s) => s.id === shooter.soldier)?.cls ?? null))
       } else if (e.type === 'rocket') {
         const from = sprites.get(e.id)
         if (!from && !e.hits.some((hit) => sprites.has(hit.target))) continue
@@ -786,6 +900,7 @@ export async function createView(): Promise<View> {
       void follow({ ...framed, y: framed.y + (zone === null ? 0 : PANEL / framed.zoom) }, FOCUS_MS)
     },
     async show(run, events, animate) {
+      soldiers = run.soldiers
       fx.clear()
       const battle = run.battle
       if (!battle) return
