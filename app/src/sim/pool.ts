@@ -19,6 +19,9 @@ const BUNDLE = (() => {
   return out
 })()
 
+/** Heap each worker may use, in MB. */
+const WORKER_HEAP_MB = 512
+
 /** Each bot's win rate over `runs` seeds from `start`, with `tuning` in place and the squad holding `doctrines` from the start, played on `threads` worker threads. */
 export async function winRates(bots: string[], runs: number, start: number, tuning: Tuning, threads = availableParallelism() - 1, doctrines: DoctrineId[] = []): Promise<Record<string, number>> {
   const jobs = bots.flatMap((bot) => Array.from({ length: runs }, (_, i) => ({ bot, seed: start + i })))
@@ -27,9 +30,11 @@ export async function winRates(bots: string[], runs: number, start: number, tuni
     slices.map(
       (slice) =>
         new Promise<{ bot: string; won: boolean }[]>((resolve, reject) => {
-          const worker = new Worker(BUNDLE, { workerData: { tuning, jobs: slice, doctrines } })
+          // A capped heap fails one worker loudly instead of starving the machine until some process crashes.
+          const worker = new Worker(BUNDLE, { workerData: { tuning, jobs: slice, doctrines }, resourceLimits: { maxOldGenerationSizeMb: WORKER_HEAP_MB } })
           worker.once('message', resolve)
           worker.once('error', reject)
+          worker.once('exit', (code) => reject(new Error(`sim worker exited with code ${code} before reporting`)))
         }),
     ),
   )

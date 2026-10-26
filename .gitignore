@@ -2,3 +2,4 @@ node_modules/
 dist/
 app/screenshots/
 app/.eye/
+app/.tune.json

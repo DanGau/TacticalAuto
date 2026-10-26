@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { bots } from '../bots/bots'
 import { TUNING } from '../core/tuning'
@@ -68,14 +68,33 @@ const HELD_OUT = 1_000_000
 /** How much less a move must miss by to count, as two standard errors of a win rate near half at this many runs. */
 const MARGIN = 2 * Math.sqrt(0.25 / runs)
 
+/**
+ * Progress saved after every step, so a climb that crashes resumes where it stopped. It applies only while tuning.ts
+ * and the runs asked for match the ones it began with.
+ */
+const CHECKPOINT = new URL('../../.tune.json', import.meta.url)
+interface Checkpoint {
+  start: Tuning
+  runs: number
+  best: { tuning: Tuning; rates: Record<string, number>; miss: number }
+  round: number
+  knob: number
+  improved: boolean
+}
+const saved: Checkpoint | null = existsSync(CHECKPOINT) ? JSON.parse(readFileSync(CHECKPOINT, 'utf8')) : null
+const resumed = saved && saved.runs === runs && JSON.stringify(saved.start) === JSON.stringify(TUNING) ? saved : null
+const save = (c: Checkpoint) => writeFileSync(CHECKPOINT, JSON.stringify(c))
+
 // Greedy hill climb: try each knob a step either way on the same seeds, and keep a move that misses the bands by
 // clearly less than chance would.
 const start = structuredClone(TUNING) as Tuning
-let best = { tuning: start, ...(await score(start, 0)) }
-console.log(`start  miss ${round(best.miss)}`)
-for (let round_ = 0; round_ < Number(values.rounds) && best.miss > 0; round_++) {
-  let improved = false
-  for (const knob of KNOBS) {
+let best = resumed?.best ?? { tuning: start, ...(await score(start, 0)) }
+console.log(`${resumed ? `resumed at round ${resumed.round + 1}, knob ${resumed.knob + 1}` : 'start'}  miss ${round(best.miss)}`)
+for (let round_ = resumed?.round ?? 0; round_ < Number(values.rounds) && best.miss > 0; round_++) {
+  let improved = round_ === resumed?.round && resumed.improved
+  for (let k = round_ === resumed?.round ? resumed.knob : 0; k < KNOBS.length; k++) {
+    save({ start, runs, best, round: round_, knob: k, improved })
+    const knob = KNOBS[k]
     for (const by of [knob.step, -knob.step]) {
       const tuning = moved(best.tuning, knob, by)
       if (!tuning) continue
@@ -94,6 +113,7 @@ for (let round_ = 0; round_ < Number(values.rounds) && best.miss > 0; round_++) 
 const [before, after] = [await score(start, HELD_OUT), await score(best.tuning, HELD_OUT)]
 const kept = after.miss < before.miss
 if (kept) write(best.tuning)
+rmSync(CHECKPOINT, { force: true })
 console.log(`held-out miss ${round(before.miss)} → ${round(after.miss)}: ${kept ? 'tuning.ts rewritten' : 'tuning.ts unchanged'}`)
 const { table, warnings } = compare((kept ? after : before).rates)
 console.log([table, ...warnings.map((w) => `WARN ${w}`)].join('\n'))
