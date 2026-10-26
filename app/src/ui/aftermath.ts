@@ -4,7 +4,7 @@ import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { KEYS, level, SELL, skillOffers, soldierStats, xpFor, squadKeywords, type Report, type Run, type Soldier } from '../core/run'
 import { PATHS, SKILLS } from '../core/skills'
-import { button, describe, gearCard, keyRow, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
+import { button, describe, gearCard, gearText, keyRow, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
 
 /** A soldier's card: level, an experience bar filling toward the next level, and a level gained, or that the soldier fell. */
 function soldierCard(soldier: Report['soldiers'][number]): string {
@@ -39,7 +39,7 @@ function findChoice(run: Run): string {
     return `<tr><td>${STAT_NAMES[key]}</td><td>${show(now[key])}</td><td>→</td><td class="${delta > 0 ? 'down' : 'up'}">${show(then[key])}</td></tr>`
   })
   const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
-  return `<h2><b>${soldier.name}</b> found ${gear.rarity === 'common' ? 'some' : `${gear.rarity}`} gear${more}</h2>
+  return `<h2><b>${soldier.name}</b> found ${gear.rarity} gear as good as theirs and can't decide. <i>"You pick, boss."</i>${more}</h2>
     <div class="compare">
       <div class="gear ${old?.rarity ?? ''}"><small>Equipped</small><br>${old ? gearCard(old) : `<small>Empty ${gear.slot} slot</small>`}</div>
       <span class="arrow">→</span>
@@ -50,6 +50,13 @@ function findChoice(run: Run): string {
       ${button({ type: 'keep' }, `<b>Equip on ${soldier.name}</b>${old ? `<br><small>Sells ${old.name} for ${SELL[old.rarity]}</small>` : ''}`, 'decide')}
       ${button({ type: 'sell' }, `<b>Sell</b><br><small>+${SELL[gear.rarity]} supplies</small>`, 'decide')}
     </div>`
+}
+
+/** Finds their finders decided alone: who, what, worn or sold, and what they said. */
+export function decisions(run: Run): string {
+  return run.decisions
+    .map(({ soldier, gear, kept, line }) => `<p class="decision"><b>${soldier}</b> ${kept ? 'wears' : 'sells'} the <span class="${gear.rarity}" title="${gearText(gear)}">${gear.rarity} ${gear.name}</span>${kept ? '' : ` for ${SELL[gear.rarity]} supplies`}. <i>${line}</i></p>`)
+    .join('')
 }
 
 /** A skill for a soldier to learn: at the first, one of the class's two paths; after it, one of the path's next pair. */
@@ -92,6 +99,7 @@ export function stopReport(run: Run, report: Report): string {
       ${report.hired ? `<p class="down"><b>A new clone joins the squad: ${report.hired}.</b></p>` : ''}
       ${report.rescued !== null ? `<p class="down">${report.rescued} of ${CIVILIANS} civilians rescued</p>` : ''}
       ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : ''}
+      ${decisions(run)}
     </div>
     ${squad}
     <div class="stage ${squad ? 'third' : 'second'}">${last}</div>`

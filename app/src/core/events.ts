@@ -323,6 +323,7 @@ function openShop(run: Run): void {
  * shop or meets an event not met before this run. Either adds threat as a stop does.
  */
 export function arrive(run: Run): void {
+  run.decisions = []
   const unknown = nextStop(run) === 'unknown'
   const roll = random(run)
   if (unknown && roll < UNKNOWN_CHANCE.battle) {

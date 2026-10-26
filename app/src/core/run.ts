@@ -104,6 +104,14 @@ export interface Find {
   gear: Gear
 }
 
+/** A find its finder decided alone: worn or sold, and what the finder said. */
+export interface Decision {
+  soldier: string
+  gear: Gear
+  kept: boolean
+  line: string
+}
+
 /** What the last stop changed, for the player to review. */
 export interface Report {
   /** The stop: a mission fought, or an event met on the road. */
@@ -167,6 +175,8 @@ export interface Run {
   supplies: number
   /** Gear found and not yet equipped or sold, decided in order. */
   finds: Find[]
+  /** Finds their finders decided alone at the last stop. */
+  decisions: Decision[]
   nextGear: number
   /** Facilities built, one entry per level. */
   built: FacilityId[]
@@ -412,6 +422,7 @@ export function createRun(seed: number): Run {
     nextSoldier: 1,
     supplies: START_SUPPLIES,
     finds: [],
+    decisions: [],
     nextGear: 1,
     built: [],
     relics: [],
@@ -450,10 +461,36 @@ function rollRarity(run: Run, lucky: boolean): Rarity {
   return roll < RARITY_CHANCE.common ? 'common' : roll < RARITY_CHANCE.common + RARITY_CHANCE.rare ? 'rare' : 'epic'
 }
 
-/** A piece of gear found by a soldier drawn at random. */
+const RARITY_RANK: Record<Rarity, number> = { common: 0, rare: 1, epic: 2 }
+
+/** What a finder says on deciding a find alone, by whether the slot was empty, the find better, or worse. */
+const BLURBS = {
+  empty: ['"Finders keepers."', '"Was this anyone\'s? It\'s mine now."', '"Oh, that\'s going on immediately."', '"Naked no more!"'],
+  better: ['"Upgrade! The old one can go live on a farm."', '"Yes. Yes, you\'ll do."', '"Out with the old, in with the shiny."', '"I deserve this. Don\'t look it up."'],
+  worse: ['"I have standards."', '"Downgrade? In this economy?"', '"Sell it. Sentiment is for the dead."', '"Mine\'s better. Obviously."'],
+}
+
+/**
+ * A piece of gear found by a soldier drawn at random. The finder decides alone, with a word on why: an empty slot or a
+ * rarer find is worn, selling what it replaces; a commoner one is sold. A find as rare as what the finder wears waits
+ * for the player in run.finds.
+ */
 export function dropGear(run: Run, lucky: boolean): void {
   const gear = generateGear(run, run.nextGear++, rollRarity(run, lucky))
-  run.finds.push({ soldier: run.soldiers[randomInt(run, run.soldiers.length)].id, gear })
+  const soldier = run.soldiers[randomInt(run, run.soldiers.length)]
+  const old = soldier.gear[gear.slot]
+  if (old && RARITY_RANK[old.rarity] === RARITY_RANK[gear.rarity]) {
+    run.finds.push({ soldier: soldier.id, gear })
+    return
+  }
+  const kept = !old || RARITY_RANK[gear.rarity] > RARITY_RANK[old.rarity]
+  const lines = BLURBS[!old ? 'empty' : kept ? 'better' : 'worse']
+  const line = lines[randomInt(run, lines.length)]
+  if (kept) {
+    if (old) run.supplies += SELL[old.rarity]
+    soldier.gear[gear.slot] = gear
+  } else run.supplies += SELL[gear.rarity]
+  run.decisions.push({ soldier: soldier.name, gear, kept, line })
 }
 
 /** Moves past the zone's current stop; past its last, sets what lies ahead. */
@@ -467,6 +504,7 @@ export function advance(run: Run): void {
   const here = run.zone!.stops[run.stop]
   const stop = nextStop(run)!
   if (stop === 'shop' || stop === 'unknown') throw new Error('a shop or unknown stop is arrived at, not advanced to')
+  run.decisions = []
   if (stop === 'supply' || stop === 'cache') {
     const before = run.threat
     run.threat = Math.min(run.threat + STOP_THREAT, THREAT_MAX)

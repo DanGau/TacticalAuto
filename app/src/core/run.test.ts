@@ -31,6 +31,8 @@ import {
   xpFor,
   ZONE_STOPS,
   hire,
+  dropGear,
+  squadKeywords,
 } from './run'
 import { PATHS, SKILLS } from './skills'
 import { RELICS } from './relics'
@@ -99,14 +101,33 @@ test('a run begins with one trained clone choosing its path, at a fork of three 
 test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone adds threat, pays by the risk, gives experience, and gear its finder decides on', (risk) => {
   const run = travelling(['battle', 'battle'], risk)
   fight(run, 'human')
-  expect(run).toMatchObject({ phase: RISKS[risk].drops > 0 ? 'reward' : 'overworld', threat: STOP_THREAT, supplies: START_SUPPLIES + RISKS[risk].supplies, stop: 1 })
-  expect(run.finds).toHaveLength(RISKS[risk].drops)
-  expect(run.finds.every((find) => find.soldier === run.soldiers[0].id)).toBe(true)
-  if (RISKS[risk].rareGear) expect(run.finds[0].gear.rarity).not.toBe('common')
+  expect(run).toMatchObject({ threat: STOP_THREAT, stop: 1 })
+  expect(run.supplies).toBeGreaterThanOrEqual(START_SUPPLIES + RISKS[risk].supplies)
+  expect(run.finds.length + run.decisions.length).toBe(RISKS[risk].drops)
+  // The first find fills an empty slot, so its finder wears it without asking.
+  if (RISKS[risk].drops > 0) expect(run.decisions[0]).toMatchObject({ soldier: run.soldiers[0].name, kept: true })
+  if (RISKS[risk].rareGear) expect(run.decisions[0].gear.rarity).not.toBe('common')
   expect(run.report).toMatchObject({ stop: 'battle', won: true, threat: { before: 0, after: STOP_THREAT }, key: false, hired: null })
   expect(run.report!.soldiers).toMatchObject([{ xpBefore: 1, xpAfter: 2, downed: false }])
-  for (let i = 0; i < RISKS[risk].drops; i++) apply(run, { type: 'sell' })
+  while (run.finds.length > 0) apply(run, { type: 'sell' })
   expect(run.phase).toBe('overworld')
+})
+
+test('a finder wears a find for an empty slot or a rarer one, sells a commoner one, and asks only when they match', () => {
+  const run = started()
+  const rank = { common: 0, rare: 1, epic: 2 }
+  for (let i = 0; i < 60; i++) {
+    const before = structuredClone(run.soldiers[0].gear)
+    dropGear(run, false)
+    const decided = run.decisions.at(-1)
+    if (run.finds.length > 0) {
+      const { gear } = run.finds.pop()!
+      expect(before[gear.slot]!.rarity).toBe(gear.rarity)
+    } else if (decided!.kept) {
+      expect(run.soldiers[0].gear[decided!.gear.slot]).toBe(decided!.gear)
+      if (before[decided!.gear.slot]) expect(rank[decided!.gear.rarity]).toBeGreaterThan(rank[before[decided!.gear.slot]!.rarity])
+    } else expect(rank[decided!.gear.rarity]).toBeLessThan(rank[before[decided!.gear.slot]!.rarity])
+  }
 })
 
 test('a lost battle adds more threat and pays nothing; the fallen soldier is cloned anew with everything they had, but no experience', () => {
@@ -125,8 +146,8 @@ test('a supply drop and a cache are collected on arrival, each adding threat', (
   expect(run).toMatchObject({ phase: 'overworld', supplies: START_SUPPLIES + DROP_SUPPLIES, threat: STOP_THREAT, stop: 1 })
   expect(run.report).toMatchObject({ stop: 'supply', supplies: DROP_SUPPLIES, soldiers: [] })
   apply(run, { type: 'advance' })
-  expect(run).toMatchObject({ phase: 'reward', report: { stop: 'cache' } })
-  expect(run.finds).toHaveLength(1)
+  expect(run).toMatchObject({ report: { stop: 'cache' } })
+  expect(run.decisions).toMatchObject([{ kept: true }])
   expect(run.threat).toBe(2 * STOP_THREAT)
 })
 
@@ -145,7 +166,7 @@ test('after the forks of a leg comes its satellite: winning it wins a key, a new
   expect(run).toMatchObject({ keys: 1, fork: 0, zone: null, phase: 'reward' })
   expect(run.soldiers).toHaveLength(2)
   expect(run.report).toMatchObject({ stop: 'key', key: true, hired: run.soldiers[1].name })
-  expect(run.finds.every((find) => find.gear.rarity !== 'common')).toBe(true)
+  expect([...run.finds, ...run.decisions].every((find) => find.gear.rarity !== 'common')).toBe(true)
   expect(run.zones).toHaveLength(3)
 })
 
@@ -418,6 +439,6 @@ test("the first relic offered shares a keyword with the squad's skills, gear or 
     run.fork = FORKS
     run.zone = { stops: [stopOf('key')] }
     fight(run, 'human')
-    expect(RELICS[run.relicOffers[0]].tags).toContain('mark')
+    expect(RELICS[run.relicOffers[0]].tags!.some((tag) => squadKeywords(run).includes(tag))).toBe(true)
   }
 })

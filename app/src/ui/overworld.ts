@@ -9,6 +9,7 @@ import { RELICS } from '../core/relics'
 import { buildCost, built, KEYS, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Mission, type Muster, type Run, type Soldier, type Stop, type Zone } from '../core/run'
 import { PATHS, SKILLS, type SkillId } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
+import { decisions } from './aftermath'
 import { alienName, button, describe, gearCard, keywordChips, resistChip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
@@ -101,7 +102,7 @@ function mapView(run: Run): string {
   const next = nextStop(run)!
   const here = zone.stops[run.stop]
   const road = zone.stops.map((s, i) => chip(run, s, i < run.stop ? 'done' : i === run.stop ? 'here' : '')).join('<span class="arrow">→</span>')
-  return `<h2>${where(here)}</h2>
+  return `${run.report ? '' : decisions(run)}<h2>${where(here)}</h2>
     <div class="road">${road}</div>
     ${next === 'lastStand' ? '<p class="up"><b>The threat is full. The aliens attack before the squad can travel on.</b></p>' : ''}
     <button class="travel ${next}" data-action='${JSON.stringify({ type: 'advance' })}'>${travelLabel(run, here, next)}</button>`

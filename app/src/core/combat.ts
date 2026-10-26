@@ -162,7 +162,7 @@ function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: S
 
 /**
  * The cheapest path to each tile the unit can reach with `move`, climbing costing more, cheapest first,
- * starting with the empty path.
+ * starting with the empty path. Any first step is in reach.
  */
 function paths(battle: Battle, unit: Unit, move: number): Tile[][] {
   const best = new Map([[unit.y * GRID + unit.x, 0]])
@@ -178,7 +178,8 @@ function paths(battle: Battle, unit: Unit, move: number): Tile[][] {
         const y = from.y + dy
         if (blocked(battle, x, y) || !passable(battle, from, { x, y })) continue
         const next = cost + stepCost(battle, from, { x, y })
-        if (next > move || next >= (best.get(y * GRID + x) ?? Infinity)) continue
+        // A first step is always within reach of a unit that can move, so a climb dearer than its move cannot wall it in.
+        if ((next > move && !(cost === 0 && move > 0)) || next >= (best.get(y * GRID + x) ?? Infinity)) continue
         best.set(y * GRID + x, next)
         ;(buckets[next] ??= []).push([...path, { x, y }])
       }
@@ -390,7 +391,8 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   }
   // A unit whose perks pay for standing still holds a tile it can shoot from, unless the tile is acid, off the uplink, or too hot for a wary unit.
   const still = has(unit, 'steady') || has(unit, 'doubleTap')
-  if (still && mine(unit) > 0 && !leash(unit) && !acid(unit) && !(wary && theirs(unit) > 0)) return []
+  const shotHere = enemies.some((enemy) => revealed(battle, enemy) && shootable(battle, unit, unit, enemy, seen))
+  if (still && shotHere && !leash(unit) && !acid(unit) && !(wary && theirs(unit) > 0)) return []
   const move = Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0))
   const path = choose(move)
   if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
