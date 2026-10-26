@@ -71,6 +71,11 @@ const COLOR = {
   booming: 0xff9a3d,
   psi: 0xff6bd6,
   contact: 0xff6b5e,
+  /** Health left and lost, on an ally and on an enemy. */
+  allyHp: 0x4fe08a,
+  allyLost: 0x1f3a2a,
+  enemyHp: 0xff5555,
+  enemyLost: 0x3a2226,
   uplink: 0xffd84d,
 }
 
@@ -179,6 +184,8 @@ interface Sprite {
   /** The tile the sprite stands on, which lags the battle while a beat animates. */
   tile: Tile
   maxHp: number
+  /** Whether it fights for the squad, so its health shows in the ally colour. */
+  ally: boolean
 }
 
 /** What the camera shows: a world point at the screen's centre, and a zoom. */
@@ -291,13 +298,13 @@ export async function createView(): Promise<View> {
   }
 
   /**
-   * Draws a unit's health and armor as pips, one each, ten to a row, rows stacking upward: health left in red, health
-   * lost in dark, then armor in yellow.
+   * Draws a unit's health and armor as pips, one each, ten to a row, rows stacking upward: health left in green on an
+   * ally and red on an enemy, health lost in a dark shade of it, then armor in yellow.
    */
   function drawHp(sprite: Sprite, hp: number, armor: number): void {
     sprite.hp.clear()
     const lost = sprite.maxHp - Math.max(hp, 0)
-    const colors = [...Array(Math.max(hp, 0)).fill(0xff5555), ...Array(lost).fill(0x3a2226), ...Array(armor).fill(COLOR.hit)]
+    const colors = [...Array(Math.max(hp, 0)).fill(sprite.ally ? COLOR.allyHp : COLOR.enemyHp), ...Array(lost).fill(sprite.ally ? COLOR.allyLost : COLOR.enemyLost), ...Array(armor).fill(COLOR.hit)]
     colors.forEach((color, i) => {
       sprite.hp.rect(-PIP_ROW / 2 + (i % 10) * PIP_STEP, -38 - Math.floor(i / 10) * PIP_STEP, PIP, PIP).fill(color)
     })
@@ -314,7 +321,7 @@ export async function createView(): Promise<View> {
     const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR.civilian : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human)
     const rows = Math.ceil((unit.stats.hp + unit.stats.armor) / 10)
     for (let i = 0; i < pips; i++) body.circle(-9 + 6 * i, -40 - rows * PIP_STEP, 2).fill(COLOR.human)
-    const sprite: Sprite = { node: new Container(), hp: new Graphics(), tile: unit, maxHp: unit.stats.hp }
+    const sprite: Sprite = { node: new Container(), hp: new Graphics(), tile: unit, maxHp: unit.stats.hp, ally: unit.side === 'human' }
     sprite.node.addChild(body, sprite.hp)
     sprite.node.scale.set(unit.boss ? 1.6 : unit.target ? 1.3 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1)
     if (letter) {
