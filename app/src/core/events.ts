@@ -2,7 +2,7 @@ import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type DoctrineId } from './doctrines'
 import { RELICS, type RelicId } from './relics'
 import { random, randomInt } from './rng'
-import { advance, drawBattle, dropGear, hire, level, nextStop, passStop, settle, STOP_THREAT, THREAT_MAX, xpFor, type Run } from './run'
+import { advance, drawBattle, dropGear, hire, level, nextStop, passStop, settle, stockShop, STOP_THREAT, THREAT_MAX, xpFor, type Run } from './run'
 
 /** One way to meet an event: the squad's quip, what it does, whether the squad can, and doing it. */
 interface Option {
@@ -311,10 +311,9 @@ const encounters = {
 export type EventId = keyof typeof encounters
 export const EVENTS: Record<EventId, Encounter> = encounters
 
-/** Opens a shop: facilities, a relic, and a bribe. */
+/** Opens a shop: gear, relics, and a bribe. */
 function openShop(run: Run): void {
-  const relics = unheld(run)
-  run.shop = { relic: relics.length > 0 ? relics[randomInt(run, relics.length)] : null, bribed: false }
+  run.shop = stockShop(run)
   run.phase = 'shop'
 }
 

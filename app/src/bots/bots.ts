@@ -1,12 +1,11 @@
 import type { Action } from '../core/apply'
-import { FACILITIES, type FacilityId } from '../core/base'
 import { zoneInfo, type Battle } from '../core/battle'
 import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { SKILLS } from '../core/skills'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
-import { buildCost, danger, level, skillOffers, squadKeywords, THREAT_MAX, type Risk, type Run } from '../core/run'
+import { danger, GEAR_PRICE, level, skillOffers, squadKeywords, THREAT_MAX, type Risk, type Run } from '../core/run'
 
 /** Chooses the next action whenever the run waits for the player. `rng` is the bot's own, separate from the run's. */
 export type Bot = (run: Run, rng: { rng: number }) => Action
@@ -63,11 +62,11 @@ const LANDS = {
   },
 } satisfies Record<string, Land>
 
-/** Facilities the run can pay for now. */
-const affordable = (run: Run) => (Object.keys(FACILITIES) as FacilityId[]).filter((id) => (buildCost(run, id) ?? Infinity) <= run.supplies)
-
-/** What a building bot builds first. */
-const BUILD_ORDER: FacilityId[] = ['firingRange', 'workshop', 'optics', 'drills', 'academy', 'course']
+/** Purchases the run can pay for now: gear, then relics. */
+const affordable = (run: Run): Action[] => [
+  ...run.shop!.wares.flatMap((ware, index): Action[] => (GEAR_PRICE[ware.gear.rarity as keyof typeof GEAR_PRICE] <= run.supplies ? [{ type: 'gear', index }] : [])),
+  ...run.shop!.relics.flatMap((_, index): Action[] => (RELIC_PRICE <= run.supplies ? [{ type: 'buy', index }] : [])),
+]
 
 /** Takes the safest zones until the squad's mean level reaches 3, then the most dangerous. */
 const growing = (run: Run): Risk => (run.soldiers.reduce((sum, s) => sum + level(s), 0) / run.soldiers.length >= 3 ? 'dangerous' : 'safe')
@@ -87,11 +86,11 @@ interface Strategy {
 /** The options of the event under way the squad can take, by index. */
 const takeable = (run: Run) => EVENTS[run.event!].options.flatMap((option, i) => (!option.can || option.can(run) ? [i] : []))
 
-/** A spending bot's next purchase in a shop: facilities in BUILD_ORDER, then the relic, then a bribe once threat builds. */
+/** A spending bot's next purchase in a shop: a relic, then gear, then a bribe once threat builds. */
 function shop(run: Run): Action {
-  const facility = BUILD_ORDER.find((id) => affordable(run).includes(id))
-  if (facility) return { type: 'build', facility }
-  if (run.shop!.relic && run.supplies >= RELIC_PRICE) return { type: 'buy' }
+  const buys = affordable(run)
+  const buy = buys.find((a) => a.type === 'buy') ?? buys[0]
+  if (buy) return buy
   if (!run.shop!.bribed && run.supplies >= BRIBE.price && run.threat >= THREAT_MAX / 2) return { type: 'bribe' }
   return { type: 'leave' }
 }
@@ -116,8 +115,10 @@ const randomBot: Bot = (run, rng) => {
   if (run.phase === 'reward') return reward(run, rng, PICKS.random)
   if (run.phase === 'battle') return { type: 'land', zone: LANDS.random(run, run.battle!, rng) }
   if (run.phase === 'event') return { type: 'choose', index: takeable(run)[randomInt(rng, takeable(run).length)] }
-  const options = affordable(run)
-  if (run.phase === 'shop') return options.length > 0 && randomInt(rng, 2) === 0 ? { type: 'build', facility: options[randomInt(rng, options.length)] } : { type: 'leave' }
+  if (run.phase === 'shop') {
+    const options = affordable(run)
+    return options.length > 0 && randomInt(rng, 2) === 0 ? options[randomInt(rng, options.length)] : { type: 'leave' }
+  }
   return run.zone ? { type: 'advance' } : { type: 'zone', index: randomInt(rng, run.zones.length) }
 }
 

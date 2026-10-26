@@ -69,6 +69,16 @@ export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: str
   lastStand: { slot: 'armor', prefix: 'Stubborn', text: 'Once per battle, survives a killing hit at 1 health' },
   medkit: { slot: 'utility', prefix: "Medic's", text: 'Once per battle, heals the carrier 4 at half health or less, and the carrier still shoots' },
   grenade: { slot: 'utility', prefix: "Bombardier's", text: 'Once per battle, throws a grenade at two or more aliens standing together, and the carrier still shoots' },
+  ricochet: { slot: 'weapon', prefix: 'Ricocheting', text: 'A miss bounces to another alien within 3 tiles of the target and rolls again' },
+  arc: { slot: 'weapon', prefix: 'Arcing', text: 'A crit leaps to the nearest alien within 3 tiles for half its damage, then leaps once more', tags: ['crit'] },
+  volatile: { slot: 'weapon', prefix: 'Volatile', text: 'An alien it kills bursts, dealing 2 damage to every alien beside it', tags: ['kill'] },
+  thunder: { slot: 'weapon', prefix: 'Thundering', text: 'Hits knock the target a tile back; if something stops it, it slams into that for 1 damage' },
+  mirror: { slot: 'armor', prefix: 'Mirrored', text: 'Begins each battle with 2 mirror images; each hit on the wearer has a 50% chance to pop one instead', tags: ['ward'] },
+  bond: { slot: 'armor', prefix: 'Bonded', text: 'Takes the hits meant for squadmates beside the wearer', tags: ['ward'] },
+  guardians: { slot: 'armor', prefix: 'Haloed', text: 'Spirits strike each alien that ends its move within 2 tiles of the wearer for 1 damage' },
+  blink: { slot: 'utility', prefix: 'Blinking', text: 'Once per battle, when hit to half health or less, the carrier blinks to the safest tile within 5' },
+  polymorph: { slot: 'utility', prefix: 'Chicken', text: 'Once per battle, turns the toughest alien the carrier can shoot, a boss aside, into a chicken that loses its next action' },
+  null: { slot: 'utility', prefix: 'Null', text: 'Aliens within 3 tiles of the carrier cannot spit, panic, spawn or burst' },
 }
 
 /** A new piece of gear of the given rarity, in a random slot, built from random parts. */

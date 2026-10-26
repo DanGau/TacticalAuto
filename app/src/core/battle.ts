@@ -119,7 +119,7 @@ export const BASE_STATS: Stats = { hp: 10, armor: 0, aim: 0.75, damage: 3, range
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic'
 
 /** Something a piece of gear does; gear.ts says what each does. */
-export type GearEffect = 'frostbite' | 'tracer' | 'rime' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'thorns' | 'shield' | 'regen' | 'lastStand' | 'medkit' | 'grenade'
+export type GearEffect = 'frostbite' | 'tracer' | 'rime' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'thorns' | 'shield' | 'regen' | 'lastStand' | 'medkit' | 'grenade' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'mirror' | 'bond' | 'guardians' | 'blink' | 'polymorph' | 'null'
 /** Something a skill does; skills.ts says what each does. */
 export type SkillEffect =
   | 'frenzy'
@@ -159,7 +159,7 @@ export type SkillEffect =
   | 'ward'
   | 'drone'
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle'
+export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
 export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect
 
@@ -297,6 +297,8 @@ export interface Battle {
   breach: boolean
   /** Tiles of acid, each with the alien turns it has left. */
   acid: { x: number; y: number; turns: number }[]
+  /** Tiles of fire, each with the alien turns it has left. */
+  fire: { x: number; y: number; turns: number }[]
   /** Centres of the landing zones on offer in the deploy phase. */
   zones: Tile[]
   /** On a hold, the uplink the squad must reach and defend; null otherwise. */
@@ -616,6 +618,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     used: [],
     concealed: true,
     acid: [],
+    fire: [],
     zones: [],
     uplink: null,
     boons: [],

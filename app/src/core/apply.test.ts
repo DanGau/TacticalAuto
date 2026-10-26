@@ -70,7 +70,7 @@ test('actions outside their phase are rejected and change nothing', () => {
   run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
   apply(run, { type: 'advance' })
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
-  expect(apply(run, { type: 'build', facility: 'workshop' }).ok).toBe(false)
+  expect(apply(run, { type: 'gear', index: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'land', zone: 9 }).ok).toBe(false)
   apply(run, { type: 'land', zone: 0 })
   expect(apply(run, { type: 'land', zone: 0 }).ok).toBe(false)

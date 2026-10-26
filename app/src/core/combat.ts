@@ -138,6 +138,31 @@ function nearest(units: Unit[], from: Tile): Unit | undefined {
 
 const has = (unit: Unit, effect: Effect) => unit.effects.includes(effect)
 
+/** Tiles a ricochet reaches from its first target, an arc leaps, and the leaps it makes. */
+const RICOCHET_REACH = 3
+const ARC_REACH = 3
+const ARC_LEAPS = 2
+/** Damage a volatile kill bursts for, and a thundering hit slams a target into what stops it for. */
+const VOLATILE_DAMAGE = 2
+const SLAM_DAMAGE = 1
+/** Mirror images a wearer begins a battle with, and the chance a hit pops one instead. */
+const MIRROR_IMAGES = 2
+const MIRROR_CHANCE = 0.5
+/** Reach of spirit guardians, of a blink, and of a null field. */
+const GUARDIAN_REACH = 2
+const BLINK_REACH = 5
+const NULL_REACH = 3
+/** Alien turns fire lies on a tile. */
+const FIRE_TURNS = 2
+
+/** Whether a unit's foes include one with `effect`: a squad relic, or a soldier's gear, working on the aliens. */
+const foeHas = (battle: Battle, unit: Unit, effect: Effect) => battle.units.some((u) => u.side !== unit.side && u.hp > 0 && has(u, effect))
+
+/** Whether an alien stands in a null field, where it cannot spit, panic, spawn or burst. */
+const silenced = (battle: Battle, unit: Unit) => battle.units.some((u) => u.side !== unit.side && has(u, 'null') && distance(u, unit) <= NULL_REACH)
+
+const onTile = (pools: Tile[], unit: Tile) => pools.some((pool) => pool.x === unit.x && pool.y === unit.y)
+
 /** Uses a once-per-battle effect. False if the unit lacks it or has used it. */
 function spend(unit: Unit, effect: Effect): boolean {
   if (!has(unit, effect) || unit.spent.includes(effect)) return false
@@ -468,6 +493,7 @@ function upkeep(battle: Battle): GameEvent[] {
       events.push({ type: 'effect', id: unit.id, effect: 'rearm', amount: 0 })
     }
     if (unit.burning > 0) {
+      if (foeHas(battle, unit, 'pyre') && !onTile(battle.fire, unit)) battle.fire.push({ x: unit.x, y: unit.y, turns: FIRE_TURNS })
       unit.burning--
       events.push({ type: 'effect', id: unit.id, effect: 'incendiary', amount: -BURN_DAMAGE })
       wound(battle, unit, BURN_DAMAGE, events)
@@ -485,9 +511,10 @@ function upkeep(battle: Battle): GameEvent[] {
     events.push({ type: 'wave', units: units.map(({ id, x, y }) => ({ id, x, y })) })
   }
   battle.acid = battle.acid.map((pool) => ({ ...pool, turns: pool.turns - 1 })).filter((pool) => pool.turns > 0)
+  battle.fire = battle.fire.map((pool) => ({ ...pool, turns: pool.turns - 1 })).filter((pool) => pool.turns > 0)
   for (const unit of battle.units.filter((u) => u.side === 'alien')) {
     if (unit.cooldown > 0) unit.cooldown--
-    if (!unit.spawns || unit.cooldown > 0 || !revealed(battle, unit)) continue
+    if (!unit.spawns || unit.cooldown > 0 || !revealed(battle, unit) || silenced(battle, unit)) continue
     const [tile] = freeTilesNear(battle, unit, 1)
     if (!tile) continue
     unit.cooldown = SPAWN_EVERY
@@ -529,6 +556,17 @@ function moveSide(battle: Battle): GameEvent[] {
     if (!battle.acid.some((pool) => pool.x === unit.x && pool.y === unit.y) || immune(battle, unit, 'acid')) continue
     events.push({ type: 'hurt', id: unit.id, amount: ACID_DAMAGE, cause: 'acid' })
     wound(battle, unit, ACID_DAMAGE, events)
+  }
+  for (const unit of battle.units.filter((u) => u.side === battle.turn && onTile(battle.fire, u) && !u.resists.includes('burn'))) {
+    unit.burning = BURN_TURNS
+    events.push({ type: 'effect', id: unit.id, effect: 'pyre', amount: 0 })
+  }
+  // Spirit guardians strike each alien that ends its move near their wearer.
+  if (battle.turn === 'alien') {
+    for (const unit of battle.units.filter((u) => u.side === 'alien' && battle.units.some((g) => g.side === 'human' && g.hp > 0 && has(g, 'guardians') && distance(g, u) <= GUARDIAN_REACH))) {
+      events.push({ type: 'effect', id: unit.id, effect: 'guardians', amount: -1 })
+      wound(battle, unit, 1, events)
+    }
   }
   const sighted = sight(battle)
   // Soldiers on overwatch fire once the aliens have moved and any pod sighted has taken its place.
@@ -573,6 +611,12 @@ function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[]
   }
   battle.units = battle.units.filter((u) => u !== target)
   events.push({ type: 'death', id: target.id })
+  // A hexed death passes the mark to the nearest unmarked alien.
+  const heir = target.marked && foeHas(battle, target, 'hex') ? nearest(battle.units.filter((u) => u.side === target.side && !u.marked && !u.resists.includes('mark')), target) : undefined
+  if (heir) {
+    heir.marked = true
+    events.push({ type: 'effect', id: heir.id, effect: 'hex', amount: 0 })
+  }
   if (target.kind === 'burster') {
     const caught = battle.units.filter((u) => distance(target, u) <= BLAST_RADIUS && !immune(battle, u, 'blast'))
     events.push({ type: 'rocket', id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: BURST_DAMAGE })) })
@@ -591,6 +635,42 @@ function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[]
 function charge(battle: Battle, brute: Unit, shooter: Unit, events: GameEvent[]): void {
   const toShooter = walkingDistances(battle, shooter)
   walk(brute, bestPath(paths(battle, brute, brute.stats.move), brute, (end) => [toShooter[end.y * GRID + end.x]]), events)
+}
+
+/** A thundering hit knocks the target a tile straight back from the shooter; if something stops it, it slams into that instead. */
+function knockback(battle: Battle, unit: Unit, target: Unit, events: GameEvent[]): void {
+  const to = { x: target.x + Math.sign(target.x - unit.x), y: target.y + Math.sign(target.y - unit.y) }
+  if (!blocked(battle, to.x, to.y) && passable(battle, target, to)) {
+    target.x = to.x
+    target.y = to.y
+    events.push({ type: 'move', id: target.id, path: [to], with: 'thunder' })
+    return
+  }
+  events.push({ type: 'effect', id: target.id, effect: 'thunder', amount: -SLAM_DAMAGE })
+  wound(battle, target, SLAM_DAMAGE, events)
+}
+
+/** Blink: the unit vanishes to the free tile within reach where the enemy's best shot at it is worst. */
+function blink(battle: Battle, unit: Unit, events: GameEvent[]): void {
+  const enemies = enemiesOf(battle, unit)
+  const tiles = freeTilesNear(battle, unit, 4 * BLINK_REACH * BLINK_REACH).filter((t) => distance(t, unit) <= BLINK_REACH)
+  const to = tiles.reduce<Tile | undefined>((best, t) => (!best || exposure(battle, enemies, t) < exposure(battle, enemies, best) ? t : best), undefined)
+  if (!to) return
+  unit.x = to.x
+  unit.y = to.y
+  events.push({ type: 'move', id: unit.id, path: [to], with: 'blink' })
+}
+
+/** Polymorph: once per battle, the toughest alien the unit can shoot, a boss aside, becomes a chicken and loses its next action. */
+function polymorph(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
+  if (!has(unit, 'polymorph') || unit.spent.includes('polymorph')) return []
+  const target = battle.units
+    .filter((u) => u.side !== unit.side && !u.boss && !u.panicked && shootable(battle, unit, unit, u, seen))
+    .reduce<Unit | undefined>((best, u) => (!best || u.hp > best.hp ? u : best), undefined)
+  if (!target) return []
+  unit.spent.push('polymorph')
+  target.panicked = true
+  return [{ type: 'effect', id: target.id, effect: 'polymorph', amount: 0 }]
 }
 
 /** Spit: the nearest soldier the spitter can shoot is hit without a roll, and acid is left on its tile. */
@@ -619,6 +699,7 @@ function panic(battle: Battle, unit: Unit): GameEvent[] {
 
 /** What an alien does in place of a shot, by its kind; empty if it shoots, or has nothing to do. */
 function alienAction(battle: Battle, unit: Unit): GameEvent[] | null {
+  if (unit.kind && unit.kind !== 'trooper' && silenced(battle, unit)) return unit.kind === 'burster' ? [] : null
   if (unit.kind === 'spitter') return spit(battle, unit)
   if (unit.kind === 'psion') {
     const events = panic(battle, unit)
@@ -753,11 +834,20 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     hit = false
     events.push({ type: 'effect', id: enemy.id, effect: 'dodge', amount: 0 })
   }
+  if (hit && has(enemy, 'mirror') && enemy.spent.filter((e) => e === 'mirror').length < MIRROR_IMAGES && random(battle) < MIRROR_CHANCE) {
+    hit = false
+    enemy.spent.push('mirror')
+    events.push({ type: 'effect', id: enemy.id, effect: 'mirror', amount: 0 })
+  }
   if (hit && has(enemy, 'parry') && distance(unit, enemy) > 1 && random(battle) < PARRY_CHANCE) {
     hit = false
     events.push({ type: 'effect', id: enemy.id, effect: 'parry', amount: 0 })
   }
-  if (!hit) return [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit: false, damage: 0, with: used }, ...events, ...again(battle, unit, seen, granted, false)]
+  if (!hit) {
+    // A ricochet bounces a miss to another alien near the target, for one more roll.
+    const bounce = granted ? undefined : has(unit, 'ricochet') ? nearest(inReach.filter((u) => u !== enemy && distance(u, enemy!) <= RICOCHET_REACH), enemy) : undefined
+    return [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit: false, damage: 0, with: used }, ...events, ...(bounce ? shoot(battle, unit, seen, 'ricochet', bounce) : again(battle, unit, seen, granted, false))]
+  }
 
   const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) > 0
   const crit = !enemy.resists.includes('crit') && (sure || random(battle) < chance.crit + (ambushed ? AMBUSH_CRIT : 0))
@@ -788,7 +878,12 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   events.unshift({ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage, with: used })
   const pierced = unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) > 0
   const left = enemy.hp + (pierced ? 0 : enemy.armor)
-  wound(battle, enemy, damage, events, pierced)
+  // A bonded squadmate beside the target takes the hit in its place.
+  const guard = battle.units.find((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && has(u, 'bond') && distance(u, enemy) <= 1)
+  if (guard && damage > 0) {
+    events.push({ type: 'effect', id: guard.id, effect: 'bond', amount: -damage })
+    wound(battle, guard, damage, events, pierced)
+  } else wound(battle, enemy, damage, events, pierced)
   const spare = enemy.hp <= 0 ? when(damage > left, 'overkill', damage - left) : 0
   const next = spare > 0 ? nearest(battle.units.filter((u) => u.side === enemy.side && u.hp > 0), enemy) : undefined
   if (next) {
@@ -799,6 +894,25 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   for (const other of splash > 0 ? beside : []) {
     events.push({ type: 'effect', id: other.id, effect: has(unit, 'volley') ? 'volley' : 'cleave', amount: -splash })
     wound(battle, other, splash, events)
+  }
+  // An arc leaps from the target to the nearest alien not yet struck, and on again.
+  if (crit && damage > 0 && when(true, 'arc', 1)) {
+    const struck = new Set([enemy.id])
+    let from: Unit = enemy
+    for (let leap = 0; leap < ARC_LEAPS; leap++) {
+      const next = nearest(battle.units.filter((u) => u.side === enemy.side && !struck.has(u.id) && distance(u, from) <= ARC_REACH), from)
+      if (!next) break
+      struck.add(next.id)
+      events.push({ type: 'effect', id: next.id, effect: 'arc', amount: -Math.ceil(damage / 2) })
+      wound(battle, next, Math.ceil(damage / 2), events)
+      from = next
+    }
+  }
+  if (enemy.hp <= 0 && when(true, 'volatile', 1)) {
+    for (const other of beside.filter((u) => u.hp > 0)) {
+      events.push({ type: 'effect', id: other.id, effect: 'volatile', amount: -VOLATILE_DAMAGE })
+      wound(battle, other, VOLATILE_DAMAGE, events)
+    }
   }
   if (enemy.hp > 0 && !enemy.resists.includes('mark') && (when(true, 'mark', 1) || when(true, 'tracer', 1) || when(crit, 'exploit', 1))) enemy.marked = true
   if (enemy.hp > 0 && !enemy.resists.includes('frost') && (when(damage > 0, 'frostbite', 1) || when(crit, 'freeze', 1))) {
@@ -811,6 +925,12 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
       }
     }
   }
+  if (enemy.hp > 0 && crit && enemy.chilled > 0 && when(true, 'stasis', 1)) {
+    enemy.panicked = true
+    events.push({ type: 'effect', id: enemy.id, effect: 'stasis', amount: 0 })
+  }
+  if (enemy.hp > 0 && damage > 0 && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
+  if (enemy.hp > 0 && enemy.hp <= enemy.stats.hp / 2 && spend(enemy, 'blink')) blink(battle, enemy, events)
   if (enemy.hp <= 0 && when(true, 'momentum', 1)) unit.armor++
   if (enemy.hp <= 0 && when(true, 'bloodRite', 1)) unit.fury++
   if (enemy.hp > 0 && when(true, 'suppress', 1)) enemy.suppressed = 2
@@ -917,7 +1037,7 @@ function actNext(battle: Battle): GameEvent[] {
     if (thrown.length > 0) unit.spent.push('grenade')
     const fired = unit.charges > 0 && unit.ability === 'rocket' ? blast(battle, unit, seen, ROCKET_DAMAGE, has(unit, 'bigBlast') ? BIG_BLAST_RADIUS : BLAST_RADIUS) : []
     if (healed.length + fired.length > 0) unit.charges--
-    const acted = [...medkit(unit), ...secondWind(unit), ...healed, ...thrown, ...(fired.length > 0 ? fired : shoot(battle, unit, seen))]
+    const acted = [...medkit(unit), ...secondWind(unit), ...polymorph(battle, unit, seen), ...healed, ...thrown, ...(fired.length > 0 ? fired : shoot(battle, unit, seen))]
     // What follows an action: a drone's shot, then a skirmisher's step back.
     const events = acted.length > 0 && unit.hp > 0 ? [...acted, ...drone(battle, unit), ...skirmish(battle, unit)] : acted
     if (events.length === 0) continue

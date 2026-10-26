@@ -1,4 +1,4 @@
-import { FACILITIES, RARITY_CHANCE, type FacilityId, type Lasting, type Rarity } from './base'
+import { RARITY_CHANCE, type Lasting, type Rarity } from './base'
 import { TUNING } from './tuning'
 import { ALIENS, alienStats, muster, type AlienKind } from './aliens'
 import { GOALS, type Goal } from './goals'
@@ -47,7 +47,7 @@ export const RISKS: Record<Risk, { name: string; aliens: number; supplies: numbe
 
 /**
  * A stop on the road. A battle must be fought. A supply drop gives supplies and a cache gives gear, with no fight.
- * A shop sells facilities and more. An unknown stop is revealed on arrival as a battle, a shop or an event.
+ * A shop sells gear, relics and a bribe. An unknown stop is revealed on arrival as a battle, a shop or an event.
  * A key mission, at a satellite, wins an access key; the final mission strikes the alien source. Both have a boss.
  */
 export type StopKind = 'battle' | 'supply' | 'cache' | 'shop' | 'unknown' | 'key' | 'final'
@@ -131,9 +131,16 @@ export interface Report {
   rescued: number | null
 }
 
-/** A shop's wares beyond facilities: a relic until it is bought, and whether its bribe is spent. */
+/** A piece of gear for sale, and the soldier it is fitted to when bought. */
+export interface Ware {
+  gear: Gear
+  soldier: number
+}
+
+/** A shop's stock, each item gone once bought, and whether its bribe is spent. */
 export interface Shop {
-  relic: RelicId | null
+  wares: Ware[]
+  relics: RelicId[]
   bribed: boolean
 }
 
@@ -178,8 +185,6 @@ export interface Run {
   /** Finds their finders decided alone at the last stop. */
   decisions: Decision[]
   nextGear: number
-  /** Facilities built, one entry per level. */
-  built: FacilityId[]
   relics: RelicId[]
   /** Relics to choose from in the reward phase. */
   relicOffers: RelicId[]
@@ -197,9 +202,9 @@ export function level(soldier: { xp: number }): number {
   return Math.floor((Math.sqrt(8 * soldier.xp + 1) - 1) / 2)
 }
 
-/** The sum of one lasting effect over every facility level built and relic held. */
+/** The sum of one lasting effect over every relic and doctrine held. */
 function total(run: Run, effect: (source: Lasting) => number | undefined): number {
-  const sources: Lasting[] = [...run.built.map((id) => FACILITIES[id]), ...run.relics.map((id): Relic => RELICS[id]), ...run.doctrines.map((id): Doctrine => DOCTRINES[id])]
+  const sources: Lasting[] = [...run.relics.map((id): Relic => RELICS[id]), ...run.doctrines.map((id): Doctrine => DOCTRINES[id])]
   return sources.reduce((sum, source) => sum + (effect(source) ?? 0), 0)
 }
 
@@ -221,22 +226,6 @@ export function takeSkill(run: Run, soldier: Soldier, index: number): void {
   settle(run)
 }
 
-export function built(run: Run, id: FacilityId): number {
-  return run.built.filter((b) => b === id).length
-}
-
-/** Supplies the facility's next level costs, or null at its maximum. */
-export function buildCost(run: Run, id: FacilityId): number | null {
-  const facility = FACILITIES[id]
-  return built(run, id) < facility.max ? facility.cost * (built(run, id) + 1) : null
-}
-
-/** Builds the facility's next level. The caller checks it is affordable. */
-export function build(run: Run, id: FacilityId): void {
-  run.supplies -= buildCost(run, id)!
-  run.built.push(id)
-}
-
 export function equipped(soldier: Soldier): Gear[] {
   return SLOTS.flatMap((slot) => soldier.gear[slot] ?? [])
 }
@@ -249,6 +238,44 @@ export function keepFind(run: Run): void {
   if (old) run.supplies += SELL[old.rarity]
   soldier.gear[gear.slot] = gear
   settle(run)
+}
+
+/** What gear costs in a shop, by rarity. */
+export const GEAR_PRICE: Record<Exclude<Rarity, 'common'>, number> = { rare: 5, epic: 8 }
+/** Pieces of gear and relics a shop stocks. */
+const SHOP_WARES = 3
+const SHOP_RELICS = 2
+/** Chance a piece of shop gear is epic rather than rare. */
+const SHOP_EPIC = 0.3
+
+/**
+ * Stocks a shop: gear, each piece with an effect no other piece there has and fitted to the soldier it suits best, an
+ * empty slot first, then the commonest; relics the squad lacks; and a bribe.
+ */
+export function stockShop(run: Run): Shop {
+  const wares: Ware[] = []
+  for (let tries = 0; wares.length < SHOP_WARES && tries < 50; tries++) {
+    const gear = generateGear(run, run.nextGear, random(run) < SHOP_EPIC ? 'epic' : 'rare')
+    if (wares.some((w) => w.gear.effect === gear.effect)) continue
+    run.nextGear++
+    const rank = (s: Soldier) => (s.gear[gear.slot] ? RARITY_RANK[s.gear[gear.slot]!.rarity] + 1 : 0)
+    const fits = run.soldiers.filter((s) => rank(s) === Math.min(...run.soldiers.map(rank)))
+    wares.push({ gear, soldier: fits[randomInt(run, fits.length)].id })
+  }
+  const relics = (Object.keys(RELICS) as RelicId[]).filter((id) => !run.relics.includes(id))
+  const stocked: RelicId[] = []
+  while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(relics.splice(randomInt(run, relics.length), 1)[0])
+  return { wares, relics: stocked, bribed: false }
+}
+
+/** Buys the ware at `index`: its soldier wears it, selling what it replaces. The caller checks it is affordable. */
+export function buyWare(run: Run, index: number): void {
+  const [{ gear, soldier: id }] = run.shop!.wares.splice(index, 1)
+  const soldier = run.soldiers.find((s) => s.id === id)!
+  run.supplies -= GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
+  const old = soldier.gear[gear.slot]
+  if (old) run.supplies += SELL[old.rarity]
+  soldier.gear[gear.slot] = gear
 }
 
 /** Sells the first find. */
@@ -270,7 +297,7 @@ export function charges(run: Run, soldier: Soldier): number {
   return base + soldier.skills.reduce((sum, id) => sum + (SKILLS[id].charges ?? 0), 0) + run.relics.reduce((sum, id) => sum + ((RELICS[id] as Relic).charges ?? 0), 0)
 }
 
-/** A soldier's stats in battle: base, plus class, level, skills and gear, plus facilities and relics. */
+/** A soldier's stats in battle: base, plus class, level, skills and gear, plus relics. */
 export function soldierStats(run: Run, soldier: Soldier): Stats {
   const stats = { ...BASE_STATS }
   for (const key of Object.keys(stats) as (keyof Stats)[]) {
@@ -285,7 +312,7 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
 
 /**
  * Adds a clone to the squad and returns it. It arrives at level 1, or at the level of the squad's lowest if that is
- * higher, plus what the academy adds, so a late arrival is not left behind. Under a doctrine of unique classes it
+ * higher, so a late arrival is not left behind. Under a doctrine of unique classes it
  * takes a class no squadmate has, while one is left.
  */
 export function hire(run: Run): Soldier {
@@ -303,7 +330,7 @@ export function hire(run: Run): Soldier {
     gear: { weapon: null, armor: null, utility: null },
   }
   run.soldiers.push(soldier)
-  soldier.xp = xpFor(Math.max(1, lowest) + total(run, (u) => u.recruitRank))
+  soldier.xp = xpFor(Math.max(1, lowest))
   return soldier
 }
 
@@ -424,7 +451,6 @@ export function createRun(seed: number): Run {
     finds: [],
     decisions: [],
     nextGear: 1,
-    built: [],
     relics: [],
     relicOffers: [],
     bosses: [],

@@ -64,6 +64,7 @@ const COLOR = {
   miss: 0x77808f,
   heal: 0x7ddc5a,
   acid: 0xa6e22e,
+  fire: 0xff6a1f,
   psi: 0xff6bd6,
   contact: 0xff6b5e,
   uplink: 0xffd84d,
@@ -482,10 +483,11 @@ export async function createView(): Promise<View> {
   }
 
 
-  /** Tints every tile of acid. */
+  /** Tints every tile of acid or fire. */
   function drawAcid(battle: Battle): void {
     acid.clear()
     for (const pool of battle.acid) diamond(acid, pool.x, pool.y).fill({ color: COLOR.acid, alpha: 0.45 })
+    for (const pool of battle.fire) diamond(acid, pool.x, pool.y).fill({ color: COLOR.fire, alpha: 0.5 })
   }
 
   /** Makes the sprites match the battle exactly. */
@@ -844,7 +846,7 @@ export async function createView(): Promise<View> {
         if (!on) continue
         await follow([on.tile])
         if (e.type === 'hurt') drawHp(on, ...vitals(battle, e.id))
-        float(e.type === 'frozen' ? callout('TOO SHAKEN TO ACT', COLOR.psi, on) : callout(`${e.cause.toUpperCase()} -${e.amount}`, e.cause === 'acid' ? COLOR.acid : e.cause === 'impact' ? COLOR.crit : COLOR.psi, on))
+        float(e.type === 'frozen' ? callout(battle.units.find((u) => u.id === e.id)?.side === 'alien' ? 'STUNNED' : 'TOO SHAKEN TO ACT', COLOR.psi, on) : callout(`${e.cause.toUpperCase()} -${e.amount}`, e.cause === 'acid' ? COLOR.acid : e.cause === 'impact' ? COLOR.crit : COLOR.psi, on))
       } else if (e.type === 'spawn') {
         const unit = battle.units.find((u) => u.id === e.unit.id)
         if (!unit || !revealed(battle, unit)) continue

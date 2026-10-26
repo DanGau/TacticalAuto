@@ -1,13 +1,12 @@
 import { land } from './battle'
-import { FACILITIES, type FacilityId } from './base'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
-import { advance, build, buildCost, enterZone, keepFind, nextStop, sellFind, skillOffers, takeRelic, takeSkill, type Run } from './run'
+import { advance, buyWare, enterZone, GEAR_PRICE, keepFind, nextStop, sellFind, skillOffers, takeRelic, takeSkill, type Run } from './run'
 
 export type Action =
-  /** Shop: build the facility's next level. */
-  | { type: 'build'; facility: FacilityId }
-  /** Shop: buy its relic. */
-  | { type: 'buy' }
+  /** Shop: buy the gear at `index` of shop.wares, for the soldier it is fitted to. */
+  | { type: 'gear'; index: number }
+  /** Shop: buy the relic at `index` of shop.relics. */
+  | { type: 'buy'; index: number }
   /** Shop: pay to lower the threat, once. */
   | { type: 'bribe' }
   /** Shop: leave for the road. */
@@ -61,21 +60,21 @@ export function apply(run: Run, action: Action): Result {
     }
     return ok
   }
-  if (action.type === 'build' || action.type === 'buy' || action.type === 'bribe' || action.type === 'leave') {
+  if (action.type === 'gear' || action.type === 'buy' || action.type === 'bribe' || action.type === 'leave') {
     const shop = run.shop
     if (run.phase !== 'shop' || !shop) return no('not in a shop')
-    if (action.type === 'build') {
-      if (!(action.facility in FACILITIES)) return no('no such facility')
-      const cost = buildCost(run, action.facility)
-      if (cost === null) return no('fully built')
-      if (cost > run.supplies) return no('not enough supplies')
-      build(run, action.facility)
+    if (action.type === 'gear') {
+      const ware = shop.wares[action.index]
+      if (!ware) return no('no such gear for sale')
+      if (GEAR_PRICE[ware.gear.rarity as keyof typeof GEAR_PRICE] > run.supplies) return no('not enough supplies')
+      buyWare(run, action.index)
     } else if (action.type === 'buy') {
-      if (!shop.relic) return no('no relic for sale')
+      const relic = shop.relics[action.index]
+      if (!relic) return no('no such relic for sale')
       if (RELIC_PRICE > run.supplies) return no('not enough supplies')
       run.supplies -= RELIC_PRICE
-      run.relics.push(shop.relic)
-      shop.relic = null
+      run.relics.push(relic)
+      shop.relics.splice(action.index, 1)
     } else if (action.type === 'bribe') {
       if (shop.bribed) return no('already bribed')
       if (BRIBE.price > run.supplies) return no('not enough supplies')

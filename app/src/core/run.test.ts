@@ -1,7 +1,6 @@
 import { expect, test } from 'vitest'
 import { TUNING } from './tuning'
 import { apply } from './apply'
-import { FACILITIES } from './base'
 import { isSoldier, BASE_STATS, type Side } from './battle'
 import { CLASSES } from './classes'
 import { EVENTS } from './events'
@@ -33,6 +32,7 @@ import {
   hire,
   dropGear,
   squadKeywords,
+  GEAR_PRICE,
 } from './run'
 import { PATHS, SKILLS } from './skills'
 import { RELICS } from './relics'
@@ -170,20 +170,18 @@ test('after the forks of a leg comes its satellite: winning it wins a key, a new
   expect(run.zones).toHaveLength(3)
 })
 
-test("a new clone arrives at the level of the squad's lowest, and one higher for each academy, with a skill to choose for each level", () => {
-  const arrival = (academies: number) => {
+test("a new clone arrives at the level of the squad's lowest, with a skill to choose for each level", () => {
+  const arrival = () => {
     const run = started()
     run.soldiers[0].xp = xpFor(3)
-    run.built = Array(academies).fill('academy')
     run.fork = FORKS
     run.zone = { stops: [stopOf('key')] }
     fight(run, 'human')
     return run.soldiers[1]
   }
-  expect(level(arrival(0))).toBe(3)
-  expect(level(arrival(1))).toBe(4)
-  expect(skillOffers(arrival(0))).toHaveLength(2)
-  expect(arrival(0).cls).not.toBeNull()
+  expect(level(arrival())).toBe(3)
+  expect(skillOffers(arrival())).toHaveLength(2)
+  expect(arrival().cls).not.toBeNull()
 })
 
 test.each(['human', 'alien'] as const)('full threat puts a last stand before the next stop; %s win', (winner) => {
@@ -253,12 +251,11 @@ test('a key mission has one boss, with an escort for each key already won', () =
 
 const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], gear: { weapon: null, armor: null, utility: null }, ...extra })
 
-test('stats add class, level, skills, facilities and relics to the base', () => {
+test('stats add class, level, skills and relics to the base', () => {
   const run = createRun(1)
-  run.built = ['workshop', 'workshop']
   run.relics = ['plasma']
   const stats = soldierStats(run, soldier({ xp: xpFor(2) }))
-  expect(stats.hp).toBe(BASE_STATS.hp + 2 + 2 + 2 * LEVEL_STATS.hp!)
+  expect(stats.hp).toBe(BASE_STATS.hp + 2 * LEVEL_STATS.hp!)
   expect(stats.damage).toBe(BASE_STATS.damage + 1)
   expect(stats.aim).toBeCloseTo(BASE_STATS.aim + 2 * LEVEL_STATS.aim!)
   expect(soldierStats(run, soldier({ xp: xpFor(2), cls: 'heavy' })).hp).toBe(stats.hp + CLASSES.heavy.stats.hp!)
@@ -312,25 +309,31 @@ test('a satellite won offers three relics; a relic held changes the run', () => 
   expect(paid(['contact']).finds.every((find) => find.gear.rarity !== 'common')).toBe(true)
 })
 
-test('a shop builds facilities, each level costing more up to a maximum; sells a relic and a bribe once; and is left for the road', () => {
+test('a shop stocks one-of-a-kind gear fitted to a soldier, relics the squad lacks, and a bribe, each sold once; and is left for the road', () => {
   const run = travelling(['shop', 'battle'])
-  expect(apply(run, { type: 'build', facility: 'optics' })).toEqual({ ok: false, reason: 'not in a shop' })
+  expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: false, reason: 'not in a shop' })
   apply(run, { type: 'advance' })
   expect(run).toMatchObject({ phase: 'shop', threat: STOP_THREAT })
+  const shop = run.shop!
+  expect(shop.wares).toHaveLength(3)
+  expect(new Set(shop.wares.map((w) => w.gear.effect)).size).toBe(3)
+  expect(shop.wares.every((w) => w.gear.rarity !== 'common')).toBe(true)
+  expect(shop.relics).toHaveLength(2)
   run.supplies = 100
-  const { cost, max } = FACILITIES.optics
-  for (let n = 1; n <= max; n++) expect(apply(run, { type: 'build', facility: 'optics' })).toEqual({ ok: true })
-  expect(run.supplies).toBe(100 - cost - 2 * cost)
-  expect(apply(run, { type: 'build', facility: 'optics' })).toEqual({ ok: false, reason: 'fully built' })
-  const relic = run.shop!.relic!
-  expect(apply(run, { type: 'buy' })).toEqual({ ok: true })
+  const { gear, soldier } = shop.wares[0]
+  expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: true })
+  expect(run.soldiers.find((s) => s.id === soldier)!.gear[gear.slot]).toBe(gear)
+  expect(run.supplies).toBe(100 - GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE])
+  expect(shop.wares).toHaveLength(2)
+  const relic = shop.relics[1]
+  expect(apply(run, { type: 'buy', index: 1 })).toEqual({ ok: true })
   expect(run.relics).toContain(relic)
-  expect(apply(run, { type: 'buy' }).ok).toBe(false)
+  expect(apply(run, { type: 'buy', index: 1 }).ok).toBe(false)
   expect(apply(run, { type: 'bribe' })).toEqual({ ok: true })
   expect(run.threat).toBe(0)
   expect(apply(run, { type: 'bribe' }).ok).toBe(false)
   run.supplies = 0
-  expect(apply(run, { type: 'build', facility: 'workshop' })).toEqual({ ok: false, reason: 'not enough supplies' })
+  expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: false, reason: 'not enough supplies' })
   apply(run, { type: 'leave' })
   expect(run).toMatchObject({ phase: 'overworld', shop: null, stop: 1 })
 })

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { alienUnit, type Battle, type Unit } from './battle'
-import { stepBattle } from './combat'
+import { alienUnit, CRIT_BONUS, type Battle, type Effect, type Stats, type Unit } from './battle'
+import { stepBattle, type GameEvent } from './combat'
 import { EFFECTS, generateGear, type Gear } from './gear'
 import { createRun, SELL, soldierStats, type Run } from './run'
 import { TUNING } from './tuning'
@@ -78,7 +78,8 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
 /** Steps until the alien has shot once, returning every event up to then. */
 function untilAlienShoots(d: ReturnType<typeof duel>) {
   const events = []
-  for (;;) {
+  for (let beats = 0; ; beats++) {
+    if (beats > 200) throw new Error('the alien never shot')
     const beat = d.step()
     events.push(...beat)
     if (beat.some((e) => e.type === 'shot' && e.id === d.alien.id)) return events
@@ -148,4 +149,125 @@ test('overkill coils carry damage beyond a kill to the nearest other alien', () 
   const shot = events.find((e) => e.type === 'shot' && e.target === d.alien.id && e.hit)
   expect(shot).toBeDefined()
   expect(events).toContainEqual({ type: 'effect', id: other.id, effect: 'overkill', amount: -(shot!.type === 'shot' ? shot!.damage - 4 : 0) })
+})
+
+/** Another alien in the duel, at `dx`, `dy` from the first, too tough to die. */
+function another(d: ReturnType<typeof duel>, dx: number, dy: number): Unit {
+  const other = alienUnit(d.battle, { kind: 'trooper', stats: { ...d.alien.stats, hp: 99, armor: 0 }, stance: 'anchor', boss: false, spawns: false, target: false, resists: [] }, { x: d.alien.x + dx, y: d.alien.y + dy }, 0)
+  d.battle.units.push(other)
+  return other
+}
+
+/** A duel with the soldier holding `effects` and the given stats. */
+function armed(effects: Effect[], stats: Partial<Stats> = {}) {
+  const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Carbine', stats: {}, effect: null })
+  d.soldier.effects.push(...effects)
+  d.soldier.stats = { ...d.soldier.stats, aim: 2, crit: 0, damage: 1, ...stats }
+  return d
+}
+
+const effectsOf = (events: GameEvent[], effect: Effect) => events.filter((e) => e.type === 'effect' && e.effect === effect)
+
+test('a ricochet bounces a miss to another alien near the target', () => {
+  const d = armed(['ricochet'], { aim: -9 })
+  const other = another(d, 1, 0)
+  const events = untilAlienShoots(d)
+  expect(events).toContainEqual(expect.objectContaining({ type: 'shot', id: d.soldier.id, target: other.id, with: ['ricochet'] }))
+})
+
+test('an arcing crit leaps to the two nearest other aliens for half its damage', () => {
+  const d = armed(['arc'], { crit: 1, damage: 3 })
+  const [a, b] = [another(d, 1, 0), another(d, 2, 0)]
+  const events = untilAlienShoots(d)
+  const half = Math.ceil((3 + CRIT_BONUS) / 2)
+  expect(events).toContainEqual({ type: 'effect', id: a.id, effect: 'arc', amount: -half })
+  expect(events).toContainEqual({ type: 'effect', id: b.id, effect: 'arc', amount: -half })
+})
+
+test('a volatile kill bursts on the aliens beside it', () => {
+  const d = armed(['volatile'], { damage: 5 })
+  d.alien.hp = 1
+  const other = another(d, 1, 0)
+  const events = []
+  for (let beats = 0; d.alien.hp > 0 && beats < 200; beats++) events.push(...d.step())
+  expect(events).toContainEqual({ type: 'effect', id: other.id, effect: 'volatile', amount: -2 })
+})
+
+test('a thundering hit knocks the target back, or slams it into what stops it', () => {
+  const d = armed(['thunder'])
+  const events = untilAlienShoots(d)
+  expect(events).toContainEqual({ type: 'move', id: d.alien.id, path: [{ x: 10, y: 12 }], with: 'thunder' })
+  another(d, 0, 1)
+  expect(effectsOf(untilAlienShoots(d), 'thunder')).toEqual([{ type: 'effect', id: d.alien.id, effect: 'thunder', amount: -1 }])
+})
+
+test('mirror images pop in place of hits, two at most', () => {
+  const d = duel({ slot: 'armor', rarity: 'rare', name: 'Mirrored Vest', stats: {}, effect: 'mirror' })
+  d.soldier.stats = { ...d.soldier.stats, hp: 999, damage: 0 }
+  d.soldier.hp = 999
+  const events = Array.from({ length: 20 }, () => untilAlienShoots(d)).flat()
+  expect(effectsOf(events, 'mirror')).toHaveLength(2)
+})
+
+test('a bonded squadmate takes the hit meant for the soldier beside it', () => {
+  const d = armed([], { damage: 0 })
+  const guard: Unit = { ...d.soldier, id: 999, x: 9, y: 10, effects: ['bond'], spent: [] }
+  d.battle.units.push(guard)
+  d.alien.stats = { ...d.alien.stats, range: 1 }
+  d.soldier.effects.push('taunt')
+  const events = untilAlienShoots(d)
+  expect(events).toContainEqual({ type: 'effect', id: guard.id, effect: 'bond', amount: -d.alien.stats.damage })
+  expect(d.soldier.hp).toBe(d.soldier.stats.hp)
+})
+
+test('spirit guardians strike an alien that ends its move near the wearer', () => {
+  const d = armed(['guardians'], { damage: 0 })
+  d.alien.stats = { ...d.alien.stats, move: 0 }
+  expect(effectsOf(untilAlienShoots(d), 'guardians')).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'guardians', amount: -1 })
+})
+
+test('blinking gear carries a soldier hit to half health to safety, once', () => {
+  const d = armed(['blink'], { damage: 0 })
+  d.soldier.armor = 0
+  d.alien.stats = { ...d.alien.stats, damage: d.soldier.stats.hp - 1 }
+  const events = untilAlienShoots(d)
+  expect(events).toContainEqual(expect.objectContaining({ type: 'move', id: d.soldier.id, with: 'blink' }))
+  expect(d.soldier.spent).toContain('blink')
+})
+
+test('a chicken claw turns an alien into a chicken that loses its next action', () => {
+  const d = armed(['polymorph'], { damage: 0 })
+  const events = untilAlienShoots(d)
+  expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'polymorph', amount: 0 })
+  expect(events).toContainEqual({ type: 'frozen', id: d.alien.id })
+})
+
+test('a null field stops a spitter spitting', () => {
+  const d = armed(['null'], { damage: 0 })
+  d.alien.kind = 'spitter'
+  d.alien.stats = { ...d.alien.stats, move: 0 }
+  expect(untilAlienShoots(d).some((e) => e.type === 'spit')).toBe(false)
+})
+
+test('a pyre censer sets the ground under a burning alien ablaze', () => {
+  const d = armed(['pyre'], { damage: 0, aim: -9 })
+  d.alien.burning = 3
+  untilAlienShoots(d)
+  expect(d.battle.fire).toContainEqual(expect.objectContaining({ x: d.alien.x, y: d.alien.y }))
+})
+
+test('a stasis field freezes a chilled alien a crit lands on', () => {
+  const d = armed(['stasis'], { crit: 1 })
+  d.alien.chilled = 5
+  const events = untilAlienShoots(d)
+  expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'stasis', amount: 0 })
+  expect(events).toContainEqual({ type: 'frozen', id: d.alien.id })
+})
+
+test("a witch's hex passes a marked alien's mark to the nearest alien when it dies", () => {
+  const d = armed(['hex'], { damage: 5 })
+  Object.assign(d.alien, { hp: 1, marked: true })
+  const other = another(d, 2, 0)
+  for (let beats = 0; d.alien.hp > 0 && beats < 200; beats++) d.step()
+  expect(other.marked).toBe(true)
 })
