@@ -451,7 +451,7 @@ function rollRarity(run: Run, lucky: boolean): Rarity {
 }
 
 /** A piece of gear found by a soldier drawn at random. */
-function dropGear(run: Run, lucky: boolean): void {
+export function dropGear(run: Run, lucky: boolean): void {
   const gear = generateGear(run, run.nextGear++, rollRarity(run, lucky))
   run.finds.push({ soldier: run.soldiers[randomInt(run, run.soldiers.length)].id, gear })
 }

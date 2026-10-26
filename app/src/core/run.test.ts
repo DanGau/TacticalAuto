@@ -331,6 +331,30 @@ test('an unknown stop turns out a battle, a shop, or an event met once a run, wh
   expect([...kinds].sort()).toEqual(['battle', 'event', 'shop'])
 })
 
+test('every event offers a real choice, ending in one the squad can always take, and no two options say the same', () => {
+  const options = Object.values(EVENTS).flatMap((event) => {
+    expect(event.options.length).toBeGreaterThan(1)
+    expect(event.options.at(-1)!.can).toBeUndefined()
+    return event.options.map((o) => o.quip)
+  })
+  expect(new Set(options).size).toBe(options.length)
+})
+
+test('the Smugglers\' Tunnel skips the rest of the zone; refusing the Raiders makes the next stop an Overrun battle', () => {
+  const run = started()
+  run.zone = { stops: [stopOf('unknown'), stopOf('supply'), stopOf('cache')] }
+  run.event = 'tunnel'
+  run.phase = 'event'
+  apply(run, { type: 'choose', index: 0 })
+  expect(run.zone).toBeNull()
+  run.zone = { stops: [stopOf('unknown'), stopOf('supply')] }
+  run.stop = 0
+  run.event = 'raiders'
+  run.phase = 'event'
+  apply(run, { type: 'choose', index: 0 })
+  expect(run.zone.stops[1]).toMatchObject({ kind: 'battle', risk: 'dangerous' })
+})
+
 test('doctrines change the run: Lone Wolf leaves one soldier and stops recruits; Specialists give every soldier its own class', () => {
   const run = started()
   for (let i = 0; i < 3; i++) hire(run)

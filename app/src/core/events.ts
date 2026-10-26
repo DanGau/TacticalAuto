@@ -2,7 +2,7 @@ import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type DoctrineId } from './doctrines'
 import { RELICS, type RelicId } from './relics'
 import { random, randomInt } from './rng'
-import { advance, drawBattle, hire, level, nextStop, passStop, settle, STOP_THREAT, THREAT_MAX, xpFor, type Run } from './run'
+import { advance, drawBattle, dropGear, hire, level, nextStop, passStop, settle, STOP_THREAT, THREAT_MAX, xpFor, type Run } from './run'
 
 /** One way to meet an event: the squad's quip, what it does, whether the squad can, and doing it. */
 interface Option {
@@ -36,6 +36,11 @@ const gain = (supplies: number, quip: string): Option => ({ quip, text: `Salvage
 const leave = (quip: string): Option => ({ quip, text: 'Move on', take: () => {} })
 /** Relics the squad does not hold. */
 const unheld = (run: Run) => (Object.keys(RELICS) as RelicId[]).filter((id) => !run.relics.includes(id))
+const pick = <T>(run: Run, options: T[]): T => options[randomInt(run, options.length)]
+/** Moves a soldier `levels` up or down, never below level 1. */
+const train = (soldier: Run['soldiers'][number], levels: number) => (soldier.xp = xpFor(Math.max(1, level(soldier) + levels)))
+/** Whether the zone has a stop after this one. */
+const ahead = (run: Run) => run.stop + 1 < run.zone!.stops.length
 
 const encounters = {
   vats: {
@@ -167,6 +172,138 @@ const encounters = {
         },
       },
       leave('"We don\'t sell our own." Out loud, anyway.'),
+    ],
+  },
+  loanShark: {
+    name: 'Loan Shark',
+    text: 'A man in a tracksuit runs a lending business from the boot of a hatchback. Interest rates are written on a napkin. The napkin has been laminated.',
+    options: [
+      { quip: 'Sign the napkin. In crayon, so it does not count.', text: 'Borrow: +7 supplies; +2 threat', take: (run) => ((run.supplies += 7), raise(run, 2)) },
+      leave('"We are good, thanks." He writes your names down anyway.'),
+    ],
+  },
+  salesman: {
+    name: 'Door-to-Door Salesman',
+    text: 'A salesman steps out of a crater, brushing off ash, briefcase already open. "Have you got a minute to hear about tactical gear?" He has been following the squad for three zones.',
+    options: [
+      { quip: '"Fine. Fine! Just stop standing so close."', text: 'Buy: -2 supplies; a random piece of gear', can: (run) => run.supplies >= 2, take: (run) => ((run.supplies -= 2), dropGear(run, false)) },
+      { quip: 'Slam the door. There is no door. Slam it anyway.', text: 'Refuse: +1 threat, as he yells about you across the valley', take: (run) => raise(run, 1) },
+    ],
+  },
+  retraining: {
+    name: 'Career Fair',
+    text: 'In a gutted shopping centre, a careers fair carries on, staffed by one very committed volunteer. "Ever thought about a change? The aliens certainly have."',
+    options: [
+      {
+        quip: 'Send someone in. Whoever loses at rock-paper-scissors.',
+        text: 'A random soldier takes a random class, forgets its skills and gains a level',
+        take: (run) => {
+          const soldier = pick(run, run.soldiers)
+          soldier.cls = pick(run, Object.keys(CLASSES) as ClassId[])
+          soldier.skills = []
+          train(soldier, 1)
+        },
+      },
+      leave('Take a free pen. Take all the free pens.'),
+    ],
+  },
+  collector: {
+    name: 'The Collector',
+    text: 'An eccentric collector in a fur coat appraises the squad through a monocle. "Your trinkets. I simply must. I have a little trade in mind, or cash, darling, cash."',
+    options: [
+      {
+        quip: '"Surprise us." He claps, delighted, which is worrying.',
+        text: 'Swap: a random relic you hold for a random one you do not',
+        can: (run) => run.relics.length > 0 && unheld(run).length > 0,
+        take: (run) => {
+          const fresh = pick(run, unheld(run))
+          run.relics.splice(randomInt(run, run.relics.length), 1, fresh)
+        },
+      },
+      { quip: 'Cash, darling.', text: 'Sell: a random relic you hold; +8 supplies', can: (run) => run.relics.length > 0, take: (run) => (run.relics.splice(randomInt(run, run.relics.length), 1), (run.supplies += 8)) },
+      leave('Tell him the monocle is fake. Watch his heart break.'),
+    ],
+  },
+  fallen: {
+    name: 'Fallen Squad',
+    text: 'Another squad got here first, and did not leave. Their gear is still good. Whatever got them is probably not still here. Probably.',
+    options: [
+      { quip: 'Loot the bodies. Respectfully. With gloves.', text: 'Search: a piece of rare or better gear; +1 threat', take: (run) => (dropGear(run, true), raise(run, 1)) },
+      leave('Salute, and leave before you find out what "probably" means.'),
+    ],
+  },
+  raiders: {
+    name: 'Masked Raiders',
+    text: 'Raiders in hockey masks block the road with a burning sofa. "Toll," says the leader, who has clearly practiced this. "All your stuff. Or we find out how tough you are, at the next stop."',
+    options: [
+      {
+        quip: '"We are very tough." Squeak, goes someone\'s boot.',
+        text: 'Refuse: the next stop becomes an Overrun battle',
+        can: ahead,
+        take: (run) => (run.zone!.stops[run.stop + 1] = drawBattle(run, 'dangerous')),
+      },
+      { quip: 'Hand it over. The sofa was a nice touch.', text: 'Pay: lose all your supplies', take: (run) => (run.supplies = 0) },
+    ],
+  },
+  fightPit: {
+    name: 'Fight Pit',
+    text: 'Bookies have caught an alien and a very angry badger, and are taking bets. The crowd is mostly rats and one accountant. The odds are even. The badger looks confident.',
+    options: [
+      {
+        quip: 'Everything on the badger.',
+        text: 'Bet: -4 supplies; half the time, +9 supplies',
+        can: (run) => run.supplies >= 4,
+        take: (run) => (run.supplies += random(run) < 0.5 ? 5 : -4),
+      },
+      leave('Gambling is wrong. Also, the accountant is giving you a look.'),
+    ],
+  },
+  reactor: {
+    name: 'Leaking Reactor',
+    text: 'A power plant leaks a warm green glow. Soldiers who stand in it come out sharper, faster and very faintly humming. Every alien for miles can see the glow too.',
+    options: [
+      {
+        quip: 'Two volunteers. Bring sunscreen.',
+        text: 'Bathe: two random soldiers gain a level; +2 threat',
+        take: (run) => {
+          const first = pick(run, run.soldiers)
+          const second = pick(run, run.soldiers.filter((s) => s !== first))
+          for (const soldier of [first, second]) if (soldier) train(soldier, 1)
+          raise(run, 2)
+        },
+      },
+      leave('Nobody here wants to glow. Not even a bit.'),
+    ],
+  },
+  depot: {
+    name: 'Flooded Depot',
+    text: 'A supply depot sits under a metre of something that is not water. The crates are fine. Whoever fetches them will come back older and wiser and smelling of regret.',
+    options: [
+      {
+        quip: '"Veterans first," says everyone else.',
+        text: 'Wade in: +6 supplies; your highest-level soldier loses a level',
+        take: (run) => {
+          train(run.soldiers.reduce((top, s) => (level(s) > level(top) ? s : top)), -1)
+          run.supplies += 6
+        },
+      },
+      leave('Nothing in there is worth that smell.'),
+    ],
+  },
+  tunnel: {
+    name: 'Smugglers\' Tunnel',
+    text: 'A tunnel runs under the whole zone, signposted EXIT and, in smaller letters, MOSTLY. It skips everything ahead: every fight, and every prize. The aliens will notice the squad has gone missing.',
+    options: [
+      {
+        quip: 'Mind your heads. Mind your everything.',
+        text: 'Take it: skip the rest of the zone; +1 threat',
+        can: ahead,
+        take: (run) => {
+          run.stop = run.zone!.stops.length - 1
+          raise(run, 1)
+        },
+      },
+      leave('Tunnels are how horror films start.'),
     ],
   },
 } satisfies Record<string, Encounter>

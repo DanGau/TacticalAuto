@@ -12,6 +12,18 @@ Test every new mechanic against these. Each cites where it comes from.
 8. **Squeeze and release.** Tension must be followed by relief the player earned, and the alien advance after a win is the next squeeze. [5]
 9. **Rewards that point a build.** A reward that is strong everywhere makes runs alike; one that pays only if the player builds around it makes them differ. Offer a few at a time and make the choice permanent, so each pick matters for the whole run. Relics here are chosen one of three and kept; a skill path, once chosen, shuts the other. [6]
 
+## Events
+
+A draft event ships only if it passes every gate:
+
+1. **A real trade.** Every option but walking away costs something (2).
+2. **Stated odds.** The option says what it does, and how often if by chance (3).
+3. **No spiral.** No option cripples the squad for good (4).
+4. **Our levers.** It moves supplies, threat, soldiers, levels, gear, relics or stops; nothing the game lacks.
+5. **Its own trade.** No other event offers the same deal.
+
+A test checks what it can: every event has a choice, ends in one always open, and repeats no option.
+
 ## Sources
 
 1. [XCOM: clear choices, tough decisions](https://www.gamedeveloper.com/design/xcom-clear-choices-tough-decisions)
