@@ -32,7 +32,7 @@ export const DROP_SUPPLIES = 4
 export const SELL: Record<Rarity, number> = { common: 2, rare: 3, epic: 5 }
 
 /** What each level adds to a soldier's stats. */
-export const LEVEL_STATS: Partial<Stats> = { hp: 1, aim: 0.02 }
+export const LEVEL_STATS: Partial<Stats> = { hp: 2, aim: 0.05 }
 
 const NAMES = ['Vega', 'Okafor', 'Lindqvist', 'Tanaka', 'Reyes', 'Novak', 'Haddad', 'Brandt', 'Silva', 'Kowalski', 'Mbeki', 'Dufour', 'Ivanov', 'Castillo', 'Ng', 'Shaw']
 
