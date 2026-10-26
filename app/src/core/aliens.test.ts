@@ -241,6 +241,20 @@ test('a shot names the skills that shaped it, and an extra shot names the skill 
   expect(shots[1]).toMatchObject({ with: ['doubleTap', 'backstab'] })
 })
 
+test('a soldier whose skills pay for standing still holds a tile it can shoot from', () => {
+  const { soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
+  soldier.effects = ['steady']
+  // A rushing soldier, whose aim rises as it closes in, would close in.
+  soldier.stance = 'rush'
+  soldier.stats = { ...soldier.stats, aim: 0.4 }
+  aliens[0].hp = aliens[0].stats.hp = 99
+  aliens[0].stats = { ...aliens[0].stats, move: 0 }
+  const start = { x: soldier.x, y: soldier.y }
+  const events = until((all) => all.filter((e) => e.type === 'shot' && e.id === soldier.id).length >= 3)
+  expect(events.some((e) => e.type === 'move' && e.id === soldier.id)).toBe(false)
+  expect(soldier).toMatchObject(start)
+})
+
 test('an alien that can shoot a taunting soldier must, and cannot shoot a ghost from far off', () => {
   for (const [effect, shot] of [['taunt', true], ['ghost', false]] as const) {
     const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 15 }])

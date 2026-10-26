@@ -330,9 +330,12 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   if (!goal) return []
   const toGoal = walkingDistances(battle, goal)
   const seen = spotted(battle)
-  /** The best hit chance from `end`, in whole percent; 0 with no shot. */
+  const flanker = has(unit, 'backstab')
+  /** The best hit chance from `end`, in whole percent; 0 with no shot. A backstabber counts a target out of cover half again. */
   const mine = (end: Tile) => {
-    const chances = enemies.filter((enemy) => shootable(battle, unit, end, enemy, seen)).map((enemy) => odds(battle, end, enemy, unit.stats, has(unit, 'piercing')).hit)
+    const chances = enemies
+      .filter((enemy) => shootable(battle, unit, end, enemy, seen))
+      .map((enemy) => odds(battle, end, enemy, unit.stats, has(unit, 'piercing')).hit * (flanker && coverAgainst(battle, enemy, end) === 0 ? 1.5 : 1))
     return Math.round(100 * Math.max(0, ...chances))
   }
   const theirs = (end: Tile) => exposure(battle, enemies, end)
@@ -385,6 +388,9 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
       return spot.mine > 0 ? [...first, 0, ...WITH_SHOT[unit.stance](spot), steps] : [...first, 1, ahead(end), ...NO_SHOT[unit.stance](spot)]
     })
   }
+  // A unit whose perks pay for standing still holds a tile it can shoot from, unless the tile is acid, off the uplink, or too hot for a wary unit.
+  const still = has(unit, 'steady') || has(unit, 'doubleTap')
+  if (still && mine(unit) > 0 && !leash(unit) && !acid(unit) && !(wary && theirs(unit) > 0)) return []
   const move = Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0))
   const path = choose(move)
   if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
