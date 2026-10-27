@@ -377,7 +377,7 @@ function packsOf(run: Run, mission: Mission, mustered?: Muster[]): { name: strin
   const tier = depth(run)
   const armor = tier
   const weapon = Math.floor(tier / 2)
-  const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, armor, weapon), stance: ALIENS[kind].stance, boss: false, spawns: false, target: false, resists: ALIENS[kind].resists })
+  const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, armor, weapon), stance: ALIENS[kind].stance, boss: false, spawns: ALIENS[kind].spawns ?? false, target: false, resists: ALIENS[kind].resists })
   const boss = mission.kind === 'key' || mission.kind === 'final'
   const escort = boss ? run.keys : 0
   const packs = (mustered ?? muster(run, Math.max(0, mission.force - (boss ? 2 + escort : 0)), tier)).map((pack) => ({ name: pack.name, aliens: pack.kinds.map(alien) }))

@@ -3,7 +3,9 @@ import { TUNING } from '../core/tuning'
 import type { Report, Run } from '../core/run'
 import type { View } from '../view/view'
 import { choice, runEnd, stopReport } from './aftermath'
-import { ALIENS, type AlienKind } from '../core/aliens'
+import { ALIENS } from '../core/aliens'
+import { RELICS, type Relic } from '../core/relics'
+import { known } from './intro'
 import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_REACH, nearestAlien, zoneInfo, type Battle } from '../core/battle'
 import { KEYWORDS } from '../core/keywords'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
@@ -18,12 +20,17 @@ export interface Ui {
   update(run: Run): void
 }
 
-/** What the squad faces: each pod by name with its members, then what each kind present does. */
+/**
+ * What the squad faces: each pod by name with its members, then what each kind present does. A pod with a kind the
+ * player has not met is an unknown contact, unless the squad has a recon uplink.
+ */
 function roster(run: Run): string {
   const battle = run.battle!
   const aliens = battle.units.filter((u) => u.side === 'alien')
+  const recon = run.relics.some((id) => (RELICS[id] as Relic).recon)
   const pods = battle.pods.map((pod, index) => {
     const members = aliens.filter((u) => u.pod === index)
+    if (!recon && members.some((u) => !known(u.kind!))) return `<div><b>Unknown contact:</b> ${members.length}</div>`
     const names = [...new Set(members.map((u) => (u.boss ? 'Boss' : ALIENS[u.kind!].name)))]
     const counted = names.map((name) => {
       const count = members.filter((u) => (u.boss ? 'Boss' : ALIENS[u.kind!].name) === name).length
@@ -31,7 +38,7 @@ function roster(run: Run): string {
     })
     return `<div><b>${pod.name}:</b> ${counted.join(', ')}</div>`
   })
-  const kinds = [...new Set(aliens.filter((u) => !u.boss).map((u) => u.kind!))] as AlienKind[]
+  const kinds = [...new Set(aliens.filter((u) => !u.boss).map((u) => u.kind!))].filter((kind) => recon || known(kind))
   const boss = aliens.find((u) => u.boss)
   const rules = [...(boss ? [`${tip('Boss', 'Tough and armored, hits hard and far, and spawns swarmlings')}${boss.resists.map(resistChip).join('')}`] : []), ...kinds.map((kind) => alienName(kind))]
   return `${pods.join('')}<hr><div>${rules.join(' · ')}</div><hr><div>${tip('Stealth', `Soldiers notice an unseen alien within ${DETECT} tiles; a patrol notices a soldier within ${PATROL_DETECT}. Cover and holding still shrink that reach; high ground stretches it. Whoever notices first ambushes: a caught pod is easier to hit, and a pod that notices the squad first stalks it unseen and opens fire with the same bonus. Once every alert alien is dead, the squad is unseen again`)}</div>`

@@ -2,6 +2,7 @@ import { apply, type Action, type Result } from './core/apply'
 import type { GameEvent } from './core/combat'
 import { createRun, type Run } from './core/run'
 import { step } from './core/step'
+import { introduce, newcomers } from './ui/intro'
 import { createUi } from './ui/ui'
 import { createView } from './view/view'
 
@@ -66,7 +67,11 @@ await show([], false)
 if (!params.has('manual')) {
   for (;;) {
     await showing
-    if (state.phase === 'battle' && state.battle?.phase === 'battle') await show(step(state), true)
-    else await new Promise(requestAnimationFrame)
+    if (state.phase === 'battle' && state.battle?.phase === 'battle') {
+      const events = step(state)
+      await show(events, true)
+      // The battle waits while the player meets each new kind of alien.
+      for (const kind of newcomers(state.battle, events)) await introduce(kind)
+    } else await new Promise(requestAnimationFrame)
   }
 }

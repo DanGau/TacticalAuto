@@ -1,10 +1,10 @@
-import { ALIENS, type AlienKind } from '../core/aliens'
+import { ALIENS, DANGERS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { GOALS } from '../core/goals'
 import { SLOTS } from '../core/gear'
 import { DOCTRINES } from '../core/doctrines'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
-import { RELICS } from '../core/relics'
+import { RELICS, type Relic } from '../core/relics'
 import { GEAR_PRICE, KEYS, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Mission, type Muster, type Run, type Soldier, type Stop, type Zone } from '../core/run'
 import { FEATS } from '../core/feats'
 import { PATHS, SKILLS } from '../core/skills'
@@ -25,11 +25,18 @@ function chip(run: Run, stop: Stop, state = ''): string {
   return `<span class="chip ${stop.kind} ${stop.risk} ${state}">${risk}${STOP_NAMES[stop.kind]}${aliens}</span>`
 }
 
-/** The aliens of a battle, counted by kind: "3 Troopers, 2 Swarmlings". */
-function census(packs: Muster[]): string {
-  const counts = new Map<AlienKind, number>()
-  for (const kind of packs.flatMap((pack) => pack.kinds)) counts.set(kind, (counts.get(kind) ?? 0) + 1)
-  return [...counts].map(([kind, n]) => `${n} ${alienName(kind, `${ALIENS[kind].name}${n === 1 ? '' : 's'}`)}`).join(', ')
+/** The aliens of a zone, counted by kind with a recon uplink, "3 Troopers, 2 Swarmlings"; else by danger, "3 small, 2 medium". */
+function census(run: Run, packs: Muster[]): string {
+  const kinds = packs.flatMap((pack) => pack.kinds)
+  if (run.relics.some((id) => (RELICS[id] as Relic).recon)) {
+    const counts = new Map<AlienKind, number>()
+    for (const kind of kinds) counts.set(kind, (counts.get(kind) ?? 0) + 1)
+    return [...counts].map(([kind, n]) => `${n} ${alienName(kind, `${ALIENS[kind].name}${n === 1 ? '' : 's'}`)}`).join(', ')
+  }
+  return DANGERS.flatMap((danger) => {
+    const n = kinds.filter((kind) => ALIENS[kind].danger === danger).length
+    return n > 0 ? [`${n} ${danger}`] : []
+  }).join(', ')
 }
 
 const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '📦', cache: '🎁', shop: '🛒', unknown: '❓', key: '🛰️', final: '👁️' }
@@ -43,10 +50,10 @@ function stopIcon(stop: Stop): string {
 }
 
 /** A zone at a fork: its stops as three icons, and every alien in it by count. Clicking it commits the squad to it. */
-function zoneCard(zone: Zone, index: number): string {
+function zoneCard(run: Run, zone: Zone, index: number): string {
   const battles = zone.stops.filter((s) => s.kind === 'battle')
   const commanders = battles.filter((s) => s.goal === 'assassinate').length
-  const aliens = census(battles.flatMap((s) => s.packs)) + (commanders > 0 ? `, ${commanders} Commander${commanders === 1 ? '' : 's'}` : '')
+  const aliens = census(run, battles.flatMap((s) => s.packs)) + (commanders > 0 ? `, ${commanders} Commander${commanders === 1 ? '' : 's'}` : '')
   return button({ type: 'zone', index }, `<div class="nodes">${zone.stops.map(stopIcon).join('<span class="arrow">→</span>')}</div><span>${aliens}</span>`, 'zone')
 }
 
@@ -104,7 +111,7 @@ function mapView(run: Run): string {
   const zone = run.zone
   if (!zone) {
     return `<h2>A fork in the road. Choose a zone; what lies beyond it is unknown.</h2>
-      <div class="choices">${run.zones.map((z, i) => zoneCard(z, i)).join('')}</div>`
+      <div class="choices">${run.zones.map((z, i) => zoneCard(run, z, i)).join('')}</div>`
   }
   const next = nextStop(run)!
   const here = zone.stops[run.stop]

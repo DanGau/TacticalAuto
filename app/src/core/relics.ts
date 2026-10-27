@@ -20,6 +20,8 @@ export interface Relic {
   supplies?: number
   /** Whether every piece of gear found is rare or better. */
   rareGear?: boolean
+  /** Whether the map names the aliens of each zone, not only how dangerous they are. */
+  recon?: boolean
 }
 
 const relics = {
@@ -35,6 +37,7 @@ const relics = {
   echo: { name: 'Echo Chamber', text: 'Every class ability with limited uses has one more', charges: 1 },
   drones: { name: 'Scavenger Drones', text: 'Each won battle pays 1 more supply', supplies: 1 },
   contact: { name: 'Black Market Contact', text: 'Every piece of gear found is rare or better', rareGear: true },
+  uplink: { name: 'Recon Uplink', text: 'The map names the aliens of each zone, not only how dangerous they are', recon: true },
   accelerant: { name: 'Accelerant Gel', text: `Hits on a burning target do +${TUNING.accelerantDamage} damage`, tags: ['burn'], effect: 'accelerant' },
   wildfire: { name: 'Wildfire Spores', text: 'An alien that dies burning sets every alien beside it burning', tags: ['burn', 'kill'], effect: 'wildfire' },
   salamander: { name: 'Salamander Sigil', text: 'Crits set the target burning', tags: ['crit', 'burn'], effect: 'ignite' },

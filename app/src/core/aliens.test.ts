@@ -1,6 +1,6 @@
 import { PATHS } from './skills'
 import { expect, test } from 'vitest'
-import { ALIENS, alienStats, muster, PACKS, type AlienKind } from './aliens'
+import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, PACKS, REGEN_HEAL, type AlienKind } from './aliens'
 import { apply } from './apply'
 import { isSoldier, ACID_DAMAGE, alienUnit, mechUnit, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, type Battle, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
@@ -42,7 +42,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   battle.west.fill('none')
   const soldier = battle.units.find(isSoldier)!
   Object.assign(soldier, { x: 10, y: 10, hp: 30, stats: { ...soldier.stats, hp: 30, aim: 2, crit: 0, damage: 3 } })
-  const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss, target: false, resists: ALIENS[kind].resists }, { x, y }, 0))
+  const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss || (ALIENS[kind].spawns ?? false), target: false, resists: ALIENS[kind].resists }, { x, y }, 0))
   battle.units = [soldier, ...units]
   battle.pods = [{ name: 'Test', revealed: true, alert: true, stalking: false, ambushed: false, surprised: false, waypoint: { x: 0, y: 0 } }]
   battle.concealed = false
@@ -372,4 +372,88 @@ test('a dronemaster deploys drones that carry its skills, and a self-destructing
   const before = alien.hp
   blast.until((events) => events.some((e) => e.type === 'death' && e.id === mech.id))
   expect(alien.hp).toBeLessThanOrEqual(before - 4)
+})
+
+test("a juggernaut's plate stops a whole hit and loses one plate; a wraith takes 1 from anything but a crit", () => {
+  const jug = arena([{ kind: 'juggernaut', x: 10, y: 13 }])
+  jug.soldier.stats = { ...jug.soldier.stats, move: 0, damage: 50 }
+  jug.aliens[0].stats = { ...jug.aliens[0].stats, move: 0, range: 0 }
+  const plates = jug.aliens[0].armor
+  jug.until((all) => all.some((e) => e.type === 'shot' && e.id === jug.soldier.id))
+  expect(jug.aliens[0]).toMatchObject({ hp: jug.aliens[0].stats.hp, armor: plates - 1 })
+
+  for (const crit of [0, 1]) {
+    const { soldier, aliens, until } = arena([{ kind: 'wraith', x: 10, y: 13 }])
+    soldier.stats = { ...soldier.stats, move: 0, damage: 5, crit }
+    aliens[0].hp = aliens[0].stats.hp = 99
+    aliens[0].stats = { ...aliens[0].stats, move: 0, range: 0 }
+    const shot = until((all) => all.some((e) => e.type === 'shot' && e.id === soldier.id)).find((e) => e.type === 'shot' && e.id === soldier.id)
+    expect(99 - aliens[0].hp).toBe(crit ? (shot as { damage: number }).damage : 1)
+  }
+})
+
+test('an incubator does nothing, then hatches two brutes some alien turns after it is seen', () => {
+  const { battle, soldier, aliens, until } = arena([{ kind: 'incubator', x: 10, y: 20 }])
+  soldier.stats = { ...soldier.stats, move: 0, range: 0 }
+  expect(aliens[0].cooldown).toBe(HATCH_TURNS)
+  const events = until(has('spawn'))
+  expect(events.some((e) => e.type === 'shot' && e.id === aliens[0].id)).toBe(false)
+  expect(battle.round).toBe(HATCH_TURNS)
+  expect(battle.units.filter((u) => u.kind === 'brute')).toHaveLength(2)
+  expect(battle.units).not.toContain(aliens[0])
+})
+
+test('burrowers stay unseen underground, then surface beside the soldier standing most alone', () => {
+  const { battle, soldier, aliens, until } = arena([
+    { kind: 'burrower', x: 10, y: 17 },
+    { kind: 'burrower', x: 11, y: 17 },
+  ])
+  const loner: Unit = { ...structuredClone(soldier), id: 900, x: 25, y: 25 }
+  const mate: Unit = { ...structuredClone(soldier), id: 901, x: 11, y: 10 }
+  battle.units.push(loner, mate)
+  for (const unit of [soldier, loner, mate]) unit.stats = { ...unit.stats, move: 0, range: 0 }
+  Object.assign(battle.pods[0], { revealed: false, alert: false })
+  battle.concealed = true
+  const events = until(has('reveal'))
+  expect(events.find((e) => e.type === 'reveal')).toMatchObject({ stalked: true })
+  for (const b of aliens) expect(Math.max(Math.abs(b.x - loner.x), Math.abs(b.y - loner.y))).toBe(1)
+})
+
+test('a feeder in sight grows on each trick the squad uses; a mirror hits as hard as the hardest-hitting soldier', () => {
+  const { battle, soldier, aliens, until } = arena([{ kind: 'feeder', x: 10, y: 13 }])
+  soldier.effects = ['grenade']
+  soldier.stats = { ...soldier.stats, move: 0 }
+  battle.units.push(alienUnit(battle, { kind: 'trooper', stats: alienStats('trooper', 0, 0), stance: 'balanced', boss: false, spawns: false, target: false, resists: [] }, { x: 11, y: 13 }, 0))
+  aliens[0].hp = aliens[0].stats.hp = 99
+  aliens[0].stats = { ...aliens[0].stats, move: 0, range: 0 }
+  expect(until(has('feed'))).toContainEqual({ type: 'feed', id: aliens[0].id, damage: 1 })
+
+  const glass = arena([{ kind: 'mirror', x: 10, y: 13 }])
+  glass.soldier.stats = { ...glass.soldier.stats, move: 0, range: 0, damage: 9 }
+  glass.aliens[0].stats = { ...glass.aliens[0].stats, move: 0, aim: 2, crit: 0 }
+  const hit = glass.until((all) => all.some((e) => e.type === 'shot' && e.id === glass.aliens[0].id)).find((e) => e.type === 'shot' && e.id === glass.aliens[0].id)
+  expect(hit).toMatchObject({ hit: true, damage: 9 })
+})
+
+test('a regenerator heals each turn unless burning; a chilled sprinter cannot move; a hive node keeps spawning', () => {
+  for (const burning of [0, 5]) {
+    const { aliens, until, soldier } = arena([{ kind: 'regenerator', x: 10, y: 20 }])
+    soldier.stats = { ...soldier.stats, move: 0, range: 0 }
+    aliens[0].stats = { ...aliens[0].stats, move: 0, range: 0 }
+    aliens[0].hp = aliens[0].stats.hp - REGEN_HEAL - 2
+    aliens[0].burning = burning
+    const events = until(() => aliens[0].burning < burning || aliens[0].hp !== aliens[0].stats.hp - REGEN_HEAL - 2)
+    expect(events.some((e) => e.type === 'effect' && e.effect === 'regen')).toBe(burning === 0)
+  }
+
+  const run = arena([{ kind: 'sprinter', x: 10, y: 25 }])
+  run.soldier.stats = { ...run.soldier.stats, move: 0, range: 0 }
+  run.aliens[0].chilled = 9
+  const moves = run.until(() => run.battle.round >= 2)
+  expect(moves.some((e) => e.type === 'move' && e.id === run.aliens[0].id)).toBe(false)
+
+  const nest = arena([{ kind: 'hiveNode', x: 10, y: 25 }])
+  nest.soldier.stats = { ...nest.soldier.stats, move: 0, range: 0 }
+  nest.until(() => nest.battle.round >= 2 * NODE_EVERY + 1)
+  expect(nest.battle.units.filter((u) => u.kind === 'swarmling').length).toBeGreaterThanOrEqual(2)
 })

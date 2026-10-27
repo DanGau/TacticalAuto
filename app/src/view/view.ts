@@ -146,6 +146,15 @@ const ALIEN_LOOK: Record<AlienKind, { color: number; scale: number }> = {
   burster: { color: 0xff9a3d, scale: 0.8 },
   brute: { color: 0xb5533c, scale: 1.4 },
   psion: { color: 0xff6bd6, scale: 1 },
+  juggernaut: { color: 0x8a8f99, scale: 1.5 },
+  incubator: { color: 0xd8c27a, scale: 1.1 },
+  wraith: { color: 0xb8c8ff, scale: 1 },
+  burrower: { color: 0x9c6b3f, scale: 1.1 },
+  feeder: { color: 0xc23b6e, scale: 1.1 },
+  regenerator: { color: 0x2fc7a0, scale: 1.1 },
+  sprinter: { color: 0xf2e04b, scale: 0.8 },
+  hiveNode: { color: 0x6b3fa0, scale: 1.3 },
+  mirror: { color: 0xe6f0ff, scale: 1 },
 }
 
 const onGridTile = (x: number, y: number) => x >= 0 && y >= 0 && x < GRID && y < GRID
@@ -881,6 +890,9 @@ export async function createView(): Promise<View> {
         // A demolishing hit has already wrecked the cover in the battle; show it as the hit lands.
         if (e.effect === 'demolish') drawTerrain(battle)
         float(effectCallout(e, on))
+      } else if (e.type === 'feed') {
+        const on = sprites.get(e.id)
+        if (on) float(callout(`FED +${e.damage}`, COLOR.crit, on))
       } else if (e.type === 'heal') {
         const to = sprites.get(e.target)
         if (!to) continue

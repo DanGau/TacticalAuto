@@ -1,9 +1,10 @@
-import { ALIENS, alienStats } from './aliens'
+import { ALIENS, alienStats, NODE_EVERY, REGEN_HEAL } from './aliens'
 import { OVERKILL, type FeatId, type Tally } from './feats'
 import { TUNING } from './tuning'
 import { PARRY_CHANCE } from './doctrines'
 import {
   BASE_STATS,
+  SIGHT,
   mechUnit,
   type SkillEffect,
   type Stats,
@@ -111,6 +112,8 @@ export type GameEvent =
   | { type: 'effect'; id: number; effect: Effect; amount: number }
   /** A spitter's spit lands on its target, which takes `damage`, and leaves acid on the tile. */
   | { type: 'spit'; id: number; target: number; damage: number }
+  /** A feeder grows on a trick the squad used: its hits do `damage` more than its weapon's. */
+  | { type: 'feed'; id: number; damage: number }
   /** A psion panics a soldier, who loses its next action. */
   | { type: 'panic'; id: number; target: number }
   /** A panicked soldier loses its action. */
@@ -464,7 +467,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const shotHere = enemies.some((enemy) => revealed(battle, enemy) && shootable(battle, unit, unit, enemy, seen))
   if (still && shotHere && !leash(unit) && !acid(unit) && !(wary && theirs(unit) > 0)) return []
   // A booming charge pins a unit that can fight from where it stands; a rooted one cannot move at all.
-  if ((unit.booming > 0 && shotHere) || unit.rooted > 0) return []
+  if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || (unit.kind === 'sprinter' && unit.chilled > 0)) return []
   const move = Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0))
   const path = choose(move)
   if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
@@ -495,7 +498,7 @@ function sight(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
   const soldiers = battle.units.filter(isSoldier)
   battle.pods.forEach((pod, index) => {
-    if (pod.revealed && pod.alert) return
+    if ((pod.revealed && pod.alert) || burrowing(battle, index)) return
     const members = battle.units.filter((u) => u.pod === index)
     const noticed = !pod.revealed && members.some((m) => soldiers.some((s) => detects(battle, s, m)))
     const notices = !pod.alert && members.some((m) => soldiers.some((s) => detects(battle, m, s)))
@@ -615,6 +618,11 @@ function upkeep(battle: Battle): GameEvent[] {
       unit.armor++
       events.push({ type: 'effect', id: unit.id, effect: 'rearm', amount: 0 })
     }
+    if (unit.kind === 'regenerator' && unit.burning === 0 && unit.hp < unit.stats.hp) {
+      const amount = Math.min(REGEN_HEAL, unit.stats.hp - unit.hp)
+      unit.hp += amount
+      events.push({ type: 'effect', id: unit.id, effect: 'regen', amount })
+    }
     if (unit.burning > 0) {
       if (foeHas(battle, unit, 'pyre') && !onTile(battle.fire, unit)) battle.fire.push({ x: unit.x, y: unit.y, turns: FIRE_TURNS })
       unit.burning--
@@ -636,15 +644,62 @@ function upkeep(battle: Battle): GameEvent[] {
   battle.acid = battle.acid.map((pool) => ({ ...pool, turns: pool.turns - 1 })).filter((pool) => pool.turns > 0)
   battle.fire = battle.fire.map((pool) => ({ ...pool, turns: pool.turns - 1 })).filter((pool) => pool.turns > 0)
   for (const unit of battle.units.filter((u) => u.side === 'alien')) {
-    if (unit.cooldown > 0) unit.cooldown--
+    // An incubator's time runs only once it is seen.
+    if (unit.cooldown > 0 && (unit.kind !== 'incubator' || revealed(battle, unit))) unit.cooldown--
+    if (unit.kind === 'incubator' && unit.cooldown === 0) {
+      events.push(...hatch(battle, unit))
+      continue
+    }
     if (!unit.spawns || unit.cooldown > 0 || !revealed(battle, unit) || silenced(battle, unit)) continue
     const [tile] = freeTilesNear(battle, unit, 1)
-    if (!tile) continue
-    unit.cooldown = SPAWN_EVERY
+    if (!tile || (unit.kind === 'hiveNode' && unit.charges <= 0)) continue
+    if (unit.kind === 'hiveNode') unit.charges--
+    unit.cooldown = unit.kind === 'hiveNode' ? NODE_EVERY : SPAWN_EVERY
     const spawn = alienUnit(battle, { kind: 'swarmling', stats: alienStats('swarmling', 0, 0), stance: ALIENS.swarmling.stance, boss: false, spawns: false, target: false, resists: [] }, tile, unit.pod!)
     battle.units.push(spawn)
     events.push({ type: 'spawn', id: unit.id, unit: { id: spawn.id, x: spawn.x, y: spawn.y } })
   }
+  return events
+}
+
+/** An incubator hatches: it is gone, and two brutes of its pod stand where it was. */
+function hatch(battle: Battle, unit: Unit): GameEvent[] {
+  battle.units = battle.units.filter((u) => u !== unit)
+  const events: GameEvent[] = [{ type: 'death', id: unit.id }]
+  for (const tile of freeTilesNear(battle, unit, 2)) {
+    const brute = alienUnit(battle, { kind: 'brute', stats: alienStats('brute', unit.stats.armor, 0), stance: ALIENS.brute.stance, boss: false, spawns: false, target: false, resists: ALIENS.brute.resists }, tile, unit.pod!)
+    battle.units.push(brute)
+    events.push({ type: 'spawn', id: unit.id, unit: { id: brute.id, x: brute.x, y: brute.y } })
+  }
+  return events
+}
+
+/** Whether a pod is burrowers still underground: unseen, and beyond the squad's sight. */
+function burrowing(battle: Battle, index: number): boolean {
+  const members = battle.units.filter((u) => u.pod === index)
+  return !battle.pods[index].revealed && members.length > 0 && members.every((u) => u.kind === 'burrower')
+}
+
+/**
+ * Burrowers underground surface once the fight is on or a soldier comes within sight of them: beside the soldier with
+ * the fewest squadmates near, ready to strike this turn.
+ */
+function surface(battle: Battle): GameEvent[] {
+  const events: GameEvent[] = []
+  const soldiers = battle.units.filter(isSoldier)
+  const company = (s: Unit) => battle.units.filter((u) => u.side === s.side && u !== s && !u.civilian && distance(u, s) <= COHESION).length
+  battle.pods.forEach((pod, index) => {
+    if (!burrowing(battle, index)) return
+    const members = battle.units.filter((u) => u.pod === index)
+    if (!hunted(battle) && !members.some((m) => soldiers.some((s) => distance(s, m) <= SIGHT))) return
+    const alone = soldiers.reduce<Unit | undefined>((best, s) => (!best || company(s) < company(best) ? s : best), undefined)
+    if (!alone) return
+    freeTilesNear(battle, alone, members.length).forEach((tile, i) => Object.assign(members[i], tile))
+    Object.assign(pod, { revealed: true, alert: true, stalking: false, ambushed: false, surprised: false })
+    events.push({ type: 'reveal', ambush: false, stalked: true, units: members.map(({ id, x, y }) => ({ id, x, y })) })
+    // Surfacing is a move, so overwatch answers it.
+    for (const m of members) events.push({ type: 'move', id: m.id, path: [{ x: m.x, y: m.y }] })
+  })
   return events
 }
 
@@ -662,7 +717,7 @@ function impact(battle: Battle): GameEvent[] {
 
 /** The side on turn has its upkeep; each of its units walks its path, lowest id first; acid burns those still in it; then newly sighted pods are revealed. */
 function moveSide(battle: Battle): GameEvent[] {
-  const events = [...(battle.breach ? impact(battle) : []), ...upkeep(battle)]
+  const events = [...(battle.breach ? impact(battle) : []), ...upkeep(battle), ...(battle.turn === 'alien' ? surface(battle) : [])]
   if (battle.turn === 'alien') {
     for (const pod of battle.pods) {
       // A pod that has reached its waypoint picks the next.
@@ -723,13 +778,16 @@ export function tallyOf(battle: Battle, soldier: number): Tally {
 
 const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || tally.feats.push(id)
 
-function wound(battle: Battle, target: Unit, damage: number, events: GameEvent[], pierce = false): void {
+function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[], pierce = false, crit = false): void {
   if (target.hp <= 0) return
+  const damage = target.kind === 'wraith' && !crit ? Math.min(dealt, 1) : dealt
   const full = target.hp === target.stats.hp
-  const absorbed = pierce ? 0 : Math.min(target.armor, damage)
+  // A juggernaut's plate stops a hit whole, and is lost to it.
+  const plated = target.kind === 'juggernaut' && !pierce && target.armor > 0
+  const absorbed = plated ? damage : pierce ? 0 : Math.min(target.armor, damage)
   // Health lost: damage past what the target had left is counted for nobody.
   const lost = Math.min(target.hp, damage - absorbed)
-  target.armor -= absorbed
+  target.armor -= plated ? 1 : absorbed
   target.hp -= damage - absorbed
   if (target.soldier !== null) tallyOf(battle, target.soldier).taken += lost
   // A mech's work is its engineer's.
@@ -864,6 +922,7 @@ function panic(battle: Battle, unit: Unit): GameEvent[] {
 /** What an alien does in place of a shot, by its kind; empty if it shoots, or has nothing to do. */
 function alienAction(battle: Battle, unit: Unit): GameEvent[] | null {
   if (unit.kind && unit.kind !== 'trooper' && silenced(battle, unit)) return unit.kind === 'burster' ? [] : null
+  if (unit.kind === 'incubator') return []
   if (unit.kind === 'spitter') return spit(battle, unit)
   if (unit.kind === 'psion') {
     const events = panic(battle, unit)
@@ -1015,8 +1074,11 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
 
   const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) > 0
   const crit = !enemy.resists.includes('crit') && (sure || random(battle) < chance.crit + (ambushed ? AMBUSH_CRIT : 0))
+  // A mirror hits as hard as the squad's hardest hitter; a feeder as hard as it has grown.
+  const base = unit.kind === 'mirror' ? Math.max(unit.stats.damage, ...battle.units.filter(isSoldier).map((s) => s.stats.damage)) : unit.stats.damage
   let damage =
-    unit.stats.damage +
+    base +
+    (unit.kind === 'feeder' ? unit.fury : 0) +
     (crit ? CRIT_BONUS + when(true, 'headshot', HEADSHOT_DAMAGE) : 0) +
     when(enemy.hp <= enemy.stats.hp / 2, 'executioner', EXECUTE_BONUS) +
     when(coverAgainst(battle, enemy, unit) === 0, 'backstab', BACKSTAB_DAMAGE) +
@@ -1047,8 +1109,8 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   const guard = battle.units.find((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && has(u, 'bond') && distance(u, enemy) <= 1)
   if (guard && damage > 0) {
     events.push({ type: 'effect', id: guard.id, effect: 'bond', amount: -damage })
-    wound(battle, guard, damage, events, pierced)
-  } else wound(battle, enemy, damage, events, pierced)
+    wound(battle, guard, damage, events, pierced, crit)
+  } else wound(battle, enemy, damage, events, pierced, crit)
   const spare = enemy.hp <= 0 ? when(damage > left, 'overkill', damage - left) : 0
   const next = spare > 0 ? nearest(battle.units.filter((u) => u.side === enemy.side && u.hp > 0), enemy) : undefined
   if (next) {
@@ -1183,6 +1245,18 @@ function medkit(unit: Unit): GameEvent[] {
   return [{ type: 'effect', id: unit.id, effect: 'medkit', amount }]
 }
 
+/** Each feeder in sight grows on a trick the squad's unit used in `events`: its ability, a grenade, or a once-per-battle effect. */
+function feed(battle: Battle, unit: Unit, events: GameEvent[]): GameEvent[] {
+  const tricked = events.some((e) => (e.type === 'rocket' || e.type === 'heal' || e.type === 'spawn' || (e.type === 'effect' && e.amount >= 0)) && e.id === unit.id)
+  if (!tricked) return []
+  return battle.units
+    .filter((u) => u.kind === 'feeder' && revealed(battle, u))
+    .map((u) => {
+      u.fury++
+      return { type: 'feed', id: u.id, damage: u.fury }
+    })
+}
+
 /** Whether the unit may act this turn: an alien may not while its pod is unaware or surprised. */
 function armed(battle: Battle, unit: Unit): boolean {
   return unit.pod === null || (battle.pods[unit.pod].alert && !battle.pods[unit.pod].surprised)
@@ -1219,6 +1293,7 @@ function actNext(battle: Battle): GameEvent[] {
     // What follows an action: a drone's shot, then a skirmisher's step back.
     const events = acted.length > 0 && unit.hp > 0 ? [...acted, ...drone(battle, unit), ...skirmish(battle, unit)] : acted
     battle.actor = null
+    if (unit.side === 'human') events.push(...feed(battle, unit, events))
     if (events.length === 0) continue
     battle.shooter = unit.id
     // A stalking pod gives itself away when it opens fire.

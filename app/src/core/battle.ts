@@ -1,4 +1,4 @@
-import type { AlienKind } from './aliens'
+import { HATCH_TURNS, NODE_SPAWNS, type AlienKind } from './aliens'
 import type { Tally } from './feats'
 import type { DoctrineEffect, Rule } from './doctrines'
 import type { Keyword, Resist } from './keywords'
@@ -444,11 +444,10 @@ export function blocked(battle: Battle, x: number, y: number): boolean {
 /** Whether the unit hunts its enemies: an alien once its pod is alert. Humans always do. */
 export const alert = (battle: Battle, unit: Unit) => unit.pod === null || battle.pods[unit.pod].alert
 
-/** Whether the alien fights in the open: humans always do, an alien once its pod is revealed. */
-/** Whether the unit is a soldier: on the human side, and no civilian. */
 /** A soldier of the squad: not a civilian, nor a mech, which fights for the squad but cannot hold the field alone. */
 export const isSoldier = (unit: Unit) => unit.side === 'human' && unit.soldier !== null
 
+/** Whether the alien fights in the open: humans always do, an alien once its pod is revealed. */
 export function revealed(battle: Battle, unit: Unit): boolean {
   return unit.pod === null || battle.pods[unit.pod].revealed
 }
@@ -595,7 +594,8 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     soldier: null,
     pod,
     ability: null,
-    charges: 0,
+    // A hive node's charges are the swarmlings left in it.
+    charges: alien.kind === 'hiveNode' ? NODE_SPAWNS : 0,
     effects: [],
     spent: [],
     burning: 0,
@@ -609,7 +609,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     moved: false,
     suppressed: 0,
     marked: false,
-    cooldown: alien.spawns ? SPAWN_EVERY : 0,
+    cooldown: alien.spawns ? SPAWN_EVERY : alien.kind === 'incubator' ? HATCH_TURNS : 0,
   }
 }
 
