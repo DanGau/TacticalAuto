@@ -8,6 +8,7 @@ import type { GameEvent } from '../core/combat'
 import { level, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
 import type { Edge, Ground, Prop } from '../core/terrain'
+import { drawOutskirts } from './outskirts'
 import { weaponOf, type Weapon } from './weapons'
 
 export const WIDTH = 1280
@@ -232,6 +233,8 @@ export async function createView(): Promise<View> {
   const app = new Application()
   await app.init({ width: WIDTH, height: HEIGHT, background: 0x10141c, antialias: true })
 
+  /** The world past the battlefield: scenery beyond its far edges, cliffs falling from its near ones. */
+  const outskirts = new Graphics()
   const tiles = new Graphics()
   /** Shown before the landing: the landing zones' tint under the units, and their names and the contact markers over them. */
   const zones = new Graphics()
@@ -245,7 +248,7 @@ export async function createView(): Promise<View> {
   const lurk = new Container()
   const fx = new Graphics()
   const world = new Container()
-  world.addChild(tiles, zones, acid, fog, lurk, units, fx, marks, labels)
+  world.addChild(outskirts, tiles, zones, acid, fog, lurk, units, fx, marks, labels)
   // Nothing shows until a battle exists.
   world.visible = false
   app.stage.addChild(world)
@@ -394,6 +397,7 @@ export async function createView(): Promise<View> {
   function drawTerrain(battle: Battle): void {
     for (const { node } of scenery.splice(0)) node.destroy()
     tiles.clear()
+    drawOutskirts(outskirts, battle, TILE_W, TILE_H, RISE)
     const stand = (node: Graphics, x: number, y: number, lit: number[]) => {
       node.position.copyFrom(toWorld(x, y))
       node.zIndex = x + y

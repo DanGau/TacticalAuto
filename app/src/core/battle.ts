@@ -282,6 +282,8 @@ export interface Battle {
   rules: Rule[]
   /** What about the ground or weather changes this battle, if anything. */
   twist: Twist | null
+  /** The kind of place it is fought in. */
+  place: TerrainKind
   /** Alien turns begun. */
   round: number
   /** Packs still to arrive on a hold, one every WAVE_EVERY rounds. */
@@ -687,6 +689,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     winner: null,
     units: [],
     nextId: 1,
+    place: kind,
     ...terrain,
     cover: terrain.props.map((prop) => PROP_COVER[prop]),
     pods: [],
