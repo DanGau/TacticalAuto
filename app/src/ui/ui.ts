@@ -13,6 +13,7 @@ import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { DETECT, PATROL_DETECT } from '../core/sight'
 import { alienName, button, resistChip, STOP_NAMES, tip } from './html'
 import { overworld, type Tab } from './overworld'
+import { drawTrails } from './trails'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
 
@@ -137,6 +138,8 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     // Rewriting unchanged content would restart its animations.
     if (next !== html) {
       overlay.innerHTML = html = next
+      const map = overlay.querySelector('.map')
+      if (map) drawTrails(map)
       overlay.querySelector('.map .here, .map .branch')?.scrollIntoView({ block: 'nearest', inline: 'center' })
     }
     overlay.hidden = run.phase === 'battle'
