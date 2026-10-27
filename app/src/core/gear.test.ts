@@ -7,16 +7,15 @@ import { EFFECTS, generateGear, type Gear } from './gear'
 import { createRun, SELL, soldierStats, type Run } from './run'
 import { TUNING } from './tuning'
 
-test('gear is built by rarity: commons have one mod, rares add an effect for their slot, epics add a second mod', () => {
+test('gear does one thing: commons a stat mod, rares a simple effect, epics an elaborate one, each for its slot', () => {
   const rng = { rng: 7 }
   for (let id = 0; id < 200; id++) {
     const rarity = (['common', 'rare', 'epic'] as const)[id % 3]
     const gear = generateGear(rng, id, rarity)
-    const words = gear.name.split(' ').length
-    expect(words).toBe({ common: 2, rare: 3, epic: 4 }[rarity])
+    expect(gear.name.split(' ').length).toBe(2)
     expect(gear.effect === null).toBe(rarity === 'common')
-    if (gear.effect) expect(EFFECTS[gear.effect].slot).toBe(gear.slot)
-    expect(Object.keys(gear.stats).length).toBeGreaterThan(0)
+    expect(Object.keys(gear.stats).length > 0).toBe(rarity === 'common')
+    if (gear.effect) expect([EFFECTS[gear.effect].slot, !!EFFECTS[gear.effect].epic]).toEqual([gear.slot, rarity === 'epic'])
   }
 })
 

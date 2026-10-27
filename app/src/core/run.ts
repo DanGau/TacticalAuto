@@ -264,7 +264,7 @@ export function keepFind(run: Run): void {
 /** What gear costs in a shop, by rarity. */
 export const GEAR_PRICE: Record<Exclude<Rarity, 'common'>, number> = { rare: 5, epic: 8 }
 /** Pieces of gear and relics a shop stocks. */
-const SHOP_WARES = 3
+const SHOP_WARES = 2
 const SHOP_RELICS = 2
 /** Chance a piece of shop gear is epic rather than rare. */
 const SHOP_EPIC = 0.3
@@ -511,28 +511,30 @@ function rollRarity(run: Run, lucky: boolean): Rarity {
 
 const RARITY_RANK: Record<Rarity, number> = { common: 0, rare: 1, epic: 2 }
 
-/** What a finder says on deciding a find alone, by whether the slot was empty, the find better, or worse. */
+/** What a finder says on deciding a find alone, by whether the slot was empty, the find better, the same as what it wears, or worse. */
 const BLURBS = {
   empty: ['"Finders keepers."', '"Was this anyone\'s? It\'s mine now."', '"Oh, that\'s going on immediately."', '"Naked no more!"'],
   better: ['"Upgrade! The old one can go live on a farm."', '"Yes. Yes, you\'ll do."', '"Out with the old, in with the shiny."', '"I deserve this. Don\'t look it up."'],
+  same: ['"Already got one."', '"Twins. One of you goes."', '"Same again? Sell it."', '"I can only hold one of these."'],
   worse: ['"I have standards."', '"Downgrade? In this economy?"', '"Sell it. Sentiment is for the dead."', '"Mine\'s better. Obviously."'],
 }
 
 /**
  * A piece of gear found by a soldier drawn at random. The finder decides alone, with a word on why: an empty slot or a
- * rarer find is worn, selling what it replaces; a commoner one is sold. A find as rare as what the finder wears waits
- * for the player in run.finds.
+ * rarer find is worn, selling what it replaces; a commoner one, or one the same as what it wears, is sold. Another find
+ * as rare as what the finder wears waits for the player in run.finds.
  */
 export function dropGear(run: Run, lucky: boolean): void {
   const gear = generateGear(run, run.nextGear++, rollRarity(run, lucky))
   const soldier = run.soldiers[randomInt(run, run.soldiers.length)]
   const old = soldier.gear[gear.slot]
-  if (old && RARITY_RANK[old.rarity] === RARITY_RANK[gear.rarity]) {
+  const same = !!old && old.effect === gear.effect && JSON.stringify(old.stats) === JSON.stringify(gear.stats)
+  if (old && !same && old.rarity === gear.rarity) {
     run.finds.push({ soldier: soldier.id, gear })
     return
   }
   const kept = !old || RARITY_RANK[gear.rarity] > RARITY_RANK[old.rarity]
-  const lines = BLURBS[!old ? 'empty' : kept ? 'better' : 'worse']
+  const lines = BLURBS[!old ? 'empty' : kept ? 'better' : same ? 'same' : 'worse']
   const line = lines[randomInt(run, lines.length)]
   if (kept) {
     if (old) run.supplies += SELL[old.rarity]

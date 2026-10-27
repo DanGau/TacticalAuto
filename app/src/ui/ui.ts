@@ -79,14 +79,14 @@ function tradeoffs(battle: Battle, zone: number): string {
   return chips.join('')
 }
 
-/** Before the landing: a button per zone that flies the camera there, one back to the whole map, and the chosen zone's case. */
+/** Before the landing: a button per zone that flies the camera there, one back to the whole map, and the chosen zone's boon and case. */
 function drop(battle: Battle, zone: number | null): string {
   const zones = battle.boons.map((boon, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}" title="${i === battle.hot ? 'Land on top of a pod' : BOONS[boon].text}">${ZONE_NAMES[i]} ${i === battle.hot ? '☄️ Hot drop' : `${KEYWORDS[boon].icon} ${BOONS[boon].name}`}</button>`)
   const overview = `<button data-zone="" class="overview ${zone === null ? 'on' : ''}" title="Whole map">🗺️</button>`
   const detail =
     zone === null
       ? '<small>Pick a landing zone to fly to it.</small>'
-      : `<div class="tradeoffs">${tradeoffs(battle, zone)}</div>${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
+      : `<p>${zone === battle.hot ? 'Land on top of a pod.' : `${BOONS[battle.boons[zone]].text}.`}</p><div class="tradeoffs">${tradeoffs(battle, zone)}</div>${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
   return `<div class="zones">${zones.join('')}${overview}</div>${detail}`
 }
 

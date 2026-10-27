@@ -393,26 +393,31 @@ export function passable(battle: Battle, from: Tile, to: Tile): boolean {
   return open(from.x, from.y, to.x, from.y) && open(to.x, from.y, to.x, to.y) && open(from.x, from.y, from.x, to.y) && open(from.x, to.y, to.x, to.y)
 }
 
-/** A battle's walking graph and the distance fields found on it. Both follow from terrain alone, so wreck forgets them. */
-const walks = new WeakMap<Battle, { into: [from: number, cost: number][][]; fields: Map<number, number[]> }>()
+/**
+ * A battle's walking graph and the distance fields found on it. Both follow from terrain and the units that never move,
+ * such as a hive node, which stand as walls: wreck forgets them, and so does such a unit's death.
+ */
+const walks = new WeakMap<Battle, { fixed: string; into: [from: number, cost: number][][]; fields: Map<number, number[]> }>()
 
 /** For each tile, the open tiles a unit can step onto it from, with each step's cost. */
 function walkGraph(battle: Battle) {
+  const still = battle.units.filter((u) => u.stats.move === 0 && u.hp > 0)
+  const fixed = still.map((u) => u.y * GRID + u.x).join()
   let walk = walks.get(battle)
-  if (walk) return walk
+  if (walk?.fixed === fixed) return walk
   const into = Array.from({ length: GRID * GRID }, (_, t) => {
     const tile = { x: t % GRID, y: Math.floor(t / GRID) }
     return NEIGHBORS.flatMap(([dx, dy]): [number, number][] => {
       const from = { x: tile.x + dx, y: tile.y + dy }
-      return onGrid(from.x, from.y) && coverAt(battle, from.x, from.y) === 0 && passable(battle, tile, from) ? [[from.y * GRID + from.x, stepCost(battle, from, tile)]] : []
+      return onGrid(from.x, from.y) && coverAt(battle, from.x, from.y) === 0 && !still.some((u) => u.x === from.x && u.y === from.y) && passable(battle, tile, from) ? [[from.y * GRID + from.x, stepCost(battle, from, tile)]] : []
     })
   })
-  walk = { into, fields: new Map() }
+  walk = { fixed, into, fields: new Map() }
   walks.set(battle, walk)
   return walk
 }
 
-/** Walking distance from every tile to `goal`, row by row, ignoring units. Infinity where no path exists. Do not change it: it is shared. */
+/** Walking distance from every tile to `goal`, row by row, ignoring units that move. Infinity where no path exists. Do not change it: it is shared. */
 export function walkingDistances(battle: Battle, goal: Tile): readonly number[] {
   const { into, fields } = walkGraph(battle)
   const start = goal.y * GRID + goal.x

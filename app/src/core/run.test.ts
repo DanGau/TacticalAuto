@@ -116,7 +116,7 @@ test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone
   expect(run.phase).toBe('overworld')
 })
 
-test('a finder wears a find for an empty slot or a rarer one, sells a commoner one, and asks only when they match', () => {
+test('a finder wears a find for an empty slot or a rarer one, sells a commoner or identical one, and asks only when they match', () => {
   const run = started()
   const rank = { common: 0, rare: 1, epic: 2 }
   for (let i = 0; i < 60; i++) {
@@ -129,7 +129,11 @@ test('a finder wears a find for an empty slot or a rarer one, sells a commoner o
     } else if (decided!.kept) {
       expect(run.soldiers[0].gear[decided!.gear.slot]).toBe(decided!.gear)
       if (before[decided!.gear.slot]) expect(rank[decided!.gear.rarity]).toBeGreaterThan(rank[before[decided!.gear.slot]!.rarity])
-    } else expect(rank[decided!.gear.rarity]).toBeLessThan(rank[before[decided!.gear.slot]!.rarity])
+    } else {
+      const old = before[decided!.gear.slot]!
+      if (old.rarity === decided!.gear.rarity) expect(decided!.gear).toMatchObject({ effect: old.effect, stats: old.stats })
+      else expect(rank[decided!.gear.rarity]).toBeLessThan(rank[old.rarity])
+    }
   }
 })
 
@@ -344,8 +348,8 @@ test('a shop stocks one-of-a-kind gear fitted to a soldier, relics the squad lac
   apply(run, { type: 'advance' })
   expect(run).toMatchObject({ phase: 'shop', threat: STOP_THREAT })
   const shop = run.shop!
-  expect(shop.wares).toHaveLength(3)
-  expect(new Set(shop.wares.map((w) => w.gear.effect)).size).toBe(3)
+  expect(shop.wares).toHaveLength(2)
+  expect(new Set(shop.wares.map((w) => w.gear.effect)).size).toBe(2)
   expect(shop.wares.every((w) => w.gear.rarity !== 'common')).toBe(true)
   expect(shop.relics).toHaveLength(2)
   run.supplies = 100
@@ -353,7 +357,7 @@ test('a shop stocks one-of-a-kind gear fitted to a soldier, relics the squad lac
   expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: true })
   expect(run.soldiers.find((s) => s.id === soldier)!.gear[gear.slot]).toBe(gear)
   expect(run.supplies).toBe(100 - GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE])
-  expect(shop.wares).toHaveLength(2)
+  expect(shop.wares).toHaveLength(1)
   const relic = shop.relics[1]
   expect(apply(run, { type: 'buy', index: 1 })).toEqual({ ok: true })
   expect(run.relics).toContain(relic)
