@@ -80,7 +80,7 @@ const COLOR = {
   uplink: 0xffd84d,
 }
 
-const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x15161a, hive: 0x2a1838, water: 0x1d5f5c }
+const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x15161a, hive: 0x2a1838, water: 0x1d5f5c, void: 0x000000 }
 
 /** A box standing on a tile: how much of the tile it covers, how tall it is on screen, and its top colour. */
 interface Box {
@@ -116,6 +116,11 @@ const PROP_BOXES: Record<Exclude<Prop, 'none' | 'tree' | 'car'>, Box[]> = {
   ],
   growth: [{ wide: 0.8, deep: 0.8, base: 0, up: 9, color: 0x8f4fb5 }],
   water: [{ wide: 1, deep: 1, base: 0, up: 2, color: 0x2f9e96, alpha: 0.85 }],
+  void: [],
+  fuel: [
+    { wide: 0.6, deep: 0.6, base: 0, up: 16, color: 0xc0392b },
+    { wide: 0.35, deep: 0.35, base: 16, up: 3, color: 0xf1c40f },
+  ],
 }
 
 /** How thick a wall is, as a share of a tile. */
@@ -397,6 +402,8 @@ export async function createView(): Promise<View> {
       scenery.push({ node, tiles: lit })
     }
     for (let tile = 0; tile < GRID * GRID; tile++) {
+      // Off the battlefield there is nothing to draw.
+      if (battle.ground[tile] === 'void') continue
       const x = tile % GRID
       const y = Math.floor(tile / GRID)
       // The faces a raised tile shows above its lower neighbours toward the viewer, on +y and +x.

@@ -6,6 +6,7 @@ import { choice, runEnd, stopReport } from './aftermath'
 import { ALIENS } from '../core/aliens'
 import { RELICS, type Relic } from '../core/relics'
 import { known } from './intro'
+import { TWISTS } from '../core/twists'
 import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_REACH, nearestAlien, zoneInfo, type Battle } from '../core/battle'
 import { KEYWORDS } from '../core/keywords'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
@@ -87,7 +88,8 @@ function drop(battle: Battle, zone: number | null): string {
     zone === null
       ? '<small>Pick a landing zone to fly to it.</small>'
       : `<p>${zone === battle.hot ? 'Land on top of a pod.' : `${BOONS[battle.boons[zone]].text}.`}</p><div class="tradeoffs">${tradeoffs(battle, zone)}</div>${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
-  return `<div class="zones">${zones.join('')}${overview}</div>${detail}`
+  const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
+  return `${twist}<div class="zones">${zones.join('')}${overview}</div>${detail}`
 }
 
 /** Turns clicks into actions and hands them to `act`. */

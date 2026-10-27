@@ -11,7 +11,7 @@ function before(goal: Goal): Run {
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   apply(run, { type: 'zone', index: 1 })
   const patrol = { name: 'Patrol', kinds: ['trooper', 'trooper'] as const }
-  run.zone = { stops: [{ kind: 'battle', risk: 'standard', goal, terrain: 'town', packs: [patrol, patrol, patrol].map((p) => ({ ...p, kinds: [...p.kinds] })) }] }
+  run.zone = { stops: [{ kind: 'battle', risk: 'standard', goal, terrain: 'town', twist: null, packs: [patrol, patrol, patrol].map((p) => ({ ...p, kinds: [...p.kinds] })) }] }
   apply(run, { type: 'advance' })
   return run
 }

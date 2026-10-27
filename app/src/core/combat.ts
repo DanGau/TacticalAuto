@@ -2,7 +2,10 @@ import { ALIENS, alienStats, NODE_EVERY, REGEN_HEAL } from './aliens'
 import { OVERKILL, type FeatId, type Tally } from './feats'
 import { TUNING } from './tuning'
 import { PARRY_CHANCE } from './doctrines'
+import { FUEL_DAMAGE } from './twists'
 import {
+  crumble,
+  onGrid,
   BASE_STATS,
   SIGHT,
   mechUnit,
@@ -413,7 +416,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   /** Whether a soldier on `end` would sight a pod not yet revealed, while the squad is in a fight. */
   const provokes = (end: Tile) => (engaged && unseen.some((alien) => sees(battle, end, alien)) ? 1 : 0)
   /** Whether `end` would hurt the unit to stand on: acid, fire unless it cannot burn, or caltrops for an alien. */
-  const acid = (end: Tile) => (onTile(battle.acid, end) || (onTile(battle.fire, end) && !unit.resists.includes('burn')) || (unit.side === 'alien' && onTile(battle.caltrops, end)) ? 1 : 0)
+  const acid = (end: Tile) => (onTile(battle.acid, end) || (unit.side === 'human' && besideFuel(battle, end)) || (onTile(battle.fire, end) && !fireproof(battle, unit)) || (unit.side === 'alien' && onTile(battle.caltrops, end)) ? 1 : 0)
   /**
    * What a soldier's gear makes a tile worth, in points of hit chance: a null field over aliens with abilities, spirit
    * guardians where aliens will come while the wearer is healthy, a bond beside a squadmate.
@@ -591,6 +594,9 @@ function strew(battle: Battle, unit: Unit): GameEvent[] {
   return [{ type: 'effect', id: unit.id, effect: 'caltrops', amount: 0 }]
 }
 
+/** Alien turns after which the aliens still unseen patrol toward the squad. */
+const RESTLESS_ROUND = 25
+
 /** Whether some living alien is alert to the squad. */
 const hunted = (battle: Battle) => battle.units.some((u) => u.side === 'alien' && alert(battle, u))
 
@@ -636,6 +642,15 @@ function upkeep(battle: Battle): GameEvent[] {
   }
   if (battle.turn !== 'alien') return events
   battle.round++
+  // A long battle makes the aliens still unseen restless: they patrol toward the squad, so no fight is put off for good.
+  if (battle.round >= RESTLESS_ROUND) {
+    const soldiers = battle.units.filter(isSoldier)
+    for (const pod of battle.pods.filter((p) => !p.revealed)) {
+      const member = battle.units.find((u) => battle.pods[u.pod ?? -1] === pod)
+      const near = member && nearest(soldiers, member)
+      if (near) pod.waypoint = { x: near.x, y: near.y }
+    }
+  }
   if (battle.waves.length > 0 && battle.round % WAVE_EVERY === 0) {
     const centre = spacedTile(battle, battle.units.filter(isSoldier), ZONE_CLEARANCE)
     const units = placePod(battle, battle.waves.shift()!, centre, true)
@@ -742,7 +757,7 @@ function moveSide(battle: Battle): GameEvent[] {
     events.push({ type: 'hurt', id: unit.id, amount: ACID_DAMAGE, cause: 'acid' })
     wound(battle, unit, ACID_DAMAGE, events)
   }
-  for (const unit of battle.units.filter((u) => u.side === battle.turn && onTile(battle.fire, u) && !u.resists.includes('burn'))) {
+  for (const unit of battle.units.filter((u) => u.side === battle.turn && onTile(battle.fire, u) && !fireproof(battle, u))) {
     unit.burning = BURN_TURNS
     events.push({ type: 'effect', id: unit.id, effect: 'pyre', amount: 0 })
   }
@@ -801,7 +816,7 @@ function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[],
   if (target.hp > 0) return
   // An alien that dies burning spreads the fire, if the squad carries wildfire.
   if (target.burning > 0 && battle.units.some((u) => u.side !== target.side && has(u, 'wildfire'))) {
-    for (const other of battle.units.filter((u) => u.side === target.side && u !== target && distance(u, target) <= 1 && !u.resists.includes('burn'))) {
+    for (const other of battle.units.filter((u) => u.side === target.side && u !== target && distance(u, target) <= 1 && !fireproof(battle, u))) {
       other.burning = BURN_TURNS
       events.push({ type: 'effect', id: other.id, effect: 'wildfire', amount: 0 })
     }
@@ -969,6 +984,26 @@ function blast(battle: Battle, unit: Unit, seen: Set<number>, damage: number, ra
   return events
 }
 
+/** Whether a unit cannot burn: by its nature, or in the rain. */
+const fireproof = (battle: Battle, unit: Unit) => unit.resists.includes('burn') || battle.twist === 'rain'
+
+/** Whether a fuel tank stands beside a tile. */
+const besideFuel = (battle: Battle, tile: Tile) => NEIGHBORS.some(([dx, dy]) => onGrid(tile.x + dx, tile.y + dy) && battle.props[(tile.y + dy) * GRID + tile.x + dx] === 'fuel')
+
+/** A shot missed `target`: a fuel tank beside it goes up, hurting and setting burning everyone beside the tank. */
+function ignite(battle: Battle, target: Unit): GameEvent[] {
+  const tank = NEIGHBORS.map(([dx, dy]) => ({ x: target.x + dx, y: target.y + dy })).find((t) => onGrid(t.x, t.y) && battle.props[t.y * GRID + t.x] === 'fuel')
+  if (!tank) return []
+  const caught = battle.units.filter((u) => distance(u, tank) <= 1 && !immune(battle, u, 'blast'))
+  const events: GameEvent[] = [{ type: 'rocket', id: target.id, x: tank.x, y: tank.y, hits: caught.map((u) => ({ target: u.id, damage: FUEL_DAMAGE })) }]
+  wreck(battle, tank, 0)
+  for (const unit of caught) {
+    wound(battle, unit, FUEL_DAMAGE, events)
+    if (unit.hp > 0 && !fireproof(battle, unit)) unit.burning = BURN_TURNS
+  }
+  return events
+}
+
 /** Whether a unit is proof against panic, acid, or a blast: by its own steadfastness, or for panic and acid, by a ward on it or near it. */
 function immune(battle: Battle, unit: Unit, to: 'panic' | 'acid' | 'blast'): boolean {
   return has(unit, 'steadfast') || (to !== 'blast' && (has(unit, 'ward') || inAura(battle, unit, 'ward')))
@@ -1069,7 +1104,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   if (!hit) {
     // A ricochet bounces a miss to another alien near the target, for one more roll.
     const bounce = granted ? undefined : has(unit, 'ricochet') ? nearest(inReach.filter((u) => u !== enemy && distance(u, enemy!) <= RICOCHET_REACH), enemy) : undefined
-    return [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit: false, damage: 0, with: used }, ...events, ...(bounce ? shoot(battle, unit, seen, 'ricochet', bounce) : again(battle, unit, seen, granted, false))]
+    return [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit: false, damage: 0, with: used }, ...events, ...(battle.twist === 'fuel' ? ignite(battle, enemy) : []), ...(bounce ? shoot(battle, unit, seen, 'ricochet', bounce) : again(battle, unit, seen, granted, false))]
   }
 
   const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) > 0
@@ -1103,6 +1138,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   // Those beside the target, for a volley or a cleave, as they stand before the hit.
   const beside = battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1)
   events.unshift({ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage, with: used })
+  if (battle.twist === 'crumbling' && damage > 0) crumble(battle, enemy, unit)
   const pierced = unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) > 0
   const left = enemy.hp + (pierced ? 0 : enemy.armor)
   // A bonded squadmate beside the target takes the hit in its place.
@@ -1175,7 +1211,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     enemy.panicked = true
     events.push({ type: 'effect', id: enemy.id, effect: 'concussion', amount: 0 })
   }
-  if (enemy.hp > 0 && !enemy.resists.includes('burn') && ((damage > 0 && has(unit, 'incendiary')) || when(crit, 'ignite', 1))) {
+  if (enemy.hp > 0 && !fireproof(battle, enemy) && ((damage > 0 && has(unit, 'incendiary')) || when(crit, 'ignite', 1))) {
     enemy.burning = BURN_TURNS
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'incendiary') ? 'incendiary' : 'ignite', amount: 0 })
   }
@@ -1185,7 +1221,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     unit.hp += healed
     events.push({ type: 'effect', id: unit.id, effect: enemy.hp <= 0 && has(unit, 'feast') ? 'feast' : 'vampiric', amount: healed })
   }
-  if (has(enemy, 'kindling') && enemy.armor > 0 && !unit.resists.includes('burn')) {
+  if (has(enemy, 'kindling') && enemy.armor > 0 && !fireproof(battle, unit)) {
     unit.burning = BURN_TURNS
     events.push({ type: 'effect', id: unit.id, effect: 'kindling', amount: 0 })
   }

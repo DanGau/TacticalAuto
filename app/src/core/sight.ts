@@ -1,6 +1,7 @@
 import { FORTIFIED_DEFENSE } from './doctrines'
 import { COVER_DEFENSE, coverAt, distance, edgeBetween, GRID, heightAt, HIGH_AIM, HIGH_SIGHT, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile, type Unit } from './battle'
 import { EDGE_COVER } from './terrain'
+import { FOG_SIGHT, NIGHT_DETECT } from './twists'
 
 const SIDES = [[0, -1], [1, 0], [0, 1], [-1, 0]]
 
@@ -15,7 +16,7 @@ export function coverAgainst(battle: Battle, at: Tile, from: Tile): Cover {
     const x = at.x + dx
     const y = at.y + dy
     if (!onGrid(x, y) || (from.x - at.x) * dx + (from.y - at.y) * dy <= 0) continue
-    const cover = Math.max(coverAt(battle, x, y), EDGE_COVER[edgeBetween(battle, at, { x, y })]) as Cover
+    const cover = Math.max(battle.props[y * GRID + x] === 'void' ? 0 : coverAt(battle, x, y), EDGE_COVER[edgeBetween(battle, at, { x, y })]) as Cover
     if (cover > best) best = cover
   }
   return best
@@ -77,9 +78,9 @@ export function canShoot(battle: Battle, from: Tile, target: Tile, range: number
   return distance(from, target) <= range && lineOfSight(battle, from, target)
 }
 
-/** Whether a soldier on `from` sees the tile `to`: within its sight, farther from higher ground, with line of sight. */
+/** Whether a soldier on `from` sees the tile `to`: within its sight, less in fog, farther from higher ground, with line of sight. */
 export function sees(battle: Battle, from: Tile, to: Tile): boolean {
-  return distance(from, to) <= SIGHT + HIGH_SIGHT * (heightAt(battle, from) - heightAt(battle, to)) && lineOfSight(battle, from, to)
+  return distance(from, to) <= SIGHT - (battle.twist === 'fog' ? FOG_SIGHT : 0) + HIGH_SIGHT * (heightAt(battle, from) - heightAt(battle, to)) && lineOfSight(battle, from, to)
 }
 
 /**
@@ -93,11 +94,11 @@ export const HIDE_COVER = 2
 export const HIDE_STILL = 1
 
 /**
- * Whether `from` notices `to`, an enemy not yet seen: within DETECT or PATROL_DETECT, farther from higher ground, nearer when the
+ * Whether `from` notices `to`, an enemy not yet seen: within DETECT or PATROL_DETECT, less at night, farther from higher ground, nearer when the
  * enemy hides in cover or holds still, with line of sight. Both sides notice by the same rule.
  */
 export function detects(battle: Battle, from: Unit, to: Unit): boolean {
-  const range = (from.side === 'human' ? DETECT : PATROL_DETECT) + HIGH_SIGHT * (heightAt(battle, from) - heightAt(battle, to)) - (coverAgainst(battle, to, from) > 0 ? HIDE_COVER : 0) - (to.moved ? 0 : HIDE_STILL)
+  const range = (from.side === 'human' ? DETECT : PATROL_DETECT) - (battle.twist === 'night' ? NIGHT_DETECT : 0) + HIGH_SIGHT * (heightAt(battle, from) - heightAt(battle, to)) - (coverAgainst(battle, to, from) > 0 ? HIDE_COVER : 0) - (to.moved ? 0 : HIDE_STILL)
   return distance(from, to) <= range && lineOfSight(battle, from, to)
 }
 

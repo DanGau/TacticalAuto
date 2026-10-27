@@ -12,6 +12,7 @@ import { RESISTS, type Keyword, type Resist } from './keywords'
 import { RELIC_OFFERS, RELICS, type Relic, type RelicId } from './relics'
 import { PATHS, SKILLS, type SkillId } from './skills'
 import { ZONE_TERRAINS, type TerrainKind } from './terrain'
+import { drawTwist, type Twist } from './twists'
 import { random, randomInt } from './rng'
 
 /** Access keys needed to find the alien source; each is won at a satellite, at the end of a leg. */
@@ -68,6 +69,8 @@ export interface Stop {
   risk: Risk
   goal: Goal
   terrain: TerrainKind
+  /** What about the ground or weather changes the battle; drawn ahead, so a fork can show it. */
+  twist: Twist | null
   packs: Muster[]
 }
 
@@ -434,11 +437,11 @@ export function drawBattle(run: Run, risk: Risk, when: Run = run): Stop {
   const force = missionAt(when, 'battle', risk, goal).force
   // Each battle's force varies a little either way, so two battles of one risk are not the same fight.
   const packs = muster(run, Math.max(1, force + randomInt(run, 3) - 1), depth(when)).map(({ name, kinds }) => ({ name, kinds }))
-  return { kind: 'battle', risk, goal, terrain: ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)], packs }
+  return { kind: 'battle', risk, goal, terrain: ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)], twist: drawTwist(run, when.keys), packs }
 }
 
 /** A stop with no aliens drawn ahead: an event, a key mission or the final mission. */
-const fixed = (kind: StopKind, terrain: TerrainKind): Stop => ({ kind, risk: 'standard', goal: 'exterminate', terrain, packs: [] })
+const fixed = (kind: StopKind, terrain: TerrainKind): Stop => ({ kind, risk: 'standard', goal: 'exterminate', terrain, twist: null, packs: [] })
 
 /** How hard a zone's battles are in all: each counts one, a quiet one none and an overrun one two. */
 export const danger = (zone: Zone) => zone.stops.reduce((sum, s) => sum + (s.kind === 'battle' ? 1 + RISKS[s.risk].aliens : 0), 0)
@@ -579,7 +582,7 @@ export function advance(run: Run): void {
     effects: [...doctrines.flatMap((d) => d.effect ?? []), ...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))
   const rules = doctrines.flatMap((d) => d.rule ?? [])
-  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, packsOf(run, mission, stop === 'battle' ? here.packs : undefined), reserve, mission.goal, rules)
+  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, packsOf(run, mission, stop === 'battle' ? here.packs : undefined), reserve, mission.goal, rules, here.twist)
 }
 
 /** What a soldier still standing earns from a battle, after the feats it ends the battle with are recorded. */

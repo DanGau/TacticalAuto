@@ -4,7 +4,8 @@ import type { DoctrineEffect, Rule } from './doctrines'
 import type { Keyword, Resist } from './keywords'
 import { randomInt } from './rng'
 import { CIVILIAN_HP, CIVILIANS, type Goal } from './goals'
-import { generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Prop, type TerrainKind } from './terrain'
+import type { Twist } from './twists'
+import { EDGE_COVER, generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Prop, type TerrainKind } from './terrain'
 
 export type { Cover }
 
@@ -277,6 +278,8 @@ export interface Battle {
   goal: Goal
   /** Doctrines' changes to how this battle works. */
   rules: Rule[]
+  /** What about the ground or weather changes this battle, if anything. */
+  twist: Twist | null
   /** Alien turns begun. */
   round: number
   /** Packs still to arrive on a hold, one every WAVE_EVERY rounds. */
@@ -367,7 +370,7 @@ export function wreck(battle: Battle, centre: Tile, radius = BLAST_RADIUS): void
   walks.delete(battle)
   for (let y = centre.y - radius; y <= centre.y + radius; y++) {
     for (let x = centre.x - radius; x <= centre.x + radius; x++) {
-      if (!onGrid(x, y)) continue
+      if (!onGrid(x, y) || battle.ground[y * GRID + x] === 'void') continue
       const tile = y * GRID + x
       battle.props[tile] = 'none'
       battle.cover[tile] = 0
@@ -376,6 +379,32 @@ export function wreck(battle: Battle, centre: Tile, radius = BLAST_RADIUS): void
       if (onGrid(x, y + 1)) battle.north[tile + GRID] = 'none'
       if (onGrid(x + 1, y)) battle.west[tile + 1] = 'none'
     }
+  }
+}
+
+/**
+ * Breaks down a level the cover sheltering `at` from a shot from `from`: a wall to a window, a window to nothing,
+ * high cover to rubble, low cover to nothing. Water and void stay as they are.
+ */
+export function crumble(battle: Battle, at: Tile, from: Tile): void {
+  let best: { x: number; y: number; cover: number } | undefined
+  for (const [dx, dy] of NEIGHBORS.slice(0, 4)) {
+    const x = at.x + dx
+    const y = at.y + dy
+    if (!onGrid(x, y) || (from.x - at.x) * dx + (from.y - at.y) * dy <= 0 || ['water', 'void'].includes(battle.props[y * GRID + x])) continue
+    const cover = Math.max(coverAt(battle, x, y), EDGE_COVER[edgeBetween(battle, at, { x, y })])
+    if (cover > (best?.cover ?? 0)) best = { x, y, cover }
+  }
+  if (!best) return
+  walks.delete(battle)
+  const edge = edgeBetween(battle, at, best)
+  const edges = at.y === best.y ? battle.west : battle.north
+  const index = at.y === best.y ? at.y * GRID + Math.max(at.x, best.x) : Math.max(at.y, best.y) * GRID + at.x
+  if (edge !== 'none') edges[index] = edge === 'wall' ? 'window' : 'none'
+  else {
+    const tile = best.y * GRID + best.x
+    battle.props[tile] = battle.cover[tile] === 2 ? 'rubble' : 'none'
+    battle.cover[tile] = PROP_COVER[battle.props[tile]]
   }
 }
 
@@ -635,13 +664,14 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
  * A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. A hold keeps half its
  * packs back as waves and offers one landing zone, the uplink; a rescue places civilians away from the aliens.
  */
-export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = []): Battle {
+export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null): Battle {
   const holder = { rng: seed }
-  const terrain = generateTerrain(holder, GRID, kind)
+  const terrain = generateTerrain(holder, GRID, kind, twist)
   const battle: Battle = {
     rng: holder.rng,
     goal,
     rules,
+    twist,
     round: 0,
     waves: goal === 'hold' ? packs.slice(Math.ceil(packs.length / 2)) : [],
     beat: 0,

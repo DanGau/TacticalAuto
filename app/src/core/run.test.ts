@@ -51,6 +51,7 @@ const stopOf = (kind: StopKind, risk: Risk = 'standard'): Stop => ({
   risk,
   goal: 'exterminate',
   terrain: kind === 'key' ? 'compound' : 'town',
+  twist: null,
   packs: kind === 'battle' ? [{ name: 'Patrol', kinds: ['trooper', 'trooper'] }] : [],
 })
 

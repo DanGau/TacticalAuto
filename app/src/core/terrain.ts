@@ -1,10 +1,15 @@
 import { random, randomInt } from './rng'
 
-/** What the ground of a tile is. It changes only how the tile looks. */
-export type Ground = 'pavement' | 'road' | 'grass' | 'floor' | 'scorched' | 'hive' | 'water'
+import type { Twist } from './twists'
 
-/** The object standing on a tile. A spire and a growth are what the aliens build. */
-export type Prop = 'none' | 'car' | 'truck' | 'tree' | 'crate' | 'stack' | 'fence' | 'rubble' | 'spire' | 'growth' | 'water'
+/** What the ground of a tile is. It changes only how the tile looks, but void: no ground at all, off the battlefield. */
+export type Ground = 'pavement' | 'road' | 'grass' | 'floor' | 'scorched' | 'hive' | 'water' | 'void'
+
+/**
+ * The object standing on a tile. A spire and a growth are what the aliens build; a fuel tank explodes. Void stands
+ * where there is no ground: as low cover it blocks movement, not sight, and it shelters no one.
+ */
+export type Prop = 'none' | 'car' | 'truck' | 'tree' | 'crate' | 'stack' | 'fence' | 'rubble' | 'spire' | 'growth' | 'water' | 'fuel' | 'void'
 
 /** What stands on the line between two tiles. A window blocks movement, but soldiers shoot through it. */
 export type Edge = 'none' | 'wall' | 'window'
@@ -12,7 +17,7 @@ export type Edge = 'none' | 'wall' | 'window'
 /** Cover: 0 nothing, 1 low, 2 high. Both kinds block movement; high cover blocks shots. */
 export type Cover = 0 | 1 | 2
 
-export const PROP_COVER: Record<Prop, Cover> = { none: 0, car: 1, truck: 2, tree: 2, crate: 1, stack: 2, fence: 1, rubble: 1, spire: 2, growth: 1, water: 1 }
+export const PROP_COVER: Record<Prop, Cover> = { none: 0, car: 1, truck: 2, tree: 2, crate: 1, stack: 2, fence: 1, rubble: 1, spire: 2, growth: 1, water: 1, fuel: 1, void: 1 }
 export const EDGE_COVER: Record<Edge, Cover> = { none: 0, window: 1, wall: 2 }
 
 /**
@@ -83,7 +88,7 @@ const MAX_HOUSE = 8
  * A battlefield of the given kind, in the manner of XCOM 2's plots and parcels: roads cut the map into lots,
  * and each lot is filled with one place. Vehicles stand on the roads.
  */
-export function generateTerrain(rng: { rng: number }, size: number, kind: TerrainKind): Terrain {
+export function generateTerrain(rng: { rng: number }, size: number, kind: TerrainKind, twist: Twist | null = null): Terrain {
   const ground = Array<Ground>(size * size).fill(kind === 'countryside' ? 'grass' : 'pavement')
   const props = Array<Prop>(size * size).fill('none')
   const north = Array<Edge>(size * size).fill('none')
@@ -345,7 +350,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
   if (kind === 'compound' || kind === 'hive') {
     if (kind === 'compound') compound()
     else hive()
-    return { ground, props, north, west, height: hills() }
+    return finish()
   }
   const plot = PLOTS[kind]
 
@@ -444,5 +449,36 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
   }
   const layout = plot.layouts[randomInt(rng, plot.layouts.length)]
   layouts[layout]()
-  return { ground, props, north, west, height: hills() }
+  return finish()
+
+  /** Lays the twist on the finished plot: narrow ground cuts it to a shape, fuel scatters tanks. */
+  function finish(): Terrain {
+    if (twist === 'narrow') {
+      const half = size / 2
+      const shapes = [
+        // A corridor, a third of the map wide, across it either way.
+        (x: number, y: number) => Math.abs((vertical ? x : y) - half) > size / 5,
+        // A corner: one quarter gone, and a bit more.
+        (x: number, y: number) => (cx ? x < size * 0.45 : x >= size * 0.55) && (cy ? y < size * 0.45 : y >= size * 0.55),
+        // An island: everything beyond a circle.
+        (x: number, y: number) => Math.hypot(x + 0.5 - half, y + 0.5 - half) > half - 1,
+      ]
+      const vertical = chance(0.5)
+      const cx = chance(0.5)
+      const cy = chance(0.5)
+      const gone = shapes[randomInt(rng, shapes.length)]
+      each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => {
+        if (!gone(x, y)) return
+        const at = y * size + x
+        ground[at] = 'void'
+        props[at] = 'void'
+        north[at] = west[at] = 'none'
+        if (y + 1 < size) north[at + size] = 'none'
+        if (x + 1 < size) west[at + 1] = 'none'
+      })
+    }
+    if (twist === 'fuel') for (let i = 0; i < 14; i++) put(between(1, size - 2), between(1, size - 2), 'fuel')
+    const height = hills().map((h, t) => (ground[t] === 'void' ? 0 : h))
+    return { ground, props, north, west, height }
+  }
 }

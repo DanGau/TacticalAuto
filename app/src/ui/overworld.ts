@@ -9,6 +9,7 @@ import { GEAR_PRICE, KEYS, charges, equipped, level, missionAt, nextStop, RISKS,
 import { FEATS } from '../core/feats'
 import { PATHS, SKILLS } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
+import { TWISTS, type Twist } from '../core/twists'
 import { decisions } from './aftermath'
 import { alienName, button, describe, gearCard, keywordChips, resistChip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
 
@@ -41,12 +42,15 @@ function census(run: Run, packs: Muster[]): string {
 
 const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '📦', cache: '🎁', shop: '🛒', unknown: '❓', key: '🛰️', final: '👁️' }
 
-/** A stop at a fork as an icon; a battle's is coloured by its risk, and hovering tells its goal, place and pay. */
+/** A twist told in a sentence, or nothing. */
+const twistLine = (twist: Twist | null) => (twist ? ` ${TWISTS[twist].icon} ${TWISTS[twist].name}: ${TWISTS[twist].text}.` : '')
+
+/** A stop at a fork as an icon; a battle's is coloured by its risk and marked by its twist, and hovering tells its goal, place, pay and twist. */
 function stopIcon(stop: Stop): string {
   if (stop.kind !== 'battle') return `<span class="node ${stop.kind}" title="${STOP_NAMES[stop.kind]}">${STOP_ICONS[stop.kind]}</span>`
   const risk = RISKS[stop.risk]
   const goal = GOALS[stop.goal]
-  return `<span class="node ${stop.risk}" title="${risk.name} ${goal.name}, ${TERRAIN_TEXT[stop.terrain].name}: pays ${goal.reward}">${STOP_ICONS.battle}</span>`
+  return `<span class="node ${stop.risk}" title="${risk.name} ${goal.name}, ${TERRAIN_TEXT[stop.terrain].name}: pays ${goal.reward}.${twistLine(stop.twist)}">${STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}</span>`
 }
 
 /** A zone at a fork: its stops as three icons, and every alien in it by count. Clicking it commits the squad to it. */
@@ -74,7 +78,7 @@ function where(stop: Stop): string {
   if (stop.kind === 'unknown') return 'The road leads somewhere unknown: a fight, a shop, or something stranger.'
   if (stop.kind === 'shop') return 'The road leads to a shop, where supplies buy gear, relics, or a quieter road.'
   if (stop.kind !== 'battle') return `The road leads to a ${STOP_NAMES[stop.kind].toLowerCase()}.`
-  return `${GOALS[stop.goal].name}, ${RISKS[stop.risk].name.toLowerCase()} ${TERRAIN_TEXT[stop.terrain].name.toLowerCase()}: ${GOALS[stop.goal].text}`
+  return `${GOALS[stop.goal].name}, ${RISKS[stop.risk].name.toLowerCase()} ${TERRAIN_TEXT[stop.terrain].name.toLowerCase()}: ${GOALS[stop.goal].text}.${twistLine(stop.twist)}`
 }
 
 /** A shop: gear fitted to a soldier, relics, a bribe, and the way out. */

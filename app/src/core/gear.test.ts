@@ -3,6 +3,7 @@ import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { alienUnit, CRIT_BONUS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
+import { alienStats } from './aliens'
 import { EFFECTS, generateGear, type Gear } from './gear'
 import { createRun, SELL, soldierStats, type Run } from './run'
 import { TUNING } from './tuning'
@@ -63,7 +64,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   run.battle!.boons[zone] = 'kill'
   apply(run, { type: 'land', zone })
   const battle = run.battle!
-  Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [] })
+  Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist: null })
   battle.cover.fill(0)
   battle.height.fill(0)
   battle.north.fill('none')
@@ -73,7 +74,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   battle.units = [soldier, alien]
   battle.pods.forEach((pod) => (pod.revealed = true))
   Object.assign(soldier, { x: 10, y: 10 })
-  Object.assign(alien, { x: 10, y: 11, hp: 99, armor: 0, target: false, stats: { ...alien.stats, hp: 99, armor: 0, aim: 2, crit: 0 } })
+  Object.assign(alien, { kind: 'trooper', x: 10, y: 11, hp: 99, armor: 0, target: false, stats: { ...alienStats('trooper', 0, 0), hp: 99, armor: 0, aim: 2, crit: 0 } })
   return { battle, soldier, alien, step: () => stepBattle(battle) }
 }
 
@@ -219,7 +220,8 @@ test('a bonded squadmate takes the hit meant for the soldier beside it', () => {
   d.alien.stats = { ...d.alien.stats, range: 1 }
   d.soldier.effects.push('taunt')
   const events = untilAlienShoots(d)
-  expect(events).toContainEqual({ type: 'effect', id: guard.id, effect: 'bond', amount: -d.alien.stats.damage })
+  const shot = events.find((e) => e.type === 'shot' && e.id === d.alien.id)!
+  expect(events).toContainEqual({ type: 'effect', id: guard.id, effect: 'bond', amount: -(shot.type === 'shot' ? shot.damage : 0) })
   expect(d.soldier.hp).toBe(d.soldier.stats.hp)
 })
 
