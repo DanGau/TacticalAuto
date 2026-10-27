@@ -53,15 +53,20 @@
       .threat { padding: 0 8px; color: #ff6b5e; letter-spacing: 2px; white-space: nowrap; }
       .keys { color: #ffd84d; letter-spacing: 3px; }
       .note { font-size: 12px; color: #9aa6bd; white-space: nowrap; }
-      .road { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0; }
       .arrow { color: #5d6577; }
       .chip { padding: 4px 10px; border: 1px solid #4a5a78; border-radius: 12px; white-space: nowrap; }
-      .chip.supply, .chip.cache { border-color: #ffd84d; }
-      .chip.key, .chip.final { border-color: #c77dff; }
-      .chip.done { opacity: 0.35; }
       .chip.feat { border-color: #ffd84d; color: #ffd84d; cursor: help; }
-      .chip.here { background: #35496b; }
-      button.zone { text-align: center; }
+      .progress { margin: 4px 0; opacity: 0.7; }
+      .map { display: flex; gap: 14px; align-items: center; overflow-x: auto; padding: 8px 0 12px; }
+      .leg { display: flex; flex-direction: column; gap: 4px; padding-left: 10px; border-left: 2px solid #4a5a78; }
+      .segs { display: flex; gap: 10px; align-items: center; }
+      .seg { display: flex; flex-direction: column; gap: 6px; }
+      .map .nodes { gap: 3px; margin: 0; flex-wrap: nowrap; }
+      .map .node { font-size: 17px; width: 32px; height: 32px; line-height: 32px; border-width: 2px; flex: none; }
+      .node.done { opacity: 0.3; }
+      .node.here { box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; }
+      .node.fog { color: #556; border: 2px dashed #3a4458; background: none; }
+      button.branch { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; max-width: 150px; white-space: normal; }
       .nodes { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 8px; }
       .node { font-size: 26px; width: 44px; height: 44px; line-height: 44px; text-align: center; border-radius: 50%; border: 3px solid #888; background: #1d2433; }
       .node.safe { border-color: #7ddc5a; }
@@ -69,6 +74,7 @@
       .node.supply, .node.cache { border-color: #6fb7ff; }
       .node.shop { border-color: #ffd34e; }
       .node.unknown { border-color: #c28bff; }
+      .node.key, .node.final { border-color: #c77dff; }
       button.travel { min-width: 320px; text-align: left; line-height: 1.5; }
       button.travel.key, button.travel.final { border-color: #c77dff; }
 

@@ -5,7 +5,7 @@ import { SLOTS } from '../core/gear'
 import { DOCTRINES } from '../core/doctrines'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
-import { GEAR_PRICE, KEYS, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Mission, type Muster, type Run, type Soldier, type Stop, type Zone } from '../core/run'
+import { FORKS, GEAR_PRICE, KEYS, ZONE_STOPS, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop, type Zone } from '../core/run'
 import { FEATS } from '../core/feats'
 import { PATHS, SKILLS } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
@@ -17,14 +17,6 @@ import { alienName, button, describe, gearCard, keywordChips, resistChip, gearTe
 export const TABS = ['Map', 'Base', 'Barracks'] as const
 export type Tab = (typeof TABS)[number]
 
-
-/** A stop as a chip on the road: its name, and for a fight, its risk and how many aliens. */
-function chip(run: Run, stop: Stop, state = ''): string {
-  const fight = stop.kind === 'battle' || stop.kind === 'key' || stop.kind === 'final'
-  const risk = stop.kind === 'battle' ? `${RISKS[stop.risk].name} ` : ''
-  const aliens = fight ? ` · force ${missionAt(run, stop.kind as Mission['kind'], stop.risk, stop.goal).force}${stop.kind === 'battle' ? '' : ', with a boss'}` : ''
-  return `<span class="chip ${stop.kind} ${stop.risk} ${state}">${risk}${STOP_NAMES[stop.kind]}${aliens}</span>`
-}
 
 /** The aliens of a zone, counted by kind with a recon uplink, "3 Troopers, 2 Swarmlings"; else by danger, "3 small, 2 medium". */
 function census(run: Run, packs: Muster[]): string {
@@ -45,20 +37,51 @@ const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '�
 /** A twist told in a sentence, or nothing. */
 const twistLine = (twist: Twist | null) => (twist ? ` ${TWISTS[twist].icon} ${TWISTS[twist].name}: ${TWISTS[twist].text}.` : '')
 
-/** A stop at a fork as an icon; a battle's is coloured by its risk and marked by its twist, and hovering tells its goal, place, pay and twist. */
-function stopIcon(stop: Stop): string {
-  if (stop.kind !== 'battle') return `<span class="node ${stop.kind}" title="${STOP_NAMES[stop.kind]}">${STOP_ICONS[stop.kind]}</span>`
+/**
+ * A stop as an icon; a battle's is coloured by its risk and marked by its twist, and hovering tells its goal, place, pay and twist.
+ * `state` is done, here, or empty for ahead.
+ */
+function stopIcon(stop: Stop, state = ''): string {
+  if (stop.kind !== 'battle') return `<span class="node ${stop.kind} ${state}" title="${STOP_NAMES[stop.kind]}">${STOP_ICONS[stop.kind]}</span>`
   const risk = RISKS[stop.risk]
   const goal = GOALS[stop.goal]
-  return `<span class="node ${stop.risk}" title="${risk.name} ${goal.name}, ${TERRAIN_TEXT[stop.terrain].name}: pays ${goal.reward}.${twistLine(stop.twist)}">${STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}</span>`
+  return `<span class="node ${stop.risk} ${state}" title="${risk.name} ${goal.name}, ${TERRAIN_TEXT[stop.terrain].name}: pays ${goal.reward}.${twistLine(stop.twist)}">${STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}</span>`
 }
 
-/** A zone at a fork: its stops as three icons, and every alien in it by count. Clicking it commits the squad to it. */
-function zoneCard(run: Run, zone: Zone, index: number): string {
+/** A zone at a fork as a branch of the map: its stops as icons, and every alien in it by count. Clicking it commits the squad to it. */
+function branch(run: Run, zone: Zone, index: number): string {
   const battles = zone.stops.filter((s) => s.kind === 'battle')
   const commanders = battles.filter((s) => s.goal === 'assassinate').length
   const aliens = census(run, battles.flatMap((s) => s.packs)) + (commanders > 0 ? `, ${commanders} Commander${commanders === 1 ? '' : 's'}` : '')
-  return button({ type: 'zone', index }, `<div class="nodes">${zone.stops.map(stopIcon).join('<span class="arrow">→</span>')}</div><span>${aliens}</span>`, 'zone')
+  return button({ type: 'zone', index }, `<div class="nodes">${zone.stops.map((s) => stopIcon(s)).join('')}</div><small>${aliens}</small>`, 'branch')
+}
+
+/** A stop not yet seen. */
+const FOG = '<span class="node fog">?</span>'
+
+/** Stops in a run: each leg's forks and satellite, then the source. */
+const RUN_STOPS = KEYS * (FORKS * ZONE_STOPS + 1) + 1
+
+/**
+ * The whole run as a map, left to right: each leg's forks and its satellite, then the alien source. Stops passed
+ * and the zone under way show what they were; at a fork its three branches are the choice; forks beyond are fog.
+ */
+function runMap(run: Run): string {
+  const end = run.zone && (run.zone.stops[0].kind === 'key' || run.zone.stops[0].kind === 'final')
+  const at = run.keys * (FORKS + 1) + (!run.zone ? run.fork : end ? FORKS : run.fork - 1)
+  const legs = Array.from({ length: KEYS + 1 }, (_, leg) => {
+    const slots = Array.from({ length: leg === KEYS ? 1 : FORKS + 1 }, (_, f) => {
+      const i = leg * (FORKS + 1) + f
+      if (i === at && !run.zone) return `<div class="seg">${run.zones.map((z, k) => branch(run, z, k)).join('')}</div>`
+      const zone = i === at ? run.zone : i < at ? run.trail[i] : null
+      if (zone) return `<div class="seg"><div class="nodes">${zone.stops.map((s, k) => stopIcon(s, i < at || k < run.stop ? 'done' : k === run.stop ? 'here' : '')).join('')}</div></div>`
+      if (leg === KEYS || f === FORKS) return `<div class="seg"><div class="nodes">${stopIcon({ kind: leg === KEYS ? 'final' : 'key' } as Stop, i < at ? 'done' : '')}</div></div>`
+      return `<div class="seg">${`<div class="nodes">${FOG.repeat(ZONE_STOPS)}</div>`.repeat(3)}</div>`
+    })
+    return `<div class="leg"><small>${leg === KEYS ? 'Source' : `Leg ${leg + 1}`}</small><div class="segs">${slots.join('')}</div></div>`
+  })
+  const passed = run.trail.slice(0, at).reduce((n, z) => n + z.stops.length, 0) + (run.zone ? run.stop : 0)
+  return `<p class="progress">Stop ${passed + 1} of ${RUN_STOPS}</p><div class="map">${legs.join('')}</div>`
 }
 
 /** The words on the button that travels to the next stop. */
@@ -113,15 +136,11 @@ function mapView(run: Run): string {
   if (run.phase === 'shop') return shopView(run)
   if (run.phase === 'event') return eventView(run)
   const zone = run.zone
-  if (!zone) {
-    return `<h2>A fork in the road. Choose a zone; what lies beyond it is unknown.</h2>
-      <div class="choices">${run.zones.map((z, i) => zoneCard(run, z, i)).join('')}</div>`
-  }
+  if (!zone) return `<h2>A fork in the road. Choose a branch; what lies beyond it is unknown.</h2>${runMap(run)}`
   const next = nextStop(run)!
   const here = zone.stops[run.stop]
-  const road = zone.stops.map((s, i) => chip(run, s, i < run.stop ? 'done' : i === run.stop ? 'here' : '')).join('<span class="arrow">→</span>')
   return `${run.report ? '' : decisions(run)}<h2>${where(here)}</h2>
-    <div class="road">${road}</div>
+    ${runMap(run)}
     ${next === 'lastStand' ? '<p class="up"><b>The threat is full. The aliens attack before the squad can travel on.</b></p>' : ''}
     <button class="travel ${next}" data-action='${JSON.stringify({ type: 'advance' })}'>${travelLabel(run, here, next)}</button>`
 }

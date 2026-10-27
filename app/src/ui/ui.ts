@@ -135,7 +135,10 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     shown = run
     const next = panel(run)
     // Rewriting unchanged content would restart its animations.
-    if (next !== html) overlay.innerHTML = html = next
+    if (next !== html) {
+      overlay.innerHTML = html = next
+      overlay.querySelector('.map .here, .map .branch')?.scrollIntoView({ block: 'nearest', inline: 'center' })
+    }
     overlay.hidden = run.phase === 'battle'
   }
 

@@ -171,6 +171,8 @@ export interface Run {
   zones: Zone[]
   /** The zone being travelled; null at a fork. */
   zone: Zone | null
+  /** Zones travelled this run, in order, the one under way last. Each leg is FORKS zones and its satellite. */
+  trail: Zone[]
   /** Index of the next stop in the zone. */
   stop: number
   threat: number
@@ -454,6 +456,7 @@ function nextStretch(run: Run): void {
   if (run.keys === KEYS) run.zone = { stops: [fixed('final', 'hive')] }
   else if (run.fork === FORKS) run.zone = { stops: [fixed('key', 'compound')] }
   else run.zones = drawZones(run)
+  if (run.zone) run.trail.push(run.zone)
 }
 
 export function createRun(seed: number): Run {
@@ -464,6 +467,7 @@ export function createRun(seed: number): Run {
     fork: 0,
     zones: [],
     zone: null,
+    trail: [],
     stop: 0,
     threat: 0,
     phase: 'overworld',
@@ -496,6 +500,7 @@ export function createRun(seed: number): Run {
 export function enterZone(run: Run, zone: Zone): void {
   run.zone = zone
   run.zones = []
+  run.trail.push(zone)
   run.fork++
 }
 
