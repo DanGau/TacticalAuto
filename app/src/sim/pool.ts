@@ -75,7 +75,8 @@ export async function winRates(bots: string[], runs: number, start: number, tuni
       proc.disconnect()
     }
     const spawn = () => {
-      const proc = fork(BUNDLE, { execArgv: [`--max-old-space-size=${HEAP_MB}`], stdio: ['ignore', 'inherit', 'inherit', 'ipc'] })
+      // Maglev can crash a CPU-starved process (nodejs/node#64841); without it the sim runs as fast.
+      const proc = fork(BUNDLE, { execArgv: [`--max-old-space-size=${HEAP_MB}`, '--no-maglev'], stdio: ['ignore', 'inherit', 'inherit', 'ipc'] })
       procs.set(proc, { rss: 0 })
       proc.send({ tuning, doctrines })
       proc.on('message', (m: { ready: true } | { id: number; won: typeof won; rss: number }) => {
