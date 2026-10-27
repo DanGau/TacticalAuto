@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js'
-import { BLAST_RADIUS, distance, GRID, nearestAlien, revealed, ZONE_RADIUS, type Battle, type Tile, type Unit } from '../core/battle'
+import { BLAST_RADIUS, distance, GRID, nearestAlien, revealed, ZONE_NAMES, ZONE_RADIUS, type Battle, type Tile, type Unit } from '../core/battle'
 import { KEYWORDS } from '../core/keywords'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
@@ -173,9 +173,6 @@ const highland = (color: number, level: number) => {
 /** A darker shade of a colour, for a box's sides. */
 const shade = (color: number, by: number) => (((color >> 16) * by) << 16) | ((((color >> 8) & 255) * by) << 8) | ((color & 255) * by)
 
-/** Names of the landing zones, in battle.zones order. */
-const ZONE_NAMES = ['A', 'B', 'C']
-
 /** The letter over a unit that is no soldier: its kind's initial, C for a commander, nothing for a boss or civilian. */
 const letter = (unit: Unit) => (unit.target ? 'C' : unit.summoner !== null ? 'M' : unit.boss || !unit.kind ? '' : ALIENS[unit.kind].name[0])
 
@@ -227,6 +224,8 @@ export interface View {
   zoneAt(sx: number, sy: number): number | null
   /** Before the landing, glides the camera to a landing zone and marks its way in; null pulls back to the whole map. */
   focus(zone: number | null): void
+  /** Glides the camera to frame the given tiles, above the landing panel; null pulls back to the whole map. */
+  frame(tiles: Tile[] | null): Promise<void>
 }
 
 export async function createView(): Promise<View> {
@@ -938,6 +937,10 @@ export async function createView(): Promise<View> {
   return {
     canvas: app.canvas,
     zoneAt,
+    frame(tiles) {
+      const framed = tiles === null ? OVERVIEW : framing(tiles)
+      return follow({ ...framed, y: framed.y + (tiles === null ? 0 : PANEL / framed.zoom) }, FOCUS_MS)
+    },
     focus(zone) {
       if (shown?.phase !== 'deploy') return
       selected = zone

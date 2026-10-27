@@ -87,6 +87,8 @@ export const BANE_REACH = 3
 export const BANE_AIM = 0.1
 export const DRONE_DAMAGE = 2
 export const DRONE_REACH = 5
+/** The letters landing zones go by, in battle.zones order. */
+export const ZONE_NAMES = 'ABC'
 /** Landing zones offered to the squad. */
 export const ZONES = 3
 /** Tiles around a landing zone's centre that count as the zone. */

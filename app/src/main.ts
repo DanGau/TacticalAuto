@@ -2,6 +2,7 @@ import { apply, type Action, type Result } from './core/apply'
 import type { GameEvent } from './core/combat'
 import { createRun, type Run } from './core/run'
 import { step } from './core/step'
+import { brief } from './ui/briefing'
 import { introduce, newcomers } from './ui/intro'
 import { createUi } from './ui/ui'
 import { createView } from './view/view'
@@ -27,9 +28,16 @@ const state = createRun(params.has('seed') ? Number(params.get('seed')) : Date.n
 const view = await createView()
 document.body.prepend(view.canvas)
 
+/** The battle last briefed, so each is briefed once, as its landing opens. */
+let briefed: Run['battle'] = null
+
 async function show(events: GameEvent[], animate: boolean): Promise<void> {
   await view.show(state, events, animate)
   ui.update(state)
+  if (state.battle?.phase === 'deploy' && state.battle !== briefed && !params.has('manual')) {
+    briefed = state.battle
+    void brief(view, state.battle)
+  }
 }
 
 /** What the view is showing outside the battle loop, which the loop waits for: the landing plays before the first beat. */

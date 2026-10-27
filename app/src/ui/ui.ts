@@ -7,7 +7,7 @@ import { ALIENS } from '../core/aliens'
 import { RELICS, type Relic } from '../core/relics'
 import { known } from './intro'
 import { TWISTS } from '../core/twists'
-import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_REACH, nearestAlien, zoneInfo, type Battle } from '../core/battle'
+import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_REACH, nearestAlien, ZONE_NAMES, zoneInfo, type Battle } from '../core/battle'
 import { KEYWORDS } from '../core/keywords'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { DETECT, PATROL_DETECT } from '../core/sight'
@@ -54,8 +54,6 @@ function status(run: Run): string {
   const rounds = battle.goal === 'hold' ? ` · round ${Math.min(battle.round, HOLD_ROUNDS)} of ${HOLD_ROUNDS}` : ''
   return `${title}${rounds} · ${SIDE[battle.turn]}' turn${battle.concealed ? ' · unseen' : ''}`
 }
-
-const ZONE_NAMES = 'ABC'
 
 /** A landing zone's pros, in green, and cons, in red, as short chips; hovering one tells it in full. */
 function tradeoffs(battle: Battle, zone: number): string {
