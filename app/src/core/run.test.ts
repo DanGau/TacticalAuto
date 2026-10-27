@@ -9,7 +9,6 @@ import {
   createRun,
   DROP_SUPPLIES,
   endBattle,
-  FORKS,
   KEYS,
   LOSS_THREAT,
   missionAt,
@@ -29,13 +28,17 @@ import {
   type StopKind,
   xpFor,
   XP,
-  ZONE_STOPS,
+  current,
+  LEG_STOPS,
+  legOf,
+  ways,
   hire,
   dropGear,
   squadKeywords,
   GEAR_PRICE,
 } from './run'
 import { PATHS, SKILLS } from './skills'
+import { atKey, road } from './roads'
 import { RELICS } from './relics'
 
 /** A run whose first clone has learned its first skill, so the overworld waits. */
@@ -55,14 +58,14 @@ const stopOf = (kind: StopKind, risk: Risk = 'standard'): Stop => ({
   packs: kind === 'battle' ? [{ name: 'Patrol', kinds: ['trooper', 'trooper'] }] : [],
 })
 
-/** Takes the fork's first zone, made into one of the given stops, each of `risk`. */
+/** Goes on to a road of the given stops, each of `risk`. */
 function enter(run: Run, risk: Risk = 'standard', stops: StopKind[] = ['battle']) {
-  const result = apply(run, { type: 'zone', index: 0 })
-  run.zone = { stops: stops.map((kind) => stopOf(kind, risk)) }
+  const result = apply(run, { type: 'go', index: 0 })
+  road(run, stops.map((kind) => stopOf(kind, risk)))
   return result
 }
 
-/** A run travelling a zone of the given stops. */
+/** A run travelling a road of the given stops. */
 function travelling(stops: StopKind[], risk: Risk = 'standard'): Run {
   const run = started()
   enter(run, risk, stops)
@@ -80,23 +83,41 @@ function fight(run: Run, winner: Side): void {
   endBattle(run)
 }
 
-test('a run begins with one level 1 recruit on a path of its class, at a fork of three zones of three stops, each with a battle', () => {
+test('a run begins with one level 1 recruit on a path of its class, choosing where to start among the battles of its first leg', () => {
   const run = createRun(1)
   expect(run.soldiers).toHaveLength(1)
   expect(level(run.soldiers[0])).toBe(1)
   expect(PATHS[run.soldiers[0].cls!].map((p) => p.core)).toContain(run.soldiers[0].skills[0])
   expect(run).toMatchObject({ phase: 'overworld', soldiers: [{ skills: [expect.anything()] }] })
-  expect(run.zones).toHaveLength(3)
-  for (const zone of run.zones) {
-    expect(zone.stops).toHaveLength(ZONE_STOPS)
-    expect(zone.stops.some((stop) => stop.kind === 'battle')).toBe(true)
-  }
+  const leg = legOf(run)
+  expect(leg.columns).toHaveLength(LEG_STOPS + 1)
+  expect(leg.columns[0].length).toBeGreaterThan(1)
+  expect(leg.columns[0].every((node) => node.stop!.kind === 'battle')).toBe(true)
+  expect(leg.columns.at(-1)).toMatchObject([{ stop: { kind: 'key', terrain: 'compound' } }])
   expect(nextStop(run)).toBeNull()
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
-  const [first] = run.zones
-  expect(apply(run, { type: 'zone', index: 0 })).toEqual({ ok: true })
-  expect(run).toMatchObject({ zones: [], fork: 1, zone: first })
-  expect(apply(run, { type: 'zone', index: 0 }).ok).toBe(false)
+  expect(apply(run, { type: 'go', index: 0 })).toEqual({ ok: true })
+  expect(current(run)).toBe(leg.columns[0][0])
+  expect(apply(run, { type: 'go', index: 0 }).ok).toBe(false)
+})
+
+test('a leg is a map of trails that part and meet without crossing; every way through is its stops then the satellite, and legs ahead are blank', () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const run = createRun(seed)
+    for (const leg of run.legs.slice(0, -1)) {
+      const { columns } = leg
+      expect(columns).toHaveLength(LEG_STOPS + 1)
+      columns.slice(0, -1).forEach((column, c) => {
+        expect(column.length).toBeLessThanOrEqual(4)
+        for (const node of column) expect(node.next.length).toBeGreaterThan(0)
+        // Each stop is reached from the column before.
+        if (c > 0) column.forEach((_, i) => expect(columns[c - 1].some((n) => n.next.includes(i))).toBe(true))
+        for (const a of column) for (const b of column) if (a.row < b.row) for (const x of a.next) for (const y of b.next) expect(columns[c + 1][x].row).toBeLessThanOrEqual(columns[c + 1][y].row)
+      })
+      expect(new Set(columns.map((column) => column.length)).size).toBeGreaterThan(1)
+    }
+    expect(run.legs.slice(1).every((leg) => leg.columns.flat().every((node) => node.stop === null))).toBe(true)
+  }
 })
 
 test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone adds threat, pays by the risk, gives experience, and gear its finder decides on', (risk) => {
@@ -159,30 +180,31 @@ test('a supply drop and a cache are collected on arrival, each adding threat', (
   expect(run.threat).toBe(2 * STOP_THREAT)
 })
 
-test('after the forks of a leg comes its satellite: winning it wins a key, a new clone, and the next leg; losing it means fighting it again', () => {
+test('after the stops of a leg comes its satellite: winning it wins a key, a new clone, and the next leg; losing it means fighting it again', () => {
   const run = started()
-  for (let fork = 0; fork < FORKS; fork++) {
-    enter(run, 'dangerous')
-    fight(run, 'alien')
-  }
-  expect(run.zone).toMatchObject({ stops: [{ kind: 'key', terrain: 'compound' }] })
+  enter(run, 'dangerous', ['battle', 'battle'])
   fight(run, 'alien')
-  expect(run).toMatchObject({ keys: 0, zone: { stops: [{ kind: 'key' }] }, stop: 0 })
+  fight(run, 'alien')
+  expect(current(run)!.stop).toMatchObject({ kind: 'key', terrain: 'compound' })
+  run.threat = 0
+  fight(run, 'alien')
+  expect(run).toMatchObject({ keys: 0, stop: 2 })
+  expect(nextStop(run)).toBe('key')
   expect(run.soldiers).toHaveLength(1)
   run.threat = 0
   fight(run, 'human')
-  expect(run).toMatchObject({ keys: 1, fork: 0, zone: null, phase: 'reward' })
+  expect(run).toMatchObject({ keys: 1, stop: 0, phase: 'reward' })
+  expect(current(run)).toBeNull()
   expect(run.soldiers).toHaveLength(2)
   expect(run.report).toMatchObject({ stop: 'key', key: true, hired: run.soldiers[1].name })
   expect([...run.finds, ...run.decisions].every((find) => find.gear.rarity !== 'common')).toBe(true)
-  expect(run.zones).toHaveLength(3)
+  expect(legOf(run).columns.flat().every((node) => node.stop !== null)).toBe(true)
 })
 
 test("a new clone arrives a level 1 recruit on a path of its class, however seasoned the squad", () => {
   const run = started()
   run.soldiers[0].xp = xpFor(5)
-  run.fork = FORKS
-  run.zone = { stops: [stopOf('key')] }
+  atKey(run)
   fight(run, 'human')
   const recruit = run.soldiers[1]
   expect(level(recruit)).toBe(1)
@@ -231,8 +253,7 @@ test.each(['human', 'alien'] as const)('full threat puts a last stand before the
 test.each(['human', 'alien'] as const)('with every key won the squad is four, only the final mission remains, and it decides the run; %s win', (winner) => {
   const run = started()
   for (let key = 0; key < KEYS; key++) {
-    run.fork = FORKS
-    run.zone = { stops: [stopOf('key')] }
+    atKey(run)
     run.threat = 0
     fight(run, 'human')
     apply(run, { type: 'relic', index: 0 })
@@ -242,7 +263,7 @@ test.each(['human', 'alien'] as const)('with every key won the squad is four, on
   }
   expect(run.soldiers).toHaveLength(KEYS + 1)
   expect(run.relics).toHaveLength(KEYS)
-  expect(run.zone).toMatchObject({ stops: [{ kind: 'final', terrain: 'hive' }] })
+  expect(current(run)!.stop).toMatchObject({ kind: 'final', terrain: 'hive' })
   run.threat = 0
   fight(run, winner)
   expect(run.phase).toBe(winner === 'human' ? 'won' : 'lost')
@@ -271,8 +292,7 @@ test('a key mission has one boss, with an escort for each key already won', () =
   for (const keys of [0, 2]) {
     const run = started()
     run.keys = keys
-    run.fork = FORKS
-    run.zone = { stops: [stopOf('key')] }
+    atKey(run)
     apply(run, { type: 'advance' })
     const battle = run.battle!
     const boss = battle.units.filter((u) => u.boss)
@@ -325,8 +345,7 @@ test('a soldier chooses one of each pair along its path; past the last, levels a
 
 test('a satellite won offers three relics; a relic held changes the run', () => {
   const run = started()
-  run.fork = FORKS
-  run.zone = { stops: [stopOf('key')] }
+  atKey(run)
   fight(run, 'human')
   expect(new Set(run.relicOffers).size).toBe(3)
   const taken = run.relicOffers[2]
@@ -398,19 +417,23 @@ test('every event offers a real choice, ending in one the squad can always take,
   expect(new Set(options).size).toBe(options.length)
 })
 
-test('the Smugglers\' Tunnel skips the rest of the zone; refusing the Raiders makes the next stop an Overrun battle', () => {
+test('the Smugglers\' Tunnel skips the next two stops and comes out anywhere in the third; refusing the Raiders makes every next stop an Overrun battle', () => {
   const run = started()
-  run.zone = { stops: [stopOf('unknown'), stopOf('supply'), stopOf('cache')] }
+  apply(run, { type: 'go', index: 0 })
   run.event = 'tunnel'
   run.phase = 'event'
   apply(run, { type: 'choose', index: 0 })
-  expect(run.zone).toBeNull()
-  run.zone = { stops: [stopOf('unknown'), stopOf('supply')] }
-  run.stop = 0
-  run.event = 'raiders'
-  run.phase = 'event'
-  apply(run, { type: 'choose', index: 0 })
-  expect(run.zone.stops[1]).toMatchObject({ kind: 'battle', risk: 'dangerous' })
+  expect(run.stop).toBe(3)
+  const column = legOf(run).columns[3]
+  if (column.length > 1) expect(ways(run)).toEqual(column.map((_, i) => i))
+
+  const raided = started()
+  apply(raided, { type: 'go', index: 0 })
+  const next = current(raided)!.next
+  raided.event = 'raiders'
+  raided.phase = 'event'
+  apply(raided, { type: 'choose', index: 0 })
+  for (const i of next) expect(legOf(raided).columns[1][i].stop).toMatchObject({ kind: 'battle', risk: 'dangerous' })
 })
 
 test('doctrines change the run: Lone Wolf leaves one soldier and stops recruits; Specialists give every soldier its own class', () => {
@@ -418,7 +441,7 @@ test('doctrines change the run: Lone Wolf leaves one soldier and stops recruits;
   for (let i = 0; i < 3; i++) hire(run)
   run.event = 'instructor'
   run.phase = 'event'
-  run.zone = { stops: [stopOf('battle')] }
+  enter(run)
   const levels = run.soldiers.map(level)
   apply(run, { type: 'choose', index: 0 })
   expect(new Set(run.soldiers.map((s) => s.cls)).size).toBe(4)
@@ -428,11 +451,12 @@ test('doctrines change the run: Lone Wolf leaves one soldier and stops recruits;
   const wolf = started()
   hire(wolf)
   const hp = soldierStats(wolf, wolf.soldiers[0]).hp
-  Object.assign(wolf, { event: 'survivor', phase: 'event', zone: { stops: [stopOf('battle')] } })
+  enter(wolf)
+  Object.assign(wolf, { event: 'survivor', phase: 'event' })
   apply(wolf, { type: 'choose', index: 0 })
   expect(wolf.soldiers).toHaveLength(1)
   expect(soldierStats(wolf, wolf.soldiers[0]).hp).toBe(hp + 40)
-  wolf.zone = { stops: [stopOf('key')] }
+  atKey(wolf)
   fight(wolf, 'human')
   expect(wolf.soldiers).toHaveLength(1)
 })
@@ -473,8 +497,7 @@ test("the first relic offered shares a keyword with the squad's skills, gear or 
     const run = started()
     run.rng = seed
     run.soldiers[0].skills = ['mark']
-    run.fork = FORKS
-    run.zone = { stops: [stopOf('key')] }
+    atKey(run)
     fight(run, 'human')
     expect(RELICS[run.relicOffers[0]].tags!.some((tag) => squadKeywords(run).includes(tag))).toBe(true)
   }

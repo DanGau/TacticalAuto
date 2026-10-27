@@ -5,7 +5,7 @@ import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { SKILLS } from '../core/skills'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
-import { danger, GEAR_PRICE, level, skillOffers, squadKeywords, THREAT_MAX, type Risk, type Run } from '../core/run'
+import { current, danger, GEAR_PRICE, legOf, level, skillOffers, squadKeywords, THREAT_MAX, ways, type Risk, type Run } from '../core/run'
 
 /** Chooses the next action whenever the run waits for the player. `rng` is the bot's own, separate from the run's. */
 export type Bot = (run: Run, rng: { rng: number }) => Action
@@ -68,11 +68,11 @@ const affordable = (run: Run): Action[] => [
   ...run.shop!.relics.flatMap((_, index): Action[] => (RELIC_PRICE <= run.supplies ? [{ type: 'buy', index }] : [])),
 ]
 
-/** Takes the safest zones until the squad's mean level reaches 3, then the most dangerous. */
+/** Takes the safest stops until the squad's mean level reaches 3, then the most dangerous. */
 const growing = (run: Run): Risk => (run.soldiers.reduce((sum, s) => sum + level(s), 0) / run.soldiers.length >= 3 ? 'dangerous' : 'safe')
 
 /**
- * One way to play: how much danger to take at each fork, how to choose offers, where to land, whether to spend at
+ * One way to play: how much danger to take at each choice of way, how to choose offers, where to land, whether to spend at
  * shops, and how to meet events: boldly, taking the first option the squad can, or cautiously, taking the last.
  */
 interface Strategy {
@@ -104,10 +104,11 @@ const play =
     if (run.phase === 'shop') return build ? shop(run) : { type: 'leave' }
     if (run.phase === 'event') return { type: 'choose', index: events === 'bold' ? takeable(run)[0] : takeable(run).at(-1)! }
     const wanted = typeof risk === 'function' ? risk(run) : risk
-    if (run.zone) return { type: 'advance' }
-    // Zones by danger, least first: a safe bot takes the first, a standard one the middle, a dangerous one the last.
-    const ranked = run.zones.map((zone, index) => ({ index, danger: danger(zone) })).sort((a, b) => a.danger - b.danger)
-    return { type: 'zone', index: ranked[{ safe: 0, standard: 1, dangerous: 2 }[wanted]].index }
+    if (current(run)) return { type: 'advance' }
+    // The ways on by danger, least first: a safe bot takes the first, a standard one the middle, a dangerous one the last.
+    const column = legOf(run).columns[run.stop]
+    const ranked = ways(run).sort((a, b) => danger(column[a].stop!) - danger(column[b].stop!))
+    return { type: 'go', index: ranked[Math.round((ranked.length - 1) * { safe: 0, standard: 0.5, dangerous: 1 }[wanted])] }
   }
 
 /** Chooses every option at random; in a shop, builds or leaves at a coin flip. Decides finds as decideFind says. */
@@ -119,7 +120,9 @@ const randomBot: Bot = (run, rng) => {
     const options = affordable(run)
     return options.length > 0 && randomInt(rng, 2) === 0 ? options[randomInt(rng, options.length)] : { type: 'leave' }
   }
-  return run.zone ? { type: 'advance' } : { type: 'zone', index: randomInt(rng, run.zones.length) }
+  if (current(run)) return { type: 'advance' }
+  const open = ways(run)
+  return { type: 'go', index: open[randomInt(rng, open.length)] }
 }
 
 /**

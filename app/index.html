@@ -58,23 +58,23 @@
       .chip.feat { border-color: #ffd84d; color: #ffd84d; cursor: help; }
       .progress { margin: 4px 0; opacity: 0.7; }
       .map { position: relative; display: flex; gap: 40px; align-items: center; overflow-x: auto; padding: 8px 4px 12px; }
-      .trails { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; }
+      .trails { position: absolute; left: 0; top: 0; pointer-events: none; }
+      .cell { position: relative; z-index: 1; }
       .trails path { fill: none; stroke: #4a5670; stroke-width: 2.5; stroke-dasharray: 1 7; stroke-linecap: round; }
       .trails path.open { stroke: #ffd166; }
       .trails path.walked { stroke: #a8b3c8; stroke-dasharray: 6 4; }
-      .trails circle { fill: #4a5670; }
-      .trails circle.walked { fill: #a8b3c8; }
       .map { scrollbar-color: #4a5670 transparent; }
       .leg small { text-align: center; opacity: 0.7; }
       .leg { display: flex; flex-direction: column; gap: 4px; }
-      .segs { display: flex; gap: 46px; align-items: center; }
-      .seg { display: flex; flex-direction: column; gap: 22px; }
-      .map .nodes { gap: 18px; margin: 0; flex-wrap: nowrap; }
-      .map .node { font-size: 17px; width: 32px; height: 32px; line-height: 32px; border-width: 2px; flex: none; }
-      .node.done { opacity: 0.3; }
+      .grid { display: grid; column-gap: 34px; row-gap: 10px; align-items: center; justify-items: center; }
+      .map .node { display: inline-block; font-size: 17px; width: 32px; height: 32px; line-height: 32px; border-width: 2px; flex: none; }
+      .node.done { opacity: 0.55; }
+      .node.missed { opacity: 0.2; }
+      button.option { padding: 0; border: none; background: none; border-radius: 50%; }
+      button.option .node { box-shadow: 0 0 0 2px #ffd166; }
+      button.option:hover .node { box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; }
       .node.here { box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; }
-      .node.fog { color: #556; border: 2px dashed #3a4458; background: none; }
-      button.branch { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; white-space: normal; }
+      .map .node.fog { color: #6b7690; border: 2px dashed #4a5670; font-size: 14px; font-weight: bold; }
       .nodes { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 8px; }
       .node { font-size: 26px; width: 44px; height: 44px; line-height: 44px; text-align: center; border-radius: 50%; border: 3px solid #888; background: #1d2433; }
       .node.safe { border-color: #7ddc5a; }

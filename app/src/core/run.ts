@@ -17,8 +17,11 @@ import { random, randomInt } from './rng'
 
 /** Access keys needed to find the alien source; each is won at a satellite, at the end of a leg. */
 export const KEYS = 3
-/** Forks in the road on each leg, before its satellite. */
-export const FORKS = 2
+/** Stops on each leg before its satellite, whichever way the squad goes. */
+export const LEG_STOPS = 6
+/** Rows a leg's map spreads across, and trails that wander them from start to satellite. */
+export const MAP_ROWS = 5
+const TRAILS = 4
 /** Threat at which the next stop becomes a last stand. */
 export const THREAT_MAX = 6
 /** Threat each stop adds, and what losing a battle adds on top. */
@@ -62,21 +65,32 @@ export interface Muster {
 
 /**
  * A stop on the road. A battle has its own risk, goal and kind of place, and `packs` holds the aliens it will send,
- * mustered in advance so a fork can show them. Other stops fight as `standard` exterminations, and have no packs.
+ * mustered in advance so the map can show them. Other stops fight as `standard` exterminations, and have no packs.
  */
 export interface Stop {
   kind: StopKind
   risk: Risk
   goal: Goal
   terrain: TerrainKind
-  /** What about the ground or weather changes the battle; drawn ahead, so a fork can show it. */
+  /** What about the ground or weather changes the battle; drawn ahead, so the map can show it. */
   twist: Twist | null
   packs: Muster[]
 }
 
-/** A stretch of road the squad commits to at a fork: its stops, in order. */
-export interface Zone {
-  stops: Stop[]
+/** A stop on a leg's map: its row, the stops in the next column it leads to, and the stop, null until its leg begins. */
+export interface MapNode {
+  row: number
+  next: number[]
+  stop: Stop | null
+}
+
+/**
+ * A leg of the road as a map: columns of stops, LEG_STOPS of them then the satellite, or the source alone on the
+ * last. `path` is the index the squad took in each column entered, -1 for a column passed underground.
+ */
+export interface Leg {
+  columns: MapNode[][]
+  path: number[]
 }
 
 /**
@@ -165,19 +179,13 @@ export interface Run {
   rng: number
   /** Access keys won; also the number of the leg under way, from 0. At KEYS, the final mission is all that remains. */
   keys: number
-  /** Forks passed on this leg. */
-  fork: number
-  /** Zones to choose from at a fork; empty while travelling. */
-  zones: Zone[]
-  /** The zone being travelled; null at a fork. */
-  zone: Zone | null
-  /** Zones travelled this run, in order, the one under way last. Each leg is FORKS zones and its satellite. */
-  trail: Zone[]
-  /** Index of the next stop in the zone. */
+  /** Every leg's map, its shape drawn when the run begins; the one at `keys` is under way. */
+  legs: Leg[]
+  /** Columns passed on the leg under way. The squad chooses where to go when it has entered no column beyond them. */
   stop: number
   threat: number
   /**
-   * In the overworld the player chooses a zone or travels on; in the reward phase, makes the choices a stop left;
+   * In the overworld the player chooses where to go or travels on; in the reward phase, makes the choices a stop left;
    * in a shop, buys; at an event, chooses how to meet it.
    */
   phase: 'overworld' | 'battle' | 'reward' | 'shop' | 'event' | 'won' | 'lost'
@@ -361,15 +369,18 @@ export function hire(run: Run): Soldier {
   return soldier
 }
 
-/** How far along the road the squad is, which sets which packs appear and how much armor aliens wear: two steps a leg, the second at its last fork. */
+/** Whether the squad is in the second half of its leg, where aliens are stronger. */
+const late = (run: Run) => run.stop >= LEG_STOPS / 2
+
+/** How far along the road the squad is, which sets which packs appear and how much armor aliens wear: two steps a leg, the second halfway. */
 function depth(run: Run): number {
-  return run.keys * 2 + (run.fork >= FORKS ? 1 : 0)
+  return run.keys * 2 + (late(run) ? 1 : 0)
 }
 
 /** The mission the squad would fight at a stop of the given kind now. Its force follows the leg, and so the size of the squad. */
 export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goal = 'exterminate'): Mission {
   const extra = { battle: 0, key: 1, final: 2, lastStand: run.keys }[kind]
-  return { kind, goal, risk, force: Math.max(1, TUNING.legForce[run.keys] + (run.fork >= FORKS ? 1 : 0) + extra + RISKS[risk].aliens + GOALS[goal].force) }
+  return { kind, goal, risk, force: Math.max(1, TUNING.legForce[run.keys] + (late(run) ? 1 : 0) + extra + RISKS[risk].aliens + GOALS[goal].force) }
 }
 
 /**
@@ -408,28 +419,50 @@ function drawGoal(run: Run): Goal {
   return goals.find((goal) => (roll -= GOALS[goal].weight) < 0) ?? 'exterminate'
 }
 
-/** Stops in each zone at a fork. */
-export const ZONE_STOPS = 3
-
-/** How likely a stop at a fork is to be each kind other than a battle; the rest are battles. */
+/** How likely a stop past a leg's first column is to be each kind other than a battle; the rest are battles. */
 export const STOP_CHANCE = { unknown: 0.25, shop: 0.1, supply: 0.1, cache: 0.1 }
 
 /**
- * The three zones at a fork, each of ZONE_STOPS stops drawn at random: a battle of any risk, goal and place, or an
- * event. Each zone has at least one battle. Its battles are mustered as they will be once the squad has taken the fork.
+ * The shape of a leg's map: trails start apart and wander a row up, down or on each column, never crossing, and
+ * every stop they pass is a node. Then the satellite, which all reach.
  */
-function drawZones(run: Run): Zone[] {
-  const ahead = { ...run, fork: run.fork + 1 }
-  const risks = Object.keys(RISKS) as Risk[]
-  const stop = (): Stop => {
-    let roll = random(run)
-    const kind = (Object.keys(STOP_CHANCE) as (keyof typeof STOP_CHANCE)[]).find((k) => (roll -= STOP_CHANCE[k]) < 0)
-    return kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], ahead)
+function drawShape(run: Run): MapNode[][] {
+  const edges = Array.from({ length: LEG_STOPS }, () => new Map<number, Set<number>>())
+  const first = randomInt(run, MAP_ROWS)
+  for (let t = 0; t < TRAILS; t++) {
+    let row = t === 0 ? first : t === 1 ? (first + 1 + randomInt(run, MAP_ROWS - 1)) % MAP_ROWS : randomInt(run, MAP_ROWS)
+    for (let c = 0; c < LEG_STOPS; c++) {
+      const out = edges[c].get(row) ?? new Set<number>()
+      edges[c].set(row, out)
+      if (c === LEG_STOPS - 1) break
+      const step = Math.min(MAP_ROWS - 1, Math.max(0, row + randomInt(run, 3) - 1))
+      // Only a step up and a step down between the same two rows can cross; then the trail goes straight on.
+      const to = step !== row && edges[c].get(step)?.has(row) ? row : step
+      out.add(to)
+      row = to
+    }
   }
-  return Array.from({ length: 3 }, () => {
-    const stops = Array.from({ length: ZONE_STOPS }, stop)
-    if (stops.every((s) => s.kind !== 'battle')) stops[randomInt(run, ZONE_STOPS)] = drawBattle(run, risks[randomInt(run, risks.length)], ahead)
-    return { stops }
+  const rows = edges.map((column) => [...column.keys()].sort((a, b) => a - b))
+  const nodes = rows.map((column, c) =>
+    column.map((row): MapNode => ({ row, stop: null, next: c === LEG_STOPS - 1 ? [0] : [...edges[c].get(row)!].sort((a, b) => a - b).map((r) => rows[c + 1].indexOf(r)) })),
+  )
+  return [...nodes, [{ row: Math.floor(MAP_ROWS / 2), next: [], stop: null }]]
+}
+
+/** Fills the stops of the leg under way: its first column battles, the rest drawn at random, each battle mustered for where it stands. */
+function drawStops(run: Run): void {
+  const leg = run.legs[run.keys]
+  if (run.keys === KEYS) {
+    leg.columns[0][0].stop = fixed('final', 'hive')
+    return
+  }
+  const risks = Object.keys(RISKS) as Risk[]
+  leg.columns.forEach((column, c) => {
+    for (const node of column) {
+      let roll = random(run)
+      const kind = c === 0 ? undefined : (Object.keys(STOP_CHANCE) as (keyof typeof STOP_CHANCE)[]).find((k) => (roll -= STOP_CHANCE[k]) < 0)
+      node.stop = c === LEG_STOPS ? fixed('key', 'compound') : kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], { ...run, stop: c })
+    }
   })
 }
 
@@ -445,18 +478,34 @@ export function drawBattle(run: Run, risk: Risk, when: Run = run): Stop {
 /** A stop with no aliens drawn ahead: an event, a key mission or the final mission. */
 const fixed = (kind: StopKind, terrain: TerrainKind): Stop => ({ kind, risk: 'standard', goal: 'exterminate', terrain, twist: null, packs: [] })
 
-/** How hard a zone's battles are in all: each counts one, a quiet one none and an overrun one two. */
-export const danger = (zone: Zone) => zone.stops.reduce((sum, s) => sum + (s.kind === 'battle' ? 1 + RISKS[s.risk].aliens : 0), 0)
+/** How hard a stop is: a battle counts one, a quiet one none and an overrun one two. */
+export const danger = (stop: Stop) => (stop.kind === 'battle' ? 1 + RISKS[stop.risk].aliens : 0)
 
-/** Sets what lies ahead once a zone is done or a run begins: a fork, the leg's satellite, or the alien source. */
-function nextStretch(run: Run): void {
-  run.stop = 0
-  run.zone = null
-  run.zones = []
-  if (run.keys === KEYS) run.zone = { stops: [fixed('final', 'hive')] }
-  else if (run.fork === FORKS) run.zone = { stops: [fixed('key', 'compound')] }
-  else run.zones = drawZones(run)
-  if (run.zone) run.trail.push(run.zone)
+/** The leg under way. */
+export const legOf = (run: Run) => run.legs[run.keys]
+
+/** The node the squad has entered and not yet passed; null while it chooses where to go. */
+export function current(run: Run): MapNode | null {
+  const leg = legOf(run)
+  return leg.path.length > run.stop ? leg.columns[run.stop][leg.path[run.stop]] : null
+}
+
+/** Indexes in the next column of where the squad can go: where its last stop leads, or anywhere at a leg's start or out of a tunnel. */
+export function ways(run: Run): number[] {
+  const leg = legOf(run)
+  const last = leg.path[run.stop - 1] ?? -1
+  return last === -1 ? leg.columns[run.stop].map((_, i) => i) : leg.columns[run.stop - 1][last].next
+}
+
+/** Enters the node at `index` of the next column. */
+export function go(run: Run, index: number): void {
+  legOf(run).path.push(index)
+}
+
+/** Takes the way on if there is only one. */
+function onward(run: Run): void {
+  const open = ways(run)
+  if (open.length === 1) go(run, open[0])
 }
 
 export function createRun(seed: number): Run {
@@ -464,10 +513,7 @@ export function createRun(seed: number): Run {
     seed,
     rng: seed,
     keys: 0,
-    fork: 0,
-    zones: [],
-    zone: null,
-    trail: [],
+    legs: [],
     stop: 0,
     threat: 0,
     phase: 'overworld',
@@ -489,25 +535,19 @@ export function createRun(seed: number): Run {
     doctrines: [],
   }
   hire(run)
-  nextStretch(run)
+  run.legs = Array.from({ length: KEYS + 1 }, (_, k) => ({ columns: k === KEYS ? [[{ row: Math.floor(MAP_ROWS / 2), next: [], stop: null }]] : drawShape(run), path: [] }))
+  drawStops(run)
   settle(run)
   const resists = Object.keys(RESISTS) as Resist[]
   run.bosses = Array.from({ length: KEYS + 1 }, () => resists[randomInt(run, resists.length)])
   return run
 }
 
-/** Commits the squad to one of the zones at a fork. */
-export function enterZone(run: Run, zone: Zone): void {
-  run.zone = zone
-  run.zones = []
-  run.trail.push(zone)
-  run.fork++
-}
-
-/** The stop the squad travels to next: a last stand if threat is full, else the zone's next stop. Null at a fork. */
+/** The stop the squad travels to next: a last stand if threat is full, else the stop it has entered. Null while it chooses. */
 export function nextStop(run: Run): StopKind | 'lastStand' | null {
-  if (!run.zone) return null
-  return run.threat >= THREAT_MAX ? 'lastStand' : run.zone.stops[run.stop].kind
+  const node = current(run)
+  if (!node) return null
+  return run.threat >= THREAT_MAX ? 'lastStand' : node.stop!.kind
 }
 
 /** A random rarity; `lucky` rules out common. */
@@ -551,15 +591,15 @@ export function dropGear(run: Run, lucky: boolean): void {
   run.decisions.push({ soldier: soldier.name, gear, kept, line })
 }
 
-/** Moves past the zone's current stop; past its last, sets what lies ahead. */
+/** Moves past the stop the squad is at, and takes the way on if there is only one. */
 export function passStop(run: Run): void {
   run.stop++
-  if (run.stop === run.zone!.stops.length) nextStretch(run)
+  onward(run)
 }
 
 /** Travels to the next stop, unless it is a shop or unknown. A battle begins; a supply drop or cache is collected at once. */
 export function advance(run: Run): void {
-  const here = run.zone!.stops[run.stop]
+  const here = current(run)!.stop!
   const stop = nextStop(run)!
   if (stop === 'shop' || stop === 'unknown') throw new Error('a shop or unknown stop is arrived at, not advanced to')
   run.decisions = []
@@ -652,9 +692,11 @@ export function endBattle(run: Run): void {
   // A key mission lost is fought again; a last stand stands in front of the stop it interrupted.
   if (key) {
     run.keys++
-    run.fork = 0
+    run.stop = 0
+    drawStops(run)
+    onward(run)
   }
-  if (mission.kind === 'battle' || key) passStop(run)
+  if (mission.kind === 'battle') passStop(run)
   // A satellite, a last stand or a hold won offers relics.
   if (won && (mission.kind !== 'battle' || mission.goal === 'hold')) {
     const pool = (Object.keys(RELICS) as RelicId[]).filter((id) => !run.relics.includes(id))

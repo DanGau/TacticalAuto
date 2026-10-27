@@ -26,8 +26,7 @@ test('a mission musters packs its depth allows, for exactly its force, and a lon
 function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }[]): { battle: Battle; soldier: Unit; aliens: Unit[]; until: (done: (events: GameEvent[]) => boolean) => GameEvent[] } {
   const run = createRun(1)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
-  apply(run, { type: 'zone', index: 1 })
-  run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
+  apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   // A cold zone, so no drop pod impact lands in the fight.
   const zone = run.battle!.hot === 0 ? 1 : 0

@@ -55,8 +55,7 @@ test('found gear is equipped on its finder, selling what it replaces, or sold; t
 function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: Unit; step: () => ReturnType<typeof stepBattle> } {
   const run = withFind(gear)
   apply(run, { type: 'keep' })
-  apply(run, { type: 'zone', index: 1 })
-  run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
+  apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   // War drums pay off only on a kill, so they leave a duel as it is.
   // A cold zone, so no drop pod impact lands in the fight.

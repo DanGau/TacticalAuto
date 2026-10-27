@@ -461,7 +461,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
         toGoal: toGoal[end.y * GRID + end.x] - Math.round(role(end) / 10),
         stray: stray(end),
         shelter: coverAgainst(battle, end, goal),
-        careful: unit.side === 'human',
+        careful: unit.side === 'human' && battle.round < RESTLESS_ROUND,
       }
       // A wary unit ranks every tile by the exchange of fire, so one with no shot and no risk can win.
       // No unit ends its move in acid if it can help it.
@@ -604,7 +604,7 @@ function strew(battle: Battle, unit: Unit): GameEvent[] {
   return [{ type: 'effect', id: unit.id, effect: 'caltrops', amount: 0 }]
 }
 
-/** Alien turns after which the aliens still unseen patrol toward the squad. */
+/** Alien turns after which the aliens still unseen patrol toward the squad, and soldiers no longer hang back out of reach. */
 const RESTLESS_ROUND = 25
 
 /** Whether some living alien is alert to the squad. */

@@ -13,8 +13,7 @@ import { drawTwist, FUEL_DAMAGE, TWISTS, type Twist } from './twists'
 function duel(twist: Twist | null): Battle {
   const run = createRun(1)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
-  apply(run, { type: 'zone', index: 1 })
-  run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
+  apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   apply(run, { type: 'land', zone: run.battle!.hot === 0 ? 1 : 0 })
   const battle = run.battle!
@@ -24,7 +23,7 @@ function duel(twist: Twist | null): Battle {
   battle.height.fill(0)
   battle.north.fill('none')
   battle.west.fill('none')
-  const soldier = battle.units.find((u) => u.side === 'human')!
+  const soldier = battle.units.find((u) => u.side === 'human' && !u.civilian)!
   const alien = battle.units.find((u) => u.side === 'alien')!
   battle.units = [soldier, alien]
   battle.pods.forEach((pod) => Object.assign(pod, { revealed: true, alert: true }))
@@ -33,11 +32,12 @@ function duel(twist: Twist | null): Battle {
   return battle
 }
 
-/** Steps the battle until a shot is fired, and returns that beat's events. */
+/** Steps the battle until the soldier fires, and returns that beat's events. */
 function untilShot(battle: Battle): GameEvent[] {
+  const soldier = battle.units.find((u) => u.side === 'human' && !u.civilian)!
   for (let beat = 0; beat < 100; beat++) {
     const events = stepBattle(battle)
-    if (events.some((e) => e.type === 'shot')) return events
+    if (events.some((e) => e.type === 'shot' && e.id === soldier.id)) return events
   }
   throw new Error('no shot')
 }
@@ -106,4 +106,29 @@ test('fog shortens sight, and night noticing', () => {
   expect(sees(battle, soldier, alien)).toBe(false)
   battle.twist = 'night'
   expect(detects(battle, soldier, alien)).toBe(false)
+})
+
+test('narrow ground leaves no open ground cut off by cover or walls', () => {
+  for (let seed = 1; seed <= 40; seed++) {
+    const t = generateTerrain({ rng: seed }, GRID, 'town', 'narrow')
+    const open = (i: number) => t.ground[i] !== 'void' && t.props[i] === 'none'
+    const start = t.props.findIndex((_, i) => open(i))
+    const reached = new Set([start])
+    const queue = [start]
+    for (let i = 0; i < queue.length; i++) {
+      const at = queue[i]
+      const steps = [
+        [at - GRID, t.north[at]],
+        [at + GRID, t.north[at + GRID]],
+        [at % GRID > 0 ? at - 1 : -1, t.west[at]],
+        [at % GRID < GRID - 1 ? at + 1 : -1, t.west[at + 1]],
+      ] as const
+      for (const [n, edge] of steps) {
+        if (n < 0 || n >= GRID * GRID || edge !== 'none' || !open(n) || reached.has(n)) continue
+        reached.add(n)
+        queue.push(n)
+      }
+    }
+    expect(t.props.filter((_, i) => open(i)).length).toBe(reached.size)
+  }
 })

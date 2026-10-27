@@ -451,6 +451,52 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
   layouts[layout]()
   return finish()
 
+  /** The edge between neighbouring tiles `a` and `b`, as an index into `north` or `west`. */
+  function edgeOf(a: number, b: number): [Edge[], number] {
+    return [Math.abs(a - b) === size ? north : west, Math.max(a, b)]
+  }
+  /** The tiles beside `t` on the grid, not void. */
+  function beside(t: number): number[] {
+    return [t - size, t + size, t % size > 0 ? t - 1 : -1, t % size < size - 1 ? t + 1 : -1].filter((n) => n >= 0 && n < size * size && ground[n] !== 'void')
+  }
+
+  /** Clears a way into every patch of open ground that cover and walls cut off, as narrow ground can. */
+  function connect(): void {
+    const open = (t: number) => ground[t] !== 'void' && props[t] === 'none'
+    for (;;) {
+      const reached = new Set<number>()
+      const start = props.findIndex((_, t) => open(t))
+      const queue = [start]
+      reached.add(start)
+      for (let i = 0; i < queue.length; i++)
+        for (const n of beside(queue[i])) {
+          const [edges, at] = edgeOf(queue[i], n)
+          if (reached.has(n) || !open(n) || edges[at] !== 'none') continue
+          reached.add(n)
+          queue.push(n)
+        }
+      const lost = props.findIndex((_, t) => open(t) && !reached.has(t))
+      if (lost === -1) return
+      // The shortest way over any ground from the patch cut off to the rest, cleared of props and walls.
+      const from = new Map<number, number>([[lost, lost]])
+      const search = [lost]
+      let end = -1
+      for (let i = 0; i < search.length && end === -1; i++)
+        for (const n of beside(search[i]))
+          if (!from.has(n)) {
+            from.set(n, search[i])
+            if (reached.has(n)) end = n
+            search.push(n)
+          }
+      for (let t = end; t !== lost; t = from.get(t)!) {
+        const [edges, at] = edgeOf(t, from.get(t)!)
+        edges[at] = 'none'
+        if (props[t] !== 'none') props[t] = 'none'
+        if (props[from.get(t)!] !== 'none') props[from.get(t)!] = 'none'
+      }
+    }
+  }
+
   /** Lays the twist on the finished plot: narrow ground cuts it to a shape, fuel scatters tanks. */
   function finish(): Terrain {
     if (twist === 'narrow') {
@@ -476,6 +522,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
         if (y + 1 < size) north[at + size] = 'none'
         if (x + 1 < size) west[at + 1] = 'none'
       })
+      connect()
     }
     if (twist === 'fuel') for (let i = 0; i < 14; i++) put(between(1, size - 2), between(1, size - 2), 'fuel')
     const height = hills().map((h, t) => (ground[t] === 'void' ? 0 : h))

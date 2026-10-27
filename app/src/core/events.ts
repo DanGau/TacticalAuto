@@ -2,7 +2,7 @@ import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type DoctrineId } from './doctrines'
 import { RELICS, type RelicId } from './relics'
 import { random, randomInt } from './rng'
-import { advance, drawBattle, dropGear, hire, level, nextStop, passStop, settle, stockShop, STOP_THREAT, THREAT_MAX, xpFor, type Run } from './run'
+import { advance, current, drawBattle, LEG_STOPS, legOf, dropGear, hire, level, nextStop, passStop, settle, stockShop, STOP_THREAT, THREAT_MAX, xpFor, type Run } from './run'
 
 /** One way to meet an event: the squad's quip, what it does, whether the squad can, and doing it. */
 interface Option {
@@ -39,8 +39,8 @@ const unheld = (run: Run) => (Object.keys(RELICS) as RelicId[]).filter((id) => !
 const pick = <T>(run: Run, options: T[]): T => options[randomInt(run, options.length)]
 /** Moves a soldier `levels` up or down, never below level 1. */
 const train = (soldier: Run['soldiers'][number], levels: number) => (soldier.xp = xpFor(Math.max(1, level(soldier) + levels)))
-/** Whether the zone has a stop after this one. */
-const ahead = (run: Run) => run.stop + 1 < run.zone!.stops.length
+/** Whether `n` more stops lie between this one and the satellite. */
+const ahead = (run: Run, n = 1) => run.stop + n < LEG_STOPS
 
 const encounters = {
   vats: {
@@ -184,7 +184,7 @@ const encounters = {
   },
   salesman: {
     name: 'Door-to-Door Salesman',
-    text: 'A salesman steps out of a crater, brushing off ash, briefcase already open. "Have you got a minute to hear about tactical gear?" He has been following the squad for three zones.',
+    text: 'A salesman steps out of a crater, brushing off ash, briefcase already open. "Have you got a minute to hear about tactical gear?" He has been following the squad for three stops.',
     options: [
       { quip: '"Fine. Fine! Just stop standing so close."', text: 'Buy: -2 supplies; a random piece of gear', can: (run) => run.supplies >= 2, take: (run) => ((run.supplies -= 2), dropGear(run, false)) },
       { quip: 'Slam the door. There is no door. Slam it anyway.', text: 'Refuse: +1 threat, as he yells about you across the valley', take: (run) => raise(run, 1) },
@@ -238,9 +238,11 @@ const encounters = {
     options: [
       {
         quip: '"We are very tough." Squeak, goes someone\'s boot.',
-        text: 'Refuse: the next stop becomes an Overrun battle',
-        can: ahead,
-        take: (run) => (run.zone!.stops[run.stop + 1] = drawBattle(run, 'dangerous')),
+        text: 'Refuse: every stop the road leads to next becomes an Overrun battle',
+        can: (run) => ahead(run),
+        take: (run) => {
+          for (const i of current(run)!.next) legOf(run).columns[run.stop + 1][i].stop = drawBattle(run, 'dangerous', { ...run, stop: run.stop + 1 })
+        },
       },
       { quip: 'Hand it over. The sofa was a nice touch.', text: 'Pay: lose all your supplies', take: (run) => (run.supplies = 0) },
     ],
@@ -292,14 +294,15 @@ const encounters = {
   },
   tunnel: {
     name: 'Smugglers\' Tunnel',
-    text: 'A tunnel runs under the whole zone, signposted EXIT and, in smaller letters, MOSTLY. It skips everything ahead: every fight, and every prize. The aliens will notice the squad has gone missing.',
+    text: 'A tunnel runs under the next two stops, signposted EXIT and, in smaller letters, MOSTLY. It skips every fight there, and every prize. The aliens will notice the squad has gone missing.',
     options: [
       {
         quip: 'Mind your heads. Mind your everything.',
-        text: 'Take it: skip the rest of the zone; +1 threat',
-        can: ahead,
+        text: 'Take it: skip the next two stops and come out at any of the third; +1 threat',
+        can: (run) => ahead(run, 2),
         take: (run) => {
-          run.stop = run.zone!.stops.length - 1
+          legOf(run).path.push(-1, -1)
+          run.stop += 2
           raise(run, 1)
         },
       },
@@ -326,7 +329,7 @@ export function arrive(run: Run): void {
   const unknown = nextStop(run) === 'unknown'
   const roll = random(run)
   if (unknown && roll < UNKNOWN_CHANCE.battle) {
-    run.zone!.stops[run.stop] = drawBattle(run, 'standard')
+    current(run)!.stop = drawBattle(run, 'standard')
     advance(run)
     return
   }

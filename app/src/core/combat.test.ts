@@ -9,8 +9,7 @@ import { detects } from './sight'
 function battle(seed: number): Battle {
   const run = createRun(seed)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
-  apply(run, { type: 'zone', index: 1 })
-  run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
+  apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   apply(run, { type: 'land', zone: 0 })
   return run.battle!

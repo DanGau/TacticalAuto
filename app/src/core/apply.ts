@@ -1,6 +1,6 @@
 import { land } from './battle'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
-import { advance, buyWare, enterZone, GEAR_PRICE, keepFind, nextStop, sellFind, skillOffers, takeRelic, takeSkill, type Run } from './run'
+import { advance, buyWare, current, GEAR_PRICE, go, keepFind, nextStop, sellFind, skillOffers, takeRelic, takeSkill, ways, type Run } from './run'
 
 export type Action =
   /** Shop: buy the gear at `index` of shop.wares, for the soldier it is fitted to. */
@@ -13,8 +13,8 @@ export type Action =
   | { type: 'leave' }
   /** Event: meet it the way its option at `index` says. */
   | { type: 'choose'; index: number }
-  /** Overworld, at a fork: commit to the zone at `index` of run.zones. */
-  | { type: 'zone'; index: number }
+  /** Overworld, choosing where to go: enter the stop at `index` of the next column, one the last stop leads to. */
+  | { type: 'go'; index: number }
   /** Overworld, in a zone: travel to the next stop. */
   | { type: 'advance' }
   /** Deploy phase: land the squad on the zone at `zone` of battle.zones and begin the battle. */
@@ -94,13 +94,13 @@ export function apply(run: Run, action: Action): Result {
     return ok
   }
   if (run.phase !== 'overworld') return no('not in the overworld')
-  if (action.type === 'zone') {
-    const zone = run.zones[action.index]
-    if (!zone) return no('no such zone')
-    enterZone(run, zone)
+  if (action.type === 'go') {
+    if (current(run)) return no('already on the way to a stop')
+    if (!ways(run).includes(action.index)) return no('no way there')
+    go(run, action.index)
     return ok
   }
-  if (!run.zone) return no('choose a zone first')
+  if (!current(run)) return no('choose where to go first')
   const stop = nextStop(run)
   if (stop === 'shop' || stop === 'unknown') arrive(run)
   else advance(run)

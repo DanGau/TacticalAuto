@@ -4,22 +4,23 @@ import { apply } from './apply'
 import { stepBattle } from './combat'
 import { CIVILIAN_SUPPLIES, CIVILIANS, HOLD_ROUNDS, type Goal } from './goals'
 import { revealed } from './battle'
+import { road } from './roads'
 import { createRun, endBattle, RISKS, START_SUPPLIES, XP, type Run } from './run'
 
 /** A run about to fight a battle of `goal`, with three packs to muster. */
 function before(goal: Goal): Run {
   const run = createRun(1)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
-  apply(run, { type: 'zone', index: 1 })
+  apply(run, { type: 'go', index: 1 })
   const patrol = { name: 'Patrol', kinds: ['trooper', 'trooper'] as const }
-  run.zone = { stops: [{ kind: 'battle', risk: 'standard', goal, terrain: 'town', twist: null, packs: [patrol, patrol, patrol].map((p) => ({ ...p, kinds: [...p.kinds] })) }] }
+  road(run, [{ kind: 'battle', risk: 'standard', goal, terrain: 'town', twist: null, packs: [patrol, patrol, patrol].map((p) => ({ ...p, kinds: [...p.kinds] })) }])
   apply(run, { type: 'advance' })
   return run
 }
 
-test('every battle at a fork has its aliens mustered in advance; no other stop has any', () => {
+test('every battle on the leg under way has its aliens mustered in advance; no other stop has any', () => {
   const run = createRun(1)
-  for (const stop of run.zones.flatMap((zone) => zone.stops)) expect(stop.packs.length > 0).toBe(stop.kind === 'battle')
+  for (const node of run.legs[0].columns.flat()) expect(node.stop!.packs.length > 0).toBe(node.stop!.kind === 'battle')
 })
 
 test('a hold offers three landing zones away from the uplink, keeps half its packs back as waves, and is won by lasting', () => {

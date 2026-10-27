@@ -10,8 +10,7 @@ import { createRun, type Run } from './run'
 function landing(): Run & { battle: Battle } {
   const run = createRun(1)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
-  apply(run, { type: 'zone', index: 1 })
-  run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
+  apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   return run as Run & { battle: Battle }
 }
@@ -63,11 +62,10 @@ test('actions outside their phase are rejected and change nothing', () => {
   expect(apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'keep' }).ok).toBe(false)
   expect(apply(run, { type: 'land', zone: 0 }).ok).toBe(false)
-  expect(apply(run, { type: 'zone', index: 9 }).ok).toBe(false)
+  expect(apply(run, { type: 'go', index: 9 }).ok).toBe(false)
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
   expect(run).toEqual(before)
-  apply(run, { type: 'zone', index: 1 })
-  run.zone!.stops.sort((a, b) => Number(b.kind === 'battle') - Number(a.kind === 'battle'))
+  apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
   expect(apply(run, { type: 'gear', index: 0 }).ok).toBe(false)
