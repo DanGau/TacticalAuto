@@ -56,11 +56,17 @@ function write(t: Tuning) {
   writeFileSync(new URL('../core/tuning.ts', import.meta.url), `${head}\nexport const TUNING = {\n${lines.join('\n')}\n}\n`)
 }
 
-const { values } = parseArgs({ options: { runs: { type: 'string', default: '300' }, rounds: { type: 'string', default: '10' }, threads: { type: 'string', default: '8' } } })
+const { values } = parseArgs({ options: { runs: { type: 'string', default: '300' }, rounds: { type: 'string', default: '10' }, threads: { type: 'string', default: '8' }, memory: { type: 'string' } } })
 const runs = Number(values.runs)
+let finished = false
+process.on('exit', (code) => {
+  if (code !== 0 || finished) return
+  console.error('tune: ended before finishing; rerun to resume from .tune.json')
+  process.exitCode = 1
+})
 const names = Object.keys(bots)
 const score = async (t: Tuning, start: number) => {
-  const rates = await winRates(names, runs, start, t, Number(values.threads))
+  const rates = await winRates(names, runs, start, t, { threads: Number(values.threads), memoryMb: values.memory ? Number(values.memory) : undefined })
   return { rates, miss: miss(rates) }
 }
 /** Seeds the climb never sees, which judge where it ends. */
@@ -117,3 +123,4 @@ rmSync(CHECKPOINT, { force: true })
 console.log(`held-out miss ${round(before.miss)} → ${round(after.miss)}: ${kept ? 'tuning.ts rewritten' : 'tuning.ts unchanged'}`)
 const { table, warnings } = compare((kept ? after : before).rates)
 console.log([table, ...warnings.map((w) => `WARN ${w}`)].join('\n'))
+finished = true

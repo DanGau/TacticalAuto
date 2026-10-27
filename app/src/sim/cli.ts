@@ -24,7 +24,7 @@ const play = (name: string) => Array.from({ length: Number(values.runs) }, (_, i
 
 if (values.bot === 'all') {
   // Every bot on the same seeds, against the win-rate bands.
-  const { table, warnings } = compare(await winRates(Object.keys(bots), Number(values.runs), start, TUNING, undefined, doctrines))
+  const { table, warnings } = compare(await winRates(Object.keys(bots), Number(values.runs), start, TUNING, { doctrines }))
   console.log([table, ...warnings.map((w) => `WARN ${w}`)].join('\n'))
 } else {
   if (!bots[values.bot]) throw new Error(`unknown bot "${values.bot}"; choose from all, ${Object.keys(bots).join(', ')}`)

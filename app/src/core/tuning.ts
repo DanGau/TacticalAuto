@@ -3,7 +3,7 @@ export const TUNING = {
   /** Every alien's health, as a multiple of its kind's. */
   alienHp: 0.72,
   /** The alien force a battle has in each leg, before its risk and kind are counted. */
-  legForce: [1, 4, 9, 15],
+  legForce: [1, 4, 8, 15],
   /** Damage each hit on a marked unit adds. */
   markDamage: 1,
   /** Damage Accelerant Gel adds to hits on a burning target. */
