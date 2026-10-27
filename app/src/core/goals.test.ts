@@ -2,7 +2,8 @@ import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { stepBattle } from './combat'
-import { CIVILIANS, HOLD_ROUNDS, type Goal } from './goals'
+import { CIVILIAN_SUPPLIES, CIVILIANS, HOLD_ROUNDS, type Goal } from './goals'
+import { revealed } from './battle'
 import { createRun, endBattle, RISKS, START_SUPPLIES, XP, type Run } from './run'
 
 /** A run about to fight a battle of `goal`, with three packs to muster. */
@@ -49,10 +50,11 @@ test('an assassination is won when the commander falls, though its guard lives',
   expect(run.finds.length + run.decisions.length).toBeGreaterThan(0)
 })
 
-test('a rescue pays experience for each civilian kept alive; a raid pays triple supplies', () => {
+test('a rescue pays supplies and experience for each civilian kept alive; a raid pays triple supplies', () => {
   const rescue = before('rescue')
   apply(rescue, { type: 'land', zone: 0 })
   expect(rescue.battle!.units.filter((u) => u.civilian)).toHaveLength(CIVILIANS)
+  const supplies = rescue.supplies
   // One civilian is lost.
   const lost = rescue.battle!.units.find((u) => u.civilian)
   rescue.battle!.units = rescue.battle!.units.filter((u) => u !== lost)
@@ -61,6 +63,7 @@ test('a rescue pays experience for each civilian kept alive; a raid pays triple 
   endBattle(rescue)
   expect(rescue.report!.rescued).toBe(alive)
   expect(rescue.report!.soldiers[0].earned).toContainEqual({ label: `${alive} civilians saved`, xp: alive * XP.civilian })
+  expect(rescue.supplies).toBe(supplies + RISKS.standard.supplies + alive * CIVILIAN_SUPPLIES)
 
   const raid = before('raid')
   apply(raid, { type: 'land', zone: 0 })
@@ -68,4 +71,19 @@ test('a rescue pays experience for each civilian kept alive; a raid pays triple 
   endBattle(raid)
   expect(raid.supplies).toBe(START_SUPPLIES + 3 * RISKS.standard.supplies)
   expect(raid.finds).toEqual([])
+})
+
+test('rescue civilians hide alone until a soldier sees one, and the squad searches for them while no alien is in the open', () => {
+  const run = before('rescue')
+  apply(run, { type: 'land', zone: 0 })
+  const battle = run.battle!
+  const civilians = battle.units.filter((u) => u.civilian)
+  expect(civilians.every((u) => !revealed(battle, u))).toBe(true)
+  for (const a of civilians) for (const b of civilians) if (a !== b) expect(Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))).toBeGreaterThan(1)
+  for (let beat = 0; beat < 2000 && battle.found.length === 0 && battle.phase === 'battle'; beat++) {
+    const events = stepBattle(battle)
+    const found = events.find((e) => e.type === 'found')
+    if (found) expect(revealed(battle, battle.units.find((u) => u.id === found.id)!)).toBe(true)
+  }
+  expect(battle.found.length).toBeGreaterThan(0)
 })

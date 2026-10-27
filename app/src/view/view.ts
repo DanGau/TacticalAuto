@@ -487,7 +487,7 @@ export async function createView(): Promise<View> {
       if (!lit) diamond(fog, i % GRID, Math.floor(i / GRID)).fill({ color: COLOR.fog, alpha: 0.55 })
     })
     // Mid-beat, a glow stays where its slide left it; the battle already holds where the alien ends up.
-    const lurking = seen ? battle.units.filter((u) => u.hp > 0 && !revealed(battle, u)) : []
+    const lurking = seen ? battle.units.filter((u) => u.hp > 0 && !u.civilian && !revealed(battle, u)) : []
     const ids = new Set(lurking.map((u) => u.id))
     for (const [id, glow] of glows) {
       if (ids.has(id)) continue
@@ -853,6 +853,8 @@ export async function createView(): Promise<View> {
         await follow([from.tile, to.tile])
         const shooter = battle.units.find((u) => u.id === e.id)!
         await shoot(from, to, e, vitals(battle, e.target), weaponOf(shooter, soldiers.find((s) => s.id === shooter.soldier)?.cls ?? null))
+        // Crumbling cover has already broken in the battle; show it as the hit lands.
+        if (battle.twist === 'crumbling' && e.damage > 0) drawTerrain(battle)
       } else if (e.type === 'rocket') {
         const from = sprites.get(e.id)
         if (!from && !e.hits.some((hit) => sprites.has(hit.target))) continue
@@ -897,6 +899,9 @@ export async function createView(): Promise<View> {
         // A demolishing hit has already wrecked the cover in the battle; show it as the hit lands.
         if (e.effect === 'demolish') drawTerrain(battle)
         float(effectCallout(e, on))
+      } else if (e.type === 'found') {
+        const on = sprites.get(e.id)
+        if (on) float(callout('FOUND', COLOR.civilian, on))
       } else if (e.type === 'feed') {
         const on = sprites.get(e.id)
         if (on) float(callout(`FED +${e.damage}`, COLOR.crit, on))

@@ -117,6 +117,8 @@ export type GameEvent =
   | { type: 'spit'; id: number; target: number; damage: number }
   /** A feeder grows on a trick the squad used: its hits do `damage` more than its weapon's. */
   | { type: 'feed'; id: number; damage: number }
+  /** A soldier finds a hidden civilian. */
+  | { type: 'found'; id: number }
   /** A psion panics a soldier, who loses its next action. */
   | { type: 'panic'; id: number; target: number }
   /** A panicked soldier loses its action. */
@@ -360,8 +362,8 @@ function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
 
 /**
  * Where a side's units close on when they have no shot, by the battle's goal. Soldiers share one, so the squad moves
- * together: on a hold, the uplink; on an assassination, the commander once sighted; on a rescue, the alien
- * nearest the civilians; else the alien nearest the squad's centre. On a hold the aliens close on the uplink;
+ * together: on a hold, the uplink; on an assassination, the commander once sighted; on a rescue, the hidden
+ * civilian nearest the squad while no alien is in the open, else the alien nearest the civilians found; else the alien nearest the squad's centre. On a hold the aliens close on the uplink;
  * otherwise an alien closes on the human nearest itself.
  */
 function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
@@ -369,7 +371,11 @@ function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
   if (battle.uplink) return battle.uplink
   if (unit.side === 'alien') return nearest(enemies, unit)
   const civilians = battle.units.filter((u) => u.civilian)
-  const guarded = battle.goal === 'rescue' && civilians.length > 0 ? centreOf(civilians) : centreOf(battle.units.filter(isSoldier))
+  // With no alien in the open, a rescuer searches toward the nearest civilian still hidden.
+  const hidden = civilians.filter((u) => !revealed(battle, u))
+  if (hidden.length > 0 && !enemies.some((e) => revealed(battle, e))) return nearest(hidden, centreOf(battle.units.filter(isSoldier)))
+  const found = civilians.filter((u) => revealed(battle, u))
+  const guarded = battle.goal === 'rescue' && found.length > 0 ? centreOf(found) : centreOf(battle.units.filter(isSoldier))
   return enemies.find((u) => u.target && revealed(battle, u)) ?? nearest(enemies, guarded)
 }
 
@@ -415,8 +421,8 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const engaged = unit.side === 'human' && seen.size > 0
   /** Whether a soldier on `end` would sight a pod not yet revealed, while the squad is in a fight. */
   const provokes = (end: Tile) => (engaged && unseen.some((alien) => sees(battle, end, alien)) ? 1 : 0)
-  /** Whether `end` would hurt the unit to stand on: acid, fire unless it cannot burn, or caltrops for an alien. */
-  const acid = (end: Tile) => (onTile(battle.acid, end) || (unit.side === 'human' && besideFuel(battle, end)) || (onTile(battle.fire, end) && !fireproof(battle, unit)) || (unit.side === 'alien' && onTile(battle.caltrops, end)) ? 1 : 0)
+  /** Whether `end` would hurt the unit to stand on: acid, or fire unless it cannot burn; for a soldier, a fuel tank beside it. Caltrops only slow and hurt the way. */
+  const acid = (end: Tile) => (onTile(battle.acid, end) || (unit.side === 'human' && besideFuel(battle, end)) || (onTile(battle.fire, end) && !fireproof(battle, unit)) ? 1 : 0)
   /**
    * What a soldier's gear makes a tile worth, in points of hit chance: a null field over aliens with abilities, spirit
    * guardians where aliens will come while the wearer is healthy, a bond beside a squadmate.
@@ -516,6 +522,10 @@ function sight(battle: Battle): GameEvent[] {
     events.push({ type: 'reveal', ambush, stalked: false, units: members.map(({ id, x, y }) => ({ id, x, y })) })
     if (!ambush && !wasAlert) for (const member of members) walk(member, fightPath(battle, member), events)
   })
+  for (const civilian of battle.units.filter((u) => u.civilian && !battle.found.includes(u.id) && soldiers.some((s) => sees(battle, s, u)))) {
+    battle.found.push(civilian.id)
+    events.push({ type: 'found', id: civilian.id })
+  }
   battle.concealed = !hunted(battle)
   return events
 }

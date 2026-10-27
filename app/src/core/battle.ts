@@ -324,6 +324,8 @@ export interface Battle {
   fire: { x: number; y: number; turns: number }[]
   /** Tiles strewn with caltrops: dear to cross, and they hurt an alien that steps on them. */
   caltrops: Tile[]
+  /** Civilians some soldier has seen, by id. Until found, a civilian is hidden from the player and from the aliens. */
+  found: number[]
   /** Centres of the landing zones on offer in the deploy phase. */
   zones: Tile[]
   /** On a hold, the uplink the squad must reach and defend; null otherwise. */
@@ -481,8 +483,9 @@ export const alert = (battle: Battle, unit: Unit) => unit.pod === null || battle
 /** A soldier of the squad: not a civilian, nor a mech, which fights for the squad but cannot hold the field alone. */
 export const isSoldier = (unit: Unit) => unit.side === 'human' && unit.soldier !== null
 
-/** Whether the alien fights in the open: humans always do, an alien once its pod is revealed. */
+/** Whether the unit is in the open: an alien once its pod is revealed, a civilian once found, any other human always. */
 export function revealed(battle: Battle, unit: Unit): boolean {
+  if (unit.civilian) return battle.found.includes(unit.id)
   return unit.pod === null || battle.pods[unit.pod].revealed
 }
 
@@ -662,7 +665,7 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
 
 /**
  * A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. A hold keeps half its
- * packs back as waves and offers one landing zone, the uplink; a rescue places civilians away from the aliens.
+ * packs back as waves and offers one landing zone, the uplink; a rescue hides civilians alone about the map.
  */
 export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null): Battle {
   const holder = { rng: seed }
@@ -690,6 +693,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     acid: [],
     fire: [],
     caltrops: [],
+    found: [],
     actor: null,
     tally: {},
     zones: [],
@@ -708,7 +712,9 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     placePod(battle, pack, centre, false)
   }
   if (goal === 'rescue') {
-    for (const tile of freeTilesNear(battle, spacedTile(battle, battle.units, ZONE_CLEARANCE), CIVILIANS)) {
+    // Each hides alone somewhere on the map, for the squad to find.
+    for (let i = 0; i < CIVILIANS; i++) {
+      const tile = spacedTile(battle, battle.units, ZONE_CLEARANCE)
       const stats = { ...BASE_STATS, hp: CIVILIAN_HP, aim: 0, damage: 0, range: 0, move: 0, crit: 0 }
       battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
     }
