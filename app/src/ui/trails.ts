@@ -13,10 +13,21 @@ function bend(a: { x: number; y: number }, b: { x: number; y: number }, cls: str
 
 /**
  * Draws dotted trails over the run map, up from each stop to each shown that it leads to. Trails the squad has walked are solid;
- * those it can take next glow.
+ * those it can take next glow, or, with a stop picked, those from it on.
  */
 export function drawTrails(map: Element): void {
   const paths: string[] = []
+  // With a stop picked, its trails ahead light up and the rest grey out.
+  const picked = map.querySelector('.option.picked')?.closest<HTMLElement>('.cell')
+  const lit = new Set<string>()
+  for (let todo = picked ? [picked.dataset.n!] : []; todo.length > 0; ) {
+    const id = todo.pop()!
+    if (lit.has(id)) continue
+    lit.add(id)
+    const cell = map.querySelector<HTMLElement>(`[data-n="${id}"]`)
+    if (cell) todo.push(...cell.dataset.next!.split(' ').filter(Boolean))
+  }
+  for (const cell of map.querySelectorAll<HTMLElement>('.cell')) cell.classList.toggle('dim', !!picked && !lit.has(cell.dataset.n!) && !cell.querySelector('.done, .here'))
   for (const cell of map.querySelectorAll<HTMLElement>('.cell')) {
     const from = cell.querySelector('.node')!
     for (const id of cell.dataset.next!.split(' ').filter(Boolean)) {
@@ -24,7 +35,9 @@ export function drawTrails(map: Element): void {
       const target = map.querySelector(`[data-n="${id}"]`)
       const to = target?.querySelector('.node')
       if (!target || !to) continue
-      const cls = from.matches('.done') && to.matches('.done, .here') ? 'walked' : target.querySelector('.option') || from.matches('.here') ? 'open' : ''
+      const walked = from.matches('.done') && to.matches('.done, .here')
+      const ahead = picked ? lit.has(cell.dataset.n!) && lit.has(id) : target.querySelector('.option') || from.matches('.here')
+      const cls = walked ? 'walked' : picked && to.closest('.option.picked') ? 'open' : ahead ? 'open' : ''
       paths.push(bend(edge(map, from, 'top'), edge(map, to, 'bottom'), cls))
     }
   }

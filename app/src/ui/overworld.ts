@@ -67,7 +67,7 @@ const SIGHT = 3
  * The run map, bottom to top: the stops the squad took, then the stops it can still reach, up to SIGHT ahead.
  * Stops it passed by, and stops beyond sight, stay hidden.
  */
-function runMap(run: Run): string {
+function runMap(run: Run, picked: number | null): string {
   const here = current(run)
   const open = here ? [] : ways(run)
   const at = run.keys * (LEG_STOPS + 1) + run.stop
@@ -96,7 +96,7 @@ function runMap(run: Run): string {
         const next = c === leg.columns.length - 1 ? (run.legs[l + 1]?.columns[0].map((_, k) => `${l + 1}-0-${k}`) ?? []) : node.next.map((k) => `${l}-${c + 1}-${k}`)
         const state = taken ? (l === run.keys && c === run.stop ? 'here' : 'done') : ''
         const icon = !node.stop ? (c === leg.columns.length - 1 ? stopIcon(run, { kind: l === KEYS ? 'final' : 'key' } as Stop) : FOG) : stopIcon(run, node.stop, state)
-        const body = open.includes(i) && l === run.keys && c === run.stop ? button({ type: 'go', index: i }, icon, 'option') : icon
+        const body = open.includes(i) && l === run.keys && c === run.stop ? `<button class="option${i === picked ? ' picked' : ''}" data-pick="${i}">${icon}</button>` : icon
         // Where the squad stands: the stop under way, or else the last it took.
         const squad = l === run.keys && taken && (here ? c === run.stop : c === run.stop - 1)
         return [`<div class="cell${squad ? ' squad' : ''}" data-n="${id}" data-next="${next.join(' ')}" style="grid-row: ${rows.slice(c).filter(Boolean).length}; grid-column: ${node.row + 1}">${body}</div>`]
@@ -156,15 +156,21 @@ function eventView(run: Run): string {
 }
 
 /** The map: a shop or event being met; else the run's map, with the ways on to choose from or a button to travel on. */
-function mapView(run: Run): string {
+/** The map, with the stop the player has picked to look at but not yet set out for, if any. */
+function mapView(run: Run, picked: number | null): string {
   if (run.phase === 'shop') return shopView(run)
   if (run.phase === 'event') return eventView(run)
   const node = current(run)
-  if (!node) return `${run.report ? '' : decisions(run)}<h2>Choose where to go next. Hover a stop to see what waits there.</h2>${runMap(run)}`
+  const ahead = picked !== null && ways(run).includes(picked) ? legOf(run).columns[run.stop][picked].stop : null
+  if (!node && !ahead) return `${run.report ? '' : decisions(run)}<h2>Choose where to go next. Click a stop to see what waits there and where it leads.</h2>${runMap(run, null)}`
+  if (!node)
+    return `${run.report ? '' : decisions(run)}<h2>${where(ahead!)}</h2>
+    ${runMap(run, picked)}
+    <button class="travel" data-action='${JSON.stringify({ type: 'go', index: picked })}'>Set out for this stop</button>`
   const next = nextStop(run)!
   const here = node.stop!
   return `${run.report ? '' : decisions(run)}<h2>${where(here)}</h2>
-    ${runMap(run)}
+    ${runMap(run, null)}
     ${next === 'lastStand' ? '<p class="up"><b>The threat is full. The aliens attack before the squad can travel on.</b></p>' : ''}
     <button class="travel ${next}" data-action='${JSON.stringify({ type: 'advance' })}'>${travelLabel(run, here, next)}</button>`
 }
@@ -228,8 +234,8 @@ function barracksView(run: Run, open: number | null): string {
  * The screen between stops: a header with the keys, threat, supplies and tabs, over the chosen tab's view.
  * `open` is the soldier opened in the Barracks.
  */
-export function overworld(run: Run, tab: Tab, open: number | null): string {
-  const views = { Map: mapView, Base: baseView, Barracks: (r: Run) => barracksView(r, open) }
+export function overworld(run: Run, tab: Tab, open: number | null, picked: number | null): string {
+  const views = { Map: (r: Run) => mapView(r, picked), Base: baseView, Barracks: (r: Run) => barracksView(r, open) }
   const tabs = TABS.map((name) => `<button class="tab ${name === tab ? 'active' : ''}" data-tab="${name}">${name}</button>`)
   return `
     <div class="header">

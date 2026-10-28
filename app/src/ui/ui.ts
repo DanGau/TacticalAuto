@@ -104,6 +104,8 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   let tab: Tab = 'Map'
   /** The soldier opened in the Barracks. */
   let open: number | null = null
+  /** The stop ahead the player clicked to look at, before setting out for it. */
+  let picked: number | null = null
   let shown: Run | null = null
   let html = ''
 
@@ -123,13 +125,13 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
       // Arriving shows the shop or event; the other tabs stay open to the player while they decide.
       if (phase !== run.phase) tab = 'Map'
       phase = run.phase
-      return overworld(run, tab, open)
+      return overworld(run, tab, open, picked)
     }
     phase = run.phase
     if (report && seen !== report) {
       return stopReport(run, report)
     }
-    return overworld(run, tab, open)
+    return overworld(run, tab, open, picked)
   }
 
   function render(run: Run): void {
@@ -178,11 +180,13 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (target.id === 'again') location.href = location.pathname
     else if (target.dataset.seen) seen = shown!.report
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
+    else if (target.dataset.pick) picked = Number(target.dataset.pick)
     else if (target.dataset.open) {
       // Clicking the soldier open closes it.
       const id = Number(target.dataset.open)
       open = open === id ? null : id
     } else if (target.dataset.action) {
+      picked = null
       act(JSON.parse(target.dataset.action) as Action)
       return
     }
