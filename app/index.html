@@ -76,6 +76,9 @@
       button.option .node { box-shadow: 0 0 0 2px #ffd166; }
       button.option:hover .node { box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; }
       .node.here { box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; }
+      .cell.squad .node { opacity: 1; box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; animation: pulse 1.6s ease-in-out infinite; }
+      .cell.squad::after { content: 'SQUAD'; position: absolute; left: 50%; top: 100%; transform: translate(-50%, 3px); padding: 0 5px; border-radius: 6px; background: #ffd166; color: #10141c; font-size: 10px; font-weight: bold; letter-spacing: 1px; white-space: nowrap; }
+      @keyframes pulse { 50% { box-shadow: 0 0 0 5px #ffd166aa, 0 0 22px #ffd166; } }
       .map .node.fog { color: #6b7690; border: 2px dashed #4a5670; font-size: 14px; font-weight: bold; }
       .nodes { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 8px; }
       .node { font-size: 26px; width: 44px; height: 44px; line-height: 44px; text-align: center; border-radius: 50%; border: 3px solid #888; background: #1d2433; }

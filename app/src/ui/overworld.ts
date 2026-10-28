@@ -97,7 +97,9 @@ function runMap(run: Run): string {
         const state = taken ? (l === run.keys && c === run.stop ? 'here' : 'done') : ''
         const icon = !node.stop ? (c === leg.columns.length - 1 ? stopIcon(run, { kind: l === KEYS ? 'final' : 'key' } as Stop) : FOG) : stopIcon(run, node.stop, state)
         const body = open.includes(i) && l === run.keys && c === run.stop ? button({ type: 'go', index: i }, icon, 'option') : icon
-        return [`<div class="cell" data-n="${id}" data-next="${next.join(' ')}" style="grid-row: ${rows.slice(c).filter(Boolean).length}; grid-column: ${node.row + 1}">${body}</div>`]
+        // Where the squad stands: the stop under way, or else the last it took.
+        const squad = l === run.keys && taken && (here ? c === run.stop : c === run.stop - 1)
+        return [`<div class="cell${squad ? ' squad' : ''}" data-n="${id}" data-next="${next.join(' ')}" style="grid-row: ${rows.slice(c).filter(Boolean).length}; grid-column: ${node.row + 1}">${body}</div>`]
       }),
     )
     if (cells.length === 0) return ''
