@@ -272,6 +272,8 @@ export interface Pod {
   ambushed: boolean
   /** Revealed during the current alien turn, or crashed onto by drop pods, so its members do not shoot until the next. */
   surprised: boolean
+  /** Squad turns the squad has spent setting up an ambush on it, seen but unaware. */
+  stalked: number
   waypoint: Tile
 }
 
@@ -484,6 +486,9 @@ export function blocked(battle: Battle, x: number, y: number): boolean {
 /** Whether the unit hunts its enemies: an alien once its pod is alert. Humans always do. */
 export const alert = (battle: Battle, unit: Unit) => unit.pod === null || battle.pods[unit.pod].alert
 
+/** Whether a unit belongs to a pod the squad has seen and that has not noticed it: one the squad is setting an ambush on. */
+export const unaware = (battle: Battle, unit: Unit) => unit.pod !== null && battle.pods[unit.pod].revealed && !battle.pods[unit.pod].alert
+
 /** A soldier of the squad: not a civilian, nor a mech, which fights for the squad but cannot hold the field alone. */
 export const isSoldier = (unit: Unit) => unit.side === 'human' && unit.soldier !== null
 
@@ -663,7 +668,7 @@ export function mechUnit(battle: Battle, owner: Unit, stats: Stats, effects: Eff
 export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }, centre: Tile, revealed: boolean): Unit[] {
   const units = freeTilesNear(battle, centre, pack.aliens.length).map((tile, i) => alienUnit(battle, pack.aliens[i], tile, battle.pods.length))
   battle.units.push(...units)
-  battle.pods.push({ name: pack.name, revealed, alert: revealed, stalking: false, ambushed: false, surprised: false, waypoint: randomTile(battle) })
+  battle.pods.push({ name: pack.name, revealed, alert: revealed, stalking: false, ambushed: false, surprised: false, stalked: 0, waypoint: randomTile(battle) })
   return units
 }
 

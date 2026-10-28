@@ -18,7 +18,7 @@ export const known = (kind: AlienKind) => !ALIENS[kind].intro || met.has(kind)
 
 /** The kinds the player has not met among the aliens `events` brought into view. */
 export function newcomers(battle: Battle, events: GameEvent[]): AlienKind[] {
-  const ids = events.flatMap((e) => (e.type === 'reveal' || e.type === 'wave' ? e.units.map((u) => u.id) : e.type === 'spawn' ? [e.unit.id] : []))
+  const ids = events.flatMap((e) => (e.type === 'reveal' || e.type === 'wave' || e.type === 'sighted' ? e.units.map((u) => u.id) : e.type === 'spawn' ? [e.unit.id] : []))
   const kinds = ids.flatMap((id) => battle.units.find((u) => u.id === id)?.kind ?? [])
   return [...new Set(kinds)].filter((kind) => !known(kind))
 }

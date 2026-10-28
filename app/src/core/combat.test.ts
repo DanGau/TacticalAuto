@@ -76,3 +76,25 @@ test('a pod is revealed once a soldier notices one of its aliens', () => {
     }
   })
 })
+
+test('a squad that sees a pod first holds its fire and sets up, then springs the ambush all at once; unseen, it creeps', () => {
+  let sprung = 0
+  for (let seed = 1; seed <= 30; seed++) {
+    play(seed, (events, before, after) => {
+      // Unseen soldiers walk at most CREEP of their move in their move stage.
+      for (const e of events) {
+        if (e.type !== 'move' || !before.concealed || before.stage !== 'move' || e.with) continue
+        const unit = before.units.find((u) => u.id === e.id)!
+        if (isSoldier(unit)) expect(e.path.length).toBeLessThanOrEqual(Math.ceil(unit.stats.move * 0.6) + 1)
+      }
+      // No soldier fires on a pod the squad has seen that has not noticed it.
+      for (const e of events.filter((e) => e.type === 'shot')) {
+        const target = before.units.find((u) => u.id === e.target)
+        const pod = target && target.pod !== null ? before.pods[target.pod] : null
+        if (isSoldier(before.units.find((u) => u.id === e.id)!) && pod?.revealed) expect(pod.alert || after.pods[target!.pod!].ambushed).toBe(true)
+      }
+      sprung += events.filter((e) => e.type === 'reveal' && e.ambush && before.pods.some((p, i) => p.revealed && !p.alert && e.units.some((u) => before.units.find((b) => b.id === u.id)?.pod === i))).length
+    })
+  }
+  expect(sprung).toBeGreaterThan(0)
+})

@@ -93,6 +93,7 @@ import {
   type Tile,
   type Unit,
   wreck,
+  unaware,
 } from './battle'
 import { HOLD_ROUNDS, WAVE_EVERY } from './goals'
 import { random, randomInt } from './rng'
@@ -106,6 +107,8 @@ export type GameEvent =
    * stalked the squad and gave itself away by opening fire), its moves to cover follow.
    */
   | { type: 'reveal'; ambush: boolean; stalked: boolean; units: { id: number; x: number; y: number }[] }
+  /** The squad sees a pod that has not noticed it, and holds its fire to set an ambush. */
+  | { type: 'sighted'; units: { id: number; x: number; y: number }[] }
   /** `damage` is 0 for a miss. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. */
   | { type: 'shot'; id: number; target: number; hit: boolean; crit: boolean; damage: number; with: Effect[] }
   /** A rocket or grenade lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */
@@ -218,6 +221,8 @@ function spotted(battle: Battle): Set<number> {
 
 /** Whether `unit`, standing on `from`, may shoot `target`. Squadsight reaches any spotted alien in a clear line; a ghost is safe from far off. */
 function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: Set<number>): boolean {
+  // Soldiers hold their fire on a pod they are setting an ambush on, until it is sprung.
+  if (unit.side === 'human' && unaware(battle, target)) return false
   if (has(target, 'ghost') && distance(from, target) > GHOST_REACH) return false
   // A psionic attack needs no line of sight, only an alien whose pod is revealed.
   if (has(unit, 'psionic') && revealed(battle, target) && distance(from, target) <= unit.stats.range) return true
@@ -292,6 +297,8 @@ interface Spot {
   stray: number
   /** The cover the tile gives against the goal. */
   shelter: number
+  /** 1 if the tile brings the unit no nearer the goal than where it stands. */
+  stalled: number
   /** Whether the unit is a soldier. Soldiers pick their way forward; aliens press the attack. */
   careful: boolean
 }
@@ -334,13 +341,14 @@ const WARY = 0.5
 /**
  * Closing on the goal with no shot to take. An alien takes the shortest walk. A soldier gives up some of the walk to
  * stay with the squad, to stay out of an enemy's sights, and to end behind cover facing the goal; a wary one walks
- * only through tiles no enemy can shoot. A soldier's costs are in tenths of a tile: a tile of straying costs two
- * tiles of progress, a certain hit coming back five, and high cover is worth one.
+ * only through tiles no enemy can shoot. It moves from cover to cover: any tile nearer the goal beats standing still,
+ * and among those, cover is worth a lot. A soldier's costs are in tenths of a tile: a tile of straying costs two tiles
+ * of progress, a certain hit coming back five, and each level of cover one and a half.
  */
-const advance = ({ toGoal, theirs, wary, stray, shelter, careful }: Spot) => {
+const advance = ({ toGoal, theirs, wary, stray, shelter, careful, stalled }: Spot) => {
   if (!careful) return [toGoal, theirs]
-  const cost = 10 * toGoal + 20 * stray + Math.round(theirs / 2) - 5 * shelter
-  return wary ? [theirs, cost] : [cost]
+  const cost = 10 * toGoal + 20 * stray + Math.round(theirs / 2) - 15 * shelter
+  return wary ? [theirs, stalled, cost] : [stalled, cost]
 }
 
 /** How each stance ranks a tile with no shot, lowest first. */
@@ -444,6 +452,11 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const slot = marching && leaders.length > 0 ? Math.min(...leaders.map((u) => toGoal[u.y * GRID + u.x])) + REAR_GAP : 0
   /** Tiles `end` is ahead of the unit's place in the formation. */
   const ahead = (end: Tile) => Math.max(0, slot - toGoal[end.y * GRID + end.x])
+  const quarry = enemies.filter((e) => unaware(battle, e))
+  /** Whether the squad is setting an ambush: it sees a pod unaware of it, and no alert alien. */
+  const setting = unit.side === 'human' && quarry.length > 0 && !enemies.some((e) => revealed(battle, e) && alert(battle, e))
+  const noticed = (end: Tile) => (quarry.some((e) => detects(battle, e, { ...unit, x: end.x, y: end.y, moved: true })) ? 1 : 0)
+  const lays = (end: Tile) => quarry.some((e) => canShoot(battle, end, e, unit.stats.range))
   const choose = (move: number) => {
     const reach = paths(battle, unit, move)
     /** Whether some tile in reach has a shot; out of contact, even a wary unit keeps advancing. */
@@ -461,12 +474,15 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
         toGoal: toGoal[end.y * GRID + end.x] - Math.round(role(end) / 10),
         stray: stray(end),
         shelter: coverAgainst(battle, end, goal),
+        stalled: toGoal[end.y * GRID + end.x] >= toGoal[unit.y * GRID + unit.x] ? 1 : 0,
         careful: unit.side === 'human' && battle.round < RESTLESS_ROUND,
       }
       // A wary unit ranks every tile by the exchange of fire, so one with no shot and no risk can win.
       // No unit ends its move in acid if it can help it.
       // On a hold, a soldier stands its ground at the uplink before anything else.
       const first = [leash(end), acid(end), provokes(end)]
+      // Setting an ambush: unnoticed first, then a shot at the pod, then the best cover against it, then nearer.
+      if (setting) return [...first, noticed(end), lays(end) ? 0 : 1, -coverAgainst(battle, end, goal), steps]
       if (wary && unit.stance !== 'standoff' && inContact) return [...first, 0, ...WITH_SHOT[unit.stance](spot), spot.toGoal]
       return spot.mine > 0 ? [...first, 0, ...WITH_SHOT[unit.stance](spot), steps] : [...first, 1, ahead(end), ...NO_SHOT[unit.stance](spot)]
     })
@@ -477,9 +493,11 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   if (still && shotHere && !leash(unit) && !acid(unit) && !(wary && theirs(unit) > 0)) return []
   // A booming charge pins a unit that can fight from where it stands; a rooted one cannot move at all.
   if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || (unit.kind === 'sprinter' && unit.chilled > 0)) return []
-  const move = Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0))
+  const full = Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0))
+  // Unseen, a soldier creeps.
+  const move = unit.side === 'human' && battle.concealed ? Math.ceil(full * CREEP) : full
   const path = choose(move)
-  if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
+  if (unit.ability === 'runAndGun' && !battle.concealed && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
   return path
 }
 
@@ -512,6 +530,18 @@ function sight(battle: Battle): GameEvent[] {
     const noticed = !pod.revealed && members.some((m) => soldiers.some((s) => detects(battle, s, m)))
     const notices = !pod.alert && members.some((m) => soldiers.some((s) => detects(battle, m, s)))
     const wasAlert = pod.alert
+    // A pod the squad is setting an ambush on spots it first: the fight is on, with no ambush.
+    if (pod.revealed && notices) {
+      Object.assign(pod, { alert: true, surprised: battle.turn === 'alien' })
+      events.push({ type: 'reveal', ambush: false, stalked: false, units: members.map(({ id, x, y }) => ({ id, x, y })) })
+      return
+    }
+    // A pod the squad sees first, unaware of it, goes on as it was while the squad sets up its ambush.
+    if (noticed && !notices && !wasAlert) {
+      pod.revealed = true
+      events.push({ type: 'sighted', units: members.map(({ id, x, y }) => ({ id, x, y })) })
+      return
+    }
     if (notices) {
       pod.alert = true
       pod.stalking = !noticed
@@ -747,7 +777,7 @@ function moveSide(battle: Battle): GameEvent[] {
     for (const pod of battle.pods) {
       // A pod that has reached its waypoint picks the next.
       const arrived = battle.units.some((u) => battle.pods[u.pod ?? -1] === pod && distance(u, pod.waypoint) <= PATROL_MOVE)
-      if (!pod.revealed && arrived) pod.waypoint = { x: randomInt(battle, GRID), y: randomInt(battle, GRID) }
+      if (!pod.alert && arrived) pod.waypoint = { x: randomInt(battle, GRID), y: randomInt(battle, GRID) }
     }
   }
   const watched = new Set<number>()
@@ -778,7 +808,7 @@ function moveSide(battle: Battle): GameEvent[] {
       wound(battle, unit, 1, events)
     }
   }
-  const sighted = sight(battle)
+  const sighted = [...sight(battle), ...(battle.turn === 'human' ? spring(battle) : [])]
   // Soldiers on overwatch fire once the aliens have moved and any pod sighted has taken its place.
   if (battle.turn === 'alien') sighted.push(...overwatch(battle, [...events, ...sighted].flatMap((e) => (e.type === 'move' ? [e.id] : []))))
   // A patrolling pod that could not move, hemmed in by others, tries for somewhere else next turn.
@@ -786,7 +816,7 @@ function moveSide(battle: Battle): GameEvent[] {
     battle.pods.forEach((pod, index) => {
       const members = battle.units.filter((u) => u.pod === index)
       const moved = events.some((e) => e.type === 'move' && members.some((u) => u.id === e.id))
-      if (!pod.revealed && members.length > 0 && !moved) pod.waypoint = { x: randomInt(battle, GRID), y: randomInt(battle, GRID) }
+      if (!pod.alert && members.length > 0 && !moved) pod.waypoint = { x: randomInt(battle, GRID), y: randomInt(battle, GRID) }
     })
   }
   return [...events, ...sighted]
@@ -1351,6 +1381,31 @@ function actNext(battle: Battle): GameEvent[] {
     return events
   }
   return []
+}
+
+/** Share of its move a soldier walks while the squad is unseen. */
+const CREEP = 0.6
+/** Squad turns the squad sets up an ambush before it springs it, ready or not. */
+const SETUP_TURNS = 2
+
+/**
+ * After the squad moves, each ambush it is setting is sprung once every soldier who can fight has a shot at the pod,
+ * or after SETUP_TURNS: the pod turns alert and is ambushed, and the squad opens fire together.
+ */
+function spring(battle: Battle): GameEvent[] {
+  const events: GameEvent[] = []
+  const soldiers = battle.units.filter((u) => isSoldier(u) && armed(battle, u))
+  battle.pods.forEach((pod, index) => {
+    if (!pod.revealed || pod.alert) return
+    const members = battle.units.filter((u) => u.pod === index)
+    pod.stalked++
+    const ready = soldiers.every((s) => members.some((m) => canShoot(battle, s, m, s.stats.range)))
+    if (!ready && pod.stalked <= SETUP_TURNS) return
+    Object.assign(pod, { alert: true, ambushed: true })
+    events.push({ type: 'reveal', ambush: true, stalked: false, units: members.map(({ id, x, y }) => ({ id, x, y })) })
+  })
+  battle.concealed = !hunted(battle)
+  return events
 }
 
 /** The next move stage or action, passing the turn when a side has nothing left to do. */

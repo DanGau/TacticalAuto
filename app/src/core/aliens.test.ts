@@ -43,7 +43,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   Object.assign(soldier, { x: 10, y: 10, hp: 30, stats: { ...soldier.stats, hp: 30, aim: 2, crit: 0, damage: 3 } })
   const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss || (ALIENS[kind].spawns ?? false), target: false, resists: ALIENS[kind].resists }, { x, y }, 0))
   battle.units = [soldier, ...units]
-  battle.pods = [{ name: 'Test', revealed: true, alert: true, stalking: false, ambushed: false, surprised: false, waypoint: { x: 0, y: 0 } }]
+  battle.pods = [{ name: 'Test', revealed: true, alert: true, stalking: false, ambushed: false, surprised: false, stalked: 0, waypoint: { x: 0, y: 0 } }]
   battle.concealed = false
   const until = (done: (events: GameEvent[]) => boolean) => {
     const all: GameEvent[] = []
@@ -186,7 +186,7 @@ test('once every alert alien is dead, the squad slips back into stealth', () => 
   const { battle, aliens, until } = arena([{ kind: 'swarmling', x: 10, y: 12 }, { kind: 'trooper', x: 30, y: 30 }])
   // A second pod, far off and unaware, keeps the battle going.
   aliens[1].pod = 1
-  battle.pods.push({ name: 'Far', revealed: false, alert: false, stalking: false, ambushed: false, surprised: false, waypoint: { x: 30, y: 30 } })
+  battle.pods.push({ name: 'Far', revealed: false, alert: false, stalking: false, ambushed: false, surprised: false, stalked: 0, waypoint: { x: 30, y: 30 } })
   battle.concealed = false
   until((all) => all.some((e) => e.type === 'death'))
   until(() => battle.turn === 'human')

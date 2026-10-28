@@ -71,7 +71,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   const soldier = battle.units.find((u) => u.soldier === run.soldiers[0].id)!
   const alien = battle.units.find((u) => u.side === 'alien')!
   battle.units = [soldier, alien]
-  battle.pods.forEach((pod) => (pod.revealed = true))
+  battle.pods.forEach((pod) => Object.assign(pod, { revealed: true, alert: true }))
   Object.assign(soldier, { x: 10, y: 10 })
   Object.assign(alien, { kind: 'trooper', x: 10, y: 11, hp: 99, armor: 0, target: false, stats: { ...alienStats('trooper', 0, 0), hp: 99, armor: 0, aim: 2, crit: 0 } })
   return { battle, soldier, alien, step: () => stepBattle(battle) }
