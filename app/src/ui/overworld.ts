@@ -5,7 +5,7 @@ import { SLOTS } from '../core/gear'
 import { DOCTRINES } from '../core/doctrines'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
-import { current, GEAR_PRICE, KEYS, LEG_STOPS, MAP_ROWS, ways, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
+import { current, legOf, GEAR_PRICE, KEYS, LEG_STOPS, MAP_ROWS, ways, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
 import { FEATS } from '../core/feats'
 import { PATHS, SKILLS } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
@@ -60,26 +60,50 @@ const RUN_STOPS = KEYS * (LEG_STOPS + 1) + 1
  * names the stops it leads to in `data-next`, for the trails between them. The leg under way shows every stop; the
  * ways on are buttons; legs ahead are fog until the squad reaches them.
  */
+/** How many stops ahead of the squad the map shows. */
+const SIGHT = 3
+
+/**
+ * The run map, bottom to top: the stops the squad took, then the stops it can still reach, up to SIGHT ahead.
+ * Stops it passed by, and stops beyond sight, stay hidden.
+ */
 function runMap(run: Run): string {
   const here = current(run)
   const open = here ? [] : ways(run)
+  const at = run.keys * (LEG_STOPS + 1) + run.stop
+  // The stops the squad can still reach, leg by leg and column by column.
+  const reach = run.legs.map((leg) => leg.columns.map(() => new Set<number>()))
+  for (const i of here ? [legOf(run).path[run.stop]] : open) reach[run.keys][run.stop].add(i)
+  for (let l = run.keys; l < run.legs.length; l++) {
+    const { columns } = run.legs[l]
+    for (let c = l === run.keys ? run.stop : 0; c < columns.length; c++) {
+      for (const i of reach[l][c]) {
+        if (c < columns.length - 1) for (const k of columns[c][i].next) reach[l][c + 1].add(k)
+        else run.legs[l + 1]?.columns[0].forEach((_, k) => reach[l + 1][0].add(k))
+      }
+    }
+  }
   const legs = run.legs.map((leg, l) => {
+    const walked = (c: number) => l < run.keys || (l === run.keys && (c < run.stop || (c === run.stop && here !== null)))
+    const shown = (c: number, i: number) => (walked(c) ? leg.path[c] === i : reach[l][c].has(i) && l * (LEG_STOPS + 1) + c <= at + SIGHT)
+    // Columns with no stop shown take no room.
+    const rows = leg.columns.map((column, c) => column.some((_, i) => shown(c, i)))
     const cells = leg.columns.flatMap((column, c) =>
-      column.map((node, i) => {
+      column.flatMap((node, i) => {
+        if (!shown(c, i)) return []
+        const taken = walked(c)
         const id = `${l}-${c}-${i}`
         const next = c === leg.columns.length - 1 ? (run.legs[l + 1]?.columns[0].map((_, k) => `${l + 1}-0-${k}`) ?? []) : node.next.map((k) => `${l}-${c + 1}-${k}`)
-        const walked = l < run.keys || (l === run.keys && (c < run.stop || (c === run.stop && here !== null)))
-        const taken = walked && leg.path[c] === i
-        const state = taken ? (l === run.keys && c === run.stop ? 'here' : 'done') : walked ? 'missed' : ''
+        const state = taken ? (l === run.keys && c === run.stop ? 'here' : 'done') : ''
         const icon = !node.stop ? (c === leg.columns.length - 1 ? stopIcon(run, { kind: l === KEYS ? 'final' : 'key' } as Stop) : FOG) : stopIcon(run, node.stop, state)
-        const choice = l === run.keys && c === run.stop && open.includes(i)
-        const body = choice ? button({ type: 'go', index: i }, icon, 'option') : icon
-        return `<div class="cell" data-n="${id}" data-next="${next.join(' ')}" style="grid-column: ${c + 1}; grid-row: ${node.row + 1}">${body}</div>`
+        const body = open.includes(i) && l === run.keys && c === run.stop ? button({ type: 'go', index: i }, icon, 'option') : icon
+        return [`<div class="cell" data-n="${id}" data-next="${next.join(' ')}" style="grid-row: ${rows.slice(c).filter(Boolean).length}; grid-column: ${node.row + 1}">${body}</div>`]
       }),
     )
-    return `<div class="leg"><small>${l === KEYS ? 'Source' : `Leg ${l + 1}`}</small><div class="grid" style="grid-template-columns: repeat(${leg.columns.length}, auto); grid-template-rows: repeat(${MAP_ROWS}, auto)">${cells.join('')}</div></div>`
+    if (cells.length === 0) return ''
+    return `<div class="leg"><small>${l === KEYS ? 'Source' : `Leg ${l + 1}`}</small><div class="grid" style="grid-template-columns: repeat(${MAP_ROWS}, 32px)">${cells.join('')}</div></div>`
   })
-  return `<p class="progress">Stop ${run.keys * (LEG_STOPS + 1) + run.stop + 1} of ${RUN_STOPS}</p><div class="map">${legs.join('')}</div>`
+  return `<p class="progress">Stop ${at + 1} of ${RUN_STOPS}</p><div class="map">${legs.join('')}</div>`
 }
 
 /** The words on the button that travels to the next stop. */

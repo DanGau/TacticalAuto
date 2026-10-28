@@ -307,13 +307,17 @@ interface Spot {
  * How each stance ranks a tile it can shoot from, lowest first. Weighing `risk` makes a healthy unit bold
  * and a wounded one careful.
  */
+/** How much the enemy's best hit chance on a tile, weighted by health, must differ for a soldier to count it safer cover. */
+const RISK_BAND = 15
+
 const WITH_SHOT: Record<Stance, (spot: Spot) => number[]> = {
-  // The exchange of fire that most favours the unit, short of straying from the squad.
-  balanced: ({ mine, risk, stray }) => [risk - mine + STRAY_COST * stray],
+  // A soldier takes the safest cover it can shoot from, then the best shot from it; an alien, the exchange of fire
+  // that most favours it. Neither strays from its side.
+  balanced: ({ mine, risk, stray, careful }) => [careful ? Math.round(risk / RISK_BAND) : 0, risk - mine + STRAY_COST * stray],
   // The surest shot; what comes back counts only as wounds mount.
   rush: ({ mine, risk, hurt, stray }) => [Math.round(hurt * risk) - mine + STRAY_COST * stray],
-  // The same exchange, with safety counted double.
-  anchor: ({ mine, risk, stray }) => [2 * risk - mine + STRAY_COST * stray],
+  // The same, with safety counted double.
+  anchor: ({ mine, risk, stray, careful }) => [careful ? Math.round(risk / RISK_BAND) : 0, 2 * risk - mine + STRAY_COST * stray],
   // Out of every enemy's reach, then at a distance, then the best shot.
   standoff: ({ mine, theirs, crowded }) => [theirs, crowded, -mine],
   // A good exchange that keeps a squadmate within reach.

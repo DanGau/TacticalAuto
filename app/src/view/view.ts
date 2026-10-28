@@ -193,6 +193,20 @@ function toWorld(x: number, y: number): Tile {
 
 const lerp = (a: Tile, b: Tile, t: number): Tile => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
 
+/** How far a walk through `points` goes over the ground, in tiles: a diagonal step is the longer. */
+const ground = (points: Tile[]) => points.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - points[i].x, p.y - points[i].y), 0)
+
+/** Where a walk through `points` is once it has gone a share `t` of the way, at a steady pace. */
+function along(points: Tile[], t: number): Tile {
+  let left = t * ground(points)
+  for (let i = 1; i < points.length; i++) {
+    const step = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y)
+    if (left <= step && step > 0) return lerp(points[i - 1], points[i], left / step)
+    left -= step
+  }
+  return points.at(-1)!
+}
+
 interface Sprite {
   node: Container
   hp: Graphics
@@ -227,6 +241,8 @@ export interface View {
   zoneAt(sx: number, sy: number): number | null
   /** Before the landing, glides the camera to a landing zone and marks its way in; null pulls back to the whole map. */
   focus(zone: number | null): void
+  /** Hides the landing zones while the briefing flies over the mission, and shows them once it is done. */
+  hideZones(hidden: boolean): void
   /** Glides the camera to frame the given tiles, above the landing panel; null pulls back to the whole map. */
   frame(tiles: Tile[] | null): Promise<void>
 }
@@ -271,6 +287,8 @@ export async function createView(): Promise<View> {
   let hovered: number | null = null
   /** The landing zone the camera is on before the landing. */
   let selected: number | null = null
+  /** Whether the briefing is under way, so the landing zones are hidden. */
+  let briefing = false
 
   const diamond = (g: Graphics, x: number, y: number) => {
     const c = toWorld(x, y)
@@ -462,7 +480,7 @@ export async function createView(): Promise<View> {
     marks.removeChildren().forEach((child) => child.destroy())
     if (battle.uplink) marks.addChild(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
     if (battle.phase !== 'deploy') return
-    battle.zones.forEach((zone, i) => {
+    if (!briefing) battle.zones.forEach((zone, i) => {
       for (let y = 0; y < GRID; y++) {
         for (let x = 0; x < GRID; x++) {
           if (distance(zone, { x, y }) <= ZONE_RADIUS) diamond(zones, x, y).fill({ color: i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone, alpha: 0.8 })
@@ -598,25 +616,20 @@ export async function createView(): Promise<View> {
     }).then(() => mark.destroy())
   }
 
-  function walk(sprite: Sprite, path: Tile[]): Promise<void> {
+  /** How long `sprite` takes to walk `path` from where it stands: unseen, the squad creeps. */
+  const walkMs = (sprite: Sprite, path: Tile[]) => MS_PER_TILE * (shown?.concealed && sprite.ally ? CREEP_PACE : 1) * ground([sprite.tile, ...path])
+
+  function walk(sprite: Sprite, path: Tile[], ms = walkMs(sprite, path)): Promise<void> {
     const points = [sprite.tile, ...path]
-    // Unseen, the squad creeps.
-    const pace = shown?.concealed && sprite.ally ? CREEP_PACE : 1
-    return tween(MS_PER_TILE * pace * path.length, (t) => {
-      const along = t * path.length
-      const i = Math.min(Math.floor(along), path.length - 1)
-      place(sprite, lerp(points[i], points[i + 1], along - i))
-    })
+    return tween(ms, (t) => place(sprite, along(points, t)))
   }
 
   /** Slides an unfound alien's glow along its path through the fog. */
-  function glide(glow: { node: Graphics; tile: Tile }, path: Tile[]): Promise<void> {
+  function glide(glow: { node: Graphics; tile: Tile }, path: Tile[], ms = MS_PER_TILE * ground([glow.tile, ...path])): Promise<void> {
     const points = [glow.tile, ...path]
     glow.tile = path.at(-1)!
-    return tween(MS_PER_TILE * path.length, (t) => {
-      const along = t * path.length
-      const i = Math.min(Math.floor(along), path.length - 1)
-      const at = lerp(points[i], points[i + 1], along - i)
+    return tween(ms, (t) => {
+      const at = along(points, t)
       glow.node.position.copyFrom(toWorld(at.x, at.y))
     })
   }
@@ -826,6 +839,7 @@ export async function createView(): Promise<View> {
 
   /** Plays a beat in order. Moves in a row play together; moves by unseen aliens are skipped. */
   async function play(battle: Battle, events: GameEvent[]): Promise<void> {
+    const calm = events.every((e) => e.type === 'move' || e.type === 'sighted' || e.type === 'reveal')
     for (let i = 0; i < events.length; i++) {
       const e = events[i]
       if (e.type === 'move') {
@@ -833,14 +847,18 @@ export async function createView(): Promise<View> {
         for (; events[i]?.type === 'move'; i++) moves.push(events[i] as Extract<GameEvent, { type: 'move' }>)
         i--
         const seen = moves.filter((m) => sprites.has(m.id))
-        const glides = moves.filter((m) => glows.has(m.id)).map((m) => glide(glows.get(m.id)!, m.path))
+        const gliding = moves.filter((m) => glows.has(m.id))
+        // Before a fight everyone walks the whole beat, the camera with them, so nobody stops to wait; in one, the camera finds the movers first.
+        const ms = calm ? Math.max(...seen.map((m) => walkMs(sprites.get(m.id)!, m.path)), ...gliding.map((m) => MS_PER_TILE * ground([glows.get(m.id)!.tile, ...m.path]))) : undefined
+        const glides = gliding.map((m) => glide(glows.get(m.id)!, m.path, ms))
         if (seen.length === 0) {
           await Promise.all(glides)
           continue
         }
-        await follow(seen.flatMap((m) => [sprites.get(m.id)!.tile, m.path.at(-1)!]))
+        const framing = follow(seen.flatMap((m) => [sprites.get(m.id)!.tile, m.path.at(-1)!]))
         for (const m of seen) if (m.with) float(callout(effectName(m.with).toUpperCase(), 0xffffff, sprites.get(m.id)!))
-        await Promise.all([...glides, ...seen.map((m) => walk(sprites.get(m.id)!, m.path))])
+        if (!calm) await framing
+        await Promise.all([framing, ...glides, ...seen.map((m) => walk(sprites.get(m.id)!, m.path, ms))])
         // The fog lifts where the squad arrived, before any pod it uncovered appears.
         drawFog(battle)
       } else if (e.type === 'reveal' || e.type === 'wave' || e.type === 'sighted') {
@@ -951,6 +969,10 @@ export async function createView(): Promise<View> {
     frame(tiles) {
       const framed = tiles === null ? OVERVIEW : framing(tiles)
       return follow({ ...framed, y: framed.y + (tiles === null ? 0 : PANEL / framed.zoom) }, FOCUS_MS)
+    },
+    hideZones(hidden) {
+      briefing = hidden
+      if (shown) drawMarks(shown)
     },
     focus(zone) {
       if (shown?.phase !== 'deploy') return

@@ -12,7 +12,10 @@
       .roster { margin-top: 8px; padding: 8px 12px; max-width: 420px; background: #171d29d9; border: 1px solid #3a465c; border-radius: 6px; line-height: 1.5; font-size: 13px; }
       #panel { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); width: min(1200px, calc(100vw - 16px)); max-height: calc(100vh - 48px); overflow-y: auto; box-sizing: border-box; padding: 14px 24px 18px; background: #171d29f2; border: 1px solid #3a465c; border-radius: 8px; }
       #panel[hidden], #drop[hidden] { display: none; }
-      .brief { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 5; max-width: min(640px, calc(100vw - 32px)); padding: 10px 16px; border-radius: 8px; background: rgba(10, 13, 19, 0.85); color: #e8e2c8; font-size: 16px; text-align: center; pointer-events: none; animation: fade 0.4s; }
+      .brief { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5; width: min(560px, calc(100vw - 32px)); box-sizing: border-box; padding: 10px 16px; border-radius: 8px; background: rgba(10, 13, 19, 0.85); color: #e8e2c8; font-size: 16px; line-height: 1.5; pointer-events: none; animation: fade 0.4s; }
+      .brief p { margin: 0; animation: fade 0.6s; }
+      .brief p:not(:last-child) { color: #9aa6bd; font-size: 14px; }
+      #drop.briefing { visibility: hidden; }
       .intro { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; background: radial-gradient(#232c3d, #0a0d13 70%); text-align: center; animation: fade 0.6s; }
       .intro svg { width: min(52vh, 80vw); height: auto; }
       .intro h1 { font-size: 32px; letter-spacing: 2px; text-transform: uppercase; }
@@ -57,7 +60,7 @@
       .chip { padding: 4px 10px; border: 1px solid #4a5a78; border-radius: 12px; white-space: nowrap; }
       .chip.feat { border-color: #ffd84d; color: #ffd84d; cursor: help; }
       .progress { margin: 4px 0; opacity: 0.7; }
-      .map { position: relative; display: flex; gap: 40px; align-items: center; overflow-x: auto; padding: 8px 4px 12px; }
+      .map { position: relative; display: flex; flex-direction: column-reverse; gap: 20px; align-items: center; max-height: 46vh; overflow-y: auto; padding: 8px 4px 12px; }
       .trails { position: absolute; left: 0; top: 0; pointer-events: none; }
       .cell { position: relative; z-index: 1; }
       .trails path { fill: none; stroke: #4a5670; stroke-width: 2.5; stroke-dasharray: 1 7; stroke-linecap: round; }
@@ -66,10 +69,9 @@
       .map { scrollbar-color: #4a5670 transparent; }
       .leg small { text-align: center; opacity: 0.7; }
       .leg { display: flex; flex-direction: column; gap: 4px; }
-      .grid { display: grid; column-gap: 34px; row-gap: 10px; align-items: center; justify-items: center; }
+      .grid { display: grid; column-gap: 18px; row-gap: 30px; align-items: center; justify-items: center; }
       .map .node { display: inline-block; font-size: 17px; width: 32px; height: 32px; line-height: 32px; border-width: 2px; flex: none; }
       .node.done { opacity: 0.55; }
-      .node.missed { opacity: 0.2; }
       button.option { padding: 0; border: none; background: none; border-radius: 50%; }
       button.option .node { box-shadow: 0 0 0 2px #ffd166; }
       button.option:hover .node { box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; }
