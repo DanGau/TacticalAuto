@@ -332,6 +332,8 @@ export interface Battle {
   caltrops: Tile[]
   /** Civilians some soldier has seen, by id. Until found, a civilian is hidden from the player and from the aliens. */
   found: number[]
+  /** Rounds ended with a soldier inside the uplink's zone, on a hold. */
+  held: number
   /** Civilians soldiers have reached and got out, on a rescue. */
   saved: number
   /** Centres of the landing zones on offer in the deploy phase. */
@@ -710,6 +712,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     caltrops: [],
     found: [],
     saved: 0,
+    held: 0,
     actor: null,
     tally: {},
     zones: [],

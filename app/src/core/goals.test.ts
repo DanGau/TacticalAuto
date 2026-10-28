@@ -1,9 +1,9 @@
 import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { stepBattle } from './combat'
+import { stepBattle, UPLINK_REACH } from './combat'
 import { CIVILIAN_SUPPLIES, CIVILIANS, HOLD_ROUNDS, type Goal } from './goals'
-import { revealed } from './battle'
+import { isSoldier, revealed } from './battle'
 import { road } from './roads'
 import { createRun, endBattle, RISKS, START_SUPPLIES, XP, type Run } from './run'
 
@@ -30,12 +30,24 @@ test('a hold offers three landing zones away from the uplink, keeps half its pac
   expect(battle.uplink).not.toBeNull()
   expect(battle.waves).toHaveLength(1)
   apply(run, { type: 'land', zone: 0 })
-  battle.round = HOLD_ROUNDS + 1
+  battle.held = HOLD_ROUNDS
   stepBattle(battle)
   expect(battle).toMatchObject({ phase: 'over', winner: 'human' })
   endBattle(run)
   expect(run.relicOffers).toHaveLength(3)
   expect(run.finds).toEqual([])
+})
+
+test('a hold counts only the rounds the squad ends inside the uplink zone', () => {
+  const run = before('hold')
+  const battle = run.battle!
+  apply(run, { type: 'land', zone: 0 })
+  while (battle.round < 3 && battle.phase === 'battle') {
+    const [round, held] = [battle.round, battle.held]
+    stepBattle(battle)
+    if (battle.round > round) expect(battle.held - held).toBe(battle.units.some((u) => isSoldier(u) && Math.max(Math.abs(u.x - battle.uplink!.x), Math.abs(u.y - battle.uplink!.y)) <= UPLINK_REACH) ? 1 : 0)
+  }
+  expect(battle.held).toBeLessThan(battle.round + 1)
 })
 
 test('an assassination is won when the commander falls, though its guard lives', () => {

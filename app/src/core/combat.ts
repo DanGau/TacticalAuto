@@ -380,12 +380,13 @@ function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
  * Where a side's units close on when they have no shot, by the battle's goal. Soldiers share one, so the squad moves
  * together: on a hold, the uplink; on an assassination, the commander once sighted; else the alien nearest the
  * squad's centre. On a rescue each soldier makes for the nearest civilian found, and with none found and no alien in the
- * open the squad searches toward the nearest hidden. On a hold the aliens close on the uplink; on a rescue they hunt
+ * open the squad searches toward the nearest hidden. On a hold the aliens close on the uplink, then the squad; on a rescue they hunt
  * the civilians found; otherwise an alien closes on the human nearest itself.
  */
 function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
   if (enemies.length === 0) return undefined
-  if (battle.uplink) return battle.uplink
+  // On a hold an alien makes for the uplink, then from its zone goes for the squad, so no stand-off lasts.
+  if (battle.uplink) return unit.side === 'alien' && distance(unit, battle.uplink) <= UPLINK_REACH ? nearest(enemies, unit) : battle.uplink
   const civilians = battle.units.filter((u) => u.civilian)
   const found = civilians.filter((u) => revealed(battle, u))
   // Aliens hunt the civilians found; soldiers make for the nearest found to get them out.
@@ -454,7 +455,8 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   /** Mirror images left make a wearer bolder: half what comes back counts. */
   const images = has(unit, 'mirror') && unit.spent.filter((e) => e === 'mirror').length < MIRROR_IMAGES ? 0.5 : 1
   const uplink = battle.uplink
-  const leash = (end: Tile) => (uplink && unit.side === 'human' ? Math.max(0, distance(end, uplink) - UPLINK_REACH) : 0)
+  // Measured by the walk there, so a wall between a soldier and the uplink cannot strand it.
+  const leash = (end: Tile) => (uplink && unit.side === 'human' && distance(end, uplink) > UPLINK_REACH ? toGoal[end.y * GRID + end.x] : 0)
   const marching = unit.side === 'human' && seen.size === 0
   // An escort follows the squad rather than leading it, so it leads no one.
   const leaders = unit.stance === 'standoff' ? squadmates.filter((u) => u.stance !== 'standoff' && u.stance !== 'escort') : []
@@ -702,6 +704,8 @@ function upkeep(battle: Battle): GameEvent[] {
   }
   if (battle.turn !== 'alien') return events
   battle.round++
+  // A hold counts only the rounds the squad ends standing on it.
+  if (battle.uplink && battle.units.some((u) => isSoldier(u) && distance(u, battle.uplink!) <= UPLINK_REACH)) battle.held++
   // A long battle makes the aliens still unseen restless: they patrol toward the squad, so no fight is put off for good.
   if (battle.round >= RESTLESS_ROUND) {
     const soldiers = battle.units.filter(isSoldier)
@@ -1460,7 +1464,7 @@ export function stepBattle(battle: Battle): GameEvent[] {
   const events = act(battle)
   const humans = battle.units.some(isSoldier)
   // Aliens left to beat: none once the commander falls, for the rest flee, nor once a hold has lasted.
-  const fled = (battle.goal === 'assassinate' && !battle.units.some((u) => u.target)) || (battle.goal === 'hold' && battle.round > HOLD_ROUNDS)
+  const fled = (battle.goal === 'assassinate' && !battle.units.some((u) => u.target)) || (battle.goal === 'hold' && battle.held >= HOLD_ROUNDS)
   const aliens = !fled && (battle.units.some((u) => u.side === 'alien') || battle.waves.length > 0)
   // A rescue is over once no civilian is left to save: won if any were.
   const emptied = battle.goal === 'rescue' && !battle.units.some((u) => u.civilian)
