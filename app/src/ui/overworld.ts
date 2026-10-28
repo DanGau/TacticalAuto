@@ -105,7 +105,7 @@ function runMap(run: Run, picked: number | null): string {
     if (cells.length === 0) return ''
     return `<div class="leg"><small>${l === KEYS ? 'Source' : `Leg ${l + 1}`}</small><div class="grid" style="grid-template-columns: repeat(${MAP_ROWS}, 32px)">${cells.join('')}</div></div>`
   })
-  return `<p class="progress">Stop ${at + 1} of ${RUN_STOPS}</p><div class="map">${legs.join('')}</div>`
+  return `<p class="progress">Stop ${at + 1} of ${RUN_STOPS}</p><div class="map">${legs.reverse().join('')}</div>`
 }
 
 /** The words on the button that travels to the next stop. */

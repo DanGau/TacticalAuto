@@ -60,7 +60,7 @@
       .chip { padding: 4px 10px; border: 1px solid #4a5a78; border-radius: 12px; white-space: nowrap; }
       .chip.feat { border-color: #ffd84d; color: #ffd84d; cursor: help; }
       .progress { margin: 4px 0; opacity: 0.7; }
-      .map { position: relative; display: flex; flex-direction: column-reverse; gap: 20px; align-items: center; max-height: 46vh; overflow-y: auto; padding: 8px 4px 12px; }
+      .map { position: relative; display: flex; flex-direction: column; gap: 20px; align-items: center; max-height: 46vh; overflow-y: auto; padding: 8px 4px 12px; }
       .trails { position: absolute; left: 0; top: 0; pointer-events: none; }
       .cell { position: relative; z-index: 1; }
       .trails path { fill: none; stroke: #4a5670; stroke-width: 2.5; stroke-dasharray: 1 7; stroke-linecap: round; }
@@ -68,7 +68,7 @@
       .trails path.walked { stroke: #a8b3c8; stroke-dasharray: 6 4; }
       .map { scrollbar-color: #4a5670 transparent; }
       .leg small { text-align: center; opacity: 0.7; }
-      .leg { display: flex; flex-direction: column; gap: 4px; }
+      .leg { display: flex; flex-direction: column-reverse; gap: 4px; }
       .grid { display: grid; column-gap: 18px; row-gap: 30px; align-items: center; justify-items: center; }
       .map .node { display: inline-block; font-size: 17px; width: 32px; height: 32px; line-height: 32px; border-width: 2px; flex: none; }
       .node.done { opacity: 0.55; }
@@ -156,6 +156,11 @@
       .choices button br { display: none; }
       button.card { min-height: 110px; }
       button.decide { padding: 12px 20px; }
+      button.gearpick { display: flex; flex-direction: column; gap: 6px; width: 280px; padding: 12px; text-align: left; border: 2px solid #3a465c; }
+      button.gearpick.on { border-color: #ffd166; box-shadow: 0 0 12px #ffd16688; }
+      button.gearpick .gain { margin-top: auto; font-size: 16px; }
+      button.gearpick .gear small { margin-right: 6px; }
+      button.gearpick ~ button.decide, .choices + button.decide { margin-top: 10px; }
       button.rare { border-color: #4da3ff; }
       button.rare small { color: #4da3ff; }
       button.epic { border-color: #c77dff; }

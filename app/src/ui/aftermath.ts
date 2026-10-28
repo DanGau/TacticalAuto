@@ -37,8 +37,11 @@ function title(report: Report): string {
   return `<h1 class="${report.won ? 'down' : 'up'}">${name} ${report.won ? 'won' : 'lost'}</h1>`
 }
 
-/** The first find: what its finder wears in the slot beside it, how the finder's stats would change, and the choice to equip or sell. */
-function findChoice(run: Run): string {
+/**
+ * The first find: what its finder wears beside it, each a card to pick, with the supplies its pick sells the other for;
+ * the found card shows how the finder's stats would change. A button confirms the pick.
+ */
+function findChoice(run: Run, pick: 'keep' | 'sell' | null): string {
   const { soldier: id, gear } = run.finds[0]
   const soldier = run.soldiers.find((s) => s.id === id)!
   const old = soldier.gear[gear.slot]
@@ -50,17 +53,16 @@ function findChoice(run: Run): string {
     return `<tr><td>${STAT_NAMES[key]}</td><td>${show(now[key])}</td><td>→</td><td class="${delta > 0 ? 'down' : 'up'}">${show(then[key])}</td></tr>`
   })
   const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
+  const gain = { keep: old ? SELL[old.rarity] : 0, sell: SELL[gear.rarity] }
+  const paid = (n: number) => `<b class="supplies">+${n} ${n === 1 ? 'supply' : 'supplies'}</b>`
+  const card = (choice: 'keep' | 'sell', head: string, body: string) =>
+    `<button class="gearpick ${pick === choice ? 'on' : ''}" data-gear="${choice}">${head}${body}<div class="gain">${paid(gain[choice])}</div></button>`
+  const keeps = card('sell', `<small>Keep what ${soldier.name} wears</small>`, `<div class="gear ${old?.rarity ?? ''}">${old ? gearCard(old) : `<small>Empty ${gear.slot} slot</small>`}</div><small>Sells the find</small>`)
+  const takes = card('keep', `<small>Equip the find</small>`, `<div class="gear ${gear.rarity}">${gearCard(gear, squadKeywords(run))}</div>${rows.length > 0 ? `<table class="stats">${rows.join('')}</table>` : ''}<small>${old ? `Sells ${old.name}` : 'Nothing to sell'}</small>`)
+  const confirm = pick === null ? 'Pick one' : pick === 'keep' ? `Equip ${gear.name} · ${paid(gain.keep)}` : `Keep ${old?.name ?? 'the slot empty'} · ${paid(gain.sell)}`
   return `<h2><b>${soldier.name}</b> found ${gear.rarity} gear as good as theirs and can't decide. <i>"You pick, boss."</i>${more}</h2>
-    <div class="compare">
-      <div class="gear ${old?.rarity ?? ''}"><small>Equipped</small><br>${old ? gearCard(old) : `<small>Empty ${gear.slot} slot</small>`}</div>
-      <span class="arrow">→</span>
-      <div class="gear ${gear.rarity} drop"><small>Found</small><br>${gearCard(gear, squadKeywords(run))}</div>
-      ${rows.length > 0 ? `<table class="stats">${rows.join('')}</table>` : ''}
-    </div>
-    <div class="choices">
-      ${button({ type: 'keep' }, `<b>Equip on ${soldier.name}</b>${old ? `<br><small>Sells ${old.name} for ${SELL[old.rarity]}</small>` : ''}`, 'decide')}
-      ${button({ type: 'sell' }, `<b>Sell</b><br><small>+${SELL[gear.rarity]} supplies</small>`, 'decide')}
-    </div>`
+    <div class="choices">${keeps}${takes}</div>
+    ${button({ type: pick ?? 'keep' }, `<b>${confirm}</b>`, 'decide', pick !== null)}`
 }
 
 /** Finds their finders decided alone: who, what, worn or sold, and what they said. */
@@ -80,11 +82,11 @@ function skillChoice(run: Run, soldier: Soldier): string {
 }
 
 /** The next choice of the reward phase, alone on its screen: a relic, then each find, then each skill owed. */
-export function choice(run: Run): string {
+export function choice(run: Run, pick: 'keep' | 'sell' | null = null): string {
   const held = squadKeywords(run)
   const relic = (id: RelicId, index: number) => button({ type: 'relic', index }, `<small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic')
   if (run.relicOffers.length > 0) return `<h2>Alien artifacts lie in the wreckage. The squad can carry one, and keeps it for the run.</h2><div class="choices">${run.relicOffers.map(relic).join('')}</div>`
-  if (run.finds.length > 0) return findChoice(run)
+  if (run.finds.length > 0) return findChoice(run, pick)
   return skillChoice(run, run.soldiers.find((s) => skillOffers(s).length > 0)!)
 }
 

@@ -106,6 +106,8 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   let open: number | null = null
   /** The stop ahead the player clicked to look at, before setting out for it. */
   let picked: number | null = null
+  /** How the player picked to settle the find on screen, before confirming. */
+  let gear: 'keep' | 'sell' | null = null
   let shown: Run | null = null
   let html = ''
 
@@ -120,7 +122,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     const report = run.report
     if (run.phase === 'battle') return ''
     if (run.phase === 'won' || run.phase === 'lost') return runEnd(run)
-    if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run)}`
+    if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run, gear)}`
     if (run.phase === 'shop' || run.phase === 'event') {
       // Arriving shows the shop or event; the other tabs stay open to the player while they decide.
       if (phase !== run.phase) tab = 'Map'
@@ -181,12 +183,14 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     else if (target.dataset.seen) seen = shown!.report
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
     else if (target.dataset.pick) picked = Number(target.dataset.pick)
+    else if (target.dataset.gear) gear = target.dataset.gear as 'keep' | 'sell'
     else if (target.dataset.open) {
       // Clicking the soldier open closes it.
       const id = Number(target.dataset.open)
       open = open === id ? null : id
     } else if (target.dataset.action) {
       picked = null
+      gear = null
       act(JSON.parse(target.dataset.action) as Action)
       return
     }
