@@ -95,7 +95,7 @@ import {
   wreck,
   unaware,
 } from './battle'
-import { HOLD_ROUNDS, WAVE_EVERY } from './goals'
+import { ESCAPE_REACH, HOLD_ROUNDS, WAVE_EVERY } from './goals'
 import { random, randomInt } from './rng'
 import { canShoot, coverAgainst, lineOfSight, odds, sees, detects } from './sight'
 
@@ -124,6 +124,8 @@ export type GameEvent =
   | { type: 'found'; id: number }
   /** A soldier reaches a civilian and gets them out. */
   | { type: 'saved'; id: number }
+  /** A soldier reaches the escape zone and lifts off. */
+  | { type: 'escaped'; id: number }
   /** A psion panics a soldier, who loses its next action. */
   | { type: 'panic'; id: number; target: number }
   /** A panicked soldier loses its action. */
@@ -385,6 +387,7 @@ function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
  */
 function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
   if (enemies.length === 0) return undefined
+  if (battle.escape && unit.side === 'human') return battle.escape
   // On a hold an alien makes for the uplink, then from its zone goes for the squad, so no stand-off lasts.
   if (battle.uplink) return unit.side === 'alien' && distance(unit, battle.uplink) <= UPLINK_REACH ? nearest(enemies, unit) : battle.uplink
   const civilians = battle.units.filter((u) => u.civilian)
@@ -495,7 +498,8 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
       // A wary unit ranks every tile by the exchange of fire, so one with no shot and no risk can win.
       // No unit ends its move in acid if it can help it.
       // On a hold, a soldier stands its ground at the uplink before anything else.
-      const first = [leash(end), acid(end), provokes(end), saves(end)]
+      // On an escape every move must bring a soldier nearer the way out.
+      const first = [battle.escape && unit.side === 'human' ? spot.stalled : 0, leash(end), acid(end), provokes(end), saves(end)]
       // Setting an ambush: unnoticed first, then a shot at the pod, then the best cover against it, then nearer.
       if (setting) return [...first, noticed(end), lays(end) ? 0 : 1, -coverAgainst(battle, end, goal), steps]
       if (wary && unit.stance !== 'standoff' && inContact) return [...first, 0, ...WITH_SHOT[unit.stance](spot), spot.toGoal]
@@ -505,7 +509,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   // A unit whose perks pay for standing still holds a tile it can shoot from, unless the tile is acid, off the uplink, or too hot for a wary unit.
   const still = has(unit, 'steady') || has(unit, 'doubleTap')
   const shotHere = enemies.some((enemy) => revealed(battle, enemy) && shootable(battle, unit, unit, enemy, seen))
-  if (still && shotHere && !leash(unit) && !acid(unit) && !(wary && theirs(unit) > 0)) return []
+  if (still && shotHere && !battle.escape && !leash(unit) && !acid(unit) && !(wary && theirs(unit) > 0)) return []
   // A booming charge pins a unit that can fight from where it stands; a rooted one cannot move at all.
   if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || (unit.kind === 'sprinter' && unit.chilled > 0)) return []
   const full = Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0))
@@ -571,6 +575,12 @@ function sight(battle: Battle): GameEvent[] {
   for (const civilian of battle.units.filter((u) => u.civilian && !battle.found.includes(u.id) && [...soldiers, ...aliens].some((s) => sees(battle, s, u)))) {
     battle.found.push(civilian.id)
     events.push({ type: 'found', id: civilian.id })
+  }
+  // A soldier at the escape zone lifts off.
+  for (const soldier of battle.escape ? soldiers.filter((s) => distance(s, battle.escape!) <= ESCAPE_REACH) : []) {
+    battle.units.splice(battle.units.indexOf(soldier), 1)
+    battle.escaped++
+    events.push({ type: 'escaped', id: soldier.id })
   }
   // A soldier beside a civilian gets them out.
   for (const civilian of battle.units.filter((u) => u.civilian && soldiers.some((s) => distance(s, u) <= 1))) {
@@ -1471,7 +1481,7 @@ export function stepBattle(battle: Battle): GameEvent[] {
   if (!humans || !aliens || emptied || battle.beat >= MAX_BEATS) {
     battle.phase = 'over'
     // With every alien beaten the squad has won, even if its last soldier fell to the same blast; clones are made anew.
-    battle.winner = !aliens || (emptied && battle.saved > 0) ? 'human' : humans && !emptied ? null : 'alien'
+    battle.winner = !aliens || (emptied && battle.saved > 0) || (!humans && battle.escaped > 0) ? 'human' : humans && !emptied ? null : 'alien'
     events.push({ type: 'end', winner: battle.winner })
   }
   return events

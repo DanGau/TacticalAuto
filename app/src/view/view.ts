@@ -479,6 +479,8 @@ export async function createView(): Promise<View> {
     zones.clear()
     marks.removeChildren().forEach((child) => child.destroy())
     if (battle.uplink) marks.addChild(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
+    if (battle.escape) marks.addChild(label('🚁 ESCAPE', battle.escape, COLOR.uplink, 28))
+    if (battle.start && battle.phase === 'deploy') marks.addChild(label('⚠ AMBUSHED HERE', battle.start, COLOR.contact, 24))
     if (battle.phase !== 'deploy') return
     if (!briefing) battle.zones.forEach((zone, i) => {
       for (let y = 0; y < GRID; y++) {
@@ -487,13 +489,14 @@ export async function createView(): Promise<View> {
         }
       }
       // The selected zone's way in: a line to the uplink, or to the nearest contact.
-      const toward = i === selected && (battle.uplink ?? nearestAlien(battle, zone))
+      // On an escape, the way out from where the squad is ambushed.
+      const toward = i === selected && (battle.start ?? battle.uplink ?? nearestAlien(battle, zone))
       if (toward) {
         const a = toWorld(zone.x, zone.y)
         const b = toWorld(toward.x, toward.y)
         zones.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: battle.uplink ? COLOR.uplink : COLOR.contact, width: 4, alpha: 0.9 })
       }
-      marks.addChild(label(`${ZONE_NAMES[i]} ${i === battle.hot ? '☄️' : KEYWORDS[battle.boons[i]].icon}`, zone, 0xffffff))
+      marks.addChild(label(`${ZONE_NAMES[i]} ${battle.start ? '🚁' : i === battle.hot ? '☄️' : KEYWORDS[battle.boons[i]].icon}`, zone, 0xffffff))
     })
     battle.pods.forEach((_, pod) => {
       const members = battle.units.filter((u) => u.pod === pod)
@@ -927,10 +930,10 @@ export async function createView(): Promise<View> {
         // A demolishing hit has already wrecked the cover in the battle; show it as the hit lands.
         if (e.effect === 'demolish') drawTerrain(battle)
         float(effectCallout(e, on))
-      } else if (e.type === 'saved') {
+      } else if (e.type === 'saved' || e.type === 'escaped') {
         const sprite = sprites.get(e.id)
         if (!sprite) continue
-        float(callout('SAVED', COLOR.heal, sprite))
+        float(callout(e.type === 'saved' ? 'SAVED' : 'LIFTED OFF', COLOR.heal, sprite))
         await tween(DEATH_MS, (t) => (sprite.node.alpha = 1 - t))
         remove(e.id)
       } else if (e.type === 'found') {

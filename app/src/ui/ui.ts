@@ -7,7 +7,7 @@ import { ALIENS } from '../core/aliens'
 import { RELICS, type Relic } from '../core/relics'
 import { known } from './intro'
 import { TWISTS } from '../core/twists'
-import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_REACH, nearestAlien, ZONE_NAMES, zoneInfo, type Battle } from '../core/battle'
+import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_REACH, nearestAlien, onTheWay, ZONE_NAMES, zoneInfo, type Battle, type Unit } from '../core/battle'
 import { KEYWORDS } from '../core/keywords'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { DETECT, PATROL_DETECT } from '../core/sight'
@@ -50,9 +50,9 @@ function status(run: Run): string {
   const battle = run.battle
   if (run.phase !== 'battle' || !battle) return ''
   const mission = run.mission!
-  const title = mission.kind === 'battle' ? `${GOALS[mission.goal].name}: ${GOALS[mission.goal].text}` : STOP_NAMES[mission.kind]
+  const title = mission.kind === 'battle' || mission.kind === 'escape' ? `${GOALS[mission.goal].name}: ${GOALS[mission.goal].text}` : STOP_NAMES[mission.kind]
   if (battle.phase === 'deploy') return `${title}<div class="roster">${roster(run)}</div>`
-  const rounds = battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
+  const rounds = battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : battle.escape ? ` · ${battle.escaped} lifted off` : ''
   return `${title}${rounds} · ${SIDE[battle.turn]}' turn${battle.concealed ? ' · unseen' : ''}`
 }
 
@@ -81,6 +81,7 @@ function tradeoffs(battle: Battle, zone: number): string {
 
 /** Before the landing: a button per zone that flies the camera there, one back to the whole map, and the chosen zone's boon and case. */
 function drop(battle: Battle, zone: number | null): string {
+  if (battle.start) return escapes(battle, zone)
   const zones = battle.boons.map((boon, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}" title="${i === battle.hot ? 'Land on top of a pod' : BOONS[boon].text}">${ZONE_NAMES[i]} ${i === battle.hot ? '☄️ Hot drop' : `${KEYWORDS[boon].icon} ${BOONS[boon].name}`}</button>`)
   const overview = `<button data-zone="" class="overview ${zone === null ? 'on' : ''}" title="Whole map">🗺️</button>`
   const detail =
@@ -89,6 +90,25 @@ function drop(battle: Battle, zone: number | null): string {
       : `<p>${zone === battle.hot ? 'Land on top of a pod.' : `${BOONS[battle.boons[zone]].text}.`}</p><div class="tradeoffs">${tradeoffs(battle, zone)}</div>${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
   const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
   return `${twist}<div class="zones">${zones.join('')}${overview}</div>${detail}`
+}
+
+/** On an escape: a button per escape zone, then the chosen one's aliens on the way and boon. */
+function escapes(battle: Battle, zone: number | null): string {
+  const zones = battle.zones.map((_, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}">${ZONE_NAMES[i]} 🚁 ${onTheWay(battle, battle.zones[i]).length} aliens</button>`)
+  const overview = `<button data-zone="" class="overview ${zone === null ? 'on' : ''}" title="Whole map">🗺️</button>`
+  const kinds = (aliens: Unit[]) => {
+    const count = new Map<string, number>()
+    for (const u of aliens) {
+      const name = u.boss ? 'the Hunter' : ALIENS[u.kind!].name
+      count.set(name, (count.get(name) ?? 0) + 1)
+    }
+    return [...count].map(([name, n]) => `${n} ${name}`).join(', ') || 'none'
+  }
+  const detail =
+    zone === null
+      ? '<small>The squad is ambushed. Pick the way out.</small>'
+      : `<p>On the way: ${kinds(onTheWay(battle, battle.zones[zone]))}.</p><p>${KEYWORDS[battle.boons[zone]].icon} ${BOONS[battle.boons[zone]].name}: ${BOONS[battle.boons[zone]].text}.</p>${button({ type: 'land', zone }, `Break out toward ${ZONE_NAMES[zone]}`)}`
+  return `<div class="zones">${zones.join('')}${overview}</div>${detail}`
 }
 
 /** Turns clicks into actions and hands them to `act`. */

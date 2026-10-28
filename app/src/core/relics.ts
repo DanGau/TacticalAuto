@@ -3,7 +3,7 @@ import { TUNING } from './tuning'
 import type { Keyword } from './keywords'
 
 /**
- * An artifact the squad keeps for the run, taken from three offered after a satellite, a hold or a last stand is won.
+ * An artifact the squad keeps for the run, taken from three offered after a satellite, a hold or an escape is won.
  * It changes every soldier, or how the run pays; `text` says how.
  */
 export interface Relic {

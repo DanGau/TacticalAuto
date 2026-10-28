@@ -239,12 +239,12 @@ test('experience follows what a soldier did: kills and damage its own, feats onl
   expect(clone.feats).toEqual(['hatTrick'])
 })
 
-test.each(['human', 'alien'] as const)('full threat puts a last stand before the next stop; %s win', (winner) => {
+test.each(['human', 'alien'] as const)('full threat puts an escape before the next stop; %s win', (winner) => {
   const run = travelling(['battle', 'battle'])
   run.threat = THREAT_MAX
-  expect(nextStop(run)).toBe('lastStand')
+  expect(nextStop(run)).toBe('escape')
   fight(run, winner)
-  expect(run.report!.stop).toBe('lastStand')
+  expect(run.report!.stop).toBe('escape')
   if (winner === 'alien') return expect(run.phase).toBe('lost')
   expect(run).toMatchObject({ phase: 'reward', threat: 0, stop: 0 })
   expect(nextStop(run)).toBe('battle')

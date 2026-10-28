@@ -114,7 +114,7 @@ function travelLabel(run: Run, stop: Stop, next: NonNullable<ReturnType<typeof n
   if (next === 'shop') return 'Enter the shop'
   if (next === 'unknown') return 'Find out what lies ahead'
   const mission = missionAt(run, next, stop.risk, next === 'battle' ? stop.goal : 'exterminate')
-  const stakes = next === 'lastStand' || next === 'final' ? ' · lose and the run ends' : ''
+  const stakes = next === 'escape' || next === 'final' ? ' · lose and the run ends' : ''
   return `<b>${STOP_NAMES[next]}</b><br>Alien force ${mission.force}${next === 'key' || next === 'final' ? ', with a boss' : ''}${stakes}`
 }
 
@@ -172,7 +172,7 @@ function mapView(run: Run, picked: number | null): string {
   const here = node.stop!
   return `${run.report ? '' : decisions(run)}<h2>${where(here)}</h2>
     ${runMap(run, null)}
-    ${next === 'lastStand' ? '<p class="up"><b>The threat is full. The aliens attack before the squad can travel on.</b></p>' : ''}
+    ${next === 'escape' ? '<p class="up"><b>The threat is full. The squad is ambushed on the road and must escape.</b></p>' : ''}
     <button class="travel ${next}" data-action='${JSON.stringify({ type: 'advance' })}'>${travelLabel(run, here, next)}</button>`
 }
 

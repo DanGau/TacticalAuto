@@ -2,7 +2,7 @@ import { HATCH_TURNS, NODE_SPAWNS, type AlienKind } from './aliens'
 import type { Tally } from './feats'
 import type { DoctrineEffect, Rule } from './doctrines'
 import type { Keyword, Resist } from './keywords'
-import { randomInt } from './rng'
+import { random, randomInt } from './rng'
 import { CIVILIAN_HP, CIVILIANS, type Goal } from './goals'
 import type { Twist } from './twists'
 import { EDGE_COVER, generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Prop, type TerrainKind } from './terrain'
@@ -340,6 +340,11 @@ export interface Battle {
   zones: Tile[]
   /** On a hold, the uplink the squad must reach and defend; null otherwise. */
   uplink: Tile | null
+  /** On an escape, where the squad is ambushed, and the escape zone it chose; null otherwise. */
+  start: Tile | null
+  escape: Tile | null
+  /** Soldiers lifted off, on an escape. */
+  escaped: number
   /** The keyword each landing zone grants the squad for the battle, in zones order. */
   boons: Keyword[]
   /** Soldiers not yet landed. */
@@ -502,6 +507,15 @@ export function revealed(battle: Battle, unit: Unit): boolean {
   return unit.pod === null || battle.pods[unit.pod].revealed
 }
 
+/** The open tile nearest `tile` as the crow flies. */
+function openNear(battle: Battle, tile: Tile): Tile {
+  for (let reach = 0; ; reach++) {
+    for (let y = tile.y - reach; y <= tile.y + reach; y++) {
+      for (let x = tile.x - reach; x <= tile.x + reach; x++) if (onGrid(x, y) && distance(tile, { x, y }) === reach && !blocked(battle, x, y)) return { x, y }
+    }
+  }
+}
+
 /** The `count` free tiles nearest `centre` by walking, nearest first. */
 export function freeTilesNear(battle: Battle, centre: Tile, count: number): Tile[] {
   const found: Tile[] = []
@@ -530,6 +544,17 @@ export function spacedTile(battle: Battle, avoid: Tile[], clearance: number): Ti
     const needed = clearance - Math.floor(tries / 200)
     if (coverAt(battle, tile.x, tile.y) === 0 && avoid.every((other) => distance(tile, other) >= needed)) return tile
   }
+}
+
+/** How far to either side of an escape route its aliens stand. */
+const ROUTE_WIDTH = 5
+
+/** The aliens near the straight way from an escape's start to an escape zone. */
+export function onTheWay(battle: Battle, zone: Tile): Unit[] {
+  const start = battle.start!
+  const steps = Math.max(1, distance(start, zone))
+  const line = Array.from({ length: steps + 1 }, (_, i) => ({ x: Math.round(start.x + ((zone.x - start.x) * i) / steps), y: Math.round(start.y + ((zone.y - start.y) * i) / steps) }))
+  return battle.units.filter((u) => u.side === 'alien' && line.some((tile) => distance(tile, u) <= ROUTE_WIDTH))
 }
 
 /** The alien nearest a tile, if any. */
@@ -579,7 +604,14 @@ export function land(battle: Battle, zone: Tile): void {
       else pod.waypoint = zone
     })
   }
-  const tiles = freeTilesNear(battle, zone, battle.reserve.length)
+  // On an escape the zone is where the squad makes for. The Hunter has found it; the packs across the ways out are
+  // in sight but have yet to notice it.
+  if (battle.start) {
+    battle.escape = zone
+    battle.concealed = false
+    battle.pods.forEach((pod, i) => Object.assign(pod, { revealed: true, alert: i === 0 }))
+  }
+  const tiles = freeTilesNear(battle, battle.start ?? zone, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => {
     battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
   })
@@ -680,6 +712,9 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
  * A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. A hold keeps half its
  * packs back as waves and offers one landing zone, the uplink; a rescue hides civilians alone about the map.
  */
+/** How far from the squad and the ways out an escape's Hunter starts. */
+const HUNTER_START = 12
+
 /** Tiles apart a rescue's civilians hide, from each other and the aliens. */
 const CIVILIAN_CLEARANCE = 3
 
@@ -692,7 +727,8 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     rules,
     twist,
     round: 0,
-    waves: goal === 'hold' ? packs.slice(Math.ceil(packs.length / 2)) : [],
+    // An escape's packs come on a second time, as waves.
+    waves: goal === 'hold' ? packs.slice(Math.ceil(packs.length / 2)) : goal === 'escape' ? packs.slice(1) : [],
     beat: 0,
     phase: 'deploy',
     turn: 'human',
@@ -717,19 +753,39 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     tally: {},
     zones: [],
     uplink: null,
+    start: null,
+    escape: null,
+    escaped: 0,
     boons: [],
     hot: null,
     breach: false,
     reserve,
   }
   sealPockets(battle)
+  if (goal === 'escape') {
+    // Ambushed mid-map, with a way out toward three edges.
+    battle.start = openNear(battle, { x: GRID >> 1, y: GRID >> 1 })
+    const edges = [
+      { x: 2, y: 2 }, { x: GRID >> 1, y: 1 }, { x: GRID - 3, y: 2 }, { x: GRID - 2, y: GRID >> 1 },
+      { x: GRID - 3, y: GRID - 3 }, { x: GRID >> 1, y: GRID - 2 }, { x: 2, y: GRID - 3 }, { x: 1, y: GRID >> 1 },
+    ]
+    const first = randomInt(battle, edges.length)
+    for (const step of [0, 3, 5]) battle.zones.push(openNear(battle, edges[(first + step) % edges.length]))
+  }
 
   const centres: Tile[] = []
-  for (const pack of packs.slice(0, packs.length - battle.waves.length)) {
-    const centre = spacedTile(battle, centres, ZONE_CLEARANCE)
+  packs.slice(0, goal === 'hold' ? packs.length - battle.waves.length : packs.length).forEach((pack, i) => {
+    // On an escape the Hunter starts far off, and each pack after it stands across one of the ways out.
+    const route = battle.start && i > 0 ? battle.zones[(i - 1) % ZONES] : null
+    const along = route ? 0.4 + 0.4 * random(battle) : 0
+    const centre = route
+      ? openNear(battle, { x: Math.round(battle.start!.x + (route.x - battle.start!.x) * along), y: Math.round(battle.start!.y + (route.y - battle.start!.y) * along) })
+      : battle.start
+        ? spacedTile(battle, [battle.start, ...battle.zones], HUNTER_START)
+        : spacedTile(battle, centres, ZONE_CLEARANCE)
     centres.push(centre)
     placePod(battle, pack, centre, false)
-  }
+  })
   if (goal === 'rescue') {
     // Each hides alone somewhere on the map, for the squad to find.
     for (let i = 0; i < CIVILIANS; i++) {
@@ -743,7 +799,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   const boons = Object.keys(BOONS) as Keyword[]
   battle.boons = battle.zones.map(() => boons.splice(randomInt(battle, boons.length), 1)[0])
   // One zone is a hot drop, right on a pod.
-  if (goal !== 'hold' && centres.length > 0) {
+  if (goal !== 'hold' && goal !== 'escape' && centres.length > 0) {
     battle.hot = randomInt(battle, ZONES)
     battle.zones[battle.hot] = centres[randomInt(battle, centres.length)]
   }

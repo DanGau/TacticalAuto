@@ -1,7 +1,9 @@
 /** What a battle asks of the squad. Each pays differently, so where the squad goes shapes what it builds. */
-export type Goal = 'exterminate' | 'assassinate' | 'hold' | 'rescue' | 'raid'
+export type Goal = 'exterminate' | 'assassinate' | 'hold' | 'rescue' | 'raid' | 'escape'
 
 export const HOLD_ROUNDS = 6
+/** How near the escape zone a soldier must come to lift off. */
+export const ESCAPE_REACH = 3
 /** Alien turns between waves on a hold. */
 export const WAVE_EVERY = 2
 /** Civilians hidden on a rescue, the health of each, and the supplies each saved pays. */
@@ -21,4 +23,6 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
     weight: 1,
   },
   raid: { name: 'Supply raid', text: 'A weak guard over a supply cache', reward: 'triple supplies, no gear', force: -1, weight: 1 },
+  // Never drawn: a full threat turns the next stop into an escape.
+  escape: { name: 'Escape', text: 'Ambushed on patrol and hunted. Get to the escape zone and lift off; any soldier out wins it', reward: 'the threat emptied', force: -3, weight: 0 },
 }

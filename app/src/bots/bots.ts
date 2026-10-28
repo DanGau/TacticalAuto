@@ -1,5 +1,5 @@
 import type { Action } from '../core/apply'
-import { zoneInfo, type Battle } from '../core/battle'
+import { onTheWay, zoneInfo, type Battle } from '../core/battle'
 import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
@@ -100,6 +100,8 @@ const play =
   ({ risk, pick, land, build, events }: Strategy): Bot =>
   (run, rng) => {
     if (run.phase === 'reward') return reward(run, rng, PICKS[pick])
+    // Any bot with a landing plan breaks out the way with the fewest aliens.
+    if (run.phase === 'battle' && run.battle!.start) return { type: 'land', zone: best(run.battle!, (i) => -onTheWay(run.battle!, run.battle!.zones[i]).length) }
     if (run.phase === 'battle') return { type: 'land', zone: LANDS[land](run, run.battle!, rng) }
     if (run.phase === 'shop') return build ? shop(run) : { type: 'leave' }
     if (run.phase === 'event') return { type: 'choose', index: events === 'bold' ? takeable(run)[0] : takeable(run).at(-1)! }
