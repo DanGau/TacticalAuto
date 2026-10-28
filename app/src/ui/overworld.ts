@@ -166,6 +166,7 @@ function mapView(run: Run, picked: number | null): string {
   if (!node)
     return `${run.report ? '' : decisions(run)}<h2>${where(ahead!)}</h2>
     ${runMap(run, picked)}
+    <p class="progress">Click another stop to compare, or set out.</p>
     <button class="travel" data-action='${JSON.stringify({ type: 'go', index: picked })}'>Set out for this stop</button>`
   const next = nextStop(run)!
   const here = node.stop!
