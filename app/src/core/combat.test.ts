@@ -26,13 +26,14 @@ function play(seed: number, check: (events: GameEvent[], before: Battle, after: 
 }
 
 test('a turn is one move beat, then one shot per beat in id order, then the other side', () => {
-  let turn = 'human'
+  let turn = ''
   let stage = 'move'
   let shooter = 0
-  const end = play(1, (events, before) => {
+  const end = play(1, (events, before, after) => {
     const first = events.find((e) => ['move', 'shot', 'rocket', 'heal', 'spit', 'panic', 'frozen'].includes(e.type)) as Extract<GameEvent, { id: number }> | undefined
     if (!first) return
-    const side = before.units.find((u) => u.id === first.id)!.side
+    // A turn spent standing still shows no event, so turns are told apart by the round as well as the side.
+    const side = `${after.round}:${before.units.find((u) => u.id === first.id)!.side}`
     if (side !== turn) {
       turn = side
       stage = 'move'

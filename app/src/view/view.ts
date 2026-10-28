@@ -927,6 +927,12 @@ export async function createView(): Promise<View> {
         // A demolishing hit has already wrecked the cover in the battle; show it as the hit lands.
         if (e.effect === 'demolish') drawTerrain(battle)
         float(effectCallout(e, on))
+      } else if (e.type === 'saved') {
+        const sprite = sprites.get(e.id)
+        if (!sprite) continue
+        float(callout('SAVED', COLOR.heal, sprite))
+        await tween(DEATH_MS, (t) => (sprite.node.alpha = 1 - t))
+        remove(e.id)
       } else if (e.type === 'found') {
         const on = sprites.get(e.id)
         if (on) float(callout('FOUND', COLOR.civilian, on))

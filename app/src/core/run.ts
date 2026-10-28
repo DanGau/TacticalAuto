@@ -660,7 +660,7 @@ export function endBattle(run: Run): void {
   const mission = run.mission!
   const standing = new Set(battle.units.map((u) => u.soldier))
   const won = battle.winner === 'human'
-  const rescued = mission.goal === 'rescue' ? battle.units.filter((u) => u.civilian).length : null
+  const rescued = mission.goal === 'rescue' ? battle.saved + battle.units.filter((u) => u.civilian).length : null
   const soldiers = run.soldiers.map((s) => {
     const xpBefore = s.xp
     const { earned, feats } = standing.has(s.id) ? earn(battle, s, won, rescued) : { earned: [], feats: [] }

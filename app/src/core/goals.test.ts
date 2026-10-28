@@ -51,7 +51,7 @@ test('an assassination is won when the commander falls, though its guard lives',
   expect(run.finds.length + run.decisions.length).toBeGreaterThan(0)
 })
 
-test('a rescue pays supplies and experience for each civilian kept alive; a raid pays triple supplies', () => {
+test('a rescue pays supplies and experience for each civilian saved or alive; a raid pays triple supplies', () => {
   const rescue = before('rescue')
   apply(rescue, { type: 'land', zone: 0 })
   expect(rescue.battle!.units.filter((u) => u.civilian)).toHaveLength(CIVILIANS)
@@ -87,4 +87,25 @@ test('rescue civilians hide alone until a soldier sees one, and the squad search
     if (found) expect(revealed(battle, battle.units.find((u) => u.id === found.id)!)).toBe(true)
   }
   expect(battle.found.length).toBeGreaterThan(0)
+})
+
+test('on a rescue soldiers reach civilians to get them out, and aliens hunt the civilians found', () => {
+  let saved = 0
+  let shotAt = 0
+  for (let seed = 1; seed <= 6; seed++) {
+    const run = before('rescue')
+    run.battle!.rng = seed
+    apply(run, { type: 'land', zone: seed % 3 })
+    const battle = run.battle!
+    while (battle.phase === 'battle') {
+      const civilians = new Set(battle.units.filter((u) => u.civilian).map((u) => u.id))
+      for (const e of stepBattle(battle)) {
+        if (e.type === 'saved') saved++
+        if (e.type === 'shot' && civilians.has(e.target)) shotAt++
+      }
+    }
+    expect(battle.saved).toBeLessThanOrEqual(CIVILIANS)
+  }
+  expect(saved).toBeGreaterThan(0)
+  expect(shotAt).toBeGreaterThan(0)
 })

@@ -332,6 +332,8 @@ export interface Battle {
   caltrops: Tile[]
   /** Civilians some soldier has seen, by id. Until found, a civilian is hidden from the player and from the aliens. */
   found: number[]
+  /** Civilians soldiers have reached and got out, on a rescue. */
+  saved: number
   /** Centres of the landing zones on offer in the deploy phase. */
   zones: Tile[]
   /** On a hold, the uplink the squad must reach and defend; null otherwise. */
@@ -676,6 +678,9 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
  * A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. A hold keeps half its
  * packs back as waves and offers one landing zone, the uplink; a rescue hides civilians alone about the map.
  */
+/** Tiles apart a rescue's civilians hide, from each other and the aliens. */
+const CIVILIAN_CLEARANCE = 3
+
 export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null): Battle {
   const holder = { rng: seed }
   const terrain = generateTerrain(holder, GRID, kind, twist)
@@ -704,6 +709,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     fire: [],
     caltrops: [],
     found: [],
+    saved: 0,
     actor: null,
     tally: {},
     zones: [],
@@ -724,7 +730,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   if (goal === 'rescue') {
     // Each hides alone somewhere on the map, for the squad to find.
     for (let i = 0; i < CIVILIANS; i++) {
-      const tile = spacedTile(battle, battle.units, ZONE_CLEARANCE)
+      const tile = spacedTile(battle, battle.units, CIVILIAN_CLEARANCE)
       const stats = { ...BASE_STATS, hp: CIVILIAN_HP, aim: 0, damage: 0, range: 0, move: 0, crit: 0 }
       battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
     }

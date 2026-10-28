@@ -4,8 +4,8 @@ export type Goal = 'exterminate' | 'assassinate' | 'hold' | 'rescue' | 'raid'
 export const HOLD_ROUNDS = 6
 /** Alien turns between waves on a hold. */
 export const WAVE_EVERY = 2
-/** Civilians hidden on a rescue, the health of each, and the supplies each kept alive pays. */
-export const CIVILIANS = 4
+/** Civilians hidden on a rescue, the health of each, and the supplies each saved pays. */
+export const CIVILIANS = 10
 export const CIVILIAN_HP = 5
 export const CIVILIAN_SUPPLIES = 2
 
@@ -15,7 +15,7 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
   hold: { name: 'Hold the uplink', text: `Reach the uplink and hold it for ${HOLD_ROUNDS} rounds as waves arrive`, reward: 'a relic, no gear', force: 2, weight: 1 },
   rescue: {
     name: 'Rescue',
-    text: `${CIVILIANS} civilians hide about the map, unseen until a soldier finds one; aliens hunt those found. Kill every alien; each civilian alive pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience`,
+    text: `${CIVILIANS} civilians hide about the map, and the aliens hunt them. A soldier who reaches one gets them out. Save who you can; each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience`,
     reward: 'supplies and experience, no gear',
     force: 0,
     weight: 1,
