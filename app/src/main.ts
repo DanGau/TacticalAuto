@@ -71,12 +71,32 @@ window.debug = {
 
 await show([], false)
 
+/** A beat stepped by flow but not yet shown. */
+let held: GameEvent[] | null = null
+
+/** Steps beats of moves while the squad is unseen, so the squad and the aliens move as one, without waiting on each other's turns. It stops at anything else, or before a unit would move twice. */
+function flow(): GameEvent[] {
+  const events: GameEvent[] = held ?? step(state)
+  held = null
+  const moved = new Set<number>()
+  for (;;) {
+    for (const e of events) if (e.type === 'move') moved.add(e.id)
+    if (events.some((e) => e.type !== 'move') || state.battle?.phase !== 'battle' || !state.battle.concealed) return events
+    const next = step(state)
+    if (next.some((e) => e.type === 'move' && moved.has(e.id))) {
+      held = next
+      return events
+    }
+    events.push(...next)
+  }
+}
+
 // With ?manual, the battle advances only through debug.step, so the model sees every beat it asks for.
 if (!params.has('manual')) {
   for (;;) {
     await showing
     if (state.phase === 'battle' && state.battle?.phase === 'battle') {
-      const events = step(state)
+      const events = held || state.battle.concealed ? flow() : step(state)
       await show(events, true)
       // The battle waits while the player meets each new kind of alien.
       for (const kind of newcomers(state.battle, events)) await introduce(kind)
