@@ -8,9 +8,9 @@ import { createUi } from './ui/ui'
 import { createView, HEIGHT, WIDTH } from './view/view'
 
 // A failure shows on screen, where a player on a phone, with no console, can report it.
-const report = (message: string) => document.getElementById('panel')!.insertAdjacentHTML('beforeend', `<p class="up">Error: ${message}</p>`)
-addEventListener('error', (e) => report(e.message))
-addEventListener('unhandledrejection', (e) => report(String(e.reason)))
+const report = (message: string) => document.getElementById('panel')!.insertAdjacentHTML('afterbegin', `<p class="up">${message}</p>`)
+addEventListener('error', (e) => report(`Error: ${e.message}`))
+addEventListener('unhandledrejection', (e) => report(`Error: ${String(e.reason)}`))
 
 // The panels are laid out for a WIDTH by HEIGHT window and zoom with it; on a narrow, upright one, such as a phone's,
 // they fit its width instead, laid out for a 600 pixel wide one.
@@ -28,7 +28,9 @@ const enter = () =>
 const toggle = document.getElementById('fullscreen')!
 toggle.addEventListener('pointerdown', (e) => e.stopPropagation())
 toggle.addEventListener('click', () => {
-  if (document.fullscreenElement) void document.exitFullscreen()
+  // A browser opened inside another app, as a link from a chat often is, has no full screen.
+  if (!document.fullscreenEnabled) report("this browser can't go full screen. Open the page in Chrome or Safari itself, then tap ⛶")
+  else if (document.fullscreenElement) void document.exitFullscreen()
   else void enter()
 })
 // Browsers allow full screen only on a click, so the first one anywhere enters it.
