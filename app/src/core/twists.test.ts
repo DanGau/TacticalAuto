@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 import { alienStats } from './aliens'
+import { deploy } from './roads'
 import { apply } from './apply'
 import { coverAt, crumble, GRID, type Battle } from './battle'
 import { stepBattle, type GameEvent } from './combat'
@@ -15,7 +16,7 @@ function duel(twist: Twist | null): Battle {
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
-  apply(run, { type: 'land', zone: run.battle!.hot === 0 ? 1 : 0 })
+  deploy(run, run.battle!.hot === 0 ? 1 : 0)
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist })
   battle.cover.fill(0)

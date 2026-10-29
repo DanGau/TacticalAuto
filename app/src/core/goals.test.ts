@@ -2,10 +2,10 @@ import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { stepBattle, UPLINK_REACH } from './combat'
-import { CIVILIAN_SUPPLIES, CIVILIANS, HOLD_ROUNDS, type Goal } from './goals'
+import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, type Goal } from './goals'
 import { isSoldier, revealed } from './battle'
-import { road } from './roads'
-import { createRun, endBattle, RISKS, START_SUPPLIES, XP, type Run } from './run'
+import { road, deploy } from './roads'
+import { createRun, endBattle, RISKS, START_SUPPLIES, THREAT_MAX, XP, type Run } from './run'
 
 /** A run about to fight a battle of `goal`, with three packs to muster. */
 function before(goal: Goal): Run {
@@ -29,7 +29,7 @@ test('a hold offers three landing zones away from the uplink, keeps half its pac
   expect(battle.zones).toHaveLength(3)
   expect(battle.uplink).not.toBeNull()
   expect(battle.waves).toHaveLength(1)
-  apply(run, { type: 'land', zone: 0 })
+  deploy(run, 0)
   battle.held = HOLD_ROUNDS
   stepBattle(battle)
   expect(battle).toMatchObject({ phase: 'over', winner: 'human' })
@@ -41,7 +41,7 @@ test('a hold offers three landing zones away from the uplink, keeps half its pac
 test('a hold counts only the rounds the squad ends inside the uplink zone', () => {
   const run = before('hold')
   const battle = run.battle!
-  apply(run, { type: 'land', zone: 0 })
+  deploy(run, 0)
   while (battle.round < 3 && battle.phase === 'battle') {
     const [round, held] = [battle.round, battle.held]
     stepBattle(battle)
@@ -53,7 +53,7 @@ test('a hold counts only the rounds the squad ends inside the uplink zone', () =
 test('an assassination is won when the commander falls, though its guard lives', () => {
   const run = before('assassinate')
   const battle = run.battle!
-  apply(run, { type: 'land', zone: 0 })
+  deploy(run, 0)
   const commander = battle.units.filter((u) => u.target)
   expect(commander).toHaveLength(1)
   battle.units = battle.units.filter((u) => !u.target)
@@ -65,7 +65,7 @@ test('an assassination is won when the commander falls, though its guard lives',
 
 test('a rescue pays supplies and experience for each civilian saved or alive; a raid pays triple supplies', () => {
   const rescue = before('rescue')
-  apply(rescue, { type: 'land', zone: 0 })
+  deploy(rescue, 0)
   expect(rescue.battle!.units.filter((u) => u.civilian)).toHaveLength(CIVILIANS)
   const supplies = rescue.supplies
   // One civilian is lost.
@@ -79,7 +79,7 @@ test('a rescue pays supplies and experience for each civilian saved or alive; a 
   expect(rescue.supplies).toBe(supplies + RISKS.standard.supplies + alive * CIVILIAN_SUPPLIES)
 
   const raid = before('raid')
-  apply(raid, { type: 'land', zone: 0 })
+  deploy(raid, 0)
   raid.battle!.winner = 'human'
   endBattle(raid)
   expect(raid.supplies).toBe(START_SUPPLIES + 3 * RISKS.standard.supplies)
@@ -88,7 +88,7 @@ test('a rescue pays supplies and experience for each civilian saved or alive; a 
 
 test('rescue civilians hide alone until a soldier sees one, and the squad searches for them while no alien is in the open', () => {
   const run = before('rescue')
-  apply(run, { type: 'land', zone: 0 })
+  deploy(run, 0)
   const battle = run.battle!
   const civilians = battle.units.filter((u) => u.civilian)
   expect(civilians.every((u) => !revealed(battle, u))).toBe(true)
@@ -107,7 +107,7 @@ test('on a rescue soldiers reach civilians to get them out, and aliens hunt the 
   for (let seed = 1; seed <= 6; seed++) {
     const run = before('rescue')
     run.battle!.rng = seed
-    apply(run, { type: 'land', zone: seed % 3 })
+    deploy(run, seed % 3)
     const battle = run.battle!
     while (battle.phase === 'battle') {
       const civilians = new Set(battle.units.filter((u) => u.civilian).map((u) => u.id))
@@ -120,4 +120,19 @@ test('on a rescue soldiers reach civilians to get them out, and aliens hunt the 
   }
   expect(saved).toBeGreaterThan(0)
   expect(shotAt).toBeGreaterThan(0)
+})
+
+test('a rescue squad split into teams lands each team apart, and left-behind civilians add threat', () => {
+  const run = before('rescue')
+  run.battle!.reserve = [...run.battle!.reserve, ...run.battle!.reserve.map((r) => ({ ...r, soldier: r.soldier + 100 }))]
+  apply(run, { type: 'split', teams: 2 })
+  const battle = run.battle!
+  const [a, b] = [0, 1].map((t) => battle.units.filter((u) => isSoldier(u) && u.team === t))
+  expect(a).toHaveLength(1)
+  expect(b).toHaveLength(1)
+  expect(Math.max(Math.abs(a[0].x - b[0].x), Math.abs(a[0].y - b[0].y))).toBeGreaterThan(4)
+  const threat = run.threat
+  battle.winner = 'alien'
+  endBattle(run)
+  expect(run.threat).toBe(Math.min(THREAT_MAX, threat + 2 + Math.floor(CIVILIANS / CIVILIANS_PER_THREAT)))
 })

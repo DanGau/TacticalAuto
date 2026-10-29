@@ -397,8 +397,10 @@ function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
   if (found.length > 0) return nearest(found, unit)
   // With no alien in the open, a rescuer searches toward the nearest civilian still hidden.
   const hidden = civilians.filter((u) => !revealed(battle, u))
-  if (hidden.length > 0 && !enemies.some((e) => revealed(battle, e))) return nearest(hidden, centreOf(battle.units.filter(isSoldier)))
-  return enemies.find((u) => u.target && revealed(battle, u)) ?? nearest(enemies, centreOf(battle.units.filter(isSoldier)))
+  // A split squad's teams each go their own way.
+  const team = centreOf(battle.units.filter((u) => isSoldier(u) && u.team === unit.team))
+  if (hidden.length > 0 && !enemies.some((e) => revealed(battle, e))) return nearest(hidden, team)
+  return enemies.find((u) => u.target && revealed(battle, u)) ?? nearest(enemies, team)
 }
 
 /** On a hold, how far from the uplink a soldier may stand and still defend it. */
@@ -431,7 +433,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
     return Math.round(100 * Math.max(0, ...chances))
   }
   const theirs = (end: Tile) => exposure(battle, enemies, end)
-  const squadmates = battle.units.filter((u) => u.side === unit.side && u !== unit && !u.civilian)
+  const squadmates = battle.units.filter((u) => u.side === unit.side && u !== unit && !u.civilian && u.team === unit.team)
   const hurt = 1 - unit.hp / unit.stats.hp
   const wary = unit.side === 'human' && hurt >= WARY && squadmates.some((u) => u.hp / u.stats.hp > 1 - WARY)
   const apart = (end: Tile) => Math.max(0, Math.min(MEDIC_REACH, ...squadmates.map((u) => distance(end, u) - MEDIC_REACH)))

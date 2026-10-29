@@ -243,6 +243,8 @@ export interface View {
   focus(zone: number | null): void
   /** Hides the landing zones while the briefing flies over the mission, and shows them once it is done. */
   hideZones(hidden: boolean): void
+  /** On a rescue, shows where each of `teams` teams would land. */
+  showTeams(teams: number): void
   /** Glides the camera to frame the given tiles, above the landing panel; null pulls back to the whole map. */
   frame(tiles: Tile[] | null): Promise<void>
 }
@@ -289,6 +291,8 @@ export async function createView(): Promise<View> {
   let selected: number | null = null
   /** Whether the briefing is under way, so the landing zones are hidden. */
   let briefing = false
+  /** On a rescue, the teams whose landing zones show. */
+  let teams = 1
 
   const diamond = (g: Graphics, x: number, y: number) => {
     const c = toWorld(x, y)
@@ -296,7 +300,7 @@ export async function createView(): Promise<View> {
   }
 
   function zoneAt(px: number, py: number): number | null {
-    if (shown?.phase !== 'deploy') return null
+    if (shown?.phase !== 'deploy' || shown.goal === 'rescue') return null
     // The canvas is scaled to fit the window.
     const sx = (px * WIDTH) / app.canvas.clientWidth
     const sy = (py * HEIGHT) / app.canvas.clientHeight
@@ -482,7 +486,9 @@ export async function createView(): Promise<View> {
     if (battle.escape) marks.addChild(label('🚁 ESCAPE', battle.escape, COLOR.uplink, 28))
     if (battle.start && battle.phase === 'deploy') marks.addChild(label('⚠ AMBUSHED HERE', battle.start, COLOR.contact, 24))
     if (battle.phase !== 'deploy') return
-    if (!briefing) battle.zones.forEach((zone, i) => {
+    // A rescue shows where each of its teams would land.
+    const shownZones = battle.goal === 'rescue' ? battle.zones.slice(0, teams) : battle.zones
+    if (!briefing) shownZones.forEach((zone, i) => {
       for (let y = 0; y < GRID; y++) {
         for (let x = 0; x < GRID; x++) {
           if (distance(zone, { x, y }) <= ZONE_RADIUS) diamond(zones, x, y).fill({ color: i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone, alpha: 0.8 })
@@ -496,7 +502,7 @@ export async function createView(): Promise<View> {
         const b = toWorld(toward.x, toward.y)
         zones.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: battle.uplink ? COLOR.uplink : COLOR.contact, width: 4, alpha: 0.9 })
       }
-      marks.addChild(label(`${ZONE_NAMES[i]} ${battle.start ? '🚁' : i === battle.hot ? '☄️' : KEYWORDS[battle.boons[i]].icon}`, zone, 0xffffff))
+      marks.addChild(label(battle.goal === 'rescue' ? `Team ${i + 1}` : `${ZONE_NAMES[i]} ${battle.start ? '🚁' : i === battle.hot ? '☄️' : KEYWORDS[battle.boons[i]].icon}`, zone, 0xffffff))
     })
     battle.pods.forEach((_, pod) => {
       const members = battle.units.filter((u) => u.pod === pod)
@@ -978,6 +984,10 @@ export async function createView(): Promise<View> {
     frame(tiles) {
       const framed = tiles === null ? OVERVIEW : framing(tiles)
       return follow({ ...framed, y: framed.y + (tiles === null ? 0 : PANEL / framed.zoom) }, FOCUS_MS)
+    },
+    showTeams(n) {
+      teams = n
+      if (shown) drawMarks(shown)
     },
     hideZones(hidden) {
       briefing = hidden

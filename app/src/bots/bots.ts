@@ -1,5 +1,5 @@
 import type { Action } from '../core/apply'
-import { onTheWay, zoneInfo, type Battle } from '../core/battle'
+import { onTheWay, TEAMS, zoneInfo, type Battle } from '../core/battle'
 import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
@@ -102,6 +102,11 @@ const play =
     if (run.phase === 'reward') return reward(run, rng, PICKS[pick])
     // Any bot with a landing plan breaks out the way with the fewest aliens.
     if (run.phase === 'battle' && run.battle!.start) return { type: 'land', zone: best(run.battle!, (i) => -onTheWay(run.battle!, run.battle!.zones[i]).length) }
+    // A rescue splits the squad by the bot's appetite for risk: a safe bot stays together, a dangerous one scatters.
+    if (run.phase === 'battle' && run.battle!.goal === 'rescue') {
+      const most = Math.min(TEAMS, run.battle!.reserve.length)
+      return { type: 'split', teams: Math.max(1, Math.round(most * { safe: 0, standard: 0.5, dangerous: 1 }[typeof risk === 'function' ? risk(run) : risk])) }
+    }
     if (run.phase === 'battle') return { type: 'land', zone: LANDS[land](run, run.battle!, rng) }
     if (run.phase === 'shop') return build ? shop(run) : { type: 'leave' }
     if (run.phase === 'event') return { type: 'choose', index: events === 'bold' ? takeable(run)[0] : takeable(run).at(-1)! }
@@ -116,6 +121,7 @@ const play =
 /** Chooses every option at random; in a shop, builds or leaves at a coin flip. Decides finds as decideFind says. */
 const randomBot: Bot = (run, rng) => {
   if (run.phase === 'reward') return reward(run, rng, PICKS.random)
+  if (run.phase === 'battle' && run.battle!.goal === 'rescue') return { type: 'split', teams: 1 + randomInt(rng, Math.min(TEAMS, run.battle!.reserve.length)) }
   if (run.phase === 'battle') return { type: 'land', zone: LANDS.random(run, run.battle!, rng) }
   if (run.phase === 'event') return { type: 'choose', index: takeable(run)[randomInt(rng, takeable(run).length)] }
   if (run.phase === 'shop') {

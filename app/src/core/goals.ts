@@ -10,6 +10,8 @@ export const WAVE_EVERY = 2
 export const CIVILIANS = 10
 export const CIVILIAN_HP = 5
 export const CIVILIAN_SUPPLIES = 2
+/** Civilians left unsaved on a rescue for each point of threat they add. */
+export const CIVILIANS_PER_THREAT = 4
 
 export const GOALS: Record<Goal, { name: string; text: string; reward: string; force: number; weight: number }> = {
   exterminate: { name: 'Exterminate', text: 'Kill every alien', reward: 'supplies and gear', force: 0, weight: 3 },
@@ -17,7 +19,7 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
   hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as waves arrive`, reward: 'a relic, no gear', force: 2, weight: 1 },
   rescue: {
     name: 'Rescue',
-    text: `${CIVILIANS} civilians hide about the map, and the aliens hunt them. A soldier who reaches one gets them out. Save who you can; each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience`,
+    text: `${CIVILIANS} civilians hide about the map, and the aliens hunt them. A soldier who reaches one gets them out. Split the squad to reach more. Each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
     reward: 'supplies and experience, no gear',
     force: 0,
     weight: 1,

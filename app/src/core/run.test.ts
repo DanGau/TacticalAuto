@@ -38,7 +38,7 @@ import {
   GEAR_PRICE,
 } from './run'
 import { PATHS, SKILLS } from './skills'
-import { atKey, road } from './roads'
+import { atKey, road, deploy } from './roads'
 import { RELICS } from './relics'
 
 /** A run whose first clone has learned its first skill, so the overworld waits. */
@@ -75,7 +75,7 @@ function travelling(stops: StopKind[], risk: Risk = 'standard'): Run {
 /** Travels to the next stop, a battle, and ends it with `winner`: the losing side is dead to the last unit. */
 function fight(run: Run, winner: Side): void {
   apply(run, { type: 'advance' })
-  apply(run, { type: 'land', zone: 0 })
+  deploy(run, 0)
   const battle = run.battle!
   battle.units = battle.units.filter((u) => u.side === winner)
   battle.phase = 'over'
@@ -217,7 +217,7 @@ test('experience follows what a soldier did: kills and damage its own, feats onl
   const [clone] = run.soldiers
   const battle = () => {
     apply(run, { type: 'advance' })
-    apply(run, { type: 'land', zone: 0 })
+    deploy(run, 0)
     const b = run.battle!
     b.tally[clone.id] = { dealt: 12, kills: 3, taken: 4, feats: ['hatTrick'] }
     b.units = b.units.filter((u) => u.side === 'human')
@@ -464,7 +464,7 @@ test('doctrines change the run: Lone Wolf leaves one soldier and stops recruits;
 test('under exosuits cover shields aliens but not soldiers; fortification makes every cover count for more', () => {
   const run = travelling(['battle'])
   apply(run, { type: 'advance' })
-  apply(run, { type: 'land', zone: 0 })
+  deploy(run, 0)
   const battle = run.battle!
   const soldier = battle.units.find(isSoldier)!
   const alien = battle.units.find((u) => u.side === 'alien')!
@@ -486,7 +486,7 @@ test("a soldier lands with its class's ability and its uses, the effects of its 
   run.relics = ['echo', 'capacitor']
   apply(run, { type: 'advance' })
   run.battle!.boons[0] = 'crit'
-  apply(run, { type: 'land', zone: 0 })
+  deploy(run, 0)
   const [unit] = run.battle!.units.filter(isSoldier)
   expect(unit).toMatchObject({ ability: 'rocket', charges: 3, stance: 'anchor', armor: 2, effects: ['shred', 'opener'] })
   expect(unit.hp).toBe(soldierStats(run, run.soldiers[0]).hp)

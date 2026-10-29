@@ -1,5 +1,6 @@
 import { PATHS } from './skills'
 import { expect, test } from 'vitest'
+import { deploy } from './roads'
 import { apply } from './apply'
 import { alienUnit, CRIT_BONUS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
@@ -61,7 +62,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   // A cold zone, so no drop pod impact lands in the fight.
   const zone = run.battle!.hot === 0 ? 1 : 0
   run.battle!.boons[zone] = 'kill'
-  apply(run, { type: 'land', zone })
+  deploy(run, zone)
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist: null })
   battle.cover.fill(0)

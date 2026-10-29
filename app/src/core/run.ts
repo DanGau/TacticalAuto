@@ -1,7 +1,7 @@
 import { RARITY_CHANCE, type Lasting, type Rarity } from './base'
 import { TUNING } from './tuning'
 import { ALIENS, alienStats, muster, type AlienKind } from './aliens'
-import { CIVILIAN_SUPPLIES, GOALS, type Goal } from './goals'
+import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, GOALS, type Goal } from './goals'
 import { BASE_STATS, createBattle, type Alien, type Battle, type Stats } from './battle'
 import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type Doctrine, type DoctrineId } from './doctrines'
@@ -681,7 +681,7 @@ export function endBattle(run: Run): void {
   const risk = RISKS[mission.risk]
   // An escape won empties the threat; any other battle is a stop, and adds to it.
   if (mission.kind === 'escape') run.threat = won ? 0 : run.threat
-  else run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT), THREAT_MAX)
+  else run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT) + (rescued === null ? 0 : Math.floor((CIVILIANS - (won ? rescued : 0)) / CIVILIANS_PER_THREAT)), THREAT_MAX)
   const held = run.relics.map((id): Relic => RELICS[id])
   const supplies = won ? risk.supplies * (mission.goal === 'raid' ? 3 : 1) + (rescued ?? 0) * CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
   run.supplies += supplies

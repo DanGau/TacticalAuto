@@ -1,6 +1,7 @@
 import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, PACKS, REGEN_HEAL, type AlienKind } from './aliens'
+import { deploy } from './roads'
 import { apply } from './apply'
 import { isSoldier, ACID_DAMAGE, alienUnit, mechUnit, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, type Battle, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
@@ -31,7 +32,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   // A cold zone, so no drop pod impact lands in the fight.
   const zone = run.battle!.hot === 0 ? 1 : 0
   run.battle!.boons[zone] = 'kill'
-  apply(run, { type: 'land', zone })
+  deploy(run, zone)
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [] })
   battle.cover.fill(0)

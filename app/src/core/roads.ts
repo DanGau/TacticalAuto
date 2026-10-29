@@ -1,3 +1,4 @@
+import { apply, type Result } from './apply'
 import { legOf, type Run, type Stop } from './run'
 
 /** For tests: lays the rest of the leg as a road of `stops` one after another, the first entered, then the satellite. */
@@ -13,4 +14,9 @@ export function atKey(run: Run): void {
   leg.columns.at(-1)![0].stop ??= { kind: 'key', risk: 'standard', goal: 'exterminate', terrain: 'compound', twist: null, packs: [] }
   run.stop = leg.columns.length - 1
   leg.path = [...Array<number>(run.stop).fill(-1), 0]
+}
+
+/** For tests: lands at `zone`, or on a rescue, as one squad. */
+export function deploy(run: Run, zone: number): Result {
+  return apply(run, run.battle?.goal === 'rescue' ? { type: 'split', teams: 1 } : { type: 'land', zone })
 }

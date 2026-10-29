@@ -1,4 +1,4 @@
-import { land } from './battle'
+import { land, TEAMS } from './battle'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
 import { advance, buyWare, current, GEAR_PRICE, go, keepFind, nextStop, sellFind, skillOffers, takeRelic, takeSkill, ways, type Run } from './run'
 
@@ -19,6 +19,8 @@ export type Action =
   | { type: 'advance' }
   /** Deploy phase: land the squad on the zone at `zone` of battle.zones and begin the battle. */
   | { type: 'land'; zone: number }
+  /** On a rescue, in place of a landing zone: how many teams the squad splits into, each landing apart. */
+  | { type: 'split'; teams: number }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
   /** Reward phase: equip the first of run.finds on the soldier who found it, selling what it replaces. */
@@ -35,9 +37,17 @@ const no = (reason: string): Result => ({ ok: false, reason })
 
 /** The only way a player changes state. A rejected action leaves state untouched. */
 export function apply(run: Run, action: Action): Result {
+  if (action.type === 'split') {
+    const battle = run.battle
+    if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy' || battle.goal !== 'rescue') return no('not splitting up')
+    if (!Number.isInteger(action.teams) || action.teams < 1 || action.teams > Math.min(TEAMS, battle.reserve.length)) return no('no such split')
+    land(battle, battle.zones[0], action.teams)
+    return ok
+  }
   if (action.type === 'land') {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not landing')
+    if (battle.goal === 'rescue') return no('a rescue splits up instead')
     const zone = battle.zones[action.zone]
     if (!zone) return no('no such landing zone')
     land(battle, zone)

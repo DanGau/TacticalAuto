@@ -246,6 +246,8 @@ export interface Unit {
   civilian: boolean
   /** For a mech, the soldier id of the engineer who deployed it, credited with what it does; null for any other unit. */
   summoner: number | null
+  /** The team a soldier keeps with, when a rescue splits the squad; 0 otherwise. */
+  team: number
   /** Whether the unit loses its next action. */
   panicked: boolean
   /** Whether the unit has moved this turn. */
@@ -589,10 +591,11 @@ export const BOON_ARMOR = 2
 
 /**
  * Lands the whole squad on the free tiles nearest the zone's centre, grants the zone's boon, and begins the battle.
+ * Split into `teams`, each team lands at its own zone instead.
  * A drop onto the hot zone breaches: the pod beneath is caught unaware and loses its first alien turn's shots, its
  * members take the impact in the first beat, and every other pod hears the landing and converges on it.
  */
-export function land(battle: Battle, zone: Tile): void {
+export function land(battle: Battle, zone: Tile, teams = 1): void {
   const index = battle.zones.indexOf(zone)
   const boon = battle.boons[index]
   if (index === battle.hot) {
@@ -611,9 +614,10 @@ export function land(battle: Battle, zone: Tile): void {
     battle.concealed = false
     battle.pods.forEach((pod, i) => Object.assign(pod, { revealed: true, alert: i === 0 }))
   }
-  const tiles = freeTilesNear(battle, battle.start ?? zone, battle.reserve.length)
+  // Split up, each team lands at its own zone, the soldiers dealt among them in turn.
+  const tiles = Array.from({ length: teams }, (_, t) => freeTilesNear(battle, teams > 1 ? battle.zones[t] : (battle.start ?? zone), battle.reserve.length))
   battle.reserve.forEach((soldier, i) => {
-    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
+    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i % teams][Math.floor(i / teams)], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: null, team: i % teams, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
   })
   battle.reserve = []
   battle.phase = 'battle'
@@ -687,6 +691,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     fury: 0,
     civilian: false,
     summoner: null,
+    team: 0,
     panicked: false,
     moved: false,
     suppressed: 0,
@@ -697,7 +702,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
 
 /** A mech built by the engineer `owner`, with `stats` and the `effects` its skills give it, standing on `tile`. */
 export function mechUnit(battle: Battle, owner: Unit, stats: Stats, effects: Effect[], tile: Tile): Unit {
-  return { id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: stats.armor, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'rush', effects, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: owner.soldier, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 }
+  return { id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: stats.armor, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'rush', effects, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: owner.soldier, team: battle.units.find((u) => u.soldier === owner.soldier)?.team ?? 0, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 }
 }
 
 /** Places a pack as a new pod around `centre`. */
@@ -712,6 +717,9 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
  * A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. A hold keeps half its
  * packs back as waves and offers one landing zone, the uplink; a rescue hides civilians alone about the map.
  */
+/** The most teams a rescue can split the squad into. */
+export const TEAMS = 4
+
 /** How far from the squad and the ways out an escape's Hunter starts. */
 const HUNTER_START = 12
 
@@ -791,15 +799,18 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     for (let i = 0; i < CIVILIANS; i++) {
       const tile = spacedTile(battle, battle.units, CIVILIAN_CLEARANCE)
       const stats = { ...BASE_STATS, hp: CIVILIAN_HP, aim: 0, damage: 0, range: 0, move: 0, crit: 0 }
-      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
+      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, summoner: null, team: 0, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
     }
   }
   if (goal === 'hold') battle.uplink = spacedTile(battle, battle.units, ZONE_CLEARANCE)
+  // A rescue lands wherever its teams scatter to: zones far apart, one for each team it might split into.
+  if (goal === 'rescue') while (battle.zones.length < TEAMS) battle.zones.push(spacedTile(battle, [...battle.units.filter((u) => u.side === 'alien'), ...battle.zones], 2 * ZONE_CLEARANCE))
   while (battle.zones.length < ZONES) battle.zones.push(spacedTile(battle, [...battle.units, ...battle.zones, ...(battle.uplink ? [battle.uplink] : [])], ZONE_CLEARANCE))
   const boons = Object.keys(BOONS) as Keyword[]
-  battle.boons = battle.zones.map(() => boons.splice(randomInt(battle, boons.length), 1)[0])
+  // A rescue's choice is how to split the squad, not where to land, so its zones grant nothing.
+  battle.boons = goal === 'rescue' ? [] : battle.zones.map(() => boons.splice(randomInt(battle, boons.length), 1)[0])
   // One zone is a hot drop, right on a pod.
-  if (goal !== 'hold' && goal !== 'escape' && centres.length > 0) {
+  if (goal !== 'hold' && goal !== 'escape' && goal !== 'rescue' && centres.length > 0) {
     battle.hot = randomInt(battle, ZONES)
     battle.zones[battle.hot] = centres[randomInt(battle, centres.length)]
   }

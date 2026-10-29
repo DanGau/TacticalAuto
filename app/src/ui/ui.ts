@@ -7,7 +7,7 @@ import { ALIENS } from '../core/aliens'
 import { RELICS, type Relic } from '../core/relics'
 import { known } from './intro'
 import { TWISTS } from '../core/twists'
-import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_REACH, nearestAlien, onTheWay, ZONE_NAMES, zoneInfo, type Battle, type Unit } from '../core/battle'
+import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_REACH, nearestAlien, onTheWay, TEAMS, ZONE_NAMES, zoneInfo, type Battle, type Unit } from '../core/battle'
 import { KEYWORDS } from '../core/keywords'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { DETECT, PATROL_DETECT } from '../core/sight'
@@ -80,8 +80,9 @@ function tradeoffs(battle: Battle, zone: number): string {
 }
 
 /** Before the landing: a button per zone that flies the camera there, one back to the whole map, and the chosen zone's boon and case. */
-function drop(battle: Battle, zone: number | null): string {
+function drop(battle: Battle, zone: number | null, teams: number): string {
   if (battle.start) return escapes(battle, zone)
+  if (battle.goal === 'rescue') return splits(battle, teams)
   const zones = battle.boons.map((boon, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}" title="${i === battle.hot ? 'Land on top of a pod' : BOONS[boon].text}">${ZONE_NAMES[i]} ${i === battle.hot ? '☄️ Hot drop' : `${KEYWORDS[boon].icon} ${BOONS[boon].name}`}</button>`)
   const overview = `<button data-zone="" class="overview ${zone === null ? 'on' : ''}" title="Whole map">🗺️</button>`
   const detail =
@@ -90,6 +91,22 @@ function drop(battle: Battle, zone: number | null): string {
       : `<p>${zone === battle.hot ? 'Land on top of a pod.' : `${BOONS[battle.boons[zone]].text}.`}</p><div class="tradeoffs">${tradeoffs(battle, zone)}</div>${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
   const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
   return `${twist}<div class="zones">${zones.join('')}${overview}</div>${detail}`
+}
+
+/** The ways a rescue can split a squad of `size`: together, in two teams, or each alone. */
+const splitsOf = (size: number) => [...new Set([1, 2, Math.min(TEAMS, size)])].filter((n) => n <= size)
+
+/** On a rescue: a button per way to split the squad, then the chosen split's teams and where they land. */
+function splits(battle: Battle, teams: number): string {
+  const size = battle.reserve.length
+  const name = (n: number) => (n === 1 ? 'Stay together' : n === size ? 'Split up' : `${n} teams`)
+  const buttons = splitsOf(size).map((n) => `<button data-split="${n}" class="${n === teams ? 'on' : ''}">${name(n)}</button>`)
+  const members = Array.from({ length: teams }, (_, t) => battle.reserve.filter((_, i) => i % teams === t).length)
+  const what =
+    teams === 1
+      ? 'The squad lands as one. Safest, but slow to reach civilians spread across the map.'
+      : `${members.join(' + ')}: each team lands apart and makes for the civilians nearest it. More are reached, but a small team is easy prey.`
+  return `<div class="zones">${buttons.join('')}</div><p>${what}</p>${button({ type: 'split', teams }, teams === 1 ? 'Land together' : teams === size ? 'Land split up' : `Land in ${teams} teams`)}`
 }
 
 /** On an escape: a button per escape zone, then the chosen one's aliens on the way and boon. */
@@ -118,6 +135,8 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   const dropPanel = document.getElementById('drop')!
   /** The landing zone chosen in the deploy phase, and the battle it was chosen in. */
   let zone: number | null = null
+  /** The teams chosen to split a rescue's squad into. */
+  let teams = 1
   let zoneBattle: Battle | null = null
   /** The report the player has continued past. */
   let seen: Report | null = null
@@ -176,8 +195,10 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (battle !== zoneBattle) {
       zoneBattle = battle
       zone = null
+      teams = 1
+      view.showTeams(teams)
     }
-    dropPanel.innerHTML = drop(battle, zone)
+    dropPanel.innerHTML = drop(battle, zone, teams)
   }
 
   function choose(next: number | null): void {
@@ -194,7 +215,11 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     const target = (e.target as HTMLElement).closest('button')
     if (!target) return
     if (target.dataset.action) act(JSON.parse(target.dataset.action) as Action)
-    else choose(target.dataset.zone ? Number(target.dataset.zone) : null)
+    else if (target.dataset.split) {
+      teams = Number(target.dataset.split)
+      view.showTeams(teams)
+      showDrop(shown!)
+    } else choose(target.dataset.zone ? Number(target.dataset.zone) : null)
   })
   overlay.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')

@@ -76,6 +76,8 @@ function shots(battle: Battle): Shot[] {
     const what = battle.start ? `Escape zone ${ZONE_NAMES[i]}` : i === battle.hot ? `Landing zone ${ZONE_NAMES[i]}, a hot drop onto a pod` : `Landing zone ${ZONE_NAMES[i]}: ${BOONS[battle.boons[i]].name}`
     return { tiles: around(zone), line: `${what}. ${ground(battle, zone)}.`, zones: true }
   })
+  // A rescue lands where its teams scatter to, so it shows no landing zones.
+  if (battle.goal === 'rescue') return [{ tiles: null, line: `Objective: ${goal.text}.` }, ...targets, ...twists, { tiles: null, line: 'Choose how to split the squad.', zones: true }]
   return [
     { tiles: null, line: `Objective: ${goal.text}.` },
     ...targets,
