@@ -7,11 +7,10 @@ import { introduce, newcomers } from './ui/intro'
 import { createUi } from './ui/ui'
 import { createView, HEIGHT, WIDTH } from './view/view'
 
-document.getElementById('fullscreen')!.addEventListener('click', () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()))
-// The game is drawn at a fixed size; the page zooms it to fit the window, full screen or not.
-const fit = () => (document.body.style.zoom = String(Math.min(innerWidth / WIDTH, innerHeight / HEIGHT)))
+const fit = () => document.documentElement.style.setProperty('--ui', String(Math.min(innerWidth / WIDTH, innerHeight / HEIGHT)))
 addEventListener('resize', fit)
 fit()
+document.getElementById('fullscreen')!.addEventListener('click', () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()))
 
 export interface Debug {
   snapshot(): Run

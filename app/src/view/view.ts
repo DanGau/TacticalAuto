@@ -254,7 +254,8 @@ export interface View {
 
 export async function createView(): Promise<View> {
   const app = new Application()
-  await app.init({ width: WIDTH, height: HEIGHT, background: 0x10141c, antialias: true })
+  await app.init({ resizeTo: window, background: 0x10141c, antialias: true })
+  addEventListener('resize', () => requestAnimationFrame(() => look(camera)))
 
   /** The world past the battlefield: scenery beyond its far edges, cliffs falling from its near ones. */
   const outskirts = new Graphics()
@@ -304,11 +305,8 @@ export async function createView(): Promise<View> {
 
   function zoneAt(px: number, py: number): number | null {
     if (shown?.phase !== 'deploy' || shown.goal === 'rescue') return null
-    // The canvas is scaled to fit the window.
-    const sx = (px * WIDTH) / app.canvas.clientWidth
-    const sy = (py * HEIGHT) / app.canvas.clientHeight
-    const a = (sx - world.x) / world.scale.x / (TILE_W / 2)
-    const b = (sy - world.y) / world.scale.y / (TILE_H / 2) + GRID
+    const a = (px - world.x) / world.scale.x / (TILE_W / 2)
+    const b = (py - world.y) / world.scale.y / (TILE_H / 2) + GRID
     const tile = { x: Math.floor((a + b) / 2), y: Math.floor((b - a) / 2) }
     const index = shown.zones.findIndex((zone) => distance(zone, tile) <= ZONE_RADIUS)
     return index < 0 ? null : index
@@ -316,8 +314,10 @@ export async function createView(): Promise<View> {
 
   function look(to: Camera): void {
     camera = to
-    world.scale.set(to.zoom)
-    world.position.set(WIDTH / 2 - to.x * to.zoom, HEIGHT / 2 - to.y * to.zoom)
+    // Cameras are framed for a WIDTH by HEIGHT screen; the window scales them to fill it.
+    const zoom = to.zoom * Math.min(app.screen.width / WIDTH, app.screen.height / HEIGHT)
+    world.scale.set(zoom)
+    world.position.set(app.screen.width / 2 - to.x * zoom, app.screen.height / 2 - to.y * zoom)
   }
 
   /** The camera that frames the given tiles, zoomed in no closer than life size. */

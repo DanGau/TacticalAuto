@@ -6,7 +6,9 @@
     <title>TacticalAuto</title>
     <style>
       body { margin: 0; overflow: hidden; height: 100vh; display: flex; align-items: center; background: #10141c; color: #dde; font: 14px sans-serif; }
-      canvas { display: block; width: min(100vw, calc(100vh * 16 / 9)); height: auto; margin: 0 auto; }
+      canvas { display: block; position: fixed; inset: 0; }
+      /* The panels are laid out for a 1280 by 720 window and scale with it. */
+      body > :not(canvas, script) { zoom: var(--ui, 1); }
       #hud { position: absolute; top: 12px; left: 12px; pointer-events: none; }
       .roster hr { border: 0; border-top: 1px solid #3a465c; margin: 6px 0; }
       .roster { margin-top: 8px; padding: 8px 12px; max-width: 420px; background: #171d29d9; border: 1px solid #3a465c; border-radius: 6px; line-height: 1.5; font-size: 13px; }

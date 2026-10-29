@@ -2,7 +2,9 @@
 function edge(map: Element, node: Element, side: 'top' | 'bottom'): { x: number; y: number } {
   const m = map.getBoundingClientRect()
   const r = node.getBoundingClientRect()
-  return { x: r.left + r.width / 2 - m.left + map.scrollLeft, y: (side === 'top' ? r.top : r.bottom) - m.top + map.scrollTop }
+  // Screen pixels per CSS pixel, as the page zooms the panels to the window.
+  const zoom = m.width / (map as HTMLElement).offsetWidth || 1
+  return { x: (r.left + r.width / 2 - m.left) / zoom + map.scrollLeft, y: ((side === 'top' ? r.top : r.bottom) - m.top) / zoom + map.scrollTop }
 }
 
 /** A gently bending trail up from `a` to `b`. */
