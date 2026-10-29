@@ -1,4 +1,5 @@
 import { apply, type Result } from './apply'
+import { spacedTile, ZONE_CLEARANCE, type Battle, type Plan } from './battle'
 import { legOf, type Run, type Stop } from './run'
 
 /** For tests: lays the rest of the leg as a road of `stops` one after another, the first entered, then the satellite. */
@@ -19,4 +20,13 @@ export function atKey(run: Run): void {
 /** For tests: lands at `zone`, or on a rescue, as one squad. */
 export function deploy(run: Run, zone: number): Result {
   return apply(run, run.battle?.goal === 'rescue' ? { type: 'split', teams: 1 } : { type: 'land', zone })
+}
+
+/** For tests: the index of a zone of `plan`, making zone 0 one if none is: on a pod for a hot drop, else clear of all. */
+export function zoneOf(battle: Battle, plan: Plan): number {
+  if (battle.plans.includes(plan)) return battle.plans.indexOf(plan)
+  const alien = battle.units.find((u) => u.side === 'alien')!
+  battle.zones[0] = plan === 'hot' ? { x: alien.x, y: alien.y } : spacedTile(battle, battle.units, ZONE_CLEARANCE)
+  battle.plans[0] = plan
+  return 0
 }

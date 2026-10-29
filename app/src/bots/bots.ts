@@ -1,5 +1,5 @@
 import type { Action } from '../core/apply'
-import { onTheWay, TEAMS, zoneInfo, type Battle } from '../core/battle'
+import { onTheWay, TEAMS, zoneInfo, type Battle, type Stance } from '../core/battle'
 import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
@@ -41,6 +41,16 @@ function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
   return { type: 'skill', soldier: learner.id, index: pick(run, rng, skillOffers(learner).map((id) => SKILLS[id].tags ?? [])) }
 }
 
+/**
+ * Whether a zone's ground suits a soldier of `stance`: a sniper wants high ground over the aliens or room to shoot from
+ * afar, an assault to start close, anyone else plenty of cover.
+ */
+function suits(stance: Stance, info: ReturnType<typeof zoneInfo>): boolean {
+  if (stance === 'standoff') return info.high > 0 || (info.contact >= 8 && info.contact < Infinity)
+  if (stance === 'rush') return info.contact <= 6
+  return info.cover >= 10
+}
+
 /** Chooses a landing zone. */
 type Land = (run: Run, battle: Battle, rng: { rng: number }) => number
 
@@ -54,12 +64,9 @@ const LANDS = {
   /** The least cover: a careless landing. */
   exposed: (_run, battle) => best(battle, (i) => -cover(battle, i)),
   /** The hot drop when offered, else the most cover. */
-  hot: (_run, battle) => battle.hot ?? best(battle, (i) => cover(battle, i)),
-  /** A boon the squad's build pays off on, then cover. */
-  boon: (run, battle) => {
-    const held = squadKeywords(run)
-    return best(battle, (i) => (held.includes(battle.boons[i]) ? 100 : 0) + cover(battle, i))
-  },
+  hot: (_run, battle) => (battle.plans.includes('hot') ? battle.plans.indexOf('hot') : best(battle, (i) => cover(battle, i))),
+  /** The zone whose ground suits the most of the squad. */
+  fit: (_run, battle) => best(battle, (i) => battle.reserve.filter((r) => suits(r.stance, zoneInfo(battle, battle.zones[i]))).length * 100 + cover(battle, i)),
 } satisfies Record<string, Land>
 
 /** Purchases the run can pay for now: gear, then relics. */
@@ -107,6 +114,11 @@ const play =
       const most = Math.min(TEAMS, run.battle!.reserve.length)
       return { type: 'split', teams: Math.max(1, Math.round(most * { safe: 0, standard: 0.5, dangerous: 1 }[typeof risk === 'function' ? risk(run) : risk])) }
     }
+    // A raid goes for caches by the same appetite.
+    if (run.phase === 'battle' && run.battle!.goal === 'raid') {
+      const most = run.battle!.caches.length
+      return { type: 'grab', caches: Math.max(1, Math.round(most * { safe: 0, standard: 0.5, dangerous: 1 }[typeof risk === 'function' ? risk(run) : risk])) }
+    }
     if (run.phase === 'battle') return { type: 'land', zone: LANDS[land](run, run.battle!, rng) }
     if (run.phase === 'shop') return build ? shop(run) : { type: 'leave' }
     if (run.phase === 'event') return { type: 'choose', index: events === 'bold' ? takeable(run)[0] : takeable(run).at(-1)! }
@@ -122,6 +134,7 @@ const play =
 const randomBot: Bot = (run, rng) => {
   if (run.phase === 'reward') return reward(run, rng, PICKS.random)
   if (run.phase === 'battle' && run.battle!.goal === 'rescue') return { type: 'split', teams: 1 + randomInt(rng, Math.min(TEAMS, run.battle!.reserve.length)) }
+  if (run.phase === 'battle' && run.battle!.goal === 'raid') return { type: 'grab', caches: 1 + randomInt(rng, run.battle!.caches.length) }
   if (run.phase === 'battle') return { type: 'land', zone: LANDS.random(run, run.battle!, rng) }
   if (run.phase === 'event') return { type: 'choose', index: takeable(run)[randomInt(rng, takeable(run).length)] }
   if (run.phase === 'shop') {
@@ -146,6 +159,6 @@ export const bots: Record<string, Bot> = {
   dangerous: play({ risk: 'dangerous', pick: 'first', land: 'cover', build: true, events: 'cautious' }),
   growing: play({ risk: growing, pick: 'first', land: 'cover', build: true, events: 'cautious' }),
   breacher: play({ risk: 'standard', pick: 'first', land: 'hot', build: true, events: 'cautious' }),
-  synergy: play({ risk: 'standard', pick: 'synergy', land: 'boon', build: true, events: 'cautious' }),
+  synergy: play({ risk: 'standard', pick: 'synergy', land: 'fit', build: true, events: 'cautious' }),
   expert: play({ risk: growing, pick: 'synergy', land: 'hot', build: true, events: 'cautious' }),
 }

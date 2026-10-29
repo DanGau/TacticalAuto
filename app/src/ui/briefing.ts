@@ -1,5 +1,5 @@
 import { ALIENS } from '../core/aliens'
-import { BOONS, GRID, heightAt, ZONE_NAMES, type Battle, type Tile } from '../core/battle'
+import { GRID, PLANS, heightAt, ZONE_NAMES, type Battle, type Tile } from '../core/battle'
 import type { Prop } from '../core/terrain'
 import { GOALS } from '../core/goals'
 import { TWISTS } from '../core/twists'
@@ -73,11 +73,13 @@ function shots(battle: Battle): Shot[] {
   const tanks = battle.props.flatMap((p, t) => (p === 'fuel' ? [{ x: t % GRID, y: Math.floor(t / GRID) }] : []))
   const twists: Shot[] = twist ? [{ tiles: tanks.length > 0 ? tanks : null, line: `${twist.icon} ${twist.name}: ${twist.text}.` }] : []
   const zones = battle.zones.map((zone, i): Shot => {
-    const what = battle.start ? `Escape zone ${ZONE_NAMES[i]}` : i === battle.hot ? `Landing zone ${ZONE_NAMES[i]}, a hot drop onto a pod` : `Landing zone ${ZONE_NAMES[i]}: ${BOONS[battle.boons[i]].name}`
+    const what = battle.start ? `Escape zone ${ZONE_NAMES[i]}` : `Landing zone ${ZONE_NAMES[i]}: ${PLANS[battle.plans[i]].name}`
     return { tiles: around(zone), line: `${what}. ${ground(battle, zone)}.`, zones: true }
   })
-  // A rescue lands where its teams scatter to, so it shows no landing zones.
-  if (battle.goal === 'rescue') return [{ tiles: null, line: `Objective: ${goal.text}.` }, ...targets, ...twists, { tiles: null, line: 'Choose how to split the squad.', zones: true }]
+  // A rescue lands where its teams scatter to, and a raid once, so neither shows landing zones; a raid shows its caches.
+  const caches = battle.caches.map((cache, i): Shot => ({ tiles: around(cache), line: `Supply cache ${i + 1}. ${ground(battle, cache)}.` }))
+  if (battle.goal === 'rescue' || battle.goal === 'raid')
+    return [{ tiles: null, line: `Objective: ${goal.text}.` }, ...caches, ...targets, ...twists, { tiles: null, line: battle.goal === 'rescue' ? 'Choose how to split the squad.' : 'Choose how many caches to go for.', zones: true }]
   return [
     { tiles: null, line: `Objective: ${goal.text}.` },
     ...targets,

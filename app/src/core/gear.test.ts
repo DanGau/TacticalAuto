@@ -1,6 +1,6 @@
 import { PATHS } from './skills'
 import { expect, test } from 'vitest'
-import { deploy } from './roads'
+import { deploy, zoneOf } from './roads'
 import { apply } from './apply'
 import { alienUnit, CRIT_BONUS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
@@ -60,8 +60,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   apply(run, { type: 'advance' })
   // War drums pay off only on a kill, so they leave a duel as it is.
   // A cold zone, so no drop pod impact lands in the fight.
-  const zone = run.battle!.hot === 0 ? 1 : 0
-  run.battle!.boons[zone] = 'kill'
+  const zone = zoneOf(run.battle!, 'stealth')
   deploy(run, zone)
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist: null })

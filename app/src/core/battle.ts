@@ -1,7 +1,7 @@
 import { HATCH_TURNS, NODE_SPAWNS, type AlienKind } from './aliens'
 import type { Tally } from './feats'
 import type { DoctrineEffect, Rule } from './doctrines'
-import type { Keyword, Resist } from './keywords'
+import type { Resist } from './keywords'
 import { random, randomInt } from './rng'
 import { CIVILIAN_HP, CIVILIANS, type Goal } from './goals'
 import type { Twist } from './twists'
@@ -322,8 +322,6 @@ export interface Battle {
   used: Effect[]
   /** True while no living pod is alert to the squad. */
   concealed: boolean
-  /** The landing zone on top of a pod, which the squad can drop onto; null on a hold. */
-  hot: number | null
   /** Set by a landing on the hot zone until the drop pods' impact lands, as the battle's first beat. */
   breach: boolean
   /** Tiles of acid, each with the alien turns it has left. */
@@ -347,8 +345,12 @@ export interface Battle {
   escape: Tile | null
   /** Soldiers lifted off, on an escape. */
   escaped: number
-  /** The keyword each landing zone grants the squad for the battle, in zones order. */
-  boons: Keyword[]
+  /** What landing at each zone means, in zones order. */
+  plans: Plan[]
+  /** On a raid, the supply caches still on the map, and how many the squad set out to grab and has grabbed. */
+  caches: Tile[]
+  greed: number
+  grabbed: number
   /** Soldiers not yet landed. */
   reserve: Reserve[]
 }
@@ -564,41 +566,52 @@ export const nearestAlien = (battle: Battle, tile: Tile): Unit | undefined =>
   battle.units.filter((u) => u.side === 'alien').reduce<Unit | undefined>((best, u) => (!best || distance(tile, u) < distance(tile, best) ? u : best), undefined)
 
 /** What a landing zone offers: cover tiles in and around it, and the distance to the nearest alien. */
-export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: number } {
+export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: number; high: number } {
   let cover = 0
+  let top = 0
   for (let y = zone.y - ZONE_RADIUS; y <= zone.y + ZONE_RADIUS; y++) {
     for (let x = zone.x - ZONE_RADIUS; x <= zone.x + ZONE_RADIUS; x++) {
-      if (onGrid(x, y) && coverAt(battle, x, y) > 0) cover++
+      if (!onGrid(x, y)) continue
+      if (coverAt(battle, x, y) > 0) cover++
+      else top = Math.max(top, heightAt(battle, { x, y }))
     }
   }
   const alien = nearestAlien(battle, zone)
-  return { cover, contact: alien ? distance(zone, alien) : Infinity }
+  return { cover, contact: alien ? distance(zone, alien) : Infinity, high: alien ? top - heightAt(battle, alien) : 0 }
 }
 
-/** What landing in a zone gives the squad for the battle, by the zone's keyword. */
-export const BOONS: Record<Keyword, { name: string; text: string }> = {
-  burn: { name: 'Fuel depot', text: "Every soldier's hits this battle set the target burning" },
-  frost: { name: 'Coolant leak', text: 'Every alien starts the battle chilled' },
-  mark: { name: 'Spotter tower', text: 'Every alien of the pod nearest this zone starts marked' },
-  crit: { name: 'Sniper nest', text: 'Every soldier has +15% crit chance this battle' },
-  kill: { name: 'War drums', text: 'Each kill gives the soldier who made it +1 damage for the rest of the battle' },
-  ward: { name: 'Supply crates', text: 'Every soldier lands with +2 armor' },
+/** What each plan is called, and what it does, for the player. */
+export const PLANS: Record<Plan, { name: string; icon: string; text: string }> = {
+  hot: { name: 'Hot drop', icon: '☄️', text: 'Land right on a pod: the drop pods hit it and it is ambushed, but every other pod hears and converges' },
+  stealth: { name: 'Stealth insertion', icon: '🌘', text: 'Land unseen, clear of every pod, and creep in to set ambushes' },
+  decap: { name: 'Decapitation', icon: '🗡️', text: 'Land on the commander: it is ambushed, but every guard converges on the squad' },
+  overwatch: { name: 'Overwatch', icon: '🔭', text: "Land on high ground at range from the commander; its pod sees the squad coming" },
+  bait: { name: 'Bait', icon: '🪤', text: 'Land far off: the guards come for the squad, leaving the commander alone' },
+  uplink: { name: 'Uplink', icon: '📡', text: 'Land beside this uplink and hold it' },
+  escape: { name: 'Way out', icon: '🚁', text: 'Break out toward this escape zone' },
+  team: { name: 'Team', icon: '👥', text: 'Where a team lands' },
 }
-
-const BOON_EFFECTS: Partial<Record<Keyword, Effect>> = { burn: 'incendiary', kill: 'bloodRite' }
-export const BOON_CRIT = 0.15
-export const BOON_ARMOR = 2
 
 /**
- * Lands the whole squad on the free tiles nearest the zone's centre, grants the zone's boon, and begins the battle.
+ * What landing at a zone means. Exterminate and raid: a hot drop onto a pod, or a stealth insertion clear of every pod.
+ * Assassinate: a decapitation onto the commander, an overwatch on high ground at range, or bait far off that draws the
+ * guards away. Hold: which uplink to hold. Escape: which way out. A rescue's zones are where its teams land.
+ */
+export type Plan = 'hot' | 'stealth' | 'decap' | 'overwatch' | 'bait' | 'uplink' | 'escape' | 'team'
+
+/** The supply caches a raid can grab, at most. */
+export const CACHES = 3
+
+/**
+ * Lands the whole squad on the free tiles nearest the zone's centre, as the zone's plan has it, and begins the battle.
  * Split into `teams`, each team lands at its own zone instead.
- * A drop onto the hot zone breaches: the pod beneath is caught unaware and loses its first alien turn's shots, its
- * members take the impact in the first beat, and every other pod hears the landing and converges on it.
+ * A hot drop or a decapitation breaches: the pod beneath is caught unaware and loses its first alien turn's shots, its
+ * members take the impact in the first beat, and every other pod hears the landing and converges on it. An overwatch
+ * alerts the commander's pod; bait draws every other pod to the landing. A hold's zone is the uplink it holds.
  */
 export function land(battle: Battle, zone: Tile, teams = 1): void {
-  const index = battle.zones.indexOf(zone)
-  const boon = battle.boons[index]
-  if (index === battle.hot) {
+  const plan = battle.plans[battle.zones.indexOf(zone)]
+  if (plan === 'hot' || plan === 'decap') {
     battle.breach = true
     battle.concealed = false
     const under = nearestAlien(battle, zone)!.pod!
@@ -607,6 +620,10 @@ export function land(battle: Battle, zone: Tile, teams = 1): void {
       else pod.waypoint = zone
     })
   }
+  const commander = battle.units.find((u) => u.target)
+  if (plan === 'overwatch' && commander) Object.assign(battle.pods[commander.pod!], { revealed: true, alert: true })
+  if (plan === 'bait') battle.pods.forEach((pod, i) => i !== commander?.pod && (pod.waypoint = zone))
+  if (plan === 'uplink') battle.uplink = zone
   // On an escape the zone is where the squad makes for. The Hunter has found it; the packs across the ways out are
   // in sight but have yet to notice it.
   if (battle.start) {
@@ -622,22 +639,60 @@ export function land(battle: Battle, zone: Tile, teams = 1): void {
   battle.reserve = []
   battle.phase = 'battle'
   const squad = battle.units.filter((u) => u.side === 'human' && !u.civilian)
-  const aliens = battle.units.filter((u) => u.side === 'alien')
-  const effect = BOON_EFFECTS[boon]
-  for (const unit of squad) {
-    if (effect) unit.effects = [...unit.effects, effect]
-    if (boon === 'crit') unit.stats = { ...unit.stats, crit: unit.stats.crit + BOON_CRIT }
-    if (boon === 'ward') unit.armor += BOON_ARMOR
-  }
-  if (boon === 'frost') for (const alien of aliens.filter((u) => !u.resists.includes('frost'))) alien.chilled = CHILL_TURNS
-  if (boon === 'mark' && aliens.length > 0) {
-    const pod = aliens.reduce((a, b) => (distance(zone, a) <= distance(zone, b) ? a : b)).pod
-    for (const alien of aliens.filter((u) => u.pod === pod && !u.resists.includes('mark'))) alien.marked = true
-  }
   dropRelics(battle, squad, [...new Set(squad.map((u) => (teams > 1 ? battle.zones[u.team] : (battle.start ?? zone))))])
   // A barrier projector armors every squadmate of its carrier.
   for (const carrier of squad.filter((u) => u.effects.includes('barrier'))) {
     for (const mate of squad) if (mate !== carrier) mate.armor += BARRIER_ARMOR
+  }
+}
+
+/** Tiles weighed for each zone of a distinct kind. */
+const CANDIDATES = 40
+
+/** The chance each zone of an exterminate or a raid is a hot drop, by the kind of place: the wilder, the likelier. */
+const HOT_CHANCE: Record<TerrainKind, number> = { town: 0.2, countryside: 0.2, city: 0.35, industrial: 0.4, ruins: 0.55, compound: 0.5, hive: 0.7 }
+
+/** Lays out the zones a battle offers and what each means, by its goal; see Plan. `centres` are where the pods stand. */
+function planZones(battle: Battle, centres: Tile[]): void {
+  const clear = () => spacedTile(battle, [...battle.units, ...battle.zones], ZONE_CLEARANCE)
+  // Zones clear of every pod differ in kind, one each in turn: the highest ground over the aliens, the heaviest cover,
+  // the nearest to them. Which suits a squad depends on who is in it.
+  const kinds = [(i: ReturnType<typeof zoneInfo>) => i.high, (i: ReturnType<typeof zoneInfo>) => i.cover, (i: ReturnType<typeof zoneInfo>) => -i.contact]
+  let next = randomInt(battle, kinds.length)
+  const distinct = () => {
+    const score = kinds[next++ % kinds.length]
+    const options = Array.from({ length: CANDIDATES }, clear)
+    return options.reduce((a, b) => (score(zoneInfo(battle, b)) > score(zoneInfo(battle, a)) ? b : a))
+  }
+  const add = (zone: Tile, plan: Plan) => {
+    battle.zones.push(zone)
+    battle.plans.push(plan)
+  }
+  const goal = battle.goal
+  if (goal === 'escape') battle.plans = battle.zones.map((): Plan => 'escape')
+  // A rescue lands wherever its teams scatter to: zones far apart, one for each team it might split into.
+  else if (goal === 'rescue') while (battle.zones.length < TEAMS) add(spacedTile(battle, [...battle.units.filter((u) => u.side === 'alien'), ...battle.zones], 2 * ZONE_CLEARANCE), 'team')
+  else if (goal === 'hold') while (battle.zones.length < ZONES) add(distinct(), 'uplink')
+  else if (goal === 'assassinate') {
+    const commander = battle.units.find((u) => u.target)!
+    add({ x: commander.x, y: commander.y }, 'decap')
+    // The highest open tile at range from the commander, clear of its guards.
+    const ring = Array.from({ length: GRID * GRID }, (_, t) => ({ x: t % GRID, y: Math.floor(t / GRID) })).filter(
+      (t) => !blocked(battle, t.x, t.y) && distance(t, commander) >= 7 && distance(t, commander) <= 10 && battle.units.every((u) => u.side !== 'alien' || distance(u, t) >= 4),
+    )
+    add(ring.length > 0 ? ring.reduce((a, b) => (heightAt(battle, b) > heightAt(battle, a) ? b : a)) : clear(), 'overwatch')
+    add(spacedTile(battle, [commander, ...battle.zones], 2 * ZONE_CLEARANCE), 'bait')
+  } else if (goal === 'raid') {
+    // A raid lands once, clear of the guards; its choice is how many caches to go for. Each stands by a pod, guarded.
+    add(distinct(), 'stealth')
+    battle.caches = Array.from({ length: CACHES }, (_, i) => (centres[i] ? (freeTilesNear(battle, centres[i], 4)[3] ?? centres[i]) : clear()))
+  } else {
+    // Exterminate: each zone a hot drop onto a pod or a stealth insertion, as the place makes likely.
+    const pods = [...centres]
+    for (let i = 0; i < ZONES; i++) {
+      if (pods.length > 0 && random(battle) < HOT_CHANCE[battle.place]) add(pods.splice(randomInt(battle, pods.length), 1)[0], 'hot')
+      else add(distinct(), 'stealth')
+    }
   }
 }
 
@@ -813,8 +868,10 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     start: null,
     escape: null,
     escaped: 0,
-    boons: [],
-    hot: null,
+    plans: [],
+    caches: [],
+    greed: 0,
+    grabbed: 0,
     breach: false,
     reserve,
   }
@@ -851,17 +908,6 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
       battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, summoner: null, team: 0, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
     }
   }
-  if (goal === 'hold') battle.uplink = spacedTile(battle, battle.units, ZONE_CLEARANCE)
-  // A rescue lands wherever its teams scatter to: zones far apart, one for each team it might split into.
-  if (goal === 'rescue') while (battle.zones.length < TEAMS) battle.zones.push(spacedTile(battle, [...battle.units.filter((u) => u.side === 'alien'), ...battle.zones], 2 * ZONE_CLEARANCE))
-  while (battle.zones.length < ZONES) battle.zones.push(spacedTile(battle, [...battle.units, ...battle.zones, ...(battle.uplink ? [battle.uplink] : [])], ZONE_CLEARANCE))
-  const boons = Object.keys(BOONS) as Keyword[]
-  // A rescue's choice is how to split the squad, not where to land, so its zones grant nothing.
-  battle.boons = goal === 'rescue' ? [] : battle.zones.map(() => boons.splice(randomInt(battle, boons.length), 1)[0])
-  // One zone is a hot drop, right on a pod.
-  if (goal !== 'hold' && goal !== 'escape' && goal !== 'rescue' && centres.length > 0) {
-    battle.hot = randomInt(battle, ZONES)
-    battle.zones[battle.hot] = centres[randomInt(battle, centres.length)]
-  }
+  planZones(battle, centres)
   return battle
 }

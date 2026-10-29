@@ -21,6 +21,8 @@ export type Action =
   | { type: 'land'; zone: number }
   /** On a rescue, in place of a landing zone: how many teams the squad splits into, each landing apart. */
   | { type: 'split'; teams: number }
+  /** On a raid, in place of a landing zone: how many supply caches the squad goes for before it lifts off. */
+  | { type: 'grab'; caches: number }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
   /** Reward phase: equip the first of run.finds on the soldier who found it, selling what it replaces. */
@@ -37,6 +39,14 @@ const no = (reason: string): Result => ({ ok: false, reason })
 
 /** The only way a player changes state. A rejected action leaves state untouched. */
 export function apply(run: Run, action: Action): Result {
+  if (action.type === 'grab') {
+    const battle = run.battle
+    if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy' || battle.goal !== 'raid') return no('not raiding')
+    if (!Number.isInteger(action.caches) || action.caches < 1 || action.caches > battle.caches.length) return no('no such raid')
+    battle.greed = action.caches
+    land(battle, battle.zones[0])
+    return ok
+  }
   if (action.type === 'split') {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy' || battle.goal !== 'rescue') return no('not splitting up')
@@ -48,6 +58,7 @@ export function apply(run: Run, action: Action): Result {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not landing')
     if (battle.goal === 'rescue') return no('a rescue splits up instead')
+    if (battle.goal === 'raid') return no('a raid picks how many caches to grab instead')
     const zone = battle.zones[action.zone]
     if (!zone) return no('no such landing zone')
     land(battle, zone)

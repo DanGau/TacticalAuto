@@ -1,6 +1,5 @@
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js'
-import { BLAST_RADIUS, distance, GRID, nearestAlien, revealed, ZONE_NAMES, ZONE_RADIUS, type Battle, type Tile, type Unit } from '../core/battle'
-import { KEYWORDS } from '../core/keywords'
+import { BLAST_RADIUS, distance, GRID, nearestAlien, revealed, PLANS, ZONE_NAMES, ZONE_RADIUS, type Battle, type Tile, type Unit } from '../core/battle'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { effectName } from '../core/effects'
@@ -484,6 +483,7 @@ export async function createView(): Promise<View> {
     marks.removeChildren().forEach((child) => child.destroy())
     if (battle.uplink) marks.addChild(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
     if (battle.escape) marks.addChild(label('🚁 ESCAPE', battle.escape, COLOR.uplink, 28))
+    for (const cache of battle.caches) marks.addChild(label('📦', cache, COLOR.uplink, 24))
     if (battle.start && battle.phase === 'deploy') marks.addChild(label('⚠ AMBUSHED HERE', battle.start, COLOR.contact, 24))
     if (battle.phase !== 'deploy') return
     // A rescue shows where each of its teams would land.
@@ -502,7 +502,7 @@ export async function createView(): Promise<View> {
         const b = toWorld(toward.x, toward.y)
         zones.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: battle.uplink ? COLOR.uplink : COLOR.contact, width: 4, alpha: 0.9 })
       }
-      marks.addChild(label(battle.goal === 'rescue' ? `Team ${i + 1}` : `${ZONE_NAMES[i]} ${battle.start ? '🚁' : i === battle.hot ? '☄️' : KEYWORDS[battle.boons[i]].icon}`, zone, 0xffffff))
+      marks.addChild(label(battle.goal === 'rescue' ? `Team ${i + 1}` : `${ZONE_NAMES[i]} ${PLANS[battle.plans[i]].icon}`, zone, 0xffffff))
     })
     battle.pods.forEach((_, pod) => {
       const members = battle.units.filter((u) => u.pod === pod)

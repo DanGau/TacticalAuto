@@ -128,6 +128,8 @@ export type GameEvent =
   | { type: 'saved'; id: number }
   /** A soldier reaches the escape zone and lifts off. */
   | { type: 'escaped'; id: number }
+  /** A soldier grabs a raid's supply cache. */
+  | { type: 'grabbed'; id: number; x: number; y: number }
   /** A psion panics a soldier, who loses its next action. */
   | { type: 'panic'; id: number; target: number }
   /** A panicked soldier loses its action. */
@@ -390,6 +392,8 @@ function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
 function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
   if (enemies.length === 0) return undefined
   if (battle.escape && unit.side === 'human') return battle.escape
+  // A raider makes for the nearest cache until it has as many as it came for.
+  if (battle.goal === 'raid' && unit.side === 'human' && battle.caches.length > 0) return battle.caches.reduce((a, b) => (distance(b, unit) < distance(a, unit) ? b : a))
   // On a hold an alien makes for the uplink, then from its zone goes for the squad, so no stand-off lasts.
   if (battle.uplink) return unit.side === 'alien' && distance(unit, battle.uplink) <= UPLINK_REACH ? nearest(enemies, unit) : battle.uplink
   const civilians = battle.units.filter((u) => u.civilian)
@@ -595,6 +599,12 @@ function sight(battle: Battle): GameEvent[] {
     battle.units.splice(battle.units.indexOf(soldier), 1)
     battle.escaped++
     events.push({ type: 'escaped', id: soldier.id })
+  }
+  // A soldier beside a raid's cache grabs it.
+  for (const cache of battle.caches.filter((c) => soldiers.some((s) => distance(s, c) <= 1))) {
+    battle.caches.splice(battle.caches.indexOf(cache), 1)
+    battle.grabbed++
+    events.push({ type: 'grabbed', id: soldiers.find((s) => distance(s, cache) <= 1)!.id, x: cache.x, y: cache.y })
   }
   // A soldier beside a civilian gets them out.
   for (const civilian of battle.units.filter((u) => u.civilian && soldiers.some((s) => distance(s, u) <= (has(s, 'beacon') ? BEACON_REACH : 1)))) {
@@ -1494,12 +1504,13 @@ export function stepBattle(battle: Battle): GameEvent[] {
   // Aliens left to beat: none once the commander falls, for the rest flee, nor once a hold has lasted.
   const fled = (battle.goal === 'assassinate' && !battle.units.some((u) => u.target)) || (battle.goal === 'hold' && battle.held >= HOLD_ROUNDS)
   const aliens = !fled && (battle.units.some((u) => u.side === 'alien') || battle.waves.length > 0)
-  // A rescue is over once no civilian is left to save: won if any were.
+  // A rescue is over once no civilian is left to save: won if any were. A raid is won once it has the caches it came for.
   const emptied = battle.goal === 'rescue' && !battle.units.some((u) => u.civilian)
-  if (!humans || !aliens || emptied || battle.beat >= MAX_BEATS) {
+  const loaded = battle.goal === 'raid' && battle.grabbed >= battle.greed
+  if (!humans || !aliens || emptied || loaded || battle.beat >= MAX_BEATS) {
     battle.phase = 'over'
     // With every alien beaten the squad has won, even if its last soldier fell to the same blast; clones are made anew.
-    battle.winner = !aliens || (emptied && battle.saved > 0) || (!humans && battle.escaped > 0) ? 'human' : humans && !emptied ? null : 'alien'
+    battle.winner = !aliens || loaded || (emptied && battle.saved > 0) || (!humans && battle.escaped > 0) ? 'human' : humans && !emptied ? null : 'alien'
     events.push({ type: 'end', winner: battle.winner })
   }
   return events

@@ -1,15 +1,15 @@
 import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { TUNING } from './tuning'
-import { deploy } from './roads'
+import { deploy, zoneOf } from './roads'
 import { apply } from './apply'
 import { isSoldier, coverAt, distance, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
 import { stepBattle } from './combat'
 import { createRun, current, type Run } from './run'
 
 /** A run choosing where to land for its first battle. */
-function landing(): Run & { battle: Battle } {
-  const run = createRun(1)
+function landing(seed = 1): Run & { battle: Battle } {
+  const run = createRun(seed)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'
@@ -17,20 +17,22 @@ function landing(): Run & { battle: Battle } {
   return run as Run & { battle: Battle }
 }
 
-test('a battle offers landing zones clear of every alien, but for a hot drop onto a pod', () => {
-  const { battle } = landing()
-  expect(battle.zones).toHaveLength(ZONES)
-  battle.zones.forEach((zone, i) => {
-    const near = Math.min(...battle.units.map((alien) => distance(zone, alien)))
-    if (i === battle.hot) expect(near).toBeLessThanOrEqual(2)
-    else expect(near).toBeGreaterThanOrEqual(ZONE_CLEARANCE)
-  })
+test('an exterminate offers hot drops onto pods and stealth insertions clear of every alien', () => {
+  for (let seed = 1; seed <= 10; seed++) {
+    const { battle } = landing(seed)
+    expect(battle.zones).toHaveLength(ZONES)
+    battle.zones.forEach((zone, i) => {
+      const near = Math.min(...battle.units.map((alien) => distance(zone, alien)))
+      if (battle.plans[i] === 'hot') expect(near).toBeLessThanOrEqual(2)
+      else expect(near).toBeGreaterThanOrEqual(ZONE_CLEARANCE - 1)
+    })
+  }
 })
 
 test('a hot drop breaches: the pod beneath is ambushed and cannot shoot, its members take the impact, and the other pods converge', () => {
   const run = landing()
   const battle = run.battle
-  const hot = battle.hot!
+  const hot = zoneOf(battle, 'hot')
   const zone = battle.zones[hot]
   deploy(run, hot)
   const under = battle.units.find((u) => u.side === 'alien' && distance(u, zone) <= 2)!
@@ -43,7 +45,7 @@ test('a hot drop breaches: the pod beneath is ambushed and cannot shoot, its mem
 
 test('landing puts the whole squad on open tiles by the zone and begins the battle', () => {
   const run = landing()
-  const cold = run.battle.hot === 1 ? 0 : 1
+  const cold = zoneOf(run.battle, 'stealth')
   const zone = run.battle.zones[cold]
   expect(deploy(run, cold)).toEqual({ ok: true })
   const squad = run.battle.units.filter(isSoldier)

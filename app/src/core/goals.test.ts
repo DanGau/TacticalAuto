@@ -5,7 +5,7 @@ import { stepBattle, UPLINK_REACH } from './combat'
 import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, type Goal } from './goals'
 import { isSoldier, revealed } from './battle'
 import { road, deploy } from './roads'
-import { createRun, endBattle, RISKS, START_SUPPLIES, THREAT_MAX, XP, type Run } from './run'
+import { createRun, endBattle, RISKS, START_SUPPLIES, STOP_THREAT, THREAT_MAX, XP, type Run } from './run'
 
 /** A run about to fight a battle of `goal`, with three packs to muster. */
 function before(goal: Goal): Run {
@@ -23,13 +23,13 @@ test('every battle on the leg under way has its aliens mustered in advance; no o
   for (const node of run.legs[0].columns.flat()) expect(node.stop!.packs.length > 0).toBe(node.stop!.kind === 'battle')
 })
 
-test('a hold offers three landing zones away from the uplink, keeps half its packs back as waves, and is won by lasting', () => {
+test('a hold offers three uplinks to hold, keeps half its packs back as waves, and is won by lasting', () => {
   const run = before('hold')
   const battle = run.battle!
-  expect(battle.zones).toHaveLength(3)
-  expect(battle.uplink).not.toBeNull()
+  expect(battle.plans).toEqual(['uplink', 'uplink', 'uplink'])
   expect(battle.waves).toHaveLength(1)
-  deploy(run, 0)
+  deploy(run, 1)
+  expect(battle.uplink).toEqual(battle.zones[1])
   battle.held = HOLD_ROUNDS
   stepBattle(battle)
   expect(battle).toMatchObject({ phase: 'over', winner: 'human' })
@@ -63,7 +63,7 @@ test('an assassination is won when the commander falls, though its guard lives',
   expect(run.finds.length + run.decisions.length).toBeGreaterThan(0)
 })
 
-test('a rescue pays supplies and experience for each civilian saved or alive; a raid pays triple supplies', () => {
+test('a rescue pays supplies and experience for each civilian saved or alive; a raid pays by the cache grabbed, and costs a threat for each sought beyond the first', () => {
   const rescue = before('rescue')
   deploy(rescue, 0)
   expect(rescue.battle!.units.filter((u) => u.civilian)).toHaveLength(CIVILIANS)
@@ -79,10 +79,14 @@ test('a rescue pays supplies and experience for each civilian saved or alive; a 
   expect(rescue.supplies).toBe(supplies + RISKS.standard.supplies + alive * CIVILIAN_SUPPLIES)
 
   const raid = before('raid')
-  deploy(raid, 0)
+  expect(apply(raid, { type: 'land', zone: 0 }).ok).toBe(false)
+  apply(raid, { type: 'grab', caches: 2 })
+  const threat = raid.threat
+  raid.battle!.grabbed = 2
   raid.battle!.winner = 'human'
   endBattle(raid)
-  expect(raid.supplies).toBe(START_SUPPLIES + 3 * RISKS.standard.supplies)
+  expect(raid.supplies).toBe(START_SUPPLIES + 2 * RISKS.standard.supplies)
+  expect(raid.threat).toBe(threat + STOP_THREAT + 1)
   expect(raid.finds).toEqual([])
 })
 

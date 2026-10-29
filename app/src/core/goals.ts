@@ -24,7 +24,7 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
     force: 0,
     weight: 1,
   },
-  raid: { name: 'Supply raid', text: 'A weak guard over a supply cache', reward: 'triple supplies, no gear', force: -1, weight: 1 },
+  raid: { name: 'Supply raid', text: 'Guarded supply caches. Choose how many to go for; each pays supplies, and each beyond the first adds a threat', reward: 'supplies by the cache, no gear', force: -1, weight: 1 },
   // Never drawn: a full threat turns the next stop into an escape.
   escape: { name: 'Escape', text: 'Ambushed on patrol and hunted. Get to the escape zone and lift off; any soldier out wins it', reward: 'the threat emptied', force: -3, weight: 0 },
 }

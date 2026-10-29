@@ -488,7 +488,6 @@ test("a soldier lands with its class's ability and its uses, the effects of its 
   run.soldiers[0].skills = ['arsenal', 'shredder']
   run.relics = ['echo', 'capacitor']
   apply(run, { type: 'advance' })
-  run.battle!.boons[0] = 'crit'
   deploy(run, 0)
   const [unit] = run.battle!.units.filter(isSoldier)
   expect(unit).toMatchObject({ ability: 'rocket', charges: 3, stance: 'anchor', armor: 2, effects: ['shred', 'opener'] })

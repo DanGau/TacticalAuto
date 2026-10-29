@@ -1,5 +1,4 @@
 import type { Action } from '../core/apply'
-import { TUNING } from '../core/tuning'
 import type { Report, Run } from '../core/run'
 import type { View } from '../view/view'
 import { choice, runEnd, stopReport } from './aftermath'
@@ -7,8 +6,7 @@ import { ALIENS } from '../core/aliens'
 import { RELICS, type Relic } from '../core/relics'
 import { known } from './intro'
 import { TWISTS } from '../core/twists'
-import { AMBUSH_AIM, AMBUSH_CRIT, BOONS, distance, heightAt, IMPACT_REACH, nearestAlien, onTheWay, TEAMS, ZONE_NAMES, zoneInfo, type Battle, type Unit } from '../core/battle'
-import { KEYWORDS } from '../core/keywords'
+import { onTheWay, PLANS, TEAMS, ZONE_NAMES, type Battle, type Unit } from '../core/battle'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { DETECT, PATROL_DETECT } from '../core/sight'
 import { alienName, button, resistChip, STOP_NAMES, tip } from './html'
@@ -56,41 +54,26 @@ function status(run: Run): string {
   return `${title}${rounds} · ${SIDE[battle.turn]}' turn${battle.concealed ? ' · unseen' : ''}`
 }
 
-/** A landing zone's pros, in green, and cons, in red, as short chips; hovering one tells it in full. */
-function tradeoffs(battle: Battle, zone: number): string {
-  const tile = battle.zones[zone]
-  const { cover, contact } = zoneInfo(battle, tile)
-  const chip = (good: boolean, label: string, text: string) => `<span class="${good ? 'pro' : 'con'}" title="${text}">${label}</span>`
-  const chips = [
-    cover >= 12 ? chip(true, '🛡️ Cover', 'Heavy cover to land behind') : cover >= 5 ? '' : chip(false, '🎯 Open', 'Open ground: the squad lands exposed'),
-    heightAt(battle, tile) > 0 ? chip(true, '⛰️ High', 'High ground: sees farther and shoots down at aliens') : '',
-  ]
-  if (zone === battle.hot) {
-    const pod = battle.pods[nearestAlien(battle, tile)!.pod!].name
-    chips.push(
-      chip(true, '☄️ Impact', `Drop pods deal ${TUNING.impactDamage} damage to each alien within ${IMPACT_REACH} tiles`),
-      chip(true, '😵 Surprised', `The ${pod} can't shoot its first turn, and the squad's first volley gets +${100 * AMBUSH_AIM}% aim and +${100 * AMBUSH_CRIT}% crit`),
-      chip(false, '📣 Loud', 'Every other pod hears the landing and converges on it'),
-    )
-  } else if (battle.uplink) {
-    const far = distance(tile, battle.uplink)
-    chips.push(chip(far <= 8, `📡 ${far}`, `Uplink ${far} tiles away: ${far <= 8 ? 'a short run to hold it' : 'a long run before the waves'}`))
-  } else chips.push(chip(contact > 6, `👽 ${contact}`, `Aliens ${contact} tiles away: ${contact <= 6 ? 'the fight starts at once' : 'time to spread out first'}`))
-  return chips.join('')
-}
-
-/** Before the landing: a button per zone that flies the camera there, one back to the whole map, and the chosen zone's boon and case. */
-function drop(battle: Battle, zone: number | null, teams: number): string {
+/** Before the landing: a button per zone that flies the camera there, one back to the whole map, and the chosen zone's plan. */
+function drop(battle: Battle, zone: number | null, teams: number, greed: number): string {
   if (battle.start) return escapes(battle, zone)
   if (battle.goal === 'rescue') return splits(battle, teams)
-  const zones = battle.boons.map((boon, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}" title="${i === battle.hot ? 'Land on top of a pod' : BOONS[boon].text}">${ZONE_NAMES[i]} ${i === battle.hot ? '☄️ Hot drop' : `${KEYWORDS[boon].icon} ${BOONS[boon].name}`}</button>`)
+  if (battle.goal === 'raid') return raids(battle, greed)
+  const zones = battle.plans.map((plan, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}">${ZONE_NAMES[i]} ${PLANS[plan].icon} ${PLANS[plan].name}</button>`)
   const overview = `<button data-zone="" class="overview ${zone === null ? 'on' : ''}" title="Whole map">🗺️</button>`
   const detail =
     zone === null
       ? '<small>Pick a landing zone to fly to it.</small>'
-      : `<p>${zone === battle.hot ? 'Land on top of a pod.' : `${BOONS[battle.boons[zone]].text}.`}</p><div class="tradeoffs">${tradeoffs(battle, zone)}</div>${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
+      : `<p>${PLANS[battle.plans[zone]].text}.</p>${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
   const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
   return `${twist}<div class="zones">${zones.join('')}${overview}</div>${detail}`
+}
+
+/** On a raid: a button per number of caches to go for, then what that pays and costs. */
+function raids(battle: Battle, greed: number): string {
+  const buttons = battle.caches.map((_, i) => `<button data-greed="${i + 1}" class="${i + 1 === greed ? 'on' : ''}">📦 ${i + 1}</button>`)
+  const what = greed === 1 ? 'Grab the nearest cache and lift off.' : `Grab ${greed} caches before lifting off: ${greed} times the supplies, and ${greed - 1} more threat.`
+  return `<div class="zones">${buttons.join('')}</div><p>${what}</p>${button({ type: 'grab', caches: greed }, `Go for ${greed}`)}`
 }
 
 /** The ways a rescue can split a squad of `size`: together, in two teams, or each alone. */
@@ -109,7 +92,7 @@ function splits(battle: Battle, teams: number): string {
   return `<div class="zones">${buttons.join('')}</div><p>${what}</p>${button({ type: 'split', teams }, teams === 1 ? 'Land together' : teams === size ? 'Land split up' : `Land in ${teams} teams`)}`
 }
 
-/** On an escape: a button per escape zone, then the chosen one's aliens on the way and boon. */
+/** On an escape: a button per escape zone, then the chosen one's aliens on the way. */
 function escapes(battle: Battle, zone: number | null): string {
   const zones = battle.zones.map((_, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}">${ZONE_NAMES[i]} 🚁 ${onTheWay(battle, battle.zones[i]).length} aliens</button>`)
   const overview = `<button data-zone="" class="overview ${zone === null ? 'on' : ''}" title="Whole map">🗺️</button>`
@@ -124,7 +107,7 @@ function escapes(battle: Battle, zone: number | null): string {
   const detail =
     zone === null
       ? '<small>The squad is ambushed. Pick the way out.</small>'
-      : `<p>On the way: ${kinds(onTheWay(battle, battle.zones[zone]))}.</p><p>${KEYWORDS[battle.boons[zone]].icon} ${BOONS[battle.boons[zone]].name}: ${BOONS[battle.boons[zone]].text}.</p>${button({ type: 'land', zone }, `Break out toward ${ZONE_NAMES[zone]}`)}`
+      : `<p>On the way: ${kinds(onTheWay(battle, battle.zones[zone]))}.</p>${button({ type: 'land', zone }, `Break out toward ${ZONE_NAMES[zone]}`)}`
   return `<div class="zones">${zones.join('')}${overview}</div>${detail}`
 }
 
@@ -135,8 +118,9 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   const dropPanel = document.getElementById('drop')!
   /** The landing zone chosen in the deploy phase, and the battle it was chosen in. */
   let zone: number | null = null
-  /** The teams chosen to split a rescue's squad into. */
+  /** The teams chosen to split a rescue's squad into, and the caches chosen to go for on a raid. */
   let teams = 1
+  let greed = 1
   let zoneBattle: Battle | null = null
   /** The report the player has continued past. */
   let seen: Report | null = null
@@ -196,9 +180,10 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
       zoneBattle = battle
       zone = null
       teams = 1
+      greed = 1
       view.showTeams(teams)
     }
-    dropPanel.innerHTML = drop(battle, zone, teams)
+    dropPanel.innerHTML = drop(battle, zone, teams, greed)
   }
 
   function choose(next: number | null): void {
@@ -215,7 +200,10 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     const target = (e.target as HTMLElement).closest('button')
     if (!target) return
     if (target.dataset.action) act(JSON.parse(target.dataset.action) as Action)
-    else if (target.dataset.split) {
+    else if (target.dataset.greed) {
+      greed = Number(target.dataset.greed)
+      showDrop(shown!)
+    } else if (target.dataset.split) {
       teams = Number(target.dataset.split)
       view.showTeams(teams)
       showDrop(shown!)

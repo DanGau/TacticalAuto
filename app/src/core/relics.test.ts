@@ -3,6 +3,7 @@ import { apply } from './apply'
 import { distance, isSoldier, POD_REACH } from './battle'
 import { createRun, current, type Run } from './run'
 import type { RelicId } from './relics'
+import { zoneOf } from './roads'
 
 /** A run landing for an exterminate battle with `relics`, at its hot drop so aliens are near. */
 function landed(relics: RelicId[]): Run {
@@ -11,7 +12,7 @@ function landed(relics: RelicId[]): Run {
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })
-  apply(run, { type: 'land', zone: run.battle!.hot ?? 0 })
+  apply(run, { type: 'land', zone: zoneOf(run.battle!, 'hot') })
   return run
 }
 

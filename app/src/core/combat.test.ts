@@ -86,8 +86,9 @@ test('a squad that sees a pod first holds its fire and sets up, then springs the
       // Unseen soldiers walk at most CREEP of their move in their move stage.
       for (const e of events) {
         if (e.type !== 'move' || !before.concealed || before.stage !== 'move' || e.with) continue
-        const unit = before.units.find((u) => u.id === e.id)!
-        if (isSoldier(unit)) expect(e.path.length).toBeLessThanOrEqual(Math.ceil(unit.stats.move * 0.6) + 1)
+        // A unit that arrived this beat, such as a wave, has no move stage behind it.
+        const unit = before.units.find((u) => u.id === e.id)
+        if (unit && isSoldier(unit)) expect(e.path.length).toBeLessThanOrEqual(Math.ceil(unit.stats.move * 0.6) + 1)
       }
       // No soldier fires on a pod the squad has seen that has not noticed it.
       for (const e of events.filter((e) => e.type === 'shot')) {
