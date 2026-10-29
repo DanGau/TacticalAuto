@@ -120,7 +120,7 @@ test('a leg is a map of trails that part and meet without crossing; every way th
   }
 })
 
-test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone adds threat, pays by the risk, gives experience, and gear its finder decides on', (risk) => {
+test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone adds threat, pays by the risk, gives experience and gear its finder decides on, and relics if Overrun', (risk) => {
   const run = travelling(['battle', 'battle'], risk)
   fight(run, 'human')
   expect(run).toMatchObject({ threat: STOP_THREAT, stop: 1 })
@@ -135,6 +135,9 @@ test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone
   expect(report.earned).toEqual(expect.arrayContaining([{ label: 'survived', xp: XP.survived }, { label: 'won', xp: XP.won }]))
   expect(report.xpAfter - report.xpBefore).toBe(report.earned.reduce((sum, e) => sum + e.xp, 0))
   while (run.finds.length > 0) apply(run, { type: 'sell' })
+  // An Overrun battle won offers relics too.
+  expect(run.relicOffers).toHaveLength(risk === 'dangerous' ? 3 : 0)
+  if (risk === 'dangerous') apply(run, { type: 'relic', index: 0 })
   expect(run.phase).toBe('overworld')
 })
 

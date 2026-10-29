@@ -172,7 +172,7 @@ export type SkillEffect =
   | 'ward'
   | 'drone'
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial'
+export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'podBlast' | 'podShred' | 'podFrost' | 'podWall' | 'podTurret' | 'ghost' | 'killzone' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
 export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect
 
@@ -634,9 +634,58 @@ export function land(battle: Battle, zone: Tile, teams = 1): void {
     const pod = aliens.reduce((a, b) => (distance(zone, a) <= distance(zone, b) ? a : b)).pod
     for (const alien of aliens.filter((u) => u.pod === pod && !u.resists.includes('mark'))) alien.marked = true
   }
+  dropRelics(battle, squad, [...new Set(squad.map((u) => (teams > 1 ? battle.zones[u.team] : (battle.start ?? zone))))])
   // A barrier projector armors every squadmate of its carrier.
   for (const carrier of squad.filter((u) => u.effects.includes('barrier'))) {
     for (const mate of squad) if (mate !== carrier) mate.armor += BARRIER_ARMOR
+  }
+}
+
+/** How near a landing the drop pods' relics reach aliens. */
+export const POD_REACH = 4
+/** The damage Impact Charges add to the drop pods' impact. */
+export const POD_BLAST = 3
+/** A drop turret: it never moves, and shoots far and true. */
+const TURRET: Stats = { ...BASE_STATS, hp: 8, aim: 0.7, damage: 3, range: 7, move: 0, crit: 0.1 }
+
+/**
+ * What the squad's drop pod relics do where it lands: hurt, strip or chill the aliens near, raise full cover beside each
+ * soldier toward the nearest alien, or drop a turret.
+ */
+function dropRelics(battle: Battle, squad: Unit[], spots: Tile[]): void {
+  const held = (effect: RelicEffect) => squad.some((u) => u.effects.includes(effect))
+  // The impact lands in the first beat; these relics give every landing one, reaching farther.
+  if (held('podBlast') || held('podShred') || held('podFrost')) battle.breach = true
+  for (const spot of spots) {
+    for (const alien of battle.units.filter((u) => u.side === 'alien' && distance(u, spot) <= POD_REACH)) {
+      if (held('podShred')) alien.armor = 0
+      if (held('podFrost') && !alien.resists.includes('frost')) alien.chilled = CHILL_TURNS
+    }
+    if (held('podTurret')) {
+      const [tile] = freeTilesNear(battle, spot, 1)
+      if (tile) battle.units.push(mechUnit(battle, squad.find((u) => distance(u, spot) <= ZONE_RADIUS) ?? squad[0], TURRET, [], tile))
+    }
+  }
+  if (!held('podWall')) return
+  walks.delete(battle)
+  for (const soldier of squad) {
+    const toward = nearestAlien(battle, soldier) ?? { x: GRID >> 1, y: GRID >> 1 }
+    // The free tile beside the soldier nearest that alien.
+    const tile = NEIGHBORS.map(([dx, dy]) => ({ x: soldier.x + dx, y: soldier.y + dy }))
+      .filter((t) => onGrid(t.x, t.y) && !blocked(battle, t.x, t.y))
+      .sort((a, b) => distance(a, toward) - distance(b, toward))[0]
+    if (!tile) continue
+    const t = tile.y * GRID + tile.x
+    const open = walkingDistances(battle, soldier).filter(Number.isFinite).length
+    battle.props[t] = 'stack'
+    battle.cover[t] = PROP_COVER.stack
+    walks.delete(battle)
+    // Cover that would cut ground off from the soldier is not raised.
+    if (walkingDistances(battle, soldier).filter(Number.isFinite).length < open - 1) {
+      battle.props[t] = 'none'
+      battle.cover[t] = 0
+      walks.delete(battle)
+    }
   }
 }
 

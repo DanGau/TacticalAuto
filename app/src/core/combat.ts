@@ -20,6 +20,8 @@ import {
   AMBUSH_CRIT,
 
   IMPACT_REACH,
+  POD_BLAST,
+  POD_REACH,
   AURA_REACH,
   BACKSTAB_DAMAGE,
   BANE_AIM,
@@ -403,8 +405,17 @@ function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
   return enemies.find((u) => u.target && revealed(battle, u)) ?? nearest(enemies, team)
 }
 
-/** On a hold, how far from the uplink a soldier may stand and still defend it. */
+/** On a hold, how far from the uplink a soldier may stand and still defend it; Relay Booster widens it. */
 export const UPLINK_REACH = 3
+export const RELAY_REACH = 2
+const uplinkReach = (battle: Battle) => UPLINK_REACH + (battle.units.some((u) => isSoldier(u) && has(u, 'relay')) ? RELAY_REACH : 0)
+/** How near the escape zone lifts a soldier off; a Signal Flare widens it. */
+const FLARE_REACH = 3
+const escapeReach = (battle: Battle) => ESCAPE_REACH + (battle.units.some((u) => isSoldier(u) && has(u, 'flare')) ? FLARE_REACH : 0)
+/** What Killing Ground adds to an ambush's aim and crit, Bounty Rounds to hits on a boss, and how far an Evac Beacon gets a civilian out from. */
+export const KILLZONE = 0.15
+export const BOUNTY_DAMAGE = 3
+export const BEACON_REACH = 3
 
 /** The tile at the middle of some units. */
 function centreOf(units: Unit[]): Tile {
@@ -461,7 +472,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const images = has(unit, 'mirror') && unit.spent.filter((e) => e === 'mirror').length < MIRROR_IMAGES ? 0.5 : 1
   const uplink = battle.uplink
   // Measured by the walk there, so a wall between a soldier and the uplink cannot strand it.
-  const leash = (end: Tile) => (uplink && unit.side === 'human' && distance(end, uplink) > UPLINK_REACH ? toGoal[end.y * GRID + end.x] : 0)
+  const leash = (end: Tile) => (uplink && unit.side === 'human' && distance(end, uplink) > uplinkReach(battle) ? toGoal[end.y * GRID + end.x] : 0)
   const marching = unit.side === 'human' && seen.size === 0
   // An escort follows the squad rather than leading it, so it leads no one.
   const leaders = unit.stance === 'standoff' ? squadmates.filter((u) => u.stance !== 'standoff' && u.stance !== 'escort') : []
@@ -516,7 +527,8 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || (unit.kind === 'sprinter' && unit.chilled > 0)) return []
   const full = Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0))
   // Unseen, a soldier creeps.
-  const move = unit.side === 'human' && battle.concealed ? Math.ceil(full * CREEP) : full
+  // Unless it wears Ghost Weave.
+  const move = unit.side === 'human' && battle.concealed && !has(unit, 'ghost') ? Math.ceil(full * CREEP) : full
   const path = choose(move)
   if (unit.ability === 'runAndGun' && !battle.concealed && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
   return path
@@ -579,13 +591,13 @@ function sight(battle: Battle): GameEvent[] {
     events.push({ type: 'found', id: civilian.id })
   }
   // A soldier at the escape zone lifts off.
-  for (const soldier of battle.escape ? soldiers.filter((s) => distance(s, battle.escape!) <= ESCAPE_REACH) : []) {
+  for (const soldier of battle.escape ? soldiers.filter((s) => distance(s, battle.escape!) <= escapeReach(battle)) : []) {
     battle.units.splice(battle.units.indexOf(soldier), 1)
     battle.escaped++
     events.push({ type: 'escaped', id: soldier.id })
   }
   // A soldier beside a civilian gets them out.
-  for (const civilian of battle.units.filter((u) => u.civilian && soldiers.some((s) => distance(s, u) <= 1))) {
+  for (const civilian of battle.units.filter((u) => u.civilian && soldiers.some((s) => distance(s, u) <= (has(s, 'beacon') ? BEACON_REACH : 1)))) {
     battle.units.splice(battle.units.indexOf(civilian), 1)
     battle.saved++
     events.push({ type: 'saved', id: civilian.id })
@@ -717,7 +729,7 @@ function upkeep(battle: Battle): GameEvent[] {
   if (battle.turn !== 'alien') return events
   battle.round++
   // A hold counts only the rounds the squad ends standing on it.
-  if (battle.uplink && battle.units.some((u) => isSoldier(u) && distance(u, battle.uplink!) <= UPLINK_REACH)) battle.held++
+  if (battle.uplink && battle.units.some((u) => isSoldier(u) && distance(u, battle.uplink!) <= uplinkReach(battle))) battle.held++
   // A long battle makes the aliens still unseen restless: they patrol toward the squad, so no fight is put off for good.
   if (battle.round >= RESTLESS_ROUND) {
     const soldiers = battle.units.filter(isSoldier)
@@ -794,14 +806,17 @@ function surface(battle: Battle): GameEvent[] {
   return events
 }
 
-/** Drop pods' impact after a breach: each alien beside where a soldier landed is hurt. */
+/** Drop pods' impact after a breach: each alien beside where a soldier landed is hurt, farther and harder with drop pod relics. */
 function impact(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
   battle.breach = false
   const soldiers = battle.units.filter(isSoldier)
-  for (const alien of battle.units.filter((u) => u.side === 'alien' && soldiers.some((s) => distance(s, u) <= IMPACT_REACH))) {
-    events.push({ type: 'hurt', id: alien.id, amount: TUNING.impactDamage, cause: 'impact' })
-    wound(battle, alien, TUNING.impactDamage, events)
+  const held = (effect: Effect) => soldiers.some((s) => has(s, effect))
+  const reach = held('podBlast') || held('podShred') || held('podFrost') ? POD_REACH : IMPACT_REACH
+  const damage = TUNING.impactDamage + (held('podBlast') ? POD_BLAST : 0)
+  for (const alien of battle.units.filter((u) => u.side === 'alien' && soldiers.some((s) => distance(s, u) <= reach))) {
+    events.push({ type: 'hurt', id: alien.id, amount: damage, cause: 'impact' })
+    wound(battle, alien, damage, events)
   }
   return events
 }
@@ -1152,7 +1167,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   const baned = battle.units.some((u) => u.side !== unit.side && has(u, 'bane') && distance(u, unit) <= BANE_REACH)
   const toHit =
     chance.hit +
-    (ambushed ? AMBUSH_AIM : 0) +
+    (ambushed ? AMBUSH_AIM + when(true, 'killzone', KILLZONE) : 0) +
     (inAura(battle, unit, 'inspire') ? INSPIRE_AIM : 0) +
     when(true, 'reckless', RECKLESS_AIM) +
     (has(enemy, 'reckless') ? RECKLESS_AIM : 0) +
@@ -1184,7 +1199,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   }
 
   const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) > 0
-  const crit = !enemy.resists.includes('crit') && (sure || random(battle) < chance.crit + (ambushed ? AMBUSH_CRIT : 0))
+  const crit = !enemy.resists.includes('crit') && (sure || random(battle) < chance.crit + (ambushed ? AMBUSH_CRIT + (has(unit, 'killzone') ? KILLZONE : 0) : 0))
   // A mirror hits as hard as the squad's hardest hitter; a feeder as hard as it has grown.
   const base = unit.kind === 'mirror' ? Math.max(unit.stats.damage, ...battle.units.filter(isSoldier).map((s) => s.stats.damage)) : unit.stats.damage
   let damage =
@@ -1201,6 +1216,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     when(enemy.burning > 0 && enemy.chilled > 0, 'thermal', TUNING.thermalDamage) +
     when(unit.armor > 0, 'armored', 1) +
     when(enemy.rooted > 0, 'net', 2) +
+    when(enemy.boss, 'bounty', BOUNTY_DAMAGE) +
     when(unit.fury > 0, 'bloodRite', unit.fury) -
     (has(enemy, 'thick') ? THICK_ARMOR : 0)
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0

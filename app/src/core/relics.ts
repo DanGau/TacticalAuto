@@ -1,4 +1,5 @@
-import type { RelicEffect, Stats } from './battle'
+import { POD_BLAST, POD_REACH, type RelicEffect, type Stats } from './battle'
+import { BEACON_REACH, BOUNTY_DAMAGE, KILLZONE, RELAY_REACH } from './combat'
 import { TUNING } from './tuning'
 import type { Keyword } from './keywords'
 
@@ -22,6 +23,8 @@ export interface Relic {
   rareGear?: boolean
   /** Whether the map names the aliens of each zone, not only how dangerous they are. */
   recon?: boolean
+  /** Added to the supplies each civilian saved pays. */
+  civilianSupplies?: number
 }
 
 const relics = {
@@ -59,6 +62,21 @@ const relics = {
   net: { name: "Hunter's Net", text: 'Hits on a rooted alien do +2 damage', effect: 'net' },
   glacial: { name: 'Glacial Snare', text: 'Chilling an alien roots it too', tags: ['frost'], effect: 'glacial' },
   juggernaut: { name: 'Juggernaut Servos', text: '+1 damage while the soldier has armor left', tags: ['ward'], effect: 'armored' },
+  // The drop pods: each makes where the squad lands matter more.
+  impact: { name: 'Impact Charges', text: `Every landing's drop pods hurt each alien within ${POD_REACH} tiles for ${TUNING.impactDamage + POD_BLAST}`, effect: 'podBlast' },
+  shredder: { name: 'Shredder Pods', text: `Every landing's drop pods strip the armor from each alien within ${POD_REACH} tiles and hurt it`, tags: ['ward'], effect: 'podShred' },
+  cryopods: { name: 'Cryo Pods', text: `Every landing's drop pods chill each alien within ${POD_REACH} tiles and hurt it`, tags: ['frost'], effect: 'podFrost' },
+  bulwark: { name: 'Bulwark Pods', text: 'The drop pods stand as full cover beside each soldier, toward the nearest alien', effect: 'podWall' },
+  turrets: { name: 'Turret Drop', text: 'A turret lands with each team: it never moves, and shoots far and true', effect: 'podTurret' },
+  // Stealth and ambushes.
+  ghost: { name: 'Ghost Weave', text: 'Unseen, soldiers move at full pace instead of creeping', effect: 'ghost' },
+  killzone: { name: 'Killing Ground', text: `An ambush's shots hit and crit ${Math.round(100 * KILLZONE)}% more often still`, tags: ['crit'], effect: 'killzone' },
+  // The goals.
+  beacon: { name: 'Evac Beacon', text: `A soldier gets a civilian out from ${BEACON_REACH} tiles away`, effect: 'beacon' },
+  charity: { name: 'Refugee Network', text: 'Each civilian saved pays 1 more supply', civilianSupplies: 1 },
+  relay: { name: 'Relay Booster', text: `The uplink's zone reaches ${RELAY_REACH} tiles farther`, effect: 'relay' },
+  flare: { name: 'Signal Flare', text: 'A soldier lifts off from farther from the escape zone', effect: 'flare' },
+  bounty: { name: 'Bounty Rounds', text: `Hits on a boss, a Guardian or the Hunter, do +${BOUNTY_DAMAGE} damage`, tags: ['kill'], effect: 'bounty' },
 } satisfies Record<string, Relic>
 
 export type RelicId = keyof typeof relics

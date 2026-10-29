@@ -18,7 +18,7 @@ import { random, randomInt } from './rng'
 /** Access keys needed to find the alien source; each is won at a satellite, at the end of a leg. */
 export const KEYS = 3
 /** Stops on each leg before its satellite, whichever way the squad goes. */
-export const LEG_STOPS = 6
+export const LEG_STOPS = 9
 /** Rows a leg's map spreads across, and trails that wander them from start to satellite. */
 export const MAP_ROWS = 5
 const TRAILS = 4
@@ -683,7 +683,7 @@ export function endBattle(run: Run): void {
   if (mission.kind === 'escape') run.threat = won ? 0 : run.threat
   else run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT) + (rescued === null ? 0 : Math.floor((CIVILIANS - (won ? rescued : 0)) / CIVILIANS_PER_THREAT)), THREAT_MAX)
   const held = run.relics.map((id): Relic => RELICS[id])
-  const supplies = won ? risk.supplies * (mission.goal === 'raid' ? 3 : 1) + (rescued ?? 0) * CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
+  const supplies = won ? risk.supplies * (mission.goal === 'raid' ? 3 : 1) + (rescued ?? 0) * (CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.civilianSupplies ?? 0), 0)) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
   run.supplies += supplies
   // A won battle drops gear by its goal; a key mission's, an escape's, and the first of an Overrun battle's is rare or better.
   const byGoal = { exterminate: risk.drops, assassinate: Math.max(1, risk.drops), hold: 0, rescue: 0, raid: 0, escape: 0 }[mission.goal]
@@ -706,8 +706,8 @@ export function endBattle(run: Run): void {
     onward(run)
   }
   if (mission.kind === 'battle') passStop(run)
-  // A satellite, an escape or a hold won offers relics.
-  if (won && (mission.kind !== 'battle' || mission.goal === 'hold')) {
+  // A satellite, an escape, a hold or an Overrun battle won offers relics.
+  if (won && (mission.kind !== 'battle' || mission.goal === 'hold' || mission.risk === 'dangerous')) {
     const pool = (Object.keys(RELICS) as RelicId[]).filter((id) => !run.relics.includes(id))
     // The first offer builds on a keyword the squad already has, when one can.
     const held = squadKeywords(run)
