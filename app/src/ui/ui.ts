@@ -176,10 +176,20 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (next !== html) {
       overlay.innerHTML = html = next
       const map = overlay.querySelector('.map')
+      overlay.hidden = run.phase === 'battle'
+      shrink()
       if (map) drawTrails(map)
-      overlay.querySelector('.map .here, .map .option')?.scrollIntoView({ block: 'center', inline: 'nearest' })
     }
     overlay.hidden = run.phase === 'battle'
+  }
+
+  /** Shrinks the panel until its content fits the screen: a game never scrolls. */
+  function shrink(): void {
+    overlay.style.setProperty('--shrink', '1')
+    for (let i = 0; i < 4 && overlay.scrollHeight > overlay.clientHeight + 1; i++) {
+      const now = Number(overlay.style.getPropertyValue('--shrink'))
+      overlay.style.setProperty('--shrink', String(now * Math.max(0.5, overlay.clientHeight / overlay.scrollHeight)))
+    }
   }
 
   function showDrop(run: Run): void {
@@ -222,6 +232,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   // A resize, such as entering full screen, moves the stops; the trails between them are measured again once it lands.
   addEventListener('resize', () =>
     requestAnimationFrame(() => {
+      shrink()
       const map = overlay.querySelector('.map')
       if (map) drawTrails(map)
     }),

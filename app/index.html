@@ -12,7 +12,7 @@
       #hud { position: absolute; top: 12px; left: 12px; pointer-events: none; }
       .roster hr { border: 0; border-top: 1px solid #3a465c; margin: 6px 0; }
       .roster { margin-top: 8px; padding: 8px 12px; max-width: 420px; background: #171d29d9; border: 1px solid #3a465c; border-radius: 6px; line-height: 1.5; font-size: 13px; }
-      #panel { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); width: min(1200px, calc(100vw - 16px)); max-height: calc(100vh - 48px); overflow-y: auto; box-sizing: border-box; padding: 14px 24px 18px; background: #171d29f2; border: 1px solid #3a465c; border-radius: 8px; }
+      #panel { position: fixed; inset: 0; zoom: calc(var(--ui, 1) * var(--shrink, 1)); overflow: hidden; box-sizing: border-box; padding: 14px max(24px, calc(50% - 600px)) 18px; background: #171d29; }
       #panel[hidden], #drop[hidden] { display: none; }
       .brief { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5; width: min(560px, calc(100vw - 32px)); box-sizing: border-box; padding: 10px 16px; border-radius: 8px; background: rgba(10, 13, 19, 0.85); color: #e8e2c8; font-size: 16px; line-height: 1.5; pointer-events: none; animation: fade 0.4s; }
       .brief p { margin: 0; animation: fade 0.6s; }
@@ -65,7 +65,10 @@
       .menu h1 { font-size: 44px; letter-spacing: 6px; margin: 24px 0 8px; }
       .menu > p { color: #9aa6bd; margin-bottom: 28px; }
       .menu .choices { text-align: left; margin: 16px 0 20px; }
-      button.recruit { gap: 6px; min-height: 230px; }
+      button.recruit { position: relative; gap: 10px; width: 240px; }
+      button.recruit .feats { display: flex; flex-wrap: wrap; gap: 4px; }
+      button.recruit .more { color: #9aa6bd; }
+      button.recruit.chosen .defs { display: flex; position: static; width: auto; padding: 0; }
       button.recruit .name { font-size: 20px; }
       button.recruit .trait { display: flex; flex-direction: column; gap: 2px; margin-top: auto; padding-top: 8px; border-top: 1px solid #3a465c; }
       button.recruit.chosen { outline: 2px solid #ffd84d; background: #35496b; }
@@ -75,7 +78,7 @@
       .chip { padding: 4px 10px; border: 1px solid #4a5a78; border-radius: 12px; white-space: nowrap; }
       .chip.feat { border-color: #ffd84d; color: #ffd84d; cursor: help; }
       .progress { margin: 4px 0; opacity: 0.7; }
-      .map { position: relative; display: flex; flex-direction: column; gap: 20px; align-items: center; max-height: 62vh; overflow-y: auto; padding: 8px 4px 12px; }
+      .map { position: relative; display: flex; flex-direction: column; gap: 20px; align-items: center; padding: 8px 4px 12px; }
       .trails { position: absolute; left: 0; top: 0; pointer-events: none; }
       .cell { position: relative; z-index: 1; }
       .trails path { fill: none; stroke: #4a5670; stroke-width: 2.5; stroke-dasharray: 1 7; stroke-linecap: round; }
@@ -198,7 +201,7 @@
       @keyframes land { from { opacity: 0; transform: scale(3); } }
       @media (max-width: 900px) {
         body { font-size: 12px; }
-        #panel { top: 8px; max-height: calc(100vh - 16px); padding: 8px 12px; }
+        #panel { padding: 8px 12px; }
         .choices, .squad, .compare, .details, .header { flex-wrap: wrap; }
         .stash { grid-template-columns: repeat(2, 1fr); }
         .roster { max-width: 240px; font-size: 11px; padding: 4px 8px; }

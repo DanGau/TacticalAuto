@@ -13,20 +13,22 @@ export function title(): string {
   </div>`
 }
 
-/** A recruit as a card to pick: its class and ability, its path, and its trait's strength and weakness. */
+/**
+ * A recruit as a card to pick: its class, path and trait at a glance, its ability and skills by name. Hovering or
+ * picking the card tells what they do.
+ */
 function card(recruit: Soldier, index: number, chosen: number | null): string {
   const cls = CLASSES[recruit.cls!]
   const path = PATHS[recruit.cls!].find((p) => p.core === recruit.skills[0])!
   const trait: Trait | null = recruit.trait ? TRAITS[recruit.trait] : null
-  const quirk = trait
-    ? `<b>${trait.name}</b><span class="down">${trait.pro}</span><span class="up">${trait.con}</span>`
-    : '<b>Steady</b><small>No strengths, no weaknesses</small>'
+  const quirk = trait ? `<b>${trait.name}</b><span class="down">${trait.pro}</span><span class="up">${trait.con}</span>` : '<b>Steady</b><small>No quirks</small>'
+  const named = [{ name: cls.abilityName, text: cls.abilityText }, ...recruit.skills.map((id) => SKILLS[id])]
   return `<button data-recruit="${index}" class="card recruit ${index === chosen ? 'chosen' : ''}">
     <small>${cls.name} · ${path.name}</small>
     <b class="name">${recruit.name}</b>
-    <span><b>${cls.abilityName}:</b> ${cls.abilityText}.</span>
-    ${recruit.skills.map((id) => `<span><b>${SKILLS[id].name}:</b> ${SKILLS[id].text}.</span>`).join('')}
+    <span class="feats">${named.map((n, i) => `<span class="chip ${i === 0 ? 'feat' : ''}">${n.name}</span>`).join('')}<span class="more">ⓘ</span></span>
     <div class="trait">${quirk}</div>
+    <span class="defs">${named.map((n) => `<span class="def"><b>${n.name}</b>${n.text}.</span>`).join('')}</span>
   </button>`
 }
 
