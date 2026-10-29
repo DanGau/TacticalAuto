@@ -23,10 +23,11 @@ export const STOP_NAMES: Record<StopKind | Mission['kind'], string> = {
   escape: 'Escape',
 }
 
-/** The threat bar. `landed` is how many of the newest pips animate in. */
+/** The threat bar. `landed` is how much of the newest threat animates in. */
 export function threatBar(threat: number, landed = 0): string {
-  const pips = `${'■'.repeat(threat - landed)}<span class="landed">${'■'.repeat(landed)}</span>${'□'.repeat(THREAT_MAX - threat)}`
-  return `<span class="threat">${pips}</span>${threat === THREAT_MAX ? '<b class="up">escape next</b>' : ''}`
+  const pct = (n: number) => `${(100 * n) / THREAT_MAX}%`
+  const meter = `<span class="threat"><i style="width:${pct(threat - landed)}"></i><i class="landed" style="width:${pct(landed)}"></i></span>`
+  return `${meter}${threat === THREAT_MAX ? '<b class="up">escape next</b>' : ''}`
 }
 
 /** The access keys, won and still to win. */

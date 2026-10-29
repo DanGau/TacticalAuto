@@ -23,11 +23,13 @@ export const LEG_STOPS = 9
 export const MAP_ROWS = 5
 const TRAILS = 4
 /** Threat at which the next stop becomes an escape. */
-export const THREAT_MAX = 6
+export const THREAT_MAX = 18
 /** Threat each stop adds, and what losing a battle adds on top. */
 export const STOP_THREAT = 1
 export const LOSS_THREAT = 1
 export const START_SUPPLIES = 3
+/** Supplies lost for each soldier downed on an escape. */
+export const ESCAPE_DOWNED_SUPPLIES = 2
 /** What an assassination's commander has over a trooper. */
 export const COMMANDER = { hp: 4, armor: 1 }
 /** Supplies a supply drop gives. */
@@ -684,7 +686,8 @@ export function endBattle(run: Run): void {
   else run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT) + (mission.goal === 'raid' ? Math.max(0, battle.greed - 1) : 0) + (rescued === null ? 0 : Math.floor((CIVILIANS - (won ? rescued : 0)) / CIVILIANS_PER_THREAT)), THREAT_MAX)
   const held = run.relics.map((id): Relic => RELICS[id])
   const supplies = won ? risk.supplies * (mission.goal === 'raid' ? battle.grabbed : 1) + (rescued ?? 0) * (CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.civilianSupplies ?? 0), 0)) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
-  run.supplies += supplies
+  const downed = mission.kind === 'escape' ? soldiers.filter((s) => s.downed).length * ESCAPE_DOWNED_SUPPLIES : 0
+  run.supplies = Math.max(0, run.supplies + supplies - downed)
   // A won battle drops gear by its goal; a key mission's, an escape's, and the first of an Overrun battle's is rare or better.
   const byGoal = { exterminate: risk.drops, assassinate: Math.max(1, risk.drops), hold: 0, rescue: 0, raid: 0, escape: 0 }[mission.goal]
   const drops = won && mission.kind !== 'final' ? (mission.kind === 'battle' ? byGoal : 1) : 0
@@ -692,7 +695,7 @@ export function endBattle(run: Run): void {
   const key = won && mission.kind === 'key'
   // Each key won brings a new clone to the squad.
   const hired = key && !run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).noRecruits) ? hire(run).name : null
-  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, soldiers, hired, rescued }
+  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies: supplies - downed, key, soldiers, hired, rescued }
 
   if (mission.kind === 'final' || (mission.kind === 'escape' && !won)) {
     run.phase = won ? 'won' : 'lost'

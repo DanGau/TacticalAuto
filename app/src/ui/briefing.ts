@@ -104,6 +104,10 @@ export async function brief(view: View, battle: Battle): Promise<void> {
     skipped = true
     wake()
   }
+  const button = document.createElement('button')
+  button.className = 'skip'
+  button.textContent = 'Skip ⏭'
+  document.body.append(button)
   addEventListener('pointerdown', skip, { once: true, capture: true })
   view.hideZones(true)
   document.getElementById('drop')!.classList.add('briefing')
@@ -122,6 +126,7 @@ export async function brief(view: View, battle: Battle): Promise<void> {
   }
   removeEventListener('pointerdown', skip, { capture: true })
   caption.remove()
+  button.remove()
   view.hideZones(false)
   document.getElementById('drop')!.classList.remove('briefing')
 }

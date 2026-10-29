@@ -53,7 +53,10 @@
       .tab { padding: 6px 18px; background: none; border-color: transparent; color: #9aa6bd; }
       .tab.active { background: #263042; border-color: #4a5a78; color: #dde; }
 
-      .threat { padding: 0 8px; color: #ff6b5e; letter-spacing: 2px; white-space: nowrap; }
+      .threat { display: inline-flex; width: 120px; height: 8px; margin: 0 8px; vertical-align: middle; background: #10141c; border: 1px solid #ff6b5e; border-radius: 4px; overflow: hidden; }
+      .threat i { background: #ff6b5e; }
+      .threat i.landed { background: #ffd84d; transition: width 0.6s 0.6s; }
+      .skip { position: absolute; right: 24px; bottom: 24px; }
       .keys { color: #ffd84d; letter-spacing: 3px; }
       .note { font-size: 12px; color: #9aa6bd; white-space: nowrap; }
       .arrow { color: #5d6577; }

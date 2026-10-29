@@ -22,7 +22,7 @@ export interface Encounter {
 /** What a shop's relic costs. */
 export const RELIC_PRICE = 8
 /** What a shop's bribe costs, and the threat it takes away. */
-export const BRIBE = { price: 3, threat: 2 }
+export const BRIBE = { price: 3, threat: 6 }
 /** How likely an unknown stop is to be a battle, and a shop; otherwise it is an event. */
 export const UNKNOWN_CHANCE = { battle: 0.3, shop: 0.3 }
 

@@ -657,13 +657,17 @@ const HOT_CHANCE: Record<TerrainKind, number> = { town: 0.2, countryside: 0.2, c
 /** Lays out the zones a battle offers and what each means, by its goal; see Plan. `centres` are where the pods stand. */
 function planZones(battle: Battle, centres: Tile[]): void {
   const clear = () => spacedTile(battle, [...battle.units, ...battle.zones], ZONE_CLEARANCE)
+  // A zone the squad can walk off and the aliens can walk to: high ground may be a ledge with no way down.
+  const anchor = centres[0]
+  const joined = (t: Tile) => !anchor || (walkingDistances(battle, anchor)[t.y * GRID + t.x] < Infinity && walkingDistances(battle, t)[anchor.y * GRID + anchor.x] < Infinity)
   // Zones clear of every pod differ in kind, one each in turn: the highest ground over the aliens, the heaviest cover,
   // the nearest to them. Which suits a squad depends on who is in it.
   const kinds = [(i: ReturnType<typeof zoneInfo>) => i.high, (i: ReturnType<typeof zoneInfo>) => i.cover, (i: ReturnType<typeof zoneInfo>) => -i.contact]
   let next = randomInt(battle, kinds.length)
   const distinct = () => {
     const score = kinds[next++ % kinds.length]
-    const options = Array.from({ length: CANDIDATES }, clear)
+    const sampled = Array.from({ length: CANDIDATES }, clear)
+    const options = sampled.filter(joined).length > 0 ? sampled.filter(joined) : sampled
     return options.reduce((a, b) => (score(zoneInfo(battle, b)) > score(zoneInfo(battle, a)) ? b : a))
   }
   const add = (zone: Tile, plan: Plan) => {
@@ -680,7 +684,7 @@ function planZones(battle: Battle, centres: Tile[]): void {
     add({ x: commander.x, y: commander.y }, 'decap')
     // The highest open tile at range from the commander, clear of its guards.
     const ring = Array.from({ length: GRID * GRID }, (_, t) => ({ x: t % GRID, y: Math.floor(t / GRID) })).filter(
-      (t) => !blocked(battle, t.x, t.y) && distance(t, commander) >= 7 && distance(t, commander) <= 10 && battle.units.every((u) => u.side !== 'alien' || distance(u, t) >= 4),
+      (t) => !blocked(battle, t.x, t.y) && distance(t, commander) >= 7 && distance(t, commander) <= 10 && battle.units.every((u) => u.side !== 'alien' || distance(u, t) >= 4) && joined(t),
     )
     add(ring.length > 0 ? ring.reduce((a, b) => (heightAt(battle, b) > heightAt(battle, a) ? b : a)) : clear(), 'overwatch')
     add(spacedTile(battle, [commander, ...battle.zones], 2 * ZONE_CLEARANCE), 'bait')
@@ -719,8 +723,15 @@ function dropRelics(battle: Battle, squad: Unit[], spots: Tile[]): void {
       if (held('podFrost') && !alien.resists.includes('frost')) alien.chilled = CHILL_TURNS
     }
     if (held('podTurret')) {
-      const [tile] = freeTilesNear(battle, spot, 1)
-      if (tile) battle.units.push(mechUnit(battle, squad.find((u) => distance(u, spot) <= ZONE_RADIUS) ?? squad[0], TURRET, [], tile))
+      const owner = squad.find((u) => distance(u, spot) <= ZONE_RADIUS) ?? squad[0]
+      const open = walkingDistances(battle, owner).filter(Number.isFinite).length
+      // The nearest free tile where the turret, which never moves, cuts no ground off from the squad.
+      for (const tile of freeTilesNear(battle, spot, 6)) {
+        const turret = mechUnit(battle, owner, TURRET, [], tile)
+        battle.units.push(turret)
+        if (walkingDistances(battle, owner).filter(Number.isFinite).length >= open - 1) break
+        battle.units.splice(battle.units.indexOf(turret), 1)
+      }
     }
   }
   if (!held('podWall')) return
@@ -880,14 +891,12 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   }
   sealPockets(battle)
   if (goal === 'escape') {
-    // Ambushed mid-map, with a way out toward three edges.
-    battle.start = openNear(battle, { x: GRID >> 1, y: GRID >> 1 })
-    const edges = [
-      { x: 2, y: 2 }, { x: GRID >> 1, y: 1 }, { x: GRID - 3, y: 2 }, { x: GRID - 2, y: GRID >> 1 },
-      { x: GRID - 3, y: GRID - 3 }, { x: GRID >> 1, y: GRID - 2 }, { x: 2, y: GRID - 3 }, { x: 1, y: GRID >> 1 },
-    ]
-    const first = randomInt(battle, edges.length)
-    for (const step of [0, 3, 5]) battle.zones.push(openNear(battle, edges[(first + step) % edges.length]))
+    // Ambushed at one corner, with the ways out across the map at the far one and the edges beside it.
+    const corners = [{ x: 2, y: 2 }, { x: GRID - 3, y: 2 }, { x: GRID - 3, y: GRID - 3 }, { x: 2, y: GRID - 3 }]
+    const corner = randomInt(battle, corners.length)
+    const far = corners[(corner + 2) % corners.length]
+    battle.start = openNear(battle, corners[corner])
+    for (const exit of [far, { x: far.x, y: GRID >> 1 }, { x: GRID >> 1, y: far.y }]) battle.zones.push(openNear(battle, exit))
   }
 
   const centres: Tile[] = []

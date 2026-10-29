@@ -105,7 +105,7 @@ export function stopReport(run: Run, report: Report): string {
       ${report.key ? `<p class="keys">Access key won ${keyRow(run.keys)} ${run.keys === KEYS ? 'The alien source is found.' : ''}</p>` : ''}
       ${report.hired ? `<p class="down"><b>A new clone joins the squad: ${report.hired}.</b></p>` : ''}
       ${report.rescued !== null ? `<p class="down">${report.rescued} of ${CIVILIANS} civilians rescued</p>` : ''}
-      ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : ''}
+      ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : report.supplies < 0 ? `<p class="up">${report.supplies} supplies for the soldiers downed</p>` : ''}
       ${squad ? '' : decisions(run)}
     </div>
     ${squad}
