@@ -219,6 +219,13 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
       showDrop(shown!)
     } else choose(target.dataset.zone ? Number(target.dataset.zone) : null)
   })
+  // A resize, such as entering full screen, moves the stops; the trails between them are measured again once it lands.
+  addEventListener('resize', () =>
+    requestAnimationFrame(() => {
+      const map = overlay.querySelector('.map')
+      if (map) drawTrails(map)
+    }),
+  )
   overlay.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (!target || target.disabled) return
