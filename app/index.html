@@ -57,6 +57,7 @@
       .threat i { background: #ff6b5e; }
       .threat i.landed { background: #ffd84d; transition: width 0.6s 0.6s; }
       .skip { position: absolute; right: 24px; bottom: 24px; }
+      #fullscreen { position: absolute; bottom: 12px; left: 12px; z-index: 10; padding: 6px 10px; font-size: 18px; }
       .keys { color: #ffd84d; letter-spacing: 3px; }
       .note { font-size: 12px; color: #9aa6bd; white-space: nowrap; }
       .arrow { color: #5d6577; }
@@ -197,6 +198,7 @@
     <div id="hud"><span id="status"></span></div>
     <div id="drop" hidden></div>
     <div id="panel"></div>
+    <button id="fullscreen" title="Full screen">⛶</button>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
