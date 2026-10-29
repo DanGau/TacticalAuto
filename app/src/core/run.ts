@@ -396,6 +396,10 @@ function offerRecruits(run: Run): void {
   for (let i = 0; i < RECRUITS; i++) {
     const recruit = draft(run, run.recruits.map((r) => r.cls!))
     if (i !== plain) recruit.trait = traits.splice(randomInt(run, traits.length), 1)[0]
+    // A recruit joining above level 1 has already learned a skill for each level.
+    const joins = recruit.trait ? (TRAITS[recruit.trait] as Trait).level : undefined
+    if (joins) recruit.xp = xpFor(joins)
+    for (let offers = skillOffers(recruit); offers.length > 0; offers = skillOffers(recruit)) recruit.skills.push(offers[randomInt(run, offers.length)])
     run.recruits.push(recruit)
   }
 }
@@ -407,7 +411,6 @@ export function recruit(run: Run, index: number): void {
   soldier.id = run.nextSoldier++
   run.soldiers.push(soldier)
   const trait: Trait | null = soldier.trait ? TRAITS[soldier.trait] : null
-  if (trait?.level) soldier.xp = xpFor(trait.level)
   run.supplies += trait?.supplies ?? 0
   run.threat = Math.min(run.threat + (trait?.threat ?? 0), THREAT_MAX)
   if (trait?.relic) {

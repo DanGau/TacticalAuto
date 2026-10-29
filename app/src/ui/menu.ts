@@ -25,7 +25,7 @@ function card(recruit: Soldier, index: number, chosen: number | null): string {
     <small>${cls.name} · ${path.name}</small>
     <b class="name">${recruit.name}</b>
     <span><b>${cls.abilityName}:</b> ${cls.abilityText}.</span>
-    <span><b>${SKILLS[recruit.skills[0]].name}:</b> ${SKILLS[recruit.skills[0]].text}.</span>
+    ${recruit.skills.map((id) => `<span><b>${SKILLS[id].name}:</b> ${SKILLS[id].text}.</span>`).join('')}
     <div class="trait">${quirk}</div>
   </button>`
 }

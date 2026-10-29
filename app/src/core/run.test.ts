@@ -519,6 +519,8 @@ test('a run begins with a choice of recruits of different classes, one plain, th
     expect(new Set(run.recruits.map((r) => r.cls)).size).toBe(RECRUITS)
     expect(run.recruits.filter((r) => r.trait === null)).toHaveLength(1)
     expect(new Set(run.recruits.map((r) => r.trait)).size).toBe(RECRUITS)
+    // A veteran joins with its skills learned.
+    for (const r of run.recruits) expect(r.skills).toHaveLength(r.trait === 'veteran' ? 3 : 1)
   }
   const run = createRun(1)
   run.recruits[0].trait = 'quartermaster'
