@@ -324,6 +324,8 @@ export interface Battle {
   concealed: boolean
   /** Set by a landing on the hot zone until the drop pods' impact lands, as the battle's first beat. */
   breach: boolean
+  /** Whether an orbital strike was called before the landing. */
+  strike: boolean
   /** Tiles of acid, each with the alien turns it has left. */
   acid: { x: number; y: number; turns: number }[]
   /** Tiles of fire, each with the alien turns it has left. */
@@ -648,6 +650,9 @@ export function land(battle: Battle, zone: Tile, teams = 1): void {
   }
 }
 
+/** An orbital strike's threat, and the damage it does every alien, never killing one. */
+export const STRIKE = { threat: 2, damage: 5 }
+
 /** Tiles weighed for each zone of a distinct kind. */
 const CANDIDATES = 40
 
@@ -887,6 +892,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     greed: 0,
     grabbed: 0,
     breach: false,
+    strike: false,
     reserve,
   }
   sealPockets(battle)

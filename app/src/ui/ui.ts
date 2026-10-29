@@ -6,7 +6,7 @@ import { ALIENS } from '../core/aliens'
 import { RELICS, type Relic } from '../core/relics'
 import { known } from './intro'
 import { TWISTS } from '../core/twists'
-import { onTheWay, PLANS, TEAMS, ZONE_NAMES, type Battle, type Unit } from '../core/battle'
+import { onTheWay, PLANS, STRIKE, TEAMS, ZONE_NAMES, type Battle, type Unit } from '../core/battle'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { DETECT, PATROL_DETECT } from '../core/sight'
 import { alienName, button, resistChip, STOP_NAMES, tip } from './html'
@@ -67,6 +67,11 @@ function drop(battle: Battle, zone: number | null, teams: number, greed: number)
       : `<p>${PLANS[battle.plans[zone]].text}.</p>${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
   const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
   return `${twist}<div class="zones">${zones.join('')}${overview}</div>${detail}`
+}
+
+/** Before any landing: an orbital strike that wounds every alien, for threat. */
+function strike(battle: Battle): string {
+  return button({ type: 'strike' }, battle.strike ? '🛰️ Strike called' : `🛰️ Orbital strike: every alien -${STRIKE.damage} health; <span class="up">+${STRIKE.threat} threat</span>`, 'strike', !battle.strike)
 }
 
 /** On a raid: a button per number of caches to go for, then what that pays and costs. */
@@ -183,7 +188,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
       greed = 1
       view.showTeams(teams)
     }
-    dropPanel.innerHTML = drop(battle, zone, teams, greed)
+    dropPanel.innerHTML = drop(battle, zone, teams, greed) + strike(battle)
   }
 
   function choose(next: number | null): void {

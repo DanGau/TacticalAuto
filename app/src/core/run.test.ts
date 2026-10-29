@@ -3,7 +3,7 @@ import { TUNING } from './tuning'
 import { apply } from './apply'
 import { isSoldier, BASE_STATS, type Side } from './battle'
 import { CLASSES } from './classes'
-import { EVENTS } from './events'
+import { CREDIT_THREAT, EVENTS } from './events'
 import { coverAgainst, odds } from './sight'
 import {
   createRun,
@@ -390,6 +390,10 @@ test('a shop stocks one-of-a-kind gear fitted to a soldier, relics the squad lac
   expect(apply(run, { type: 'bribe' }).ok).toBe(false)
   run.supplies = 0
   expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: false, reason: 'not enough supplies' })
+  const owed = shop.relics[0]
+  expect(apply(run, { type: 'owe', index: 0 })).toEqual({ ok: true })
+  expect(run.relics).toContain(owed)
+  expect(run).toMatchObject({ supplies: 0, threat: CREDIT_THREAT })
   apply(run, { type: 'leave' })
   expect(run).toMatchObject({ phase: 'overworld', shop: null, stop: 1 })
 })

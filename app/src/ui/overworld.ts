@@ -3,7 +3,7 @@ import { CLASSES } from '../core/classes'
 import { GOALS } from '../core/goals'
 import { SLOTS } from '../core/gear'
 import { DOCTRINES } from '../core/doctrines'
-import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
+import { BRIBE, CREDIT_THREAT, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
 import { current, legOf, GEAR_PRICE, KEYS, LEG_STOPS, MAP_ROWS, ways, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
 import { FEATS } from '../core/feats'
@@ -139,7 +139,7 @@ function shopView(run: Run): string {
     return button({ type: 'gear', index }, `${gearCard(gear, held)}<br><small>for ${soldier.name}${old ? `, replacing ${old.name}` : ''} · ${price} supplies</small>`, `card gear ${gear.rarity}`, price <= run.supplies)
   })
   const relics = shop.relics.map((id, index) =>
-    button({ type: 'buy', index }, `<small>relic · ${RELIC_PRICE} supplies</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic', RELIC_PRICE <= run.supplies),
+    `<div class="buy">${button({ type: 'buy', index }, `<small>relic · ${RELIC_PRICE} supplies</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic', RELIC_PRICE <= run.supplies)}${button({ type: 'owe', index }, `<small class="up">or on credit: +${CREDIT_THREAT} threat</small>`, 'credit')}</div>`,
   )
   const bribe = button({ type: 'bribe' }, `<b>Bribe the patrols</b><br>-${BRIBE.threat} threat<br><small>${BRIBE.price} supplies, once</small>`, '', !shop.bribed && BRIBE.price <= run.supplies && run.threat > 0)
   return `<h2>A shop. Each piece is one of a kind.</h2>

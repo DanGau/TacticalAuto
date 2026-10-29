@@ -3,7 +3,7 @@ import { expect, test } from 'vitest'
 import { TUNING } from './tuning'
 import { deploy, zoneOf } from './roads'
 import { apply } from './apply'
-import { isSoldier, coverAt, distance, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
+import { isSoldier, coverAt, distance, STRIKE, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
 import { stepBattle } from './combat'
 import { createRun, current, type Run } from './run'
 
@@ -79,4 +79,14 @@ test('actions outside their phase are rejected and change nothing', () => {
   expect(apply(run, { type: 'split', teams: 9 }).ok).toBe(false)
   apply(run, { type: 'split', teams: 1 })
   expect(apply(run, { type: 'split', teams: 1 }).ok).toBe(false)
+})
+
+test('an orbital strike before the landing wounds every alien, never killing one, for threat, once', () => {
+  const run = landing()
+  const before = run.battle.units.map((u) => u.hp)
+  const threat = run.threat
+  expect(apply(run, { type: 'strike' })).toEqual({ ok: true })
+  run.battle.units.forEach((u, i) => expect(u.hp).toBe(Math.max(1, before[i] - STRIKE.damage)))
+  expect(run.threat).toBe(threat + STRIKE.threat)
+  expect(apply(run, { type: 'strike' }).ok).toBe(false)
 })
