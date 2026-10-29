@@ -7,6 +7,11 @@ import { introduce, newcomers } from './ui/intro'
 import { createUi } from './ui/ui'
 import { createView, HEIGHT, WIDTH } from './view/view'
 
+// A failure shows on screen, where a player on a phone, with no console, can report it.
+const report = (message: string) => document.getElementById('panel')!.insertAdjacentHTML('beforeend', `<p class="up">Error: ${message}</p>`)
+addEventListener('error', (e) => report(e.message))
+addEventListener('unhandledrejection', (e) => report(String(e.reason)))
+
 // The panels are laid out for a WIDTH by HEIGHT window and zoom with it; on a narrow, upright one, such as a phone's,
 // they fit its width instead, laid out for a 600 pixel wide one.
 const UPRIGHT_WIDTH = 600
@@ -47,6 +52,7 @@ declare global {
 const params = new URLSearchParams(location.search)
 const state = createRun(params.has('seed') ? Number(params.get('seed')) : Date.now() | 0)
 
+document.getElementById('panel')!.innerHTML = '<p>Loading…</p>'
 const view = await createView()
 document.body.prepend(view.canvas)
 
