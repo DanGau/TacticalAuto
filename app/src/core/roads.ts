@@ -1,6 +1,6 @@
 import { apply, type Result } from './apply'
 import { spacedTile, ZONE_CLEARANCE, type Battle, type Plan } from './battle'
-import { legOf, type Run, type Stop } from './run'
+import { createRun, legOf, type Run, type Stop } from './run'
 
 /** For tests: lays the rest of the leg as a road of `stops` one after another, the first entered, then the satellite. */
 export function road(run: Run, stops: Stop[]): void {
@@ -29,4 +29,11 @@ export function zoneOf(battle: Battle, plan: Plan): number {
   battle.zones[0] = plan === 'hot' ? { x: alien.x, y: alien.y } : spacedTile(battle, battle.units, ZONE_CLEARANCE)
   battle.plans[0] = plan
   return 0
+}
+
+/** For tests: a run of `seed` under way, its first soldier the plain recruit, with no trait. */
+export function begun(seed: number): Run {
+  const run = createRun(seed)
+  apply(run, { type: 'recruit', index: run.recruits.findIndex((r) => r.trait === null) })
+  return run
 }

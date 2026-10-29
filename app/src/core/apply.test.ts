@@ -1,15 +1,15 @@
 import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { TUNING } from './tuning'
-import { deploy, zoneOf } from './roads'
+import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
 import { isSoldier, coverAt, distance, STRIKE, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
 import { stepBattle } from './combat'
-import { createRun, current, type Run } from './run'
+import { current, type Run } from './run'
 
 /** A run choosing where to land for its first battle. */
 function landing(seed = 1): Run & { battle: Battle } {
-  const run = createRun(seed)
+  const run = begun(seed)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'
@@ -60,9 +60,10 @@ test('landing puts the whole squad on open tiles by the zone and begins the batt
 })
 
 test('actions outside their phase are rejected and change nothing', () => {
-  const run = createRun(1)
+  const run = begun(1)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   const before = structuredClone(run)
+  expect(apply(run, { type: 'recruit', index: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'keep' }).ok).toBe(false)
   expect(apply(run, { type: 'land', zone: 0 }).ok).toBe(false)
@@ -70,10 +71,11 @@ test('actions outside their phase are rejected and change nothing', () => {
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
   expect(run).toEqual(before)
   apply(run, { type: 'go', index: 1 })
+  current(run)!.stop!.goal = 'rescue'
   apply(run, { type: 'advance' })
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
   expect(apply(run, { type: 'gear', index: 0 }).ok).toBe(false)
-  // The first battle on this road is a rescue, which splits up rather than picking a zone.
+  // A rescue splits up rather than picking a zone.
   expect(run.battle!.goal).toBe('rescue')
   expect(apply(run, { type: 'land', zone: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'split', teams: 9 }).ok).toBe(false)

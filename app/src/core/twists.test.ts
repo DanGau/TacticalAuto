@@ -1,18 +1,17 @@
 import { expect, test } from 'vitest'
 import { alienStats } from './aliens'
-import { deploy, zoneOf } from './roads'
+import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
 import { coverAt, crumble, GRID, type Battle } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { PATHS } from './skills'
-import { createRun } from './run'
 import { coverAgainst, detects, sees } from './sight'
 import { generateTerrain } from './terrain'
 import { drawTwist, FUEL_DAMAGE, TWISTS, type Twist } from './twists'
 
 /** A soldier at (10, 10) and a trooper at (10, 12) on open, flat ground, with `twist`. */
 function duel(twist: Twist | null): Battle {
-  const run = createRun(1)
+  const run = begun(1)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })

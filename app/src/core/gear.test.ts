@@ -1,12 +1,12 @@
 import { PATHS } from './skills'
 import { expect, test } from 'vitest'
-import { deploy, zoneOf } from './roads'
+import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
 import { alienUnit, CRIT_BONUS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { alienStats } from './aliens'
 import { EFFECTS, generateGear, type Gear } from './gear'
-import { createRun, SELL, soldierStats, type Run } from './run'
+import { SELL, soldierStats, type Run } from './run'
 import { TUNING } from './tuning'
 
 test('gear does one thing: commons a stat mod, rares a simple effect, epics an elaborate one, each for its slot', () => {
@@ -23,7 +23,7 @@ test('gear does one thing: commons a stat mod, rares a simple effect, epics an e
 
 /** A run whose clone has learned its first skill and found `gear`. */
 function withFind(gear: Omit<Gear, 'id'>): Run {
-  const run = createRun(1)
+  const run = begun(1)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   run.finds.push({ soldier: run.soldiers[0].id, gear: { id: 1, ...gear } })
   run.phase = 'reward'
@@ -339,6 +339,7 @@ test('the sentinel protocol shoots an alien that walks away from beside a soldie
 test('a snaring soldier shoots the alien closing in over an equal shot at one that keeps its distance', () => {
   const d = armed(['snare'], { damage: 0 })
   d.alien.stats = { ...d.alien.stats, move: 0 }
+  d.alien.stance = 'anchor'
   const rusher = another(d, 1, -1)
   rusher.stats = { ...rusher.stats, range: 1, move: 0 }
   const [shot] = untilAlienShoots(d).filter((e) => e.type === 'shot' && e.id === d.soldier.id)

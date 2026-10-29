@@ -1,3 +1,4 @@
+import { recruits, title } from './menu'
 import type { Action } from '../core/apply'
 import type { Report, Run } from '../core/run'
 import type { View } from '../view/view'
@@ -137,6 +138,9 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   /** How the player picked to settle the find on screen, before confirming. */
   let gear: 'keep' | 'sell' | null = null
   let shown: Run | null = null
+  /** Whether the player has left the title screen, and the recruit picked before confirming. */
+  let started = false
+  let recruit: number | null = null
   let html = ''
 
   /** The run's phase when the panel was last drawn. */
@@ -148,6 +152,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
    */
   function panel(run: Run): string {
     const report = run.report
+    if (run.phase === 'recruit') return started ? recruits(run, recruit) : title()
     if (run.phase === 'battle') return ''
     if (run.phase === 'won' || run.phase === 'lost') return runEnd(run)
     if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run, gear)}`
@@ -218,6 +223,8 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     const target = (e.target as HTMLElement).closest('button')
     if (!target || target.disabled) return
     if (target.id === 'again') location.href = location.pathname
+    else if (target.id === 'start') started = true
+    else if (target.dataset.recruit) recruit = Number(target.dataset.recruit)
     else if (target.dataset.seen) seen = shown!.report
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
     else if (target.dataset.pick) picked = Number(target.dataset.pick)

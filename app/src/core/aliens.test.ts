@@ -1,11 +1,10 @@
 import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, PACKS, REGEN_HEAL, type AlienKind } from './aliens'
-import { deploy, zoneOf } from './roads'
+import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
 import { isSoldier, ACID_DAMAGE, alienUnit, mechUnit, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, type Battle, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
-import { createRun } from './run'
 
 test('a mission musters packs its depth allows, for exactly its force, and a lone scout only to use up the last of it', () => {
   const rng = { rng: 5 }
@@ -25,7 +24,7 @@ test('a mission musters packs its depth allows, for exactly its force, and a lon
  * The soldier never misses and never crits.
  */
 function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }[]): { battle: Battle; soldier: Unit; aliens: Unit[]; until: (done: (events: GameEvent[]) => boolean) => GameEvent[] } {
-  const run = createRun(1)
+  const run = begun(1)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })

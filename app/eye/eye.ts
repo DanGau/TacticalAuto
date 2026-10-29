@@ -72,7 +72,7 @@ function ensureBrowser(name: 'browser' | 'window', args: string[]): Promise<void
 type Command = (page: Page, ...args: string[]) => Promise<unknown>
 
 const commands: Record<string, Command> = {
-  /** open [seed]: loads a new battle. */
+  /** open [seed]: loads a new run, at its choice of recruit. */
   async open(page, seed = '0') {
     await page.goto(`${URL}?manual&seed=${seed}`)
     await page.waitForFunction(() => 'debug' in window)

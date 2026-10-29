@@ -14,6 +14,7 @@ import { PATHS, SKILLS, type SkillId } from './skills'
 import { ZONE_TERRAINS, type TerrainKind } from './terrain'
 import { drawTwist, type Twist } from './twists'
 import { random, randomInt } from './rng'
+import { TRAITS, type Trait, type TraitId } from './traits'
 
 /** Access keys needed to find the alien source; each is won at a satellite, at the end of a leg. */
 export const KEYS = 3
@@ -118,6 +119,8 @@ export interface Soldier {
   /** Feats it has pulled off, each paying experience only the first time. */
   feats: FeatId[]
   gear: Record<Slot, Gear | null>
+  /** The quirk it was recruited with, if any. */
+  trait: TraitId | null
 }
 
 /** Gear a soldier found, waiting to be equipped on that soldier or sold. */
@@ -190,7 +193,7 @@ export interface Run {
    * In the overworld the player chooses where to go or travels on; in the reward phase, makes the choices a stop left;
    * in a shop, buys; at an event, chooses how to meet it.
    */
-  phase: 'overworld' | 'battle' | 'reward' | 'shop' | 'event' | 'won' | 'lost'
+  phase: 'recruit' | 'overworld' | 'battle' | 'reward' | 'shop' | 'event' | 'won' | 'lost'
   /** What the shop the squad is in sells; null outside a shop. */
   shop: Shop | null
   /** The event the squad is meeting; null outside one. */
@@ -216,6 +219,8 @@ export interface Run {
   relics: RelicId[]
   /** Relics to choose from in the reward phase. */
   relicOffers: RelicId[]
+  /** At the run's start, the recruits to choose the first soldier from. */
+  recruits: Soldier[]
   /** What each leg's boss resists, by keys won; known from the start so the squad can build to beat it. */
   bosses: Resist[]
 }
@@ -341,7 +346,8 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
     const fromClass = soldier.cls ? (CLASSES[soldier.cls].stats[key] ?? 0) : 0
     const fromGear = equipped(soldier).reduce((sum, gear) => sum + (gear.stats[key] ?? 0), 0)
     const fromSkills = soldier.skills.reduce((sum, id) => sum + (SKILLS[id].stats?.[key] ?? 0), 0)
-    stats[key] += fromClass + fromGear + fromSkills + level(soldier) * (LEVEL_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
+    const fromTrait = soldier.trait ? ((TRAITS[soldier.trait] as Trait).stats?.[key] ?? 0) : 0
+    stats[key] += fromClass + fromGear + fromSkills + fromTrait + level(soldier) * (LEVEL_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
   }
   for (const id of run.doctrines) Object.assign(stats, (DOCTRINES[id] as Doctrine).set)
   return stats
@@ -352,23 +358,63 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
  * doctrine of unique classes it takes a class no squadmate has, while one is left.
  */
 export function hire(run: Run): Soldier {
+  const soldier = draft(run, [])
+  soldier.id = run.nextSoldier++
+  run.soldiers.push(soldier)
+  return soldier
+}
+
+/** A level 1 clone of a class none of `taken` has, if one is left, not yet in the squad. */
+function draft(run: Run, taken: ClassId[]): Soldier {
   const unused = (Object.keys(CLASSES) as ClassId[]).filter((id) => !run.soldiers.some((s) => s.cls === id))
   const unique = run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).uniqueClasses) && unused.length > 0
-  const classes = unique ? unused : (Object.keys(CLASSES) as ClassId[])
-  const free = NAMES.filter((name) => !run.soldiers.some((s) => s.name === name))
+  const all = (unique ? unused : (Object.keys(CLASSES) as ClassId[])).filter((id) => !taken.includes(id))
+  const classes = all.length > 0 ? all : (Object.keys(CLASSES) as ClassId[])
+  const free = NAMES.filter((name) => ![...run.soldiers, ...run.recruits].some((s) => s.name === name))
   const name = free[randomInt(run, free.length)]
   const cls = classes[randomInt(run, classes.length)]
   const soldier: Soldier = {
-    id: run.nextSoldier++,
+    id: 0,
     name,
     xp: xpFor(1),
     cls,
     skills: [PATHS[cls][randomInt(run, 2)].core],
     feats: [],
     gear: { weapon: null, armor: null, utility: null },
+    trait: null,
   }
-  run.soldiers.push(soldier)
   return soldier
+}
+
+/** Recruits offered at a run's start. */
+export const RECRUITS = 3
+
+/** Offers the run's first soldier: recruits of different classes, one plain and the rest each with a different trait. */
+function offerRecruits(run: Run): void {
+  const traits = Object.keys(TRAITS) as TraitId[]
+  const plain = randomInt(run, RECRUITS)
+  for (let i = 0; i < RECRUITS; i++) {
+    const recruit = draft(run, run.recruits.map((r) => r.cls!))
+    if (i !== plain) recruit.trait = traits.splice(randomInt(run, traits.length), 1)[0]
+    run.recruits.push(recruit)
+  }
+}
+
+/** Takes the recruit at `index` as the run's first soldier, with what its trait brings. */
+export function recruit(run: Run, index: number): void {
+  const soldier = run.recruits[index]
+  run.recruits = []
+  soldier.id = run.nextSoldier++
+  run.soldiers.push(soldier)
+  const trait: Trait | null = soldier.trait ? TRAITS[soldier.trait] : null
+  if (trait?.level) soldier.xp = xpFor(trait.level)
+  run.supplies += trait?.supplies ?? 0
+  run.threat = Math.min(run.threat + (trait?.threat ?? 0), THREAT_MAX)
+  if (trait?.relic) {
+    const unheld = (Object.keys(RELICS) as RelicId[]).filter((id) => !run.relics.includes(id))
+    run.relics.push(unheld[randomInt(run, unheld.length)])
+  }
+  settle(run)
 }
 
 /** Whether the squad is in the second half of its leg, where aliens are stronger. */
@@ -539,16 +585,17 @@ export function createRun(seed: number): Run {
     nextGear: 1,
     relics: [],
     relicOffers: [],
+    recruits: [],
     bosses: [],
     shop: null,
     event: null,
     met: [],
     doctrines: [],
   }
-  hire(run)
+  offerRecruits(run)
   run.legs = Array.from({ length: KEYS + 1 }, (_, k) => ({ columns: k === KEYS ? [[{ row: Math.floor(MAP_ROWS / 2), next: [], stop: null }]] : drawShape(run), path: [] }))
   drawStops(run)
-  settle(run)
+  run.phase = 'recruit'
   const resists = Object.keys(RESISTS) as Resist[]
   run.bosses = Array.from({ length: KEYS + 1 }, () => resists[randomInt(run, resists.length)])
   return run

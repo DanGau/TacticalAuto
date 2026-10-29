@@ -109,6 +109,8 @@ const play =
   ({ risk, pick, land, build, events }: Strategy): Bot =>
   (run, rng) => {
     if (run.phase === 'reward') return reward(run, rng, PICKS[pick])
+    // A bold bot takes a recruit with a trait, any other the plain one.
+    if (run.phase === 'recruit') return { type: 'recruit', index: run.recruits.findIndex((r) => (events === 'bold') === (r.trait !== null)) }
     // A strike on the hard fights, a key, the final mission or an Overrun battle, while the threat leaves room for it.
     const hard = run.mission && (run.mission.kind === 'key' || run.mission.kind === 'final' || run.mission.risk === 'dangerous')
     if (run.phase === 'battle' && hard && !run.battle!.strike && run.threat + STRIKE.threat < THREAT_MAX) return { type: 'strike' }
@@ -138,6 +140,7 @@ const play =
 /** Chooses every option at random; in a shop, builds or leaves at a coin flip. Decides finds as decideFind says. */
 const randomBot: Bot = (run, rng) => {
   if (run.phase === 'reward') return reward(run, rng, PICKS.random)
+  if (run.phase === 'recruit') return { type: 'recruit', index: randomInt(rng, run.recruits.length) }
   if (run.phase === 'battle' && !run.battle!.strike && randomInt(rng, 2) === 0) return { type: 'strike' }
   if (run.phase === 'battle' && run.battle!.goal === 'rescue') return { type: 'split', teams: 1 + randomInt(rng, Math.min(TEAMS, run.battle!.reserve.length)) }
   if (run.phase === 'battle' && run.battle!.goal === 'raid') return { type: 'grab', caches: 1 + randomInt(rng, run.battle!.caches.length) }

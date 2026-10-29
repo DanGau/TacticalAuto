@@ -1,8 +1,10 @@
 import { land, STRIKE, TEAMS } from './battle'
 import { arrive, BRIBE, CREDIT_THREAT, depart, EVENTS, RELIC_PRICE } from './events'
-import { advance, buyWare, current, GEAR_PRICE, go, keepFind, nextStop, sellFind, skillOffers, takeRelic, takeSkill, THREAT_MAX, ways, type Run } from './run'
+import { advance, buyWare, current, GEAR_PRICE, go, keepFind, nextStop, recruit, sellFind, skillOffers, takeRelic, takeSkill, THREAT_MAX, ways, type Run } from './run'
 
 export type Action =
+  /** At the run's start: take the recruit at `index` of run.recruits as the first soldier. */
+  | { type: 'recruit'; index: number }
   /** Shop: buy the gear at `index` of shop.wares, for the soldier it is fitted to. */
   | { type: 'gear'; index: number }
   /** Shop: buy the relic at `index` of shop.relics. */
@@ -43,6 +45,13 @@ const no = (reason: string): Result => ({ ok: false, reason })
 
 /** The only way a player changes state. A rejected action leaves state untouched. */
 export function apply(run: Run, action: Action): Result {
+  if (action.type === 'recruit') {
+    if (run.phase !== 'recruit') return no('not recruiting')
+    if (!run.recruits[action.index]) return no('no such recruit')
+    recruit(run, action.index)
+    return ok
+  }
+  if (run.phase === 'recruit') return no('choose a recruit first')
   if (action.type === 'strike') {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not landing')

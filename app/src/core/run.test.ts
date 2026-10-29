@@ -7,6 +7,7 @@ import { CREDIT_THREAT, EVENTS } from './events'
 import { coverAgainst, odds } from './sight'
 import {
   createRun,
+  RECRUITS,
   DROP_SUPPLIES,
   endBattle,
   KEYS,
@@ -38,12 +39,13 @@ import {
   GEAR_PRICE,
 } from './run'
 import { PATHS, SKILLS } from './skills'
-import { atKey, road, deploy } from './roads'
+import { atKey, road, deploy, begun } from './roads'
+import { TRAITS } from './traits'
 import { RELICS } from './relics'
 
 /** A run whose first clone has learned its first skill, so the overworld waits. */
 function started(): Run {
-  const run = createRun(1)
+  const run = begun(1)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   return run
 }
@@ -84,7 +86,7 @@ function fight(run: Run, winner: Side): void {
 }
 
 test('a run begins with one level 1 recruit on a path of its class, choosing where to start among the battles of its first leg', () => {
-  const run = createRun(1)
+  const run = begun(1)
   expect(run.soldiers).toHaveLength(1)
   expect(level(run.soldiers[0])).toBe(1)
   expect(PATHS[run.soldiers[0].cls!].map((p) => p.core)).toContain(run.soldiers[0].skills[0])
@@ -103,7 +105,7 @@ test('a run begins with one level 1 recruit on a path of its class, choosing whe
 
 test('a leg is a map of trails that part and meet without crossing; every way through is its stops then the satellite, and legs ahead are blank', () => {
   for (let seed = 1; seed <= 20; seed++) {
-    const run = createRun(seed)
+    const run = begun(seed)
     for (const leg of run.legs.slice(0, -1)) {
       const { columns } = leg
       expect(columns).toHaveLength(LEG_STOPS + 1)
@@ -305,10 +307,10 @@ test('a key mission has one boss, with an escort for each key already won', () =
   }
 })
 
-const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: { weapon: null, armor: null, utility: null }, ...extra })
+const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: { weapon: null, armor: null, utility: null }, trait: null, ...extra })
 
 test('stats add class, level, skills and relics to the base', () => {
-  const run = createRun(1)
+  const run = begun(1)
   run.relics = ['plasma']
   const stats = soldierStats(run, soldier({ xp: xpFor(2) }))
   expect(stats.hp).toBe(BASE_STATS.hp + 2 * LEVEL_STATS.hp!)
@@ -329,7 +331,7 @@ test('levels never stop: each takes more experience than the last', () => {
 })
 
 test('a soldier chooses one of each pair along its path; past the last, levels add stats only', () => {
-  const run = createRun(1)
+  const run = begun(1)
   const [clone] = run.soldiers
   const other = PATHS[clone.cls!][1]
   clone.skills = [other.core]
@@ -401,7 +403,7 @@ test('a shop stocks one-of-a-kind gear fitted to a soldier, relics the squad lac
 test('an unknown stop turns out a battle, a shop, or an event met once a run, whose options change the run', () => {
   const kinds = new Set<string>()
   for (let seed = 0; seed < 40; seed++) {
-    const run = createRun(seed)
+    const run = begun(seed)
     run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
     enter(run, 'standard', ['unknown', 'battle'])
     apply(run, { type: 'advance' })
@@ -507,4 +509,26 @@ test("the first relic offered shares a keyword with the squad's skills, gear or 
     fight(run, 'human')
     expect(RELICS[run.relicOffers[0]].tags!.some((tag) => squadKeywords(run).includes(tag))).toBe(true)
   }
+})
+
+test('a run begins with a choice of recruits of different classes, one plain, the rest each with its own trait, applied on joining', () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const run = createRun(seed)
+    expect(run.phase).toBe('recruit')
+    expect(run.soldiers).toHaveLength(0)
+    expect(new Set(run.recruits.map((r) => r.cls)).size).toBe(RECRUITS)
+    expect(run.recruits.filter((r) => r.trait === null)).toHaveLength(1)
+    expect(new Set(run.recruits.map((r) => r.trait)).size).toBe(RECRUITS)
+  }
+  const run = createRun(1)
+  run.recruits[0].trait = 'quartermaster'
+  run.recruits[1].trait = 'veteran'
+  const chosen = run.recruits[0]
+  expect(apply(run, { type: 'recruit', index: 0 })).toEqual({ ok: true })
+  expect(run.soldiers).toEqual([chosen])
+  expect(run.supplies).toBe(START_SUPPLIES + TRAITS.quartermaster.supplies)
+  expect(soldierStats(run, chosen).aim).toBeCloseTo(soldierStats(run, { ...chosen, trait: null }).aim + TRAITS.quartermaster.stats.aim)
+  expect(run.recruits).toHaveLength(0)
+  expect(run.phase).not.toBe('recruit')
+  expect(apply(run, { type: 'recruit', index: 0 }).ok).toBe(false)
 })

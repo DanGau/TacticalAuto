@@ -1,14 +1,13 @@
 import { PATHS } from './skills'
 import { expect, test } from 'vitest'
-import { deploy } from './roads'
+import { deploy, begun } from './roads'
 import { apply } from './apply'
 import { isSoldier, revealed, type Battle } from './battle'
 import { stepBattle, type GameEvent } from './combat'
-import { createRun } from './run'
 import { detects } from './sight'
 
 function battle(seed: number): Battle {
-  const run = createRun(seed)
+  const run = begun(seed)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })

@@ -1,13 +1,13 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { distance, isSoldier, POD_REACH } from './battle'
-import { createRun, current, type Run } from './run'
+import { current, type Run } from './run'
 import type { RelicId } from './relics'
-import { zoneOf } from './roads'
+import { zoneOf, begun } from './roads'
 
 /** A run landing for an exterminate battle with `relics`, at its hot drop so aliens are near. */
 function landed(relics: RelicId[]): Run {
-  const run = createRun(1)
+  const run = begun(1)
   run.relics = relics
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'

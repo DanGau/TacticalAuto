@@ -4,12 +4,12 @@ import { apply } from './apply'
 import { stepBattle, UPLINK_REACH } from './combat'
 import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, type Goal } from './goals'
 import { isSoldier, revealed } from './battle'
-import { road, deploy } from './roads'
-import { createRun, endBattle, RISKS, START_SUPPLIES, STOP_THREAT, THREAT_MAX, XP, type Run } from './run'
+import { road, deploy, begun } from './roads'
+import { endBattle, RISKS, START_SUPPLIES, STOP_THREAT, THREAT_MAX, XP, type Run } from './run'
 
 /** A run about to fight a battle of `goal`, with three packs to muster. */
 function before(goal: Goal): Run {
-  const run = createRun(1)
+  const run = begun(1)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
   apply(run, { type: 'go', index: 1 })
   const patrol = { name: 'Patrol', kinds: ['trooper', 'trooper'] as const }
@@ -19,7 +19,7 @@ function before(goal: Goal): Run {
 }
 
 test('every battle on the leg under way has its aliens mustered in advance; no other stop has any', () => {
-  const run = createRun(1)
+  const run = begun(1)
   for (const node of run.legs[0].columns.flat()) expect(node.stop!.packs.length > 0).toBe(node.stop!.kind === 'battle')
 })
 
