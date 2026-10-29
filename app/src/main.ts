@@ -10,7 +10,20 @@ import { createView, HEIGHT, WIDTH } from './view/view'
 const fit = () => document.documentElement.style.setProperty('--ui', String(Math.min(innerWidth / WIDTH, innerHeight / HEIGHT)))
 addEventListener('resize', fit)
 fit()
-document.getElementById('fullscreen')!.addEventListener('click', () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()))
+/** Fills the screen, on its side where the browser allows: the game is laid out wide. */
+const enter = () =>
+  document.documentElement
+    .requestFullscreen()
+    .then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape'))
+    .catch(() => {})
+const toggle = document.getElementById('fullscreen')!
+toggle.addEventListener('pointerdown', (e) => e.stopPropagation())
+toggle.addEventListener('click', () => {
+  if (document.fullscreenElement) void document.exitFullscreen()
+  else void enter()
+})
+// Browsers allow full screen only on a click, so the first one anywhere enters it.
+addEventListener('pointerdown', () => void enter(), { once: true })
 
 export interface Debug {
   snapshot(): Run
