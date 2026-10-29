@@ -12,6 +12,7 @@ Architecture rules: [docs/architecture/CLAUDE.md](docs/architecture/CLAUDE.md). 
 4. **No memorial to the old way.** When behavior changes, the old behavior is absent: no legacy names, shims, commented-out code, or "previously we". History lives in git.
 5. **Progressive disclosure.** This file stays under 50 lines. Detail goes in `docs/`, linked from here.
 6. **Commit and push after every change**, straight onto `main`.
+7. **End every reply with the game link:** https://dangau.github.io/TacticalAuto/
 
 ## Commands
 
