@@ -11,6 +11,7 @@
     "sim": "node scripts/deadline.mjs 1800 tsx src/sim/cli.ts",
     "tune": "node scripts/deadline.mjs 86400 tsx src/sim/tune.ts",
     "eye": "tsx eye/eye.ts",
+    "tsx": "node scripts/deadline.mjs 600 tsx",
     "check": "npm run lint && npm run typecheck && npm run test && npm run sim -- --runs=50",
     "prepare": "git config core.hooksPath .githooks"
   },
