@@ -30,6 +30,10 @@ const FLY_MS = 1600
 const PANEL = 110
 /** A drop pod's fall, the burst of dust as it lands, the gap between pods, and the height it falls from in world pixels. */
 const POD_FALL_MS = 800
+/** How long a stealth insertion's parachutes take to drift down, how high they start, and how long a canopy takes to fold. */
+const CHUTE_FALL_MS = 1500
+const CHUTE_HEIGHT = 260
+const CHUTE_FOLD_MS = 350
 const POD_DUST_MS = 450
 const POD_STAGGER_MS = 160
 const POD_HEIGHT = 400
@@ -817,6 +821,7 @@ export async function createView(): Promise<View> {
     if (soldiers.length === 0) return
     for (const unit of soldiers) sprites.get(unit.id)!.node.alpha = 0
     await follow(soldiers.map((u) => ({ x: u.x, y: u.y })))
+    if (battle.landed === 'stealth') return parachute(soldiers)
     await Promise.all(
       soldiers.map(async (unit, i) => {
         const sprite = sprites.get(unit.id)!
@@ -841,6 +846,38 @@ export async function createView(): Promise<View> {
           if (hot) world.position.x += Math.sin(t * 60) * 3 * (1 - t)
         })
         pod.destroy()
+      }),
+    )
+    look(camera)
+  }
+
+  /** A stealth insertion: each soldier drifts down under a canopy, swaying, and lands without a sound. */
+  async function parachute(soldiers: Unit[]): Promise<void> {
+    await Promise.all(
+      soldiers.map(async (unit, i) => {
+        const sprite = sprites.get(unit.id)!
+        const ground = { x: sprite.node.x, y: sprite.node.y }
+        const chute = new Graphics()
+        world.addChildAt(chute, world.getChildIndex(fx))
+        await tween(i * POD_STAGGER_MS, () => {})
+        sprite.node.alpha = 1
+        await tween(CHUTE_FALL_MS, (t) => {
+          const sway = Math.sin(t * Math.PI * 3) * 10 * (1 - t)
+          const x = ground.x + sway
+          const y = ground.y - CHUTE_HEIGHT * (1 - t)
+          sprite.node.position.set(x, y)
+          chute.clear()
+          chute.ellipse(ground.x, ground.y, 14 * t, 7 * t).fill({ color: 0x000000, alpha: 0.35 })
+          // Lines from the soldier's shoulders up to the canopy.
+          chute.moveTo(x - 6, y - 34).lineTo(x - 22, y - 74).moveTo(x + 6, y - 34).lineTo(x + 22, y - 74).stroke({ color: 0xd8dde6, width: 1.5, alpha: 0.9 })
+          chute.moveTo(x - 26, y - 72).arc(x, y - 72, 26, Math.PI, 0).closePath().fill(0x4a5a3c).stroke({ color: 0x2b3424, width: 2 })
+        })
+        sprite.node.position.set(ground.x, ground.y)
+        await tween(CHUTE_FOLD_MS, (t) => {
+          chute.clear()
+          chute.moveTo(ground.x - 26, ground.y - 72 + 60 * t).arc(ground.x + 20 * t, ground.y - 72 + 60 * t, 26 * (1 - t / 2), Math.PI, 0).closePath().fill({ color: 0x4a5a3c, alpha: 1 - t })
+        })
+        chute.destroy()
       }),
     )
     look(camera)

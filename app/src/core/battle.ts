@@ -345,8 +345,9 @@ export interface Battle {
   escape: Tile | null
   /** Soldiers lifted off, on an escape. */
   escaped: number
-  /** What landing at each zone means, in zones order. */
+  /** What landing at each zone means, in zones order, and the plan the squad landed by; null before it lands. */
   plans: Plan[]
+  landed: Plan | null
   /** On a raid, the supply caches still on the map, and how many the squad set out to grab and has grabbed. */
   caches: Tile[]
   greed: number
@@ -611,6 +612,7 @@ export const CACHES = 3
  */
 export function land(battle: Battle, zone: Tile, teams = 1): void {
   const plan = battle.plans[battle.zones.indexOf(zone)]
+  battle.landed = plan
   if (plan === 'hot' || plan === 'decap') {
     battle.breach = true
     battle.concealed = false
@@ -869,6 +871,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     escape: null,
     escaped: 0,
     plans: [],
+    landed: null,
     caches: [],
     greed: 0,
     grabbed: 0,
