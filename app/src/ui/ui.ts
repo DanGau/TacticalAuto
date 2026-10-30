@@ -14,6 +14,8 @@ import { alienName, button, resistChip, STOP_NAMES, tip } from './html'
 import { overworld, type Tab } from './overworld'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
+/** How long the helicopter takes to fly between stops, in milliseconds. */
+const FLIGHT_MS = 1100
 
 export interface Ui {
   /** Shows `run` in the status line and the panel. */
@@ -229,24 +231,47 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     } else choose(target.dataset.zone ? Number(target.dataset.zone) : null)
   })
   addEventListener('resize', () => requestAnimationFrame(shrink))
+
+  /** Whether the helicopter is in the air, the map waiting for it to land. */
+  let flying = false
+  /** Flies the squad's helicopter from where it stands to the stop `to` is pinned at, then `land`s. */
+  function fly(to: HTMLElement, land: () => void): void {
+    const chopper = overlay.querySelector<HTMLElement>('.chopper')
+    const cell = to.closest<HTMLElement>('.cell')
+    if (!chopper || !cell) return land()
+    flying = true
+    const dx = cell.offsetLeft - chopper.offsetLeft
+    chopper.classList.toggle('east', dx > 0)
+    chopper.classList.add('flying')
+    chopper.style.left = cell.style.left
+    chopper.style.top = cell.style.top
+    setTimeout(() => {
+      flying = false
+      land()
+    }, FLIGHT_MS)
+  }
   overlay.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
-    if (!target || target.disabled) return
+    if (!target || target.disabled || flying) return
     if (target.id === 'again') location.href = location.pathname
     else if (target.id === 'start') started = true
     else if (target.id === 'begin') told = true
-    else if (target.dataset.recruit) recruit = Number(target.dataset.recruit)
+    else if (target.dataset.recruit) {
+      // A city tapped once shows who waits there; tapped again, the run begins there.
+      const index = Number(target.dataset.recruit)
+      if (recruit !== index) recruit = index
+      else return act({ type: 'recruit', index })
+    }
     else if (target.dataset.seen) seen = shown!.report
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
     else if (target.dataset.pick) {
       // A stop tapped once is picked to look at; tapped again, the squad sets out for it.
       const index = Number(target.dataset.pick)
       if (picked !== index) picked = index
-      else {
+      else return fly(target, () => {
         picked = null
         act({ type: 'go', index })
-        return
-      }
+      })
     }
     else if (target.dataset.gear) gear = target.dataset.gear as 'keep' | 'sell'
     else if (target.dataset.open) {

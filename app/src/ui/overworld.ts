@@ -97,17 +97,20 @@ function runMap(run: Run, picked: number | null): string {
         const icon = !node.stop ? (c === leg.columns.length - 1 ? stopIcon(run, { kind: l === KEYS ? 'final' : 'key' } as Stop) : FOG) : stopIcon(run, node.stop, state)
         const html = open.includes(i) && l === run.keys && c === run.stop ? `<button class="option${i === picked ? ' picked' : ''}" data-pick="${i}">${icon}</button>` : icon
         const squad = taken && standing(c)
-        const pin = { id: `${l}-${c}-${i}`, at: node.at ?? run.route[l].to.at, html, next, squad, lit: l === run.keys && c === run.stop && i === picked }
+        const choice = open.includes(i) && l === run.keys && c === run.stop
+        const pin = { id: `${l}-${c}-${i}`, at: node.at ?? run.route[l].to.at, html, next, squad, choice, lit: squad ? picked !== null : choice && i === picked }
         if (taken) path.push(pin.at)
         if (squad) focus = pin.at
         pins.push(pin)
       }),
     )
   })
+  // At a leg's start the squad stands in the city it set out from, its trails reaching to each choice.
+  if (!pins.some((p) => p.squad)) pins.push({ id: 'from', at: focus, html: '', next: open.map((i) => `${run.keys}-0-${i}`), squad: true, choice: false, lit: picked !== null })
   const stage = run.route[run.keys]
   const banner = stage.hero ? `Leg ${run.keys + 1} of ${KEYS}: across ${CONTINENTS[stage.continent!].name} to ${stage.hero.name}, waiting in ${stage.to.name}, ${stage.to.country}.` : 'The last leg: to the alien hub under the Antarctic ice.'
   // The way on from the picked stop lights up, stop by stop.
-  for (const pin of pins) if (pin.lit) for (const id of pin.next) pins.forEach((p) => p.id === id && (p.lit = true))
+  for (const pin of pins) if (pin.lit && !pin.squad) for (const id of pin.next) pins.forEach((p) => p.id === id && (p.lit = true))
   return `<p class="progress">${banner}</p><div class="map">${globe(run, pins, focus, path, picked !== null)}</div>`
 }
 

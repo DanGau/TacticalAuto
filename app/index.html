@@ -80,14 +80,14 @@
       .story { max-width: 640px; margin: 8vh auto 0; animation: none; }
       .story p, .story button { font-size: 19px; line-height: 1.6; color: #e8e2c8; animation: rise 1.1s backwards; }
       .story p { margin: 0 0 18px; }
-      button.recruit .home { color: #9ad7ff; }
-      button.recruit { position: relative; gap: 10px; width: 240px; }
-      button.recruit .feats { display: flex; flex-wrap: wrap; gap: 4px; }
-      button.recruit .more { color: #9aa6bd; }
-      button.recruit.chosen .defs { display: flex; position: static; width: auto; padding: 0; }
-      button.recruit .name { font-size: 20px; }
-      button.recruit .trait { display: flex; flex-direction: column; gap: 2px; margin-top: auto; padding-top: 8px; border-top: 1px solid #3a465c; }
-      button.recruit.chosen { outline: 2px solid #ffd84d; background: #35496b; }
+      .recruit .home { color: #9ad7ff; }
+      .recruit { position: relative; display: flex; flex-direction: column; gap: 10px; width: 240px; padding: 14px; border-radius: 10px; background: #35496b; text-align: left; animation: rise 0.3s; }
+      .recruit .feats { display: flex; flex-wrap: wrap; gap: 4px; }
+      .recruit .more { color: #9aa6bd; }
+      .recruit.chosen .defs { display: flex; position: static; width: auto; padding: 0; }
+      .recruit .name { font-size: 20px; }
+      .recruit .trait { display: flex; flex-direction: column; gap: 2px; margin-top: auto; padding-top: 8px; border-top: 1px solid #3a465c; }
+      .recruit.chosen { outline: 2px solid #ffd84d; background: #35496b; }
       .keys { color: #ffd84d; letter-spacing: 3px; }
       .note { font-size: 12px; color: #9aa6bd; white-space: nowrap; }
       .arrow { color: #5d6577; }
@@ -102,7 +102,6 @@
       .globe .land { fill: #23402f; stroke: #7fe7c4; stroke-width: 1.2; stroke-opacity: 0.55; filter: drop-shadow(0 0 4px #4fe0a088); }
       .globe .graticule { fill: none; stroke: #4da3ff; stroke-opacity: 0.12; stroke-width: 0.8; }
       .globe .walked { fill: none; stroke: #ffd166; stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 4px #ffd166); }
-      .globe .ahead { fill: none; stroke: #ffd166; stroke-opacity: 0.55; stroke-width: 2; stroke-dasharray: 2 7; stroke-linecap: round; }
       .globe .trail { stroke: #dde; stroke-opacity: 0.6; stroke-width: 2; stroke-dasharray: 3 5; }
       .globe .trail.lit { stroke: #ffd166; stroke-opacity: 1; stroke-width: 3; filter: drop-shadow(0 0 3px #ffd166); }
       .globe .trail.dim { stroke-opacity: 0.2; }
@@ -117,13 +116,24 @@
       .trails path.open { stroke: #ffd166; }
       .trails path.walked { stroke: #a8b3c8; stroke-dasharray: 6 4; }
       .node.done { opacity: 0.55; }
-      button.option { padding: 0; border: none; background: none; border-radius: 50%; }
-      button.option .node { box-shadow: 0 0 0 2px #ffd166; }
-      button.option.picked .node { box-shadow: 0 0 0 4px #ffd166, 0 0 18px #ffd166; }
-      button.option:hover .node { box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; }
       .node.here { box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; }
-      .cell.squad .node { opacity: 1; box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; animation: pulse 1.6s ease-in-out infinite; }
-      .cell.squad::after { content: 'SQUAD'; position: absolute; left: 50%; top: 100%; transform: translate(-50%, 3px); padding: 0 5px; border-radius: 6px; background: #ffd166; color: #10141c; font-size: 10px; font-weight: bold; letter-spacing: 1px; white-space: nowrap; }
+      .globe .cell.choice { z-index: 2; }
+      .globe .cell:not(.choice):not(.squad) .node { transform: scale(0.75); opacity: 0.75; }
+      button.option { position: relative; padding: 0; border: none; background: none; border-radius: 50%; }
+      button.option .node { width: 40px; height: 40px; line-height: 40px; font-size: 22px; border-color: #ffd166; box-shadow: 0 0 0 3px #ffd166, 0 0 16px #ffd166; animation: pulse 1.6s ease-in-out infinite; }
+      button.option::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid #ffd166; animation: ripple 1.6s ease-out infinite; pointer-events: none; }
+      button.option.picked .node { box-shadow: 0 0 0 5px #fff, 0 0 26px #ffd166; animation: none; }
+      button.option:hover .node { box-shadow: 0 0 0 4px #ffd166, 0 0 22px #ffd166; }
+      button.option .label { position: absolute; left: 50%; top: 100%; transform: translate(-50%, 4px); white-space: nowrap; color: #e8e2c8; font-size: 13px; text-shadow: 0 0 4px #0a1626, 0 0 4px #0a1626; }
+      @keyframes ripple { from { transform: scale(0.9); opacity: 0.9; } to { transform: scale(1.8); opacity: 0; } }
+      .chopper { position: absolute; z-index: 3; transform: translate(-50%, -110%); font-size: 28px; pointer-events: none; filter: drop-shadow(0 6px 3px #0008); transition: left 1.1s ease-in-out, top 1.1s ease-in-out; }
+      .chopper span { display: inline-block; animation: hover 1.2s ease-in-out infinite; }
+      .chopper.east span { transform: scaleX(-1); }
+      .chopper.flying span { animation: none; }
+      .chopper.flying.east span { transform: scaleX(-1) rotate(-12deg); }
+      .chopper.flying:not(.east) span { transform: rotate(12deg); }
+      @keyframes hover { 50% { translate: 0 -4px; } }
+      .start { display: flex; align-items: center; justify-content: center; gap: 16px; }
       @keyframes pulse { 50% { box-shadow: 0 0 0 5px #ffd166aa, 0 0 22px #ffd166; } }
       .map .node.fog { color: #6b7690; border: 2px dashed #4a5670; font-size: 14px; font-weight: bold; }
       .nodes { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 8px; }
