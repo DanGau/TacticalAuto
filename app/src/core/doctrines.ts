@@ -15,9 +15,9 @@ export interface Doctrine extends Lasting {
   name: string
   text: string
   rule?: Rule
-  /** Whether winning a key no longer brings a new clone. */
+  /** Whether winning a key no longer brings a hero. */
   noRecruits?: boolean
-  /** Whether a new clone takes a class no squadmate has, while one is left. */
+  /** Whether a new soldier takes a class no squadmate has, while one is left. */
   uniqueClasses?: boolean
   /** Whether it is how the squad fights. The squad fights one way: adopting one sets aside the last. */
   weapon?: boolean
@@ -36,7 +36,7 @@ export const FORTIFIED_DEFENSE = [0, 0.3, 0.6]
 
 const doctrines = {
   massCloning: { name: 'Mass Cloning', text: 'Every soldier has 2 less health', stats: { hp: -2 } },
-  loneWolf: { name: 'Lone Wolf', text: 'Every soldier has +40 health, +4 armor, +5 damage, +25% aim, +25% crit and +2 move; no new clone ever joins', stats: { hp: 40, armor: 4, damage: 5, aim: 0.25, crit: 0.25, move: 2 }, noRecruits: true },
+  loneWolf: { name: 'Lone Wolf', text: 'Every soldier has +40 health, +4 armor, +5 damage, +25% aim, +25% crit and +2 move; no new soldier ever joins', stats: { hp: 40, armor: 4, damage: 5, aim: 0.25, crit: 0.25, move: 2 }, noRecruits: true },
   specialists: { name: 'Specialist Doctrine', text: 'No two soldiers share a class while a class is left unused', uniqueClasses: true },
   exosuits: { name: 'Exosuits', text: 'Every soldier has +3 armor, but cover gives soldiers no defense', stats: { armor: 3 }, rule: 'exosuits' },
   fortified: { name: 'Fortification Doctrine', text: 'Low cover stops 30% of shots and high cover 60%, for both sides', rule: 'fortified' },
@@ -65,7 +65,7 @@ const doctrines = {
     effect: 'demolish',
     weapon: true,
   },
-  gunslingers: { name: 'Gunslingers', text: 'Every soldier has 1 less damage, 20% less aim and 2 less range, but fires twice each turn', stats: { damage: -1, aim: -0.2, range: -2 }, effect: 'twin', weapon: true },
+  gunslingers: { name: 'Gunslingers', text: 'Every soldier has 1 less damage, 20% less aim and 2 less range, but fires a third shot each turn', stats: { damage: -1, aim: -0.2, range: -2 }, effect: 'twin', weapon: true },
 } satisfies Record<string, Doctrine>
 
 export type DoctrineId = keyof typeof doctrines

@@ -2,7 +2,7 @@ import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { deploy, begun } from './roads'
 import { apply } from './apply'
-import { isSoldier, revealed, type Battle } from './battle'
+import { isSoldier, revealed, SOLDIER_ATTACKS, type Battle } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { detects } from './sight'
 
@@ -25,10 +25,12 @@ function play(seed: number, check: (events: GameEvent[], before: Battle, after: 
   return state
 }
 
-test('a turn is one move beat, then one shot per beat in id order, then the other side', () => {
+test('a turn is one move beat, then an attack per beat in id order, two by each soldier and one by each alien, then the other side', () => {
   let turn = ''
   let stage = 'move'
   let shooter = 0
+  let attacks = 0
+  let twice = 0
   const end = play(1, (events, before, after) => {
     const first = events.find((e) => ['move', 'shot', 'rocket', 'heal', 'spit', 'panic', 'frozen'].includes(e.type)) as Extract<GameEvent, { id: number }> | undefined
     if (!first) return
@@ -45,11 +47,16 @@ test('a turn is one move beat, then one shot per beat in id order, then the othe
       stage = 'shoot'
     } else {
       stage = 'shoot'
-      expect(first.id).toBeGreaterThan(shooter)
+      expect(first.id).toBeGreaterThanOrEqual(shooter)
+      attacks = first.id === shooter ? attacks + 1 : 1
       shooter = first.id
+      const unit = [...before.units, ...after.units].find((u) => u.id === first.id)!
+      expect(attacks).toBeLessThanOrEqual(isSoldier(unit) ? SOLDIER_ATTACKS : 1)
+      if (attacks === SOLDIER_ATTACKS) twice++
     }
   })
   expect(end.winner).not.toBeNull()
+  expect(twice).toBeGreaterThan(0)
 })
 
 test('no unit moves farther than its move', () => {

@@ -1026,6 +1026,8 @@ export async function createView(): Promise<View> {
     if (battle.uplink) marks.push(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
     if (battle.escape) marks.push(label(battle.goal === 'hold' ? '🚁 EXTRACT' : '🚁 ESCAPE', battle.escape, COLOR.uplink, 28))
     for (const cache of battle.caches) marks.push(label('📦', cache, COLOR.uplink, 24))
+    // Soldiers down where they fell; a recovery's captives are held.
+    for (const body of battle.downed.filter((d) => d.carrier === null)) marks.push(label(battle.captives.some((c) => c.soldier === body.soldier) ? '⛓ HELD' : '✚ DOWNED', body, COLOR.contact, 22))
     if (battle.start && battle.phase === 'deploy') marks.push(label('⚠ AMBUSHED HERE', battle.start, COLOR.contact, 24))
     if (battle.phase === 'deploy') {
       // A rescue shows where each of its teams would land.
@@ -1583,6 +1585,18 @@ export async function createView(): Promise<View> {
         float(callout(e.type === 'saved' ? 'SAVED' : 'LIFTED OFF', COLOR.heal, sprite))
         await tween(DEATH_MS, (t) => fade(sprite, 1 - t))
         remove(e.id)
+      } else if (e.type === 'carried') {
+        const on = sprites.get(e.id)
+        drawMarks(battle)
+        if (on) float(callout('CARRYING', COLOR.heal, on))
+      } else if (e.type === 'freed') {
+        const unit = battle.units.find((u) => u.id === e.unit.id)
+        drawMarks(battle)
+        if (!unit) continue
+        await follow([e.unit])
+        const freed = create({ ...unit, x: e.unit.x, y: e.unit.y }, 0, letter(unit))
+        await tween(REVEAL_MS, (t) => fade(freed, t))
+        float(callout('FREED', COLOR.heal, freed))
       } else if (e.type === 'extract') {
         drawMarks(battle)
         await follow([e])
@@ -1600,6 +1614,7 @@ export async function createView(): Promise<View> {
         if (!sprite) continue
         await tween(DEATH_MS, (t) => fade(sprite, 1 - t))
         remove(e.id)
+        drawMarks(battle)
       }
     }
   }

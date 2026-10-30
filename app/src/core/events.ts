@@ -138,7 +138,7 @@ const encounters = {
     text: 'A column of survivors blocks the road: grandparents, a goat, a teenager livestreaming. The aliens are not far behind, and the goat is very loud.',
     options: [
       { quip: 'Feed the goat. The goat has earned this.', text: 'Shelter them: -4 supplies, -2 threat', can: (run) => run.supplies >= 4, take: (run) => ((run.supplies -= 4), raise(run, -2)) },
-      { quip: '"Anyone who can lift a rifle, step forward." The goat steps forward.', text: 'Recruit the fit: a new clone joins; +2 threat', take: (run) => (hire(run), raise(run, 2)) },
+      { quip: '"Anyone who can lift a rifle, step forward." The goat steps forward.', text: 'Recruit the fit: a new soldier joins; +2 threat', take: (run) => (hire(run), raise(run, 2)) },
       leave('Wave, smile, and take the other road very quickly.'),
     ],
   },
@@ -165,7 +165,7 @@ const encounters = {
     options: [
       {
         quip: 'Everybody chip in for a new paint job. Somebody has to be the chip.',
-        text: 'Sell a clone: your lowest-level soldier leaves; +10 supplies',
+        text: 'Sell a soldier: your lowest-level soldier leaves; +10 supplies',
         can: (run) => run.soldiers.length > 1,
         take: (run) => {
           const worst = run.soldiers.reduce((low, s) => (level(s) < level(low) ? s : low))

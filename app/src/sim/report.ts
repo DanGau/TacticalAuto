@@ -4,6 +4,8 @@ import type { RunResult } from './run'
 export interface Report {
   runs: number
   wins: number
+  lostToBattle: number
+  lostToRecovery: number
   lostToEscape: number
   lostToExtraction: number
   lostToFinal: number
@@ -23,6 +25,8 @@ export function report(results: RunResult[]): Report {
   return {
     runs: results.length,
     wins: results.filter((r) => r.won).length,
+    lostToBattle: lost('battle'),
+    lostToRecovery: lost('recovery'),
     lostToEscape: lost('escape'),
     lostToExtraction: lost('key'),
     lostToFinal: lost('final'),
@@ -37,6 +41,8 @@ export function formatReport(r: Report): string {
   return [
     `runs                ${r.runs}`,
     `wins                ${percent(r.wins)}`,
+    `lost a battle       ${percent(r.lostToBattle)}`,
+    `lost a recovery     ${percent(r.lostToRecovery)}`,
     `lost an escape      ${percent(r.lostToEscape)}`,
     `lost an extraction  ${percent(r.lostToExtraction)}`,
     `lost final mission  ${percent(r.lostToFinal)}`,

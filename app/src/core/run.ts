@@ -2,7 +2,7 @@ import { RARITY_CHANCE, type Lasting, type Rarity } from './base'
 import { TUNING } from './tuning'
 import { ALIENS, alienStats, muster, type AlienKind } from './aliens'
 import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, GOALS, type Goal } from './goals'
-import { BASE_STATS, createBattle, type Alien, type Battle, type Stats } from './battle'
+import { BASE_STATS, createBattle, holdCaptives, type Alien, type Battle, type Reserve, type Stats } from './battle'
 import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type Doctrine, type DoctrineId } from './doctrines'
 import type { EventId } from './events'
@@ -27,13 +27,11 @@ export const LEG_STOPS = 9
 export const MAP_ROWS = 5
 const TRAILS = 4
 /** Threat at which the next stop becomes an escape. */
-export const THREAT_MAX = 18
+export const THREAT_MAX = 24
 /** Threat each stop adds, and what losing a battle adds on top. */
-export const STOP_THREAT = 1
+export const STOP_THREAT = 2
 export const LOSS_THREAT = 1
 export const START_SUPPLIES = 3
-/** Supplies lost for each soldier downed on an escape. */
-export const ESCAPE_DOWNED_SUPPLIES = 2
 /** What an assassination's commander has over a trooper, its guards, and the depth from which it has one more. */
 export const COMMANDER = { hp: 6, armor: 2, guards: 2, moreFrom: 3 }
 /** Supplies a supply drop gives. */
@@ -118,12 +116,12 @@ export interface Leg {
 }
 
 /**
- * A battle to fight. An escape comes when threat is full, in place of the next stop; losing it loses the run,
- * as does losing the final mission. `force` is what the aliens can muster: a trooper costs one, and some kinds
+ * A battle to fight. An escape comes when threat is full, and a recovery when the aliens hold soldiers, in place of
+ * the next stop; losing either loses the run, as does losing the final mission. `force` is what the aliens can muster: a trooper costs one, and some kinds
  * cost two or come in pairs.
  */
 export interface Mission {
-  kind: 'battle' | 'key' | 'final' | 'escape'
+  kind: 'battle' | 'key' | 'final' | 'escape' | 'recovery'
   goal: Goal
   risk: Risk
   force: number
@@ -133,16 +131,16 @@ export interface Soldier {
   id: number
   name: string
   xp: number
-  /** Drawn at random when the clone is made. */
+  /** Drawn at random when the soldier is made. */
   cls: ClassId | null
-  /** In the order learned; the first, drawn at random when the clone is made, sets the soldier's path. */
+  /** In the order learned; the first, drawn at random when the soldier is made, sets the soldier's path. */
   skills: SkillId[]
   /** Feats it has pulled off, each paying experience only the first time. */
   feats: FeatId[]
   gear: Record<Slot, Gear | null>
   /** The quirk it was recruited with, if any. */
   trait: TraitId | null
-  /** Where it comes from: a recruit's home, a hero's city; none for a clone. */
+  /** Where it comes from: a recruit's home, a hero's city; none for one who joined on the road. */
   home: City | null
 }
 
@@ -172,11 +170,11 @@ export interface Report {
   /** Whether an access key was won. */
   key: boolean
   /**
-   * Every soldier in the squad when a battle began, with the class each has after it; empty for an event. A downed
-   * soldier fell in the battle and is cloned anew. `earned` is what its experience came from; `feats`, those first
-   * pulled off.
+   * Every soldier in the squad when a battle began, with the class each has after it; empty for an event. A taken
+   * soldier was left downed on the field, and the aliens hold it. `earned` is what its experience came from; `feats`,
+   * those first pulled off.
    */
-  soldiers: { id: number; name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; downed: boolean; earned: Earned[]; feats: FeatId[] }[]
+  soldiers: { id: number; name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; taken: boolean; earned: Earned[]; feats: FeatId[] }[]
   /** The name of the hero the stop added to the squad. */
   hired: string | null
   /** Civilians kept alive on a rescue; null on any other stop. */
@@ -248,6 +246,8 @@ export interface Run {
   route: Stage[]
   /** What each leg's boss resists, by keys won; known from the start so the squad can build to beat it. */
   bosses: Resist[]
+  /** Soldiers the aliens hold, by id: left downed on a field. The next stop is a recovery until they are back. */
+  captives: number[]
 }
 
 /** Experience each level takes beyond the last: level n takes LEVEL_XP × n more. */
@@ -267,7 +267,7 @@ export function level(soldier: { xp: number }): number {
  * Experience a soldier still standing earns from a battle: some shared, for surviving and winning, and the rest its
  * own: for each kill, each `damage` points done, each civilian a won rescue keeps alive, and each feat the first time.
  */
-export const XP = { survived: 1, won: 2, kill: 1, damage: 5, civilian: 1, feat: 2 }
+export const XP = { fought: 1, won: 2, kill: 1, damage: 5, civilian: 1, feat: 2 }
 
 /** The sum of one lasting effect over every relic and doctrine held. */
 function total(run: Run, effect: (source: Lasting) => number | undefined): number {
@@ -309,8 +309,8 @@ export function keepFind(run: Run): void {
 /** What gear costs in a shop, by rarity. */
 export const GEAR_PRICE: Record<Exclude<Rarity, 'common'>, number> = { rare: 5, epic: 8 }
 /** Pieces of gear and relics a shop stocks. */
-const SHOP_WARES = 2
-const SHOP_RELICS = 2
+export const SHOP_WARES = 5
+export const SHOP_RELICS = 4
 /** Chance a piece of shop gear is epic rather than rare. */
 const SHOP_EPIC = 0.3
 
@@ -379,7 +379,7 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
 }
 
 /**
- * Adds a clone to the squad and returns it: a level 1 recruit set on one of its class's paths at random. Under a
+ * Adds a recruit to the squad and returns it: a level 1 recruit set on one of its class's paths at random. Under a
  * doctrine of unique classes it takes a class no squadmate has, while one is left.
  */
 export function hire(run: Run): Soldier {
@@ -400,7 +400,7 @@ function join(run: Run, soldier: Soldier): Soldier {
   return soldier
 }
 
-/** A level 1 clone of a class none of `taken` has, if one is left, not yet in the squad. */
+/** A level 1 soldier of a class none of `taken` has, if one is left, not yet in the squad. */
 function draft(run: Run, taken: ClassId[]): Soldier {
   const unused = (Object.keys(CLASSES) as ClassId[]).filter((id) => !run.soldiers.some((s) => s.cls === id))
   const unique = run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).uniqueClasses) && unused.length > 0
@@ -563,9 +563,13 @@ function depth(run: Run): number {
   return run.keys * 2 + (late(run) ? 1 : 0)
 }
 
+/** The force the hunt adds to a mission: at full threat, TUNING.hunt of its own. */
+export const huntForce = (run: Run, mission: Mission) => Math.round((mission.force * TUNING.hunt * run.threat) / THREAT_MAX)
+
 /** The mission the squad would fight at a stop of the given kind now. Its force follows the leg, and so the size of the squad. */
 export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goal = 'exterminate'): Mission {
-  const extra = { battle: 0, key: 1, final: 2, escape: run.keys }[kind]
+  // A recovery's aliens come at half strength, but keep coming.
+  const extra = { battle: 0, key: 1, final: 2, escape: run.keys, recovery: -Math.floor(TUNING.legForce[run.keys] / 2) }[kind]
   return { kind, goal, risk, force: Math.max(1, TUNING.legForce[run.keys] + (late(run) ? 1 : 0) + extra + RISKS[risk].aliens + GOALS[goal].force) }
 }
 
@@ -582,7 +586,9 @@ function packsOf(run: Run, mission: Mission, mustered?: Muster[]): { name: strin
   const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, armor, weapon), stance: ALIENS[kind].stance, boss: false, spawns: ALIENS[kind].spawns ?? false, target: false, resists: ALIENS[kind].resists })
   const boss = mission.kind === 'key' || mission.kind === 'final'
   const escort = boss ? run.keys : 0
-  const packs = (mustered ?? muster(run, Math.max(0, mission.force - (boss ? 2 + escort : 0)), tier)).map((pack) => ({ name: pack.name, aliens: pack.kinds.map(alien) }))
+  // The hunt sends more packs the higher the threat.
+  const hunting = muster(run, huntForce(run, mission), tier)
+  const packs = [...(mustered ?? muster(run, Math.max(0, mission.force - (boss ? 2 + escort : 0)), tier)), ...hunting].map((pack) => ({ name: pack.name, aliens: pack.kinds.map(alien) }))
   // An assassination's commander: a trooper tougher than its kind, with its guards.
   if (mission.goal === 'assassinate') {
     const commander = alien('trooper')
@@ -613,9 +619,9 @@ const HARVESTERS_MORE_FROM = 2
 /** What an escape's hunter adds to a trooper. */
 const HUNTER = { hp: 6, armor: 1, damage: 1, move: 1 }
 
-/** A goal drawn by GOALS' weights. */
-function drawGoal(run: Run): Goal {
-  const goals = Object.keys(GOALS) as Goal[]
+/** A goal drawn by GOALS' weights, among those the leg of `when` has. */
+function drawGoal(run: Run, when: Run): Goal {
+  const goals = (Object.keys(GOALS) as Goal[]).filter((goal) => GOALS[goal].from <= when.keys)
   let roll = random(run) * goals.reduce((sum, goal) => sum + GOALS[goal].weight, 0)
   return goals.find((goal) => (roll -= GOALS[goal].weight) < 0) ?? 'exterminate'
 }
@@ -682,7 +688,7 @@ function placed(run: Run, kind: TerrainKind): { region: RegionId; city: string }
 
 /** A battle of `risk` with a goal and place drawn at random, its aliens mustered for the squad as it will be at `when`. */
 export function drawBattle(run: Run, risk: Risk, when: Run = run): Stop {
-  const goal = drawGoal(run)
+  const goal = drawGoal(run, when)
   const force = missionAt(when, 'battle', risk, goal).force
   // Each battle's force varies a little either way, so two battles of one risk are not the same fight.
   const packs = muster(run, Math.max(1, force + randomInt(run, 3) - 1), depth(when)).map(({ name, kinds }) => ({ name, kinds }))
@@ -750,6 +756,7 @@ export function createRun(seed: number): Run {
     event: null,
     met: [],
     doctrines: [],
+    captives: [],
   }
   offerRecruits(run)
   run.legs = Array.from({ length: KEYS + 1 }, (_, k) => ({ columns: k === KEYS ? [[{ row: Math.floor(MAP_ROWS / 2), next: [], stop: null, town: null, at: null }]] : drawShape(run), path: [] }))
@@ -759,11 +766,14 @@ export function createRun(seed: number): Run {
   return run
 }
 
-/** The stop the squad travels to next: an escape if threat is full, else the stop it has entered. Null while it chooses. */
-export function nextStop(run: Run): StopKind | 'escape' | null {
+/**
+ * The stop the squad travels to next: a recovery if the aliens hold soldiers, an escape if threat is full, else the
+ * stop it has entered. Null while it chooses.
+ */
+export function nextStop(run: Run): StopKind | 'escape' | 'recovery' | null {
   const node = current(run)
   if (!node) return null
-  return run.threat >= THREAT_MAX ? 'escape' : node.stop!.kind
+  return run.captives.length > 0 ? 'recovery' : run.threat >= THREAT_MAX ? 'escape' : node.stop!.kind
 }
 
 /** A random rarity; `lucky` rules out common. */
@@ -830,11 +840,12 @@ export function advance(run: Run): void {
     settle(run)
     return
   }
-  const mission = missionAt(run, stop, here.risk, stop === 'battle' ? here.goal : stop === 'escape' ? 'escape' : 'exterminate')
+  const goal = stop === 'battle' ? here.goal : stop === 'escape' ? 'escape' : stop === 'recovery' ? 'recover' : 'exterminate'
+  const mission = missionAt(run, stop, stop === 'recovery' ? 'standard' : here.risk, goal)
   run.mission = mission
   run.phase = 'battle'
   const doctrines = run.doctrines.map((id): Doctrine => DOCTRINES[id])
-  const reserve = run.soldiers.map((s) => ({
+  const reserve = run.soldiers.map((s): Reserve => ({
     soldier: s.id,
     stats: soldierStats(run, s),
     ability: s.cls && CLASSES[s.cls].ability,
@@ -843,10 +854,12 @@ export function advance(run: Run): void {
     effects: [...doctrines.flatMap((d) => d.effect ?? []), ...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))
   const rules = doctrines.flatMap((d) => d.rule ?? [])
-  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, packsOf(run, mission, stop === 'battle' ? here.packs : undefined), reserve, mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city } : undefined)
+  const held = (r: Reserve) => run.captives.includes(r.soldier)
+  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, packsOf(run, mission, stop === 'battle' ? here.packs : undefined), reserve.filter((r) => !held(r)), mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city } : undefined)
+  holdCaptives(run.battle, reserve.filter(held))
 }
 
-/** What a soldier still standing earns from a battle, after the feats it ends the battle with are recorded. */
+/** What a soldier earns from a battle, after the feats it ends the battle with are recorded. */
 function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | null): { earned: Earned[]; feats: FeatId[] } {
   const tally = battle.tally[soldier.id] ?? { dealt: 0, kills: 0, taken: 0, feats: [] }
   // A soldier lifted off has left the field.
@@ -857,7 +870,7 @@ function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | 
   soldier.feats.push(...feats)
   const saved = won ? (rescued ?? 0) : 0
   const earned: Earned[] = [
-    { label: 'survived', xp: XP.survived },
+    { label: 'fought', xp: XP.fought },
     { label: 'won', xp: won ? XP.won : 0 },
     { label: `${tally.kills} kill${tally.kills === 1 ? '' : 's'}`, xp: tally.kills * XP.kill },
     { label: `${tally.dealt} damage`, xp: Math.floor(tally.dealt / XP.damage) },
@@ -868,44 +881,49 @@ function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | 
 }
 
 /**
- * Settles a finished battle: experience, threat, rewards, and where the squad stands on the road.
- * A soldier who fell is cloned anew and stays in the squad with everything they had; only those still standing
- * gain experience.
+ * Settles a finished battle: experience, threat, rewards, and where the squad stands on the road. Every soldier earns
+ * experience. A soldier downed comes home if the squad won with a soldier standing on the field. Otherwise only
+ * those carried out do, and the aliens take the rest. A wipe, with none standing or lifted off, loses the run.
  */
 export function endBattle(run: Run): void {
   const battle = run.battle!
   const mission = run.mission!
-  const standing = new Set([...battle.units.map((u) => u.soldier), ...battle.escaped])
   const won = battle.winner === 'human'
+  // A wipe, every soldier downed and none lifted off, loses the run.
+  const standing = battle.units.some((u) => u.side === 'human' && u.soldier !== null)
+  const wiped = !standing && battle.escaped.length === 0
+  const field = won && standing
+  const taken = new Set(field ? [] : battle.downed.map((d) => d.soldier))
+  // A recovery won brings every captive home.
+  run.captives = mission.kind === 'recovery' && won ? [] : [...new Set([...run.captives, ...taken])]
   const rescued = mission.goal === 'rescue' ? battle.saved + battle.units.filter((u) => u.civilian).length : null
   const soldiers = run.soldiers.map((s) => {
     const xpBefore = s.xp
-    const { earned, feats } = standing.has(s.id) ? earn(battle, s, won, rescued) : { earned: [], feats: [] }
+    const { earned, feats } = earn(battle, s, won, rescued)
     s.xp += earned.reduce((sum, e) => sum + e.xp, 0)
-    return { id: s.id, name: s.name, cls: s.cls, xpBefore, xpAfter: s.xp, downed: !standing.has(s.id), earned, feats }
+    return { id: s.id, name: s.name, cls: s.cls, xpBefore, xpAfter: s.xp, taken: run.captives.includes(s.id), earned, feats }
   })
 
   const before = run.threat
   const risk = RISKS[mission.risk]
   // An escape won empties the threat; any other battle is a stop, and adds to it.
   if (mission.kind === 'escape') run.threat = won ? 0 : run.threat
-  else run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT) + (mission.goal === 'raid' ? Math.max(0, battle.greed - 1) : 0) + (rescued === null ? 0 : Math.floor((CIVILIANS - (won ? rescued : 0)) / CIVILIANS_PER_THREAT)), THREAT_MAX)
+  else if (mission.kind !== 'recovery') run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT) + (mission.goal === 'raid' ? Math.max(0, battle.greed - 1) : 0) + (rescued === null ? 0 : Math.floor((CIVILIANS - (won ? rescued : 0)) / CIVILIANS_PER_THREAT)), THREAT_MAX)
   const held = run.relics.map((id): Relic => RELICS[id])
   const supplies = won ? risk.supplies * (mission.goal === 'raid' ? battle.grabbed : 1) + (rescued ?? 0) * (CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.civilianSupplies ?? 0), 0)) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
-  const downed = mission.kind === 'escape' ? soldiers.filter((s) => s.downed).length * ESCAPE_DOWNED_SUPPLIES : 0
-  run.supplies = Math.max(0, run.supplies + supplies - downed)
+  run.supplies += supplies
   // A won battle drops gear by its goal; a key mission's, an escape's, and the first of an Overrun battle's is rare or better.
-  const byGoal = { exterminate: risk.drops, assassinate: Math.max(1, risk.drops), hold: 0, rescue: 0, raid: 0, escape: 0 }[mission.goal]
-  const drops = won && mission.kind !== 'final' ? (mission.kind === 'battle' ? byGoal : 1) : 0
+  const byGoal = { exterminate: risk.drops, assassinate: Math.max(1, risk.drops), hold: 0, rescue: 0, raid: 0, escape: 0, recover: 0 }[mission.goal]
+  const drops = won && mission.kind !== 'final' && mission.kind !== 'recovery' ? (mission.kind === 'battle' ? byGoal : 1) : 0
   for (let i = 0; i < drops; i++) dropGear(run, (risk.rareGear && i === 0) || mission.kind !== 'battle' || held.some((relic) => relic.rareGear))
   const key = won && mission.kind === 'key'
   // Each hero extracted joins the squad.
   const hero = run.route[run.keys]?.hero
   const hired = key && hero && !run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).noRecruits) ? join(run, hero).name : null
-  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies: supplies - downed, key, soldiers, hired, rescued }
+  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, soldiers, hired, rescued }
 
-  // Losing the hero's extraction, an escape or the hub loses the run.
-  if (mission.kind === 'final' || (mission.kind !== 'battle' && !won)) {
+  // Losing the hero's extraction, an escape, a recovery or the hub loses the run, as does a wipe.
+  if (mission.kind === 'final' || (mission.kind !== 'battle' && !won) || wiped) {
     run.phase = mission.kind === 'final' && won ? 'won' : 'lost'
     return
   }
@@ -918,7 +936,7 @@ export function endBattle(run: Run): void {
   }
   if (mission.kind === 'battle') passStop(run)
   // A satellite, an escape, a hold or an Overrun battle won offers relics.
-  if (won && (mission.kind !== 'battle' || mission.goal === 'hold' || mission.risk === 'dangerous')) {
+  if (won && (mission.kind === 'key' || mission.kind === 'escape' || (mission.kind === 'battle' && (mission.goal === 'hold' || mission.risk === 'dangerous')))) {
     const pool = offerable(run.relics)
     // The first offer builds on a keyword the squad already has, when one can.
     const held = squadKeywords(run)

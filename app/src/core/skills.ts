@@ -44,7 +44,7 @@ const skills = {
   steady: { name: 'Steady Aim', text: 'If it did not move this turn, it rolls twice to hit and takes the better', effect: 'steady' },
   headshot: { name: 'Headshot', tags: ['crit'], text: 'Crits do 2 more damage', effect: 'headshot' },
   mark: { name: "Hunter's Mark", tags: ['mark'], text: `A target it hits is marked: every later hit on it does ${TUNING.markDamage} more damage`, effect: 'mark' },
-  doubleTap: { name: 'Double Tap', text: 'If it did not move this turn, it shoots twice', effect: 'doubleTap' },
+  doubleTap: { name: 'Double Tap', text: 'If it did not move this turn, it shoots a third time', effect: 'doubleTap' },
   hollowPoint: { name: 'Piercing Rounds', text: "Its shots ignore the target's cover", effect: 'pierce' },
   assassinate: { name: 'Assassinate', tags: ['crit'], text: 'A hit on a target at full health is a crit', effect: 'assassinate' },
   longshot: { name: 'Longshot', text: '+2 range', stats: { range: 2 } },

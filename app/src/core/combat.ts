@@ -90,6 +90,8 @@ import {
   ROCKET_DAMAGE,
   SPAWN_EVERY,
   SPIT_DAMAGE,
+  SOLDIER_ATTACKS,
+  soldierUnit,
   STANDOFF,
   type Battle,
   type Ability,
@@ -128,8 +130,12 @@ export type GameEvent =
   | { type: 'feed'; id: number; damage: number }
   /** A soldier reaches a civilian and gets them out. */
   | { type: 'saved'; id: number }
-  /** A soldier reaches the escape zone and lifts off. */
+  /** A soldier reaches the escape zone and lifts off, with any squadmate it carries. */
   | { type: 'escaped'; id: number }
+  /** A soldier picks up the downed soldier `soldier` to carry out. */
+  | { type: 'carried'; id: number; soldier: number }
+  /** A soldier reaches a squadmate the aliens held, who gets up and fights as `unit`. */
+  | { type: 'freed'; id: number; unit: { id: number; x: number; y: number } }
   /** A soldier grabs a raid's supply cache. */
   | { type: 'grabbed'; id: number; x: number; y: number }
   /** A psion panics a soldier, who loses its next action. */
@@ -158,8 +164,8 @@ function enemiesOf(battle: Battle, unit: Unit): Unit[] {
 }
 
 /** The unit in `units` nearest to `from`; the lowest id wins a tie. */
-function nearest(units: Unit[], from: Tile): Unit | undefined {
-  let best: Unit | undefined
+function nearest<T extends Tile>(units: T[], from: Tile): T | undefined {
+  let best: T | undefined
   for (const unit of units) if (!best || distance(from, unit) < distance(from, best)) best = unit
   return best
 }
@@ -398,7 +404,10 @@ function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
  */
 function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
   if (enemies.length === 0) return undefined
-  if (battle.escape && unit.side === 'human') return battle.escape
+  // Getting out, a soldier with its hands free goes for the nearest squadmate down first.
+  if (battle.escape && unit.side === 'human') return (!carrying(battle, unit) && nearest(lying(battle), unit)) || battle.escape
+  const captive = unit.side === 'human' && nearest(lying(battle).filter((d) => battle.captives.some((r) => r.soldier === d.soldier)), unit)
+  if (captive) return captive
   // A raider makes for the nearest cache until it has as many as it came for.
   if (battle.goal === 'raid' && unit.side === 'human' && battle.caches.length > 0) return battle.caches.reduce((a, b) => (distance(b, unit) < distance(a, unit) ? b : a))
   // On a hold an alien makes for the uplink, then from its zone goes for the squad, so no stand-off lasts.
@@ -414,6 +423,10 @@ function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
   const team = centreOf(battle.units.filter((u) => isSoldier(u) && u.team === unit.team))
   return enemies.find((u) => u.target && revealed(battle, u)) ?? nearest(enemies, team)
 }
+
+/** Soldiers down and not carried. */
+const lying = (battle: Battle) => battle.downed.filter((d) => d.carrier === null)
+const carrying = (battle: Battle, unit: Unit) => battle.downed.some((d) => d.carrier === unit.id)
 
 /** On a hold, how far from the uplink a soldier may stand and still defend it; Relay Booster widens it. */
 export const UPLINK_REACH = 3
@@ -523,8 +536,8 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
       // A wary unit ranks every tile by the exchange of fire, so one with no shot and no risk can win.
       // No unit ends its move in acid if it can help it.
       // On a hold, a soldier stands its ground at the uplink before anything else.
-      // On an escape every move must bring a soldier nearer the way out.
-      const first = [battle.escape && unit.side === 'human' ? spot.stalled : 0, leash(end), acid(end), provokes(end), saves(end)]
+      // Getting out, a soldier makes for the way out as fast as it can.
+      const first = [battle.escape && unit.side === 'human' ? spot.toGoal : 0, leash(end), acid(end), provokes(end), saves(end)]
       // Setting an ambush: unnoticed first, then a shot at the pod, then the best cover against it, then nearer.
       if (setting) return [...first, noticed(end), lays(end) ? 0 : 1, -coverAgainst(battle, end, goal), steps]
       if (wary && unit.stance !== 'standoff' && inContact) return [...first, 0, ...WITH_SHOT[unit.stance](spot), spot.toGoal]
@@ -537,7 +550,8 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   if (still && shotHere && !battle.escape && !leash(unit) && !acid(unit) && !(wary && theirs(unit) > 0)) return []
   // A booming charge pins a unit that can fight from where it stands; a rooted one cannot move at all.
   if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || (unit.kind === 'sprinter' && unit.chilled > 0)) return []
-  const full = Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0))
+  // A carrier walks at half its move.
+  const full = Math.ceil(Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0)) / (carrying(battle, unit) ? 2 : 1))
   // Unseen, a soldier creeps.
   // Unless it wears Ghost Weave.
   const move = unit.side === 'human' && battle.concealed && !has(unit, 'ghost') ? Math.ceil(full * CREEP) : full
@@ -609,10 +623,31 @@ function sight(battle: Battle): GameEvent[] {
     events.push({ type: 'reveal', ambush, stalked: false, units: members.map(({ id, x, y }) => ({ id, x, y })) })
     if (!ambush && !wasAlert) for (const member of members) walk(member, fightPath(battle, member), events)
   })
-  // A soldier at the escape zone lifts off.
+  // Getting out, a soldier with its hands free beside a squadmate down picks them up.
+  for (const body of battle.escape ? lying(battle) : []) {
+    const carrier = soldiers.find((s) => distance(s, body) <= 1 && !carrying(battle, s))
+    if (!carrier) continue
+    body.carrier = carrier.id
+    events.push({ type: 'carried', id: carrier.id, soldier: body.soldier })
+  }
+  // A soldier beside a squadmate the aliens hold gets them up, at half health.
+  for (const body of lying(battle)) {
+    const captive = battle.captives.find((r) => r.soldier === body.soldier)
+    const rescuer = captive && soldiers.find((s) => distance(s, body) <= 1)
+    if (!captive || !rescuer) continue
+    battle.captives.splice(battle.captives.indexOf(captive), 1)
+    battle.downed.splice(battle.downed.indexOf(body), 1)
+    const [tile] = freeTilesNear(battle, body, 1)
+    const unit = soldierUnit(battle, captive, tile)
+    unit.hp = Math.ceil(unit.hp / 2)
+    battle.units.push(unit)
+    events.push({ type: 'freed', id: rescuer.id, unit: { id: unit.id, x: unit.x, y: unit.y } })
+  }
+  // A soldier at the escape zone lifts off, with whoever it carries.
   for (const soldier of battle.escape ? soldiers.filter((s) => distance(s, battle.escape!) <= escapeReach(battle)) : []) {
     battle.units.splice(battle.units.indexOf(soldier), 1)
-    battle.escaped.push(soldier.soldier!)
+    battle.escaped.push(soldier.soldier!, ...battle.downed.filter((d) => d.carrier === soldier.id).map((d) => d.soldier))
+    battle.downed = battle.downed.filter((d) => d.carrier !== soldier.id)
     events.push({ type: 'escaped', id: soldier.id })
   }
   // A soldier beside a raid's cache grabs it.
@@ -778,10 +813,11 @@ function upkeep(battle: Battle): GameEvent[] {
   }
   // A hold's waves come in from the edges, without end, each pack one alien larger every time it returns.
   const hold = battle.goal === 'hold'
-  if (battle.waves.length > 0 && battle.round % (hold ? HOLD_WAVE_EVERY : WAVE_EVERY) === 0) {
+  if (battle.waves.length > 0 && battle.round % (battle.goal === 'escape' ? WAVE_EVERY : HOLD_WAVE_EVERY) === 0) {
     const centre = spacedTile(battle, battle.units.filter(isSoldier), ZONE_CLEARANCE, hold ? 'edge' : 'anywhere')
     const wave = battle.waves.shift()!
-    if (hold) battle.waves.push({ ...wave, aliens: [...wave.aliens, wave.aliens[0]] })
+    // Once the squad extracts, they stop growing.
+    if (hold) battle.waves.push(battle.escape ? wave : { ...wave, aliens: [...wave.aliens, wave.aliens[0]] })
     // It comes in unseen but hunting, as a stalking pod does, and shows once the squad sights it.
     const units = placePod(battle, wave, centre, false)
     Object.assign(battle.pods.at(-1)!, { alert: true, stalking: true })
@@ -976,6 +1012,11 @@ function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[],
     return
   }
   battle.units = battle.units.filter((u) => u !== target)
+  // A soldier falls where it stands, dropping whoever it carried.
+  if (isSoldier(target)) {
+    for (const body of battle.downed.filter((d) => d.carrier === target.id)) Object.assign(body, { x: target.x, y: target.y, carrier: null })
+    battle.downed.push({ soldier: target.soldier!, x: target.x, y: target.y, carrier: null })
+  }
   events.push({ type: 'death', id: target.id })
   if (target.civilian && killer?.kind === 'harvester') battle.husks.push({ x: target.x, y: target.y, pod: killer.pod! })
   if (has(target, 'detonate')) {
@@ -1418,8 +1459,10 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
  */
 function again(battle: Battle, unit: Unit, seen: Set<number>, granted: Effect | undefined, killed: boolean): GameEvent[] {
   if (granted || unit.hp <= 0) return []
+  // Twin and double tap add one shot to a turn's attacks, after the last.
+  const last = battle.attacks >= attacksOf(unit)
   const by: Effect | null =
-    killed && has(unit, 'frenzy') ? 'frenzy' : killed && has(unit, 'chain') ? 'chain' : has(unit, 'twin') ? 'twin' : has(unit, 'doubleTap') && !unit.moved ? 'doubleTap' : has(unit, 'surge') && !unit.spent.includes('surge') ? 'surge' : null
+    killed && has(unit, 'frenzy') ? 'frenzy' : killed && has(unit, 'chain') ? 'chain' : last && has(unit, 'twin') ? 'twin' : last && has(unit, 'doubleTap') && !unit.moved ? 'doubleTap' : has(unit, 'surge') && !unit.spent.includes('surge') ? 'surge' : null
   if (!by) return []
   const shots = shoot(battle, unit, seen, by)
   if (by === 'surge' && shots.length > 0) unit.spent.push('surge')
@@ -1464,13 +1507,16 @@ function feed(battle: Battle, unit: Unit, events: GameEvent[]): GameEvent[] {
     })
 }
 
+/** Primary attacks the unit makes each turn. */
+const attacksOf = (unit: Unit) => (isSoldier(unit) ? SOLDIER_ATTACKS : 1)
+
 /** Whether the unit may act this turn: an alien may not while its pod is unaware or surprised. */
 function armed(battle: Battle, unit: Unit): boolean {
   return unit.pod === null || (battle.pods[unit.pod].alert && !battle.pods[unit.pod].surprised)
 }
 
 /**
- * The next unit of the side on turn with something to do acts once. A panicked soldier loses the action.
+ * The next attack of the side on turn: a soldier makes SOLDIER_ATTACKS a turn, an alien one. A panicked soldier loses its turn.
  * An alien does what its kind does in place of a shot, if anything. Otherwise, first come what does not cost the
  * shot: a medkit, a medic's heal, a grenade. Then a rocket, when its moment has come, or else a shot.
  * Empty when no unit is left.
@@ -1478,18 +1524,32 @@ function armed(battle: Battle, unit: Unit): boolean {
 function actNext(battle: Battle): GameEvent[] {
   const seen = spotted(battle)
   for (const unit of battle.units) {
-    if (unit.side !== battle.turn || unit.id <= battle.shooter || unit.civilian || !armed(battle, unit)) continue
+    if (unit.side !== battle.turn || unit.id < battle.shooter || unit.civilian || !armed(battle, unit)) continue
+    if (unit.id === battle.shooter) {
+      if (battle.attacks >= attacksOf(unit)) continue
+      // A further attack: a shot alone, then what follows the last.
+      battle.attacks++
+      battle.actor = unit.id
+      const events = [...shoot(battle, unit, seen), ...(battle.attacks >= attacksOf(unit) && unit.hp > 0 ? [...drone(battle, unit), ...skirmish(battle, unit)] : [])]
+      battle.actor = null
+      if (events.length === 0) continue
+      return events
+    }
     if (unit.panicked) {
       unit.panicked = false
       battle.shooter = unit.id
+      battle.attacks = attacksOf(unit)
       return [{ type: 'frozen', id: unit.id }]
     }
     const special = alienAction(battle, unit)
     if (special) {
       if (special.length === 0) continue
       battle.shooter = unit.id
+      battle.attacks = 1
       return special
     }
+    const before = battle.attacks
+    battle.attacks = 1
     battle.actor = unit.id
     const healed = unit.charges > 0 && unit.ability === 'medic' ? heal(battle, unit) : []
     const thrown = has(unit, 'grenade') && !unit.spent.includes('grenade') ? blast(battle, unit, seen, GRENADE_DAMAGE) : []
@@ -1499,10 +1559,13 @@ function actNext(battle: Battle): GameEvent[] {
     if (healed.length + fired.length > 0) unit.charges--
     const acted = [...medkit(unit), ...secondWind(unit), ...polymorph(battle, unit, seen), ...strew(battle, unit), ...deploy(battle, unit, seen), ...healed, ...thrown, ...(fired.length > 0 ? fired : shoot(battle, unit, seen))]
     // What follows an action: a drone's shot, then a skirmisher's step back.
-    const events = acted.length > 0 && unit.hp > 0 ? [...acted, ...drone(battle, unit), ...skirmish(battle, unit)] : acted
+    const events = acted.length > 0 && unit.hp > 0 && attacksOf(unit) === 1 ? [...acted, ...drone(battle, unit), ...skirmish(battle, unit)] : acted
     battle.actor = null
     if (unit.side === 'human') events.push(...feed(battle, unit, events))
-    if (events.length === 0) continue
+    if (events.length === 0) {
+      battle.attacks = before
+      continue
+    }
     battle.shooter = unit.id
     // A stalking pod gives itself away when it opens fire.
     const pod = unit.pod === null ? null : battle.pods[unit.pod]
@@ -1579,7 +1642,7 @@ export function stepBattle(battle: Battle): GameEvent[] {
   const loaded = battle.goal === 'raid' && battle.grabbed >= battle.greed
   if (!humans || !aliens || emptied || loaded || battle.beat >= MAX_BEATS) {
     battle.phase = 'over'
-    // With every alien beaten the squad has won, even if its last soldier fell to the same blast; clones are made anew.
+    // With every alien beaten the squad has won, even if its last soldier fell to the same blast.
     battle.winner = !aliens || loaded || (emptied && battle.saved > 0) || (!humans && battle.escaped.length > 0) ? 'human' : humans && !emptied ? null : 'alien'
     events.push({ type: 'end', winner: battle.winner })
   }

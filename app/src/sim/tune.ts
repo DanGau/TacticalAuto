@@ -16,13 +16,14 @@ interface Knob {
 
 const KNOBS: Knob[] = [
   { key: 'alienHp', step: 0.1, min: 0.5, max: 2 },
-  ...[0, 1, 2, 3].map((index) => ({ key: 'legForce' as const, index, step: 1, min: 1, max: 30 })),
+  ...[0, 1, 2, 3].map((index) => ({ key: 'legForce' as const, index, step: 1, min: 1, max: 60 })),
   { key: 'markDamage', step: 1, min: 0, max: 4 },
   { key: 'accelerantDamage', step: 1, min: 0, max: 4 },
   { key: 'shatterDamage', step: 1, min: 0, max: 5 },
   { key: 'thermalDamage', step: 1, min: 0, max: 6 },
   { key: 'impactDamage', step: 1, min: 0, max: 6 },
   { key: 'dangerSupplies', step: 1, min: 0, max: 10 },
+  { key: 'hunt', step: 0.1, min: 0, max: 2 },
 ]
 
 /** What each tuning number does, for the comments of the file the climber writes. */
@@ -35,6 +36,7 @@ const MEANING: Record<keyof Tuning, string> = {
   thermalDamage: 'Damage Thermal Shock Core adds to hits on a target both burning and chilled',
   impactDamage: "Damage drop pods deal to each alien near a soldier landing in a breach",
   dangerSupplies: 'Supplies an overrun zone pays',
+  hunt: 'The share of its own force the hunt adds to a battle at full threat',
 }
 
 const get = (t: Tuning, k: Knob) => (k.index === undefined ? (t[k.key] as number) : t.legForce[k.index])

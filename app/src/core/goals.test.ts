@@ -5,7 +5,7 @@ import { stepBattle, UPLINK_REACH, type GameEvent } from './combat'
 import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, type Goal } from './goals'
 import { distance, edgeDepths, freeTilesNear, GRID, INNER, isSoldier, revealed } from './battle'
 import { road, deploy, begun } from './roads'
-import { endBattle, RISKS, START_SUPPLIES, STOP_THREAT, THREAT_MAX, XP, type Run } from './run'
+import { endBattle, LOSS_THREAT, RISKS, START_SUPPLIES, STOP_THREAT, THREAT_MAX, XP, type Run } from './run'
 
 /** A run about to fight a battle of `goal`, with three packs to muster. */
 function before(goal: Goal): Run {
@@ -44,7 +44,7 @@ test('a hold sets its uplink within, the squad coming at it from the edge; once 
   expect(battle.winner).toBe('human')
   expect(battle.escaped).toHaveLength(soldiers.length)
   endBattle(run)
-  expect(run.report!.soldiers.every((s) => !s.downed)).toBe(true)
+  expect(run.report!.soldiers.every((s) => !s.taken)).toBe(true)
   expect(run.relicOffers).toHaveLength(3)
   expect(run.finds).toEqual([])
 })
@@ -196,7 +196,7 @@ test('a rescue squad split into teams lands each team apart, and left-behind civ
   const threat = run.threat
   battle.winner = 'alien'
   endBattle(run)
-  expect(run.threat).toBe(Math.min(THREAT_MAX, threat + 2 + Math.floor(CIVILIANS / CIVILIANS_PER_THREAT)))
+  expect(run.threat).toBe(Math.min(THREAT_MAX, threat + STOP_THREAT + LOSS_THREAT + Math.floor(CIVILIANS / CIVILIANS_PER_THREAT)))
 })
 
 test('no one shot kills a commander from full health; brought low, it blinks away', () => {

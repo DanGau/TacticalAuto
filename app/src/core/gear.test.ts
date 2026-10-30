@@ -2,7 +2,7 @@ import { PATHS, SKILLS } from './skills'
 import { expect, test } from 'vitest'
 import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
-import { alienUnit, CHILL_TURNS, CRIT_BONUS, SEARING_DAMAGE, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
+import { alienUnit, CHILL_TURNS, CRIT_BONUS, SEARING_DAMAGE, SOLDIER_ATTACKS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { alienStats } from './aliens'
 import { EFFECTS, generateGear, type Gear } from './gear'
@@ -21,7 +21,7 @@ test('gear does one thing: commons a stat mod, rares a simple effect, epics an e
   }
 })
 
-/** A run whose clone has learned its first skill and found `gear`. */
+/** A run whose soldier has learned its first skill and found `gear`. */
 function withFind(gear: Omit<Gear, 'id'>): Run {
   const run = begun(1)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
@@ -33,22 +33,22 @@ function withFind(gear: Omit<Gear, 'id'>): Run {
 test('found gear is equipped on its finder, selling what it replaces, or sold; then the reward phase ends', () => {
   const vest = { slot: 'armor', rarity: 'common', name: 'Sturdy Vest', stats: { armor: 2 }, effect: null } as const
   const run = withFind(vest)
-  const [clone] = run.soldiers
-  expect(soldierStats(run, clone).armor).toBe(0)
+  const [soldier] = run.soldiers
+  expect(soldierStats(run, soldier).armor).toBe(0)
   expect(apply(run, { type: 'keep' })).toEqual({ ok: true })
-  expect(soldierStats(run, clone).armor).toBe(2)
+  expect(soldierStats(run, soldier).armor).toBe(2)
   expect(run).toMatchObject({ finds: [], phase: 'overworld' })
   const supplies = run.supplies
-  run.finds.push({ soldier: clone.id, gear: { id: 2, ...vest, rarity: 'rare', stats: { armor: 4 } } })
+  run.finds.push({ soldier: soldier.id, gear: { id: 2, ...vest, rarity: 'rare', stats: { armor: 4 } } })
   run.phase = 'reward'
   apply(run, { type: 'keep' })
   expect(run.supplies).toBe(supplies + SELL.common)
-  expect(clone.gear.armor).toMatchObject({ id: 2 })
-  run.finds.push({ soldier: clone.id, gear: { id: 3, ...vest, rarity: 'epic' } })
+  expect(soldier.gear.armor).toMatchObject({ id: 2 })
+  run.finds.push({ soldier: soldier.id, gear: { id: 3, ...vest, rarity: 'epic' } })
   run.phase = 'reward'
   apply(run, { type: 'sell' })
   expect(run.supplies).toBe(supplies + SELL.common + SELL.epic)
-  expect(clone.gear.armor).toMatchObject({ id: 2 })
+  expect(soldier.gear.armor).toMatchObject({ id: 2 })
   expect(apply(run, { type: 'sell' }).ok).toBe(false)
 })
 
@@ -112,7 +112,7 @@ test('a scorching weapon burns its target at the start of the target\'s turns', 
   const events = untilAlienShoots(d)
   expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'incendiary', amount: 0 })
   expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'incendiary', amount: -1 })
-  expect(d.alien.hp).toBe(99 - 1 - 1)
+  expect(d.alien.hp).toBe(99 - SOLDIER_ATTACKS - 1)
 })
 
 test('a rimed weapon chills its target, and a shatterglass edge and thermal shock core pay off on it', () => {
@@ -186,7 +186,7 @@ test('an arcing crit leaps to the two nearest other aliens for half its damage',
   const events = untilAlienShoots(d)
   const half = Math.ceil((3 + CRIT_BONUS) / 2)
   const arcs = effectsOf(events, 'arc')
-  expect(arcs).toHaveLength(2)
+  expect(arcs).toHaveLength(2 * SOLDIER_ATTACKS)
   expect(arcs.every((e) => e.type === 'effect' && e.amount === -half && [d.alien.id, a.id, b.id].includes(e.id))).toBe(true)
 })
 
@@ -204,7 +204,7 @@ test('a thundering hit knocks the target back, or slams it into what stops it', 
   const events = untilAlienShoots(d)
   expect(events).toContainEqual({ type: 'move', id: d.alien.id, path: [{ x: 10, y: 12 }], with: 'thunder' })
   another(d, 0, 1)
-  expect(effectsOf(untilAlienShoots(d), 'thunder')).toEqual([{ type: 'effect', id: d.alien.id, effect: 'thunder', amount: -1 }])
+  expect(effectsOf(untilAlienShoots(d), 'thunder')).toEqual(Array(SOLDIER_ATTACKS).fill({ type: 'effect', id: d.alien.id, effect: 'thunder', amount: -1 }))
 })
 
 test('mirror images pop in place of hits, two at most', () => {

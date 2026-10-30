@@ -3,6 +3,7 @@ import { EFFECTS, type Gear } from '../core/gear'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import type { Stats } from '../core/battle'
 import { KEYWORDS, RESISTS, type Keyword, type Resist } from '../core/keywords'
+import { TUNING } from '../core/tuning'
 import { THREAT_MAX, type Mission, type StopKind } from '../core/run'
 
 /** A button that performs `action` when clicked. */
@@ -21,12 +22,13 @@ export const STOP_NAMES: Record<StopKind | Mission['kind'], string> = {
   key: 'Extraction',
   final: 'The alien source',
   escape: 'Escape',
+  recovery: 'Recovery',
 }
 
 /** The threat bar. `landed` is how much of the newest threat animates in. */
 export function threatBar(threat: number, landed = 0): string {
   const pct = (n: number) => `${(100 * n) / THREAT_MAX}%`
-  const meter = `<span class="threat"><i style="width:${pct(threat - landed)}"></i><i class="landed" style="width:${pct(landed)}"></i></span>`
+  const meter = `<span class="threat" title="The hunt: the fuller the bar, the more aliens every battle has, up to ${Math.round(100 * TUNING.hunt)}% more. Full, it ambushes the squad"><i style="width:${pct(threat - landed)}"></i><i class="landed" style="width:${pct(landed)}"></i></span>`
   return `${meter}${threat === THREAT_MAX ? '<b class="up">escape next</b>' : ''}`
 }
 

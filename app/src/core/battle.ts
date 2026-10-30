@@ -324,6 +324,8 @@ export interface Battle {
   stage: 'move' | 'shoot'
   /** Id of the last unit to shoot this turn; 0 before the first shot. */
   shooter: number
+  /** Attacks that unit has made this turn. */
+  attacks: number
   /** Set when phase is 'over'; null is a draw. */
   winner: Side | null
   units: Unit[]
@@ -381,7 +383,21 @@ export interface Battle {
   grabbed: number
   /** Soldiers not yet landed. */
   reserve: Reserve[]
+  /** Soldiers down on the field: lying where they fell, or carried by the unit `carrier`. */
+  downed: Downed[]
+  /** On a recovery, the soldiers the aliens hold, each lying in `downed` until a squadmate reaches it. */
+  captives: Reserve[]
 }
+
+export interface Downed {
+  soldier: number
+  x: number
+  y: number
+  carrier: number | null
+}
+
+/** Primary attacks a soldier makes each turn; an alien makes one. */
+export const SOLDIER_ATTACKS = 2
 
 /** Tiles between two points, counting a diagonal as one. */
 export const distance = (a: Tile, b: Tile) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
@@ -725,7 +741,7 @@ export function land(battle: Battle, zone: Tile, teams = 1): void {
   // Split up, each team lands at its own zone, the soldiers dealt among them in turn.
   const tiles = Array.from({ length: teams }, (_, t) => freeTilesNear(battle, teams > 1 ? battle.zones[t] : (battle.start ?? zone), battle.reserve.length))
   battle.reserve.forEach((soldier, i) => {
-    battle.units.push({ id: battle.nextId++, side: 'human', ...tiles[i % teams][Math.floor(i / teams)], hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: null, team: i % teams, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier })
+    battle.units.push(soldierUnit(battle, soldier, tiles[i % teams][Math.floor(i / teams)], i % teams))
   })
   battle.reserve = []
   battle.phase = 'battle'
@@ -735,6 +751,21 @@ export function land(battle: Battle, zone: Tile, teams = 1): void {
   for (const carrier of squad.filter((u) => u.effects.includes('barrier'))) {
     for (const mate of squad) if (mate !== carrier) mate.armor += BARRIER_ARMOR
   }
+}
+
+/** Lays each soldier the aliens hold on a recovery beside a pod, in turn. */
+export function holdCaptives(battle: Battle, captives: Reserve[]): void {
+  battle.captives = captives
+  const pods = battle.pods.map((_, i) => battle.units.find((u) => u.pod === i)!).filter(Boolean)
+  captives.forEach((captive, i) => {
+    const [tile] = freeTilesNear(battle, pods[i % pods.length], 12).filter((t) => !battle.downed.some((d) => d.x === t.x && d.y === t.y))
+    battle.downed.push({ soldier: captive.soldier, ...tile, carrier: null })
+  })
+}
+
+/** A soldier's unit, landing from the reserve on `tile`. */
+export function soldierUnit(battle: Battle, soldier: Reserve, tile: Tile, team = 0): Unit {
+  return { id: battle.nextId++, side: 'human', ...tile, hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: null, team, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier }
 }
 
 /** An orbital strike's threat, and the damage it does every alien, never killing one. */
@@ -950,13 +981,14 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     rules,
     twist,
     round: 0,
-    // An escape's packs come on a second time, as waves.
-    waves: goal === 'hold' ? packs.slice(Math.ceil(packs.length / 2)) : goal === 'escape' ? packs.slice(1) : [],
+    // An escape's packs after its Hunter, and all of a recovery's, come on a second time, as waves.
+    waves: goal === 'hold' ? packs.slice(Math.ceil(packs.length / 2)) : goal === 'escape' ? packs.slice(1) : goal === 'recover' ? [...packs] : [],
     beat: 0,
     phase: 'deploy',
     turn: 'human',
     stage: 'move',
     shooter: 0,
+    attacks: 0,
     winner: null,
     units: [],
     nextId: 1,
@@ -987,6 +1019,8 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     breach: false,
     strike: false,
     reserve,
+    downed: [],
+    captives: [],
   }
   sealPockets(battle)
   if (goal === 'escape') {

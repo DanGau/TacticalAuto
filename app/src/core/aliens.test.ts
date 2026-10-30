@@ -127,8 +127,8 @@ test('a psion panics a soldier, who loses its next action, and hurts its pod whe
   soldier.stats = { ...soldier.stats, move: 0, damage: 50, range: 9 }
   aliens[1].stats = { ...aliens[1].stats, move: 0, aim: 0 }
   aliens[0].stats = { ...aliens[0].stats, move: 0 }
-  // The soldier shoots first and would kill the psion, so make the psion outlast one shot.
-  aliens[0].hp = 80
+  // The soldier shoots first and would kill the psion, so make the psion outlast a turn of shots.
+  aliens[0].hp = 150
   const events = until(has('frozen'))
   expect(events).toContainEqual({ type: 'panic', id: aliens[0].id, target: soldier.id })
   expect(events.at(-1)).toEqual({ type: 'frozen', id: soldier.id })
@@ -232,15 +232,16 @@ test('revive gets a fallen squadmate back up, once', () => {
   expect(battle.units).not.toContain(soldier)
 })
 
-test('a shot names the skills that shaped it, and an extra shot names the skill that granted it', () => {
+test('a shot names the skills that shaped it, and an extra shot names the skill that granted it, after its two', () => {
   const { soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
   soldier.effects = ['backstab', 'doubleTap']
   soldier.stats = { ...soldier.stats, move: 0 }
   aliens[0].hp = aliens[0].stats.hp = 99
   aliens[0].stats = { ...aliens[0].stats, move: 0 }
-  const shots = until((all) => all.filter((e) => e.type === 'shot' && e.id === soldier.id).length >= 2).filter((e) => e.type === 'shot' && e.id === soldier.id)
+  const shots = until((all) => all.filter((e) => e.type === 'shot' && e.id === soldier.id).length >= 3).filter((e) => e.type === 'shot' && e.id === soldier.id)
   expect(shots[0]).toMatchObject({ with: ['backstab'] })
-  expect(shots[1]).toMatchObject({ with: ['doubleTap', 'backstab'] })
+  expect(shots[1]).toMatchObject({ with: ['backstab'] })
+  expect(shots[2]).toMatchObject({ with: ['doubleTap', 'backstab'] })
 })
 
 test('a soldier whose skills pay for standing still holds a tile it can shoot from', () => {
@@ -273,7 +274,7 @@ test('an alien that can shoot a taunting soldier must, and cannot shoot a ghost 
   }
 })
 
-test('cleave hurts the aliens beside a kill; a skirmisher steps away after it acts', () => {
+test('cleave hurts the aliens beside a kill; a skirmisher steps away after its last attack', () => {
   const { soldier, aliens, until } = arena([
     { kind: 'swarmling', x: 10, y: 13 },
     { kind: 'trooper', x: 11, y: 13 },
@@ -286,7 +287,10 @@ test('cleave hurts the aliens beside a kill; a skirmisher steps away after it ac
   const events = until((all) => all.some((e) => e.type === 'death'))
   expect(events).toContainEqual({ type: 'effect', id: aliens[1].id, effect: 'cleave', amount: -2 })
   expect(aliens[1].hp).toBe(97)
-  expect(events.at(-1)).toMatchObject({ type: 'move', id: soldier.id, with: 'skirmish' })
+  expect(events.some((e) => e.type === 'move')).toBe(false)
+  const second = until((all) => all.some((e) => e.type === 'move'))
+  expect(second).toContainEqual(expect.objectContaining({ type: 'shot', id: soldier.id, target: aliens[1].id }))
+  expect(second.at(-1)).toMatchObject({ type: 'move', id: soldier.id, with: 'skirmish' })
 })
 
 test("a blademaster charges in and strikes from the next tile; a parry deflects a shot from beyond arm's reach", () => {
@@ -307,7 +311,7 @@ test("a blademaster charges in and strikes from the next tile; a parry deflects 
   expect(duel.until((all) => all.some((e) => e.type === 'effect' && e.effect === 'parry'))).toContainEqual({ type: 'effect', id: duel.soldier.id, effect: 'parry', amount: 0 })
 })
 
-test('a psionic attack passes through a wall and ignores cover; a demolishing hit wrecks the cover around its target; twin guns fire twice', () => {
+test('a psionic attack passes through a wall and ignores cover; a demolishing hit wrecks the cover around its target; twin guns add a third shot', () => {
   const psi = arena([{ kind: 'trooper', x: 10, y: 13 }])
   psi.battle.cover[12 * GRID + 10] = 2
   psi.soldier.effects = ['psionic']
@@ -330,9 +334,10 @@ test('a psionic attack passes through a wall and ignores cover; a demolishing hi
   twin.soldier.stats = { ...twin.soldier.stats, move: 0 }
   twin.aliens[0].stats = { ...twin.aliens[0].stats, move: 0, range: 0 }
   twin.aliens[0].hp = twin.aliens[0].stats.hp = 99
-  const shots = twin.until(has('shot')).filter((e) => e.type === 'shot' && e.id === twin.soldier.id)
-  expect(shots).toHaveLength(2)
-  expect(shots[1]).toMatchObject({ with: ['twin'] })
+  const shots = twin.until((all) => all.filter((e) => e.type === 'shot').length >= 3).filter((e) => e.type === 'shot' && e.id === twin.soldier.id)
+  expect(shots).toHaveLength(3)
+  expect(shots[1]).toMatchObject({ with: [] })
+  expect(shots[2]).toMatchObject({ with: ['twin'] })
 })
 
 test('an engineer deploys a mech once aliens are in sight, credited with its kills; a mech alone cannot hold the field', () => {

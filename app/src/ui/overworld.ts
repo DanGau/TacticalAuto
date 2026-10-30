@@ -5,7 +5,7 @@ import { SLOTS } from '../core/gear'
 import { DOCTRINES } from '../core/doctrines'
 import { BRIBE, CREDIT_THREAT, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
-import { current, legOf, GEAR_PRICE, KEYS, LEG_STOPS, ways, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
+import { current, legOf, GEAR_PRICE, KEYS, LEG_STOPS, ways, charges, equipped, level, missionAt, huntForce, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
 import { FEATS } from '../core/feats'
 import { PATHS, SKILLS } from '../core/skills'
 import { TWISTS } from '../core/twists'
@@ -107,9 +107,10 @@ function runMap(run: Run, picked: number | null): string {
 }
 
 /** The alien force at the squad's stop. */
-function travelLabel(run: Run, stop: Stop, next: 'battle' | 'key' | 'final' | 'escape'): string {
+function travelLabel(run: Run, stop: Stop, next: 'battle' | 'key' | 'final'): string {
   const mission = missionAt(run, next, stop.risk, next === 'battle' ? stop.goal : 'exterminate')
-  return `force ${mission.force}${next === 'key' || next === 'final' ? ' + boss' : ''}`
+  const hunt = huntForce(run, mission)
+  return `force ${mission.force}${hunt > 0 ? ` + ${hunt} hunting` : ''}${next === 'key' || next === 'final' ? ' + boss' : ''}`
 }
 
 /** What the squad faces at a stop, as the map's heading. */
@@ -163,7 +164,7 @@ function mapView(run: Run, picked: number | null): string {
   if (!node) return `${choices}${brief(where(run, ahead!))}${runMap(run, picked)}`
   const next = nextStop(run)!
   const here = node.stop!
-  return `${choices}${brief(next === 'escape' ? '<b class="up">Ambushed: escape</b>' : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
+  return `${choices}${brief(next === 'recovery' ? '<b class="up">Recover your soldiers</b>' : next === 'escape' ? '<b class="up">Ambushed: escape</b>' : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
     ${runMap(run, null)}`
 }
 
