@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { distance, isSoldier, POD_REACH } from './battle'
 import { current, type Run } from './run'
-import type { RelicId } from './relics'
+import { offerable, REQUIRES, type RelicId } from './relics'
 import { zoneOf, begun } from './roads'
 
 /** A run landing for an exterminate battle with `relics`, at its hot drop so aliens are near. */
@@ -26,4 +26,11 @@ test('drop pod relics strip, chill and wall in where the squad lands, and drop a
   expect(battle.props.filter((p) => p === 'stack').length).toBeGreaterThan(plain.props.filter((p) => p === 'stack').length)
   expect(battle.units.filter((u) => u.side === 'human' && u.soldier === null && u.stats.move === 0)).toHaveLength(1)
   expect(battle.breach).toBe(true)
+})
+
+test('a relic that needs another is offered only once that one is held', () => {
+  for (const [id, need] of Object.entries(REQUIRES)) {
+    expect(offerable([])).not.toContain(id)
+    expect(offerable([need])).toContain(id)
+  }
 })

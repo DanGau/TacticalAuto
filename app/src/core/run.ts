@@ -9,7 +9,7 @@ import type { EventId } from './events'
 import { FEATS, type FeatId } from './feats'
 import { EFFECTS, generateGear, SLOTS, type Gear, type Slot } from './gear'
 import { RESISTS, type Keyword, type Resist } from './keywords'
-import { RELIC_OFFERS, RELICS, type Relic, type RelicId } from './relics'
+import { offerable, RELIC_OFFERS, RELICS, type Relic, type RelicId } from './relics'
 import { PATHS, SKILLS, type SkillId } from './skills'
 import { ZONE_TERRAINS, type TerrainKind } from './terrain'
 import { drawTwist, type Twist } from './twists'
@@ -329,7 +329,7 @@ export function stockShop(run: Run): Shop {
     const fits = run.soldiers.filter((s) => rank(s) === Math.min(...run.soldiers.map(rank)))
     wares.push({ gear, soldier: fits[randomInt(run, fits.length)].id })
   }
-  const relics = (Object.keys(RELICS) as RelicId[]).filter((id) => !run.relics.includes(id))
+  const relics = offerable(run.relics)
   const stocked: RelicId[] = []
   while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(relics.splice(randomInt(run, relics.length), 1)[0])
   return { wares, relics: stocked, bribed: false }
@@ -453,7 +453,7 @@ export function recruit(run: Run, index: number): void {
   run.supplies += trait?.supplies ?? 0
   run.threat = Math.min(run.threat + (trait?.threat ?? 0), THREAT_MAX)
   if (trait?.relic) {
-    const unheld = (Object.keys(RELICS) as RelicId[]).filter((id) => !run.relics.includes(id))
+    const unheld = offerable(run.relics)
     run.relics.push(unheld[randomInt(run, unheld.length)])
   }
   settle(run)
@@ -910,7 +910,7 @@ export function endBattle(run: Run): void {
   if (mission.kind === 'battle') passStop(run)
   // A satellite, an escape, a hold or an Overrun battle won offers relics.
   if (won && (mission.kind !== 'battle' || mission.goal === 'hold' || mission.risk === 'dangerous')) {
-    const pool = (Object.keys(RELICS) as RelicId[]).filter((id) => !run.relics.includes(id))
+    const pool = offerable(run.relics)
     // The first offer builds on a keyword the squad already has, when one can.
     const held = squadKeywords(run)
     const fits = pool.filter((id) => RELICS[id].tags?.some((tag) => held.includes(tag)))

@@ -1,5 +1,5 @@
 import type { Stats } from '../core/battle'
-import { CLASSES } from '../core/classes'
+import { CLASSES, type ClassId } from '../core/classes'
 import { FEATS } from '../core/feats'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
@@ -7,9 +7,12 @@ import { KEYS, level, SELL, skillOffers, soldierStats, xpFor, squadKeywords, typ
 import { PATHS, SKILLS } from '../core/skills'
 import { button, describe, gearCard, gearText, keyRow, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
 
+/** Each class's badge; a soldier not yet promoted wears a helmet. */
+const BADGES: Record<ClassId, string> = { assault: '🔫', heavy: '🚀', sniper: '🎯', support: '⛑️', engineer: '🔧' }
+
 /**
- * A soldier's card: level, an experience bar filling toward the next level, and a level gained or that the soldier
- * fell. Under it, quiet notes: experience gained, gear it decided on, feats first pulled off; hovering one tells it.
+ * A soldier's card: class badge, name, and an experience bar filling with what the battle earned, flaring on a level
+ * gained; gear the soldier chose to wear drops onto it; feats first pulled off below. Hovering a note tells it.
  */
 function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
   const before = level({ xp: soldier.xpBefore })
@@ -17,18 +20,23 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
   const filled = (xp: number) => Math.min(100, (100 * (xp - xpFor(before))) / (xpFor(before + 1) - xpFor(before)))
   const cls = soldier.cls && CLASSES[soldier.cls].name
   const gained = soldier.xpAfter - soldier.xpBefore
-  const badge = soldier.downed ? '<b class="up">Downed · cloned anew</b>' : after > before ? `<b class="down promoted">Level ${after}</b>` : ''
-  const notes = [
-    ...(gained > 0 ? [`<li title="${soldier.earned.map((e) => `${e.label}: +${e.xp}`).join('&#10;')}">+${gained} experience</li>`] : []),
-    ...run.decisions.filter((d) => d.soldier === soldier.name).map((d) => `<li class="${d.gear.rarity}" title="${gearText(d.gear)}&#10;${d.line}">${d.kept ? 'wears' : 'sold'} ${d.gear.name}</li>`),
-    ...soldier.feats.map((id) => `<li class="feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</li>`),
-  ]
-  return `<div class="soldier ${soldier.downed ? 'died' : ''}">
-    <small>Level ${before}${cls ? ` · ${cls}` : ''}</small><br><b>${soldier.name}</b>
+  const up = after > before && !soldier.downed
+  const badge = soldier.downed ? '<b class="up">Downed · cloned anew</b>' : up ? `<b class="down promoted">Level ${after}!</b>` : ''
+  const worn = run.decisions.filter((d) => d.soldier === soldier.name && d.kept).map((d) => `<div class="gear won ${d.gear.rarity}" title="${gearText(d.gear)}&#10;${d.line}"><small>${d.gear.slot}</small> <b>${d.gear.name}</b></div>`)
+  const feats = soldier.feats.map((id) => `<li class="feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</li>`)
+  return `<div class="soldier ${soldier.downed ? 'died' : ''} ${up ? 'levelled' : ''}">
+    <div class="who"><span class="portrait">${soldier.cls ? BADGES[soldier.cls] : '🪖'}</span><span><b>${soldier.name}</b><br><small>Level ${before}${cls ? ` · ${cls}` : ''}</small></span></div>
     <div class="bar"><div class="fill" style="--from: ${filled(soldier.xpBefore)}%; --to: ${filled(soldier.xpAfter)}%"></div></div>
-    ${badge}
-    ${notes.length > 0 ? `<ul class="notes">${notes.join('')}</ul>` : ''}
+    ${gained > 0 ? `<small class="gained" title="${soldier.earned.map((e) => `${e.label}: +${e.xp}`).join('&#10;')}">+${gained} xp</small>` : ''} ${badge}
+    ${worn.join('')}
+    ${feats.length > 0 ? `<ul class="notes">${feats.join('')}</ul>` : ''}
   </div>`
+}
+
+/** Finds sold off, each a line paying out its supplies. */
+function sales(run: Run): string {
+  const sold = run.decisions.filter((d) => !d.kept)
+  return sold.length > 0 ? `<div class="sales">${sold.map(({ gear, line }) => `<p class="sold" title="${line}">🪙 Sold <span class="${gear.rarity}">${gear.name}</span> <b class="supplies chaching" style="--paid: ${SELL[gear.rarity]}"></b></p>`).join('')}</div>` : ''
 }
 
 function title(report: Report): string {
@@ -97,7 +105,7 @@ export function choice(run: Run, pick: 'keep' | 'sell' | null = null): string {
 export function stopReport(run: Run, report: Report): string {
   const { before, after } = report.threat
   const threat = after === before ? '' : `<span class="note">${signed(after - before)}</span>`
-  const squad = report.soldiers.length > 0 ? `<div class="stage second"><h2>Squad</h2><div class="squad">${report.soldiers.map((s) => soldierCard(run, s)).join('')}</div></div>` : ''
+  const squad = report.soldiers.length > 0 ? `<div class="stage second"><div class="squad">${report.soldiers.map((s) => soldierCard(run, s)).join('')}</div>${sales(run)}</div>` : ''
   return `
     ${title(report)}
     <div class="stage">

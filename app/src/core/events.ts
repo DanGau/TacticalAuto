@@ -1,6 +1,6 @@
 import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type DoctrineId } from './doctrines'
-import { RELICS, type RelicId } from './relics'
+import { offerable } from './relics'
 import { random, randomInt } from './rng'
 import { advance, current, drawBattle, LEG_STOPS, legOf, dropGear, hire, level, nextStop, passStop, settle, stockShop, STOP_THREAT, THREAT_MAX, xpFor, type Run } from './run'
 
@@ -36,8 +36,8 @@ const adopt = (run: Run, id: DoctrineId) => {
 }
 const gain = (supplies: number, quip: string): Option => ({ quip, text: `Salvage it: +${supplies} supplies`, take: (run) => (run.supplies += supplies) })
 const leave = (quip: string): Option => ({ quip, text: 'Move on', take: () => {} })
-/** Relics the squad does not hold. */
-const unheld = (run: Run) => (Object.keys(RELICS) as RelicId[]).filter((id) => !run.relics.includes(id))
+/** Relics the squad may be offered. */
+const unheld = (run: Run) => offerable(run.relics)
 const pick = <T>(run: Run, options: T[]): T => options[randomInt(run, options.length)]
 /** Moves a soldier `levels` up or down, never below level 1. */
 const train = (soldier: Run['soldiers'][number], levels: number) => (soldier.xp = xpFor(Math.max(1, level(soldier) + levels)))
@@ -218,8 +218,9 @@ const encounters = {
         text: 'Swap: a random relic you hold for a random one you do not',
         can: (run) => run.relics.length > 0 && unheld(run).length > 0,
         take: (run) => {
-          const fresh = pick(run, unheld(run))
-          run.relics.splice(randomInt(run, run.relics.length), 1, fresh)
+          // What is given up is gone before the new one is drawn, so the new one needs no relic given up.
+          const [old] = run.relics.splice(randomInt(run, run.relics.length), 1)
+          run.relics.push(pick(run, unheld(run).filter((id) => id !== old)) ?? old)
         },
       },
       { quip: 'Cash, darling.', text: 'Sell: a random relic you hold; +8 supplies', can: (run) => run.relics.length > 0, take: (run) => (run.relics.splice(randomInt(run, run.relics.length), 1), (run.supplies += 8)) },

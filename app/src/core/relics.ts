@@ -84,5 +84,13 @@ const relics = {
 export type RelicId = keyof typeof relics
 export const RELICS: Record<RelicId, Relic> = relics
 
+/** The relic each needs held before it is offered: the drop pods' relics need the pods. */
+export const REQUIRES: Partial<Record<RelicId, RelicId>> = { impact: 'dropPods', shredder: 'dropPods', cryopods: 'dropPods', bulwark: 'dropPods', turrets: 'dropPods' }
+
+/** Relics that may be offered to a squad holding `held`: those it lacks whose requirement it holds. */
+export function offerable(held: RelicId[]): RelicId[] {
+  return (Object.keys(RELICS) as RelicId[]).filter((id) => !held.includes(id) && (!REQUIRES[id] || held.includes(REQUIRES[id])))
+}
+
 /** Relics offered at a time. */
 export const RELIC_OFFERS = 3
