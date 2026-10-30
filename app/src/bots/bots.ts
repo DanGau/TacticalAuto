@@ -5,7 +5,7 @@ import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { SKILLS } from '../core/skills'
 import { BRIBE, CREDIT_THREAT, EVENTS, RELIC_PRICE } from '../core/events'
-import { current, danger, GEAR_PRICE, legOf, level, skillOffers, squadKeywords, THREAT_MAX, ways, type Risk, type Run } from '../core/run'
+import { current, danger, GEAR_PRICE, health, legOf, level, skillOffers, soldierStats, squadKeywords, THREAT_MAX, ways, type Risk, type Run } from '../core/run'
 
 /** Chooses the next action whenever the run waits for the player. `rng` is the bot's own, separate from the run's. */
 export type Bot = (run: Run, rng: { rng: number }) => Action
@@ -75,6 +75,10 @@ const affordable = (run: Run): Action[] => [
   ...run.shop!.relics.flatMap((_, index): Action[] => (RELIC_PRICE <= run.supplies ? [{ type: 'buy', index }] : [])),
 ]
 
+/** The squad's health as a share of its most. */
+const squadHealth = (run: Run) => run.soldiers.reduce((sum, s) => sum + health(run, s), 0) / run.soldiers.reduce((sum, s) => sum + soldierStats(run, s).hp, 0)
+const HURT = 0.6
+
 /** Takes the safest stops until the squad's mean level reaches 3, then the most dangerous. */
 const growing = (run: Run): Risk => (run.soldiers.reduce((sum, s) => sum + level(s), 0) / run.soldiers.length >= 3 ? 'dangerous' : 'safe')
 
@@ -128,11 +132,15 @@ const play =
     }
     if (run.phase === 'battle') return { type: 'land', zone: LANDS[land](run, run.battle!, rng) }
     if (run.phase === 'shop') return build ? shop(run) : { type: 'leave' }
-    if (run.phase === 'event') return { type: 'choose', index: events === 'bold' ? takeable(run)[0] : takeable(run).at(-1)! }
-    const wanted = typeof risk === 'function' ? risk(run) : risk
+    // At a medic, the first thing it offers: rest when hurt, a bonus at full health.
+    if (run.phase === 'event') return { type: 'choose', index: events === 'bold' || run.event === 'medic' ? takeable(run)[0] : takeable(run).at(-1)! }
+    const wanted = squadHealth(run) < HURT ? 'safe' : typeof risk === 'function' ? risk(run) : risk
     if (current(run)) return { type: 'advance' }
     // The ways on by danger, least first: a safe bot takes the first, a standard one the middle, a dangerous one the last.
     const column = legOf(run).columns[run.stop]
+    // A squad below HURT of its health makes for a medic when one is on the way.
+    const medic = ways(run).find((i) => column[i].stop!.kind === 'medic')
+    if (medic !== undefined && squadHealth(run) < HURT) return { type: 'go', index: medic }
     const ranked = ways(run).sort((a, b) => danger(column[a].stop!) - danger(column[b].stop!))
     return { type: 'go', index: ranked[Math.round((ranked.length - 1) * { safe: 0, standard: 0.5, dangerous: 1 }[wanted])] }
   }

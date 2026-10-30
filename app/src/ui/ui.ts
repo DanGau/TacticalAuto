@@ -255,7 +255,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   function setIn(): void {
     const next = nextStop(shown!)
     if (!next) return
-    if (next === 'supply' || next === 'cache' || next === 'shop') act({ type: 'advance' })
+    if (next === 'supply' || next === 'cache' || next === 'shop' || next === 'medic') act({ type: 'advance' })
     else dive(() => act({ type: 'advance' }))
   }
 

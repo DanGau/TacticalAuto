@@ -214,6 +214,8 @@ export interface Alien {
 export interface Reserve {
   soldier: number
   stats: Stats
+  /** Health it lands with. */
+  hp: number
   ability: Ability | null
   charges: number
   stance: Stance
@@ -372,8 +374,9 @@ export interface Battle {
   /** On an escape, where the squad is ambushed, and the escape zone it chose; null otherwise. */
   start: Tile | null
   escape: Tile | null
-  /** Soldiers lifted off from an escape or extraction zone, by soldier id. */
+  /** Soldiers lifted off from an escape or extraction zone, by soldier id, and the health each left with; 0 if carried. */
   escaped: number[]
+  lifted: Record<number, number>
   /** What landing at each zone means, in zones order, and the plan the squad landed by; null before it lands. */
   plans: Plan[]
   landed: Plan | null
@@ -765,7 +768,7 @@ export function holdCaptives(battle: Battle, captives: Reserve[]): void {
 
 /** A soldier's unit, landing from the reserve on `tile`. */
 export function soldierUnit(battle: Battle, soldier: Reserve, tile: Tile, team = 0): Unit {
-  return { id: battle.nextId++, side: 'human', ...tile, hp: soldier.stats.hp, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: null, team, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier }
+  return { id: battle.nextId++, side: 'human', ...tile, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: null, team, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, ...soldier }
 }
 
 /** An orbital strike's threat, and the damage it does every alien, never killing one. */
@@ -1011,6 +1014,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     start: null,
     escape: null,
     escaped: [],
+    lifted: {},
     plans: [],
     landed: null,
     caches: [],

@@ -18,12 +18,16 @@ export const STOP_NAMES: Record<StopKind | Mission['kind'], string> = {
   supply: 'Supply drop',
   cache: 'Gear cache',
   shop: 'Shop',
+  medic: 'Medic',
   unknown: '❓ Unknown',
   key: 'Extraction',
   final: 'The alien source',
   escape: 'Escape',
   recovery: 'Recovery',
 }
+
+/** A soldier's health as a red bar and a count. */
+export const healthBar = (hp: number, max: number) => `<div class="health" title="Health ${hp} of ${max}">♥ ${hp}/${max}<div class="bar"><div style="width: ${(100 * hp) / max}%"></div></div></div>`
 
 /** The threat bar. `landed` is how much of the newest threat animates in. */
 export function threatBar(threat: number, landed = 0): string {

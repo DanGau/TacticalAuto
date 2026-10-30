@@ -56,10 +56,10 @@ export const RISKS: Record<Risk, { name: string; aliens: number; supplies: numbe
 
 /**
  * A stop on the road. A battle must be fought. A supply drop gives supplies and a cache gives gear, with no fight.
- * A shop sells gear, relics and a bribe. An unknown stop is revealed on arrival as a battle, a shop or an event.
+ * A shop sells gear, relics and a bribe. At a medic the squad heals, or takes a bonus at full health. An unknown stop is revealed on arrival as a battle, a shop or an event.
  * A key mission, at a satellite, wins an access key; the final mission strikes the alien source. Both have a boss.
  */
-export type StopKind = 'battle' | 'supply' | 'cache' | 'shop' | 'unknown' | 'key' | 'final'
+export type StopKind = 'battle' | 'supply' | 'cache' | 'shop' | 'unknown' | 'medic' | 'key' | 'final'
 
 /** A pack of aliens by name and kinds, mustered before it is equipped. */
 export interface Muster {
@@ -142,6 +142,8 @@ export interface Soldier {
   trait: TraitId | null
   /** Where it comes from: a recruit's home, a hero's city; none for one who joined on the road. */
   home: City | null
+  /** Health lost and not yet healed; it carries from battle to battle. */
+  wounds: number
 }
 
 /** Gear a soldier found, waiting to be equipped on that soldier or sold. */
@@ -174,7 +176,7 @@ export interface Report {
    * soldier was left downed on the field, and the aliens hold it. `earned` is what its experience came from; `feats`,
    * those first pulled off.
    */
-  soldiers: { id: number; name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; taken: boolean; earned: Earned[]; feats: FeatId[] }[]
+  soldiers: { id: number; name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; taken: boolean; earned: Earned[]; feats: FeatId[]; hp: number; maxHp: number }[]
   /** The name of the hero the stop added to the squad. */
   hired: string | null
   /** Civilians kept alive on a rescue; null on any other stop. */
@@ -364,6 +366,20 @@ export function charges(run: Run, soldier: Soldier): number {
   return base + soldier.skills.reduce((sum, id) => sum + (SKILLS[id].charges ?? 0), 0) + run.relics.reduce((sum, id) => sum + ((RELICS[id] as Relic).charges ?? 0), 0)
 }
 
+/** Health every soldier heals for each stop travelled to. */
+export const TRAVEL_HEAL = 2
+
+/** A soldier's health now: its most less its wounds, never below 1. */
+export const health = (run: Run, soldier: Soldier) => Math.max(1, soldierStats(run, soldier).hp - soldier.wounds)
+
+/** Heals every soldier `amount`; Infinity heals fully. */
+export function mend(run: Run, amount: number): void {
+  for (const s of run.soldiers) s.wounds = Math.max(0, Math.min(s.wounds, soldierStats(run, s).hp - 1) - amount)
+}
+
+/** Whether any soldier is below full health. */
+export const wounded = (run: Run) => run.soldiers.some((s) => health(run, s) < soldierStats(run, s).hp)
+
 /** A soldier's stats in battle: base, plus class, level, skills and gear, plus relics. */
 export function soldierStats(run: Run, soldier: Soldier): Stats {
   const stats = { ...BASE_STATS }
@@ -419,6 +435,7 @@ function draft(run: Run, taken: ClassId[]): Soldier {
     gear: { weapon: null, armor: null, utility: null },
     trait: null,
     home: null,
+    wounds: 0,
   }
   return soldier
 }
@@ -627,7 +644,7 @@ function drawGoal(run: Run, when: Run): Goal {
 }
 
 /** How likely a stop past a leg's first column is to be each kind other than a battle; the rest are battles. */
-export const STOP_CHANCE = { unknown: 0.25, shop: 0.1, supply: 0.1, cache: 0.1 }
+export const STOP_CHANCE = { unknown: 0.25, shop: 0.1, medic: 0.1, supply: 0.08, cache: 0.08 }
 
 /**
  * The shape of a leg's map: trails start apart and wander a row up, down or on each column, never crossing, and
@@ -827,7 +844,7 @@ export function passStop(run: Run): void {
 export function advance(run: Run): void {
   const here = current(run)!.stop!
   const stop = nextStop(run)!
-  if (stop === 'shop' || stop === 'unknown') throw new Error('a shop or unknown stop is arrived at, not advanced to')
+  if (stop === 'shop' || stop === 'unknown' || stop === 'medic') throw new Error('a shop, medic or unknown stop is arrived at, not advanced to')
   run.decisions = []
   if (stop === 'supply' || stop === 'cache') {
     const before = run.threat
@@ -848,6 +865,7 @@ export function advance(run: Run): void {
   const reserve = run.soldiers.map((s): Reserve => ({
     soldier: s.id,
     stats: soldierStats(run, s),
+    hp: health(run, s),
     ability: s.cls && CLASSES[s.cls].ability,
     charges: charges(run, s),
     stance: doctrines.find((d) => d.stance)?.stance ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
@@ -901,7 +919,11 @@ export function endBattle(run: Run): void {
     const xpBefore = s.xp
     const { earned, feats } = earn(battle, s, won, rescued)
     s.xp += earned.reduce((sum, e) => sum + e.xp, 0)
-    return { id: s.id, name: s.name, cls: s.cls, xpBefore, xpAfter: s.xp, taken: run.captives.includes(s.id), earned, feats }
+    // Health carries on: what it ends standing or lifted off with; downed, it comes back at 1.
+    const maxHp = soldierStats(run, s).hp
+    const hp = Math.max(1, Math.min(maxHp, battle.units.find((u) => u.soldier === s.id)?.hp ?? battle.lifted[s.id] ?? 0))
+    s.wounds = maxHp - hp
+    return { id: s.id, name: s.name, cls: s.cls, xpBefore, xpAfter: s.xp, taken: run.captives.includes(s.id), earned, feats, hp, maxHp }
   })
 
   const before = run.threat

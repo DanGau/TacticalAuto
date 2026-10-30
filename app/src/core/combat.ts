@@ -639,7 +639,7 @@ function sight(battle: Battle): GameEvent[] {
     battle.downed.splice(battle.downed.indexOf(body), 1)
     const [tile] = freeTilesNear(battle, body, 1)
     const unit = soldierUnit(battle, captive, tile)
-    unit.hp = Math.ceil(unit.hp / 2)
+    unit.hp = Math.ceil(unit.stats.hp / 2)
     battle.units.push(unit)
     events.push({ type: 'freed', id: rescuer.id, unit: { id: unit.id, x: unit.x, y: unit.y } })
   }
@@ -647,6 +647,7 @@ function sight(battle: Battle): GameEvent[] {
   for (const soldier of battle.escape ? soldiers.filter((s) => distance(s, battle.escape!) <= escapeReach(battle)) : []) {
     battle.units.splice(battle.units.indexOf(soldier), 1)
     battle.escaped.push(soldier.soldier!, ...battle.downed.filter((d) => d.carrier === soldier.id).map((d) => d.soldier))
+    battle.lifted[soldier.soldier!] = soldier.hp
     battle.downed = battle.downed.filter((d) => d.carrier !== soldier.id)
     events.push({ type: 'escaped', id: soldier.id })
   }

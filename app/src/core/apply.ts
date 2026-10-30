@@ -1,6 +1,6 @@
 import { land, STRIKE, TEAMS } from './battle'
 import { arrive, BRIBE, CREDIT_THREAT, depart, EVENTS, RELIC_PRICE } from './events'
-import { advance, buyWare, current, GEAR_PRICE, go, keepFind, nextStop, recruit, sellFind, skillOffers, takeRelic, takeSkill, THREAT_MAX, ways, type Run } from './run'
+import { advance, buyWare, current, GEAR_PRICE, go, keepFind, mend, nextStop, recruit, sellFind, skillOffers, takeRelic, takeSkill, THREAT_MAX, TRAVEL_HEAL, ways, type Run } from './run'
 
 export type Action =
   /** At the run's start: take the recruit at `index` of run.recruits as the first soldier. */
@@ -151,7 +151,8 @@ export function apply(run: Run, action: Action): Result {
   }
   if (!current(run)) return no('choose where to go first')
   const stop = nextStop(run)
-  if (stop === 'shop' || stop === 'unknown') arrive(run)
+  mend(run, TRAVEL_HEAL)
+  if (stop === 'shop' || stop === 'unknown' || stop === 'medic') arrive(run)
   else advance(run)
   return ok
 }

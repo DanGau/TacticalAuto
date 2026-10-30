@@ -2,7 +2,7 @@ import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type DoctrineId } from './doctrines'
 import { offerable } from './relics'
 import { random, randomInt } from './rng'
-import { advance, current, drawBattle, LEG_STOPS, legOf, dropGear, hire, level, nextStop, passStop, settle, stockShop, STOP_THREAT, THREAT_MAX, xpFor, type Run } from './run'
+import { advance, current, drawBattle, LEG_STOPS, legOf, dropGear, hire, level, mend, nextStop, passStop, settle, stockShop, STOP_THREAT, THREAT_MAX, wounded, xpFor, type Run } from './run'
 
 /** One way to meet an event: the squad's quip, what it does, whether the squad can, and doing it. */
 interface Option {
@@ -44,7 +44,25 @@ const train = (soldier: Run['soldiers'][number], levels: number) => (soldier.xp 
 /** Whether `n` more stops lie between this one and the satellite. */
 const ahead = (run: Run, n = 1) => run.stop + n < LEG_STOPS
 
+/** Wounds every soldier `amount`, never below 1 health. */
+const hurt = (run: Run, amount: number) => run.soldiers.forEach((s) => (s.wounds += amount))
+
 const encounters = {
+  medic: {
+    name: 'Field Hospital',
+    text: 'A field hospital still runs in a school gym, cots in rows under the basketball hoops. The surgeon has not slept in a week and has opinions about your posture.',
+    options: [
+      { quip: 'Beds. Real beds.', text: 'Rest: every soldier heals fully', can: (run) => wounded(run), take: (run) => mend(run, Infinity) },
+      { quip: 'Nobody here is bleeding. Raid the quartermaster.', text: 'At full health, requisition: a piece of rare or better gear', can: (run) => !wounded(run), take: (run) => dropGear(run, true) },
+      {
+        quip: 'Nobody here is bleeding. Sit in on the trauma lectures.',
+        text: 'At full health, train: your lowest-level soldier gains a level',
+        can: (run) => !wounded(run),
+        take: (run) => train(run.soldiers.reduce((low, s) => (level(s) < level(low) ? s : low)), 1),
+      },
+      leave('Wave at the surgeon. The surgeon does not wave back.'),
+    ],
+  },
   vats: {
     name: 'Cloning Vats',
     text: `An abandoned cloning plant hums away, a sticky note on the console: SET TO 'ECONOMY' TO SAVE POWER. The vats can push out clones twice as fast. Nobody asks what economy skips.`,
@@ -295,6 +313,23 @@ const encounters = {
       leave('Nothing in there is worth that smell.'),
     ],
   },
+  bloodBank: {
+    name: 'Blood Bank',
+    text: 'A clinic pays in canned goods for blood, no questions asked, though the nurse does ask whether anyone is part alien. Nobody is sure.',
+    options: [
+      { quip: 'Roll up your sleeves. Both of them.', text: 'Donate: every soldier loses 4 health; +6 supplies', take: (run) => (hurt(run, 4), (run.supplies += 6)) },
+      leave('Keep your blood on the inside, where it works best.'),
+    ],
+  },
+  stims: {
+    name: 'Stim Lab',
+    text: 'A pharmacist in a hazmat suit sells combat stims from a vending machine he has hot-wired. "Side effects include feeling great. Also, they glow. The aliens love the glow."',
+    options: [
+      { quip: 'One each. Two for the sniper.', text: 'Buy: -3 supplies; every soldier heals 6', can: (run) => run.supplies >= 3, take: (run) => ((run.supplies -= 3), mend(run, 6)) },
+      { quip: 'Take the whole machine.', text: 'Steal: every soldier heals fully; +3 threat', take: (run) => (mend(run, Infinity), raise(run, 3)) },
+      leave('Nothing that glows goes in anyone.'),
+    ],
+  },
   tunnel: {
     name: 'Smugglers\' Tunnel',
     text: 'A tunnel runs under the next two stops, signposted EXIT and, in smaller letters, MOSTLY. It skips every fight there, and every prize. The aliens will notice the squad has gone missing.',
@@ -324,7 +359,7 @@ function openShop(run: Run): void {
 }
 
 /**
- * Arrives at a shop or an unknown stop. An unknown one is revealed: a battle begins at once, or the squad enters a
+ * Arrives at a shop, a medic or an unknown stop. A medic is the Field Hospital, met at every medic stop. An unknown one is revealed: a battle begins at once, or the squad enters a
  * shop or meets an event not met before this run. Either adds threat as a stop does.
  */
 export function arrive(run: Run): void {
@@ -338,10 +373,15 @@ export function arrive(run: Run): void {
   }
   raise(run, STOP_THREAT)
   run.report = null
-  const fresh = (Object.keys(EVENTS) as EventId[]).filter((id) => !run.met.includes(id))
+  if (nextStop(run) === 'medic') return meet(run, 'medic')
+  const fresh = (Object.keys(EVENTS) as EventId[]).filter((id) => id !== 'medic' && !run.met.includes(id))
   if (!unknown || roll < UNKNOWN_CHANCE.battle + UNKNOWN_CHANCE.shop || fresh.length === 0) return openShop(run)
   const id = fresh[randomInt(run, fresh.length)]
   run.met.push(id)
+  meet(run, id)
+}
+
+function meet(run: Run, id: EventId): void {
   run.event = id
   run.phase = 'event'
 }

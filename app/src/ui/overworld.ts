@@ -5,14 +5,14 @@ import { SLOTS } from '../core/gear'
 import { DOCTRINES } from '../core/doctrines'
 import { BRIBE, CREDIT_THREAT, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
-import { current, legOf, GEAR_PRICE, KEYS, LEG_STOPS, ways, charges, equipped, level, missionAt, huntForce, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
+import { current, legOf, GEAR_PRICE, KEYS, LEG_STOPS, ways, charges, equipped, health, level, missionAt, huntForce, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
 import { FEATS } from '../core/feats'
 import { PATHS, SKILLS } from '../core/skills'
 import { TWISTS } from '../core/twists'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
 import { decisions } from './aftermath'
-import { alienName, button, describe, gearCard, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
+import { alienName, button, describe, gearCard, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
 export const TABS = ['Map', 'Base', 'Barracks'] as const
@@ -33,7 +33,7 @@ function census(run: Run, packs: Muster[]): string {
   }).join(', ')
 }
 
-const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '📦', cache: '🎁', shop: '🛒', unknown: '❓', key: '⭐', final: '👁️' }
+const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '📦', cache: '🎁', shop: '🛒', medic: '✚', unknown: '❓', key: '⭐', final: '👁️' }
 
 /**
  * A stop as an icon; a battle's is coloured by its risk and marked by its twist, and hovering tells its goal, place, pay and twist.
@@ -179,7 +179,7 @@ function baseView(run: Run): string {
 }
 
 /** A soldier's card, kept short: level, class, name, experience, and three gear slots. Clicking it opens the soldier's details. */
-function soldierCard(soldier: Soldier, open: number | null): string {
+function soldierCard(run: Run, soldier: Soldier, open: number | null): string {
   const r = level(soldier)
   const cls = soldier.cls && CLASSES[soldier.cls]
   const filled = (100 * (soldier.xp - xpFor(r))) / (xpFor(r + 1) - xpFor(r))
@@ -190,6 +190,7 @@ function soldierCard(soldier: Soldier, open: number | null): string {
   return `<button class="soldier who ${open === soldier.id ? 'chosen' : ''}" data-open="${soldier.id}">
     <small>Level ${r}${cls ? ` · ${cls.name}` : ''}</small><br><b>${soldier.name}</b>
     <div class="bar"><div style="width: ${filled}%"></div></div>
+    ${healthBar(health(run, soldier), soldierStats(run, soldier).hp)}
     ${slots.join('')}
   </button>`
 }
@@ -207,7 +208,7 @@ function details(run: Run, soldier: Soldier): string {
   return `<h2>${soldier.name}${path ? `, ${path.name}` : ''} · ${xpFor(r + 1) - soldier.xp} experience to level ${r + 1}</h2>
     <div class="details">
       <table class="stats">
-        <tr><td>Health</td><td>${stats.hp}</td><td>Armor</td><td>${stats.armor}</td></tr>
+        <tr><td>Health</td><td>${health(run, soldier)}/${stats.hp}</td><td>Armor</td><td>${stats.armor}</td></tr>
         <tr><td>Aim</td><td>${Math.round(100 * stats.aim)}%</td><td>Crit</td><td>${Math.round(100 * stats.crit)}%</td></tr>
         <tr><td>Damage</td><td>${stats.damage}</td><td>Range</td><td>${stats.range}</td></tr>
         <tr><td>Move</td><td>${stats.move}</td><td></td><td></td></tr>
@@ -220,7 +221,7 @@ function details(run: Run, soldier: Soldier): string {
 /** The squad as short cards, and below them the details of the soldier opened. */
 function barracksView(run: Run, open: number | null): string {
   const soldier = run.soldiers.find((s) => s.id === open)
-  return `<div class="squad">${run.soldiers.map((s) => soldierCard(s, open)).join('')}</div>${soldier ? details(run, soldier) : '<h2>Click a soldier for details. Gear is equipped when found.</h2>'}`
+  return `<div class="squad">${run.soldiers.map((s) => soldierCard(run, s, open)).join('')}</div>${soldier ? details(run, soldier) : '<h2>Click a soldier for details. Gear is equipped when found.</h2>'}`
 }
 
 /**

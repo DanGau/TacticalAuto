@@ -3,10 +3,10 @@ import { CLASSES, type ClassId } from '../core/classes'
 import { FEATS } from '../core/feats'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
-import { KEYS, level, SELL, skillOffers, soldierStats, xpFor, squadKeywords, type Report, type Run, type Soldier } from '../core/run'
+import { health, KEYS, level, SELL, skillOffers, soldierStats, xpFor, squadKeywords, type Report, type Run, type Soldier } from '../core/run'
 import { PATHS, SKILLS } from '../core/skills'
 import { TRAITS } from '../core/traits'
-import { button, describe, gearCard, gearText, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
+import { button, describe, gearCard, gearText, healthBar, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
 
 /** Each class's badge; a soldier not yet promoted wears a helmet. */
 const BADGES: Record<ClassId, string> = { assault: '🔫', heavy: '🚀', sniper: '🎯', support: '⛑️', engineer: '🔧', pyro: '🔥', cryo: '❄️' }
@@ -33,6 +33,7 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number], opened: Set<
   return `<div class="soldier ${soldier.taken ? 'died' : ''} ${up ? 'levelled' : ''}">
     <div class="who"><span class="portrait">${soldier.cls ? BADGES[soldier.cls] : '🪖'}</span><span><b>${soldier.name}</b><br><small>Level ${before}${cls ? ` · ${cls}` : ''}</small></span></div>
     <div class="bar"><div class="fill" style="--from: ${filled(soldier.xpBefore)}%; --to: ${filled(soldier.xpAfter)}%"></div></div>
+    ${healthBar(soldier.hp, soldier.maxHp)}
     ${gained > 0 ? `<small class="gained" title="${soldier.earned.map((e) => `${e.label}: +${e.xp}`).join('&#10;')}">+${gained} xp</small>` : ''} ${badge}
     ${crates.length > 0 ? `<div class="crates">${crates.join('')}</div>` : ''}${worn.join('')}
     ${feats.length > 0 ? `<ul class="notes">${feats.join('')}</ul>` : ''}
@@ -149,7 +150,7 @@ export function stopReport(run: Run, report: Report, opened: Set<number> = new S
   const threat = after === before ? '' : `<span class="note">${signed(after - before)}</span>`
   // The hero just joined stands with the squad that fought.
   const hero = run.soldiers.find((s) => s.name === report.hired)
-  const all = [...report.soldiers, ...(hero ? [{ id: hero.id, name: hero.name, cls: hero.cls, xpBefore: hero.xp, xpAfter: hero.xp, taken: false, earned: [], feats: [] }] : [])]
+  const all = [...report.soldiers, ...(hero ? [{ id: hero.id, name: hero.name, cls: hero.cls, xpBefore: hero.xp, xpAfter: hero.xp, taken: false, earned: [], feats: [], hp: health(run, hero), maxHp: soldierStats(run, hero).hp }] : [])]
   const squad = report.soldiers.length > 0 ? `<div class="stage second"><div class="squad">${all.map((s) => soldierCard(run, s, opened)).join('')}</div>${sales(run, opened)}</div>` : ''
   return `<div class="debrief${still ? ' still' : ''}">
     ${title(report)}

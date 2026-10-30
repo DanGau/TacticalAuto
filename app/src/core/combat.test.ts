@@ -31,7 +31,7 @@ test('a turn is one move beat, then an attack per beat in id order, two by each 
   let shooter = 0
   let attacks = 0
   let twice = 0
-  const end = play(1, (events, before, after) => {
+  const end = play(4, (events, before, after) => {
     const first = events.find((e) => ['move', 'shot', 'rocket', 'heal', 'spit', 'panic', 'frozen'].includes(e.type)) as Extract<GameEvent, { id: number }> | undefined
     if (!first) return
     // A turn spent standing still shows no event, so turns are told apart by the round as well as the side. A unit

@@ -41,6 +41,8 @@ import {
   GEAR_PRICE,
   SHOP_RELICS,
   SHOP_WARES,
+  health,
+  TRAVEL_HEAL,
 } from './run'
 import { PATHS, SKILLS } from './skills'
 import { atKey, road, deploy, begun } from './roads'
@@ -237,6 +239,9 @@ test('on a recovery, a soldier who reaches a held squadmate gets them up at half
   const [body] = battle.downed
   const rescuer = battle.units.find(isSoldier)!
   Object.assign(rescuer, freeTilesNear(battle, body, 2).find((t) => t.x !== body.x || t.y !== body.y)!)
+  // It cannot end the battle by shooting before it gets to them.
+  rescuer.stats = { ...rescuer.stats, damage: 0 }
+  rescuer.ability = null
   const events: GameEvent[] = []
   for (let beats = 0; beats < 50 && !events.some((e) => e.type === 'freed'); beats++) events.push(...stepBattle(battle))
   const freed = battle.units.find((u) => u.soldier === body.soldier)!
@@ -284,6 +289,46 @@ test('a supply drop and a cache are collected on arrival, each adding threat', (
   expect(run).toMatchObject({ report: { stop: 'cache' } })
   expect(run.decisions).toMatchObject([{ kept: true }])
   expect(run.threat).toBe(2 * STOP_THREAT)
+})
+
+test('soldiers keep their health between battles, heal TRAVEL_HEAL for each stop travelled to, and come back from downed at 1', () => {
+  const run = travelling(['battle', 'battle', 'battle'])
+  hire(run).skills.splice(1)
+  run.phase = 'overworld'
+  const [hurt, fallen] = run.soldiers
+  const most = soldierStats(run, hurt).hp
+  apply(run, { type: 'advance' })
+  deploy(run, 0)
+  const battle = run.battle!
+  battle.units.find((u) => u.soldier === hurt.id)!.hp = 3
+  const body = battle.units.find((u) => u.soldier === fallen.id)!
+  battle.downed.push({ soldier: fallen.id, x: body.x, y: body.y, carrier: null })
+  battle.units = battle.units.filter((u) => u.side === 'human' && u !== body)
+  Object.assign(battle, { phase: 'over', winner: 'human' })
+  endBattle(run)
+  run.phase = 'overworld'
+  expect(health(run, hurt)).toBe(3)
+  expect(health(run, fallen)).toBe(1)
+  expect(run.report!.soldiers).toMatchObject([{ hp: 3, maxHp: most }, { hp: 1 }])
+  apply(run, { type: 'advance' })
+  expect(run.battle!.reserve.find((r) => r.soldier === hurt.id)!.hp).toBe(3 + TRAVEL_HEAL)
+})
+
+test('at a medic every soldier heals fully; at full health the squad takes a bonus instead', () => {
+  const run = travelling(['medic', 'medic', 'battle'])
+  run.soldiers[0].wounds = 7
+  apply(run, { type: 'advance' })
+  expect(run).toMatchObject({ phase: 'event', event: 'medic' })
+  const can = () => EVENTS.medic.options.flatMap((o, i) => (!o.can || o.can(run) ? [i] : []))
+  expect(can()).toEqual([0, 3])
+  apply(run, { type: 'choose', index: 0 })
+  expect(run.soldiers[0].wounds).toBe(0)
+  expect(run.met).toEqual([])
+  apply(run, { type: 'advance' })
+  expect(can()).toEqual([1, 2, 3])
+  const xp = run.soldiers[0].xp
+  apply(run, { type: 'choose', index: 2 })
+  expect(run.soldiers[0].xp).toBeGreaterThan(xp)
 })
 
 test('after the stops of a leg comes its satellite: winning it wins a key, a hero, and the next leg', () => {
@@ -417,7 +462,7 @@ test('a key mission has one boss, with an escort for each key already won', () =
   }
 })
 
-const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: { weapon: null, armor: null, utility: null }, trait: null, home: null, ...extra })
+const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: { weapon: null, armor: null, utility: null }, trait: null, home: null, wounds: 0, ...extra })
 
 test('stats add class, level, skills and relics to the base', () => {
   const run = begun(1)
