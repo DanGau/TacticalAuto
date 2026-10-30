@@ -463,7 +463,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     // A blast crater: an open bowl of scorched ground in the middle, ringed by rubble, where no one has cover.
     crater: () => {
       const c = { x: between(scaled(12), size - scaled(13)), y: between(scaled(12), size - scaled(13)) }
-      const reach = between(scaled(5), scaled(7))
+      const reach = between(5, 7)
       each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => {
         const d = Math.hypot(x - c.x, y - c.y)
         if (d <= reach) clear(x, y, 'scorched')
