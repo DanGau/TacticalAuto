@@ -34,8 +34,8 @@ export const LOSS_THREAT = 1
 export const START_SUPPLIES = 3
 /** Supplies lost for each soldier downed on an escape. */
 export const ESCAPE_DOWNED_SUPPLIES = 2
-/** What an assassination's commander has over a trooper. */
-export const COMMANDER = { hp: 4, armor: 1 }
+/** What an assassination's commander has over a trooper, its guards, and the depth from which it has one more. */
+export const COMMANDER = { hp: 6, armor: 2, guards: 2, moreFrom: 3 }
 /** Supplies a supply drop gives. */
 export const DROP_SUPPLIES = 4
 
@@ -583,12 +583,15 @@ function packsOf(run: Run, mission: Mission, mustered?: Muster[]): { name: strin
   const boss = mission.kind === 'key' || mission.kind === 'final'
   const escort = boss ? run.keys : 0
   const packs = (mustered ?? muster(run, Math.max(0, mission.force - (boss ? 2 + escort : 0)), tier)).map((pack) => ({ name: pack.name, aliens: pack.kinds.map(alien) }))
-  // An assassination's commander: a trooper tougher than its kind.
+  // An assassination's commander: a trooper tougher than its kind, with its guards.
   if (mission.goal === 'assassinate') {
     const commander = alien('trooper')
     commander.stats = { ...commander.stats, hp: commander.stats.hp + COMMANDER.hp, armor: commander.stats.armor + COMMANDER.armor, damage: commander.stats.damage + 1 }
-    packs.unshift({ name: 'Commander', aliens: [{ ...commander, target: true, stance: 'anchor' }] })
+    const guards = Array.from({ length: COMMANDER.guards + (tier >= COMMANDER.moreFrom ? 1 : 0) }, () => alien('trooper'))
+    packs.unshift({ name: 'Commander', aliens: [{ ...commander, target: true, stance: 'anchor' }, ...guards] })
   }
+  // A terror site's harvesters, more of them deeper along the road.
+  if (mission.goal === 'rescue') packs.unshift({ name: 'Harvesters', aliens: Array.from({ length: tier >= HARVESTERS_MORE_FROM ? 2 : 1 }, () => alien('harvester')) })
   // An escape's champion: a hunter tougher, faster and deadlier than any trooper, that runs the squad down.
   if (mission.goal === 'escape') {
     const hunter = alien('trooper')
@@ -603,6 +606,9 @@ function packsOf(run: Run, mission: Mission, mustered?: Muster[]): { name: strin
   }
   return packs
 }
+
+/** The depth from which a rescue has a second harvester. */
+const HARVESTERS_MORE_FROM = 2
 
 /** What an escape's hunter adds to a trooper. */
 const HUNTER = { hp: 6, armor: 1, damage: 1, move: 1 }
@@ -843,9 +849,10 @@ export function advance(run: Run): void {
 /** What a soldier still standing earns from a battle, after the feats it ends the battle with are recorded. */
 function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | null): { earned: Earned[]; feats: FeatId[] } {
   const tally = battle.tally[soldier.id] ?? { dealt: 0, kills: 0, taken: 0, feats: [] }
-  const unit = battle.units.find((u) => u.soldier === soldier.id)!
+  // A soldier lifted off has left the field.
+  const unit = battle.units.find((u) => u.soldier === soldier.id)
   if (won && tally.taken === 0) tally.feats.push('untouched')
-  if (won && unit.hp <= 2) tally.feats.push('lastLegs')
+  if (won && unit && unit.hp <= 2) tally.feats.push('lastLegs')
   const feats = tally.feats.filter((id) => !soldier.feats.includes(id))
   soldier.feats.push(...feats)
   const saved = won ? (rescued ?? 0) : 0
@@ -868,7 +875,7 @@ function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | 
 export function endBattle(run: Run): void {
   const battle = run.battle!
   const mission = run.mission!
-  const standing = new Set(battle.units.map((u) => u.soldier))
+  const standing = new Set([...battle.units.map((u) => u.soldier), ...battle.escaped])
   const won = battle.winner === 'human'
   const rescued = mission.goal === 'rescue' ? battle.saved + battle.units.filter((u) => u.civilian).length : null
   const soldiers = run.soldiers.map((s) => {

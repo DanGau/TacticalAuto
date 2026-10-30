@@ -261,6 +261,8 @@ const ALIEN_LOOK: Record<AlienKind, { color: number; scale: number }> = {
   hiveNode: { color: 0x6b3fa0, scale: 1.3 },
   mirror: { color: 0xe6f0ff, scale: 1 },
   turret: { color: 0x5f7a6a, scale: 1.1 },
+  harvester: { color: 0x7a2fd1, scale: 1.1 },
+  husk: { color: 0x9a9a7a, scale: 0.9 },
 }
 
 const onGridTile = (x: number, y: number) => x >= 0 && y >= 0 && x < GRID && y < GRID
@@ -1012,7 +1014,7 @@ export async function createView(): Promise<View> {
     const tint = new Shapes()
     marks = []
     if (battle.uplink) marks.push(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
-    if (battle.escape) marks.push(label('🚁 ESCAPE', battle.escape, COLOR.uplink, 28))
+    if (battle.escape) marks.push(label(battle.goal === 'hold' ? '🚁 EXTRACT' : '🚁 ESCAPE', battle.escape, COLOR.uplink, 28))
     for (const cache of battle.caches) marks.push(label('📦', cache, COLOR.uplink, 24))
     if (battle.start && battle.phase === 'deploy') marks.push(label('⚠ AMBUSHED HERE', battle.start, COLOR.contact, 24))
     if (battle.phase === 'deploy') {
@@ -1555,9 +1557,9 @@ export async function createView(): Promise<View> {
         float(callout(e.type === 'saved' ? 'SAVED' : 'LIFTED OFF', COLOR.heal, sprite))
         await tween(DEATH_MS, (t) => fade(sprite, 1 - t))
         remove(e.id)
-      } else if (e.type === 'found') {
-        const on = sprites.get(e.id)
-        if (on) float(callout('FOUND', COLOR.civilian, on))
+      } else if (e.type === 'extract') {
+        drawMarks(battle)
+        await follow([e])
       } else if (e.type === 'feed') {
         const on = sprites.get(e.id)
         if (on) float(callout(`FED +${e.damage}`, COLOR.crit, on))

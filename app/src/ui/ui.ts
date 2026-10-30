@@ -53,7 +53,7 @@ function status(run: Run): string {
   const mission = run.mission!
   const title = mission.kind === 'battle' || mission.kind === 'escape' ? `${GOALS[mission.goal].name}: ${GOALS[mission.goal].text}` : STOP_NAMES[mission.kind]
   if (battle.phase === 'deploy') return `${title}<div class="roster">${roster(run)}</div>`
-  const rounds = battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : battle.escape ? ` · ${battle.escaped} lifted off` : ''
+  const rounds = battle.escape ? ` · ${battle.escaped.length} lifted off` : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
   return `${title}${rounds} · ${SIDE[battle.turn]}' turn${battle.concealed ? ' · unseen' : ''}`
 }
 

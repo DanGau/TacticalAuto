@@ -32,6 +32,8 @@ export type AlienKind =
   | 'hiveNode'
   | 'mirror'
   | 'turret'
+  | 'harvester'
+  | 'husk'
 
 /** How much of a threat an alien is, as the map tells it before the fight. */
 export const DANGERS = ['small', 'medium', 'large'] as const
@@ -199,6 +201,25 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     hp: 1.5,
     stats: { move: 0, range: 7, damage: 4 },
     stance: 'anchor',
+    resists: [],
+  },
+  harvester: {
+    name: 'Harvester',
+    text: 'Fast, and attacks up close; a civilian it kills rises the next alien turn as a husk that fights for the aliens',
+    intro: 'It is not killing them. It is harvesting them. Whoever it takes gets back up, on its side.',
+    danger: 'medium',
+    hp: 1,
+    stats: { range: 1, move: 7, damage: 4, aim: 0.85, close: 0 },
+    stance: 'rush',
+    resists: [],
+  },
+  husk: {
+    name: 'Husk',
+    text: 'A civilian a harvester killed, risen: weak, and attacks up close',
+    danger: 'small',
+    hp: 0.5,
+    stats: { range: 1, move: 4, damage: 2, aim: 0.8, close: 0 },
+    stance: 'rush',
     resists: [],
   },
 }

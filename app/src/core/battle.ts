@@ -3,7 +3,7 @@ import type { Tally } from './feats'
 import type { DoctrineEffect, Rule } from './doctrines'
 import type { Resist } from './keywords'
 import { random, randomInt } from './rng'
-import { CIVILIAN_HP, CIVILIANS, type Goal } from './goals'
+import { CIVILIAN_HP, CIVILIAN_MOVE, CIVILIANS, type Goal } from './goals'
 import type { Twist } from './twists'
 import { EDGE_COVER, generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Locale, type Prop, type Terrain, type TerrainKind } from './terrain'
 
@@ -260,7 +260,7 @@ export interface Unit {
   target: boolean
   /** Keywords it shrugs off; empty for humans. */
   resists: Resist[]
-  /** A civilian to rescue: on the human side, but never moves or shoots, and is not a soldier. */
+  /** A civilian to rescue: on the human side, but flees rather than fights, and is not a soldier. */
   civilian: boolean
   /** For a mech, the soldier id of the engineer who deployed it, credited with what it does; null for any other unit. */
   summoner: number | null
@@ -310,7 +310,7 @@ export interface Battle {
   place: TerrainKind
   /** Alien turns begun. */
   round: number
-  /** Packs still to arrive on a hold, one every WAVE_EVERY rounds. */
+  /** Packs still to arrive as waves, on a hold or an escape. */
   waves: { name: string; aliens: Alien[] }[]
   /** The unit whose action is under way, credited with the damage it does; null between actions. */
   actor: number | null
@@ -357,8 +357,8 @@ export interface Battle {
   fire: { x: number; y: number; turns: number }[]
   /** Tiles strewn with caltrops: dear to cross, and they hurt an alien that steps on them. */
   caltrops: Tile[]
-  /** Civilians some soldier has seen, by id. Until found, a civilian is hidden from the player and from the aliens. */
-  found: number[]
+  /** Where civilians a harvester killed lie, to rise as husks of its pod on the next alien turn. */
+  husks: { x: number; y: number; pod: number }[]
   /** Rounds ended with a soldier inside the uplink's zone, on a hold. */
   held: number
   /** Civilians soldiers have reached and got out, on a rescue. */
@@ -370,8 +370,8 @@ export interface Battle {
   /** On an escape, where the squad is ambushed, and the escape zone it chose; null otherwise. */
   start: Tile | null
   escape: Tile | null
-  /** Soldiers lifted off, on an escape. */
-  escaped: number
+  /** Soldiers lifted off from an escape or extraction zone, by soldier id. */
+  escaped: number[]
   /** What landing at each zone means, in zones order, and the plan the squad landed by; null before it lands. */
   plans: Plan[]
   landed: Plan | null
@@ -534,9 +534,8 @@ export const unaware = (battle: Battle, unit: Unit) => unit.pod !== null && batt
 /** A soldier of the squad: not a civilian, nor a mech, which fights for the squad but cannot hold the field alone. */
 export const isSoldier = (unit: Unit) => unit.side === 'human' && unit.soldier !== null
 
-/** Whether the unit is in the open: an alien once its pod is revealed, a civilian once found, any other human always. */
+/** Whether the unit is in the open: an alien once its pod is revealed, any human always. */
 export function revealed(battle: Battle, unit: Unit): boolean {
-  if (unit.civilian) return battle.found.includes(unit.id)
   return unit.pod === null || battle.pods[unit.pod].revealed
 }
 
@@ -587,7 +586,7 @@ export function spacedTile(battle: Battle, avoid: Tile[], clearance: number, wit
 /**
  * The battlefield's two borders. Its outer border is the edge of the map the squad can walk; its inner border lies
  * INNER tiles within. Inside the inner border stands what the battle is about: the pods, the uplink, the caches.
- * Civilians, hiding, may be anywhere. Between the two, the edge, is where the squad comes in and gets out; the outermost tiles are left free.
+ * Civilians may be anywhere. Between the two, the edge, is where the squad comes in and gets out; the outermost tiles are left free.
  */
 export const INNER = 7
 const EDGE_GAP = 2
@@ -628,7 +627,7 @@ export function edgeDepths(battle: Battle): number[] {
 }
 
 /** The open tile of the edge nearest `tile`. */
-function edgeNear(battle: Battle, tile: Tile): Tile {
+export function edgeNear(battle: Battle, tile: Tile): Tile {
   const depth = edgeDepths(battle)
   let best: Tile | null = null
   for (let t = 0; t < GRID * GRID; t++) {
@@ -894,7 +893,8 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     ability: null,
     // A hive node's charges are the swarmlings left in it.
     charges: alien.kind === 'hiveNode' ? NODE_SPAWNS : 0,
-    effects: [],
+    // A commander blinks to safety once wounded.
+    effects: alien.target ? ['blink'] : [],
     spent: [],
     burning: 0,
     chilled: 0,
@@ -927,7 +927,7 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
 
 /**
  * A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. A hold keeps half its
- * packs back as waves and offers one landing zone, the uplink; a rescue hides civilians alone about the map.
+ * packs back as waves; a rescue is a terror site, its aliens in the open and its civilians fleeing them.
  */
 /** The share of packs, outside an escape's ways out, that hold their post as guards. */
 const GUARD_SHARE = 0.25
@@ -937,7 +937,7 @@ export const TEAMS = 4
 /** How far from the squad and the ways out an escape's Hunter starts. */
 const HUNTER_START = 12
 
-/** Tiles apart a rescue's civilians hide, from each other and the aliens. */
+/** Tiles apart a rescue's civilians start, from each other and the aliens. */
 const CIVILIAN_CLEARANCE = 3
 
 export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale): Battle {
@@ -968,7 +968,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     acid: [],
     fire: [],
     caltrops: [],
-    found: [],
+    husks: [],
     saved: 0,
     held: 0,
     actor: null,
@@ -977,7 +977,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     uplink: null,
     start: null,
     escape: null,
-    escaped: 0,
+    escaped: [],
     plans: [],
     landed: null,
     caches: [],
@@ -1010,13 +1010,16 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
         ? spacedTile(battle, [battle.start, ...battle.zones], HUNTER_START)
         : spacedTile(battle, centres, ZONE_CLEARANCE, 'inner')
     centres.push(centre)
-    placePod(battle, pack, centre, false, !route && random(battle) < GUARD_SHARE)
+    // A terror site has no stealth: every alien is in the open and already killing.
+    const terror = goal === 'rescue'
+    placePod(battle, pack, centre, terror, !route && !terror && random(battle) < GUARD_SHARE)
   })
   if (goal === 'rescue') {
-    // Each hides alone somewhere on the map, for the squad to find.
+    battle.concealed = false
+    // Civilians scattered about the map, in the open, fleeing the aliens.
     for (let i = 0; i < CIVILIANS; i++) {
       const tile = spacedTile(battle, battle.units, CIVILIAN_CLEARANCE)
-      const stats = { ...BASE_STATS, hp: CIVILIAN_HP, aim: 0, damage: 0, range: 0, move: 0, crit: 0 }
+      const stats = { ...BASE_STATS, hp: CIVILIAN_HP, aim: 0, damage: 0, range: 0, move: CIVILIAN_MOVE, crit: 0 }
       battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, summoner: null, team: 0, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0 })
     }
   }
