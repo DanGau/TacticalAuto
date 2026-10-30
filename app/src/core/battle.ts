@@ -262,8 +262,8 @@ export interface Unit {
   target: boolean
   /** Keywords it shrugs off; empty for humans. */
   resists: Resist[]
-  /** A civilian to rescue: on the human side, but flees rather than fights, and is not a soldier. */
-  civilian: boolean
+  /** A civilian to rescue, null for any other unit: on the human side, never fights, and is not a soldier. A hider takes cover and stays; a runner flees the aliens. */
+  civilian: 'hider' | 'runner' | null
   /** For a mech, the soldier id of the engineer who deployed it, credited with what it does; null for any other unit. */
   summoner: number | null
   /** The team a soldier keeps with, when a rescue splits the squad; 0 otherwise. */
@@ -809,7 +809,7 @@ export function holdCaptives(battle: Battle, captives: Reserve[]): void {
 
 /** A soldier's unit, landing from the reserve on `tile`. */
 export function soldierUnit(battle: Battle, soldier: Reserve, tile: Tile, team = 0): Unit {
-  return { id: battle.nextId++, side: 'human', ...tile, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: null, team, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null, ...soldier }
+  return { id: battle.nextId++, side: 'human', ...tile, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: null, summoner: null, team, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null, ...soldier }
 }
 
 /** An orbital strike's threat, and the damage it does every alien, never killing one. */
@@ -979,7 +979,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     rooted: 0,
     booming: 0,
     fury: 0,
-    civilian: false,
+    civilian: null,
     summoner: null,
     team: 0,
     panicked: false,
@@ -993,7 +993,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
 
 /** A mech built by the engineer `owner`, with `stats` and the `effects` its skills give it, standing on `tile`. */
 export function mechUnit(battle: Battle, owner: Unit, stats: Stats, effects: Effect[], tile: Tile): Unit {
-  return { id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: stats.armor, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'rush', effects, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: false, summoner: owner.soldier, team: battle.units.find((u) => u.soldier === owner.soldier)?.team ?? 0, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null }
+  return { id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: stats.armor, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'rush', effects, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: null, summoner: owner.soldier, team: battle.units.find((u) => u.soldier === owner.soldier)?.team ?? 0, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null }
 }
 
 /** Places a pack as a new pod around `centre`. */
@@ -1103,11 +1103,11 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   })
   if (goal === 'rescue') {
     battle.concealed = false
-    // Civilians scattered about the map, in the open, fleeing the aliens.
+    // Civilians scattered about the map, in the open: half hide where they are, half run from the aliens.
     for (let i = 0; i < CIVILIANS; i++) {
       const tile = spacedTile(battle, battle.units, CIVILIAN_CLEARANCE)
       const stats = { ...BASE_STATS, hp: CIVILIAN_HP, aim: 0, damage: 0, range: 0, move: CIVILIAN_MOVE, crit: 0 }
-      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: true, summoner: null, team: 0, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null })
+      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: i % 2 === 0 ? 'hider' : 'runner', summoner: null, team: 0, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null })
     }
   }
   planZones(battle, centres)

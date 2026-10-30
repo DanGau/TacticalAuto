@@ -1,7 +1,7 @@
 import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { stepBattle, UPLINK_REACH, type GameEvent } from './combat'
+import { goalOf, stepBattle, UPLINK_REACH, type GameEvent } from './combat'
 import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, RESCUE_QUORUM, type Goal } from './goals'
 import { distance, edgeDepths, freeTilesNear, GRID, INNER, isSoldier, revealed } from './battle'
 import { road, deploy, begun } from './roads'
@@ -161,6 +161,42 @@ test('a rescue is a terror site: aliens and civilians in the open from the start
     }
   }
   expect(killed).toBeGreaterThan(0)
+})
+
+test('a rescue mixes civilians who hide, taking cover and staying put, with civilians who run from the aliens', () => {
+  const run = terror(3)
+  const battle = run.battle!
+  const civilians = battle.units.filter((u) => u.civilian)
+  expect(new Set(civilians.map((u) => u.civilian))).toEqual(new Set(['hider', 'runner']))
+  stepBattle(battle)
+  while (battle.turn !== 'human') stepBattle(battle)
+  const hidden = civilians.filter((u) => u.civilian === 'hider' && battle.units.includes(u)).map((u) => ({ u, x: u.x, y: u.y }))
+  let ran = false
+  for (let i = 0; i < 6 && battle.phase === 'battle'; i++)
+    for (const e of stepBattle(battle)) {
+      const mover = e.type === 'move' ? civilians.find((c) => c.id === e.id) : undefined
+      if (mover?.civilian === 'runner') ran = true
+      expect(hidden.some((h) => h.u === mover)).toBe(false)
+    }
+  expect(hidden.length).toBeGreaterThan(0)
+  expect(ran).toBe(true)
+})
+
+test('on a rescue a soldier makes for an alien hunting a civilian when it is nearer than any civilian', () => {
+  const run = before('rescue')
+  deploy(run, 0)
+  const battle = run.battle!
+  const soldier = battle.units.find(isSoldier)!
+  const alien = battle.units.find((u) => u.side === 'alien')!
+  const civilian = battle.units.find((u) => u.civilian)!
+  battle.units = battle.units.filter((u) => u === soldier || u === alien || u === civilian)
+  const tiles = freeTilesNear(battle, soldier, 600)
+  Object.assign(alien, tiles.find((t) => distance(t, soldier) === 10))
+  Object.assign(civilian, tiles.find((t) => distance(t, alien) === 6 && distance(t, soldier) === 14))
+  expect(goalOf(battle, soldier, [alien])).toBe(alien)
+  // Hunting no one, the alien is passed by for the civilian.
+  Object.assign(civilian, tiles.find((t) => distance(t, alien) > 12 && distance(t, soldier) === 14))
+  expect(goalOf(battle, soldier, [alien])).toBe(civilian)
 })
 
 test('a civilian a harvester kills rises on the next alien turn as a husk', () => {

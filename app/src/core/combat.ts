@@ -103,6 +103,7 @@ import {
   type Unit,
   wreck,
   unaware,
+  coverAt,
 } from './battle'
 import { ESCAPE_REACH, HOLD_ROUNDS, RESCUE_QUORUM, HOLD_WAVE_EVERY, WAVE_EVERY } from './goals'
 import { random, randomInt } from './rng'
@@ -430,11 +431,11 @@ function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
 /**
  * Where a side's units close on when they have no shot, by the battle's goal. Soldiers share one, so the squad moves
  * together: on a hold, the uplink, then the extraction zone; on an assassination, the commander once sighted; else the
- * alien nearest the squad's centre. On a rescue each soldier makes for the nearest civilian. On a hold the aliens close on
+ * alien nearest the squad's centre. On a rescue each soldier makes for the nearest civilian or alien hunting one. On a hold the aliens close on
  * the uplink, then the squad; on a rescue an alien fights a soldier it sees, else hunts a civilian within PREY_REACH, else closes on the squad; otherwise
  * an alien closes on the human nearest itself.
  */
-function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
+export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
   if (enemies.length === 0) return undefined
   // Getting out, a soldier with its hands free goes for the nearest squadmate down first.
   if (battle.escape && unit.side === 'human') return (!carrying(battle, unit) && nearest(lying(battle), unit)) || battle.escape
@@ -451,7 +452,8 @@ function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
     return nearest(fighters.length > 0 ? fighters : prey.length > 0 ? prey : enemies.filter((e) => !e.civilian), unit) ?? nearest(civilians, unit)
   }
   if (unit.side === 'alien') return nearest(enemies, unit)
-  if (civilians.length > 0) return nearest(civilians, unit)
+  // On a rescue a soldier goes for whichever is nearer: a civilian, or an alien hunting one.
+  if (civilians.length > 0) return nearest([...civilians, ...enemies.filter((e) => !e.civilian && revealed(battle, e) && civilians.some((c) => distance(c, e) <= PREY_REACH))], unit)
   // A split squad's teams each go their own way.
   const team = centreOf(battle.units.filter((u) => isSoldier(u) && u.team === unit.team))
   return enemies.find((u) => u.target && revealed(battle, u)) ?? nearest(enemies, team)
@@ -627,8 +629,13 @@ function orderFor(battle: Battle, unit: Unit, { wary, exposed, threatened }: { w
 /** Tiles from every alien a fleeing civilian counts safe. */
 const SAFE = 6
 
-/** A civilian's path: away from the nearest alien until SAFE from all, then toward the nearest soldier. */
+/** The most cover a prop beside `tile` gives: what a hider hides behind. */
+const hideout = (battle: Battle, tile: Tile) =>
+  Math.max(...[[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => (onGrid(tile.x + dx, tile.y + dy) ? coverAt(battle, tile.x + dx, tile.y + dy) : 0)))
+
+/** A civilian's path. A hider makes for the best cover in reach and stays there; a runner goes away from the nearest alien until SAFE from all, then toward the nearest soldier. */
 function fleePath(battle: Battle, unit: Unit): Tile[] {
+  if (unit.civilian === 'hider') return hideout(battle, unit) > 0 ? [] : bestPath(paths(battle, unit, unit.stats.move), unit, (end, steps) => [-hideout(battle, end), steps])
   const aliens = battle.units.filter((u) => u.side === 'alien')
   const soldier = nearest(battle.units.filter(isSoldier), unit)
   const toSquad = soldier ? walkingDistances(battle, soldier) : null

@@ -74,7 +74,8 @@ const BODY_RES = 2
 const DECAL_LIFT = 0.02
 
 const COLOR = {
-  civilian: 0xe8e2c8,
+  hider: 0xe0a24a,
+  runner: 0xe8e2c8,
   mech: 0x9aa9bf,
   human: 0x4da3ff,
   alien: 0x7ddc5a,
@@ -731,7 +732,7 @@ export async function createView(): Promise<View> {
     shadow.position.y = DECAL_LIFT * 2
     const node = new Group()
     node.add(shadow, body)
-    const color = unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR.civilian : unit.summoner !== null ? COLOR.mech : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human
+    const color = unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR[unit.civilian] : unit.summoner !== null ? COLOR.mech : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human
     const rows = Math.ceil((unit.stats.hp + unit.stats.armor) / 10)
     const maxHp = unit.stats.hp
     const ally = unit.side === 'human'
@@ -748,7 +749,10 @@ export async function createView(): Promise<View> {
         g.clearRect(-BODY.left, -BODY.up, 2 * BODY.left, BODY.up + BODY.down)
         g.fillStyle = css(color)
         g.beginPath()
-        g.roundRect(-9, -30, 18, 30, 6)
+        // A hider crouches low and wide; a runner stands tall and thin.
+        if (unit.civilian === 'hider') g.roundRect(-14, -22, 28, 22, 10)
+        else if (unit.civilian === 'runner') g.roundRect(-6, -34, 12, 34, 6)
+        else g.roundRect(-9, -30, 18, 30, 6)
         g.fill()
         g.fillStyle = css(COLOR.human)
         for (let i = 0; i < pips; i++) {
