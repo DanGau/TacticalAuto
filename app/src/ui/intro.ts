@@ -56,6 +56,8 @@ const PORTRAITS: Partial<Record<AlienKind, string>> = {
     ${[[30, 186], [176, 182], [100, 190]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="6" fill="#3f8f4a"/>`).join('')}`,
   mirror: `<path d="M100 26 L156 100 L100 178 L44 100Z" fill="#e6f0ff" opacity="0.85"/><path d="M100 26 L156 100 L100 100Z" fill="#fff" opacity="0.6"/>
     <path d="M100 70 Q112 70 112 84 Q112 96 100 96 Q88 96 88 84 Q88 70 100 70Z M84 140 Q84 104 100 104 Q116 104 116 140Z" fill="#4a5a78" opacity="0.7"/>`,
+  turret: `<path d="M50 180 L70 130 L130 130 L150 180Z" fill="#3b4a42"/><ellipse cx="100" cy="116" rx="44" ry="30" fill="#5f7a6a"/>
+    <rect x="120" y="100" width="66" height="12" rx="4" fill="#2a332e"/><rect x="120" y="116" width="66" height="12" rx="4" fill="#2a332e"/><circle cx="92" cy="108" r="7" fill="#ff5555"/>`,
 }
 
 /**

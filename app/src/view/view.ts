@@ -260,6 +260,7 @@ const ALIEN_LOOK: Record<AlienKind, { color: number; scale: number }> = {
   sprinter: { color: 0xf2e04b, scale: 0.8 },
   hiveNode: { color: 0x6b3fa0, scale: 1.3 },
   mirror: { color: 0xe6f0ff, scale: 1 },
+  turret: { color: 0x5f7a6a, scale: 1.1 },
 }
 
 const onGridTile = (x: number, y: number) => x >= 0 && y >= 0 && x < GRID && y < GRID

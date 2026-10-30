@@ -348,7 +348,8 @@ const REAR_GAP = 2
 /**
  * A soldier that has lost this share of its health is wary while a healthier squadmate fights on: it gives up a shot
  * for a tile where less comes back, and stops advancing through tiles an enemy can shoot. With no healthier
- * squadmate it fights as normal, so a battle always ends. Aliens are never wary; they press the attack.
+ * squadmate, or once the battle drags on, it fights as normal, so a battle always ends, even against a turret.
+ * Aliens are never wary; they press the attack.
  */
 const WARY = 0.5
 
@@ -450,7 +451,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const theirs = (end: Tile) => exposure(battle, enemies, end)
   const squadmates = battle.units.filter((u) => u.side === unit.side && u !== unit && !u.civilian && u.team === unit.team)
   const hurt = 1 - unit.hp / unit.stats.hp
-  const wary = unit.side === 'human' && hurt >= WARY && squadmates.some((u) => u.hp / u.stats.hp > 1 - WARY)
+  const wary = unit.side === 'human' && battle.round < RESTLESS_ROUND && hurt >= WARY && squadmates.some((u) => u.hp / u.stats.hp > 1 - WARY)
   const apart = (end: Tile) => Math.max(0, Math.min(MEDIC_REACH, ...squadmates.map((u) => distance(end, u) - MEDIC_REACH)))
   const centre = squadmates.length > 0 ? centreOf(squadmates) : unit
   /** Tiles `end` is beyond COHESION from the middle of the unit's squadmates. Aliens fight as they find themselves. */
@@ -538,8 +539,9 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   return path
 }
 
-/** The path an alien takes while its pod is unseen: toward the pod's waypoint, slowly. */
+/** The path an alien takes while its pod is unaware: toward the pod's waypoint, slowly, unless it guards its post. */
 function patrolPath(battle: Battle, unit: Unit): Tile[] {
+  if (battle.pods[unit.pod!].guard) return []
   const toWaypoint = walkingDistances(battle, battle.pods[unit.pod!].waypoint)
   return bestPath(paths(battle, unit, PATROL_MOVE), unit, (end) => [toWaypoint[end.y * GRID + end.x]])
 }
@@ -746,7 +748,7 @@ function upkeep(battle: Battle): GameEvent[] {
     for (const pod of battle.pods.filter((p) => !p.revealed)) {
       const member = battle.units.find((u) => battle.pods[u.pod ?? -1] === pod)
       const near = member && nearest(soldiers, member)
-      if (near) pod.waypoint = { x: near.x, y: near.y }
+      if (near) Object.assign(pod, { guard: false, waypoint: { x: near.x, y: near.y } })
     }
   }
   if (battle.waves.length > 0 && battle.round % WAVE_EVERY === 0) {

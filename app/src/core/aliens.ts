@@ -31,6 +31,7 @@ export type AlienKind =
   | 'sprinter'
   | 'hiveNode'
   | 'mirror'
+  | 'turret'
 
 /** How much of a threat an alien is, as the map tells it before the fight. */
 export const DANGERS = ['small', 'medium', 'large'] as const
@@ -190,6 +191,16 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     stance: 'balanced',
     resists: [],
   },
+  turret: {
+    name: 'Turret',
+    text: 'An automated gun: never moves, and shoots any soldier in range it can see',
+    intro: 'An automated gun emplacement. It will not move, so do not stand in its sights.',
+    danger: 'medium',
+    hp: 1.5,
+    stats: { move: 0, range: 7, damage: 4 },
+    stance: 'anchor',
+    resists: [],
+  },
 }
 
 /** Hit chance each step of an alien's weapon adds. */
@@ -236,6 +247,7 @@ export const PACKS: Pack[] = [
   { name: 'Feeder', kinds: ['feeder', 'trooper', 'trooper'], cost: 3, from: 3 },
   { name: 'Nest', kinds: ['hiveNode', 'trooper'], cost: 3, from: 3 },
   { name: 'Mirror', kinds: ['mirror', 'trooper'], cost: 3, from: 4 },
+  { name: 'Emplacement', kinds: ['turret', 'trooper'], cost: 3, from: 1 },
 ]
 
 /** The packs a mission of the given force sends, at the given depth: random picks that the force can pay for. */

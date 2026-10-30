@@ -43,7 +43,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, hp: 30, stats: { ...soldier.stats, hp: 30, aim: 2, crit: 0, damage: 3 } })
   const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss || (ALIENS[kind].spawns ?? false), target: false, resists: ALIENS[kind].resists }, { x, y }, 0))
   battle.units = [soldier, ...units]
-  battle.pods = [{ name: 'Test', revealed: true, alert: true, stalking: false, ambushed: false, surprised: false, stalked: 0, waypoint: { x: 0, y: 0 } }]
+  battle.pods = [{ name: 'Test', revealed: true, alert: true, stalking: false, ambushed: false, surprised: false, stalked: 0, guard: false, waypoint: { x: 0, y: 0 } }]
   battle.concealed = false
   const until = (done: (events: GameEvent[]) => boolean) => {
     const all: GameEvent[] = []
@@ -186,7 +186,7 @@ test('once every alert alien is dead, the squad slips back into stealth', () => 
   const { battle, aliens, until } = arena([{ kind: 'swarmling', x: 10, y: 12 }, { kind: 'trooper', x: 30, y: 30 }])
   // A second pod, far off and unaware, keeps the battle going.
   aliens[1].pod = 1
-  battle.pods.push({ name: 'Far', revealed: false, alert: false, stalking: false, ambushed: false, surprised: false, stalked: 0, waypoint: { x: 30, y: 30 } })
+  battle.pods.push({ name: 'Far', revealed: false, alert: false, stalking: false, ambushed: false, surprised: false, stalked: 0, guard: false, waypoint: { x: 30, y: 30 } })
   battle.concealed = false
   until((all) => all.some((e) => e.type === 'death'))
   until(() => battle.concealed)
@@ -455,4 +455,23 @@ test('a regenerator heals each turn unless burning; a chilled sprinter cannot mo
   nest.soldier.stats = { ...nest.soldier.stats, move: 0, range: 0 }
   nest.until(() => nest.battle.round >= 2 * NODE_EVERY + 1)
   expect(nest.battle.units.filter((u) => u.kind === 'swarmling').length).toBeGreaterThanOrEqual(2)
+})
+
+test('a guard pod holds its post while unaware, and fights once it notices the squad', () => {
+  const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 30, y: 30 }])
+  Object.assign(battle.pods[0], { revealed: false, alert: false, guard: true, waypoint: { x: 10, y: 10 } })
+  soldier.stats = { ...soldier.stats, move: 0, range: 0 }
+  until(() => battle.round >= 3)
+  expect(aliens[0]).toMatchObject({ x: 30, y: 30 })
+  Object.assign(soldier, { x: 30, y: 27 })
+  until((all) => all.some((e) => e.type === 'shot' && e.id === aliens[0].id))
+  expect(battle.pods[0].alert).toBe(true)
+})
+
+test('a turret never moves, and shoots a soldier in range', () => {
+  const { soldier, aliens, until } = arena([{ kind: 'turret', x: 10, y: 16 }])
+  soldier.stats = { ...soldier.stats, move: 0, range: 0 }
+  const events = until((all) => all.some((e) => e.type === 'shot' && e.id === aliens[0].id))
+  expect(events.some((e) => e.type === 'move' && e.id === aliens[0].id)).toBe(false)
+  expect(aliens[0]).toMatchObject({ x: 10, y: 16 })
 })

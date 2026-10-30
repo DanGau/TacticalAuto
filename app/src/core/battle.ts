@@ -276,6 +276,8 @@ export interface Pod {
   surprised: boolean
   /** Squad turns the squad has spent setting up an ambush on it, seen but unaware. */
   stalked: number
+  /** Holds its post, unmoving, until it notices the squad or the battle drags on. */
+  guard: boolean
   waypoint: Tile
 }
 
@@ -898,10 +900,10 @@ export function mechUnit(battle: Battle, owner: Unit, stats: Stats, effects: Eff
 }
 
 /** Places a pack as a new pod around `centre`. */
-export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }, centre: Tile, revealed: boolean): Unit[] {
+export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }, centre: Tile, revealed: boolean, guard = false): Unit[] {
   const units = freeTilesNear(battle, centre, pack.aliens.length).map((tile, i) => alienUnit(battle, pack.aliens[i], tile, battle.pods.length))
   battle.units.push(...units)
-  battle.pods.push({ name: pack.name, revealed, alert: revealed, stalking: false, ambushed: false, surprised: false, stalked: 0, waypoint: randomTile(battle) })
+  battle.pods.push({ name: pack.name, revealed, alert: revealed, stalking: false, ambushed: false, surprised: false, stalked: 0, guard, waypoint: randomTile(battle) })
   return units
 }
 
@@ -909,6 +911,8 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
  * A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. A hold keeps half its
  * packs back as waves and offers one landing zone, the uplink; a rescue hides civilians alone about the map.
  */
+/** The share of packs, outside an escape's ways out, that hold their post as guards. */
+const GUARD_SHARE = 0.25
 /** The most teams a rescue can split the squad into. */
 export const TEAMS = 4
 
@@ -988,7 +992,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
         ? spacedTile(battle, [battle.start, ...battle.zones], HUNTER_START)
         : spacedTile(battle, centres, ZONE_CLEARANCE, 'inner')
     centres.push(centre)
-    placePod(battle, pack, centre, false)
+    placePod(battle, pack, centre, false, !route && random(battle) < GUARD_SHARE)
   })
   if (goal === 'rescue') {
     // Each hides alone somewhere on the map, for the squad to find.
