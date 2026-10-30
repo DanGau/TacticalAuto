@@ -1,6 +1,6 @@
 import { along, arc, type LonLat } from '../core/world'
 import type { Run } from '../core/run'
-import { geoContains, geoDistance, geoOrthographic, geoPath, type GeoPermissibleObjects } from 'd3-geo'
+import { geoCentroid, geoContains, geoDistance, geoOrthographic, geoPath, type GeoPermissibleObjects } from 'd3-geo'
 import { feature } from 'topojson-client'
 import type { Topology } from 'topojson-specification'
 import land110 from 'world-atlas/land-110m.json'
@@ -56,6 +56,16 @@ export interface View {
 /** The world's land at two levels of detail: coarse for the whole globe, fine once the view closes in. */
 const COARSE = feature(land110 as unknown as Topology, (land110 as unknown as Topology).objects.land) as unknown as GeoPermissibleObjects
 const FINE = feature(land50 as unknown as Topology, (land50 as unknown as Topology).objects.land) as unknown as GeoPermissibleObjects
+/** The fine land as separate shapes, each with its middle and how far it reaches from there, to draw only those in view. */
+const PARTS = (FINE as unknown as { features: { geometry: { type: string; coordinates: LonLat[][] | LonLat[][][] } }[] }).features.flatMap((f) =>
+  (f.geometry.type === 'MultiPolygon' ? (f.geometry.coordinates as LonLat[][][]) : [f.geometry.coordinates as LonLat[][]]).map((rings) => {
+    const shape = { type: 'Polygon' as const, coordinates: rings }
+    const middle = geoCentroid(shape) as LonLat
+    return { shape, middle, reach: Math.max(...rings[0].map((at) => geoDistance(middle, at))) }
+  }),
+)
+/** Whether the globe is gliding: it then draws the coarse land, cheap enough for every frame, and the fine once settled. */
+let moving = false
 /** The radius in pixels past which the fine land is drawn. */
 const DETAIL = 900
 
@@ -69,18 +79,20 @@ function projection({ centre, r, turn }: View, size: Size) {
     .scale(r)
     .translate([size.w / 2, open(size).middle])
     .clipAngle(90)
-    .precision(0.5)
+    // Cut at the window's edge too, so a close view draws only what shows.
+    .clipExtent([[-40, -40], [size.w + 40, size.h + 40]])
+    .precision(1)
   const project = (at: LonLat) => {
     const [x, y] = lens(at)!
     return { x, y, front: geoDistance(at, centre) < Math.PI / 2 }
   }
-  return Object.assign(project, { path: geoPath(lens) })
+  return Object.assign(project, { path: geoPath(lens).digits(1), invert: (x: number, y: number) => lens.invert!([x, y]) as LonLat })
 }
 
 /** Whether each place stands on land, as found. */
 const ashore = new Map<string, boolean>()
 const onLand = (at: LonLat) => {
-  const key = at.join()
+  const key = at.map((v) => v.toFixed(2)).join()
   if (!ashore.has(key)) ashore.set(key, geoContains(FINE, at))
   return ashore.get(key)!
 }
@@ -94,9 +106,9 @@ function island(p: { x: number; y: number }, at: LonLat, size: number): string {
   const points = Array.from({ length: 24 }, (_, i) => {
     const angle = (i / 24) * 2 * Math.PI
     const reach = size * (0.85 + 0.18 * Math.sin(seed + angle * 2) + 0.08 * Math.sin(seed * 1.7 + angle * 5))
-    return `${(p.x + Math.cos(angle) * reach * 1.3).toFixed(1)},${(p.y + Math.sin(angle) * reach).toFixed(1)}`
+    return `${(p.x + Math.cos(angle) * reach * 1.15).toFixed(1)},${(p.y + Math.sin(angle) * reach).toFixed(1)}`
   })
-  return `<path class="land" d="M${points.join('L')}Z"/>`
+  return `<path class="land isle" d="M${points.join('L')}Z"/>`
 }
 
 /** A line through `places` as an SVG path, cut where it passes round the back. */
@@ -186,6 +198,7 @@ export function glide(root: HTMLElement, from: View | null): void {
     const settled = early * early * (3 - 2 * early)
     to.now = t < 1 ? { centre: along(from.centre, target.centre, settled), r: from.r * (target.r / from.r) ** e, turn: from.turn + turning * settled } : target
     if (drawn) drawn.now = to.now
+    moving = t < 1
     globe.innerHTML = to.draw(to.now)
     globe.classList.toggle('gliding', t < 1)
     globe.classList.toggle('arrived', t === 1)
@@ -198,7 +211,10 @@ export function glide(root: HTMLElement, from: View | null): void {
 /** The globe's insides: air, sea, graticule and coasts, under `over`, with `pins` laid on top. */
 function sphere(view: View, size: Size, over: string, pins: string): string {
   const project = projection(view, size)
-  const coasts = `<path class="land" d="${project.path(view.r > DETAIL ? FINE : COARSE) ?? ''}"/>`
+  // Only the shapes reaching into the view are drawn: the part of the globe a window `size` across can show.
+  const seen = Math.asin(Math.min(1, Math.hypot(size.w, size.h) / 2 / view.r))
+  const land = moving || view.r <= DETAIL ? COARSE : { type: 'GeometryCollection' as const, geometries: PARTS.filter((part) => geoDistance(part.middle, view.centre) - part.reach < seen).map((part) => part.shape) }
+  const coasts = `<path class="land" d="${project.path(land) ?? ''}"/>`
   const graticule = [
     ...Array.from({ length: 12 }, (_, i) => Array.from({ length: 37 }, (_, k): LonLat => [i * 30, -90 + k * 5])),
     ...Array.from({ length: 5 }, (_, i) => Array.from({ length: 73 }, (_, k): LonLat => [-180 + k * 5, -60 + i * 30])),
@@ -303,9 +319,10 @@ function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: LonLat[
       return b && a.front && b.front ? [`<path class="trail${lit ? ' lit' : picking ? ' dim' : ''}" d="M${a.x},${a.y}L${b.x},${b.y}"/>`] : []
     }),
   )
+  // A stop that shows over water, pushed there to stand clear or set out at sea, stands on a speck of island.
   const isles = pins.flatMap((pin) => {
     const p = placed.get(pin.id)!
-    return pin.html && p.front && !onLand(pin.at) ? [island(p, pin.at, pin.choice ? 34 : 22)] : []
+    return pin.html && p.front && !onLand(project.invert(p.x, p.y)) ? [island(p, pin.at, pin.choice ? 24 : 18)] : []
   })
   const stops = pins.flatMap((pin) => {
     const p = placed.get(pin.id)!
