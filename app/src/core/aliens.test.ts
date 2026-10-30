@@ -3,7 +3,7 @@ import { expect, test } from 'vitest'
 import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, PACKS, REGEN_HEAL, type AlienKind } from './aliens'
 import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
-import { isSoldier, ACID_DAMAGE, alienUnit, mechUnit, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, GRID, HUNKER_DEFENSE, type Battle, type Unit } from './battle'
+import { isSoldier, reshaped, ACID_DAMAGE, alienUnit, mechUnit, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, GRID, HUNKER_DEFENSE, type Battle, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { odds } from './sight'
 
@@ -40,6 +40,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   battle.props.fill('none')
   battle.north.fill('none')
   battle.west.fill('none')
+  reshaped(battle)
   const soldier = battle.units.find(isSoldier)!
   Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, hp: 30, stats: { ...soldier.stats, hp: 30, aim: 2, crit: 0, damage: 3 } })
   const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss || (ALIENS[kind].spawns ?? false), target: false, resists: ALIENS[kind].resists }, { x, y }, 0))

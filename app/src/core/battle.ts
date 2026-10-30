@@ -511,6 +511,9 @@ const open = (battle: Battle, ax: number, ay: number, bx: number, by: number) =>
  */
 const walks = new WeakMap<Battle, { fixed: string; into: [from: number, cost: number][][]; fields: Map<number, number[]> }>()
 
+/** Drops what was worked out from the battle's terrain, once something has changed it. */
+export const reshaped = (battle: Battle) => walks.delete(battle)
+
 /** For each tile, the open tiles a unit can step onto it from, with each step's cost. */
 function walkGraph(battle: Battle) {
   // A civilian waits to be reached, not to wall a way off: it leaves once a soldier is beside it.

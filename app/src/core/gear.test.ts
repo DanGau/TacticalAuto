@@ -2,7 +2,7 @@ import { PATHS, SKILLS } from './skills'
 import { expect, test } from 'vitest'
 import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
-import { alienUnit, CHILL_TURNS, CRIT_BONUS, SEARING_DAMAGE, SOLDIER_ATTACKS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
+import { alienUnit, reshaped, CHILL_TURNS, CRIT_BONUS, SEARING_DAMAGE, SOLDIER_ATTACKS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { alienStats } from './aliens'
 import { EFFECTS, generateGear, type Gear } from './gear'
@@ -70,6 +70,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   battle.height.fill(0)
   battle.north.fill('none')
   battle.west.fill('none')
+  reshaped(battle)
   const soldier = battle.units.find((u) => u.soldier === run.soldiers[0].id)!
   const alien = battle.units.find((u) => u.side === 'alien')!
   battle.units = [soldier, alien]

@@ -239,8 +239,8 @@ test('on a recovery, a soldier who reaches a held squadmate gets them up at half
   const [body] = battle.downed
   const rescuer = battle.units.find(isSoldier)!
   Object.assign(rescuer, freeTilesNear(battle, body, 2).find((t) => t.x !== body.x || t.y !== body.y)!)
-  // It cannot end the battle by shooting before it gets to them.
-  rescuer.stats = { ...rescuer.stats, damage: 0 }
+  // It cannot end the battle by shooting, nor walk off, before it gets them up.
+  rescuer.stats = { ...rescuer.stats, damage: 0, move: 0 }
   rescuer.ability = null
   const events: GameEvent[] = []
   for (let beats = 0; beats < 50 && !events.some((e) => e.type === 'freed'); beats++) events.push(...stepBattle(battle))
