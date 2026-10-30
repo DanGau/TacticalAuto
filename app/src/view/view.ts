@@ -249,7 +249,7 @@ export interface View {
   /** On a rescue, shows where each of `teams` teams would land. */
   showTeams(teams: number): void
   /** Glides the camera to frame the given tiles, above the landing panel; null pulls back to the whole map. */
-  frame(tiles: Tile[] | null): Promise<void>
+  frame(tiles: Tile[] | null, ms?: number): Promise<void>
 }
 
 export async function createView(): Promise<View> {
@@ -594,12 +594,21 @@ export async function createView(): Promise<View> {
       app.ticker.add(tick)
     })
 
-  /** Glides the camera to frame the given tiles, or to the given camera, over `ms`. */
-  function follow(points: Tile[] | Camera, ms = CAMERA_MS, from = camera): Promise<void> {
+  /** The camera's glide under way; a new one takes over from wherever the camera is, so two never fight over it. */
+  let glides = 0
+
+  /**
+   * Glides the camera to frame the given tiles, or to the given camera, over `ms`, easing in and out. Zoom changes by
+   * the same factor each frame, so pulling out reads as steady as pushing in.
+   */
+  function follow(points: Tile[] | Camera, ms = CAMERA_MS): Promise<void> {
+    const from = camera
     const to = Array.isArray(points) ? framing(points) : points
+    const mine = ++glides
     return tween(ms, (t) => {
-      const ease = t * (2 - t)
-      look({ x: from.x + (to.x - from.x) * ease, y: from.y + (to.y - from.y) * ease, zoom: from.zoom + (to.zoom - from.zoom) * ease })
+      if (mine !== glides) return
+      const ease = t * t * (3 - 2 * t)
+      look({ x: from.x + (to.x - from.x) * ease, y: from.y + (to.y - from.y) * ease, zoom: from.zoom * (to.zoom / from.zoom) ** ease })
     })
   }
 
@@ -1018,9 +1027,9 @@ export async function createView(): Promise<View> {
   return {
     canvas: app.canvas,
     zoneAt,
-    frame(tiles) {
+    frame(tiles, ms = FOCUS_MS) {
       const framed = tiles === null ? OVERVIEW : framing(tiles)
-      return follow({ ...framed, y: framed.y + (tiles === null ? 0 : PANEL / framed.zoom) }, FOCUS_MS)
+      return follow({ ...framed, y: framed.y + (tiles === null ? 0 : PANEL / framed.zoom) }, ms)
     },
     showTeams(n) {
       teams = n
@@ -1048,7 +1057,10 @@ export async function createView(): Promise<View> {
       if (fresh) setBattle(battle)
       drawMarks(battle)
       // A new battle opens flying in from high above, down to the whole map.
-      if (fresh && battle.phase === 'deploy') void follow(OVERVIEW, FLY_MS, { x: 0, y: -HEIGHT, zoom: FIT / 4 })
+      if (fresh && battle.phase === 'deploy') {
+        look({ x: 0, y: -HEIGHT, zoom: FIT / 4 })
+        void follow(OVERVIEW, FLY_MS)
+      }
       if (animate) await play(battle, events)
       sync(run, battle)
       if (events.some((e) => e.type === 'rocket' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(battle)
