@@ -152,6 +152,9 @@ export function stopReport(run: Run, report: Report, opened: Set<number> = new S
   const hero = run.soldiers.find((s) => s.name === report.hired)
   const all = [...report.soldiers, ...(hero ? [{ id: hero.id, name: hero.name, cls: hero.cls, xpBefore: hero.xp, xpAfter: hero.xp, taken: false, earned: [], feats: [], hp: health(run, hero), maxHp: soldierStats(run, hero).hp }] : [])]
   const squad = report.soldiers.length > 0 ? `<div class="stage second"><div class="squad">${all.map((s) => soldierCard(run, s, opened)).join('')}</div>${sales(run, opened)}</div>` : ''
+  // Continue waits only on crates shown: a find with no card to open it on is listed instead.
+  const shown = new Set(report.soldiers.length > 0 ? all.map((s) => s.name) : [])
+  const sealed = run.decisions.some((d, i) => shown.has(d.soldier) && !opened.has(i))
   return `<div class="debrief${still ? ' still' : ''}">
     ${title(report)}
     <div class="stage">
@@ -161,7 +164,7 @@ export function stopReport(run: Run, report: Report, opened: Set<number> = new S
       ${squad ? '' : decisions(run)}
     </div>
     ${squad}
-    <div class="stage ${squad ? 'third' : 'second'}"><button data-seen="report"${run.soldiers.some((s) => skillOffers(s).length > 0) || run.decisions.some((_, i) => !opened.has(i)) ? ' disabled' : ''}>Continue</button></div>
+    <div class="stage ${squad ? 'third' : 'second'}"><button data-seen="report"${run.soldiers.some((s) => shown.has(s.name) && skillOffers(s).length > 0) || sealed ? ' disabled' : ''}>Continue</button></div>
   </div>`
 }
 
