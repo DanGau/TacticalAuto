@@ -2,7 +2,7 @@
 export type Goal = 'exterminate' | 'assassinate' | 'hold' | 'rescue' | 'raid' | 'escape' | 'recover'
 
 /** Rounds the squad must hold the uplink before it can extract. */
-export const HOLD_ROUNDS = 8
+export const HOLD_ROUNDS = 6
 /** How near the escape zone a soldier must come to lift off. */
 export const ESCAPE_REACH = 3
 /** Alien turns between waves on an escape, and on a hold or a recovery. */
@@ -22,7 +22,7 @@ export const RESCUE_QUORUM = CIVILIANS / 2
 export const GOALS: Record<Goal, { name: string; text: string; reward: string; force: number; weight: number; from: number }> = {
   exterminate: { name: 'Exterminate', text: 'Kill every alien', reward: 'supplies and gear', force: 0, weight: 3, from: 0 },
   assassinate: { name: 'Assassinate', text: 'Kill the commander, armored and guarded, which blinks away when wounded; the rest flee', reward: 'supplies and rare gear', force: -3, weight: 1, from: 1 },
-  hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as ever larger waves come in from the edges, then get every soldier left to the extraction zone`, reward: 'a relic, no gear', force: -2, weight: 1, from: 1 },
+  hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as ever larger waves come in from the edges, then get every soldier left to the extraction zone`, reward: 'a relic, no gear', force: -4, weight: 1, from: 1 },
   rescue: {
     name: 'Rescue',
     text: `A terror site: ${CIVILIANS} civilians flee aliens that are killing them, and harvesters raise the dead as husks. Aliens with no soldier to fight hunt civilians, so land near them. A soldier who reaches one gets them out. Split the squad to reach more. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
