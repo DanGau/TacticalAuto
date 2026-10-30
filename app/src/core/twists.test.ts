@@ -100,7 +100,7 @@ test('in the rain nothing burns', () => {
 test('fog shortens sight, and night noticing', () => {
   const battle = duel(null)
   const [soldier, alien] = battle.units
-  Object.assign(alien, { x: 10, y: 17, moved: true })
+  Object.assign(alien, { x: 10, y: 27, moved: true })
   expect(sees(battle, soldier, alien)).toBe(true)
   expect(detects(battle, soldier, alien)).toBe(true)
   battle.twist = 'fog'

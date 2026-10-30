@@ -1,5 +1,5 @@
 import { AdditiveBlending, BoxGeometry, CanvasTexture, CircleGeometry, ColorManagement, Fog, LinearSRGBColorSpace, Group, Mesh, MeshBasicMaterial, Object3D, PerspectiveCamera, Raycaster, Scene, Sprite as Billboard, SpriteMaterial, Vector2, Vector3, WebGLRenderer } from 'three'
-import { BLAST_RADIUS, distance, GRID, nearestAlien, revealed, PLANS, ZONE_NAMES, ZONE_RADIUS, type Battle, type Tile, type Unit } from '../core/battle'
+import { BLAST_RADIUS, distance, GRID, nearestAlien, revealed, PLANS, ZONE_NAMES, ZONE_RADIUS, type Battle, type Order, type Tile, type Unit } from '../core/battle'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { effectName } from '../core/effects'
@@ -380,6 +380,9 @@ function aim(at: Tile, zoom: number, yaw = YAW, height = 0): Camera {
 
 /** The opening shot of a new battle, which the briefing flies on from. */
 const OPENING: Shot = { turn: -1.1, pitch: -0.32, fov: 42, haze: 1 }
+
+/** What a soldier's order says over it. */
+const ORDERS: Record<Order, string> = { hunker: '🛡 HUNKER DOWN', prepare: '👁 OVERWATCH', sprint: '» SPRINT' }
 
 /** Words over the map: a landing zone's name, or a callout over a unit. */
 interface Label {
@@ -1523,7 +1526,7 @@ export async function createView(): Promise<View> {
         await tween(REVEAL_MS, (t) => appeared.forEach((sprite) => fade(sprite, t)))
         const first = sprites.get(e.units[0]?.id ?? -1)
         if (e.type === 'sighted' && first) float(callout('UNAWARE · HOLD FIRE', COLOR.miss, first, 18))
-        if (e.type === 'reveal' && e.ambush && first) float(callout('AMBUSH!', COLOR.hit, first, 18))
+        if (e.type === 'reveal' && e.ambush && first) float(callout('AMBUSH! CAUGHT OFF GUARD', COLOR.hit, first, 18))
         if (e.type === 'reveal' && e.stalked && first) float(callout('STALKED!', COLOR.crit, first, 18))
         if (e.type === 'wave' && appeared.length > 0) float(callout('REINFORCEMENTS', COLOR.crit, appeared[0], 18))
       } else if (e.type === 'shot') {
@@ -1560,6 +1563,9 @@ export async function createView(): Promise<View> {
           drawAcid(battle)
           float(callout(`ACID -${e.damage}`, COLOR.acid, to))
         } else float(callout('PANICKED', COLOR.psi, to))
+      } else if (e.type === 'order') {
+        const on = sprites.get(e.id)
+        if (on) float(callout(ORDERS[e.order], COLOR.hit, on, 16))
       } else if (e.type === 'frozen' || e.type === 'hurt') {
         const on = sprites.get(e.id)
         if (!on) continue

@@ -1,8 +1,8 @@
 import { random, randomInt } from './rng'
 
 /** Tiles of sight fog takes, and of noticing night takes. */
-export const FOG_SIGHT = 3
-export const NIGHT_DETECT = 3
+export const FOG_SIGHT = 8
+export const NIGHT_DETECT = 6
 /** Damage a fuel tank does to each unit beside it. */
 export const FUEL_DAMAGE = 3
 

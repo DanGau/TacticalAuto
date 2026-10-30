@@ -1,5 +1,5 @@
 import { FORTIFIED_DEFENSE } from './doctrines'
-import { COVER_DEFENSE, coverAt, distance, edgeBetween, GRID, heightAt, HIGH_AIM, HIGH_SIGHT, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile, type Unit } from './battle'
+import { COVER_DEFENSE, coverAt, HUNKER_DEFENSE, distance, edgeBetween, GRID, heightAt, HIGH_AIM, HIGH_SIGHT, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile, type Unit } from './battle'
 import { EDGE_COVER } from './terrain'
 import { FOG_SIGHT, NIGHT_DETECT } from './twists'
 
@@ -29,11 +29,13 @@ export function coverAgainst(battle: Battle, at: Tile, from: Tile): Cover {
  */
 /**
  * What cover takes off a shot's chance to hit: COVER_DEFENSE, or FORTIFIED_DEFENSE under that rule, and nothing for a
- * soldier in exosuits.
+ * soldier in exosuits; and HUNKER_DEFENSE more on a hunkered unit.
  */
 function defense(battle: Battle, target: Tile, cover: Cover): number {
-  if (battle.rules.includes('exosuits') && battle.units.some((u) => u.x === target.x && u.y === target.y && u.side === 'human')) return 0
-  return (battle.rules.includes('fortified') ? FORTIFIED_DEFENSE : COVER_DEFENSE)[cover]
+  const unit = battle.units.find((u) => u.x === target.x && u.y === target.y)
+  const hunkered = unit?.order === 'hunker' ? HUNKER_DEFENSE : 0
+  if (battle.rules.includes('exosuits') && unit?.side === 'human') return hunkered
+  return (battle.rules.includes('fortified') ? FORTIFIED_DEFENSE : COVER_DEFENSE)[cover] + hunkered
 }
 
 export function odds(battle: Battle, shooter: Tile, target: Tile, stats: Stats, piercing = false): { hit: number; crit: number } {
@@ -87,8 +89,8 @@ export function sees(battle: Battle, from: Tile, to: Tile): boolean {
  * Tiles within which a unit notices an enemy not yet seen, before cover and stillness hide the enemy: a soldier
  * scouting, or an alien on patrol, idler.
  */
-export const DETECT = 8
-export const PATROL_DETECT = 6
+export const DETECT = 20
+export const PATROL_DETECT = 5
 /** Tiles of DETECT an enemy in cover against the watcher subtracts, and one that held still since its last turn. */
 export const HIDE_COVER = 2
 export const HIDE_STILL = 1

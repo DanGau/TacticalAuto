@@ -53,6 +53,8 @@ test("a hold's waves come in from the edges, each pack larger every time it retu
   const run = before('hold')
   const battle = run.battle!
   deploy(run, 0)
+  // The squad holds out for as many waves as it takes.
+  for (const soldier of battle.units.filter(isSoldier)) soldier.hp = 999
   const size = battle.waves[0].aliens.length
   for (let wave = 0; wave < 2 && battle.phase === 'battle'; ) {
     for (const e of stepBattle(battle)) {
