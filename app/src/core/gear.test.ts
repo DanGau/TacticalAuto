@@ -64,6 +64,8 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   deploy(run, zone)
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist: null })
+  battle.ground.fill('pavement')
+  battle.props.fill('none')
   battle.cover.fill(0)
   battle.height.fill(0)
   battle.north.fill('none')
@@ -322,6 +324,8 @@ test('caltrops slow an alien that must cross them, and hurt it', () => {
   const d = armed([], { damage: 0 })
   Object.assign(d.alien, { x: 10, y: 15 })
   d.alien.stats = { ...d.alien.stats, range: 1, move: 4 }
+  // The soldier holds its ground, so the alien must come to it.
+  d.soldier.stats = { ...d.soldier.stats, move: 0 }
   d.battle.caltrops = Array.from({ length: GRID }, (_, x) => ({ x, y: 13 }))
   const events = untilAlienShoots(d)
   const steps = events.find((e) => e.type === 'move' && e.id === d.alien.id)

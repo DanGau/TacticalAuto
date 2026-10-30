@@ -1,4 +1,5 @@
 import { REGIONS, regionsFor, type Region, type RegionId } from './regions'
+import { layStreets, type Way } from './streets'
 import { random, randomInt } from './rng'
 
 import type { Twist } from './twists'
@@ -92,8 +93,6 @@ const HILLS: Record<TerrainKind, number> = { town: 2, city: 1, countryside: 3, i
 
 /** The battlefield's half-width, in tiles, at its narrowest and widest; the town goes on around it. */
 const REACH: [number, number] = [14, 21]
-/** A canal is crossed by a bridge every this many tiles. */
-const BRIDGE_EVERY = 7
 
 /**
  * A battlefield of the given kind, in the manner of XCOM 2's plots and parcels: roads cut the map into lots,
@@ -104,7 +103,8 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
   const region = options[randomInt(rng, options.length)]
   const R: Region = REGIONS[region]
   const city = R.cities[randomInt(rng, R.cities.length)]
-  const ROAD = R.road
+  /** Width of a bridge over a river. */
+  const ROAD = 2
   const [MIN_BUILDING, MAX_HOUSE] = R.building
   const ground = Array<Ground>(size * size).fill(kind === 'countryside' ? 'grass' : 'pavement')
   const props = Array<Prop>(size * size).fill('none')
@@ -170,19 +170,10 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
    * Where the region builds them, it wraps a courtyard, or stands as a long slab of flats.
    */
   function house(lot: Rect): void {
-    const back = Math.min(R.setback, Math.floor((Math.min(lot.x2 - lot.x1, lot.y2 - lot.y1) - MIN_BUILDING) / 2))
-    const roomX = lot.x2 - lot.x1 + 1 - 2 * back
-    const roomY = lot.y2 - lot.y1 + 1 - 2 * back
-    let w = between(MIN_BUILDING, Math.max(MIN_BUILDING, Math.min(MAX_HOUSE, roomX)))
-    let h = between(MIN_BUILDING, Math.max(MIN_BUILDING, Math.min(MAX_HOUSE, roomY)))
-    // A slab: four deep, as long as the lot allows.
-    if (R.slabs) [w, h] = roomX >= roomY ? [Math.min(MAX_HOUSE, roomX), MIN_BUILDING] : [MIN_BUILDING, Math.min(MAX_HOUSE, roomY)]
-    w = Math.min(w, roomX)
-    h = Math.min(h, roomY)
-    const x1 = between(lot.x1 + back, lot.x2 - back - w + 1)
-    const y1 = between(lot.y1 + back, lot.y2 - back - h + 1)
-    const b: Rect = { x1, y1, x2: x1 + w - 1, y2: y1 + h - 1 }
-    building(b, R.windowEvery, ['crate'])
+    const b = footprint(lot)
+    building(b, R.windowEvery, ['crate', 'none', 'none'])
+    const w = b.x2 - b.x1 + 1
+    const h = b.y2 - b.y1 + 1
     if (R.courtyards && w >= 7 && h >= 7) {
       const yard: Rect = { x1: b.x1 + 2, y1: b.y1 + 2, x2: b.x2 - 2, y2: b.y2 - 2 }
       building(yard, 99, ['tree'])
@@ -196,13 +187,30 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     })
   }
 
+  /** Where a building stands on a lot: kept back from its edge by the region's setback, a slab where the region builds them. */
+  function footprint(lot: Rect): Rect {
+    const back = Math.max(0, Math.min(R.setback, Math.floor((Math.min(lot.x2 - lot.x1, lot.y2 - lot.y1) - MIN_BUILDING) / 2)))
+    const roomX = lot.x2 - lot.x1 + 1 - 2 * back
+    const roomY = lot.y2 - lot.y1 + 1 - 2 * back
+    // A packed region builds wall to wall, filling its lot; others leave a yard.
+    const span = (room: number) => (R.setback === 0 ? Math.min(MAX_HOUSE, room) : between(MIN_BUILDING, Math.max(MIN_BUILDING, Math.min(MAX_HOUSE, room))))
+    let w = span(roomX)
+    let h = span(roomY)
+    // A slab: four deep, as long as the lot allows.
+    if (R.slabs) [w, h] = roomX >= roomY ? [Math.min(MAX_HOUSE, roomX), MIN_BUILDING] : [MIN_BUILDING, Math.min(MAX_HOUSE, roomY)]
+    w = Math.min(w, roomX)
+    h = Math.min(h, roomY)
+    const x1 = between(lot.x1 + back, lot.x2 - back - w + 1)
+    const y1 = between(lot.y1 + back, lot.y2 - back - h + 1)
+    return { x1, y1, x2: x1 + w - 1, y2: y1 + h - 1 }
+  }
+
   /** A building fallen in: about half its walls gone, rubble where they stood. */
   function ruin(lot: Rect): void {
-    const w = between(MIN_BUILDING, Math.min(MAX_HOUSE, lot.x2 - lot.x1 - 1))
-    const h = between(MIN_BUILDING, Math.min(MAX_HOUSE, lot.y2 - lot.y1 - 1))
-    const x1 = between(lot.x1 + 1, lot.x2 - w)
-    const y1 = between(lot.y1 + 1, lot.y2 - h)
-    building({ x1, y1, x2: x1 + w - 1, y2: y1 + h - 1 }, 4, ['rubble'])
+    const { x1, y1, x2, y2 } = footprint(lot)
+    const w = x2 - x1 + 1
+    const h = y2 - y1 + 1
+    building({ x1, y1, x2, y2 }, 4, ['rubble'])
     for (let y = y1; y <= y1 + h; y++) {
       for (let x = x1; x <= x1 + w; x++) {
         for (const edges of [north, west]) {
@@ -288,27 +296,22 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
 
   const build: Record<Place, (lot: Rect) => void> = { house, warehouse, ruin, park, orchard, graveyard, plaza, market, carPark, depot, field }
 
+  /**
+   * Fills a lot with one place: as often as the region builds, a building of the kind of place, a house, a warehouse
+   * or a fenced depot, or a ruin, else an open place of the kind's. The countryside builds seldom.
+   */
   function fill(lot: Rect): void {
-    const roomy = lot.x2 - lot.x1 >= MIN_BUILDING + 1 && lot.y2 - lot.y1 >= MIN_BUILDING + 1
-    const places = plot.places.filter((place) => roomy || (place !== 'house' && place !== 'warehouse' && place !== 'ruin'))
+    // A packed region builds on any lot it can fit a room on.
+    const least = R.setback === 0 ? 2 : MIN_BUILDING
+    const roomy = lot.x2 - lot.x1 + 1 >= least && lot.y2 - lot.y1 + 1 >= least
+    const builds = roomy && chance(R.built * (kind === 'countryside' ? 0.3 : 1))
+    // A warehouse needs room for its walls inside the lot.
+    const shed = lot.x2 - lot.x1 >= 4 && lot.y2 - lot.y1 >= 4 && chance(0.5)
+    if (builds) return build[kind === 'industrial' ? (shed ? 'warehouse' : 'depot') : kind === 'ruins' ? 'ruin' : 'house'](lot)
+    // A scrap of land too small for a place of its own is a yard, a tree or two in it.
+    if (lot.x2 - lot.x1 < 2 || lot.y2 - lot.y1 < 2) return each(lot, (x, y) => void (chance(0.15 * R.green) && put(x, y, 'tree')))
+    const places = plot.places.filter((place) => place !== 'house' && place !== 'warehouse' && place !== 'ruin')
     build[places[randomInt(rng, places.length)] ?? 'park'](lot)
-  }
-
-  /** Fills a block, first cutting it in two along its length if it is long. */
-  function block(r: Rect): void {
-    const w = r.x2 - r.x1 + 1
-    const h = r.y2 - r.y1 + 1
-    if (w < 3 || h < 3) return
-    if (Math.max(w, h) < 16) return fill(r)
-    if (w >= h) {
-      const cut = r.x1 + Math.floor(w / 2)
-      fill({ ...r, x2: cut - 1 })
-      fill({ ...r, x1: cut + 1 })
-    } else {
-      const cut = r.y1 + Math.floor(h / 2)
-      fill({ ...r, y2: cut - 1 })
-      fill({ ...r, y1: cut + 1 })
-    }
   }
 
   /** A satellite compound: a walled yard with gates, a control room, the dish, and stores; scrub outside. */
@@ -388,64 +391,29 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
   }
   const plot = PLOTS[kind]
 
-  /** Where roads cross the map, `count` of them a plot holds, the region's spacing apart times `stretch`; none if it holds none. */
-  const roadsAt = (count: number, stretch: number, from = 0, to = size - 1) => {
-    const roads: number[] = []
-    if (count === 0) return roads
-    for (let at = from + between(2, Math.round(R.spacing[0] * stretch)); at < to - ROAD - 2; at += Math.round(between(...R.spacing) * stretch) + ROAD) roads.push(at)
-    return roads
-  }
-  /** The stretches the roads leave between them, each one tile back from a road. */
-  const stretches = (roads: number[]) => {
-    const starts = [0, ...roads.map((road) => road + ROAD + 1)]
-    const ends = [...roads.map((road) => road - 2), size - 1]
-    return starts.map((start, i) => [start, ends[i]])
-  }
-
-  const roadsX = roadsAt(plot.roads[0], 1)
-  for (const x of roadsX) pave({ x1: x, y1: 0, x2: x + ROAD - 1, y2: size - 1 }, 'road')
-  // Cross streets run the width of the map, or in a staggered region start afresh in each stretch between streets.
-  const columns = stretches(roadsX)
-  const shared = roadsAt(plot.roads[1], R.stretch)
-  const rows = columns.map(([x1, x2]) => {
-    const ys = R.staggered ? roadsAt(plot.roads[1], R.stretch) : shared
-    for (const y of ys) pave({ x1: Math.max(0, x1 - 1), y1: y, x2: Math.min(size - 1, x2 + 1), y2: y + ROAD - 1 }, 'road')
-    return ys
+  // The region's streets, then the lots packed into the blocks they leave, each filled with one place.
+  // Out in the country the streets run twice as far apart, round lots twice as big and farther apart.
+  const ways = layStreets(rng, size, kind === 'countryside' ? { ...R.streets, spacing: [R.streets.spacing[0] * 2, R.streets.spacing[1] * 2] } : R.streets)
+  ways.forEach((way, t) => {
+    if (way === 'land') return
+    ground[t] = way === 'canal' ? 'water' : way === 'square' ? 'pavement' : 'road'
+    if (way === 'canal') props[t] = 'water'
   })
-  // Vehicles on the roads, lying along them, but on a canal.
-  for (let i = 2; i < size - 2 && !R.canals; i += 2) {
-    for (const x of roadsX) {
-      if (!chance(0.2)) continue
-      const lane = x + randomInt(rng, ROAD)
-      put(lane, i, 'car')
-      put(lane, i + 1, 'car')
-    }
-    columns.forEach(([x1, x2], c) => {
-      if (i < x1 || i + 1 > x2) return
-      for (const y of rows[c]) {
-        if (!chance(0.2)) continue
-        const lane = y + randomInt(rng, ROAD)
-        const vehicle = chance(0.25) ? 'truck' : 'car'
-        put(i, lane, vehicle)
-        put(i + 1, lane, vehicle)
-      }
-    })
-  }
-  // In ruins, rubble lies across the roads.
-  if (kind === 'ruins') each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => void (ground[y * size + x] === 'road' && chance(0.08) && put(x, y, 'rubble')))
-  columns.forEach(([x1, x2], c) => {
-    for (const [y1, y2] of stretches(rows[c])) block({ x1, y1, x2, y2 })
+  // A highway's median is a crash barrier; vehicles stand along the streets.
+  const along = (t: number) => (t % size < size - 1 && ways[t + 1] === 'street' ? 1 : t + size < size * size && ways[t + size] === 'street' ? size : 0)
+  ways.forEach((way, t) => {
+    if (way === 'median') return void (t % 3 !== 0 && put(t % size, Math.floor(t / size), 'fence'))
+    if (way !== 'street' || !chance(R.streets.plan === 'freeway' ? 0.05 : 0.025)) return
+    const next = along(t)
+    if (!next || props[t + next] !== 'none') return
+    const vehicle = chance(kind === 'industrial' ? 0.5 : 0.2) ? 'truck' : 'car'
+    put(t % size, Math.floor(t / size), vehicle)
+    put((t + next) % size, Math.floor((t + next) / size), vehicle)
   })
-  // A canal quarter's streets are water, bridged every few tiles and where streets cross.
-  if (R.canals)
-    each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => {
-      const t = y * size + x
-      if (ground[t] !== 'road') return
-      const crossing = roadsX.some((r) => x >= r && x < r + ROAD) && rows.some((ys) => ys.some((r) => y >= r && y < r + ROAD))
-      if (crossing || (x % BRIDGE_EVERY < 2 && y % BRIDGE_EVERY < 2)) return
-      ground[t] = 'water'
-      props[t] = 'water'
-    })
+  // In ruins, rubble lies across the streets.
+  if (kind === 'ruins') ways.forEach((way, t) => void (way === 'street' && chance(0.08) && put(t % size, Math.floor(t / size), 'rubble')))
+  const country = kind === 'countryside' ? 2 : 1
+  for (const lot of packLots(ways, size, [R.lot[0] * country, R.lot[1] * country], R.gap * country + country - 1, rng)) fill(lot)
 
   /** Clears a tile of what stands on it and its walls, and sets its ground; water also fills it. */
   const clear = (x: number, y: number, with_: Ground) => {
@@ -632,4 +600,37 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     const height = hills().map((h, t) => (ground[t] === 'void' && !cut.outside[t] ? 0 : h))
     return { ground, props, north, west, height, region, city, ...cut }
   }
+}
+
+/**
+ * The lots the land between streets is packed into: rectangles `lot` tiles on a side at most, laid row by row over
+ * whatever shape each block is, `gap` tiles of passage left beside and below each. A scrap too small to hold a lot
+ * is left as part of the block's open ground.
+ */
+function packLots(ways: Way[], size: number, lot: [number, number], gap: number, rng: { rng: number }): Rect[] {
+  const taken = ways.map((way) => way !== 'land')
+  const free = (x: number, y: number) => x >= 0 && y >= 0 && x < size && y < size && !taken[y * size + x]
+  const lots: Rect[] = []
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      if (!free(x, y)) continue
+      const wide = lot[0] + randomInt(rng, lot[1] - lot[0] + 1)
+      const deep = lot[0] + randomInt(rng, lot[1] - lot[0] + 1)
+      let w = 0
+      while (w < wide && free(x + w, y)) w++
+      const row = (at: number) => Array.from({ length: w }, (_, i) => free(x + i, at)).every(Boolean)
+      let h = 1
+      while (h < deep && row(y + h)) h++
+      // A sliver left beside or below, too thin for a lot of its own, is folded into this one.
+      let past = 0
+      while (past < lot[0] && free(x + w + past, y)) past++
+      if (past < lot[0]) w += past
+      past = 0
+      while (past < lot[0] && row(y + h + past)) past++
+      if (past < lot[0]) h += past
+      // The lot and the passage beside and below it are claimed together.
+      for (let dy = 0; dy < h + gap; dy++) for (let dx = 0; dx < w + gap; dx++) if (free(x + dx, y + dy)) taken[(y + dy) * size + x + dx] = true
+      if (w >= 2 && h >= 2) lots.push({ x1: x, y1: y, x2: x + w - 1, y2: y + h - 1 })
+    }
+  return lots
 }
