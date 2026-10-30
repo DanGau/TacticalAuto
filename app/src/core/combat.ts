@@ -719,8 +719,9 @@ function sight(battle: Battle): GameEvent[] {
     battle.grabbed++
     events.push({ type: 'grabbed', id: soldiers.find((s) => distance(s, cache) <= 1)!.id, x: cache.x, y: cache.y })
   }
-  // A soldier beside a civilian gets them out.
-  for (const civilian of battle.units.filter((u) => u.civilian && soldiers.some((s) => distance(s, u) <= (has(s, 'beacon') ? BEACON_REACH : 1)))) {
+  // A soldier, or a mech it called down, beside a civilian gets them out.
+  const squad = battle.units.filter((u) => u.side === 'human' && !u.civilian)
+  for (const civilian of battle.units.filter((u) => u.civilian && squad.some((s) => distance(s, u) <= (has(s, 'beacon') ? BEACON_REACH : 1)))) {
     battle.units.splice(battle.units.indexOf(civilian), 1)
     battle.saved++
     events.push({ type: 'saved', id: civilian.id })

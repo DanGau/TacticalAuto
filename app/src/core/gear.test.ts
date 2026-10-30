@@ -317,7 +317,7 @@ test('caltrops are strewn in the path of an alien closing in', () => {
   const d = armed(['caltrops'], { damage: 0 })
   Object.assign(d.alien, { x: 10, y: 15 })
   d.alien.stats = { ...d.alien.stats, range: 1 }
-  untilAlienShoots(d)
+  for (let beats = 0; d.battle.caltrops.length === 0 && beats < 200; beats++) d.step()
   expect(d.battle.caltrops).toHaveLength(9)
 })
 
