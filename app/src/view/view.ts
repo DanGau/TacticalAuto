@@ -3,7 +3,9 @@ import { BLAST_RADIUS, distance, GRID, nearestAlien, revealed, PLANS, ZONE_NAMES
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { effectName } from '../core/effects'
-import type { GameEvent } from '../core/combat'
+import { UPLINK_REACH, type GameEvent } from '../core/combat'
+import { ESCAPE_REACH } from '../core/goals'
+import { fence, RISE_MS } from './fences'
 import { level, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
 import type { Edge, Ground, Prop } from '../core/terrain'
@@ -101,6 +103,7 @@ const COLOR = {
   enemyHp: 0xff5555,
   enemyLost: 0x3a2226,
   uplink: 0xffd84d,
+  extract: 0x5dff9a,
 }
 
 /** Each ground's colour, where its region's look gives none. */
@@ -443,7 +446,10 @@ export async function createView(): Promise<View> {
   const units = new Group()
   /** The briefing's beam of light over what it shows. */
   const beam = new Group()
-  scene.add(outskirts, terrain, zones, acid, fog, lurk, units, beam)
+  /** The holographic fences round the zones in play, by what and where each is, so one already standing stays up. */
+  const fences = new Group()
+  let standing = new Map<string, ReturnType<typeof fence>>()
+  scene.add(outskirts, terrain, zones, fences, acid, fog, lurk, units, beam)
   const haze = new Fog(NIGHT, 1, 2)
   scene.fog = haze
   zones.renderOrder = 1
@@ -551,6 +557,10 @@ export async function createView(): Promise<View> {
     const ms = now - last
     last = now
     for (const tick of [...ticks]) tick(ms)
+    for (const f of standing.values()) {
+      f.time.value = now / 1000
+      f.rise.value = Math.min(1, f.rise.value + ms / RISE_MS)
+    }
     reveal(ms)
     render()
   })
@@ -1044,6 +1054,20 @@ export async function createView(): Promise<View> {
       })
     }
     lay(zones, tint)
+    // A fence rings each zone in play: the landing zones to choose from, the uplink to hold, the way out.
+    const rings: [Tile, number, number][] = []
+    if (battle.phase === 'deploy' && !briefing) (battle.goal === 'rescue' ? battle.zones.slice(0, teams) : battle.zones).forEach((zone, i) => rings.push([zone, ZONE_RADIUS, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone]))
+    if (battle.uplink) rings.push([battle.uplink, UPLINK_REACH, COLOR.uplink])
+    if (battle.escape) rings.push([battle.escape, ESCAPE_REACH, COLOR.extract])
+    const next = new Map<string, ReturnType<typeof fence>>()
+    for (const [at, reach, color] of rings) {
+      const key = `${at.x},${at.y},${reach},${color}`
+      next.set(key, standing.get(key) ?? fence(at, reach, spot(at.x, at.y).y + DECAL_LIFT, color))
+    }
+    for (const [key, f] of standing) if (!next.has(key)) f.mesh.geometry.dispose()
+    standing = next
+    fences.clear()
+    for (const f of standing.values()) fences.add(f.mesh)
   }
 
   /** Dims a node of the scenery, or a unit, by `tint`. */
