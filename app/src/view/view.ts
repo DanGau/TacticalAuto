@@ -8,6 +8,7 @@ import { level, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
 import type { Edge, Ground, Prop } from '../core/terrain'
 import { LOOKS, type FenceStyle, type Look } from './looks'
+import { addRoof } from './roofs'
 import { buildOutskirts } from './outskirts'
 import { blob, css, ditherable, shade, Shapes, Sketch, type Point3 } from './shapes'
 import { ACROSS, LEVEL, PITCH, TILE_H, TILE_W, tall, YAW } from './space'
@@ -458,6 +459,8 @@ export async function createView(): Promise<View> {
   let roofs: { tiles: Set<number>; fade: { value: number }; mesh: Mesh }[] = []
   /** The tile the briefing is lighting, which no roof hides. */
   let lit: Tile | null = null
+  /** The tiles the squad sees, by index; null before the landing. */
+  let seen: boolean[] | null = null
   /** The battle on screen. */
   let shown: Battle | null = null
   let camera = aim({ x: 0, y: 0 }, FIT)
@@ -544,7 +547,7 @@ export async function createView(): Promise<View> {
 
   /**
    * Fades away each roof over a tile that matters, a unit's, the briefing's lit one, or a landing zone's while one is
-   * chosen, and thins each wall standing
+   * chosen, and each roof over a room the squad can see into, so what it sees shows as it moves; and thins each wall standing
    * just before a unit toward the camera, as XCOM cuts its buildings away; the rest fade back.
    */
   function reveal(ms: number): void {
@@ -558,7 +561,8 @@ export async function createView(): Promise<View> {
         for (let dy = -ZONE_RADIUS; dy <= ZONE_RADIUS; dy++) for (let dx = -ZONE_RADIUS; dx <= ZONE_RADIUS; dx++) if (distance(zone, { x: zone.x + dx, y: zone.y + dy }) <= ZONE_RADIUS) keys.push({ x: zone.x + dx, y: zone.y + dy })
     const under = new Set(keys.map((k) => k.y * GRID + k.x))
     for (const roof of roofs) {
-      toward(roof.fade, [...under].some((t) => roof.tiles.has(t)) ? 0 : 1)
+      const open = [...roof.tiles].some((t) => under.has(t) || seen?.[t])
+      toward(roof.fade, open ? 0 : 1)
       roof.mesh.visible = roof.fade.value > 0
     }
     for (const wall of walls) {
@@ -803,7 +807,7 @@ export async function createView(): Promise<View> {
   }
 
   /**
-   * Roofs each building at the height of its walls' trim, in the region's roof colours. A ruin has none. A roof over
+   * Roofs each building at the height of its walls' trim, in one of the region's roof styles and colours. A ruin has none. A roof over
    * the battlefield can fade; one over the town past it stays.
    */
   function addRoofs(battle: Battle, look: Look, rooms: number[][], colour: Map<number, number>, top: number, beyond: Shapes): void {
@@ -815,7 +819,17 @@ export async function createView(): Promise<View> {
       const inside = room.some((t) => !battle.outside[t])
       const shapes = inside ? new Shapes() : beyond
       const y = spot(room[0] % GRID, Math.floor(room[0] / GRID)).y + top
-      for (const t of room) shapes.flat((t % GRID) - 0.5 - eave, Math.floor(t / GRID) - 0.5 - eave, (t % GRID) + 0.5 + eave, Math.floor(t / GRID) + 0.5 + eave, y, paint)
+      const xs = room.map((t) => t % GRID)
+      const ys = room.map((t) => Math.floor(t / GRID))
+      const footing = { x1: Math.min(...xs), y1: Math.min(...ys), x2: Math.max(...xs), y2: Math.max(...ys), y }
+      // A rectangular building takes one of its region's roofs; any other shape, such as one round a courtyard, a flat one.
+      const square = (footing.x2 - footing.x1 + 1) * (footing.y2 - footing.y1 + 1) === room.length
+      let seed = room[0] * 2654435761
+      const rand = () => ((seed = (seed * 1103515245 + 12345) | 0) >>> 8) / 16777216
+      // Weathered, no two roofs quite the same shade.
+      const worn = shade(paint, 0.85 + rand() * 0.3)
+      if (square) addRoof(shapes, look.roof[pick(room[0], look.roof.length)], footing, worn, colour.get(room[0])!, eave, rand)
+      else for (const t of room) shapes.flat((t % GRID) - 0.5 - eave, Math.floor(t / GRID) - 0.5 - eave, (t % GRID) + 0.5 + eave, Math.floor(t / GRID) + 0.5 + eave, y, paint)
       if (!inside) return
       const { mesh } = shapes.build()
       terrain.add(mesh)
@@ -1014,7 +1028,7 @@ export async function createView(): Promise<View> {
   /** Darkens every tile no soldier sees, and whatever stands on it. Before the landing nothing is fogged. */
   function drawFog(battle: Battle, snap = false): void {
     const shapes = new Shapes()
-    const seen = battle.phase === 'deploy' ? null : visibleTiles(battle)
+    seen = battle.phase === 'deploy' ? null : visibleTiles(battle)
     const tint = (tile: number) => (!seen || seen[tile] ? 0xffffff : COLOR.dim)
     seen?.forEach((lit, i) => {
       if (!lit) diamond(shapes, i % GRID, Math.floor(i / GRID), COLOR.fog, 0.55, DECAL_LIFT * 3)
@@ -1042,7 +1056,7 @@ export async function createView(): Promise<View> {
       const p = spot(unit.x, unit.y)
       glow.node.position.set(p.x, p.y, p.z)
     }
-    for (const { node, tiles: lit } of scenery) dim(node, !seen || lit.some((tile) => seen[tile]) ? 0xffffff : COLOR.dim)
+    for (const { node, tiles: lit } of scenery) dim(node, !seen || lit.some((tile) => seen?.[tile]) ? 0xffffff : COLOR.dim)
     for (const sprite of sprites.values()) (sprite.body.material as SpriteMaterial).color.setHex(tint(Math.round(sprite.tile.y) * GRID + Math.round(sprite.tile.x)))
   }
 
