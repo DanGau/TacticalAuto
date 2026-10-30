@@ -95,10 +95,12 @@ function runMap(run: Run, picked: number | null): string {
         const next = c === leg.columns.length - 1 ? (run.legs[l + 1]?.columns[0].map((_, k) => `${l + 1}-0-${k}`) ?? []) : node.next.map((k) => `${l}-${c + 1}-${k}`)
         const state = taken ? (l === run.keys && c === run.stop ? 'here' : 'done') : ''
         const icon = !node.stop ? (c === leg.columns.length - 1 ? stopIcon(run, { kind: l === KEYS ? 'final' : 'key' } as Stop) : FOG) : stopIcon(run, node.stop, state)
-        const html = open.includes(i) && l === run.keys && c === run.stop ? `<button class="option${i === picked ? ' picked' : ''}" data-pick="${i}">${icon}</button>` : icon
         const squad = taken && standing(c)
-        const choice = open.includes(i) && l === run.keys && c === run.stop
-        const pin = { id: `${l}-${c}-${i}`, at: node.at ?? run.route[l].to.at, html, next, squad, choice, lit: squad ? picked !== null : choice && i === picked }
+        // A stop the squad stands at but has not yet set in to is tapped to set in.
+        const setIn = squad && here !== null
+        const choice = setIn || (open.includes(i) && l === run.keys && c === run.stop)
+        const html = setIn ? `<button class="option picked" data-in>${icon}</button>` : choice ? `<button class="option${i === picked ? ' picked' : ''}" data-pick="${i}">${icon}</button>` : icon
+        const pin = { id: `${l}-${c}-${i}`, at: node.at ?? run.route[l].to.at, html, next, squad, choice, past: taken && !squad, lit: squad ? picked !== null : choice && i === picked }
         if (taken) path.push(pin.at)
         if (squad) focus = pin.at
         pins.push(pin)
@@ -106,7 +108,7 @@ function runMap(run: Run, picked: number | null): string {
     )
   })
   // At a leg's start the squad stands in the city it set out from, its trails reaching to each choice.
-  if (!pins.some((p) => p.squad)) pins.push({ id: 'from', at: focus, html: '', next: open.map((i) => `${run.keys}-0-${i}`), squad: true, choice: false, lit: picked !== null })
+  if (!pins.some((p) => p.squad)) pins.push({ id: 'from', at: focus, html: '', next: open.map((i) => `${run.keys}-0-${i}`), squad: true, choice: false, past: false, lit: picked !== null })
   const stage = run.route[run.keys]
   const banner = stage.hero ? `Leg ${run.keys + 1} of ${KEYS}: across ${CONTINENTS[stage.continent!].name} to ${stage.hero.name}, waiting in ${stage.to.name}, ${stage.to.country}.` : 'The last leg: to the alien hub under the Antarctic ice.'
   // The way on from the picked stop lights up, stop by stop.
@@ -122,7 +124,7 @@ function travelLabel(run: Run, stop: Stop, next: NonNullable<ReturnType<typeof n
   if (next === 'unknown') return 'Find out what lies ahead'
   const mission = missionAt(run, next, stop.risk, next === 'battle' ? stop.goal : 'exterminate')
   const stakes = next === 'escape' || next === 'final' ? ' · lose and the run ends' : ''
-  return `<b>${STOP_NAMES[next]}</b><br>Alien force ${mission.force}${next === 'key' || next === 'final' ? ', with a boss' : ''}${stakes}`
+  return `${STOP_NAMES[next]}: alien force ${mission.force}${next === 'key' || next === 'final' ? ', with a boss' : ''}${stakes}`
 }
 
 /** What the squad faces at a stop, as the map's heading. */
@@ -176,10 +178,8 @@ function mapView(run: Run, picked: number | null): string {
     ${runMap(run, picked)}`
   const next = nextStop(run)!
   const here = node.stop!
-  return `${run.report ? '' : decisions(run)}<h2>${where(run, here)}</h2>
-    ${runMap(run, null)}
-    ${next === 'escape' ? '<p class="up"><b>The threat is full. The squad is ambushed on the road and must escape.</b></p>' : ''}
-    <button class="travel ${next}" data-action='${JSON.stringify({ type: 'advance' })}'>${travelLabel(run, here, next)}</button>`
+  return `${run.report ? '' : decisions(run)}<h2>${next === 'escape' ? '<b class="up">The threat is full. The squad is ambushed on the road and must escape.</b>' : where(run, here)} <small>${travelLabel(run, here, next)}. Tap the squad's stop to set in.</small></h2>
+    ${runMap(run, null)}`
 }
 
 function baseView(run: Run): string {

@@ -235,6 +235,14 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   })
   addEventListener('resize', () => requestAnimationFrame(shrink))
 
+  /** Sets the squad in to the stop it stands at: a fight dives down through the clouds to it. */
+  function setIn(): void {
+    const next = nextStop(shown!)
+    if (!next) return
+    if (next === 'supply' || next === 'cache' || next === 'shop') act({ type: 'advance' })
+    else dive(() => act({ type: 'advance' }))
+  }
+
   /** How long the dive through the clouds takes, in milliseconds. */
   const DIVE_MS = 1400
   /** Zooms the map down onto the helicopter and through a bank of clouds, then `land`s while the clouds part. */
@@ -298,12 +306,10 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
       else return fly(target, () => {
         picked = null
         act({ type: 'go', index })
-        const next = nextStop(shown!)
-        if (!next) return
-        if (next === 'supply' || next === 'cache' || next === 'shop') act({ type: 'advance' })
-        else dive(() => act({ type: 'advance' }))
+        setIn()
       })
     }
+    else if (target.dataset.in !== undefined) return setIn()
     else if (target.dataset.gear) gear = target.dataset.gear as 'keep' | 'sell'
     else if (target.dataset.open) {
       // Clicking the soldier open closes it.
