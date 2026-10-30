@@ -2,15 +2,20 @@ import { along, arc, type LonLat } from '../core/world'
 import type { Run } from '../core/run'
 import { COASTS } from './coasts'
 
-/** The window the globe is seen through, in pixels, and the globe's radius at its farthest and nearest. */
-const W = 900
-const H = 560
-const FAR = 240
-const NEAR = 4000
-/** Pixels kept clear round the stops in sight, and the fewest degrees the view spans from its middle. */
-const MARGIN = 70
-const MIN_REACH = 4
+/** The globe's radius at its farthest and nearest, in pixels. */
+const FAR = 120
+const NEAR = 12000
+/** Pixels kept clear round the stops in sight. */
+const MARGIN = 60
+/** The fewest degrees the view spans from its middle. */
+const MIN_REACH = 3
 const RAD = Math.PI / 180
+
+/** The window the globe is seen through, in pixels. */
+export interface Size {
+  w: number
+  h: number
+}
 
 /**
  * A stop shown on the globe: its id, where it stands, its markup, the stops it leads to, whether the squad stands on it,
@@ -27,9 +32,20 @@ export interface Pin {
   lit: boolean
 }
 
-/** Projects the globe, `r` pixels round, turned to face `centre`: where a place falls on the page, and whether it faces the viewer. */
-function projection(centre: LonLat, r: number) {
+/**
+ * Which way the globe is turned, and how near: the place in the window's middle, the globe's radius in pixels, and how
+ * far the picture is spun about its middle, in radians, so the way ahead points up.
+ */
+export interface View {
+  centre: LonLat
+  r: number
+  turn: number
+}
+
+/** Projects the globe seen from `view` into a window `size`: where a place falls on the page, and whether it faces the viewer. */
+function projection({ centre, r, turn }: View, { w, h }: Size) {
   const [l0, p0] = [centre[0] * RAD, centre[1] * RAD]
+  const [cos, sin] = [Math.cos(turn), Math.sin(turn)]
   return ([lon, lat]: LonLat) => {
     const [l, p] = [lon * RAD, lat * RAD]
     const cosc = Math.sin(p0) * Math.sin(p) + Math.cos(p0) * Math.cos(p) * Math.cos(l - l0)
@@ -41,7 +57,7 @@ function projection(centre: LonLat, r: number) {
       x /= len
       y /= len
     }
-    return { x: W / 2 + x * r, y: H / 2 + y * r, front: cosc >= 0 }
+    return { x: w / 2 + (x * cos - y * sin) * r, y: h / 2 + (x * sin + y * cos) * r, front: cosc >= 0 }
   }
 }
 
@@ -73,29 +89,34 @@ function middle(places: LonLat[]): LonLat {
 /** The great-circle way from `a` to `b`, as places along it. */
 const way = (a: LonLat, b: LonLat) => Array.from({ length: 24 }, (_, i) => along(a, b, i / 23))
 
-/** Which way the globe is turned, and how near: the place in the window's middle and the globe's radius in pixels. */
-export interface View {
-  centre: LonLat
-  r: number
-}
-
-/** The view that turns and zooms the globe so `seen` fills the window. */
-function framed(seen: LonLat[]): View {
+/** The view that frames `seen` to fill a window `size`, spun so the way from `up[0]` to `up[1]` points up the page. */
+function framed(seen: LonLat[], size: Size, up?: [LonLat, LonLat]): View {
   const centre = middle(seen)
-  const reach = Math.max(MIN_REACH, ...seen.map((p) => arc(centre, p))) * RAD
-  return { centre, r: Math.min(NEAR, Math.max(FAR, (H / 2 - MARGIN) / Math.sin(Math.min(reach, Math.PI / 2)))) }
+  let turn = 0
+  if (up && arc(up[0], up[1]) > 0.01) {
+    const flat = projection({ centre, r: 1, turn: 0 }, { w: 0, h: 0 })
+    const [a, b] = [flat(up[0]), flat(up[1])]
+    turn = -Math.PI / 2 - Math.atan2(b.y - a.y, b.x - a.x)
+  }
+  // The radius at which the farthest place across and the farthest up or down each just fit.
+  const unit = projection({ centre, r: 1, turn }, { w: 0, h: 0 })
+  const reach = Math.sin(MIN_REACH * RAD)
+  const across = Math.max(reach, ...seen.map((p) => Math.abs(unit(p).x)))
+  const upright = Math.max(reach, ...seen.map((p) => Math.abs(unit(p).y)))
+  const r = Math.min((size.w / 2 - MARGIN) / across, (size.h / 2 - MARGIN) / upright)
+  return { centre, r: Math.min(NEAR, Math.max(FAR, r)), turn }
 }
 
 /**
- * The globe last drawn: the view it is framed on, the view it shows now, partway through a glide, and how to draw it
- * from any view, `state` a class on it: gliding while it turns, arrived once it settles after a glide.
+ * The globe last drawn: the view it is framed on, the view it shows now, partway through a glide, and how to draw its
+ * insides from any view.
  */
-let drawn: { target: View; now: View; draw: (view: View, state: string) => string } | null = null
+let drawn: { target: View; now: View; draw: (view: View) => string } | null = null
 
-/** Draws a globe from `draw` framed on `target`, and keeps it to glide later. */
-function keep(target: View, draw: (view: View, state: string) => string): string {
+/** A globe a window `size`, drawn from `draw` framed on `target`, kept to glide later. */
+function keep(size: Size, target: View, draw: (view: View) => string): string {
   drawn = { target, now: target, draw }
-  return draw(target, '')
+  return `<div class="globe" style="width:${size.w}px;height:${size.h}px">${draw(target)}</div>`
 }
 
 /** The view the globe on screen shows, if any. */
@@ -105,26 +126,36 @@ export const viewNow = (): View | null => drawn?.now ?? null
 const GLIDE_MS = 1300
 let glides = 0
 
+/** The shortest spin from `a` to `b`. */
+const spin = (a: number, b: number) => ((((b - a) % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI
+
 /** Turns and zooms the globe in `root` from `from` to the view it is framed on, then fades its choices in. */
 export function glide(root: HTMLElement, from: View | null): void {
   const to = drawn
-  if (!to || !from || !root.querySelector('.globe') || (arc(from.centre, to.target.centre) < 0.05 && Math.abs(from.r / to.target.r - 1) < 0.01)) return
+  const globe = root.querySelector<HTMLElement>('.globe')
+  if (!to || !from || !globe) return
+  const { target } = to
+  if (arc(from.centre, target.centre) < 0.05 && Math.abs(from.r / target.r - 1) < 0.01 && Math.abs(spin(from.turn, target.turn)) < 0.01) return
   const token = ++glides
   const start = performance.now()
+  const turning = spin(from.turn, target.turn)
   const frame = (time: number) => {
-    const globe = root.querySelector('.globe')
-    if (token !== glides || drawn !== to || !globe) return
+    if (token !== glides || drawn !== to || !globe.isConnected) return
     const t = Math.min(1, (time - start) / GLIDE_MS)
     const e = t * t * (3 - 2 * t)
-    to.now = t < 1 ? { centre: along(from.centre, to.target.centre, e), r: from.r * (to.target.r / from.r) ** e } : to.target
-    globe.outerHTML = to.draw(to.now, t < 1 ? 'gliding' : 'arrived')
+    to.now = t < 1 ? { centre: along(from.centre, target.centre, e), r: from.r * (target.r / from.r) ** e, turn: from.turn + turning * e } : target
+    globe.innerHTML = to.draw(to.now)
+    globe.classList.toggle('gliding', t < 1)
+    globe.classList.toggle('arrived', t === 1)
     if (t < 1) requestAnimationFrame(frame)
   }
+  frame(start)
   requestAnimationFrame(frame)
 }
 
-/** The globe itself: air, sea, graticule and coasts, under `over`, with `pins` laid on top. */
-function sphere(r: number, project: ReturnType<typeof projection>, over: string, pins: string, state: string): string {
+/** The globe's insides: air, sea, graticule and coasts, under `over`, with `pins` laid on top. */
+function sphere(view: View, size: Size, over: string, pins: string): string {
+  const project = projection(view, size)
   const coasts = COASTS.map((ring) => `<path class="land" d="${line(project, ring, true)}"/>`).join('')
   const graticule = [
     ...Array.from({ length: 12 }, (_, i) => Array.from({ length: 37 }, (_, k): LonLat => [i * 30, -90 + k * 5])),
@@ -132,18 +163,10 @@ function sphere(r: number, project: ReturnType<typeof projection>, over: string,
   ]
     .map((places) => `<path class="graticule" d="${line(project, places)}"/>`)
     .join('')
-  return `<div class="globe ${state}" style="width:${W}px;height:${H}px">
-    <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-      <defs>
-        <radialGradient id="sea" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#1d3a5e"/><stop offset="1" stop-color="#0a1626"/></radialGradient>
-        <radialGradient id="air" r="50%"><stop offset="0.86" stop-color="#4da3ff" stop-opacity="0"/><stop offset="0.93" stop-color="#4da3ff" stop-opacity="0.35"/><stop offset="1" stop-color="#4da3ff" stop-opacity="0"/></radialGradient>
-      </defs>
-      <circle cx="${W / 2}" cy="${H / 2}" r="${r * 1.16}" fill="url(#air)"/>
-      <circle cx="${W / 2}" cy="${H / 2}" r="${r}" fill="url(#sea)"/>
-      ${graticule}${coasts}${over}
-    </svg>
-    ${pins}
-  </div>`
+  const { w, h } = size
+  return `<div class="sea" style="left:${w / 2 - view.r}px;top:${h / 2 - view.r}px;width:${2 * view.r}px;height:${2 * view.r}px"></div>
+    <svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${graticule}${coasts}${over}</svg>
+    ${pins}`
 }
 
 /** Where on the page a place falls, as CSS. */
@@ -152,34 +175,34 @@ const spot = (p: { x: number; y: number }) => `left:${p.x.toFixed(1)}px;top:${p.
 /** The squad's helicopter, over where it stands; it flies to the stop the player sets out for. */
 const chopper = (p: { x: number; y: number }) => `<div class="chopper" style="${spot(p)}"><span>🚁</span></div>`
 
-/** Places to choose between on the whole globe, each with its markup: where a run may begin. The globe turns to the one chosen. */
-export function choices(places: { at: LonLat; html: string; chosen: boolean }[]): string {
-  const chosen = places.find((p) => p.chosen)
-  const all = framed(places.map((p) => p.at))
-  return keep(chosen ? { centre: chosen.at, r: all.r * 1.4 } : all, ({ centre, r }, state) => {
-    const project = projection(centre, r)
-    const pins = places.flatMap((place) => {
+/** Places on the whole globe, each with its markup; the globe turns to the one chosen. */
+export function places(size: Size, all: { at: LonLat; html: string; chosen: boolean }[]): string {
+  const chosen = all.find((p) => p.chosen)
+  const whole = framed(all.map((p) => p.at), size)
+  return keep(size, chosen ? { ...whole, centre: chosen.at, r: whole.r * 1.3 } : whole, (view) => {
+    const project = projection(view, size)
+    const pins = all.flatMap((place) => {
       const p = project(place.at)
-      return p.front ? [`<div class="cell choice${place.chosen ? ' chosen' : ''}" style="${spot(p)}">${place.html}</div>`] : []
+      return p.front ? [`<div class="cell${place.chosen ? ' chosen' : ''}" style="${spot(p)}">${place.html}</div>`] : []
     })
-    return sphere(r, project, '', pins.join(''), state)
+    return sphere(view, size, '', pins.join(''))
   })
 }
 
 /**
- * The run as a globe framed on the stops in sight: the journey so far in gold, the hero cities, and the stops pinned
- * along the way, trails dotted from where the squad stands to each choice and on from them. The choices pulse.
+ * The run as a globe a window `size`, framed on the stops in sight and spun so the leg leads up the page: the journey so
+ * far in gold, the hero cities, and the stops pinned along the way, trails dotted from where the squad stands to each
+ * choice and on from them. The choices pulse.
  */
-export function globe(run: Run, pins: Pin[], focus: LonLat, path: LonLat[], picking: boolean): string {
-  // Framed on what is in sight, or once a stop is picked, closer in on it and the way on from it.
-  const lit = pins.filter((p) => p.lit && !p.squad)
-  return keep(framed(lit.length > 0 ? [focus, ...lit.map((p) => p.at)] : [focus, ...pins.map((p) => p.at)]), (view, state) => drawRun(run, pins, focus, path, picking, view, state))
+export function globe(size: Size, run: Run, pins: Pin[], focus: LonLat, path: LonLat[], picking: boolean): string {
+  const target = framed([focus, ...pins.map((p) => p.at)], size, [focus, run.route[run.keys].to.at])
+  return keep(size, target, (view) => drawRun(size, run, pins, focus, path, picking, view))
 }
 
 /** The run's globe seen from `view`. */
-function drawRun(run: Run, pins: Pin[], focus: LonLat, path: LonLat[], picking: boolean, { centre, r }: View, state: string): string {
+function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: LonLat[], picking: boolean, view: View): string {
   const stage = run.route[run.keys]
-  const project = projection(centre, r)
+  const project = projection(view, size)
   // The journey so far: each leg crossed, then this one up to where the squad stands.
   const walked = [...run.route.slice(0, run.keys).flatMap((s) => way(s.from, s.to.at)), ...[stage.from, ...path].flatMap((at, i, all) => (i === 0 ? [] : way(all[i - 1], at)))]
   const home = run.soldiers[0]?.home
@@ -203,5 +226,5 @@ function drawRun(run: Run, pins: Pin[], focus: LonLat, path: LonLat[], picking: 
     const p = placed.get(pin.id)!
     return p.front ? [`<div class="cell${pin.squad ? ' squad' : ''}${pin.choice ? ' choice' : ''}${picking && !pin.lit && !pin.squad ? ' dim' : ''}" style="${spot(p)}">${pin.html}</div>`] : []
   })
-  return sphere(r, project, `<path class="walked" d="${line(project, walked)}"/>${trails.join('')}${homeMark}${cities.join('')}`, stops.join('') + chopper(project(focus)), state)
+  return sphere(view, size, `<path class="walked" d="${line(project, walked)}"/>${trails.join('')}${homeMark}${cities.join('')}`, stops.join('') + chopper(project(focus)))
 }

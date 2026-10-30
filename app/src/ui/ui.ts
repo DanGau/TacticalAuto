@@ -1,6 +1,6 @@
 import { recruits, story, title } from './menu'
 import type { Action } from '../core/apply'
-import type { Report, Run } from '../core/run'
+import { nextStop, type Report, type Run } from '../core/run'
 import type { View } from '../view/view'
 import { choice, runEnd, stopReport } from './aftermath'
 import { ALIENS } from '../core/aliens'
@@ -294,9 +294,14 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
       // A stop tapped once is picked to look at; tapped again, the squad sets out for it.
       const index = Number(target.dataset.pick)
       if (picked !== index) picked = index
+      // The squad flies there and sets in: a fight dives down through the clouds.
       else return fly(target, () => {
         picked = null
         act({ type: 'go', index })
+        const next = nextStop(shown!)
+        if (!next) return
+        if (next === 'supply' || next === 'cache' || next === 'shop') act({ type: 'advance' })
+        else dive(() => act({ type: 'advance' }))
       })
     }
     else if (target.dataset.gear) gear = target.dataset.gear as 'keep' | 'sell'
@@ -307,10 +312,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     } else if (target.dataset.action) {
       picked = null
       gear = null
-      const action = JSON.parse(target.dataset.action) as Action
-      // Setting out for a fight dives down through the clouds to it.
-      if (action.type === 'advance' && !/\b(supply|cache|shop)\b/.test(target.className)) return dive(() => act(action))
-      act(action)
+      act(JSON.parse(target.dataset.action) as Action)
       return
     }
     render(shown!)

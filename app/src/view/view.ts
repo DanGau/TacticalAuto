@@ -33,6 +33,8 @@ const FOCUS_MS = 700
 const FLY_MS = 1600
 /** Screen pixels the landing panel takes from the bottom of the canvas. */
 const PANEL = 110
+/** Screen pixels kept clear around the whole battlefield, which sits in the middle of the screen above the panel. */
+const WHOLE_MARGIN = PANEL + 60
 /** A drop pod's fall, the burst of dust as it lands, the gap between pods, and the height it falls from in world pixels. */
 const POD_FALL_MS = 800
 /** How long a stealth insertion's parachutes take to drift down, how high they start, and how long a canopy takes to fold. */
@@ -528,12 +530,12 @@ export async function createView(): Promise<View> {
   }
 
   /** The camera that frames the given tiles, zoomed in no closer than life size. */
-  function framing(points: Tile[], yaw = YAW): Camera {
+  function framing(points: Tile[], yaw = YAW, margin = MARGIN): Camera {
     const at = points.map((p) => picture(spot(p.x, p.y), yaw))
     const xs = at.map((p) => p.x)
     const ys = at.map((p) => p.y)
-    const width = Math.max(...xs) - Math.min(...xs) + MARGIN
-    const height = Math.max(...ys) - Math.min(...ys) + MARGIN
+    const width = Math.max(...xs) - Math.min(...xs) + margin
+    const height = Math.max(...ys) - Math.min(...ys) + margin
     const middle = { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 }
     const ground = points.reduce((sum, p) => sum + spot(p.x, p.y).y, 0) / points.length
     return aim(middle, Math.max(FIT, Math.min(1, WIDTH / width, HEIGHT / height)), yaw, ground)
@@ -1585,10 +1587,11 @@ export async function createView(): Promise<View> {
     return [{ x: zone.x - reach, y: zone.y - reach }, { x: zone.x + reach, y: zone.y + reach }, ...(toward ? [toward] : [])]
   }
 
-  /** The camera that frames the whole battlefield. */
+  /** The camera that frames the whole battlefield, its own tiles filling the screen. */
   function wholeMap(yaw = YAW): Camera {
-    const { x1, y1, x2, y2 } = shown!.bounds
-    return framing([{ x: x1, y: y1 }, { x: x2, y: y1 }, { x: x1, y: y2 }, { x: x2, y: y2 }], yaw)
+    const battle = shown!
+    const tiles = battle.outside.flatMap((out, t) => (out ? [] : [{ x: t % GRID, y: Math.floor(t / GRID) }]))
+    return framing(tiles, yaw, WHOLE_MARGIN)
   }
 
   /**
@@ -1599,7 +1602,7 @@ export async function createView(): Promise<View> {
     const yaw = YAW + (shot.turn ?? 0)
     const framed = tiles === null ? wholeMap(yaw) : framing(tiles, yaw)
     const { up, right } = axes(yaw)
-    const lift = -PANEL / framed.zoom / ACROSS
+    const lift = -(tiles === null ? PANEL / 2 : PANEL) / framed.zoom / ACROSS
     const aside = -((shot.third ?? 0) * WIDTH) / 6 / framed.zoom / ACROSS
     return {
       ...framed,

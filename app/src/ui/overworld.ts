@@ -111,7 +111,8 @@ function runMap(run: Run, picked: number | null): string {
   const banner = stage.hero ? `Leg ${run.keys + 1} of ${KEYS}: across ${CONTINENTS[stage.continent!].name} to ${stage.hero.name}, waiting in ${stage.to.name}, ${stage.to.country}.` : 'The last leg: to the alien hub under the Antarctic ice.'
   // The way on from the picked stop lights up, stop by stop.
   for (const pin of pins) if (pin.lit && !pin.squad) for (const id of pin.next) pins.forEach((p) => p.id === id && (p.lit = true))
-  return `<p class="progress">${banner}</p><div class="map">${globe(run, pins, focus, path, picked !== null)}</div>`
+  // The map fills the screen under the header and headings.
+  return `<p class="progress">${banner}</p><div class="map">${globe({ w: innerWidth - 40, h: innerHeight - 130 }, run, pins, focus, path, picked !== null)}</div>`
 }
 
 /** The words on the button that travels to the next stop. */
@@ -171,9 +172,8 @@ function mapView(run: Run, picked: number | null): string {
   const ahead = picked !== null && ways(run).includes(picked) ? legOf(run).columns[run.stop][picked].stop : null
   if (!node && !ahead) return `${run.report ? '' : decisions(run)}<h2>Choose where to go next. Tap a stop to see what waits there and where it leads.</h2>${runMap(run, null)}`
   if (!node)
-    return `${run.report ? '' : decisions(run)}<h2>${where(run, ahead!)}</h2>
-    ${runMap(run, picked)}
-    <p class="progress">Tap it again to set out, or tap another stop to compare.</p>`
+    return `${run.report ? '' : decisions(run)}<h2>${where(run, ahead!)} <small>Tap it again to set out.</small></h2>
+    ${runMap(run, picked)}`
   const next = nextStop(run)!
   const here = node.stop!
   return `${run.report ? '' : decisions(run)}<h2>${where(run, here)}</h2>

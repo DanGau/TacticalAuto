@@ -2,7 +2,7 @@ import { CLASSES } from '../core/classes'
 import type { Run, Soldier } from '../core/run'
 import { PATHS, SKILLS } from '../core/skills'
 import { TRAITS, type Trait } from '../core/traits'
-import { choices } from './globe'
+import { places } from './globe'
 
 /** The title screen, before a run begins. */
 export function title(): string {
@@ -29,32 +29,29 @@ export function story(): string {
   </div>`
 }
 
-/** The recruit who waits in a city: class, path and trait at a glance, and what its ability and skills do. */
-function card(recruit: Soldier): string {
+/** A recruit as a card to pick: class, path, home and trait at a glance; once picked, what its ability and skills do. */
+function card(recruit: Soldier, index: number, chosen: number | null): string {
   const cls = CLASSES[recruit.cls!]
   const path = PATHS[recruit.cls!].find((p) => p.core === recruit.skills[0])!
   const trait: Trait | null = recruit.trait ? TRAITS[recruit.trait] : null
   const quirk = trait ? `<b>${trait.name}</b><span class="down">${trait.pro}</span><span class="up">${trait.con}</span>` : '<b>Steady</b><small>No quirks</small>'
   const named = [{ name: cls.abilityName, text: cls.abilityText }, ...recruit.skills.map((id) => SKILLS[id])]
-  return `<div class="card recruit chosen">
+  return `<button data-recruit="${index}" class="card recruit${index === chosen ? ' chosen' : ''}">
     <small>${cls.name} · ${path.name}</small>
     <b class="name">${recruit.name}</b>
     <small class="home">🌍 ${recruit.home!.name}, ${recruit.home!.country}</small>
     <span class="feats">${named.map((n, i) => `<span class="chip ${i === 0 ? 'feat' : ''}">${n.name}</span>`).join('')}<span class="more">ⓘ</span></span>
     <div class="trait">${quirk}</div>
     <span class="defs">${named.map((n) => `<span class="def"><b>${n.name}</b>${n.text}.</span>`).join('')}</span>
-  </div>`
+  </button>`
 }
 
-/** The run's first choice: the city it begins in, on the globe, and with it the recruit who waits there to lead. Tap a city to meet them, again to begin. */
+/** The run's first choice: which recruit leads the squad, under a globe turned to the city they wait in. Tap a card to pick, again to begin. */
 export function recruits(run: Run, chosen: number | null): string {
-  const cities = run.recruits.map((r, i) => ({
-    at: r.home!.at,
-    chosen: i === chosen,
-    html: `<button class="option${i === chosen ? ' picked' : ''}" data-recruit="${i}"><span class="node key">🌍</span><b class="label">${r.home!.name}</b></button>`,
-  }))
+  const homes = run.recruits.map((r, i) => ({ at: r.home!.at, chosen: i === chosen, html: `<span class="home${i === chosen ? ' chosen' : ''}">${r.home!.name}</span>` }))
   return `<div class="menu">
-    <h2>${chosen === null ? 'Where does the fight begin? A soldier waits in each city.' : `${run.recruits[chosen].home!.name}, ${run.recruits[chosen].home!.country}. Tap it again to begin here.`}</h2>
-    <div class="start"><div class="map">${choices(cities)}</div>${chosen === null ? '' : card(run.recruits[chosen])}</div>
+    <h2>${chosen === null ? 'Who leads the squad? Each waits in a different city.' : `Tap ${run.recruits[chosen].name} again to begin in ${run.recruits[chosen].home!.name}.`}</h2>
+    <div class="homes">${places({ w: 560, h: 220 }, homes)}</div>
+    <div class="choices">${run.recruits.map((r, i) => card(r, i, chosen)).join('')}</div>
   </div>`
 }
