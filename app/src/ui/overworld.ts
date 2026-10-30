@@ -115,11 +115,8 @@ function runMap(run: Run, picked: number | null): string {
   return `<div class="map flight">${globe({ w: innerWidth, h: innerHeight }, run, pins, focus, path, picked !== null)}</div>`
 }
 
-/** The words on the button that travels to the next stop. */
-function travelLabel(run: Run, stop: Stop, next: NonNullable<ReturnType<typeof nextStop>>): string {
-  if (next === 'supply' || next === 'cache') return `Collect the ${STOP_NAMES[next].toLowerCase()}`
-  if (next === 'shop') return 'Enter the shop'
-  if (next === 'unknown') return 'Find out what lies ahead'
+/** What the fight at the squad's stop holds: its kind, the alien force, and the stakes. */
+function travelLabel(run: Run, stop: Stop, next: 'battle' | 'key' | 'final' | 'escape'): string {
   const mission = missionAt(run, next, stop.risk, next === 'battle' ? stop.goal : 'exterminate')
   const stakes = next === 'escape' || next === 'final' ? ' · lose and the run ends' : ''
   return `${STOP_NAMES[next]}: alien force ${mission.force}${next === 'key' || next === 'final' ? ', with a boss' : ''}${stakes}`
@@ -130,9 +127,8 @@ function where(run: Run, stop: Stop): string {
   const stage = run.route[run.keys]
   if (stop.kind === 'final') return 'The squad is whole. Under the ice lies the alien hub: raid it, and end this.'
   if (stop.kind === 'key') return `${stage.hero!.name} holds out in ${stage.to.name}, surrounded. Get them out: lose them, and the run is over.`
-  if (stop.kind === 'unknown') return 'The road leads somewhere unknown: a fight, a shop, or something stranger.'
-  if (stop.kind === 'shop') return 'The road leads to a shop, where supplies buy gear, relics, or a quieter road.'
-  if (stop.kind !== 'battle') return `The road leads to a ${STOP_NAMES[stop.kind].toLowerCase()}.`
+  // A stop's icon tells what it is; only a fight says more.
+  if (stop.kind !== 'battle') return ''
   return `${GOALS[stop.goal].name}, ${RISKS[stop.risk].name.toLowerCase()} ${TERRAIN_TEXT[stop.terrain].name.toLowerCase()}: ${GOALS[stop.goal].text}.${twistLine(stop.twist)}`
 }
 
@@ -173,10 +169,11 @@ function mapView(run: Run, picked: number | null): string {
   // Flight: the map fills the screen; what a stop holds shows over it once picked or reached.
   const choices = run.report ? '' : decisions(run)
   if (!node && !ahead) return `${choices}${runMap(run, null)}`
-  if (!node) return `${choices}<div class="brief">${where(run, ahead!)}</div>${runMap(run, picked)}`
+  const brief = (text: string) => (text ? `<div class="brief">${text}</div>` : '')
+  if (!node) return `${choices}${brief(where(run, ahead!))}${runMap(run, picked)}`
   const next = nextStop(run)!
   const here = node.stop!
-  return `${choices}<div class="brief">${next === 'escape' ? '<b class="up">The threat is full. The squad is ambushed on the road and must escape.</b>' : where(run, here)}<br><small>${travelLabel(run, here, next)}</small></div>
+  return `${choices}${brief(next === 'escape' ? '<b class="up">The threat is full. The squad is ambushed on the road and must escape.</b>' : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)}<br><small>${travelLabel(run, here, next)}</small>` : '')}
     ${runMap(run, null)}`
 }
 
