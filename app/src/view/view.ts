@@ -459,6 +459,8 @@ export async function createView(): Promise<View> {
   let roofs: { tiles: Set<number>; fade: { value: number }; mesh: Mesh }[] = []
   /** The tile the briefing is lighting, which no roof hides. */
   let lit: Tile | null = null
+  /** The fades of everything past the battlefield, which only the briefing's wide lens shows. */
+  let surroundings: { value: number }[] = []
   /** The tiles the squad sees, by index; null before the landing. */
   let seen: boolean[] | null = null
   /** The battle on screen. */
@@ -540,6 +542,8 @@ export async function createView(): Promise<View> {
     render()
   })
 
+  /** The field of view, in degrees, at which everything past the battlefield shows whole. */
+  const SURROUNDINGS_FOV = 12
   /** How long a roof or wall takes to fade out of the way or back. */
   const FADE_MS = 220
   /** How solid a wall stays while a unit stands just behind it. */
@@ -551,6 +555,10 @@ export async function createView(): Promise<View> {
    * just before a unit toward the camera, as XCOM cuts its buildings away; the rest fade back.
    */
   function reveal(ms: number): void {
+    // Past the battlefield fades in as the lens widens from still, and is gone in the game's view.
+    const wide = Math.min(1, Math.max(0, (camera.fov - STILL_FOV) / SURROUNDINGS_FOV))
+    for (const fade of surroundings) fade.value = wide
+    outskirts.visible = wide > 0
     const step = ms / FADE_MS
     const toward = (fade: { value: number }, target: number) => (fade.value = fade.value < target ? Math.min(target, fade.value + step) : Math.max(target, fade.value - step))
     const keys = [...sprites.values()].map((s) => ({ x: Math.round(s.tile.x), y: Math.round(s.tile.y) }))
@@ -880,8 +888,10 @@ export async function createView(): Promise<View> {
         [x - 0.5, y - 0.5, x + 0.5, y - 0.5, drop(x, y - 1), 0.6],
         [x - 0.5, y - 0.5, x - 0.5, y + 0.5, drop(x - 1, y), 0.45],
       ] as const
-      for (const [ax, az, bx, bz, fall, light] of sides) if (fall > 0) ground.quad({ x: ax, y: top, z: az }, { x: bx, y: top, z: bz }, { x: bx, y: top - fall, z: bz }, { x: ax, y: top - fall, z: az }, shade(color, light))
-      ground.flat(x - 0.5, y - 0.5, x + 0.5, y + 0.5, top, highland(color, battle.height[tile]))
+      // The town's ground goes with the rest of it, fading with the lens.
+      const into = out ? beyond : ground
+      for (const [ax, az, bx, bz, fall, light] of sides) if (fall > 0) into.quad({ x: ax, y: top, z: az }, { x: bx, y: top, z: bz }, { x: bx, y: top - fall, z: bz }, { x: ax, y: top - fall, z: az }, shade(color, light))
+      into.flat(x - 0.5, y - 0.5, x + 0.5, y + 0.5, top, highland(color, battle.height[tile]))
       if (!out)
         for (const [ax, az, bx, bz] of [
           [x - 0.5, y - 0.5, x + 0.5, y - 0.5],
@@ -933,6 +943,12 @@ export async function createView(): Promise<View> {
     if (lines) town.add(lines)
     dim(town, shade(0xffffff, BEYOND))
     terrain.add(town)
+    surroundings = []
+    for (const group of [town, outskirts])
+      group.traverse((part) => {
+        const material = (part as Mesh).material as MeshBasicMaterial | undefined
+        if (material) surroundings.push(ditherable(material))
+      })
   }
 
   /** Clears the board for a new battle. */
@@ -991,7 +1007,7 @@ export async function createView(): Promise<View> {
         shownZones.forEach((zone, i) => {
           for (let y = 0; y < GRID; y++) {
             for (let x = 0; x < GRID; x++) {
-              if (distance(zone, { x, y }) <= ZONE_RADIUS) diamond(tint, x, y, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone, 0.8)
+              if (distance(zone, { x, y }) <= ZONE_RADIUS && battle.ground[y * GRID + x] !== 'void') diamond(tint, x, y, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone, 0.8)
             }
           }
           // The selected zone's way in: a line to the uplink, or to the nearest contact.
