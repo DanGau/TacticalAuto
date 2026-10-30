@@ -1329,14 +1329,15 @@ export async function createView(): Promise<View> {
     return callout(e.amount === 0 ? word : `${word} ${e.amount > 0 ? '+' : ''}${e.amount}`, e.amount > 0 ? COLOR.heal : e.amount < 0 ? COLOR.crit : COLOR.hit, over)
   }
 
-  /** A rocket flies from `from` to its tile and bursts, wounding every unit it caught. With no `from`, something burst where it stood. */
+  /** A rocket, or napalm in flame's colour, flies from `from` to its tile and bursts, wounding every unit it caught. With no `from`, something burst where it stood. */
   async function fireRocket(battle: Battle, from: Sprite | undefined, e: Extract<GameEvent, { type: 'rocket' }>): Promise<void> {
     const b = toWorld(e.x, e.y)
+    const color = e.fire ? COLOR.fire : COLOR.crit
     if (from) {
       const a = chest(from)
       await tween(ROCKET_MS, (t) => {
         const at = lerp(a, b, t)
-        fx.clear().circle(at.x, at.y, 5).fill(COLOR.crit)
+        fx.clear().circle(at.x, at.y, 5).fill(color)
       })
     }
     // The blast has already wrecked the terrain in the battle; show it as the rocket lands.
@@ -1346,10 +1347,10 @@ export async function createView(): Promise<View> {
       const sprite = sprites.get(hit.target)
       if (!sprite) continue
       sprite.drawHp(...vitals(battle, hit.target))
-      float(callout(`ROCKET -${hit.damage}`, COLOR.crit, sprite))
+      float(callout(`${e.fire ? 'NAPALM' : 'ROCKET'} -${hit.damage}`, color, sprite))
     }
     await tween(BLAST_MS, (t) => {
-      fx.clear().ellipse(b.x, b.y, (BLAST_RADIUS + 0.7) * TILE_W * t, (BLAST_RADIUS + 0.7) * TILE_H * t).fill({ color: COLOR.crit, alpha: 0.8 * (1 - t) })
+      fx.clear().ellipse(b.x, b.y, (BLAST_RADIUS + 0.7) * TILE_W * t, (BLAST_RADIUS + 0.7) * TILE_H * t).fill({ color, alpha: 0.8 * (1 - t) })
     })
     fx.clear()
   }

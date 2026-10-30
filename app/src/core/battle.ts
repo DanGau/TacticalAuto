@@ -28,6 +28,12 @@ export const PATROL_MOVE = 2
 /** Damage a rocket does to every unit within BLAST_RADIUS tiles of where it lands. */
 export const ROCKET_DAMAGE = 4
 export const BLAST_RADIUS = 1
+/** Damage napalm does to every unit within its blast, which it sets burning on ground set alight. */
+export const NAPALM_DAMAGE = 3
+/** Damage Searing adds and Icebreaker adds against a burning or chilled target. */
+export const SEARING_DAMAGE = 2
+/** Turns Smolder adds to burning, and Permafrost to chill. */
+export const LINGER_TURNS = 2
 /** Health a medic restores, to a soldier within MEDIC_REACH tiles. */
 export const MEDIC_HEAL = 4
 export const MEDIC_REACH = 2
@@ -120,7 +126,7 @@ export interface Stats {
 export const BASE_STATS: Stats = { hp: 10, armor: 0, aim: 0.75, damage: 3, range: 5, move: 4, crit: 0.5, close: 0.06 }
 
 /** Something a unit does unprompted beyond moving and shooting; each is described where combat applies it. */
-export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech'
+export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' | 'napalm' | 'cryo'
 
 /** Something a piece of gear does; gear.ts says what each does. */
 export type GearEffect = 'frostbite' | 'tracer' | 'rime' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'thorns' | 'shield' | 'regen' | 'lastStand' | 'medkit' | 'grenade' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'mirror' | 'bond' | 'guardians' | 'blink' | 'polymorph' | 'null' | 'snare' | 'booming' | 'tether' | 'caltrops'
@@ -171,6 +177,18 @@ export type SkillEffect =
   | 'bane'
   | 'ward'
   | 'drone'
+  | 'inferno'
+  | 'fireSuit'
+  | 'tinder'
+  | 'searing'
+  | 'backdraft'
+  | 'smolder'
+  | 'icebreak'
+  | 'frostbreak'
+  | 'deepFreeze'
+  | 'avalanche'
+  | 'permafrost'
+  | 'rimeLock'
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'podBlast' | 'podShred' | 'podFrost' | 'podWall' | 'podTurret' | 'dropPods' | 'canopies' | 'ghost' | 'killzone' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */

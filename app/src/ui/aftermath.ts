@@ -9,7 +9,7 @@ import { TRAITS } from '../core/traits'
 import { button, describe, gearCard, gearText, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
 
 /** Each class's badge; a soldier not yet promoted wears a helmet. */
-const BADGES: Record<ClassId, string> = { assault: '🔫', heavy: '🚀', sniper: '🎯', support: '⛑️', engineer: '🔧' }
+const BADGES: Record<ClassId, string> = { assault: '🔫', heavy: '🚀', sniper: '🎯', support: '⛑️', engineer: '🔧', pyro: '🔥', cryo: '❄️' }
 
 /**
  * A soldier's card: class badge, name, and an experience bar filling with what the battle earned, flaring on a level

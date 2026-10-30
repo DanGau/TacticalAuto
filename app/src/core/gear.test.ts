@@ -1,8 +1,8 @@
-import { PATHS } from './skills'
+import { PATHS, SKILLS } from './skills'
 import { expect, test } from 'vitest'
 import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
-import { alienUnit, CRIT_BONUS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
+import { alienUnit, CHILL_TURNS, CRIT_BONUS, SEARING_DAMAGE, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { alienStats } from './aliens'
 import { EFFECTS, generateGear, type Gear } from './gear'
@@ -74,8 +74,8 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   const alien = battle.units.find((u) => u.side === 'alien')!
   battle.units = [soldier, alien]
   battle.pods.forEach((pod) => Object.assign(pod, { revealed: true, alert: true }))
-  // A soldier of no class in particular: it holds its ground and has no ability.
-  Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null })
+  // A soldier of no class in particular: it holds its ground and has no ability or class skill.
+  Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, effects: soldier.effects.filter((e) => !Object.values(SKILLS).some((s) => s.effect === e)) })
   Object.assign(alien, { kind: 'trooper', x: 10, y: 11, hp: 99, armor: 0, target: false, stats: { ...alienStats('trooper', 0, 0), hp: 99, armor: 0, aim: 2, crit: 0 } })
   return { battle, soldier, alien, step: () => stepBattle(battle) }
 }
@@ -356,4 +356,50 @@ test("a soldier's kills, damage and feats are credited to it", () => {
   d.soldier.stats = { ...d.soldier.stats, damage: 120, crit: 0 }
   while (d.alien.hp > 0) d.step()
   expect(d.battle.tally[d.soldier.soldier!]).toMatchObject({ kills: 1, dealt: 99, feats: ['overkill', 'oneShot'] })
+})
+
+test('cryo rounds chill the target; an icebreaker hits a chilled one harder, and permafrost holds the chill longer', () => {
+  const d = armed(['icebreak', 'permafrost'])
+  d.soldier.ability = 'cryo'
+  const shots = () => untilAlienShoots(d).filter((e) => e.type === 'shot' && e.id === d.soldier.id)
+  expect(shots()[0]).toMatchObject({ hit: true, damage: 1 })
+  expect(d.alien.chilled).toBeGreaterThan(CHILL_TURNS)
+  expect(shots()[0]).toMatchObject({ hit: true, damage: 1 + SEARING_DAMAGE })
+})
+
+test('incendiary rounds set the target burning, and searing hits a burning one harder', () => {
+  const d = armed(['tinder', 'searing'])
+  const shots = () => untilAlienShoots(d).filter((e) => e.type === 'shot' && e.id === d.soldier.id)
+  expect(shots()[0]).toMatchObject({ hit: true, damage: 1 })
+  expect(d.alien.burning).toBeGreaterThan(0)
+  expect(shots()[0]).toMatchObject({ hit: true, damage: 1 + SEARING_DAMAGE })
+})
+
+test('napalm blasts aliens standing together, setting them burning and the ground alight', () => {
+  const d = armed([])
+  Object.assign(d.soldier, { ability: 'napalm', charges: 1 })
+  d.alien.y = 13
+  const other = another(d, 1, 0)
+  const events = untilAlienShoots(d)
+  expect(events).toContainEqual(expect.objectContaining({ type: 'rocket', id: d.soldier.id, fire: true }))
+  expect(d.soldier.charges).toBe(0)
+  expect([d.alien.burning, other.burning].every((turns) => turns > 0)).toBe(true)
+  expect(d.battle.fire).toContainEqual(expect.objectContaining({ x: 10, y: 13 }))
+})
+
+test('a fire suit keeps its wearer from burning in fire', () => {
+  const d = armed(['fireSuit'])
+  d.battle.fire.push({ x: d.soldier.x, y: d.soldier.y, turns: 9 })
+  untilAlienShoots(d)
+  expect(d.soldier.burning).toBe(0)
+})
+
+test('a kill on an alien burning and chilled spreads both to those beside it, with backdraft and avalanche', () => {
+  const d = armed(['backdraft', 'avalanche'], { damage: 5 })
+  Object.assign(d.alien, { hp: 1, burning: 9, chilled: 9 })
+  const other = another(d, 1, 0)
+  const events = []
+  while (d.alien.hp > 0) events.push(...d.step())
+  expect(effectsOf(events, 'backdraft')).toContainEqual({ type: 'effect', id: other.id, effect: 'backdraft', amount: 0 })
+  expect(effectsOf(events, 'avalanche')).toContainEqual({ type: 'effect', id: other.id, effect: 'avalanche', amount: 0 })
 })

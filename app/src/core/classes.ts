@@ -65,6 +65,26 @@ const classes = {
     abilityText: 'Once per battle, once aliens are in sight, deploys a combat mech beside it that fights for the squad until destroyed, and still shoots',
     charges: 1,
   },
+  pyro: {
+    name: 'Pyro',
+    stats: { hp: 2, armor: 1 },
+    stance: 'rush',
+    stanceText: 'Closes in to bring its flames to bear',
+    ability: 'napalm',
+    abilityName: 'Napalm',
+    abilityText: 'Twice per battle, in place of a shot, sprays napalm over two or more aliens standing together: 3 damage, and they burn on ground set alight',
+    charges: 2,
+  },
+  cryo: {
+    name: 'Cryo',
+    stats: { range: 1 },
+    stance: 'standoff',
+    stanceText: 'Hangs back and slows whatever comes on',
+    ability: 'cryo',
+    abilityName: 'Cryo Rounds',
+    abilityText: 'Its hits chill the target',
+    charges: 0,
+  },
 } satisfies Record<string, SoldierClass>
 
 export type ClassId = keyof typeof classes

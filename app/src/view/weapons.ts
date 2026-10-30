@@ -39,10 +39,14 @@ export const WEAPONS = {
   maul: { ...base, style: 'strike', color: 0xffe0a0, width: 6, ms: 140, flash: 12, hitstop: 120, shake: 8, kick: 12, sparks: 12 },
   /** A blademaster's sword: two quick cuts. */
   blade: { ...base, style: 'strike', color: 0xe8f4ff, width: 3, ms: 110, bolts: 2, flash: 8, hitstop: 70, shake: 3, kick: 8, sparks: 8 },
+  /** A pyro's flamer: a wide gout of flame. */
+  flamer: { ...base, style: 'beam', color: 0xff6a1f, core: 0xffe08a, width: 8, ms: 240, flash: 14, hitstop: 50, shake: 2, kick: 4, sparks: 14 },
+  /** A cryo's freeze gun: a frosty orb. */
+  freezer: { ...base, style: 'orb', color: 0xbfeaff, core: 0xffffff, width: 5, ms: 240, flash: 8, hitstop: 70, kick: 3, sparks: 10 },
   lance: { ...base, style: 'beam', color: 0xc77dff, core: 0xffe6ff, width: 7, ms: 420, flash: 18, hitstop: 110, shake: 9, kick: 10, sparks: 14 },
 } satisfies Record<string, Weapon>
 
-const CLASS_WEAPON: Record<ClassId, keyof typeof WEAPONS> = { assault: 'shotgun', heavy: 'minigun', sniper: 'rail', support: 'rifle', engineer: 'arc' }
+const CLASS_WEAPON: Record<ClassId, keyof typeof WEAPONS> = { assault: 'shotgun', heavy: 'minigun', sniper: 'rail', support: 'rifle', engineer: 'arc', pyro: 'flamer', cryo: 'freezer' }
 
 /** The weapon a unit attacks with: a soldier's by class, or a blade if the squad are `blademasters`; an alien's by kind, a boss's lance, a mech's cannons. */
 export function weaponOf(unit: Unit, cls: ClassId | null, blademasters = false): Weapon {

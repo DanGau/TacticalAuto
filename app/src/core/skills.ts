@@ -1,4 +1,4 @@
-import type { SkillEffect, Stats } from './battle'
+import { LINGER_TURNS, SEARING_DAMAGE, type SkillEffect, type Stats } from './battle'
 import { TUNING } from './tuning'
 import type { ClassId } from './classes'
 import type { Keyword } from './keywords'
@@ -73,6 +73,28 @@ const skills = {
   bane: { name: 'Bane', text: 'Aliens within 3 tiles of it have -10% aim', effect: 'bane' },
   ward: { name: 'Ward', text: 'It and squadmates within 2 tiles cannot be panicked, and acid does them no harm', effect: 'ward' },
   drone: { name: 'Combat Drone', text: 'After it acts, its drone does 2 damage to the nearest alien in sight within 5 tiles', effect: 'drone' },
+  // Pyro
+  tanks: { name: 'Napalm Tanks', tags: ['burn'], text: 'One more napalm each battle', charges: 1 },
+  inferno: { name: 'Inferno', tags: ['burn'], text: 'Its napalm spreads 2 tiles around where it lands', effect: 'inferno' },
+  fireSuit: { name: 'Fire Suit', text: 'It cannot burn', effect: 'fireSuit' },
+  backdraft: { name: 'Backdraft', tags: ['burn', 'kill'], text: 'An alien it kills while burning sets every alien beside it burning', effect: 'backdraft' },
+  asbestos: { name: 'Asbestos Coat', text: '+3 health', stats: { hp: 3 } },
+  tinder: { name: 'Incendiary Rounds', tags: ['burn'], text: 'Its hits set the target burning', effect: 'tinder' },
+  searing: { name: 'Searing', tags: ['burn'], text: `+${SEARING_DAMAGE} damage to a burning target`, effect: 'searing' },
+  flashpoint: { name: 'Flashpoint', tags: ['crit'], text: '+15% crit', stats: { crit: 0.15 } },
+  smolder: { name: 'Smolder', tags: ['burn'], text: `Its burns last ${LINGER_TURNS} more turns`, effect: 'smolder' },
+  afterburner: { name: 'Afterburner', text: '+2 move', stats: { move: 2 } },
+  // Cryo
+  icebreak: { name: 'Icebreaker', tags: ['frost'], text: `+${SEARING_DAMAGE} damage to a chilled target`, effect: 'icebreak' },
+  frostbreak: { name: 'Frostbite', tags: ['frost', 'ward'], text: "Hits on a chilled target ignore its armor", effect: 'frostbreak' },
+  deepFreeze: { name: 'Deep Freeze', tags: ['frost', 'crit'], text: 'A crit on a chilled alien freezes it solid: it loses its next action', effect: 'deepFreeze' },
+  avalanche: { name: 'Avalanche', tags: ['frost', 'kill'], text: 'An alien it kills while chilled chills every alien beside it', effect: 'avalanche' },
+  coldSteel: { name: 'Cold Steel', text: '+1 damage', stats: { damage: 1 } },
+  permafrost: { name: 'Permafrost', tags: ['frost'], text: `Its chills last ${LINGER_TURNS} more turns`, effect: 'permafrost' },
+  rimeLock: { name: 'Rime Lock', tags: ['frost'], text: 'An alien it chills is rooted too', effect: 'rimeLock' },
+  coldEye: { name: 'Cold Eye', text: '+10% aim', stats: { aim: 0.1 } },
+  iceArmor: { name: 'Ice Armor', tags: ['ward'], text: '+2 armor', stats: { armor: 2 } },
+  longRange: { name: 'Long Barrel', text: '+2 range', stats: { range: 2 } },
 } satisfies Record<string, Skill>
 
 export type SkillId = keyof typeof skills
@@ -102,6 +124,14 @@ export const PATHS: Record<ClassId, [Path, Path]> = {
   engineer: [
     { name: 'Mechanic', core: 'titan', tiers: [['plating', 'servos'], ['detonate', 'rebuild']] },
     { name: 'Dronemaster', core: 'swarm', tiers: [['spotter', 'linked'], ['hive', 'shock']] },
+  ],
+  pyro: [
+    { name: 'Arsonist', core: 'tanks', tiers: [['inferno', 'fireSuit'], ['backdraft', 'asbestos']] },
+    { name: 'Firestarter', core: 'tinder', tiers: [['searing', 'flashpoint'], ['smolder', 'afterburner']] },
+  ],
+  cryo: [
+    { name: 'Icebreaker', core: 'icebreak', tiers: [['frostbreak', 'coldSteel'], ['deepFreeze', 'avalanche']] },
+    { name: 'Glacier', core: 'permafrost', tiers: [['rimeLock', 'coldEye'], ['iceArmor', 'longRange']] },
   ],
   support: [
     { name: 'Medic', core: 'fieldKit', tiers: [['surgeon', 'vitality'], ['revive', 'ward']] },

@@ -60,6 +60,9 @@ import {
 
   BURN_DAMAGE,
   BURN_TURNS,
+  LINGER_TURNS,
+  NAPALM_DAMAGE,
+  SEARING_DAMAGE,
 
   CRIT_BONUS,
   distance,
@@ -89,6 +92,7 @@ import {
   SPIT_DAMAGE,
   STANDOFF,
   type Battle,
+  type Ability,
   type Effect,
   type Side,
   type Stance,
@@ -113,11 +117,11 @@ export type GameEvent =
   | { type: 'sighted'; units: { id: number; x: number; y: number }[] }
   /** `damage` is 0 for a miss. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. */
   | { type: 'shot'; id: number; target: number; hit: boolean; crit: boolean; damage: number; with: Effect[] }
-  /** A rocket or grenade lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */
-  | { type: 'rocket'; id: number; x: number; y: number; hits: { target: number; damage: number }[] }
+  /** A rocket, grenade or napalm (`fire`) lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */
+  | { type: 'rocket'; id: number; x: number; y: number; hits: { target: number; damage: number }[]; fire?: true }
   | { type: 'heal'; id: number; target: number; amount: number }
-  /** An effect of gear, a skill or a relic acts on the unit `id`. `amount` is the health it gained, or lost if negative; 0 when neither. */
-  | { type: 'effect'; id: number; effect: Effect; amount: number }
+  /** An effect of gear, a skill, a relic or a class ability acts on the unit `id`. `amount` is the health it gained, or lost if negative; 0 when neither. */
+  | { type: 'effect'; id: number; effect: Effect | Ability; amount: number }
   /** A spitter's spit lands on its target, which takes `damage`, and leaves acid on the tile. */
   | { type: 'spit'; id: number; target: number; damage: number }
   /** A feeder grows on a trick the squad used: its hits do `damage` more than its weapon's. */
@@ -215,6 +219,10 @@ const foeHas = (battle: Battle, unit: Unit, effect: Effect) => battle.units.some
 const silenced = (battle: Battle, unit: Unit) => battle.units.some((u) => u.side !== unit.side && has(u, 'null') && distance(u, unit) <= NULL_REACH)
 
 const onTile = (pools: Tile[], unit: Tile) => pools.some((pool) => pool.x === unit.x && pool.y === unit.y)
+
+/** Turns a target `unit` sets burning burns, and one it chills stays chilled. */
+const burnFrom = (unit: Unit) => BURN_TURNS + (has(unit, 'smolder') ? LINGER_TURNS : 0)
+const chillFrom = (unit: Unit) => CHILL_TURNS + (has(unit, 'permafrost') ? LINGER_TURNS : 0)
 
 /** Uses a once-per-battle effect. False if the unit lacks it or has used it. */
 function spend(unit: Unit, effect: Effect): boolean {
@@ -862,7 +870,7 @@ function moveSide(battle: Battle): GameEvent[] {
   }
   for (const unit of battle.units.filter((u) => u.side === battle.turn && onTile(battle.fire, u) && !fireproof(battle, u))) {
     unit.burning = BURN_TURNS
-    events.push({ type: 'effect', id: unit.id, effect: 'pyre', amount: 0 })
+    events.push({ type: 'effect', id: unit.id, effect: foeHas(battle, unit, 'pyre') ? 'pyre' : 'napalm', amount: 0 })
   }
   // Spirit guardians strike each alien that ends its move near their wearer.
   if (battle.turn === 'alien') {
@@ -917,11 +925,21 @@ function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[],
     if (damage >= OVERKILL) feat(tally, 'overkill')
   }
   if (target.hp > 0) return
-  // An alien that dies burning spreads the fire, if the squad carries wildfire.
-  if (target.burning > 0 && battle.units.some((u) => u.side !== target.side && has(u, 'wildfire'))) {
-    for (const other of battle.units.filter((u) => u.side === target.side && u !== target && distance(u, target) <= 1 && !fireproof(battle, u))) {
+  // An alien that dies burning spreads the fire, if the squad carries wildfire or its killer backdraft; one that dies
+  // chilled, the chill, if its killer has avalanche.
+  const wildfire = battle.units.some((u) => u.side !== target.side && has(u, 'wildfire'))
+  const killer = by && by.side !== target.side ? by : null
+  const beside = battle.units.filter((u) => u.side === target.side && u !== target && distance(u, target) <= 1)
+  if (target.burning > 0 && (wildfire || (killer && has(killer, 'backdraft')))) {
+    for (const other of beside.filter((u) => !fireproof(battle, u))) {
       other.burning = BURN_TURNS
-      events.push({ type: 'effect', id: other.id, effect: 'wildfire', amount: 0 })
+      events.push({ type: 'effect', id: other.id, effect: wildfire ? 'wildfire' : 'backdraft', amount: 0 })
+    }
+  }
+  if (target.chilled > 0 && killer && has(killer, 'avalanche')) {
+    for (const other of beside.filter((u) => !u.resists.includes('frost'))) {
+      other.chilled = chillFrom(killer)
+      events.push({ type: 'effect', id: other.id, effect: 'avalanche', amount: 0 })
     }
   }
   // A soldier who would fall may be got back up: by a squadmate's revive, or once by the squad's phoenix protocol.
@@ -1087,8 +1105,27 @@ function blast(battle: Battle, unit: Unit, seen: Set<number>, damage: number, ra
   return events
 }
 
-/** Whether a unit cannot burn: by its nature, or in the rain. */
-const fireproof = (battle: Battle, unit: Unit) => unit.resists.includes('burn') || battle.twist === 'rain'
+/** Whether a unit cannot burn: by its nature, a fire suit, or in the rain. */
+const fireproof = (battle: Battle, unit: Unit) => unit.resists.includes('burn') || has(unit, 'fireSuit') || battle.twist === 'rain'
+
+/** Napalm: a blast that sets those it catches burning and the ground it covers alight. */
+function napalm(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
+  const radius = has(unit, 'inferno') ? BIG_BLAST_RADIUS : BLAST_RADIUS
+  const events = blast(battle, unit, seen, NAPALM_DAMAGE, radius)
+  const landed = events[0]
+  if (landed?.type !== 'rocket') return events
+  landed.fire = true
+  for (let y = landed.y - radius; y <= landed.y + radius; y++) {
+    for (let x = landed.x - radius; x <= landed.x + radius; x++) {
+      if (onGrid(x, y) && !onTile(battle.fire, { x, y })) battle.fire.push({ x, y, turns: FIRE_TURNS })
+    }
+  }
+  for (const hit of landed.hits) {
+    const target = battle.units.find((u) => u.id === hit.target)
+    if (target && target.hp > 0 && !fireproof(battle, target)) target.burning = burnFrom(unit)
+  }
+  return events
+}
 
 /** Whether a fuel tank stands beside a tile. */
 const besideFuel = (battle: Battle, tile: Tile) => NEIGHBORS.some(([dx, dy]) => onGrid(tile.x + dx, tile.y + dy) && battle.props[(tile.y + dy) * GRID + tile.x + dx] === 'fuel')
@@ -1225,6 +1262,8 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     (enemy.marked ? TUNING.markDamage : 0) +
     when(enemy.burning > 0, 'accelerant', TUNING.accelerantDamage) +
     when(enemy.chilled > 0, 'shatter', TUNING.shatterDamage) +
+    when(enemy.burning > 0, 'searing', SEARING_DAMAGE) +
+    when(enemy.chilled > 0, 'icebreak', SEARING_DAMAGE) +
     when(enemy.burning > 0 && enemy.chilled > 0, 'thermal', TUNING.thermalDamage) +
     when(unit.armor > 0, 'armored', 1) +
     when(enemy.rooted > 0, 'net', 2) +
@@ -1243,7 +1282,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   const beside = battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1)
   events.unshift({ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage, with: used })
   if (battle.twist === 'crumbling' && damage > 0) crumble(battle, enemy, unit)
-  const pierced = unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) > 0
+  const pierced = unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) + when(enemy.chilled > 0, 'frostbreak', 1) > 0
   const left = enemy.hp + (pierced ? 0 : enemy.armor)
   // A bonded squadmate beside the target takes the hit in its place.
   const guard = battle.units.find((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && has(u, 'bond') && distance(u, enemy) <= 1)
@@ -1282,10 +1321,11 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     }
   }
   if (enemy.hp > 0 && !enemy.resists.includes('mark') && (when(true, 'mark', 1) || when(true, 'tracer', 1) || when(crit, 'exploit', 1))) enemy.marked = true
-  if (enemy.hp > 0 && !enemy.resists.includes('frost') && (when(damage > 0, 'frostbite', 1) || when(crit, 'freeze', 1))) {
-    enemy.chilled = CHILL_TURNS
-    if (when(true, 'glacial', 1)) enemy.rooted = CHILL_TURNS
-    events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'frostbite') ? 'frostbite' : 'freeze', amount: 0 })
+  const cryo = damage > 0 && unit.ability === 'cryo'
+  if (enemy.hp > 0 && !enemy.resists.includes('frost') && (when(damage > 0, 'frostbite', 1) || cryo || when(crit, 'freeze', 1))) {
+    enemy.chilled = chillFrom(unit)
+    if (when(true, 'glacial', 1) + when(true, 'rimeLock', 1) > 0) enemy.rooted = CHILL_TURNS
+    events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'frostbite') ? 'frostbite' : cryo ? 'cryo' : 'freeze', amount: 0 })
     if (enemy.marked && has(unit, 'conductor')) {
       for (const other of battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1 && !u.resists.includes('frost'))) {
         other.chilled = CHILL_TURNS
@@ -1293,9 +1333,9 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
       }
     }
   }
-  if (enemy.hp > 0 && crit && enemy.chilled > 0 && when(true, 'stasis', 1)) {
+  if (enemy.hp > 0 && crit && enemy.chilled > 0 && when(true, 'stasis', 1) + when(true, 'deepFreeze', 1) > 0) {
     enemy.panicked = true
-    events.push({ type: 'effect', id: enemy.id, effect: 'stasis', amount: 0 })
+    events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'stasis') ? 'stasis' : 'deepFreeze', amount: 0 })
   }
   if (enemy.hp > 0 && damage > 0 && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
   if (enemy.hp > 0 && damage > 0 && when(true, 'tether', 1)) knockback(battle, unit, enemy, events, -1)
@@ -1315,9 +1355,9 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     enemy.panicked = true
     events.push({ type: 'effect', id: enemy.id, effect: 'concussion', amount: 0 })
   }
-  if (enemy.hp > 0 && !fireproof(battle, enemy) && ((damage > 0 && has(unit, 'incendiary')) || when(crit, 'ignite', 1))) {
-    enemy.burning = BURN_TURNS
-    events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'incendiary') ? 'incendiary' : 'ignite', amount: 0 })
+  if (enemy.hp > 0 && !fireproof(battle, enemy) && ((damage > 0 && (has(unit, 'incendiary') || has(unit, 'tinder'))) || when(crit, 'ignite', 1))) {
+    enemy.burning = burnFrom(unit)
+    events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'incendiary') ? 'incendiary' : has(unit, 'tinder') ? 'tinder' : 'ignite', amount: 0 })
   }
   const healing = (damage > 0 && has(unit, 'vampiric') ? 1 : 0) + (enemy.hp <= 0 && has(unit, 'feast') ? FEAST_HEAL : 0)
   const healed = Math.min(healing, unit.stats.hp - unit.hp)
@@ -1427,7 +1467,8 @@ function actNext(battle: Battle): GameEvent[] {
     const healed = unit.charges > 0 && unit.ability === 'medic' ? heal(battle, unit) : []
     const thrown = has(unit, 'grenade') && !unit.spent.includes('grenade') ? blast(battle, unit, seen, GRENADE_DAMAGE) : []
     if (thrown.length > 0) unit.spent.push('grenade')
-    const fired = unit.charges > 0 && unit.ability === 'rocket' ? blast(battle, unit, seen, ROCKET_DAMAGE, has(unit, 'bigBlast') ? BIG_BLAST_RADIUS : BLAST_RADIUS) : []
+    const fired =
+      unit.charges <= 0 ? [] : unit.ability === 'rocket' ? blast(battle, unit, seen, ROCKET_DAMAGE, has(unit, 'bigBlast') ? BIG_BLAST_RADIUS : BLAST_RADIUS) : unit.ability === 'napalm' ? napalm(battle, unit, seen) : []
     if (healed.length + fired.length > 0) unit.charges--
     const acted = [...medkit(unit), ...secondWind(unit), ...polymorph(battle, unit, seen), ...strew(battle, unit), ...deploy(battle, unit, seen), ...healed, ...thrown, ...(fired.length > 0 ? fired : shoot(battle, unit, seen))]
     // What follows an action: a drone's shot, then a skirmisher's step back.
