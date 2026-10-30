@@ -12,6 +12,7 @@ import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { DETECT, PATROL_DETECT } from '../core/sight'
 import { alienName, button, resistChip, STOP_NAMES, tip } from './html'
 import { overworld, type Tab } from './overworld'
+import { glide, viewNow } from './globe'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
 /** How long the helicopter takes to fly between stops, in milliseconds. */
@@ -174,10 +175,12 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
 
   function render(run: Run): void {
     shown = run
+    const from = viewNow()
     const next = panel(run)
     // Rewriting unchanged content would restart its animations.
     if (next !== html) {
       overlay.innerHTML = html = next
+      glide(overlay, from)
       overlay.hidden = run.phase === 'battle'
       shrink()
     }
@@ -232,6 +235,29 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   })
   addEventListener('resize', () => requestAnimationFrame(shrink))
 
+  /** How long the dive through the clouds takes, in milliseconds. */
+  const DIVE_MS = 1400
+  /** Zooms the map down onto the helicopter and through a bank of clouds, then `land`s while the clouds part. */
+  function dive(land: () => void): void {
+    const chopper = overlay.querySelector<HTMLElement>('.chopper')
+    const globe = overlay.querySelector<HTMLElement>('.globe')
+    if (globe && chopper) {
+      globe.style.transformOrigin = `${chopper.style.left} ${chopper.style.top}`
+      globe.classList.add('diving')
+    }
+    const clouds = document.createElement('div')
+    clouds.className = 'clouds'
+    clouds.innerHTML = Array.from({ length: 9 }, (_, i) => `<i style="--x:${(i * 37) % 100}%;--y:${(i * 61) % 100}%;--d:${i * 0.07}s"></i>`).join('')
+    document.body.append(clouds)
+    flying = true
+    setTimeout(() => {
+      flying = false
+      land()
+      clouds.classList.add('parting')
+      setTimeout(() => clouds.remove(), 1200)
+    }, DIVE_MS)
+  }
+
   /** Whether the helicopter is in the air, the map waiting for it to land. */
   let flying = false
   /** Flies the squad's helicopter from where it stands to the stop `to` is pinned at, then `land`s. */
@@ -281,7 +307,10 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     } else if (target.dataset.action) {
       picked = null
       gear = null
-      act(JSON.parse(target.dataset.action) as Action)
+      const action = JSON.parse(target.dataset.action) as Action
+      // Setting out for a fight dives down through the clouds to it.
+      if (action.type === 'advance' && !/\b(supply|cache|shop)\b/.test(target.className)) return dive(() => act(action))
+      act(action)
       return
     }
     render(shown!)
