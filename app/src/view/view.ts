@@ -1486,6 +1486,8 @@ export async function createView(): Promise<View> {
         // The fog lifts where the squad arrived, before any pod it uncovered appears.
         drawFog(battle)
       } else if (e.type === 'reveal' || e.type === 'wave' || e.type === 'sighted') {
+        // A wave the squad cannot see yet stays off screen, and the camera stays where it is.
+        if (e.type === 'wave' && !e.units.some((at) => battle.units.some((u) => u.id === at.id && revealed(battle, u)))) continue
         await follow(e.units)
         // A pod already in sight, its ambush sprung or the squad spotted, stays as it is.
         const appeared = e.units.flatMap((at) => {

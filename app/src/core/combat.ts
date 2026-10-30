@@ -140,7 +140,7 @@ export type GameEvent =
   | { type: 'hurt'; id: number; amount: number; cause: 'acid' | 'backlash' | 'impact' }
   /** A hold is done: the extraction zone appears at x, y. */
   | { type: 'extract'; x: number; y: number }
-  /** A wave arrives on a hold, already in the fight. */
+  /** A wave arrives on a hold, unseen unless the squad already sees where it lands. */
   | { type: 'wave'; units: { id: number; x: number; y: number }[] }
   /** A boss spawns a swarmling, or an engineer deploys a mech. */
   | { type: 'spawn'; id: number; unit: { id: number; x: number; y: number } }
@@ -782,7 +782,9 @@ function upkeep(battle: Battle): GameEvent[] {
     const centre = spacedTile(battle, battle.units.filter(isSoldier), ZONE_CLEARANCE, hold ? 'edge' : 'anywhere')
     const wave = battle.waves.shift()!
     if (hold) battle.waves.push({ ...wave, aliens: [...wave.aliens, wave.aliens[0]] })
-    const units = placePod(battle, wave, centre, true)
+    // It comes in unseen but hunting, as a stalking pod does, and shows once the squad sights it.
+    const units = placePod(battle, wave, centre, false)
+    Object.assign(battle.pods.at(-1)!, { alert: true, stalking: true })
     events.push({ type: 'wave', units: units.map(({ id, x, y }) => ({ id, x, y })) })
   }
   battle.acid = battle.acid.map((pool) => ({ ...pool, turns: pool.turns - 1 })).filter((pool) => pool.turns > 0)

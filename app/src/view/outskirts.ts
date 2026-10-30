@@ -84,11 +84,13 @@ export function buildOutskirts(battle: Battle): Group {
   }
 
   // Bare ground under it all, low enough that it never fights the ground above it for depth, out to where the haze swallows it, and a street's width round the map before the scenery starts.
-  shapes.flat(-PLAIN, -PLAIN, GRID + PLAIN, GRID + PLAIN, -0.3, shade(look.rock, 0.45))
+  // In the region's own ground colour, so the land round the battlefield reads as more of the place, not a void.
+  const land = Object.values(LOOKS[battle.region].ground)[0] ?? look.rock
+  shapes.flat(-PLAIN, -PLAIN, GRID + PLAIN, GRID + PLAIN, -0.3, shade(land, 0.8))
   for (let y = -2; y < GRID + 2; y++)
     for (let x = -2; x < GRID + 2; x++) {
       if (past(x, y) <= 0) continue
-      shapes.flat(x - 0.5, y - 0.5, x + 0.5, y + 0.5, 0, shade(look.rock, 0.85 - 0.15 * past(x, y)))
+      shapes.flat(x - 0.5, y - 0.5, x + 0.5, y + 0.5, 0, shade(land, 0.9))
     }
   for (let y = -REACH; y < GRID + REACH; y += 2)
     for (let x = -REACH; x < GRID + REACH; x += 2) {
