@@ -106,7 +106,7 @@ export function stopReport(run: Run, report: Report): string {
   const { before, after } = report.threat
   const threat = after === before ? '' : `<span class="note">${signed(after - before)}</span>`
   const squad = report.soldiers.length > 0 ? `<div class="stage second"><div class="squad">${report.soldiers.map((s) => soldierCard(run, s)).join('')}</div>${sales(run)}</div>` : ''
-  return `
+  return `<div class="debrief">
     ${title(report)}
     <div class="stage">
       <p>Threat ${threatBar(after, Math.max(0, after - before))}${threat}</p>
@@ -117,7 +117,8 @@ export function stopReport(run: Run, report: Report): string {
       ${squad ? '' : decisions(run)}
     </div>
     ${squad}
-    <div class="stage ${squad ? 'third' : 'second'}"><button data-seen="report">Continue</button></div>`
+    <div class="stage ${squad ? 'third' : 'second'}"><button data-seen="report">Continue</button></div>
+  </div>`
 }
 
 export function runEnd(run: Run): string {
