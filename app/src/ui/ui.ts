@@ -1,8 +1,8 @@
 import { recruits, story, title } from './menu'
 import type { Action } from '../core/apply'
-import { nextStop, type Report, type Run } from '../core/run'
+import { nextStop, skillOffers, type Report, type Run } from '../core/run'
 import type { View } from '../view/view'
-import { choice, runEnd, stopReport } from './aftermath'
+import { choice, joined, runEnd, skillChoice, stopReport } from './aftermath'
 import { ALIENS } from '../core/aliens'
 import { RELICS, type Relic } from '../core/relics'
 import { known } from './intro'
@@ -145,6 +145,9 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   /** Whether the story has been told, before the first choice. */
   let told = false
   let recruit: number | null = null
+  /** The report whose joining hero has been met, and the soldier whose skill choice is open. */
+  let met: Report | null = null
+  let ability: number | null = null
   let html = ''
 
   /** The run's phase when the panel was last drawn. */
@@ -159,6 +162,12 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (run.phase === 'recruit') return !started ? title() : !told ? story() : recruits(run, recruit)
     if (run.phase === 'battle') return ''
     if (run.phase === 'won' || run.phase === 'lost') return runEnd(run)
+    // After a fight: a hero joining, then the debrief, where each soldier owed a skill chooses it, then the rewards.
+    if (report && seen !== report && report.soldiers.length > 0) {
+      if (report.hired && met !== report) return joined(run, report.hired)
+      const learner = run.soldiers.find((s) => s.id === ability && skillOffers(s).length > 0)
+      return learner ? skillChoice(run, learner) : stopReport(run, report)
+    }
     if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run, gear)}`
     if (run.phase === 'shop' || run.phase === 'event') {
       // Arriving shows the shop or event; the other tabs stay open to the player while they decide.
@@ -300,6 +309,8 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
       else return act({ type: 'recruit', index })
     }
     else if (target.dataset.seen) seen = shown!.report
+    else if (target.dataset.met) met = shown!.report
+    else if (target.dataset.ability) ability = Number(target.dataset.ability)
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
     else if (target.dataset.pick) {
       // A stop tapped once is picked to look at; tapped again, the squad sets out for it.

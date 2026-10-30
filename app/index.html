@@ -269,6 +269,11 @@
       .debrief .who { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
       .debrief .portrait { width: 96px; height: 96px; font-size: 50px; border-width: 3px; }
       .debrief .soldier .bar { height: 12px; margin-top: 10px; }
+      .joined { justify-content: center; min-height: 80vh; gap: 10px; }
+      .joined .portrait { width: 160px; height: 160px; font-size: 84px; border-color: #ffd166; box-shadow: 0 0 40px #ffd16655; animation: land 0.7s both; }
+      .joined h1 { font-size: 52px; margin: 8px 0 0; animation: rise 0.6s 0.4s both; }
+      .joined > :not(.portrait):not(h1) { animation: rise 0.6s 0.8s both; }
+      .joined .feats { display: flex; gap: 6px; justify-content: center; }
       .debrief button[data-seen] { min-width: 200px; margin-top: 8px; }
       .stage.second { margin-top: 12px; animation-delay: 1.2s; }
       .stage.third { margin-top: 12px; animation-delay: 2.8s; }

@@ -32,8 +32,9 @@ test('a turn is one move beat, then one shot per beat in id order, then the othe
   const end = play(1, (events, before, after) => {
     const first = events.find((e) => ['move', 'shot', 'rocket', 'heal', 'spit', 'panic', 'frozen'].includes(e.type)) as Extract<GameEvent, { id: number }> | undefined
     if (!first) return
-    // A turn spent standing still shows no event, so turns are told apart by the round as well as the side.
-    const side = `${after.round}:${before.units.find((u) => u.id === first.id)!.side}`
+    // A turn spent standing still shows no event, so turns are told apart by the round as well as the side. A unit
+    // arriving this beat is only in the after.
+    const side = `${after.round}:${[...before.units, ...after.units].find((u) => u.id === first.id)!.side}`
     if (side !== turn) {
       turn = side
       stage = 'move'

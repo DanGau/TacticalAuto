@@ -177,7 +177,7 @@ export interface Report {
    * pulled off.
    */
   soldiers: { id: number; name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; downed: boolean; earned: Earned[]; feats: FeatId[] }[]
-  /** The name of a clone the stop added to the squad. */
+  /** The name of the hero the stop added to the squad. */
   hired: string | null
   /** Civilians kept alive on a rescue; null on any other stop. */
   rescued: number | null
@@ -386,10 +386,17 @@ export function hire(run: Run): Soldier {
   return join(run, draft(run, []))
 }
 
-/** Adds `soldier` to the squad and returns it. */
+/** Adds `soldier` to the squad, with what its trait brings, and returns it. */
 function join(run: Run, soldier: Soldier): Soldier {
   soldier.id = run.nextSoldier++
   run.soldiers.push(soldier)
+  const trait: Trait | null = soldier.trait ? TRAITS[soldier.trait] : null
+  run.supplies += trait?.supplies ?? 0
+  run.threat = Math.min(run.threat + (trait?.threat ?? 0), THREAT_MAX)
+  if (trait?.relic) {
+    const unheld = offerable(run.relics)
+    if (unheld.length > 0) run.relics.push(unheld[randomInt(run, unheld.length)])
+  }
   return soldier
 }
 
@@ -447,15 +454,7 @@ export function recruit(run: Run, index: number): void {
   run.route = plotRoute(run, soldier.home!)
   run.route.forEach((stage, l) => placeLeg(run, run.legs[l], stage))
   drawStops(run)
-  soldier.id = run.nextSoldier++
-  run.soldiers.push(soldier)
-  const trait: Trait | null = soldier.trait ? TRAITS[soldier.trait] : null
-  run.supplies += trait?.supplies ?? 0
-  run.threat = Math.min(run.threat + (trait?.threat ?? 0), THREAT_MAX)
-  if (trait?.relic) {
-    const unheld = offerable(run.relics)
-    run.relics.push(unheld[randomInt(run, unheld.length)])
-  }
+  join(run, soldier)
   settle(run)
 }
 
@@ -478,6 +477,9 @@ function plotRoute(run: Run, home: City): Stage[] {
     const hero = draft(run, [])
     hero.home = to
     hero.xp = xpFor(HERO_LEVEL)
+    // A hero has a quirk of its own, as a recruit does, though never one that sets its level.
+    const quirks = (Object.keys(TRAITS) as TraitId[]).filter((id) => !(TRAITS[id] as Trait).level)
+    hero.trait = quirks[randomInt(run, quirks.length)]
     for (let offers = skillOffers(hero); offers.length > 0; offers = skillOffers(hero)) hero.skills.push(offers[randomInt(run, offers.length)])
     route.push({ continent, from: from.at, to, hero })
     from = to

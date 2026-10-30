@@ -29,7 +29,7 @@ export function story(): string {
   </div>`
 }
 
-/** A recruit as a card to pick: class, path, home and trait at a glance; once picked, what its ability and skills do. */
+/** A recruit as a card to pick: class, path, home and trait at a glance; hovering an ability or skill tells what it does. */
 function card(recruit: Soldier, index: number, chosen: number | null): string {
   const cls = CLASSES[recruit.cls!]
   const path = PATHS[recruit.cls!].find((p) => p.core === recruit.skills[0])!
@@ -40,9 +40,8 @@ function card(recruit: Soldier, index: number, chosen: number | null): string {
     <small>${cls.name} · ${path.name}</small>
     <b class="name">${recruit.name}</b>
     <small class="home">🌍 ${recruit.home!.name}, ${recruit.home!.country}</small>
-    <span class="feats">${named.map((n, i) => `<span class="chip ${i === 0 ? 'feat' : ''}">${n.name}</span>`).join('')}<span class="more">ⓘ</span></span>
+    <span class="feats">${named.map((n, i) => `<span class="chip ${i === 0 ? 'feat' : ''}" title="${n.text}">${n.name}</span>`).join('')}</span>
     <div class="trait">${quirk}</div>
-    <span class="defs">${named.map((n) => `<span class="def"><b>${n.name}</b>${n.text}.</span>`).join('')}</span>
   </button>`
 }
 
