@@ -49,7 +49,7 @@ function card(recruit: Soldier, index: number, chosen: number | null): string {
 /** The run's first choice: which recruit leads the squad, under a globe turned to the city they wait in. Tap a card to pick, again to begin. */
 export function recruits(run: Run, chosen: number | null): string {
   const homes = run.recruits.map((r, i) => ({ at: r.home!.at, chosen: i === chosen, html: `<span class="home${i === chosen ? ' chosen' : ''}">${r.home!.name}</span>` }))
-  return `<div class="menu">
+  return `<div class="menu picking">
     <h2>${chosen === null ? 'Who leads the squad? Each waits in a different city.' : `Tap ${run.recruits[chosen].name} again to begin in ${run.recruits[chosen].home!.name}.`}</h2>
     <div class="homes">${places({ w: 560, h: 220 }, homes)}</div>
     <div class="choices">${run.recruits.map((r, i) => card(r, i, chosen)).join('')}</div>

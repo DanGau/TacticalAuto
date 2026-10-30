@@ -62,7 +62,11 @@
       button:disabled:hover { background: #263042; }
       button.lastStand, button.final { border-color: #ff6b5e; }
 
-      .header { display: flex; align-items: center; gap: 24px; }
+      .header { display: flex; align-items: center; gap: 24px; position: relative; z-index: 2; }
+      /* Flight: the map fills the screen under the header and what floats over it. */
+      .map.flight { position: fixed; inset: 0; z-index: 0; padding: 0; }
+      .map.flight .globe { position: absolute; inset: 0; }
+      .brief { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 2; max-width: 640px; padding: 10px 16px; border-radius: 10px; background: #171d29dd; border: 1px solid #3a465c; text-align: center; pointer-events: none; }
       .tabs { display: flex; gap: 4px; flex: 1; }
       .tab { padding: 6px 18px; background: none; border-color: transparent; color: #9aa6bd; }
       .tab.active { background: #263042; border-color: #4a5a78; color: #dde; }
@@ -73,7 +77,8 @@
       .skip { position: absolute; right: 24px; bottom: 24px; }
       #fullscreen { position: absolute; bottom: 12px; left: 12px; z-index: 10; padding: 6px 10px; font-size: 18px; }
       :fullscreen #fullscreen { display: none; }
-      .menu { text-align: center; padding: 24px 0 8px; animation: rise 0.6s both; }
+      .menu { text-align: center; padding: 24px 0 8px; }
+      .menu:not(.picking) { animation: rise 0.6s both; }
       .menu h1 { font-size: 44px; letter-spacing: 6px; margin: 24px 0 8px; }
       .menu > p { color: #9aa6bd; margin-bottom: 28px; }
       .menu .choices { text-align: left; margin: 16px 0 20px; }
@@ -138,11 +143,11 @@
       .chopper.flying.east span { transform: scaleX(-1) rotate(-12deg); }
       .chopper.flying:not(.east) span { transform: rotate(12deg); }
       @keyframes hover { 50% { translate: 0 -4px; } }
-      .globe.gliding .city:not(.reached), .globe.gliding .cell.choice, .globe.gliding .trail, .globe.gliding .chopper { opacity: 0; }
-      .globe.arrived .chopper { animation: fade 0.4s both; }
+      .globe.gliding .city:not(.reached), .globe.gliding .cell.choice, .globe.gliding .trail { opacity: 0; }
       .globe.arrived .trail { animation: fade 0.5s 0.15s both; }
       .globe.arrived .cell.choice { animation: rise 0.5s 0.3s both; }
-      .globe.diving { transition: transform 1.4s cubic-bezier(0.6, 0, 0.9, 0.4), filter 1.4s; transform: scale(14); filter: blur(2px); }
+      .globe.diving { transition: transform 1.4s cubic-bezier(0.6, 0, 0.9, 0.4), filter 1.4s; filter: blur(2px); }
+      .globe.diving .trail, .globe.diving .walked, .globe.diving .cell:not(.squad) { opacity: 0; transition: opacity 0.5s; }
       .globe.diving .chopper { opacity: 0; transition: opacity 0.4s; }
       .clouds { position: fixed; inset: 0; z-index: 50; pointer-events: none; overflow: hidden; }
       .clouds i { position: absolute; left: var(--x); top: var(--y); width: 70vmax; height: 50vmax; margin: -25vmax -35vmax; border-radius: 50%; background: radial-gradient(closest-side, #f4f7fbee, #dfe7f0aa 55%, transparent); filter: blur(12px); animation: cloud 1.4s var(--d) ease-in both; }

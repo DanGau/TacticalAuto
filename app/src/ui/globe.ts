@@ -206,6 +206,28 @@ function sphere(view: View, size: Size, over: string, pins: string): string {
     ${pins}`
 }
 
+/** The fewest pixels between two stops' middles, so each is a tap of its own. */
+const ROOM = 54
+
+/** Pushes stops standing closer than ROOM apart, a few rounds over, the squad's own stop holding still. */
+function budge(stops: { p: { x: number; y: number }; fixed: boolean }[]): void {
+  for (let round = 0; round < 8; round++)
+    for (const [i, a] of stops.entries())
+      for (const b of stops.slice(i + 1)) {
+        const [dx, dy] = [b.p.x - a.p.x, b.p.y - a.p.y]
+        const d = Math.hypot(dx, dy)
+        if (d >= ROOM) continue
+        // Stops on the same spot part sideways.
+        const [ux, uy] = d > 0.01 ? [dx / d, dy / d] : [1, 0]
+        const push = ROOM - d
+        const [sa, sb] = a.fixed ? [0, 1] : b.fixed ? [1, 0] : [0.5, 0.5]
+        a.p.x -= ux * push * sa
+        a.p.y -= uy * push * sa
+        b.p.x += ux * push * sb
+        b.p.y += uy * push * sb
+      }
+}
+
 /** Where on the page a place falls, as CSS. */
 const spot = (p: { x: number; y: number }) => `left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px`
 
@@ -256,6 +278,7 @@ function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: LonLat[
     return `<g class="city ${i < run.keys ? 'reached' : ''}"><circle cx="${p.x}" cy="${p.y}" r="5"/><text x="${p.x + 10}" y="${p.y + 4}">${s.hero ? '★' : '👁'} ${name}</text></g>`
   })
   const placed = new Map(pins.map((pin) => [pin.id, project(pin.at)]))
+  budge(pins.filter((pin) => placed.get(pin.id)!.front).map((pin) => ({ p: placed.get(pin.id)!, fixed: pin.squad })))
   const trails = pins.flatMap((pin) =>
     pin.next.flatMap((id) => {
       const [a, b] = [placed.get(pin.id)!, placed.get(id)]

@@ -34,7 +34,7 @@ const FLY_MS = 1600
 /** Screen pixels the landing panel takes from the bottom of the canvas. */
 const PANEL = 110
 /** Screen pixels kept clear around the whole battlefield, which sits in the middle of the screen above the panel. */
-const WHOLE_MARGIN = PANEL + 60
+const WHOLE_MARGIN = PANEL - 20
 /** A drop pod's fall, the burst of dust as it lands, the gap between pods, and the height it falls from in world pixels. */
 const POD_FALL_MS = 800
 /** How long a stealth insertion's parachutes take to drift down, how high they start, and how long a canopy takes to fold. */
@@ -554,6 +554,8 @@ export async function createView(): Promise<View> {
 
   /** The field of view, in degrees, at which everything past the battlefield shows whole. */
   const SURROUNDINGS_FOV = 12
+  /** How much of its own colour past the battlefield keeps in the game's view, the rest sunk into the night. */
+  const SUNK = 0.9
   /** How long a roof or wall takes to fade out of the way or back. */
   const FADE_MS = 220
   /** How solid a wall stays while a unit stands just behind it. */
@@ -565,10 +567,10 @@ export async function createView(): Promise<View> {
    * just before a unit toward the camera, as XCOM cuts its buildings away; the rest fade back.
    */
   function reveal(ms: number): void {
-    // Past the battlefield fades in as the lens widens from still, and is gone in the game's view.
+    // Past the battlefield shows sunk deep into the night in the game's view, so the screen is never bare, and comes up
+    // whole as the lens widens from still.
     const wide = Math.min(1, Math.max(0, (camera.fov - STILL_FOV) / SURROUNDINGS_FOV))
-    for (const fade of surroundings) fade.value = wide
-    outskirts.visible = town.visible = wide > 0
+    for (const fade of surroundings) fade.value = SUNK + (1 - SUNK) * wide
     const step = ms / FADE_MS
     const toward = (fade: { value: number }, target: number) => (fade.value = fade.value < target ? Math.min(target, fade.value + step) : Math.max(target, fade.value - step))
     const keys = [...sprites.values()].map((s) => ({ x: Math.round(s.tile.x), y: Math.round(s.tile.y) }))

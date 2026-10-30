@@ -249,9 +249,12 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   function dive(land: () => void): void {
     const chopper = overlay.querySelector<HTMLElement>('.chopper')
     const globe = overlay.querySelector<HTMLElement>('.globe')
+    // The stop the helicopter stands over comes to the middle of the screen as the map falls away round it.
     if (globe && chopper) {
-      globe.style.transformOrigin = `${chopper.style.left} ${chopper.style.top}`
+      const [x, y] = [chopper.offsetLeft, chopper.offsetTop]
+      globe.style.transformOrigin = `${x}px ${y}px`
       globe.classList.add('diving')
+      globe.style.transform = `translate(${globe.clientWidth / 2 - x}px, ${globe.clientHeight / 2 - y}px) scale(14)`
     }
     const clouds = document.createElement('div')
     clouds.className = 'clouds'

@@ -10,7 +10,7 @@ import { FEATS } from '../core/feats'
 import { PATHS, SKILLS } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
 import { TWISTS, type Twist } from '../core/twists'
-import { CONTINENTS, type LonLat } from '../core/world'
+import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
 import { decisions } from './aftermath'
 import { alienName, button, describe, gearCard, keywordChips, resistChip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
@@ -109,12 +109,10 @@ function runMap(run: Run, picked: number | null): string {
   })
   // At a leg's start the squad stands in the city it set out from, its trails reaching to each choice.
   if (!pins.some((p) => p.squad)) pins.push({ id: 'from', at: focus, html: '', next: open.map((i) => `${run.keys}-0-${i}`), squad: true, choice: false, past: false, lit: picked !== null })
-  const stage = run.route[run.keys]
-  const banner = stage.hero ? `Leg ${run.keys + 1} of ${KEYS}: across ${CONTINENTS[stage.continent!].name} to ${stage.hero.name}, waiting in ${stage.to.name}, ${stage.to.country}.` : 'The last leg: to the alien hub under the Antarctic ice.'
   // The way on from the picked stop lights up, stop by stop.
   for (const pin of pins) if (pin.lit && !pin.squad) for (const id of pin.next) pins.forEach((p) => p.id === id && (p.lit = true))
   // The map fills the screen under the header and headings.
-  return `<p class="progress">${banner}</p><div class="map">${globe({ w: innerWidth - 40, h: innerHeight - 130 }, run, pins, focus, path, picked !== null)}</div>`
+  return `<div class="map flight">${globe({ w: innerWidth, h: innerHeight }, run, pins, focus, path, picked !== null)}</div>`
 }
 
 /** The words on the button that travels to the next stop. */
@@ -172,13 +170,13 @@ function mapView(run: Run, picked: number | null): string {
   if (run.phase === 'event') return eventView(run)
   const node = current(run)
   const ahead = picked !== null && ways(run).includes(picked) ? legOf(run).columns[run.stop][picked].stop : null
-  if (!node && !ahead) return `${run.report ? '' : decisions(run)}<h2>Choose where to go next. Tap a stop to see what waits there and where it leads.</h2>${runMap(run, null)}`
-  if (!node)
-    return `${run.report ? '' : decisions(run)}<h2>${where(run, ahead!)} <small>Tap it again to set out.</small></h2>
-    ${runMap(run, picked)}`
+  // Flight: the map fills the screen; what a stop holds shows over it once picked or reached.
+  const choices = run.report ? '' : decisions(run)
+  if (!node && !ahead) return `${choices}${runMap(run, null)}`
+  if (!node) return `${choices}<div class="brief">${where(run, ahead!)}</div>${runMap(run, picked)}`
   const next = nextStop(run)!
   const here = node.stop!
-  return `${run.report ? '' : decisions(run)}<h2>${next === 'escape' ? '<b class="up">The threat is full. The squad is ambushed on the road and must escape.</b>' : where(run, here)} <small>${travelLabel(run, here, next)}. Tap the squad's stop to set in.</small></h2>
+  return `${choices}<div class="brief">${next === 'escape' ? '<b class="up">The threat is full. The squad is ambushed on the road and must escape.</b>' : where(run, here)}<br><small>${travelLabel(run, here, next)}</small></div>
     ${runMap(run, null)}`
 }
 
