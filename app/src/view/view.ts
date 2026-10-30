@@ -7,7 +7,7 @@ import type { GameEvent } from '../core/combat'
 import { level, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
 import type { Edge, Ground, Prop } from '../core/terrain'
-import { LOOKS, type Look } from './looks'
+import { LOOKS, type FenceStyle, type Look } from './looks'
 import { buildOutskirts } from './outskirts'
 import { blob, css, shade, Shapes, Sketch, type Point3 } from './shapes'
 import { ACROSS, LEVEL, PITCH, TILE_H, TILE_W, tall, YAW } from './space'
@@ -95,7 +95,7 @@ const COLOR = {
 }
 
 /** Each ground's colour, where its region's look gives none. */
-const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x15161a, hive: 0x2a1838, water: 0x1d5f5c, void: 0x000000 }
+const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x34302c, hive: 0x2a1838, water: 0x1d5f5c, void: 0x000000 }
 
 /** A box standing on a tile: how much of the tile it covers, how tall it is on screen, and its top colour. */
 interface Box {
@@ -110,9 +110,7 @@ interface Box {
   alpha?: number
 }
 
-const CAR_COLORS = [0xb8413a, 0x3f6fb5, 0xc9c9c2, 0x3d8f6b, 0xd0a13a]
-
-/** The boxes each prop is drawn from, bottom first. A tree is drawn separately. */
+/** The boxes each prop is drawn from, bottom first, before its region's look recolours it. A tree and a car are drawn in the look's own way. */
 const PROP_BOXES: Record<Exclude<Prop, 'none' | 'tree' | 'car'>, Box[]> = {
   truck: [{ wide: 1, deep: 0.8, base: 3, up: 26, color: 0x7d8794 }],
   crate: [{ wide: 0.7, deep: 0.7, base: 0, up: 13, color: 0x9a7742 }],
@@ -157,11 +155,84 @@ const EDGE_BOXES: Record<Exclude<Edge, 'none'>, Box[]> = {
   ],
 }
 
-/** A car's body and cabin, in the colour `paint` picks. */
-const carBoxes = (paint: number): Box[] => [
-  { wide: 1, deep: 0.7, base: 3, up: 9, color: CAR_COLORS[paint % CAR_COLORS.length] },
-  { wide: 0.7, deep: 0.6, base: 12, up: 6, color: 0x2a3340 },
-]
+/** How tall a wall's trim stands, in screen pixels. */
+const CAP_UP = 3
+
+/** A fence of each style: its rails or body, bottom first, before its region's colour. */
+const FENCES: Record<FenceStyle, Omit<Box, 'color'>[]> = {
+  picket: [{ wide: 1, deep: 0.1, base: 0, up: 12 }],
+  hedge: [{ wide: 1, deep: 0.45, base: 0, up: 15 }],
+  stone: [{ wide: 1, deep: 0.35, base: 0, up: 10 }],
+  rail: [
+    { wide: 1, deep: 0.08, base: 4, up: 2 },
+    { wide: 1, deep: 0.08, base: 10, up: 2 },
+    { wide: 0.1, deep: 0.1, base: 0, up: 13 },
+  ],
+  bamboo: [{ wide: 1, deep: 0.16, base: 0, up: 17 }],
+  iron: [
+    { wide: 1, deep: 0.06, base: 0, up: 14, alpha: 0.75 },
+    { wide: 1, deep: 0.12, base: 0, up: 2 },
+  ],
+}
+
+/** A number picked from a tile, steady from one drawing to the next. */
+const pick = (tile: number, of: number) => ((tile * 2654435761) >>> 0) % of
+
+/** The boxes a prop is drawn from in a region's look; `head` is the first tile of a run it lies in, which picks its colour. */
+function propBoxes(prop: Exclude<Prop, 'none' | 'tree'>, look: Look, head: number): Box[] {
+  if (prop === 'car') return [
+    { wide: 1, deep: 0.7, base: 3, up: 9, color: look.cars[pick(head, look.cars.length)] },
+    { wide: 0.7, deep: 0.6, base: 12, up: 6, color: 0x2a3340 },
+  ]
+  if (prop === 'fence') return FENCES[look.fence].map((box) => ({ ...box, color: look.fenceColor }))
+  const crate = look.crates[pick(head, look.crates.length)]
+  if (prop === 'crate') return PROP_BOXES.crate.map((box) => ({ ...box, color: crate }))
+  if (prop === 'stack') return PROP_BOXES.stack.map((box, i) => ({ ...box, color: shade(crate, 1 + 0.15 * i) }))
+  if (prop === 'rubble') return PROP_BOXES.rubble.map((box, i) => ({ ...box, color: shade(look.rock, 0.9 + 0.12 * i) }))
+  return PROP_BOXES[prop]
+}
+
+/** A tree in its region's style, its trunk among `shapes` and its leaves among `blobs`. */
+function addTree(look: Look, at: Point3, shapes: Shapes, blobs: Object3D[], tile: number): void {
+  const { x, z } = at
+  const px = (n: number) => n / ACROSS
+  const trunk = (r: number, up: number, color = 0x5b4630) => shapes.box(x - px(r), z - px(r), x + px(r), z + px(r), at.y, at.y + tall(up), color)
+  const leaf = (dx: number, up: number, r: number, color = look.leaves) => blobs.push(blob({ x: x + px(dx) / Math.SQRT2, y: at.y + tall(up), z: z - px(dx) / Math.SQRT2 }, px(r), color))
+  const lighter = shade(look.leaves, 1.25)
+  switch (look.tree) {
+    case 'pine':
+      trunk(2, 8)
+      for (const [base, r, up] of [[6, 13, 20], [16, 10, 18], [26, 7, 14]]) shapes.spike(x, z, at.y + tall(base), px(r) / Math.SQRT2, { x, y: at.y + tall(base + up), z }, look.leaves)
+      return
+    case 'palm': {
+      // A slim trunk that leans, crowned by fronds.
+      const lean = (pick(tile, 2) * 2 - 1) * 4
+      trunk(1.5, 34, 0x8a6a48)
+      for (const dx of [-9, -4, 4, 9]) leaf(dx + lean, 34 - Math.abs(dx) * 0.6, 5, dx > 0 ? lighter : look.leaves)
+      leaf(lean, 37, 6)
+      return
+    }
+    case 'cypress':
+      trunk(2, 6)
+      for (const [up, r] of [[12, 7], [20, 7], [28, 6], [35, 4]]) leaf(0, up, r)
+      return
+    case 'acacia':
+      // A flat, spreading crown on a crooked trunk.
+      trunk(2, 20, 0x6a4a30)
+      shapes.box(x - px(16) / Math.SQRT2, z - px(16) / Math.SQRT2, x + px(16) / Math.SQRT2, z + px(16) / Math.SQRT2, at.y + tall(20), at.y + tall(25), look.leaves)
+      return
+    case 'blossom':
+      trunk(2, 14, 0x4a3428)
+      leaf(0, 24, 13)
+      leaf(-5, 28, 8, lighter)
+      leaf(6, 22, 6, 0xffffff)
+      return
+    default:
+      trunk(2, 16)
+      leaf(0, 24, 14)
+      leaf(-4, 28, 8, lighter)
+  }
+}
 
 /** How each kind of alien is drawn: its colour, and its size against a soldier's. */
 const ALIEN_LOOK: Record<AlienKind, { color: number; scale: number }> = {
@@ -652,24 +723,18 @@ export async function createView(): Promise<View> {
    * Adds the prop on a tile to `shapes`, and any leaves to `blobs`. A prop that continues onto the tile above or
    * below, such as a car parked along y, is turned to lie that way; the two halves of a car share a colour.
    */
-  function addProp(props: Prop[], tile: number, shapes: Shapes, blobs: Object3D[]): void {
+  function addProp(props: Prop[], tile: number, shapes: Shapes, blobs: Object3D[], look: Look): void {
     const prop = props[tile] as Exclude<Prop, 'none'>
     const x = tile % GRID
     const y = Math.floor(tile / GRID)
     const at = spot(x, y)
-    if (prop === 'tree') {
-      const trunk = 2 / ACROSS
-      shapes.box(x - trunk, y - trunk, x + trunk, y + trunk, at.y, at.y + tall(16), 0x5b4630)
-      const off = 4 / ACROSS / Math.SQRT2
-      blobs.push(blob({ x, y: at.y + tall(24), z: y }, 14 / ACROSS, 0x2f6b3c), blob({ x: x - off, y: at.y + tall(28), z: y + off }, 8 / ACROSS, 0x3d8049))
-      return
-    }
+    if (prop === 'tree') return addTree(look, at, shapes, blobs, tile)
     const same = (other: number) => other >= 0 && other < GRID * GRID && props[other] === prop
     const alongX = (tile % GRID > 0 && same(tile - 1)) || (tile % GRID < GRID - 1 && same(tile + 1))
     const alongY = !alongX && (same(tile - GRID) || same(tile + GRID))
     // The first tile of the run the prop lies in.
     const head = alongY ? (same(tile - GRID) ? tile - GRID : tile) : tile % GRID > 0 && same(tile - 1) ? tile - 1 : tile
-    for (const box of prop === 'car' ? carBoxes(head) : PROP_BOXES[prop]) addBox(shapes, x, at.y, y, alongY ? { ...box, wide: box.deep, deep: box.wide } : box)
+    for (const box of propBoxes(prop, look, head)) addBox(shapes, x, at.y, y, alongY ? { ...box, wide: box.deep, deep: box.wide } : box)
   }
 
   /**
@@ -708,7 +773,11 @@ export async function createView(): Promise<View> {
     /** A wall's colour: the building's on either side of it. */
     const wallColour = (a: number, b: number) => paint.get(a) ?? paint.get(b) ?? look.walls[0]
     const lift = look.up / EDGE_UP
-    const edgeBoxes = (edge: Exclude<Edge, 'none'>, color: number) => EDGE_BOXES[edge].map((box) => ({ ...box, base: box.base * lift, up: box.up * lift, color: box.alpha ? look.glass : color }))
+    // Each wall is topped by its region's trim.
+    const edgeBoxes = (edge: Exclude<Edge, 'none'>, color: number) => [
+      ...EDGE_BOXES[edge].map((box) => ({ ...box, base: box.base * lift, up: box.up * lift, color: box.alpha ? look.glass : color })),
+      { wide: 1, deep: WALL_THICK * 1.5, base: EDGE_UP * lift, up: CAP_UP, color: look.cap },
+    ]
     const ground = new Shapes()
     const beyond = new Shapes()
     const beyondBlobs: Object3D[] = []
@@ -753,7 +822,7 @@ export async function createView(): Promise<View> {
       const north = battle.north[tile]
       const west = battle.west[tile]
       if (out) {
-        if (props[tile] !== 'none') addProp(props, tile, beyond, beyondBlobs)
+        if (props[tile] !== 'none') addProp(props, tile, beyond, beyondBlobs, look)
         if (north !== 'none') for (const box of edgeBoxes(north, wallColour(tile, tile - GRID))) addBox(beyond, x, at.y, y - 0.5, box)
         if (west !== 'none') for (const box of edgeBoxes(west, wallColour(tile, tile - 1))) addBox(beyond, x - 0.5, at.y, y, { ...box, wide: box.deep, deep: box.wide })
         continue
@@ -761,7 +830,7 @@ export async function createView(): Promise<View> {
       if (props[tile] !== 'none') {
         const shapes = new Shapes()
         const blobs: Object3D[] = []
-        addProp(props, tile, shapes, blobs)
+        addProp(props, tile, shapes, blobs, look)
         stand(shapes, blobs, [tile])
       }
       // A wall stands on the edge it divides this tile from its neighbour by.

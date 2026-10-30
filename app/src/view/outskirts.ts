@@ -1,11 +1,13 @@
 import { Group } from 'three'
 import { GRID, type Battle } from '../core/battle'
 import type { TerrainKind } from '../core/terrain'
+import { LOOKS } from './looks'
 import { blob, mix, shade, Shapes } from './shapes'
 import { ACROSS, LEVEL, tall } from './space'
 
-/** Tiles of scenery drawn beyond the battlefield's far edges. */
-const REACH = 9
+/** Tiles of scenery drawn past the map on every side, and of bare ground past that, fading into the night. */
+const REACH = 14
+const PLAIN = 160
 /** How far, in screen pixels seen from the still camera, a cliff falls before it fades into the depths. */
 const FALL = 230
 
@@ -20,16 +22,21 @@ const LOOK: Record<TerrainKind, { blocks: number[]; rock: number; glow: number; 
   hive: { blocks: [0x3a1f4f, 0x4b2766, 0x2c1640], rock: 0x2a1838, glow: 0xd36bff, style: 'spires' },
 }
 
-/** Builds the world past the battlefield: on its far edges the place carries on, tall and lit; its near edges and any void fall away in cliffs. */
+/**
+ * Builds the world past the map: the place carries on all round, in its region's colours, tall and lit behind it and
+ * low before it, so no edge ever shows; only a chasm falls away in cliffs.
+ */
 export function buildOutskirts(battle: Battle): Group {
   const group = new Group()
   const shapes = new Shapes()
-  const look = LOOK[battle.place]
+  const look = { ...LOOK[battle.place], blocks: [...LOOK[battle.place].blocks, ...LOOKS[battle.region].walls.map((c) => shade(c, 0.55))] }
   // Scenery is drawn from the ground's own layout, so it stays put when the battle redraws.
   let seed = battle.ground.reduce((h, ground, i) => (h * 31 + ground.length * (i + 7)) | 0, 17)
   const rand = () => ((seed = (seed * 1103515245 + 12345) | 0) >>> 8) / 16777216
-  // The town past the battlefield is ground; only the map's edge and a chasm fall away.
-  const gone = (x: number, y: number) => x < 0 || y < 0 || x >= GRID || y >= GRID || (battle.ground[y * GRID + x] === 'void' && !battle.outside[y * GRID + x])
+  // The town past the battlefield and past the map is ground; only a chasm falls away.
+  const gone = (x: number, y: number) => x >= 0 && y >= 0 && x < GRID && y < GRID && battle.ground[y * GRID + x] === 'void' && !battle.outside[y * GRID + x]
+  /** How many tiles past the map a tile lies, on its nearest side. */
+  const past = (x: number, y: number) => Math.max(-x, -y, x - GRID + 1, y - GRID + 1)
   const across = (px: number) => px / ACROSS
   const fall = tall(FALL)
 
@@ -76,17 +83,21 @@ export function buildOutskirts(battle: Battle): Group {
     group.add(blob({ x: x - across(4 * size) / Math.SQRT2, y: base + tall(22 * size), z: y + across(4 * size) / Math.SQRT2 }, across(7 * size), look.blocks[1]))
   }
 
-  // The far edges: the place goes on beyond where the fight is. The ground carries on a little past the edge before the scenery starts.
-  for (let y = -2; y < GRID; y++)
-    for (let x = -2; x < GRID; x++) {
-      if (x >= 0 && y >= 0) continue
-      shapes.flat(x - 0.5, y - 0.5, x + 0.5, y + 0.5, 0, shade(look.rock, 0.85 - 0.15 * -Math.min(x, y)))
+  // Bare ground under it all, out to where the haze swallows it, and a street's width round the map before the scenery starts.
+  shapes.flat(-PLAIN, -PLAIN, GRID + PLAIN, GRID + PLAIN, -0.01, shade(look.rock, 0.45))
+  for (let y = -2; y < GRID + 2; y++)
+    for (let x = -2; x < GRID + 2; x++) {
+      if (past(x, y) <= 0) continue
+      shapes.flat(x - 0.5, y - 0.5, x + 0.5, y + 0.5, 0, shade(look.rock, 0.85 - 0.15 * past(x, y)))
     }
-  for (let y = -REACH; y < GRID; y += 2)
-    for (let x = -REACH; x < GRID; x += 2) {
-      if (x > -3 && y > -3) continue
-      const lot = { x: x + Math.floor(rand() * 2) * (x <= -3 ? 1 : 0), y }
-      const depth = -Math.min(lot.x, lot.y) - 2
+  for (let y = -REACH; y < GRID + REACH; y += 2)
+    for (let x = -REACH; x < GRID + REACH; x += 2) {
+      if (past(x, y) < 3) continue
+      const lot = { x: x + Math.floor(rand() * 2), y }
+      // Before the map, toward the still camera, the scenery stays low, so it hides nothing.
+      const before = lot.x >= GRID || lot.y >= GRID
+      const low = before ? 0.4 : 1
+      const depth = past(lot.x, lot.y) - 2
       // Farther scenery sinks into the night haze.
       const color = mix(look.blocks[Math.floor(rand() * look.blocks.length)], HAZE, Math.min(0.75, depth * 0.09))
       const [x0, y0] = [lot.x - 0.5, lot.y - 0.5]
@@ -97,24 +108,24 @@ export function buildOutskirts(battle: Battle): Group {
           break
         case 'rampart':
           if (near) {
-            const wall = block(x0, y0, x0 + 2.2, y0 + 2.2, 90, color)
+            const wall = block(x0, y0, x0 + 2.2, y0 + 2.2, 90 * low, color)
             if (rand() < 0.25) {
               const top = wall.left(0.5, 1)
               const pole = across(2)
               shapes.box(top.x - pole, top.z - pole, top.x + pole, top.z + pole, top.y, top.y + tall(30), 0x2a2d33)
               group.add(blob({ x: top.x, y: top.y + tall(32), z: top.z }, across(5), look.glow, 0.9))
             }
-          } else windows(block(x0, y0, x0 + 1.6, y0 + 1.6, 40 + rand() * 60, shade(color, 0.7)), 0.2)
+          } else windows(block(x0, y0, x0 + 1.6, y0 + 1.6, (40 + rand() * 60) * low, shade(color, 0.7)), 0.2)
           break
         case 'spires': {
-          const high = tall((near ? 50 : 90) + rand() * 150)
+          const high = tall(((near ? 50 : 90) + rand() * 150) * low)
           const lean = across(rand() * 10 - 5) / Math.SQRT2
           shapes.spike(lot.x, lot.y, 0, across(14) / Math.SQRT2, { x: lot.x + lean, y: high, z: lot.y - lean }, color)
           shapes.spike(lot.x, lot.y + 0.3, 0, across(2), { x: lot.x, y: high * 0.8, z: lot.y + 0.3 }, look.glow, 0.35)
           break
         }
         default: {
-          const up = { towns: 30 + rand() * 40, towers: 60 + rand() * 180, works: 30 + rand() * 50, shells: 20 + rand() * 70 }[look.style] * (near ? 0.6 : 1 + depth * 0.06)
+          const up = { towns: 30 + rand() * 40, towers: 60 + rand() * 180, works: 30 + rand() * 50, shells: 20 + rand() * 70 }[look.style] * (near ? 0.6 : 1 + depth * 0.06) * low
           const size = 1.4 + rand() * 0.8
           const face = block(x0, y0, x0 + size, y0 + size, up, color)
           windows(face, look.style === 'shells' ? 0.08 : look.style === 'towers' ? 0.8 : 0.35)
