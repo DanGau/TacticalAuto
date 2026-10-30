@@ -599,7 +599,9 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const path = choose(move)
   if (unit.ability === 'runAndGun' && !battle.concealed && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
   const end = path.at(-1) ?? unit
-  if (unit.side !== 'human' || battle.concealed || setting || enemies.some((e) => shootable(battle, unit, end, e, seen))) return path
+  const shot = enemies.some((e) => shootable(battle, unit, end, e, seen))
+  if (unit.side === 'human' && shot && !battle.concealed && !setting && !battle.escape && !carrying(battle, unit)) battle.strides[unit.id] = move - costOf(battle, unit, path)
+  if (unit.side !== 'human' || battle.concealed || setting || shot) return path
   unit.order = orderFor(battle, unit, { wary, exposed: theirs(end) > 0, threatened: threat(end) > 0 })
   if (unit.order !== 'sprint') return path
   // Sprinting, it moves again; a sprint that gets it no nearer is no sprint.
@@ -638,6 +640,37 @@ function patrolPath(battle: Battle, unit: Unit): Tile[] {
   if (battle.pods[unit.pod!].guard) return []
   const toWaypoint = walkingDistances(battle, battle.pods[unit.pod!].waypoint)
   return bestPath(paths(battle, unit, PATROL_MOVE), unit, (end) => [toWaypoint[end.y * GRID + end.x]])
+}
+
+/** The move a path costs, climbing costing more. */
+function costOf(battle: Battle, unit: Unit, path: Tile[]): number {
+  return path.reduce((sum, tile, i) => sum + stepCost(battle, path[i - 1] ?? unit, tile), 0)
+}
+
+/**
+ * A soldier's walk between or after its attacks, within the move it has left: with `toShot`, to the nearest tile with a
+ * shot, if it has none here; else back to where the aliens' best shot at it is worst. Never
+ * into harm, off the uplink, or into sight of a pod not yet revealed.
+ */
+function stride(battle: Battle, unit: Unit, seen: Set<number>, toShot: boolean): GameEvent[] {
+  const left = battle.strides[unit.id] ?? 0
+  const enemies = enemiesOf(battle, unit)
+  const shotFrom = (end: Tile) => enemies.some((e) => shootable(battle, unit, end, e, seen))
+  if (left <= 0 || unit.hp <= 0 || (toShot && shotFrom(unit))) return []
+  const unseen = battle.units.filter((u) => u.side !== unit.side && !revealed(battle, u))
+  const reach = uplinkReach(battle)
+  const barred = (end: Tile) =>
+    onTile(battle.acid, end) || besideFuel(battle, end) || (onTile(battle.fire, end) && !fireproof(battle, unit)) || (battle.uplink !== null && distance(end, battle.uplink) > reach) || unseen.some((alien) => sees(battle, end, alien)) ? 1 : 0
+  const path = bestPath(paths(battle, unit, left), unit, (end, steps) =>
+    toShot ? [barred(end), shotFrom(end) ? 0 : 1, exposure(battle, enemies, end), steps] : [barred(end), exposure(battle, enemies, end), steps],
+  )
+  const end = path.at(-1)
+  if (!end || barred(end) || (toShot && !shotFrom(end))) return []
+  battle.strides[unit.id] = left - costOf(battle, unit, path)
+  const events: GameEvent[] = []
+  walk(unit, path, events)
+  moved(battle, unit, path, events)
+  return [...events, ...sight(battle)]
 }
 
 function walk(unit: Unit, path: Tile[], events: GameEvent[]): void {
@@ -976,6 +1009,7 @@ function moveSide(battle: Battle): GameEvent[] {
     }
   }
   const watched = new Set<number>()
+  battle.strides = {}
   for (const unit of battle.units) {
     if (unit.side !== battle.turn || unit.hp <= 0) continue
     const path = unit.civilian ? fleePath(battle, unit) : alert(battle, unit) ? fightPath(battle, unit) : patrolPath(battle, unit)
@@ -1595,10 +1629,12 @@ function actNext(battle: Battle): GameEvent[] {
     if (unit.side !== battle.turn || unit.id < battle.shooter || unit.civilian || !armed(battle, unit)) continue
     if (unit.id === battle.shooter) {
       if (battle.attacks >= attacksOf(unit)) continue
-      // A further attack: a shot alone, then what follows the last.
+      // A further attack: a walk to a shot if it has none, the shot, then what follows the last, ending with a step back.
       battle.attacks++
       battle.actor = unit.id
-      const events = [...shoot(battle, unit, seen), ...(battle.attacks >= attacksOf(unit) && unit.hp > 0 ? [...drone(battle, unit), ...skirmish(battle, unit)] : [])]
+      const events = [...stride(battle, unit, seen, true)]
+      events.push(...shoot(battle, unit, seen))
+      if (battle.attacks >= attacksOf(unit) && unit.hp > 0) events.push(...drone(battle, unit), ...skirmish(battle, unit), ...stride(battle, unit, seen, false))
       battle.actor = null
       if (events.length === 0) continue
       return events

@@ -341,6 +341,8 @@ export interface Battle {
   shooter: number
   /** Attacks that unit has made this turn. */
   attacks: number
+  /** Move each soldier has left this turn to walk between and after its attacks, by unit id. */
+  strides: Record<number, number>
   /** Set when phase is 'over'; null is a draw. */
   winner: Side | null
   units: Unit[]
@@ -1036,6 +1038,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     stage: 'move',
     shooter: 0,
     attacks: 0,
+    strides: {},
     winner: null,
     units: [],
     nextId: 1,

@@ -2,7 +2,7 @@ import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { deploy, begun } from './roads'
 import { apply } from './apply'
-import { isSoldier, revealed, SOLDIER_ATTACKS, type Battle } from './battle'
+import { HASTE_MOVE, isSoldier, revealed, SOLDIER_ATTACKS, type Battle } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { detects } from './sight'
 
@@ -42,8 +42,8 @@ test('a turn is one move beat, then an attack per beat in id order, two by each 
       stage = 'move'
       shooter = 0
     }
-    if (first.type === 'move') {
-      expect(stage).toBe('move')
+    // After the move beat, a move opens a soldier's attack: its walk to a shot.
+    if (first.type === 'move' && stage === 'move') {
       stage = 'shoot'
     } else {
       stage = 'shoot'
@@ -107,4 +107,22 @@ test('a squad that sees a pod first holds its fire and sets up, then springs the
     })
   }
   expect(sprung).toBeGreaterThan(0)
+})
+
+test('a soldier may walk between and after its attacks, its walks in a turn together within its move', () => {
+  let strides = 0
+  for (let seed = 1; seed <= 6; seed++) {
+    const walked = new Map<string, number>()
+    play(seed, (events, before) => {
+      for (const e of events) {
+        const unit = e.type === 'move' && !e.with ? before.units.find((u) => u.id === e.id) : undefined
+        if (e.type !== 'move' || !unit || !isSoldier(unit) || unit.ability === 'runAndGun' || before.turn !== 'human') continue
+        if (before.stage === 'shoot') strides++
+        const key = `${before.round}:${unit.id}`
+        walked.set(key, (walked.get(key) ?? 0) + e.path.length)
+        expect(walked.get(key)).toBeLessThanOrEqual(unit.stats.move + HASTE_MOVE)
+      }
+    })
+  }
+  expect(strides).toBeGreaterThan(0)
 })
