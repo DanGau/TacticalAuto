@@ -508,8 +508,8 @@ function plotRoute(run: Run, home: City): Stage[] {
 /**
  * Sets each stop of a leg on the way across its continent, as a traveller would plan the trip: each column of stops
  * a step along the way from where the leg begins to its hero's city, the steps of uneven length, each row to one
- * side or the other in order, so no two trails cross. A real town near where a stop falls takes it. The leg ends at
- * the hero's city; the hub's leg at the hub.
+ * side or the other in order, so no two trails cross. Each stop is at a real town: the nearest one unused within its
+ * step, the step widened until one is found. The leg ends at the hero's city; the hub's leg at the hub.
  */
 function placeLeg(run: Run, leg: Leg, stage: Stage): void {
   const end = leg.columns.length - 1
@@ -538,21 +538,30 @@ function placeLeg(run: Run, leg: Leg, stage: Stage): void {
   leg.columns.slice(0, end).forEach((column, c) => {
     // Each column a step along the way, some steps longer than others.
     const t = (c + 1 + (random(run) - 0.5) * 0.6) * step
-    for (const node of column) {
+    const picks = column.map((node) => {
       const d = (node.row - (MAP_ROWS - 1) / 2 + (random(run) - 0.5) * 0.4) * gap
-      // A town near where the stop falls takes it; else it is out in the open between towns.
-      const near = towns
-        .filter((town) => !used.has(town.name) && Math.hypot((town.t - t) * length, town.d - d) < Math.min(gap, step * length) * SNAP)
-        .sort((a, b) => Math.hypot((a.t - t) * length, a.d - d) - Math.hypot((b.t - t) * length, b.d - d))[0]
-      if (near) used.add(near.name)
-      node.town = near?.name ?? null
-      node.at = near?.at ?? offset(stage, t, d)
-    }
+      const far = (town: (typeof towns)[number]) => Math.hypot((town.t - t) * length, town.d - d)
+      const free = towns.filter((town) => !used.has(town.name))
+      for (let window = step / 2; free.length > 0; window += step / 2) {
+        const near = free.filter((town) => Math.abs(town.t - t) <= window).sort((a, b) => far(a) - far(b))[0]
+        if (near) {
+          used.add(near.name)
+          return near
+        }
+      }
+      // A continent out of towns: the stop stands where it falls.
+      return { name: null, at: offset(stage, t, d), d }
+    })
+    // Rows take their towns in order across the way, so no two trails cross.
+    picks.sort((a, b) => a.d - b.d)
+    column.forEach((node, i) => {
+      node.town = picks[i].name
+      node.at = picks[i].at
+    })
   })
 }
 
-/** How near a town must lie to where a stop falls to take it, as a share of the gap between stops; and the least gap between rows, in degrees. */
-const SNAP = 0.45
+/** The least gap between rows, in degrees. */
 const MIN_ROW_GAP = 1.2
 
 /** The place a share `t` of the way along a stage, `d` degrees to its left. */

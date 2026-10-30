@@ -65,5 +65,8 @@ export const TOWNS: Record<ContinentId, [string, LonLat][]> = {
     ['Broome', [122.25, -17.95]], ['Port Hedland', [118.6, -20.3]], ['Geraldton', [114.6, -28.8]], ['Kalgoorlie', [121.45, -30.75]], ['Esperance', [121.9, -33.85]],
     ['Port Augusta', [137.75, -32.5]], ['Mount Isa', [139.5, -20.7]], ['Rockhampton', [150.5, -23.4]], ['Wellington', [174.8, -41.3]], ['Christchurch', [172.6, -43.5]],
     ['Queenstown', [168.65, -45]], ['Port Moresby', [147.2, -9.45]], ['Dubbo', [148.6, -32.25]], ['Broken Hill', [141.45, -31.95]], ['Coober Pedy', [134.75, -29]],
+    ['Newcastle', [151.75, -32.9]], ['Wagga Wagga', [147.35, -35.1]], ['Mildura', [142.15, -34.2]], ['Ballarat', [143.85, -37.55]], ['Mackay', [149.2, -21.15]],
+    ['Longreach', [144.25, -23.45]], ['Katherine', [132.25, -14.45]], ['Tennant Creek', [134.2, -19.65]], ['Carnarvon', [113.65, -24.9]], ['Albany', [117.9, -35]],
+    ['Bunbury', [115.65, -33.3]], ['Toowoomba', [151.95, -27.55]], ['Bourke', [145.95, -30.1]], ['Auckland', [174.75, -36.85]], ['Dunedin', [170.5, -45.9]],
   ],
 }

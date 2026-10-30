@@ -291,6 +291,17 @@ test('a supply drop and a cache are collected on arrival, each adding threat', (
   expect(run.threat).toBe(2 * STOP_THREAT)
 })
 
+test('every stop on the way across a continent is at a real town, none twice', () => {
+  for (let seed = 0; seed < 20; seed++) {
+    const run = begun(seed)
+    for (const leg of run.legs.slice(0, KEYS)) {
+      const towns = leg.columns.flat().map((node) => node.town)
+      expect(towns.every((town) => town !== null)).toBe(true)
+      expect(new Set(towns).size).toBe(towns.length)
+    }
+  }
+})
+
 test('soldiers keep their health between battles, heal TRAVEL_HEAL for each stop travelled to, and come back from downed at 1', () => {
   const run = travelling(['battle', 'battle', 'battle'])
   hire(run).skills.splice(1)
