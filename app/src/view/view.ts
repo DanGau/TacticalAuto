@@ -40,6 +40,9 @@ const CHUTE_FALL_MS = 1500
 const CHUTE_HEIGHT = 260
 const CHUTE_FOLD_MS = 350
 const POD_DUST_MS = 450
+/** How long a quiet approach takes to walk in, and from how many tiles out. */
+const MARCH_MS = 900
+const MARCH_FROM = 3
 const POD_STAGGER_MS = 160
 const POD_HEIGHT = 400
 const MS_PER_TILE = 110
@@ -1054,7 +1057,7 @@ export async function createView(): Promise<View> {
     seen = battle.phase === 'deploy' ? null : visibleTiles(battle)
     const tint = (tile: number) => (!seen || seen[tile] ? 0xffffff : COLOR.dim)
     seen?.forEach((lit, i) => {
-      if (!lit) diamond(shapes, i % GRID, Math.floor(i / GRID), COLOR.fog, 0.55, DECAL_LIFT * 3)
+      if (!lit && battle.ground[i] !== 'void') diamond(shapes, i % GRID, Math.floor(i / GRID), COLOR.fog, 0.55, DECAL_LIFT * 3)
     })
     lay(fog, shapes)
     // Mid-beat, a glow stays where its slide left it; the battle already holds where the alien ends up.
@@ -1365,6 +1368,7 @@ export async function createView(): Promise<View> {
     for (const unit of soldiers) fade(sprites.get(unit.id)!, 0)
     await follow(soldiers.map((u) => ({ x: u.x, y: u.y })))
     if (battle.landed === 'stealth') return parachute(soldiers)
+    if (battle.landed === 'march') return marchIn(battle, soldiers)
     await Promise.all(
       soldiers.map((unit, i) =>
         drawing(async (pod) => {
@@ -1395,6 +1399,28 @@ export async function createView(): Promise<View> {
     )
     jolt.x = 0
     look(camera)
+  }
+
+  /** A quiet approach: the squad walks in from beyond the battlefield's edge, one after another, out of nowhere. */
+  async function marchIn(battle: Battle, soldiers: Unit[]): Promise<void> {
+    const { x1, y1, x2, y2 } = battle.bounds
+    await Promise.all(
+      soldiers.map(async (unit, i) => {
+        const sprite = sprites.get(unit.id)!
+        // From the side of the map the squad stands nearest.
+        const away = { x: unit.x - (x1 + x2) / 2, y: unit.y - (y1 + y2) / 2 }
+        const len = Math.hypot(away.x, away.y) || 1
+        const from = { x: unit.x + (away.x / len) * MARCH_FROM, y: unit.y + (away.y / len) * MARCH_FROM }
+        const home = sprite.tile
+        await tween(i * POD_STAGGER_MS, () => {})
+        await tween(MARCH_MS, (t) => {
+          const at = toWorld(from.x + (home.x - from.x) * t, from.y + (home.y - from.y) * t)
+          shift(sprite, at)
+          fade(sprite, Math.min(1, t * 2))
+        })
+        place(sprite, home)
+      }),
+    )
   }
 
   /** A stealth insertion: each soldier drifts down under a canopy, swaying, and lands without a sound. */

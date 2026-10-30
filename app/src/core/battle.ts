@@ -172,7 +172,7 @@ export type SkillEffect =
   | 'ward'
   | 'drone'
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'podBlast' | 'podShred' | 'podFrost' | 'podWall' | 'podTurret' | 'ghost' | 'killzone' | 'beacon' | 'relay' | 'flare' | 'bounty'
+export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'podBlast' | 'podShred' | 'podFrost' | 'podWall' | 'podTurret' | 'dropPods' | 'canopies' | 'ghost' | 'killzone' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
 export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect
 
@@ -459,7 +459,8 @@ const walks = new WeakMap<Battle, { fixed: string; into: [from: number, cost: nu
 
 /** For each tile, the open tiles a unit can step onto it from, with each step's cost. */
 function walkGraph(battle: Battle) {
-  const still = battle.units.filter((u) => u.stats.move === 0 && u.hp > 0)
+  // A civilian waits to be reached, not to wall a way off: it leaves once a soldier is beside it.
+  const still = battle.units.filter((u) => u.stats.move === 0 && u.hp > 0 && !u.civilian)
   const fixed = still.map((u) => u.y * GRID + u.x).join()
   let walk = walks.get(battle)
   if (walk?.fixed === fixed) return walk
@@ -549,13 +550,73 @@ export function freeTilesNear(battle: Battle, centre: Tile, count: number): Tile
 
 const randomTile = (battle: Battle): Tile => ({ x: randomInt(battle, GRID), y: randomInt(battle, GRID) })
 
-/** A random open tile at least `clearance` from every tile in `avoid`; the clearance shrinks if the map is too crowded. */
-export function spacedTile(battle: Battle, avoid: Tile[], clearance: number): Tile {
+/**
+ * A random open tile at least `clearance` from every tile in `avoid`, in the part of the map `within` allows; the
+ * clearance shrinks if the map is too crowded, and in the end any part of the map will do.
+ */
+export function spacedTile(battle: Battle, avoid: Tile[], clearance: number, within: Within = 'anywhere'): Tile {
+  const depth = edgeDepths(battle)
   for (let tries = 0; ; tries++) {
     const tile = randomTile(battle)
     const needed = clearance - Math.floor(tries / 200)
-    if (coverAt(battle, tile.x, tile.y) === 0 && avoid.every((other) => distance(tile, other) >= needed)) return tile
+    const placed = tries > 2000 || inPart(depth[tile.y * GRID + tile.x], within)
+    if (placed && coverAt(battle, tile.x, tile.y) === 0 && avoid.every((other) => distance(tile, other) >= needed)) return tile
   }
+}
+
+/**
+ * The battlefield's two borders. Its outer border is the edge of the map the squad can walk; its inner border lies
+ * INNER tiles within. Inside the inner border stands what the battle is about: the pods, the uplink, the caches.
+ * Civilians, hiding, may be anywhere. Between the two, the edge, is where the squad comes in and gets out; the outermost tiles are left free.
+ */
+export const INNER = 7
+const EDGE_GAP = 2
+export type Within = 'anywhere' | 'inner' | 'edge'
+
+const inPart = (depth: number, within: Within) => within === 'anywhere' || (within === 'inner' ? depth > INNER : depth >= EDGE_GAP && depth <= INNER)
+
+const depths = new WeakMap<Battle, number[]>()
+
+/** How far each tile lies inside the battlefield: 1 on its outermost tiles, 0 off it. */
+export function edgeDepths(battle: Battle): number[] {
+  const known = depths.get(battle)
+  if (known) return known
+  const depth = Array<number>(GRID * GRID).fill(0)
+  const queue: number[] = []
+  battle.ground.forEach((g, t) => {
+    if (g === 'void') return
+    const x = t % GRID
+    const y = Math.floor(t / GRID)
+    const rim = NEIGHBORS.some(([dx, dy]) => !onGrid(x + dx, y + dy) || battle.ground[(y + dy) * GRID + x + dx] === 'void')
+    if (!rim) return
+    depth[t] = 1
+    queue.push(t)
+  })
+  for (let i = 0; i < queue.length; i++) {
+    const t = queue[i]
+    for (const [dx, dy] of NEIGHBORS) {
+      const x = (t % GRID) + dx
+      const y = Math.floor(t / GRID) + dy
+      const n = y * GRID + x
+      if (!onGrid(x, y) || battle.ground[n] === 'void' || depth[n] > 0) continue
+      depth[n] = depth[t] + 1
+      queue.push(n)
+    }
+  }
+  depths.set(battle, depth)
+  return depth
+}
+
+/** The open tile of the edge nearest `tile`. */
+function edgeNear(battle: Battle, tile: Tile): Tile {
+  const depth = edgeDepths(battle)
+  let best: Tile | null = null
+  for (let t = 0; t < GRID * GRID; t++) {
+    const at = { x: t % GRID, y: Math.floor(t / GRID) }
+    if (!inPart(depth[t], 'edge') || blocked(battle, at.x, at.y)) continue
+    if (!best || distance(at, tile) < distance(best, tile)) best = at
+  }
+  return best ?? openNear(battle, tile)
 }
 
 /** How far to either side of an escape route its aliens stand. */
@@ -590,8 +651,9 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 
 /** What each plan is called, and what it does, for the player. */
 export const PLANS: Record<Plan, { name: string; icon: string; text: string }> = {
+  march: { name: 'Quiet approach', icon: '🥾', text: 'Move in unseen from the edge, clear of every pod, and creep in to set ambushes' },
   hot: { name: 'Hot drop', icon: '☄️', text: 'Land right on a pod: the drop pods hit it and it is ambushed, but every other pod hears and converges' },
-  stealth: { name: 'Stealth insertion', icon: '🌘', text: 'Land unseen, clear of every pod, and creep in to set ambushes' },
+  stealth: { name: 'Parachute drop', icon: '🪂', text: 'Drop unseen anywhere clear of every pod, deep in, and creep in to set ambushes' },
   decap: { name: 'Decapitation', icon: '🗡️', text: 'Land on the commander: it is ambushed, but every guard converges on the squad' },
   overwatch: { name: 'Overwatch', icon: '🔭', text: "Land on high ground at range from the commander; its pod sees the squad coming" },
   bait: { name: 'Bait', icon: '🪤', text: 'Land far off: the guards come for the squad, leaving the commander alone' },
@@ -601,11 +663,12 @@ export const PLANS: Record<Plan, { name: string; icon: string; text: string }> =
 }
 
 /**
- * What landing at a zone means. Exterminate and raid: a hot drop onto a pod, or a stealth insertion clear of every pod.
+ * What landing at a zone means. Exterminate and raid: a quiet march in from the edge; with a relic, a hot drop onto a
+ * pod or a parachute drop anywhere clear of every pod.
  * Assassinate: a decapitation onto the commander, an overwatch on high ground at range, or bait far off that draws the
  * guards away. Hold: which uplink to hold. Escape: which way out. A rescue's zones are where its teams land.
  */
-export type Plan = 'hot' | 'stealth' | 'decap' | 'overwatch' | 'bait' | 'uplink' | 'escape' | 'team'
+export type Plan = 'march' | 'hot' | 'stealth' | 'decap' | 'overwatch' | 'bait' | 'uplink' | 'escape' | 'team'
 
 /** The supply caches a raid can grab, at most. */
 export const CACHES = 3
@@ -661,12 +724,9 @@ export const STRIKE = { threat: 2, damage: 5 }
 /** Tiles weighed for each zone of a distinct kind. */
 const CANDIDATES = 40
 
-/** The chance each zone of an exterminate or a raid is a hot drop, by the kind of place: the wilder, the likelier. */
-const HOT_CHANCE: Record<TerrainKind, number> = { town: 0.2, countryside: 0.2, city: 0.35, industrial: 0.4, ruins: 0.55, compound: 0.5, hive: 0.7 }
-
 /** Lays out the zones a battle offers and what each means, by its goal; see Plan. `centres` are where the pods stand. */
 function planZones(battle: Battle, centres: Tile[]): void {
-  const clear = () => spacedTile(battle, [...battle.units, ...battle.zones], ZONE_CLEARANCE)
+  const clear = (within: Within = 'edge') => spacedTile(battle, [...battle.units, ...battle.zones], ZONE_CLEARANCE, within)
   // A zone the squad can walk off and the aliens can walk to: high ground may be a ledge with no way down.
   const anchor = centres[0]
   const joined = (t: Tile) => !anchor || (walkingDistances(battle, anchor)[t.y * GRID + t.x] < Infinity && walkingDistances(battle, t)[anchor.y * GRID + anchor.x] < Infinity)
@@ -674,9 +734,9 @@ function planZones(battle: Battle, centres: Tile[]): void {
   // the nearest to them. Which suits a squad depends on who is in it.
   const kinds = [(i: ReturnType<typeof zoneInfo>) => i.high, (i: ReturnType<typeof zoneInfo>) => i.cover, (i: ReturnType<typeof zoneInfo>) => -i.contact]
   let next = randomInt(battle, kinds.length)
-  const distinct = () => {
+  const distinct = (within: Within = 'edge') => {
     const score = kinds[next++ % kinds.length]
-    const sampled = Array.from({ length: CANDIDATES }, clear)
+    const sampled = Array.from({ length: CANDIDATES }, () => clear(within))
     const options = sampled.filter(joined).length > 0 ? sampled.filter(joined) : sampled
     return options.reduce((a, b) => (score(zoneInfo(battle, b)) > score(zoneInfo(battle, a)) ? b : a))
   }
@@ -687,8 +747,8 @@ function planZones(battle: Battle, centres: Tile[]): void {
   const goal = battle.goal
   if (goal === 'escape') battle.plans = battle.zones.map((): Plan => 'escape')
   // A rescue lands wherever its teams scatter to: zones far apart, one for each team it might split into.
-  else if (goal === 'rescue') while (battle.zones.length < TEAMS) add(spacedTile(battle, [...battle.units.filter((u) => u.side === 'alien'), ...battle.zones], 2 * ZONE_CLEARANCE), 'team')
-  else if (goal === 'hold') while (battle.zones.length < ZONES) add(distinct(), 'uplink')
+  else if (goal === 'rescue') while (battle.zones.length < TEAMS) add(spacedTile(battle, [...battle.units.filter((u) => u.side === 'alien'), ...battle.zones], 2 * ZONE_CLEARANCE, 'edge'), 'team')
+  else if (goal === 'hold') while (battle.zones.length < ZONES) add(distinct('inner'), 'uplink')
   else if (goal === 'assassinate') {
     const commander = battle.units.find((u) => u.target)!
     add({ x: commander.x, y: commander.y }, 'decap')
@@ -697,18 +757,18 @@ function planZones(battle: Battle, centres: Tile[]): void {
       (t) => !blocked(battle, t.x, t.y) && distance(t, commander) >= 7 && distance(t, commander) <= 10 && battle.units.every((u) => u.side !== 'alien' || distance(u, t) >= 4) && joined(t),
     )
     add(ring.length > 0 ? ring.reduce((a, b) => (heightAt(battle, b) > heightAt(battle, a) ? b : a)) : clear(), 'overwatch')
-    add(spacedTile(battle, [commander, ...battle.zones], 2 * ZONE_CLEARANCE), 'bait')
+    add(spacedTile(battle, [commander, ...battle.zones], 2 * ZONE_CLEARANCE, 'edge'), 'bait')
   } else if (goal === 'raid') {
     // A raid lands once, clear of the guards; its choice is how many caches to go for. Each stands by a pod, guarded.
-    add(distinct(), 'stealth')
-    battle.caches = Array.from({ length: CACHES }, (_, i) => (centres[i] ? (freeTilesNear(battle, centres[i], 4)[3] ?? centres[i]) : clear()))
+    add(distinct(), 'march')
+    battle.caches = Array.from({ length: CACHES }, (_, i) => (centres[i] ? (freeTilesNear(battle, centres[i], 4)[3] ?? centres[i]) : clear('inner')))
   } else {
-    // Exterminate: each zone a hot drop onto a pod or a stealth insertion, as the place makes likely.
-    const pods = [...centres]
-    for (let i = 0; i < ZONES; i++) {
-      if (pods.length > 0 && random(battle) < HOT_CHANCE[battle.place]) add(pods.splice(randomInt(battle, pods.length), 1)[0], 'hot')
-      else add(distinct(), 'stealth')
-    }
+    // Exterminate: quiet approaches from the edge; Orbital Drop Pods make one a hot drop onto a pod, Night Canopies one a
+    // parachute drop anywhere within.
+    const held = (effect: RelicEffect) => battle.reserve.some((r) => r.effects.includes(effect))
+    if (held('dropPods') && centres.length > 0) add(centres[randomInt(battle, centres.length)], 'hot')
+    if (held('canopies')) add(distinct('anywhere'), 'stealth')
+    while (battle.zones.length < ZONES) add(distinct(), 'march')
   }
 }
 
@@ -908,8 +968,8 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     const corner = randomInt(battle, corners.length)
     const far = corners[(corner + 2) % corners.length]
     const mid = { x: (x1 + x2) >> 1, y: (y1 + y2) >> 1 }
-    battle.start = openNear(battle, corners[corner])
-    for (const exit of [far, { x: far.x, y: mid.y }, { x: mid.x, y: far.y }]) battle.zones.push(openNear(battle, exit))
+    battle.start = edgeNear(battle, corners[corner])
+    for (const exit of [far, { x: far.x, y: mid.y }, { x: mid.x, y: far.y }]) battle.zones.push(edgeNear(battle, exit))
   }
 
   const centres: Tile[] = []
@@ -921,7 +981,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
       ? openNear(battle, { x: Math.round(battle.start!.x + (route.x - battle.start!.x) * along), y: Math.round(battle.start!.y + (route.y - battle.start!.y) * along) })
       : battle.start
         ? spacedTile(battle, [battle.start, ...battle.zones], HUNTER_START)
-        : spacedTile(battle, centres, ZONE_CLEARANCE)
+        : spacedTile(battle, centres, ZONE_CLEARANCE, 'inner')
     centres.push(centre)
     placePod(battle, pack, centre, false)
   })

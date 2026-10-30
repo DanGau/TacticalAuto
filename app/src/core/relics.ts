@@ -69,6 +69,8 @@ const relics = {
   bulwark: { name: 'Bulwark Pods', text: 'The drop pods stand as full cover beside each soldier, toward the nearest alien', effect: 'podWall' },
   turrets: { name: 'Turret Drop', text: 'A turret lands with each team: it never moves, and shoots far and true', effect: 'podTurret' },
   // Stealth and ambushes.
+  dropPods: { name: 'Orbital Drop Pods', text: 'A landing may come down hot on a pod: the pods ambush it, but every other pod hears and converges', effect: 'dropPods' },
+  canopies: { name: 'Night Canopies', text: 'A landing may be a parachute drop anywhere clear of every pod, deep within', effect: 'canopies' },
   ghost: { name: 'Ghost Weave', text: 'Unseen, soldiers move at full pace instead of creeping', effect: 'ghost' },
   killzone: { name: 'Killing Ground', text: `An ambush's shots hit and crit ${Math.round(100 * KILLZONE)}% more often still`, tags: ['crit'], effect: 'killzone' },
   // The goals.
