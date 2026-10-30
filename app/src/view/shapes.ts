@@ -1,4 +1,4 @@
-import { BufferGeometry, CanvasTexture, DoubleSide, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, Sprite, SpriteMaterial } from 'three'
+import { BufferGeometry, CanvasTexture, type Material, DoubleSide, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, Sprite, SpriteMaterial } from 'three'
 
 /** A point in the world: x and z on the ground, along a tile's x and y; y up. */
 export interface Point3 {
@@ -248,3 +248,25 @@ export class Sketch {
 }
 
 export const css = (color: number) => `#${color.toString(16).padStart(6, '0')}`
+
+/**
+ * Lets a material fade by screen-door dithering: at `fade` below 1 it drops a share of its pixels in a fine fixed
+ * pattern, so what lies behind shows through without the sorting faults true transparency has. Returns the handle
+ * that sets it, 0 to 1.
+ */
+export function ditherable(material: Material): { value: number } {
+  const fade = { value: 1 }
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.fade = fade
+    shader.fragmentShader = shader.fragmentShader.replace(
+      'void main() {',
+      `uniform float fade;
+const float BAYER[16] = float[16](0., 8., 2., 10., 12., 4., 14., 6., 3., 11., 1., 9., 15., 7., 13., 5.);
+void main() {
+  ivec2 cell = ivec2(mod(gl_FragCoord.xy, 4.));
+  if (fade < 0.999 && (BAYER[cell.y * 4 + cell.x] + 0.5) / 16. >= fade) discard;`,
+    )
+  }
+  material.customProgramCacheKey = () => 'dither'
+  return fade
+}

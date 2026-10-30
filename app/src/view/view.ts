@@ -9,7 +9,7 @@ import { visibleTiles } from '../core/sight'
 import type { Edge, Ground, Prop } from '../core/terrain'
 import { LOOKS, type FenceStyle, type Look } from './looks'
 import { buildOutskirts } from './outskirts'
-import { blob, css, shade, Shapes, Sketch, type Point3 } from './shapes'
+import { blob, css, ditherable, shade, Shapes, Sketch, type Point3 } from './shapes'
 import { ACROSS, LEVEL, PITCH, TILE_H, TILE_W, tall, YAW } from './space'
 import { weaponOf, type Weapon } from './weapons'
 
@@ -452,6 +452,12 @@ export async function createView(): Promise<View> {
   const glows = new Map<number, { node: Object3D; tile: Tile }>()
   /** Each prop, wall and window on the board, with the tiles that light it: it is lit when a soldier sees any of them. */
   const scenery: { node: Object3D; tiles: number[] }[] = []
+  /** Each wall on the battlefield, where it stands, and its fade: it thins to let a unit just behind it show through. */
+  let walls: { at: Tile; fade: { value: number } }[] = []
+  /** Each roof on the battlefield, the tiles under it, and its fade: it lifts away while something that matters is under it. */
+  let roofs: { tiles: Set<number>; fade: { value: number }; mesh: Mesh }[] = []
+  /** The tile the briefing is lighting, which no roof hides. */
+  let lit: Tile | null = null
   /** The battle on screen. */
   let shown: Battle | null = null
   let camera = aim({ x: 0, y: 0 }, FIT)
@@ -527,8 +533,43 @@ export async function createView(): Promise<View> {
     const ms = now - last
     last = now
     for (const tick of [...ticks]) tick(ms)
+    reveal(ms)
     render()
   })
+
+  /** How long a roof or wall takes to fade out of the way or back. */
+  const FADE_MS = 220
+  /** How solid a wall stays while a unit stands just behind it. */
+  const SEE_THROUGH = 0.3
+
+  /**
+   * Fades away each roof over a tile that matters, a unit's, the briefing's lit one, or a landing zone's while one is
+   * chosen, and thins each wall standing
+   * just before a unit toward the camera, as XCOM cuts its buildings away; the rest fade back.
+   */
+  function reveal(ms: number): void {
+    const step = ms / FADE_MS
+    const toward = (fade: { value: number }, target: number) => (fade.value = fade.value < target ? Math.min(target, fade.value + step) : Math.max(target, fade.value - step))
+    const keys = [...sprites.values()].map((s) => ({ x: Math.round(s.tile.x), y: Math.round(s.tile.y) }))
+    if (lit) keys.push({ x: Math.round(lit.x), y: Math.round(lit.y) })
+    // Choosing where to land, the landing zones show whole.
+    if (shown?.phase === 'deploy' && !briefing)
+      for (const zone of shown.zones)
+        for (let dy = -ZONE_RADIUS; dy <= ZONE_RADIUS; dy++) for (let dx = -ZONE_RADIUS; dx <= ZONE_RADIUS; dx++) if (distance(zone, { x: zone.x + dx, y: zone.y + dy }) <= ZONE_RADIUS) keys.push({ x: zone.x + dx, y: zone.y + dy })
+    const under = new Set(keys.map((k) => k.y * GRID + k.x))
+    for (const roof of roofs) {
+      toward(roof.fade, [...under].some((t) => roof.tiles.has(t)) ? 0 : 1)
+      roof.mesh.visible = roof.fade.value > 0
+    }
+    for (const wall of walls) {
+      const before = keys.some((k) => {
+        const dx = wall.at.x - k.x
+        const dy = wall.at.y - k.y
+        return dx > -1 && dy > -1 && dx + dy > 0 && dx + dy <= 2.5
+      })
+      toward(wall.fade, before ? SEE_THROUGH : 1)
+    }
+  }
 
   function render(): void {
     const { back } = axes(camera.yaw)
@@ -709,14 +750,15 @@ export async function createView(): Promise<View> {
     shapes.box(x - w, z - d, x + w, z + d, y + tall(box.base), y + tall(box.base + box.up), box.color, box.alpha ?? 1)
   }
 
-  /** Builds the shapes into a node of the scenery, which fog can dim. */
-  function stand(shapes: Shapes, blobs: Object3D[], lit: number[]): void {
+  /** Builds the shapes into a node of the scenery, which fog can dim; a wall, standing `wall`, can thin as a unit passes behind it. */
+  function stand(shapes: Shapes, blobs: Object3D[], lit: number[], wall?: Tile): void {
     const node = new Group()
     const { mesh, lines } = shapes.build()
     node.add(mesh, ...blobs)
     if (lines) node.add(lines)
     terrain.add(node)
     scenery.push({ node, tiles: lit })
+    if (wall) walls.push({ at: wall, fade: ditherable(mesh.material as MeshBasicMaterial) })
   }
 
   /**
@@ -738,15 +780,15 @@ export async function createView(): Promise<View> {
   }
 
   /**
-   * Each building's wall colour, by tile: a floor tile joins the floor tiles beside it into a building, and each
-   * building takes the next of the region's wall colours.
+   * The battle's buildings: a floor tile joins the floor tiles beside it into a building, and each building takes the
+   * next of the region's wall colours. Returns each building's floor tiles, and the wall colour by tile.
    */
-  function buildingColours(battle: Battle, look: Look): Map<number, number> {
+  function buildings(battle: Battle, look: Look): { rooms: number[][]; colour: Map<number, number> } {
     const colour = new Map<number, number>()
-    let next = 0
+    const rooms: number[][] = []
     battle.sprawl.ground.forEach((g, start) => {
       if (g !== 'floor' || colour.has(start)) return
-      const paint = look.walls[next++ % look.walls.length]
+      const paint = look.walls[rooms.length % look.walls.length]
       const room = [start]
       colour.set(start, paint)
       for (const t of room)
@@ -755,8 +797,31 @@ export async function createView(): Promise<View> {
           colour.set(n, paint)
           room.push(n)
         }
+      rooms.push(room)
     })
-    return colour
+    return { rooms, colour }
+  }
+
+  /**
+   * Roofs each building at the height of its walls' trim, in the region's roof colours. A ruin has none. A roof over
+   * the battlefield can fade; one over the town past it stays.
+   */
+  function addRoofs(battle: Battle, look: Look, rooms: number[][], colour: Map<number, number>, top: number, beyond: Shapes): void {
+    // A roof runs out over the walls round its edge.
+    const eave = WALL_THICK
+    rooms.forEach((room, i) => {
+      if (battle.place === 'ruins') return
+      const paint = look.roofs ? look.roofs[i % look.roofs.length] : shade(colour.get(room[0])!, 0.72)
+      const inside = room.some((t) => !battle.outside[t])
+      const shapes = inside ? new Shapes() : beyond
+      const y = spot(room[0] % GRID, Math.floor(room[0] / GRID)).y + top
+      for (const t of room) shapes.flat((t % GRID) - 0.5 - eave, Math.floor(t / GRID) - 0.5 - eave, (t % GRID) + 0.5 + eave, Math.floor(t / GRID) + 0.5 + eave, y, paint)
+      if (!inside) return
+      const { mesh } = shapes.build()
+      terrain.add(mesh)
+      scenery.push({ node: mesh, tiles: room })
+      roofs.push({ tiles: new Set(room), fade: ditherable(mesh.material as MeshBasicMaterial), mesh })
+    })
   }
 
   /**
@@ -765,11 +830,13 @@ export async function createView(): Promise<View> {
    */
   function drawTerrain(battle: Battle): void {
     scenery.length = 0
+    walls = []
+    roofs = []
     terrain.clear()
     outskirts.clear()
     outskirts.add(buildOutskirts(battle))
     const look = LOOKS[battle.region]
-    const paint = buildingColours(battle, look)
+    const { rooms, colour: paint } = buildings(battle, look)
     /** A wall's colour: the building's on either side of it. */
     const wallColour = (a: number, b: number) => paint.get(a) ?? paint.get(b) ?? look.walls[0]
     const lift = look.up / EDGE_UP
@@ -837,14 +904,15 @@ export async function createView(): Promise<View> {
       if (north !== 'none') {
         const shapes = new Shapes()
         for (const box of edgeBoxes(north, wallColour(tile, tile - GRID))) addBox(shapes, x, at.y, y - 0.5, box)
-        stand(shapes, [], [tile, tile - GRID])
+        stand(shapes, [], [tile, tile - GRID], { x, y: y - 0.5 })
       }
       if (west !== 'none') {
         const shapes = new Shapes()
         for (const box of edgeBoxes(west, wallColour(tile, tile - 1))) addBox(shapes, x - 0.5, at.y, y, { ...box, wide: box.deep, deep: box.wide })
-        stand(shapes, [], [tile, tile - 1])
+        stand(shapes, [], [tile, tile - 1], { x: x - 0.5, y })
       }
     }
+    addRoofs(battle, look, rooms, paint, tall(EDGE_UP * lift + CAP_UP) + 0.01, beyond)
     const town = new Group()
     const { mesh, lines } = beyond.build()
     town.add(mesh, ...beyondBlobs)
@@ -1489,6 +1557,7 @@ export async function createView(): Promise<View> {
       return follow(above(tiles, shot), ms)
     },
     spotlight(tile) {
+      lit = tile
       beam.clear()
       if (!tile) return
       const at = spot(tile.x, tile.y)
