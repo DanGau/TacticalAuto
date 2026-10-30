@@ -154,11 +154,13 @@
       .globe.gliding .city:not(.reached), .globe.gliding .cell.choice, .globe.gliding .trail { opacity: 0; }
       .globe.arrived .trail { animation: fade 0.5s 0.15s both; }
       .globe.arrived .cell.choice { animation: rise 0.5s 0.3s both; }
-      .globe.diving { transition: transform 1.4s cubic-bezier(0.6, 0, 0.9, 0.4), filter 1.4s; filter: blur(2px); }
+      .globe.diving { transition: transform 1.4s cubic-bezier(0.6, 0, 0.9, 0.4); }
       .globe.diving .trail, .globe.diving .walked, .globe.diving .cell:not(.squad) { opacity: 0; transition: opacity 0.5s; }
+      /* Glows blown up fourteen times outgrow what the graphics card draws, and show as black boxes. */
+      .globe.diving .land, .globe.diving .walked, .globe.diving .trail { filter: none; }
       .globe.diving .chopper { opacity: 0; transition: opacity 0.4s; }
       .clouds { position: fixed; inset: 0; z-index: 50; pointer-events: none; overflow: hidden; }
-      .clouds i { position: absolute; left: var(--x); top: var(--y); width: 70vmax; height: 50vmax; margin: -25vmax -35vmax; border-radius: 50%; background: radial-gradient(closest-side, #f4f7fbee, #dfe7f0aa 55%, transparent); filter: blur(12px); animation: cloud 1.4s var(--d) ease-in both; }
+      .clouds i { position: absolute; left: var(--x); top: var(--y); width: 70vmax; height: 50vmax; margin: -25vmax -35vmax; border-radius: 50%; background: radial-gradient(closest-side, #f4f7fbee, #dfe7f0aa 55%, transparent); animation: cloud 1.4s var(--d) ease-in both; }
       .clouds.parting i { animation: part 1.1s ease-out both; }
       @keyframes cloud { from { opacity: 0; transform: scale(0.2); } 60% { opacity: 1; } to { opacity: 1; transform: scale(1.6); } }
       @keyframes part { from { opacity: 1; transform: scale(1.6); } to { opacity: 0; transform: scale(4); } }

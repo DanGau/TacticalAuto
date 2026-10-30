@@ -187,7 +187,11 @@ export function glide(root: HTMLElement, from: View | null): void {
     if (token !== glides || !globe.isConnected) return
     const t = Math.min(1, (time - start) / GLIDE_MS)
     const e = t * t * (3 - 2 * t)
-    to.now = t < 1 ? { centre: along(from.centre, target.centre, e), r: from.r * (target.r / from.r) ** e, turn: from.turn + turning * e } : target
+    // The globe turns and centres while still far off, in the first half, where that moves the stops least; then it
+    // only closes in, each stop sliding straight out from the middle.
+    const early = Math.min(1, t * 2)
+    const settled = early * early * (3 - 2 * early)
+    to.now = t < 1 ? { centre: along(from.centre, target.centre, settled), r: from.r * (target.r / from.r) ** e, turn: from.turn + turning * settled } : target
     if (drawn) drawn.now = to.now
     globe.innerHTML = to.draw(to.now)
     globe.classList.toggle('gliding', t < 1)
@@ -268,11 +272,18 @@ export function globe(size: Size, run: Run, pins: Pin[], focus: LonLat, path: Lo
   const ahead = pins.filter((p) => !p.past).map((p) => p.at)
   const choices = pins.filter((p) => p.choice).map((p) => p.at)
   const target = framed([focus, ...ahead], size, [focus, run.route[run.keys].to.at], ahead, [focus, ...choices])
-  return keep(size, target, (view) => drawRun(size, run, pins, focus, path, picking, view))
+  // Stops are pushed apart once, as the settled view shows them; mid-glide the push shrinks and turns with the globe,
+  // so a stop slides steadily rather than jostling.
+  const project = projection(target, size)
+  const at = new Map(pins.map((pin) => [pin.id, project(pin.at)]))
+  const moved = new Map([...at].map(([id, p]) => [id, { ...p }]))
+  budge(pins.filter((pin) => at.get(pin.id)!.front).map((pin) => ({ p: moved.get(pin.id)!, fixed: pin.squad })))
+  const pushed = new Map([...at].map(([id, p]) => [id, { x: moved.get(id)!.x - p.x, y: moved.get(id)!.y - p.y }]))
+  return keep(size, target, (view) => drawRun(size, run, pins, focus, path, picking, view, target, pushed))
 }
 
 /** The run's globe seen from `view`. */
-function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: LonLat[], picking: boolean, view: View): string {
+function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: LonLat[], picking: boolean, view: View, target: View, pushed: Map<string, { x: number; y: number }>): string {
   const stage = run.route[run.keys]
   const project = projection(view, size)
   // The journey so far: each leg crossed, then this one up to where the squad stands.
@@ -288,7 +299,12 @@ function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: LonLat[
     return `<g class="city ${i < run.keys ? 'reached' : ''}"><circle cx="${p.x}" cy="${p.y}" r="5"/><text x="${p.x + 10}" y="${p.y + 4}">${s.hero ? '★' : '👁'} ${name}</text></g>`
   })
   const placed = new Map(pins.map((pin) => [pin.id, project(pin.at)]))
-  budge(pins.filter((pin) => placed.get(pin.id)!.front).map((pin) => ({ p: placed.get(pin.id)!, fixed: pin.squad })))
+  const [scale, spin] = [view.r / target.r, view.turn - target.turn]
+  for (const [id, p] of placed) {
+    const { x, y } = pushed.get(id)!
+    p.x += (x * Math.cos(spin) - y * Math.sin(spin)) * scale
+    p.y += (x * Math.sin(spin) + y * Math.cos(spin)) * scale
+  }
   const trails = pins.flatMap((pin) =>
     pin.next.flatMap((id) => {
       const [a, b] = [placed.get(pin.id)!, placed.get(id)]
