@@ -1,15 +1,12 @@
 import type { Stats } from '../core/battle'
-import { CLASSES, type ClassId } from '../core/classes'
+import { CLASSES } from '../core/classes'
 import { FEATS } from '../core/feats'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { health, KEYS, level, SELL, skillOffers, soldierStats, xpFor, squadKeywords, type Report, type Run, type Soldier } from '../core/run'
 import { PATHS, SKILLS } from '../core/skills'
 import { TRAITS } from '../core/traits'
-import { button, describe, gearCard, gearText, healthBar, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
-
-/** Each class's badge; a soldier not yet promoted wears a helmet. */
-const BADGES: Record<ClassId, string> = { assault: '🔫', heavy: '🚀', sniper: '🎯', support: '⛑️', engineer: '🔧', pyro: '🔥', cryo: '❄️' }
+import { badge, button, describe, gearCard, gearText, healthBar, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
 
 /**
  * A soldier's card: class badge, name, and an experience bar filling with what the battle earned, flaring on a level
@@ -22,7 +19,7 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number], opened: Set<
   const cls = soldier.cls && CLASSES[soldier.cls].name
   const gained = soldier.xpAfter - soldier.xpBefore
   const up = after > before
-  const badge = soldier.taken ? '<b class="up">Taken · recovery next</b>' : up ? `<b class="down promoted">Level ${after}!</b>` : ''
+  const note = soldier.taken ? '<b class="up">Taken · recovery next</b>' : up ? `<b class="down promoted">Level ${after}!</b>` : ''
   // Each find is a crate on its finder's card until opened; then what was worn shows on the card.
   const finds = run.decisions.flatMap((d, i) => (d.soldier === soldier.name ? [{ d, i }] : []))
   const crates = finds.filter(({ i }) => !opened.has(i)).map(({ i }) => `<button class="crate" data-crate="${i}" title="Open">🎁</button>`)
@@ -31,10 +28,10 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number], opened: Set<
   const live = run.soldiers.find((s) => s.name === soldier.name)
   const choose = live && skillOffers(live).length > 0 ? `<button class="decide" data-ability="${live.id}">Choose ability</button>` : ''
   return `<div class="soldier ${soldier.taken ? 'died' : ''} ${up ? 'levelled' : ''}">
-    <div class="who"><span class="portrait">${soldier.cls ? BADGES[soldier.cls] : '🪖'}</span><span><b>${soldier.name}</b><br><small>Level ${before}${cls ? ` · ${cls}` : ''}</small></span></div>
+    <div class="who"><span class="portrait">${badge(soldier.cls)}</span><span><b>${soldier.name}</b><br><small>Level ${before}${cls ? ` · ${cls}` : ''}</small></span></div>
     <div class="bar"><div class="fill" style="--from: ${filled(soldier.xpBefore)}%; --to: ${filled(soldier.xpAfter)}%"></div></div>
     ${healthBar(soldier.hp, soldier.maxHp)}
-    ${gained > 0 ? `<small class="gained" title="${soldier.earned.map((e) => `${e.label}: +${e.xp}`).join('&#10;')}">+${gained} xp</small>` : ''} ${badge}
+    ${gained > 0 ? `<small class="gained" title="${soldier.earned.map((e) => `${e.label}: +${e.xp}`).join('&#10;')}">+${gained} xp</small>` : ''} ${note}
     ${crates.length > 0 ? `<div class="crates">${crates.join('')}</div>` : ''}${worn.join('')}
     ${feats.length > 0 ? `<ul class="notes">${feats.join('')}</ul>` : ''}
     ${choose}
@@ -48,7 +45,7 @@ export function joined(run: Run, name: string): string {
   const trait = hero.trait ? TRAITS[hero.trait] : null
   const named = hero.skills.map((id) => `<span class="chip" title="${SKILLS[id].text}">${SKILLS[id].name}</span>`)
   return `<div class="debrief joined">
-    <span class="portrait">${BADGES[hero.cls!]}</span>
+    <span class="portrait">${badge(hero.cls)}</span>
     <h1 class="down">${hero.name} joins</h1>
     <p>${CLASSES[hero.cls!].name}${path ? ` · ${path.name}` : ''} · level ${level(hero)} · 🌍 ${hero.home?.name ?? ''}</p>
     <p class="feats">${named.join('')}</p>
@@ -71,7 +68,7 @@ export function loot(run: Run, index: number): string {
     <div class="burst"></div>
     <span class="box">🎁</span>
     <div class="prize gear ${gear.rarity}"><small>${gear.rarity} ${gear.slot}</small><br><b>${gear.name}</b><br><small>${gearText(gear)}</small></div>
-    <p class="said"><span class="portrait">${finder?.cls ? BADGES[finder.cls] : '🪖'}</span><span><b>${name}</b>: “${line}” <span class="${kept ? 'down' : 'supplies'}">${kept ? 'Equipped' : `Sold +${SELL[gear.rarity]}`}</span></span></p>
+    <p class="said"><span class="portrait">${badge(finder?.cls)}</span><span><b>${name}</b>: “${line}” <span class="${kept ? 'down' : 'supplies'}">${kept ? 'Equipped' : `Sold +${SELL[gear.rarity]}`}</span></span></p>
     <button class="decide" data-shut="${index}">Nice</button>
   </div>`)
 }

@@ -4,6 +4,7 @@ import { ALIENS, type AlienKind } from '../core/aliens'
 import type { Stats } from '../core/battle'
 import { KEYWORDS, RESISTS, type Keyword, type Resist } from '../core/keywords'
 import { TUNING } from '../core/tuning'
+import type { ClassId } from '../core/classes'
 import { THREAT_MAX, type Mission, type StopKind } from '../core/run'
 
 /** A button that performs `action` when clicked. */
@@ -28,6 +29,11 @@ export const STOP_NAMES: Record<StopKind | Mission['kind'], string> = {
 
 /** A soldier's health as a red bar and a count. */
 export const healthBar = (hp: number, max: number) => `<div class="health" title="Health ${hp} of ${max}">♥ ${hp}/${max}<div class="bar"><div style="width: ${(100 * hp) / max}%"></div></div></div>`
+
+const BADGES: Record<ClassId, string> = { assault: '🔫', heavy: '🚀', sniper: '🎯', support: '⛑️', engineer: '🔧', pyro: '🔥', cryo: '❄️' }
+
+/** A class's badge; a soldier not yet promoted wears a helmet. */
+export const badge = (cls?: ClassId | null) => (cls ? BADGES[cls] : '🪖')
 
 /** The threat bar. `landed` is how much of the newest threat animates in. */
 export function threatBar(threat: number, landed = 0): string {

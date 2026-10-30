@@ -73,6 +73,13 @@
       /* Flight: the map fills the screen under the header and what floats over it. */
       .map.flight { position: fixed; inset: 0; z-index: 0; padding: 0; }
       .map.flight .globe { position: absolute; inset: 0; }
+      .strip { position: fixed; left: 16px; top: 70px; z-index: 2; display: flex; gap: 8px; }
+      .strip .mate { width: 40px; }
+      .strip .portrait { width: 34px; height: 34px; font-size: 18px; margin: 0 auto; }
+      .strip .bar { height: 5px; margin: 4px 0 0; }
+      .strip .bar div { background: #4fe08a; }
+      .strip .low .portrait { border-color: #e04848; background: #3a1414; }
+      .strip .low .bar div { background: #e04848; }
       .stopcard { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 2; max-width: 640px; padding: 8px 16px; border-radius: 10px; background: #171d29dd; border: 1px solid #3a465c; white-space: nowrap; pointer-events: none; }
       .tabs { display: flex; gap: 4px; flex: 1; }
       .tab { padding: 6px 18px; background: none; border-color: transparent; color: #9aa6bd; }

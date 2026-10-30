@@ -12,7 +12,7 @@ import { TWISTS } from '../core/twists'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
 import { decisions } from './aftermath'
-import { alienName, button, describe, gearCard, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
+import { alienName, badge, button, describe, gearCard, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
 export const TABS = ['Map', 'Base', 'Barracks'] as const
@@ -103,7 +103,17 @@ function runMap(run: Run, picked: number | null): string {
   for (const pin of pins) if (pin.lit && !pin.squad) for (const id of pin.next) pins.forEach((p) => p.id === id && (p.lit = true))
   // The map fills the screen under the header and headings.
   // The stops keep clear of the header above and the stop's card below.
-  return `<div class="map flight">${globe({ w: innerWidth, h: innerHeight, top: 70, bottom: 70 }, run, pins, focus, path, picked !== null)}</div>`
+  return `${squadStrip(run)}<div class="map flight">${globe({ w: innerWidth, h: innerHeight, top: 70, bottom: 70 }, run, pins, focus, path, picked !== null)}</div>`
+}
+
+/** The squad at a glance over the map: each soldier's badge over a health bar, red at half or less. */
+function squadStrip(run: Run): string {
+  const cells = run.soldiers.map((soldier) => {
+    const hp = health(run, soldier)
+    const max = soldierStats(run, soldier).hp
+    return `<div class="mate${hp <= max / 2 ? ' low' : ''}" title="${soldier.name} · ${hp}/${max}"><span class="portrait">${badge(soldier.cls)}</span><div class="bar"><div style="width: ${(100 * hp) / max}%"></div></div></div>`
+  })
+  return `<div class="strip">${cells.join('')}</div>`
 }
 
 /** The alien force at the squad's stop. */
