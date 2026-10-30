@@ -2,7 +2,7 @@ import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { stepBattle, UPLINK_REACH, type GameEvent } from './combat'
-import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, type Goal } from './goals'
+import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, RESCUE_QUORUM, type Goal } from './goals'
 import { distance, edgeDepths, freeTilesNear, GRID, INNER, isSoldier, revealed } from './battle'
 import { road, deploy, begun } from './roads'
 import { endBattle, LOSS_THREAT, RISKS, START_SUPPLIES, STOP_THREAT, THREAT_MAX, XP, type Run } from './run'
@@ -117,6 +117,21 @@ test('a rescue pays supplies and experience for each civilian saved or alive; a 
   expect(raid.supplies).toBe(START_SUPPLIES + 2 * RISKS.standard.supplies)
   expect(raid.threat).toBe(threat + STOP_THREAT + 1)
   expect(raid.finds).toEqual([])
+})
+
+test('a rescue is won, and pays, only with more than RESCUE_QUORUM civilians saved', () => {
+  for (const saved of [RESCUE_QUORUM, RESCUE_QUORUM + 1]) {
+    const run = before('rescue')
+    deploy(run, 0)
+    const battle = run.battle!
+    battle.units = battle.units.filter((u) => !u.civilian)
+    battle.saved = saved
+    const supplies = run.supplies
+    stepBattle(battle)
+    expect(battle.winner).toBe(saved > RESCUE_QUORUM ? 'human' : 'alien')
+    endBattle(run)
+    expect(run.supplies > supplies).toBe(saved > RESCUE_QUORUM)
+  }
 })
 
 /** A rescue whose squad has landed rooted and harmless, so only the aliens act on the civilians. */

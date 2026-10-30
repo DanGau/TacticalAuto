@@ -594,8 +594,8 @@ export const huntForce = (run: Run, mission: Mission) => Math.round((mission.for
 
 /** The mission the squad would fight at a stop of the given kind now. Its force follows the leg, and so the size of the squad. */
 export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goal = 'exterminate'): Mission {
-  // A recovery's aliens come at half strength, but keep coming.
-  const extra = { battle: 0, key: 1, final: 2, escape: run.keys, recovery: -Math.floor(TUNING.legForce[run.keys] / 2) }[kind]
+  // A recovery's aliens come at a third of their strength, but keep coming.
+  const extra = { battle: 0, key: 1, final: 0, escape: run.keys, recovery: -Math.ceil((2 * TUNING.legForce[run.keys]) / 3) }[kind]
   return { kind, goal, risk, force: Math.max(1, TUNING.legForce[run.keys] + (late(run) ? 1 : 0) + extra + RISKS[risk].aliens + GOALS[goal].force) }
 }
 

@@ -10,11 +10,13 @@ export const WAVE_EVERY = 3
 export const HOLD_WAVE_EVERY = 3
 /** Civilians on a rescue, the health of each, how far each flees in a turn, and the supplies each saved pays. */
 export const CIVILIANS = 10
-export const CIVILIAN_HP = 5
-export const CIVILIAN_MOVE = 3
+export const CIVILIAN_HP = 8
+export const CIVILIAN_MOVE = 4
 export const CIVILIAN_SUPPLIES = 2
 /** Civilians left unsaved on a rescue for each point of threat they add. */
 export const CIVILIANS_PER_THREAT = 4
+/** A rescue is won, and pays, only when more than this many civilians are saved. */
+export const RESCUE_QUORUM = CIVILIANS / 2
 
 /** `from` is the leg a goal is first drawn on: a lone first soldier meets no hold or assassination. */
 export const GOALS: Record<Goal, { name: string; text: string; reward: string; force: number; weight: number; from: number }> = {
@@ -23,9 +25,9 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
   hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as ever larger waves come in from the edges, then get every soldier left to the extraction zone`, reward: 'a relic, no gear', force: -2, weight: 1, from: 1 },
   rescue: {
     name: 'Rescue',
-    text: `A terror site: ${CIVILIANS} civilians flee aliens that are killing them, and harvesters raise the dead as husks. Aliens with no soldier to fight hunt civilians, so land near them. A soldier who reaches one gets them out. Split the squad to reach more. Each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
+    text: `A terror site: ${CIVILIANS} civilians flee aliens that are killing them, and harvesters raise the dead as husks. Aliens with no soldier to fight hunt civilians, so land near them. A soldier who reaches one gets them out. Split the squad to reach more. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
     reward: 'supplies and experience, no gear',
-    force: 0,
+    force: -4,
     weight: 1,
     from: 0,
   },

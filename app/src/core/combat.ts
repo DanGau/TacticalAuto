@@ -104,7 +104,7 @@ import {
   wreck,
   unaware,
 } from './battle'
-import { ESCAPE_REACH, HOLD_ROUNDS, HOLD_WAVE_EVERY, WAVE_EVERY } from './goals'
+import { ESCAPE_REACH, HOLD_ROUNDS, RESCUE_QUORUM, HOLD_WAVE_EVERY, WAVE_EVERY } from './goals'
 import { random, randomInt } from './rng'
 import { canShoot, coverAgainst, lineOfSight, odds, sees, detects } from './sight'
 
@@ -431,7 +431,7 @@ function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
  * Where a side's units close on when they have no shot, by the battle's goal. Soldiers share one, so the squad moves
  * together: on a hold, the uplink, then the extraction zone; on an assassination, the commander once sighted; else the
  * alien nearest the squad's centre. On a rescue each soldier makes for the nearest civilian. On a hold the aliens close on
- * the uplink, then the squad; on a rescue an alien fights a soldier it sees, else hunts the nearest civilian; otherwise
+ * the uplink, then the squad; on a rescue an alien fights a soldier it sees, else hunts a civilian within PREY_REACH, else closes on the squad; otherwise
  * an alien closes on the human nearest itself.
  */
 function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
@@ -447,7 +447,8 @@ function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
   const civilians = battle.units.filter((u) => u.civilian)
   if (unit.side === 'alien' && civilians.length > 0) {
     const fighters = enemies.filter((e) => !e.civilian && sees(battle, unit, e))
-    return nearest(fighters.length > 0 ? fighters : civilians, unit)
+    const prey = civilians.filter((c) => distance(c, unit) <= PREY_REACH)
+    return nearest(fighters.length > 0 ? fighters : prey.length > 0 ? prey : enemies.filter((e) => !e.civilian), unit) ?? nearest(civilians, unit)
   }
   if (unit.side === 'alien') return nearest(enemies, unit)
   if (civilians.length > 0) return nearest(civilians, unit)
@@ -455,6 +456,9 @@ function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
   const team = centreOf(battle.units.filter((u) => isSoldier(u) && u.team === unit.team))
   return enemies.find((u) => u.target && revealed(battle, u)) ?? nearest(enemies, team)
 }
+
+/** How near a civilian must be for an alien with no soldier in sight to hunt it; farther off, it makes for the squad. */
+const PREY_REACH = 8
 
 /** Soldiers down and not carried. */
 const lying = (battle: Battle) => battle.downed.filter((d) => d.carrier === null)
@@ -589,7 +593,9 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const full = Math.ceil(Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0)) / (carrying(battle, unit) || reeling ? 2 : 1))
   // Unseen, a soldier creeps.
   // Unless it wears Ghost Weave.
-  const move = unit.side === 'human' && battle.concealed && !has(unit, 'ghost') ? Math.ceil(full * CREEP) : full
+  // An alien hunting civilians, with no soldier in sight, stalks them at a patrol's pace; a harvester runs them down.
+  const stalking = unit.side === 'alien' && unit.kind !== 'harvester' && battle.units.some((u) => u.civilian && u.x === goal.x && u.y === goal.y)
+  const move = unit.side === 'human' && battle.concealed && !has(unit, 'ghost') ? Math.ceil(full * CREEP) : stalking ? Math.min(full, PATROL_MOVE) : full
   const path = choose(move)
   if (unit.ability === 'runAndGun' && !battle.concealed && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
   const end = path.at(-1) ?? unit
@@ -1704,7 +1710,9 @@ export function stepBattle(battle: Battle): GameEvent[] {
   if (!humans || !aliens || emptied || loaded || battle.beat >= MAX_BEATS) {
     battle.phase = 'over'
     // With every alien beaten the squad has won, even if its last soldier fell to the same blast.
-    battle.winner = !aliens || loaded || (emptied && battle.saved > 0) || (!humans && battle.escaped.length > 0) ? 'human' : humans && !emptied ? null : 'alien'
+    battle.winner = !aliens || loaded || emptied || (!humans && battle.escaped.length > 0) ? 'human' : humans ? null : 'alien'
+    // A rescue is won only by saving more than RESCUE_QUORUM: those got out, and those alive once no alien is left.
+    if (battle.goal === 'rescue' && battle.winner === 'human' && battle.saved + battle.units.filter((u) => u.civilian).length <= RESCUE_QUORUM) battle.winner = 'alien'
     events.push({ type: 'end', winner: battle.winner })
   }
   return events

@@ -1,3 +1,4 @@
+import type { Goal } from '../core/goals'
 import { KEYS } from '../core/run'
 import type { RunResult } from './run'
 
@@ -58,6 +59,29 @@ export function formatReport(r: Report): string {
  * and building around keywords beats taking the first offer.
  */
 export const BANDS = { floor: [0.03, 0.25], baseline: [0.35, 0.6], ceiling: [0, 0.85], gap: 0.25, payoff: 0.05 } as const
+
+/** A mission played alone by the encounter sim: a goal, or an extraction or the final mission. */
+export type Encounter = Goal | 'key' | 'final'
+export type Squad = 'weak' | 'strong'
+
+/**
+ * Win rates each mission played alone should land in at every leg, for a weak squad (the levels a careless run
+ * reaches, no gear) and a strong one (levelled, geared, a relic a leg): a strong squad rampages, a weak one can
+ * lose anywhere, so a run that falls behind must route around danger. A rescue also wants a strong squad to save
+ * RESCUE_SAVED.strong of its civilians and a weak one fewer.
+ */
+export const ENCOUNTER_BANDS: Record<Encounter, Record<Squad, readonly [number, number]>> = {
+  exterminate: { weak: [0.5, 0.85], strong: [0.9, 1] },
+  assassinate: { weak: [0.4, 0.85], strong: [0.85, 1] },
+  hold: { weak: [0.3, 0.75], strong: [0.8, 1] },
+  rescue: { weak: [0.2, 0.6], strong: [0.85, 1] },
+  raid: { weak: [0.5, 0.9], strong: [0.9, 1] },
+  escape: { weak: [0.3, 0.75], strong: [0.75, 1] },
+  recover: { weak: [0.3, 0.75], strong: [0.8, 1] },
+  key: { weak: [0.3, 0.75], strong: [0.8, 1] },
+  final: { weak: [0.1, 0.5], strong: [0.6, 0.95] },
+}
+export const RESCUE_SAVED: Record<Squad, readonly [number, number]> = { weak: [0, 5], strong: [7.5, 10] }
 
 /** Each band a set of win rates breaks, with how far outside it they fall. */
 function misses(rates: Record<string, number>): { by: number; text: string }[] {

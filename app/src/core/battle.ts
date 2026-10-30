@@ -987,7 +987,7 @@ export const TEAMS = 4
 const HUNTER_START = 12
 
 /** Tiles apart a rescue's civilians start, from each other and the aliens. */
-const CIVILIAN_CLEARANCE = 3
+const CIVILIAN_CLEARANCE = 7
 
 export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale): Battle {
   const holder = { rng: seed }
