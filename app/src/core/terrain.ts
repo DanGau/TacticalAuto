@@ -65,6 +65,12 @@ export const TERRAIN_TEXT: Record<TerrainKind, { name: string; text: string }> =
 
 export const TERRAIN_KINDS = Object.keys(TERRAIN_TEXT) as TerrainKind[]
 
+/** Where in the world a battlefield lies: how its region builds, and the place it is named for. */
+export interface Locale {
+  region: RegionId
+  city: string
+}
+
 /** A rectangle of tiles, edges included. */
 export interface Rect {
   x1: number
@@ -98,11 +104,11 @@ const REACH: [number, number] = [14, 21]
  * A battlefield of the given kind, in the manner of XCOM 2's plots and parcels: roads cut the map into lots,
  * and each lot is filled with one place. Vehicles stand on the roads.
  */
-export function generateTerrain(rng: { rng: number }, size: number, kind: TerrainKind, twist: Twist | null = null): Terrain {
+export function generateTerrain(rng: { rng: number }, size: number, kind: TerrainKind, twist: Twist | null = null, place?: Locale): Terrain {
   const options = regionsFor(kind)
-  const region = options[randomInt(rng, options.length)]
+  const region = place?.region ?? options[randomInt(rng, options.length)]
   const R: Region = REGIONS[region]
-  const city = R.cities[randomInt(rng, R.cities.length)]
+  const city = place?.city ?? R.cities[randomInt(rng, R.cities.length)]
   /** Width of a bridge over a river. */
   const ROAD = 2
   const [MIN_BUILDING, MAX_HOUSE] = R.building

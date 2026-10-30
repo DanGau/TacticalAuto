@@ -5,6 +5,7 @@ export interface Report {
   runs: number
   wins: number
   lostToEscape: number
+  lostToExtraction: number
   lostToFinal: number
   /** Mean access keys won, of KEYS. */
   meanKeys: number
@@ -23,6 +24,7 @@ export function report(results: RunResult[]): Report {
     runs: results.length,
     wins: results.filter((r) => r.won).length,
     lostToEscape: lost('escape'),
+    lostToExtraction: lost('key'),
     lostToFinal: lost('final'),
     meanKeys: mean((r) => r.keys),
     meanBattles: mean((r) => r.battles),
@@ -36,6 +38,7 @@ export function formatReport(r: Report): string {
     `runs                ${r.runs}`,
     `wins                ${percent(r.wins)}`,
     `lost an escape      ${percent(r.lostToEscape)}`,
+    `lost an extraction  ${percent(r.lostToExtraction)}`,
     `lost final mission  ${percent(r.lostToFinal)}`,
     `mean keys won       ${r.meanKeys} of ${KEYS}`,
     `mean battles        ${r.meanBattles}`,

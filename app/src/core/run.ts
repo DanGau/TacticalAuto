@@ -15,6 +15,8 @@ import { ZONE_TERRAINS, type TerrainKind } from './terrain'
 import { drawTwist, type Twist } from './twists'
 import { random, randomInt } from './rng'
 import { TRAITS, type Trait, type TraitId } from './traits'
+import { REGION_IDS, REGIONS, type RegionId } from './regions'
+import { arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
 
 /** Access keys needed to find the alien source; each is won at a satellite, at the end of a leg. */
 export const KEYS = 3
@@ -78,6 +80,21 @@ export interface Stop {
   /** What about the ground or weather changes the battle; drawn ahead, so the map can show it. */
   twist: Twist | null
   packs: Muster[]
+  /** How the town it is fought in is built, and the place it is named for; drawn by the battle when absent. */
+  region?: RegionId
+  city?: string
+}
+
+/**
+ * A stage of the journey across the globe: a leg crossing a continent from where the last ended to the city where an
+ * elite hero waits to be extracted, or the last, from there to the alien hub.
+ */
+export interface Stage {
+  continent: ContinentId | null
+  from: LonLat
+  to: City
+  /** Who waits at the stage's end; none at the hub. */
+  hero: Soldier | null
 }
 
 /** A stop on a leg's map: its row, the stops in the next column it leads to, and the stop, null until its leg begins. */
@@ -121,6 +138,8 @@ export interface Soldier {
   gear: Record<Slot, Gear | null>
   /** The quirk it was recruited with, if any. */
   trait: TraitId | null
+  /** Where it comes from: a recruit's home, a hero's city; none for a clone. */
+  home: City | null
 }
 
 /** Gear a soldier found, waiting to be equipped on that soldier or sold. */
@@ -221,6 +240,8 @@ export interface Run {
   relicOffers: RelicId[]
   /** At the run's start, the recruits to choose the first soldier from. */
   recruits: Soldier[]
+  /** The journey across the globe, a stage for each leg; set once the first soldier is chosen, from its home. */
+  route: Stage[]
   /** What each leg's boss resists, by keys won; known from the start so the squad can build to beat it. */
   bosses: Resist[]
 }
@@ -358,7 +379,11 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
  * doctrine of unique classes it takes a class no squadmate has, while one is left.
  */
 export function hire(run: Run): Soldier {
-  const soldier = draft(run, [])
+  return join(run, draft(run, []))
+}
+
+/** Adds `soldier` to the squad and returns it. */
+function join(run: Run, soldier: Soldier): Soldier {
   soldier.id = run.nextSoldier++
   run.soldiers.push(soldier)
   return soldier
@@ -382,6 +407,7 @@ function draft(run: Run, taken: ClassId[]): Soldier {
     feats: [],
     gear: { weapon: null, armor: null, utility: null },
     trait: null,
+    home: null,
   }
   return soldier
 }
@@ -389,12 +415,18 @@ function draft(run: Run, taken: ClassId[]): Soldier {
 /** Recruits offered at a run's start. */
 export const RECRUITS = 3
 
-/** Offers the run's first soldier: recruits of different classes, one plain and the rest each with a different trait. */
+/**
+ * Offers the run's first soldier: recruits of different classes from different continents, one plain and the rest
+ * each with a different trait.
+ */
 function offerRecruits(run: Run): void {
   const traits = Object.keys(TRAITS) as TraitId[]
+  const continents = [...CONTINENT_IDS]
   const plain = randomInt(run, RECRUITS)
   for (let i = 0; i < RECRUITS; i++) {
     const recruit = draft(run, run.recruits.map((r) => r.cls!))
+    const cities: City[] = CONTINENTS[continents.splice(randomInt(run, continents.length), 1)[0]].cities
+    recruit.home = cities[randomInt(run, cities.length)]
     if (i !== plain) recruit.trait = traits.splice(randomInt(run, traits.length), 1)[0]
     // A recruit joining above level 1 has already learned a skill for each level.
     const joins = recruit.trait ? (TRAITS[recruit.trait] as Trait).level : undefined
@@ -404,10 +436,12 @@ function offerRecruits(run: Run): void {
   }
 }
 
-/** Takes the recruit at `index` as the run's first soldier, with what its trait brings. */
+/** Takes the recruit at `index` as the run's first soldier, with what its trait brings, and sets out from its home. */
 export function recruit(run: Run, index: number): void {
   const soldier = run.recruits[index]
   run.recruits = []
+  run.route = plotRoute(run, soldier.home!)
+  drawStops(run)
   soldier.id = run.nextSoldier++
   run.soldiers.push(soldier)
   const trait: Trait | null = soldier.trait ? TRAITS[soldier.trait] : null
@@ -419,6 +453,36 @@ export function recruit(run: Run, index: number): void {
   }
   settle(run)
 }
+
+/** A hero's level: elite, it joins seasoned, its skills learned. */
+const HERO_LEVEL = 2
+
+/**
+ * The journey from `home`: across its own continent to a hero in another of its cities, then on to the nearest
+ * continent not yet crossed, a leg each, and at last to the alien hub. A hero waits at each leg's end.
+ */
+function plotRoute(run: Run, home: City): Stage[] {
+  const route: Stage[] = []
+  const left = [...CONTINENT_IDS]
+  let from = home
+  for (let leg = 0; leg < KEYS; leg++) {
+    const continent = leg === 0 ? left.find((id) => CONTINENTS[id].cities.some((c) => c.name === home.name))! : left.reduce((a, b) => (nearest(b, from.at) < nearest(a, from.at) ? b : a))
+    left.splice(left.indexOf(continent), 1)
+    const cities: City[] = CONTINENTS[continent].cities.filter((c) => c.name !== from.name)
+    const to = cities[randomInt(run, cities.length)]
+    const hero = draft(run, [])
+    hero.home = to
+    hero.xp = xpFor(HERO_LEVEL)
+    for (let offers = skillOffers(hero); offers.length > 0; offers = skillOffers(hero)) hero.skills.push(offers[randomInt(run, offers.length)])
+    route.push({ continent, from: from.at, to, hero })
+    from = to
+  }
+  route.push({ continent: null, from: from.at, to: HUB, hero: null })
+  return route
+}
+
+/** How near a continent's nearest city lies to `at`, in degrees round the globe. */
+const nearest = (id: ContinentId, at: LonLat) => Math.min(...CONTINENTS[id].cities.map((c) => arc(c.at, at)))
 
 /** Whether the squad is in the second half of its leg, where aliens are stronger. */
 const late = (run: Run) => run.stop >= LEG_STOPS / 2
@@ -521,9 +585,20 @@ function drawStops(run: Run): void {
     for (const node of column) {
       let roll = random(run)
       const kind = c === 0 ? undefined : (Object.keys(STOP_CHANCE) as (keyof typeof STOP_CHANCE)[]).find((k) => (roll -= STOP_CHANCE[k]) < 0)
-      node.stop = c === LEG_STOPS ? fixed('key', 'compound') : kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], { ...run, stop: c })
+      node.stop = c === LEG_STOPS ? { ...fixed('key', 'compound'), ...placed(run, 'compound'), city: run.route[run.keys].to.name } : kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], { ...run, stop: c })
     }
   })
+}
+
+/** Where on the continent under way a battle of `kind` is fought: a region it is built like there, and a city of it. */
+function placed(run: Run, kind: TerrainKind): { region: RegionId; city: string } {
+  const continent = run.route[run.keys]?.continent
+  const native: RegionId[] = continent ? CONTINENTS[continent].regions : REGION_IDS
+  const fit = native.filter((id) => (REGIONS[id].kinds as TerrainKind[]).includes(kind))
+  const options = fit.length > 0 ? fit : native
+  const region = options[randomInt(run, options.length)]
+  const cities = REGIONS[region].cities
+  return { region, city: cities[randomInt(run, cities.length)] }
 }
 
 /** A battle of `risk` with a goal and place drawn at random, its aliens mustered for the squad as it will be at `when`. */
@@ -532,7 +607,8 @@ export function drawBattle(run: Run, risk: Risk, when: Run = run): Stop {
   const force = missionAt(when, 'battle', risk, goal).force
   // Each battle's force varies a little either way, so two battles of one risk are not the same fight.
   const packs = muster(run, Math.max(1, force + randomInt(run, 3) - 1), depth(when)).map(({ name, kinds }) => ({ name, kinds }))
-  return { kind: 'battle', risk, goal, terrain: ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)], twist: drawTwist(run, when.keys), packs }
+  const terrain = ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)]
+  return { kind: 'battle', risk, goal, terrain, twist: drawTwist(run, when.keys), packs, ...placed(run, terrain) }
 }
 
 /** A stop with no aliens drawn ahead: an event, a key mission or the final mission. */
@@ -589,6 +665,7 @@ export function createRun(seed: number): Run {
     relics: [],
     relicOffers: [],
     recruits: [],
+    route: [],
     bosses: [],
     shop: null,
     event: null,
@@ -597,7 +674,6 @@ export function createRun(seed: number): Run {
   }
   offerRecruits(run)
   run.legs = Array.from({ length: KEYS + 1 }, (_, k) => ({ columns: k === KEYS ? [[{ row: Math.floor(MAP_ROWS / 2), next: [], stop: null }]] : drawShape(run), path: [] }))
-  drawStops(run)
   run.phase = 'recruit'
   const resists = Object.keys(RESISTS) as Resist[]
   run.bosses = Array.from({ length: KEYS + 1 }, () => resists[randomInt(run, resists.length)])
@@ -688,7 +764,7 @@ export function advance(run: Run): void {
     effects: [...doctrines.flatMap((d) => d.effect ?? []), ...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))
   const rules = doctrines.flatMap((d) => d.rule ?? [])
-  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, packsOf(run, mission, stop === 'battle' ? here.packs : undefined), reserve, mission.goal, rules, here.twist)
+  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, packsOf(run, mission, stop === 'battle' ? here.packs : undefined), reserve, mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city } : undefined)
 }
 
 /** What a soldier still standing earns from a battle, after the feats it ends the battle with are recorded. */
@@ -743,15 +819,17 @@ export function endBattle(run: Run): void {
   const drops = won && mission.kind !== 'final' ? (mission.kind === 'battle' ? byGoal : 1) : 0
   for (let i = 0; i < drops; i++) dropGear(run, (risk.rareGear && i === 0) || mission.kind !== 'battle' || held.some((relic) => relic.rareGear))
   const key = won && mission.kind === 'key'
-  // Each key won brings a new clone to the squad.
-  const hired = key && !run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).noRecruits) ? hire(run).name : null
+  // Each hero extracted joins the squad.
+  const hero = run.route[run.keys]?.hero
+  const hired = key && hero && !run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).noRecruits) ? join(run, hero).name : null
   run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies: supplies - downed, key, soldiers, hired, rescued }
 
-  if (mission.kind === 'final' || (mission.kind === 'escape' && !won)) {
-    run.phase = won ? 'won' : 'lost'
+  // Losing the hero's extraction, an escape or the hub loses the run.
+  if (mission.kind === 'final' || (mission.kind !== 'battle' && !won)) {
+    run.phase = mission.kind === 'final' && won ? 'won' : 'lost'
     return
   }
-  // A key mission lost is fought again; an escape stands in front of the stop it interrupted.
+  // An escape stands in front of the stop it interrupted.
   if (key) {
     run.keys++
     run.stop = 0

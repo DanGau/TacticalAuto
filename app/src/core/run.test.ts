@@ -5,6 +5,7 @@ import { isSoldier, BASE_STATS, type Side } from './battle'
 import { CLASSES } from './classes'
 import { CREDIT_THREAT, EVENTS } from './events'
 import { coverAgainst, odds } from './sight'
+import { HUB } from './world'
 import {
   createRun,
   RECRUITS,
@@ -206,15 +207,25 @@ test('after the stops of a leg comes its satellite: winning it wins a key, a new
   expect(legOf(run).columns.flat().every((node) => node.stop !== null)).toBe(true)
 })
 
-test("a new clone arrives a level 1 recruit on a path of its class, however seasoned the squad", () => {
+test("each leg crosses a continent to a hero in one of its cities, who joins seasoned once extracted; the last leads to the hub", () => {
   const run = started()
-  run.soldiers[0].xp = xpFor(5)
+  expect(run.route).toHaveLength(KEYS + 1)
+  expect(new Set(run.route.slice(0, KEYS).map((stage) => stage.continent)).size).toBe(KEYS)
+  expect(run.route[KEYS].to).toBe(HUB)
+  const hero = run.route[0].hero!
   atKey(run)
   fight(run, 'human')
-  const recruit = run.soldiers[1]
-  expect(level(recruit)).toBe(1)
-  expect(PATHS[recruit.cls!].map((p) => p.core)).toContain(recruit.skills[0])
-  expect(skillOffers(recruit)).toEqual([])
+  expect(run.soldiers[1]).toBe(hero)
+  expect(level(hero)).toBeGreaterThan(1)
+  expect(PATHS[hero.cls!].map((p) => p.core)).toContain(hero.skills[0])
+  expect(skillOffers(hero)).toEqual([])
+})
+
+test("losing a hero's extraction loses the run", () => {
+  const run = started()
+  atKey(run)
+  fight(run, 'alien')
+  expect(run.phase).toBe('lost')
 })
 
 test('experience follows what a soldier did: kills and damage its own, feats only the first time', () => {
@@ -307,7 +318,7 @@ test('a key mission has one boss, with an escort for each key already won', () =
   }
 })
 
-const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: { weapon: null, armor: null, utility: null }, trait: null, ...extra })
+const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: { weapon: null, armor: null, utility: null }, trait: null, home: null, ...extra })
 
 test('stats add class, level, skills and relics to the base', () => {
   const run = begun(1)

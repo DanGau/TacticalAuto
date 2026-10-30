@@ -5,7 +5,7 @@ import type { Resist } from './keywords'
 import { random, randomInt } from './rng'
 import { CIVILIAN_HP, CIVILIANS, type Goal } from './goals'
 import type { Twist } from './twists'
-import { EDGE_COVER, generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
+import { EDGE_COVER, generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Locale, type Prop, type Terrain, type TerrainKind } from './terrain'
 
 export type { Cover }
 
@@ -913,9 +913,9 @@ const HUNTER_START = 12
 /** Tiles apart a rescue's civilians hide, from each other and the aliens. */
 const CIVILIAN_CLEARANCE = 3
 
-export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null): Battle {
+export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale): Battle {
   const holder = { rng: seed }
-  const terrain = generateTerrain(holder, GRID, kind, twist)
+  const terrain = generateTerrain(holder, GRID, kind, twist, place)
   const battle: Battle = {
     rng: holder.rng,
     goal,

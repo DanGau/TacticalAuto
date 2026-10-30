@@ -5,11 +5,13 @@ import { SLOTS } from '../core/gear'
 import { DOCTRINES } from '../core/doctrines'
 import { BRIBE, CREDIT_THREAT, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
-import { current, legOf, GEAR_PRICE, KEYS, LEG_STOPS, MAP_ROWS, ways, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
+import { current, legOf, GEAR_PRICE, KEYS, LEG_STOPS, ways, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
 import { FEATS } from '../core/feats'
 import { PATHS, SKILLS } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
 import { TWISTS, type Twist } from '../core/twists'
+import { CONTINENTS } from '../core/world'
+import { globe, pinAt, type Pin } from './globe'
 import { decisions } from './aftermath'
 import { alienName, button, describe, gearCard, keywordChips, resistChip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
 
@@ -32,7 +34,7 @@ function census(run: Run, packs: Muster[]): string {
   }).join(', ')
 }
 
-const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '📦', cache: '🎁', shop: '🛒', unknown: '❓', key: '🛰️', final: '👁️' }
+const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '📦', cache: '🎁', shop: '🛒', unknown: '❓', key: '⭐', final: '👁️' }
 
 /** A twist told in a sentence, or nothing. */
 const twistLine = (twist: Twist | null) => (twist ? ` ${TWISTS[twist].icon} ${TWISTS[twist].name}: ${TWISTS[twist].text}.` : '')
@@ -52,20 +54,13 @@ function stopIcon(run: Run, stop: Stop, state = ''): string {
 /** A stop not yet seen. */
 const FOG = '<span class="node fog">?</span>'
 
-/** Stops in a run, whichever way it goes: each leg's and its satellite, then the source. */
-const RUN_STOPS = KEYS * (LEG_STOPS + 1) + 1
 
-/**
- * The whole run as a map, left to right: each leg's stops in columns, its satellite, then the alien source. Each stop
- * names the stops it leads to in `data-next`, for the trails between them. The leg under way shows every stop; the
- * ways on are buttons; legs ahead are fog until the squad reaches them.
- */
 /** How many stops ahead of the squad the map shows. */
 const SIGHT = 3
 
 /**
- * The run map, bottom to top: the stops the squad took, then the stops it can still reach, up to SIGHT ahead.
- * Stops it passed by, and stops beyond sight, stay hidden.
+ * The run as a globe: where the squad stands, then the stops it can still reach, up to SIGHT ahead, pinned along its
+ * way across the continent. Stops it passed by, and stops beyond sight, stay hidden.
  */
 function runMap(run: Run, picked: number | null): string {
   const here = current(run)
@@ -83,30 +78,31 @@ function runMap(run: Run, picked: number | null): string {
       }
     }
   }
-  const legs = run.legs.map((leg, l) => {
+  const pins: Pin[] = []
+  let focus = run.route[run.keys].from
+  run.legs.forEach((leg, l) => {
     const walked = (c: number) => l < run.keys || (l === run.keys && (c < run.stop || (c === run.stop && here !== null)))
     // Where the squad stands: the stop under way, or else the last it took. The way behind it is not shown.
     const standing = (c: number) => l === run.keys && (here ? c === run.stop : c === run.stop - 1)
     const shown = (c: number, i: number) => (walked(c) ? standing(c) && leg.path[c] === i : reach[l][c].has(i) && l * (LEG_STOPS + 1) + c <= at + SIGHT)
-    // Columns with no stop shown take no room.
-    const rows = leg.columns.map((column, c) => column.some((_, i) => shown(c, i)))
-    const cells = leg.columns.flatMap((column, c) =>
-      column.flatMap((node, i) => {
-        if (!shown(c, i)) return []
+    leg.columns.forEach((column, c) =>
+      column.forEach((node, i) => {
+        if (!shown(c, i)) return
         const taken = walked(c)
-        const id = `${l}-${c}-${i}`
         const next = c === leg.columns.length - 1 ? (run.legs[l + 1]?.columns[0].map((_, k) => `${l + 1}-0-${k}`) ?? []) : node.next.map((k) => `${l}-${c + 1}-${k}`)
         const state = taken ? (l === run.keys && c === run.stop ? 'here' : 'done') : ''
         const icon = !node.stop ? (c === leg.columns.length - 1 ? stopIcon(run, { kind: l === KEYS ? 'final' : 'key' } as Stop) : FOG) : stopIcon(run, node.stop, state)
-        const body = open.includes(i) && l === run.keys && c === run.stop ? `<button class="option${i === picked ? ' picked' : ''}" data-pick="${i}">${icon}</button>` : icon
+        const html = open.includes(i) && l === run.keys && c === run.stop ? `<button class="option${i === picked ? ' picked' : ''}" data-pick="${i}">${icon}</button>` : icon
         const squad = taken && standing(c)
-        return [`<div class="cell${squad ? ' squad' : ''}" data-n="${id}" data-next="${next.join(' ')}" style="grid-row: ${rows.slice(c).filter(Boolean).length}; grid-column: ${node.row + 1}">${body}</div>`]
+        const pin = { id: `${l}-${c}-${i}`, at: pinAt(run, l, c, node.row), html, next, squad }
+        if (squad) focus = pin.at
+        pins.push(pin)
       }),
     )
-    if (cells.length === 0) return ''
-    return `<div class="leg"><small>${l === KEYS ? 'Source' : `Leg ${l + 1}`}</small><div class="grid" style="grid-template-columns: repeat(${MAP_ROWS}, 32px)">${cells.join('')}</div></div>`
   })
-  return `<p class="progress">Stop ${at + 1} of ${RUN_STOPS}</p><div class="map">${legs.reverse().join('')}</div>`
+  const stage = run.route[run.keys]
+  const banner = stage.hero ? `Leg ${run.keys + 1} of ${KEYS}: across ${CONTINENTS[stage.continent!].name} to ${stage.hero.name}, waiting in ${stage.to.name}, ${stage.to.country}.` : 'The last leg: to the alien hub under the Antarctic ice.'
+  return `<p class="progress">${banner}</p><div class="map">${globe(run, pins, focus)}</div>`
 }
 
 /** The words on the button that travels to the next stop. */
@@ -120,9 +116,10 @@ function travelLabel(run: Run, stop: Stop, next: NonNullable<ReturnType<typeof n
 }
 
 /** What the squad faces at a stop, as the map's heading. */
-function where(stop: Stop): string {
-  if (stop.kind === 'final') return 'All three keys are won. The alien source is found.'
-  if (stop.kind === 'key') return 'The road ends at a satellite. Its access key is guarded.'
+function where(run: Run, stop: Stop): string {
+  const stage = run.route[run.keys]
+  if (stop.kind === 'final') return 'The squad is whole. Under the ice lies the alien hub: raid it, and end this.'
+  if (stop.kind === 'key') return `${stage.hero!.name} holds out in ${stage.to.name}, surrounded. Get them out: lose them, and the run is over.`
   if (stop.kind === 'unknown') return 'The road leads somewhere unknown: a fight, a shop, or something stranger.'
   if (stop.kind === 'shop') return 'The road leads to a shop, where supplies buy gear, relics, or a quieter road.'
   if (stop.kind !== 'battle') return `The road leads to a ${STOP_NAMES[stop.kind].toLowerCase()}.`
@@ -165,13 +162,13 @@ function mapView(run: Run, picked: number | null): string {
   const ahead = picked !== null && ways(run).includes(picked) ? legOf(run).columns[run.stop][picked].stop : null
   if (!node && !ahead) return `${run.report ? '' : decisions(run)}<h2>Choose where to go next. Click a stop to see what waits there and where it leads.</h2>${runMap(run, null)}`
   if (!node)
-    return `${run.report ? '' : decisions(run)}<h2>${where(ahead!)}</h2>
+    return `${run.report ? '' : decisions(run)}<h2>${where(run, ahead!)}</h2>
     ${runMap(run, picked)}
     <p class="progress">Click another stop to compare, or set out.</p>
     <button class="travel" data-action='${JSON.stringify({ type: 'go', index: picked })}'>Set out for this stop</button>`
   const next = nextStop(run)!
   const here = node.stop!
-  return `${run.report ? '' : decisions(run)}<h2>${where(here)}</h2>
+  return `${run.report ? '' : decisions(run)}<h2>${where(run, here)}</h2>
     ${runMap(run, null)}
     ${next === 'escape' ? '<p class="up"><b>The threat is full. The squad is ambushed on the road and must escape.</b></p>' : ''}
     <button class="travel ${next}" data-action='${JSON.stringify({ type: 'advance' })}'>${travelLabel(run, here, next)}</button>`

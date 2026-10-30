@@ -1,4 +1,4 @@
-import { recruits, title } from './menu'
+import { recruits, story, title } from './menu'
 import type { Action } from '../core/apply'
 import type { Report, Run } from '../core/run'
 import type { View } from '../view/view'
@@ -12,7 +12,6 @@ import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { DETECT, PATROL_DETECT } from '../core/sight'
 import { alienName, button, resistChip, STOP_NAMES, tip } from './html'
 import { overworld, type Tab } from './overworld'
-import { drawTrails } from './trails'
 
 const SIDE = { human: 'Humans', alien: 'Aliens' }
 
@@ -140,6 +139,8 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   let shown: Run | null = null
   /** Whether the player has left the title screen, and the recruit picked before confirming. */
   let started = false
+  /** Whether the story has been told, before the first choice. */
+  let told = false
   let recruit: number | null = null
   let html = ''
 
@@ -152,7 +153,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
    */
   function panel(run: Run): string {
     const report = run.report
-    if (run.phase === 'recruit') return started ? recruits(run, recruit) : title()
+    if (run.phase === 'recruit') return !started ? title() : !told ? story() : recruits(run, recruit)
     if (run.phase === 'battle') return ''
     if (run.phase === 'won' || run.phase === 'lost') return runEnd(run)
     if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run, gear)}`
@@ -175,10 +176,8 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     // Rewriting unchanged content would restart its animations.
     if (next !== html) {
       overlay.innerHTML = html = next
-      const map = overlay.querySelector('.map')
       overlay.hidden = run.phase === 'battle'
       shrink()
-      if (map) drawTrails(map)
     }
     overlay.hidden = run.phase === 'battle'
   }
@@ -229,19 +228,13 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
       showDrop(shown!)
     } else choose(target.dataset.zone ? Number(target.dataset.zone) : null)
   })
-  // A resize, such as entering full screen, moves the stops; the trails between them are measured again once it lands.
-  addEventListener('resize', () =>
-    requestAnimationFrame(() => {
-      shrink()
-      const map = overlay.querySelector('.map')
-      if (map) drawTrails(map)
-    }),
-  )
+  addEventListener('resize', () => requestAnimationFrame(shrink))
   overlay.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (!target || target.disabled) return
     if (target.id === 'again') location.href = location.pathname
     else if (target.id === 'start') started = true
+    else if (target.id === 'begin') told = true
     else if (target.dataset.recruit) recruit = Number(target.dataset.recruit)
     else if (target.dataset.seen) seen = shown!.report
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
