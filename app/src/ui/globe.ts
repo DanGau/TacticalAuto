@@ -11,11 +11,16 @@ const MARGIN = 60
 const MIN_REACH = 3
 const RAD = Math.PI / 180
 
-/** The window the globe is seen through, in pixels. */
+/** The window the globe is seen through, in pixels, and how much of its top and bottom the page covers. */
 export interface Size {
   w: number
   h: number
+  top?: number
+  bottom?: number
 }
+
+/** Where the middle of the window's open part lies, and how far it reaches up and down. */
+const open = ({ h, top = 0, bottom = 0 }: Size) => ({ middle: top + (h - top - bottom) / 2, half: (h - top - bottom) / 2 })
 
 /**
  * A stop shown on the globe: its id, where it stands, its markup, the stops it leads to, whether the squad stands on it,
@@ -45,7 +50,9 @@ export interface View {
 }
 
 /** Projects the globe seen from `view` into a window `size`: where a place falls on the page, and whether it faces the viewer. */
-function projection({ centre, r, turn }: View, { w, h }: Size) {
+function projection({ centre, r, turn }: View, size: Size) {
+  const { w } = size
+  const { middle: mid } = open(size)
   const [l0, p0] = [centre[0] * RAD, centre[1] * RAD]
   const [cos, sin] = [Math.cos(turn), Math.sin(turn)]
   return ([lon, lat]: LonLat) => {
@@ -59,13 +66,15 @@ function projection({ centre, r, turn }: View, { w, h }: Size) {
       x /= len
       y /= len
     }
-    return { x: w / 2 + (x * cos - y * sin) * r, y: h / 2 + (x * sin + y * cos) * r, front: cosc >= 0 }
+    return { x: w / 2 + (x * cos - y * sin) * r, y: mid + (x * sin + y * cos) * r, front: cosc >= 0 }
   }
 }
 
 /** Points along the globe's rim, seen from `view` in a window `size`, from where `a` lies on it round the shorter way to `b`. */
-function rim(a: { x: number; y: number }, b: { x: number; y: number }, { r }: View, { w, h }: Size): string {
-  const [from, to] = [Math.atan2(a.y - h / 2, a.x - w / 2), Math.atan2(b.y - h / 2, b.x - w / 2)]
+function rim(a: { x: number; y: number }, b: { x: number; y: number }, { r }: View, size: Size): string {
+  const { w } = size
+  const h2 = open(size).middle
+  const [from, to] = [Math.atan2(a.y - h2, a.x - w / 2), Math.atan2(b.y - h2, b.x - w / 2)]
   let sweep = to - from
   if (sweep > Math.PI) sweep -= 2 * Math.PI
   if (sweep < -Math.PI) sweep += 2 * Math.PI
@@ -73,7 +82,7 @@ function rim(a: { x: number; y: number }, b: { x: number; y: number }, { r }: Vi
   let d = ''
   for (let i = 1; i < steps; i++) {
     const t = from + (sweep * i) / steps
-    d += `L${(w / 2 + Math.cos(t) * r).toFixed(1)},${(h / 2 + Math.sin(t) * r).toFixed(1)}`
+    d += `L${(w / 2 + Math.cos(t) * r).toFixed(1)},${(h2 + Math.sin(t) * r).toFixed(1)}`
   }
   return d
 }
@@ -129,9 +138,10 @@ function framed(seen: LonLat[], size: Size, up?: [LonLat, LonLat], apart: LonLat
   const reach = Math.sin(MIN_REACH * RAD)
   const across = Math.max(reach, ...seen.map((p) => Math.abs(unit(p).x)))
   const upright = Math.max(reach, ...seen.map((p) => Math.abs(unit(p).y)))
+  const { half } = open(size)
   const fit = (places: LonLat[]) =>
-    Math.min((size.w / 2 - MARGIN) / Math.max(reach, ...places.map((p) => Math.abs(unit(p).x))), (size.h / 2 - MARGIN) / Math.max(reach, ...places.map((p) => Math.abs(unit(p).y))))
-  let r = Math.min((size.w / 2 - MARGIN) / across, (size.h / 2 - MARGIN) / upright)
+    Math.min((size.w / 2 - MARGIN) / Math.max(reach, ...places.map((p) => Math.abs(unit(p).x))), (half - MARGIN) / Math.max(reach, ...places.map((p) => Math.abs(unit(p).y))))
+  let r = Math.min((size.w / 2 - MARGIN) / across, (half - MARGIN) / upright)
   const nearest = Math.min(...apart.flatMap((a, i) => apart.slice(i + 1).map((b) => Math.hypot(unit(a).x - unit(b).x, unit(a).y - unit(b).y))).filter((d) => d > 0))
   if (Number.isFinite(nearest)) r = Math.max(r, Math.min(GAP / nearest, fit(must)))
   return { centre, r: Math.min(NEAR, Math.max(FAR, r)), turn }
@@ -201,7 +211,7 @@ function sphere(view: View, size: Size, over: string, pins: string): string {
     .map((places) => `<path class="graticule" d="${line(project, places)}"/>`)
     .join('')
   const { w, h } = size
-  return `<div class="sea" style="left:${w / 2 - view.r}px;top:${h / 2 - view.r}px;width:${2 * view.r}px;height:${2 * view.r}px"></div>
+  return `<div class="sea" style="left:${w / 2 - view.r}px;top:${open(size).middle - view.r}px;width:${2 * view.r}px;height:${2 * view.r}px"></div>
     <svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${graticule}${coasts}${over}</svg>
     ${pins}`
 }

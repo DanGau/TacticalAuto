@@ -8,8 +8,7 @@ import { RELICS, type Relic } from '../core/relics'
 import { current, legOf, GEAR_PRICE, KEYS, LEG_STOPS, ways, charges, equipped, level, missionAt, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
 import { FEATS } from '../core/feats'
 import { PATHS, SKILLS } from '../core/skills'
-import { TERRAIN_TEXT } from '../core/terrain'
-import { TWISTS, type Twist } from '../core/twists'
+import { TWISTS } from '../core/twists'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
 import { decisions } from './aftermath'
@@ -36,9 +35,6 @@ function census(run: Run, packs: Muster[]): string {
 
 const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '📦', cache: '🎁', shop: '🛒', unknown: '❓', key: '⭐', final: '👁️' }
 
-/** A twist told in a sentence, or nothing. */
-const twistLine = (twist: Twist | null) => (twist ? ` ${TWISTS[twist].icon} ${TWISTS[twist].name}: ${TWISTS[twist].text}.` : '')
-
 /**
  * A stop as an icon; a battle's is coloured by its risk and marked by its twist, and hovering tells its goal, place, pay and twist.
  * `state` is done, here, or empty for ahead.
@@ -48,7 +44,7 @@ function stopIcon(run: Run, stop: Stop, state = ''): string {
   const risk = RISKS[stop.risk]
   const goal = GOALS[stop.goal]
   const aliens = census(run, stop.packs) + (stop.goal === 'assassinate' ? ', a Commander' : '')
-  return `<span class="node ${stop.risk} ${state}" title="${risk.name} ${goal.name}, ${TERRAIN_TEXT[stop.terrain].name}: pays ${goal.reward}. ${aliens.replace(/<[^>]*>/g, '')}.${twistLine(stop.twist)}">${STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}</span>`
+  return `<span class="node ${stop.risk} ${state}" title="${goal.name} · ${risk.name} · ${aliens.replace(/<[^>]*>/g, '')}">${STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}</span>`
 }
 
 /** A stop not yet seen. */
@@ -66,18 +62,12 @@ function runMap(run: Run, picked: number | null): string {
   const here = current(run)
   const open = here ? [] : ways(run)
   const at = run.keys * (LEG_STOPS + 1) + run.stop
-  // The stops the squad can still reach, leg by leg and column by column.
+  // The stops the squad can still reach, column by column. A leg ends at its extraction; the next leg's ways show
+  // once it is won.
   const reach = run.legs.map((leg) => leg.columns.map(() => new Set<number>()))
+  const { columns } = legOf(run)
   for (const i of here ? [legOf(run).path[run.stop]] : open) reach[run.keys][run.stop].add(i)
-  for (let l = run.keys; l < run.legs.length; l++) {
-    const { columns } = run.legs[l]
-    for (let c = l === run.keys ? run.stop : 0; c < columns.length; c++) {
-      for (const i of reach[l][c]) {
-        if (c < columns.length - 1) for (const k of columns[c][i].next) reach[l][c + 1].add(k)
-        else run.legs[l + 1]?.columns[0].forEach((_, k) => reach[l + 1][0].add(k))
-      }
-    }
-  }
+  for (let c = run.stop; c < columns.length - 1; c++) for (const i of reach[run.keys][c]) for (const k of columns[c][i].next) reach[run.keys][c + 1].add(k)
   const pins: Pin[] = []
   /** The stops the squad took on this leg, in order. */
   const path: LonLat[] = []
@@ -92,7 +82,7 @@ function runMap(run: Run, picked: number | null): string {
       column.forEach((node, i) => {
         if (!shown(c, i)) return
         const taken = walked(c)
-        const next = c === leg.columns.length - 1 ? (run.legs[l + 1]?.columns[0].map((_, k) => `${l + 1}-0-${k}`) ?? []) : node.next.map((k) => `${l}-${c + 1}-${k}`)
+        const next = c === leg.columns.length - 1 ? [] : node.next.map((k) => `${l}-${c + 1}-${k}`)
         const state = taken ? (l === run.keys && c === run.stop ? 'here' : 'done') : ''
         const icon = !node.stop ? (c === leg.columns.length - 1 ? stopIcon(run, { kind: l === KEYS ? 'final' : 'key' } as Stop) : FOG) : stopIcon(run, node.stop, state)
         const squad = taken && standing(c)
@@ -112,24 +102,24 @@ function runMap(run: Run, picked: number | null): string {
   // The way on from the picked stop lights up, stop by stop.
   for (const pin of pins) if (pin.lit && !pin.squad) for (const id of pin.next) pins.forEach((p) => p.id === id && (p.lit = true))
   // The map fills the screen under the header and headings.
-  return `<div class="map flight">${globe({ w: innerWidth, h: innerHeight }, run, pins, focus, path, picked !== null)}</div>`
+  // The stops keep clear of the header above and the stop's card below.
+  return `<div class="map flight">${globe({ w: innerWidth, h: innerHeight, top: 70, bottom: 70 }, run, pins, focus, path, picked !== null)}</div>`
 }
 
-/** What the fight at the squad's stop holds: its kind, the alien force, and the stakes. */
+/** The alien force at the squad's stop. */
 function travelLabel(run: Run, stop: Stop, next: 'battle' | 'key' | 'final' | 'escape'): string {
   const mission = missionAt(run, next, stop.risk, next === 'battle' ? stop.goal : 'exterminate')
-  const stakes = next === 'escape' || next === 'final' ? ' · lose and the run ends' : ''
-  return `${STOP_NAMES[next]}: alien force ${mission.force}${next === 'key' || next === 'final' ? ', with a boss' : ''}${stakes}`
+  return `force ${mission.force}${next === 'key' || next === 'final' ? ' + boss' : ''}`
 }
 
 /** What the squad faces at a stop, as the map's heading. */
 function where(run: Run, stop: Stop): string {
   const stage = run.route[run.keys]
-  if (stop.kind === 'final') return 'The squad is whole. Under the ice lies the alien hub: raid it, and end this.'
-  if (stop.kind === 'key') return `${stage.hero!.name} holds out in ${stage.to.name}, surrounded. Get them out: lose them, and the run is over.`
+  if (stop.kind === 'final') return 'The alien hub'
+  if (stop.kind === 'key') return `Extract ${stage.hero!.name}`
   // A stop's icon tells what it is; only a fight says more.
   if (stop.kind !== 'battle') return ''
-  return `${GOALS[stop.goal].name}, ${RISKS[stop.risk].name.toLowerCase()} ${TERRAIN_TEXT[stop.terrain].name.toLowerCase()}: ${GOALS[stop.goal].text}.${twistLine(stop.twist)}`
+  return `${GOALS[stop.goal].name} · ${RISKS[stop.risk].name}${stop.twist ? ` · ${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}` : ''}`
 }
 
 /** A shop: gear fitted to a soldier, relics, a bribe, and the way out. */
@@ -169,11 +159,11 @@ function mapView(run: Run, picked: number | null): string {
   // Flight: the map fills the screen; what a stop holds shows over it once picked or reached.
   const choices = run.report ? '' : decisions(run)
   if (!node && !ahead) return `${choices}${runMap(run, null)}`
-  const brief = (text: string) => (text ? `<div class="brief">${text}</div>` : '')
+  const brief = (text: string) => (text ? `<div class="stopcard">${text}</div>` : '')
   if (!node) return `${choices}${brief(where(run, ahead!))}${runMap(run, picked)}`
   const next = nextStop(run)!
   const here = node.stop!
-  return `${choices}${brief(next === 'escape' ? '<b class="up">The threat is full. The squad is ambushed on the road and must escape.</b>' : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)}<br><small>${travelLabel(run, here, next)}</small>` : '')}
+  return `${choices}${brief(next === 'escape' ? '<b class="up">Ambushed: escape</b>' : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
     ${runMap(run, null)}`
 }
 

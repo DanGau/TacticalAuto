@@ -66,7 +66,7 @@
       /* Flight: the map fills the screen under the header and what floats over it. */
       .map.flight { position: fixed; inset: 0; z-index: 0; padding: 0; }
       .map.flight .globe { position: absolute; inset: 0; }
-      .brief { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 2; max-width: 640px; padding: 10px 16px; border-radius: 10px; background: #171d29dd; border: 1px solid #3a465c; text-align: center; pointer-events: none; }
+      .stopcard { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 2; max-width: 640px; padding: 8px 16px; border-radius: 10px; background: #171d29dd; border: 1px solid #3a465c; white-space: nowrap; pointer-events: none; }
       .tabs { display: flex; gap: 4px; flex: 1; }
       .tab { padding: 6px 18px; background: none; border-color: transparent; color: #9aa6bd; }
       .tab.active { background: #263042; border-color: #4a5a78; color: #dde; }
@@ -74,7 +74,7 @@
       .threat { display: inline-flex; width: 120px; height: 8px; margin: 0 8px; vertical-align: middle; background: #10141c; border: 1px solid #ff6b5e; border-radius: 4px; overflow: hidden; }
       .threat i { background: #ff6b5e; }
       .threat i.landed { background: #ffd84d; transition: width 0.6s 0.6s; }
-      .skip { position: absolute; right: 24px; bottom: 24px; }
+      .skip { position: absolute; right: 24px; bottom: 24px; z-index: 6; }
       #fullscreen { position: absolute; bottom: 12px; left: 12px; z-index: 10; padding: 6px 10px; font-size: 18px; }
       :fullscreen #fullscreen { display: none; }
       .menu { text-align: center; padding: 24px 0 8px; }
