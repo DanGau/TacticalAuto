@@ -478,8 +478,8 @@ export async function createView(): Promise<View> {
   const scenery: { node: Object3D; tiles: number[] }[] = []
   /** Each wall on the battlefield, where it stands, and its fade: it thins to let a unit just behind it show through. */
   let walls: { at: Tile; fade: { value: number } }[] = []
-  /** Each roof on the battlefield, the tiles under it, and its fade: it lifts away while something that matters is under it. */
-  let roofs: { tiles: Set<number>; fade: { value: number }; mesh: Mesh }[] = []
+  /** Each roof on the battlefield, the tiles under it and the rectangle they span, and its fade: see reveal. */
+  let roofs: { tiles: Set<number>; box: { x1: number; y1: number; x2: number; y2: number }; fade: { value: number }; mesh: Mesh }[] = []
   /** The tile the briefing is lighting, which no roof hides. */
   let lit: Tile | null = null
   /** The town past the battlefield, and the fades of it and of the world beyond, which only the briefing's wide lens shows. */
@@ -576,13 +576,15 @@ export async function createView(): Promise<View> {
   const SUNK = 0.9
   /** How long a roof or wall takes to fade out of the way or back. */
   const FADE_MS = 220
+  /** Tiles from anyone on the squad's side within which every roof is cut away. */
+  const ROOF_REACH = 5
   /** How solid a wall stays while a unit stands just behind it. */
   const SEE_THROUGH = 0.3
 
   /**
-   * Fades away each roof over a tile that matters, a unit's, the briefing's lit one, or a landing zone's while one is
-   * chosen, and each roof over a room the squad can see into, so what it sees shows as it moves; and thins each wall standing
-   * just before a unit toward the camera, as XCOM cuts its buildings away; the rest fade back.
+   * Fades away each roof within ROOF_REACH of anyone on the squad's side, and each over a tile that matters: a unit's,
+   * the briefing's lit one, or a landing zone's while one is chosen. Thins each wall standing just before a unit toward
+   * the camera, as XCOM cuts its buildings away. The rest fade back.
    */
   function reveal(ms: number): void {
     // Past the battlefield shows sunk deep into the night in the game's view, so the screen is never bare, and comes up
@@ -598,8 +600,11 @@ export async function createView(): Promise<View> {
       for (const zone of shown.zones)
         for (let dy = -ZONE_RADIUS; dy <= ZONE_RADIUS; dy++) for (let dx = -ZONE_RADIUS; dx <= ZONE_RADIUS; dx++) if (distance(zone, { x: zone.x + dx, y: zone.y + dy }) <= ZONE_RADIUS) keys.push({ x: zone.x + dx, y: zone.y + dy })
     const under = new Set(keys.map((k) => k.y * GRID + k.x))
+    const squad = [...sprites.values()].filter((s) => s.ally).map((s) => s.tile)
     for (const roof of roofs) {
-      const open = [...roof.tiles].some((t) => under.has(t) || seen?.[t])
+      const { x1, y1, x2, y2 } = roof.box
+      const near = squad.some((t) => Math.max(x1 - t.x, t.x - x2, y1 - t.y, t.y - y2) <= ROOF_REACH)
+      const open = near || [...roof.tiles].some((t) => under.has(t))
       toward(roof.fade, open ? 0 : 1)
       roof.mesh.visible = roof.fade.value > 0
     }
@@ -874,7 +879,7 @@ export async function createView(): Promise<View> {
       const { mesh } = shapes.build()
       terrain.add(mesh)
       scenery.push({ node: mesh, tiles: room })
-      roofs.push({ tiles: new Set(room.filter((t) => !battle.outside[t])), fade: ditherable(mesh.material as MeshBasicMaterial), mesh })
+      roofs.push({ tiles: new Set(room.filter((t) => !battle.outside[t])), box: footing, fade: ditherable(mesh.material as MeshBasicMaterial), mesh })
     })
   }
 
