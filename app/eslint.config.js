@@ -15,7 +15,7 @@ export default tseslint.config(
   layer('core', '\./', 'core/ imports only core/. Pass data in instead.'),
   layer('bots', '\./|\.\./core/', 'bots/ imports only bots/ and core/.'),
   layer('sim', '\./|\.\./(core|bots)/|node:|esbuild$', 'sim/ imports only sim/, bots/, core/, node builtins and esbuild.'),
-  layer('{view,ui}', '\./|\.\./(core|view|ui)/|pixi\.js$', 'view/ and ui/ import only view/, ui/, core/ and pixi.js.'),
+  layer('{view,ui}', '\./|\.\./(core|view|ui)/|three$', 'view/ and ui/ import only view/, ui/, core/ and three.'),
   {
     files: ['src/core/**/*.ts'],
     ignores: ['**/*.test.ts'],

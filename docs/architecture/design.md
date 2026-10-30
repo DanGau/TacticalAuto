@@ -4,7 +4,7 @@ Target design; `app/` holds what is built.
 
 ## Stack
 
-TypeScript (strict), Vite, Pixi.js, Vitest, ESLint, tsx, npm. Versions: `app/package.json`.
+TypeScript (strict), Vite, three.js, Vitest, ESLint, tsx, npm. Versions: `app/package.json`.
 
 ## Layers
 
@@ -12,7 +12,7 @@ Imports point down this list only.
 
 | Layer | Owns | May import |
 |---|---|---|
-| `view/`, `ui/` | Pixi rendering; turning input into actions | `core/` |
+| `view/`, `ui/` | three.js rendering; turning input into actions | `core/` |
 | `bots/` | Players that decide without a human | `core/` |
 | `sim/` | Node CLI that plays runs with bots | `core/`, `bots/` |
 | `core/` | Every game rule: battle and run | nothing |

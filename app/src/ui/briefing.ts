@@ -10,6 +10,8 @@ const DWELL_MS = 1800
 /** How long the camera takes to fly in, and to glide between shots. */
 const FLY_MS = 2400
 const GLIDE_MS = 1400
+/** Radians the camera turns at each stop on the objective. */
+const TURN = 0.18
 /** Lines the caption keeps, the newest last. */
 const LINES = 3
 /** Tiles around a thing the briefing frames, and whose ground it names. */
@@ -114,8 +116,8 @@ export async function brief(view: View, battle: Battle): Promise<void> {
     line.textContent = shot.line
     caption.append(line)
     while (caption.childElementCount > LINES) caption.firstElementChild!.remove()
-    // The first glide flies in from high above, slowly.
-    await view.frame(shot.tiles, shot === all[0] ? FLY_MS : GLIDE_MS)
+    // The first glide flies in from high above, slowly; the camera turns as it goes, and settles still on the whole map.
+    await view.frame(shot.tiles, shot === all[0] ? FLY_MS : GLIDE_MS, shot.tiles ? TURN * (all.indexOf(shot) + 1) : 0)
     await new Promise<void>((done) => {
       wake = done
       setTimeout(done, DWELL_MS)

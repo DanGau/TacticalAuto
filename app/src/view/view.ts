@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js'
+import { CanvasTexture, CircleGeometry, ColorManagement, LinearSRGBColorSpace, Group, Mesh, MeshBasicMaterial, Object3D, OrthographicCamera, Raycaster, Scene, Sprite as Billboard, SpriteMaterial, Vector2, Vector3, WebGLRenderer } from 'three'
 import { BLAST_RADIUS, distance, GRID, nearestAlien, revealed, PLANS, ZONE_NAMES, ZONE_RADIUS, type Battle, type Tile, type Unit } from '../core/battle'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
@@ -7,14 +7,14 @@ import type { GameEvent } from '../core/combat'
 import { level, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
 import type { Edge, Ground, Prop } from '../core/terrain'
-import { drawOutskirts } from './outskirts'
+import { buildOutskirts } from './outskirts'
+import { blob, css, shade, Shapes, Sketch, type Point3 } from './shapes'
+import { ACROSS, LEVEL, PITCH, TILE_H, TILE_W, tall, YAW } from './space'
 import { weaponOf, type Weapon } from './weapons'
 
 export const WIDTH = 1280
 export const HEIGHT = 720
 
-const TILE_W = 56
-const TILE_H = 28
 /** Height above the ground that shots leave and land. */
 const CHEST = 18
 /** Zoom that shows the whole map. */
@@ -51,6 +51,13 @@ const PIP_ROW = 10 * PIP_STEP - 1
 const PSI_MS = 320
 const ROCKET_MS = 320
 const BLAST_MS = 380
+/** World units a unit's picture stands toward the camera from its feet, so the ground it stands on never cuts it. */
+const STANDOFF = 0.6
+/** A unit's picture, in screen pixels about its feet, and the pixels per one drawn, for a crisp edge. */
+const BODY = { left: 36, up: 100, down: 4 }
+const BODY_RES = 2
+/** How far a decal floats over the ground it marks, so the ground never shows through it. */
+const DECAL_LIFT = 0.02
 
 const COLOR = {
   civilian: 0xe8e2c8,
@@ -176,22 +183,33 @@ const highland = (color: number, level: number) => {
   return (lift(color >> 16) << 16) | (lift((color >> 8) & 255) << 8) | lift(color & 255)
 }
 
-/** A darker shade of a colour, for a box's sides. */
-const shade = (color: number, by: number) => (((color >> 16) * by) << 16) | ((((color >> 8) & 255) * by) << 8) | ((color & 255) * by)
-
 /** The letter over a unit that is no soldier: its kind's initial, C for a commander, nothing for a boss or civilian. */
 const letter = (unit: Unit) => (unit.target ? 'C' : unit.summoner !== null ? 'M' : unit.boss || !unit.kind ? '' : ALIENS[unit.kind].name[0])
 
-/** Position of a tile's centre in the world the camera looks at. Fractional tiles are allowed. */
-/** Screen pixels a tile rises for each level of height. */
-const RISE = 16
-
 /** The height of each tile of the battle shown, row by row. */
 let heights: number[] = []
-const riseAt = (x: number, y: number) => RISE * (heights[Math.round(y) * GRID + Math.round(x)] ?? 0)
 
-function toWorld(x: number, y: number): Tile {
-  return { x: ((x - y) * TILE_W) / 2, y: ((x + y + 1 - GRID) * TILE_H) / 2 - riseAt(x, y) }
+/** The point on the ground at the centre of a tile, its height that of the tile it rounds to. Fractional tiles are allowed. */
+const spot = (x: number, y: number): Point3 => ({ x, y: LEVEL * (heights[Math.round(y) * GRID + Math.round(x)] ?? 0), z: y })
+
+/** The world point the camera's plane is measured from: the middle of the map, on the ground. */
+const ORIGIN = { x: (GRID - 1) / 2, y: 0, z: (GRID - 1) / 2 }
+
+/** The camera's axes for a turn of `yaw`: toward it, and to the right and up across its picture. */
+function axes(yaw: number): { back: Vector3; right: Vector3; up: Vector3 } {
+  const back = new Vector3(Math.cos(PITCH) * Math.sin(yaw), Math.sin(PITCH), Math.cos(PITCH) * Math.cos(yaw))
+  const right = new Vector3(Math.cos(yaw), 0, -Math.sin(yaw))
+  return { back, right, up: new Vector3().crossVectors(back, right) }
+}
+
+/**
+ * Where a world point falls in the camera's picture, in screen pixels at zoom 1 measured from the map's middle, y
+ * down. Seen from the still camera, it is where the flat isometric map would draw it.
+ */
+function picture(p: Point3, yaw: number): Tile {
+  const { right, up } = axes(yaw)
+  const d = new Vector3(p.x - ORIGIN.x, p.y - ORIGIN.y, p.z - ORIGIN.z)
+  return { x: d.dot(right) * ACROSS, y: -d.dot(up) * ACROSS }
 }
 
 const lerp = (a: Tile, b: Tile, t: number): Tile => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
@@ -211,25 +229,58 @@ function along(points: Tile[], t: number): Tile {
 }
 
 interface Sprite {
-  node: Container
-  hp: Graphics
+  /** The unit's feet, with its shadow; its picture stands on them, facing the camera. */
+  node: Group
+  body: Billboard
+  shadow: Mesh
+  /** Redraws the picture with the given health and armor. */
+  drawHp(hp: number, armor: number): void
   /** The tile the sprite stands on, which lags the battle while a beat animates. */
   tile: Tile
-  maxHp: number
+  /** Where its feet show in the camera's picture, which a lunge, knockback or fall moves off its tile. */
+  at: Tile
+  /** Its size against a soldier's. */
+  scale: number
   /** Whether it fights for the squad, so its health shows in the ally colour. */
   ally: boolean
 }
 
-/** What the camera shows: a world point at the screen's centre, and a zoom. */
+/** What the camera shows: the world point at the screen's centre, a zoom, and its turn about the vertical. */
 interface Camera {
   x: number
   y: number
+  z: number
   zoom: number
+  yaw: number
 }
 
-const WHOLE_MAP: Camera = { x: 0, y: 0, zoom: FIT }
+/** The camera that shows the picture point `at` at the screen's centre, aimed at the ground `height` units up. */
+function aim(at: Tile, zoom: number, yaw = YAW, height = 0): Camera {
+  const { back, right, up } = axes(yaw)
+  const p = new Vector3(ORIGIN.x, ORIGIN.y, ORIGIN.z).addScaledVector(right, at.x / ACROSS).addScaledVector(up, -at.y / ACROSS)
+  // Slid along the line of sight, which leaves the picture as it is, onto the ground.
+  p.addScaledVector(back, (height - p.y) / back.y)
+  return { x: p.x, y: p.y, z: p.z, zoom, yaw }
+}
+
+const WHOLE_MAP = aim({ x: 0, y: 0 }, FIT)
 /** The whole map before the landing, shrunk and raised to clear the landing panel below it. */
-const OVERVIEW: Camera = { x: 0, y: 70, zoom: FIT * 0.82 }
+const OVERVIEW = aim({ x: 0, y: 70 }, FIT * 0.82)
+/** Where a new battle's fly-in starts: high above, turned away from where it settles. */
+const SKY = aim({ x: 0, y: -HEIGHT }, FIT / 4, YAW - 0.6)
+
+/** Words over the map, drawn in the camera's picture: a landing zone's name, or a callout over a unit. */
+interface Label {
+  text: string
+  color: number
+  size: number
+  /** Where it stands, in the camera's picture. */
+  at: () => Tile
+  /** Share of its height that stands above `at`. */
+  rise: number
+  outline: number
+  alpha: number
+}
 
 export interface View {
   canvas: HTMLCanvasElement
@@ -248,45 +299,61 @@ export interface View {
   hideZones(hidden: boolean): void
   /** On a rescue, shows where each of `teams` teams would land. */
   showTeams(teams: number): void
-  /** Glides the camera to frame the given tiles, above the landing panel; null pulls back to the whole map. */
-  frame(tiles: Tile[] | null, ms?: number): Promise<void>
+  /** Glides the camera to frame the given tiles, above the landing panel, turned `turn` radians from still; null pulls back to the whole map. */
+  frame(tiles: Tile[] | null, ms?: number, turn?: number): Promise<void>
 }
 
 export async function createView(): Promise<View> {
-  const app = new Application()
-  await app.init({ resizeTo: window, background: 0x10141c, antialias: true })
-  addEventListener('resize', () => requestAnimationFrame(() => look(camera)))
+  // Colours are drawn as given, as flat art is: no conversion between colour spaces.
+  ColorManagement.enabled = false
+  const renderer = new WebGLRenderer({ antialias: true })
+  renderer.outputColorSpace = LinearSRGBColorSpace
+  renderer.setPixelRatio(devicePixelRatio)
+  renderer.setClearColor(0x10141c)
+  const canvas = renderer.domElement
+  /** Shots, sparks, pods and words, drawn over the scene in the camera's picture. */
+  const overlay = document.createElement('canvas')
+  for (const c of [canvas, overlay]) Object.assign(c.style, { position: 'fixed', left: '0', top: '0' })
+  overlay.style.pointerEvents = 'none'
+  document.body.prepend(overlay)
+  const ctx = overlay.getContext('2d')!
 
+  const scene = new Scene()
+  const eye = new OrthographicCamera()
   /** The world past the battlefield: scenery beyond its far edges, cliffs falling from its near ones. */
-  const outskirts = new Graphics()
-  const tiles = new Graphics()
-  /** Shown before the landing: the landing zones' tint under the units, and their names and the contact markers over them. */
-  const zones = new Graphics()
-  const acid = new Graphics()
-  const marks = new Container()
-  /** Shot callouts. */
-  const labels = new Container()
-  const units = new Container()
-  units.sortableChildren = true
-  const fog = new Graphics()
-  const lurk = new Container()
-  const fx = new Graphics()
-  const world = new Container()
-  world.addChild(outskirts, tiles, zones, acid, fog, lurk, units, fx, marks, labels)
+  const outskirts = new Group()
+  /** The ground, and the props, walls and windows standing on it. */
+  const terrain = new Group()
+  /** Marks on the ground, in the order they lie: the landing zones' tint, acid and fire, fog, and glows in the fog. */
+  const zones = new Group()
+  const acid = new Group()
+  const fog = new Group()
+  const lurk = new Group()
+  const units = new Group()
+  scene.add(outskirts, terrain, zones, acid, fog, lurk, units)
+  zones.renderOrder = 1
   // Nothing shows until a battle exists.
-  world.visible = false
-  app.stage.addChild(world)
+  scene.visible = false
+
+  /** Shot effects over the scene, and each landing pod or canopy under way. */
+  const fx = new Sketch()
+  const drops = new Set<Sketch>()
+  /** Before the landing, the landing zones' names and the contact markers; and the callouts over units. */
+  let marks: Label[] = []
+  const labels = new Set<Label>()
 
   const sprites = new Map<number, Sprite>()
   /** The squad of the run shown, for each soldier's class. */
   let soldiers: Run['soldiers'] = []
   /** A red glow under each alien the squad hasn't found, by unit id. */
-  const glows = new Map<number, { node: Graphics; tile: Tile }>()
+  const glows = new Map<number, { node: Object3D; tile: Tile }>()
   /** Each prop, wall and window on the board, with the tiles that light it: it is lit when a soldier sees any of them. */
-  const scenery: { node: Graphics; tiles: number[] }[] = []
+  const scenery: { node: Object3D; tiles: number[] }[] = []
   /** The battle on screen. */
   let shown: Battle | null = null
   let camera = WHOLE_MAP
+  /** Screen pixels the picture is jolted by, as a blow lands. */
+  const jolt = { x: 0, y: 0 }
   /** Whether the battle last shown was waiting for the landing, so the next one shown plays it. */
   let deploying = false
   /** The landing zone under the pointer. */
@@ -298,60 +365,145 @@ export async function createView(): Promise<View> {
   /** On a rescue, the teams whose landing zones show. */
   let teams = 1
 
-  const diamond = (g: Graphics, x: number, y: number) => {
-    const c = toWorld(x, y)
-    return g.poly([c.x, c.y - TILE_H / 2, c.x + TILE_W / 2, c.y, c.x, c.y + TILE_H / 2, c.x - TILE_W / 2, c.y])
-  }
+  /** Where a tile falls in the camera's picture. */
+  const toWorld = (x: number, y: number): Tile => picture(spot(x, y), camera.yaw)
+  /** Screen pixels per picture pixel. */
+  const scale = () => camera.zoom * Math.min(innerWidth / WIDTH, innerHeight / HEIGHT)
 
-  function zoneAt(px: number, py: number): number | null {
-    if (shown?.phase !== 'deploy' || shown.goal === 'rescue') return null
-    const a = (px - world.x) / world.scale.x / (TILE_W / 2)
-    const b = (py - world.y) / world.scale.y / (TILE_H / 2) + GRID
-    const tile = { x: Math.floor((a + b) / 2), y: Math.floor((b - a) / 2) }
-    const index = shown.zones.findIndex((zone) => distance(zone, tile) <= ZONE_RADIUS)
-    return index < 0 ? null : index
+  function resize(): void {
+    renderer.setSize(innerWidth, innerHeight)
+    overlay.width = innerWidth * devicePixelRatio
+    overlay.height = innerHeight * devicePixelRatio
+    Object.assign(overlay.style, { width: `${innerWidth}px`, height: `${innerHeight}px` })
+    look(camera)
   }
+  addEventListener('resize', () => requestAnimationFrame(resize))
 
   function look(to: Camera): void {
     camera = to
     // Cameras are framed for a WIDTH by HEIGHT screen; the window scales them to fill it.
-    const zoom = to.zoom * Math.min(app.screen.width / WIDTH, app.screen.height / HEIGHT)
-    world.scale.set(zoom)
-    world.position.set(app.screen.width / 2 - to.x * zoom, app.screen.height / 2 - to.y * zoom)
+    const units = scale() * ACROSS
+    const { back, right, up } = axes(to.yaw)
+    const p = new Vector3(to.x, to.y, to.z).addScaledVector(right, -jolt.x / units).addScaledVector(up, jolt.y / units)
+    eye.position.copy(p).addScaledVector(back, 100)
+    eye.up.copy(up)
+    eye.lookAt(p)
+    eye.left = -innerWidth / 2 / units
+    eye.right = innerWidth / 2 / units
+    eye.top = innerHeight / 2 / units
+    eye.bottom = -innerHeight / 2 / units
+    eye.near = 1
+    eye.far = 400
+    eye.updateProjectionMatrix()
   }
 
   /** The camera that frames the given tiles, zoomed in no closer than life size. */
-  function framing(points: Tile[]): Camera {
-    const at = points.map((p) => toWorld(p.x, p.y))
+  function framing(points: Tile[], yaw = YAW): Camera {
+    const at = points.map((p) => picture(spot(p.x, p.y), yaw))
     const xs = at.map((p) => p.x)
     const ys = at.map((p) => p.y)
     const width = Math.max(...xs) - Math.min(...xs) + MARGIN
     const height = Math.max(...ys) - Math.min(...ys) + MARGIN
-    return {
-      x: (Math.max(...xs) + Math.min(...xs)) / 2,
-      y: (Math.max(...ys) + Math.min(...ys)) / 2,
-      zoom: Math.max(FIT, Math.min(1, WIDTH / width, HEIGHT / height)),
-    }
+    const middle = { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 }
+    const ground = points.reduce((sum, p) => sum + spot(p.x, p.y).y, 0) / points.length
+    return aim(middle, Math.max(FIT, Math.min(1, WIDTH / width, HEIGHT / height)), yaw, ground)
   }
 
+  /** Each rendered frame's work for a tween under way, given the milliseconds since the last frame. */
+  const ticks = new Set<(ms: number) => void>()
+  let last = performance.now()
+  renderer.setAnimationLoop((now) => {
+    const ms = now - last
+    last = now
+    for (const tick of [...ticks]) tick(ms)
+    render()
+  })
+
+  function render(): void {
+    const { back } = axes(camera.yaw)
+    for (const sprite of sprites.values()) sprite.body.position.copy(back).multiplyScalar(STANDOFF)
+    renderer.render(scene, eye)
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.clearRect(0, 0, overlay.width, overlay.height)
+    if (!scene.visible) return
+    const k = scale()
+    const middle = picture(camera, camera.yaw)
+    const dpr = devicePixelRatio
+    ctx.setTransform(k * dpr, 0, 0, k * dpr, (innerWidth / 2 - middle.x * k + jolt.x) * dpr, (innerHeight / 2 - middle.y * k + jolt.y) * dpr)
+    for (const drop of drops) drop.draw(ctx)
+    fx.draw(ctx)
+    for (const label of [...marks, ...labels]) write(label)
+  }
+
+  function write(label: Label): void {
+    const at = label.at()
+    ctx.font = `bold ${label.size}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+    ctx.lineJoin = 'round'
+    ctx.globalAlpha = label.alpha
+    const y = at.y - label.rise * label.size * 1.2
+    ctx.strokeStyle = css(COLOR.line)
+    ctx.lineWidth = label.outline
+    ctx.strokeText(label.text, at.x, y)
+    ctx.fillStyle = css(label.color)
+    ctx.fillText(label.text, at.x, y)
+    ctx.globalAlpha = 1
+  }
+
+  /** Calls `frame` with progress 0..1 each rendered frame for `ms`. */
+  const tween = (ms: number, frame: (t: number) => void) =>
+    new Promise<void>((done) => {
+      let elapsed = 0
+      const tick = (step: number) => {
+        elapsed += step
+        const t = Math.min(elapsed / ms, 1)
+        frame(t)
+        if (t === 1) {
+          ticks.delete(tick)
+          done()
+        }
+      }
+      ticks.add(tick)
+    })
+
+  const raycaster = new Raycaster()
+  function zoneAt(px: number, py: number): number | null {
+    if (shown?.phase !== 'deploy' || shown.goal === 'rescue') return null
+    raycaster.setFromCamera(new Vector2((px / innerWidth) * 2 - 1, 1 - (py / innerHeight) * 2), eye)
+    const hit = raycaster.intersectObject(terrain.children[0])[0]
+    if (!hit) return null
+    const tile = { x: Math.round(hit.point.x), y: Math.round(hit.point.z) }
+    const index = shown.zones.findIndex((zone) => distance(zone, tile) <= ZONE_RADIUS)
+    return index < 0 ? null : index
+  }
+
+  /** Stands a sprite on a tile. */
   function place(sprite: Sprite, tile: Tile): void {
     sprite.tile = tile
-    sprite.node.position.copyFrom(toWorld(tile.x, tile.y))
-    // Far tiles first, so near units overlap them.
-    sprite.node.zIndex = tile.x + tile.y
+    const p = spot(tile.x, tile.y)
+    sprite.node.position.set(p.x, p.y, p.z)
+    sprite.at = toWorld(tile.x, tile.y)
   }
 
-  /**
-   * Draws a unit's health and armor as pips, one each, ten to a row, rows stacking upward: health left in green on an
-   * ally and red on an enemy, health lost in a dark shade of it, then armor in yellow.
-   */
-  function drawHp(sprite: Sprite, hp: number, armor: number): void {
-    sprite.hp.clear()
-    const lost = sprite.maxHp - Math.max(hp, 0)
-    const colors = [...Array(Math.max(hp, 0)).fill(sprite.ally ? COLOR.allyHp : COLOR.enemyHp), ...Array(lost).fill(sprite.ally ? COLOR.allyLost : COLOR.enemyLost), ...Array(armor).fill(COLOR.hit)]
-    colors.forEach((color, i) => {
-      sprite.hp.rect(-PIP_ROW / 2 + (i % 10) * PIP_STEP, -38 - Math.floor(i / 10) * PIP_STEP, PIP, PIP).fill(color)
-    })
+  /** Moves a sprite's feet off its tile to `at` in the camera's picture, as a lunge, knockback or fall does. */
+  function shift(sprite: Sprite, at: Tile): void {
+    const p = spot(sprite.tile.x, sprite.tile.y)
+    const home = picture(p, camera.yaw)
+    const { right, up } = axes(camera.yaw)
+    sprite.node.position.set(p.x, p.y, p.z).addScaledVector(right, (at.x - home.x) / ACROSS).addScaledVector(up, -(at.y - home.y) / ACROSS)
+    sprite.at = at
+  }
+
+  /** Stretches a sprite's picture by `wide` across and `high` up, as a blow squashes it. */
+  function squash(sprite: Sprite, wide: number, high: number): void {
+    const size = (sprite.scale * BODY_RES) / ACROSS
+    sprite.body.scale.set((2 * BODY.left * size * wide) / BODY_RES, ((BODY.up + BODY.down) * size * high) / BODY_RES, 1)
+  }
+
+  function fade(sprite: Sprite, alpha: number): void {
+    ;(sprite.body.material as SpriteMaterial).opacity = alpha
+    ;(sprite.shadow.material as MeshBasicMaterial).opacity = 0.4 * alpha
   }
 
   /** A unit's health and armor in the battle; none of either once it is gone. */
@@ -360,103 +512,176 @@ export async function createView(): Promise<View> {
     return [unit?.hp ?? 0, unit?.armor ?? 0]
   }
 
-  /** `pips` marks a soldier's level above the health pips; `letter` is the initial of its class. */
+  /**
+   * `pips` marks a soldier's level above its health; `letter` is the initial of its class. Its health and armor show as
+   * pips, one each, ten to a row, rows stacking upward: health left in green on an ally and red on an enemy, health
+   * lost in a dark shade of it, then armor in yellow.
+   */
   function create(unit: Unit, pips: number, letter = ''): Sprite {
-    const body = new Graphics().ellipse(0, 0, 14, 7).fill({ color: 0x000000, alpha: 0.4 }).roundRect(-9, -30, 18, 30, 6).fill(unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR.civilian : unit.summoner !== null ? COLOR.mech : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human)
+    const picture = document.createElement('canvas')
+    picture.width = 2 * BODY.left * BODY_RES
+    picture.height = (BODY.up + BODY.down) * BODY_RES
+    const g = picture.getContext('2d')!
+    const texture = new CanvasTexture(picture)
+    const body = new Billboard(new SpriteMaterial({ map: texture, transparent: true, depthWrite: false }))
+    body.center.set(0.5, BODY.down / (BODY.up + BODY.down))
+    const shadow = new Mesh(new CircleGeometry(14 / ACROSS, 20).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4, depthWrite: false }))
+    shadow.position.y = DECAL_LIFT * 2
+    const node = new Group()
+    node.add(shadow, body)
+    const color = unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR.civilian : unit.summoner !== null ? COLOR.mech : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human
     const rows = Math.ceil((unit.stats.hp + unit.stats.armor) / 10)
-    for (let i = 0; i < pips; i++) body.circle(-9 + 6 * i, -40 - rows * PIP_STEP, 2).fill(COLOR.human)
-    const sprite: Sprite = { node: new Container(), hp: new Graphics(), tile: unit, maxHp: unit.stats.hp, ally: unit.side === 'human' }
-    sprite.node.addChild(body, sprite.hp)
-    sprite.node.scale.set(unit.boss ? 1.6 : unit.target ? 1.3 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1)
-    if (letter) {
-      const mark = new Text({ text: letter, style: { fill: 0x10141c, fontSize: 13, fontWeight: 'bold', fontFamily: 'sans-serif' } })
-      mark.anchor.set(0.5)
-      mark.position.set(0, -17)
-      sprite.node.addChild(mark)
+    const maxHp = unit.stats.hp
+    const ally = unit.side === 'human'
+    const sprite: Sprite = {
+      node,
+      body,
+      shadow,
+      tile: unit,
+      at: { x: 0, y: 0 },
+      scale: unit.boss ? 1.6 : unit.target ? 1.3 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1,
+      ally,
+      drawHp(hp, armor) {
+        g.setTransform(BODY_RES, 0, 0, BODY_RES, BODY.left * BODY_RES, BODY.up * BODY_RES)
+        g.clearRect(-BODY.left, -BODY.up, 2 * BODY.left, BODY.up + BODY.down)
+        g.fillStyle = css(color)
+        g.beginPath()
+        g.roundRect(-9, -30, 18, 30, 6)
+        g.fill()
+        g.fillStyle = css(COLOR.human)
+        for (let i = 0; i < pips; i++) {
+          g.beginPath()
+          g.arc(-9 + 6 * i, -40 - rows * PIP_STEP, 2, 0, Math.PI * 2)
+          g.fill()
+        }
+        if (letter) {
+          g.fillStyle = css(0x10141c)
+          g.font = 'bold 13px sans-serif'
+          g.textAlign = 'center'
+          g.textBaseline = 'middle'
+          g.fillText(letter, 0, -17)
+        }
+        const lost = maxHp - Math.max(hp, 0)
+        const colors = [...Array(Math.max(hp, 0)).fill(ally ? COLOR.allyHp : COLOR.enemyHp), ...Array(Math.max(lost, 0)).fill(ally ? COLOR.allyLost : COLOR.enemyLost), ...Array(armor).fill(COLOR.hit)]
+        colors.forEach((c, i) => {
+          g.fillStyle = css(c)
+          g.fillRect(-PIP_ROW / 2 + (i % 10) * PIP_STEP, -38 - Math.floor(i / 10) * PIP_STEP, PIP, PIP)
+        })
+        texture.needsUpdate = true
+      },
     }
-    units.addChild(sprite.node)
+    node.scale.setScalar(1)
+    shadow.scale.setScalar(sprite.scale)
+    squash(sprite, 1, 1)
+    units.add(node)
     sprites.set(unit.id, sprite)
     place(sprite, { x: unit.x, y: unit.y })
-    drawHp(sprite, unit.hp, unit.armor)
+    sprite.drawHp(unit.hp, unit.armor)
     return sprite
   }
 
   function remove(id: number): void {
-    sprites.get(id)?.node.destroy({ children: true })
+    const sprite = sprites.get(id)
+    if (!sprite) return
+    units.remove(sprite.node)
+    ;(sprite.body.material as SpriteMaterial).map?.dispose()
     sprites.delete(id)
   }
 
-  /** Draws a box, centred on the origin's tile, as its two near sides and its top. */
-  function drawBox(g: Graphics, box: Box): void {
-    const w = (TILE_W / 4) * box.wide
-    const d = (TILE_W / 4) * box.deep
-    // The tile's x axis runs down-right on screen and its y axis down-left; each is half as tall as wide.
-    const corner = (x: number, y: number, lift: number) => [x * w - y * d, (x * w + y * d) / 2 - lift] as const
-    const low = box.base
-    const high = box.base + box.up
-    const alpha = box.alpha ?? 1
-    g.poly([...corner(-1, 1, low), ...corner(1, 1, low), ...corner(1, 1, high), ...corner(-1, 1, high)]).fill({ color: shade(box.color, 0.72), alpha })
-    g.poly([...corner(1, -1, low), ...corner(1, 1, low), ...corner(1, 1, high), ...corner(1, -1, high)]).fill({ color: shade(box.color, 0.55), alpha })
-    g.poly([...corner(-1, -1, high), ...corner(1, -1, high), ...corner(1, 1, high), ...corner(-1, 1, high)]).fill({ color: box.color, alpha })
+  /** Adds a box to `shapes`, centred on the tile at x, z standing at height y. */
+  function addBox(shapes: Shapes, x: number, y: number, z: number, box: Box): void {
+    const w = box.wide / 2
+    const d = box.deep / 2
+    shapes.box(x - w, z - d, x + w, z + d, y + tall(box.base), y + tall(box.base + box.up), box.color, box.alpha ?? 1)
+  }
+
+  /** Builds the shapes into a node of the scenery, which fog can dim. */
+  function stand(shapes: Shapes, blobs: Object3D[], lit: number[]): void {
+    const node = new Group()
+    const { mesh, lines } = shapes.build()
+    node.add(mesh, ...blobs)
+    if (lines) node.add(lines)
+    terrain.add(node)
+    scenery.push({ node, tiles: lit })
   }
 
   /**
-   * Draws the prop on a tile. A prop that continues onto the tile above or below, such as a car parked along y,
+   * Builds the prop on a tile. A prop that continues onto the tile above or below, such as a car parked along y,
    * is turned to lie that way; the two halves of a car share a colour.
    */
-  function drawProp(battle: Battle, tile: number): Graphics {
+  function buildProp(battle: Battle, tile: number): void {
     const prop = battle.props[tile] as Exclude<Prop, 'none'>
-    const g = new Graphics()
+    const x = tile % GRID
+    const y = Math.floor(tile / GRID)
+    const at = spot(x, y)
+    const shapes = new Shapes()
     if (prop === 'tree') {
-      g.rect(-2, -16, 4, 16).fill(0x5b4630).circle(0, -24, 14).fill(0x2f6b3c).circle(-4, -28, 8).fill(0x3d8049)
-      return g
+      const trunk = 2 / ACROSS
+      shapes.box(x - trunk, y - trunk, x + trunk, y + trunk, at.y, at.y + tall(16), 0x5b4630)
+      const off = 4 / ACROSS / Math.SQRT2
+      return stand(shapes, [blob({ x, y: at.y + tall(24), z: y }, 14 / ACROSS, 0x2f6b3c), blob({ x: x - off, y: at.y + tall(28), z: y + off }, 8 / ACROSS, 0x3d8049)], [tile])
     }
     const same = (other: number) => other >= 0 && other < GRID * GRID && battle.props[other] === prop
     const alongX = (tile % GRID > 0 && same(tile - 1)) || (tile % GRID < GRID - 1 && same(tile + 1))
     const alongY = !alongX && (same(tile - GRID) || same(tile + GRID))
     // The first tile of the run the prop lies in.
     const head = alongY ? (same(tile - GRID) ? tile - GRID : tile) : tile % GRID > 0 && same(tile - 1) ? tile - 1 : tile
-    for (const box of prop === 'car' ? carBoxes(head) : PROP_BOXES[prop]) drawBox(g, alongY ? { ...box, wide: box.deep, deep: box.wide } : box)
-    return g
+    for (const box of prop === 'car' ? carBoxes(head) : PROP_BOXES[prop]) addBox(shapes, x, at.y, y, alongY ? { ...box, wide: box.deep, deep: box.wide } : box)
+    stand(shapes, [], [tile])
   }
 
-  /** Draws the battle's ground, props, walls and windows afresh. They change only when a blast wrecks them. */
+  /** Builds the battle's ground, props, walls and windows afresh. They change only when a blast wrecks them. */
   function drawTerrain(battle: Battle): void {
-    for (const { node } of scenery.splice(0)) node.destroy()
-    tiles.clear()
-    drawOutskirts(outskirts, battle, TILE_W, TILE_H, RISE)
-    const stand = (node: Graphics, x: number, y: number, lit: number[]) => {
-      node.position.copyFrom(toWorld(x, y))
-      node.zIndex = x + y
-      units.addChild(node)
-      scenery.push({ node, tiles: lit })
-    }
+    scenery.length = 0
+    terrain.clear()
+    outskirts.clear()
+    outskirts.add(buildOutskirts(battle))
+    const ground = new Shapes()
     for (let tile = 0; tile < GRID * GRID; tile++) {
       // Off the battlefield there is nothing to draw.
       if (battle.ground[tile] === 'void') continue
       const x = tile % GRID
       const y = Math.floor(tile / GRID)
-      // The faces a raised tile shows above its lower neighbours toward the viewer, on +y and +x.
-      const c = toWorld(x, y)
-      const drop = (nx: number, ny: number) => (onGridTile(nx, ny) ? Math.max(0, battle.height[tile] - battle.height[ny * GRID + nx]) * RISE : 0)
-      const left = drop(x, y + 1)
-      const right = drop(x + 1, y)
-      if (left > 0) tiles.poly([c.x - TILE_W / 2, c.y, c.x, c.y + TILE_H / 2, c.x, c.y + TILE_H / 2 + left, c.x - TILE_W / 2, c.y + left]).fill(shade(GROUND_COLOR[battle.ground[tile]], 0.6))
-      if (right > 0) tiles.poly([c.x + TILE_W / 2, c.y, c.x, c.y + TILE_H / 2, c.x, c.y + TILE_H / 2 + right, c.x + TILE_W / 2, c.y + right]).fill(shade(GROUND_COLOR[battle.ground[tile]], 0.45))
-      diamond(tiles, x, y).fill(highland(GROUND_COLOR[battle.ground[tile]], battle.height[tile])).stroke({ color: COLOR.line, width: 1, alpha: 0.5 })
-      if (battle.props[tile] !== 'none') stand(drawProp(battle, tile), x, y, [tile])
-      // A wall stands half a tile toward the neighbour it divides this tile from.
+      const top = LEVEL * battle.height[tile]
+      const color = GROUND_COLOR[battle.ground[tile]]
+      // The faces a raised tile shows above its lower neighbours.
+      const drop = (nx: number, ny: number) => (onGridTile(nx, ny) ? Math.max(0, battle.height[tile] - battle.height[ny * GRID + nx]) * LEVEL : 0)
+      const sides = [
+        [x - 0.5, y + 0.5, x + 0.5, y + 0.5, drop(x, y + 1), 0.6],
+        [x + 0.5, y - 0.5, x + 0.5, y + 0.5, drop(x + 1, y), 0.45],
+        [x - 0.5, y - 0.5, x + 0.5, y - 0.5, drop(x, y - 1), 0.6],
+        [x - 0.5, y - 0.5, x - 0.5, y + 0.5, drop(x - 1, y), 0.45],
+      ] as const
+      for (const [ax, az, bx, bz, fall, light] of sides) if (fall > 0) ground.quad({ x: ax, y: top, z: az }, { x: bx, y: top, z: bz }, { x: bx, y: top - fall, z: bz }, { x: ax, y: top - fall, z: az }, shade(color, light))
+      ground.flat(x - 0.5, y - 0.5, x + 0.5, y + 0.5, top, highland(color, battle.height[tile]))
+      for (const [ax, az, bx, bz] of [
+        [x - 0.5, y - 0.5, x + 0.5, y - 0.5],
+        [x - 0.5, y - 0.5, x - 0.5, y + 0.5],
+      ])
+        ground.line({ x: ax, y: top + 0.002, z: az }, { x: bx, y: top + 0.002, z: bz }, COLOR.line, 0.5)
+    }
+    const built = ground.build()
+    // The ground is the terrain's first child, which a click on the map is tested against.
+    terrain.add(built.mesh)
+    if (built.lines) terrain.add(built.lines)
+    for (let tile = 0; tile < GRID * GRID; tile++) {
+      if (battle.ground[tile] === 'void') continue
+      const x = tile % GRID
+      const y = Math.floor(tile / GRID)
+      if (battle.props[tile] !== 'none') buildProp(battle, tile)
+      // A wall stands on the edge it divides this tile from its neighbour by.
       const north = battle.north[tile]
       const west = battle.west[tile]
+      const at = spot(x, y)
       if (north !== 'none') {
-        const node = new Graphics()
-        for (const box of EDGE_BOXES[north]) drawBox(node, box)
-        stand(node, x, y - 0.5, [tile, tile - GRID])
+        const shapes = new Shapes()
+        for (const box of EDGE_BOXES[north]) addBox(shapes, x, at.y, y - 0.5, box)
+        stand(shapes, [], [tile, tile - GRID])
       }
       if (west !== 'none') {
-        const node = new Graphics()
-        for (const box of EDGE_BOXES[west]) drawBox(node, { ...box, wide: box.deep, deep: box.wide })
-        stand(node, x - 0.5, y, [tile, tile - 1])
+        const shapes = new Shapes()
+        for (const box of EDGE_BOXES[west]) addBox(shapes, x - 0.5, at.y, y, { ...box, wide: box.deep, deep: box.wide })
+        stand(shapes, [], [tile, tile - 1])
       }
     }
   }
@@ -466,101 +691,141 @@ export async function createView(): Promise<View> {
     shown = battle
     heights = battle.height
     selected = null
-    sprites.clear()
+    for (const id of [...sprites.keys()]) remove(id)
     glows.clear()
-    lurk.removeChildren().forEach((child) => child.destroy())
-    scenery.length = 0
-    units.removeChildren().forEach((child) => child.destroy({ children: true }))
+    lurk.clear()
     drawTerrain(battle)
   }
 
-  function label(text: string, tile: Tile, color: number, size = 44): Text {
-    const mark = new Text({ text, style: { fill: color, fontSize: size, fontWeight: 'bold', fontFamily: 'sans-serif', align: 'center', stroke: { color: 0x10141c, width: 6 } } })
-    mark.anchor.set(0.5, size === 44 ? 0.8 : 0)
-    mark.position.copyFrom(toWorld(tile.x, tile.y))
-    return mark
+  /** Words over a tile, `rise` of their height above it. */
+  const label = (text: string, tile: Tile, color: number, size = 44): Label => ({ text, color, size, at: () => toWorld(tile.x, tile.y), rise: size === 44 ? 0.8 : 0, outline: 6, alpha: 1 })
+
+  /** Replaces the marks on the ground in `layer` with `shapes`. */
+  function lay(layer: Group, shapes: Shapes): void {
+    layer.clear()
+    const { mesh } = shapes.build()
+    mesh.renderOrder = layer.renderOrder
+    layer.add(mesh)
+  }
+
+  /** A tile's top, as a mark on the ground. */
+  const diamond = (shapes: Shapes, x: number, y: number, color: number, alpha: number, lift = DECAL_LIFT) => {
+    const h = spot(x, y).y + lift
+    shapes.flat(x - 0.5, y - 0.5, x + 0.5, y + 0.5, h, color, alpha)
+  }
+
+  /** A ring around a tile's top, `width` screen pixels wide. */
+  const ring = (shapes: Shapes, x: number, y: number, color: number, width: number, alpha: number) => {
+    const h = spot(x, y).y + DECAL_LIFT * 2
+    const w = width / ACROSS
+    const c = [
+      { x: x - 0.5, y: h, z: y - 0.5 },
+      { x: x + 0.5, y: h, z: y - 0.5 },
+      { x: x + 0.5, y: h, z: y + 0.5 },
+      { x: x - 0.5, y: h, z: y + 0.5 },
+    ]
+    for (let i = 0; i < 4; i++) shapes.band(c[i], c[(i + 1) % 4], w, color, alpha)
   }
 
   /** Before the landing: tints, names and describes each landing zone, and marks where each pod is. */
   function drawMarks(battle: Battle): void {
-    zones.clear()
-    marks.removeChildren().forEach((child) => child.destroy())
-    if (battle.uplink) marks.addChild(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
-    if (battle.escape) marks.addChild(label('🚁 ESCAPE', battle.escape, COLOR.uplink, 28))
-    for (const cache of battle.caches) marks.addChild(label('📦', cache, COLOR.uplink, 24))
-    if (battle.start && battle.phase === 'deploy') marks.addChild(label('⚠ AMBUSHED HERE', battle.start, COLOR.contact, 24))
-    if (battle.phase !== 'deploy') return
-    // A rescue shows where each of its teams would land.
-    const shownZones = battle.goal === 'rescue' ? battle.zones.slice(0, teams) : battle.zones
-    if (!briefing) shownZones.forEach((zone, i) => {
-      for (let y = 0; y < GRID; y++) {
-        for (let x = 0; x < GRID; x++) {
-          if (distance(zone, { x, y }) <= ZONE_RADIUS) diamond(zones, x, y).fill({ color: i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone, alpha: 0.8 })
-        }
-      }
-      // The selected zone's way in: a line to the uplink, or to the nearest contact.
-      // On an escape, the way out from where the squad is ambushed.
-      const toward = i === selected && (battle.start ?? battle.uplink ?? nearestAlien(battle, zone))
-      if (toward) {
-        const a = toWorld(zone.x, zone.y)
-        const b = toWorld(toward.x, toward.y)
-        zones.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: battle.uplink ? COLOR.uplink : COLOR.contact, width: 4, alpha: 0.9 })
-      }
-      marks.addChild(label(battle.goal === 'rescue' ? `Team ${i + 1}` : `${ZONE_NAMES[i]} ${PLANS[battle.plans[i]].icon}`, zone, 0xffffff))
-    })
-    battle.pods.forEach((_, pod) => {
-      const members = battle.units.filter((u) => u.pod === pod)
-      if (members.length > 0) marks.addChild(label('?', members[0], COLOR.contact), label(battle.pods[pod].name, members[0], COLOR.contact, 20))
+    const tint = new Shapes()
+    marks = []
+    if (battle.uplink) marks.push(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
+    if (battle.escape) marks.push(label('🚁 ESCAPE', battle.escape, COLOR.uplink, 28))
+    for (const cache of battle.caches) marks.push(label('📦', cache, COLOR.uplink, 24))
+    if (battle.start && battle.phase === 'deploy') marks.push(label('⚠ AMBUSHED HERE', battle.start, COLOR.contact, 24))
+    if (battle.phase === 'deploy') {
+      // A rescue shows where each of its teams would land.
+      const shownZones = battle.goal === 'rescue' ? battle.zones.slice(0, teams) : battle.zones
+      if (!briefing)
+        shownZones.forEach((zone, i) => {
+          for (let y = 0; y < GRID; y++) {
+            for (let x = 0; x < GRID; x++) {
+              if (distance(zone, { x, y }) <= ZONE_RADIUS) diamond(tint, x, y, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone, 0.8)
+            }
+          }
+          // The selected zone's way in: a line to the uplink, or to the nearest contact.
+          // On an escape, the way out from where the squad is ambushed.
+          const toward = i === selected && (battle.start ?? battle.uplink ?? nearestAlien(battle, zone))
+          if (toward) {
+            const a = spot(zone.x, zone.y)
+            const b = spot(toward.x, toward.y)
+            const lift = Math.max(a.y, b.y) + DECAL_LIFT * 3
+            tint.band({ ...a, y: lift }, { ...b, y: lift }, 4 / ACROSS, battle.uplink ? COLOR.uplink : COLOR.contact, 0.9)
+          }
+          marks.push(label(battle.goal === 'rescue' ? `Team ${i + 1}` : `${ZONE_NAMES[i]} ${PLANS[battle.plans[i]].icon}`, zone, 0xffffff))
+        })
+      battle.pods.forEach((_, pod) => {
+        const members = battle.units.filter((u) => u.pod === pod)
+        if (members.length > 0) marks.push(label('?', members[0], COLOR.contact), label(battle.pods[pod].name, members[0], COLOR.contact, 20))
+      })
+    }
+    lay(zones, tint)
+  }
+
+  /** Dims a node of the scenery, or a unit, by `tint`. */
+  function dim(node: Object3D, tint: number): void {
+    node.traverse((part) => {
+      const material = (part as Mesh).material as MeshBasicMaterial | SpriteMaterial | undefined
+      if (!material) return
+      // A blob's material holds its own colour, so it is dimmed from that; a box's colours are its vertices'.
+      if (part instanceof Billboard) part.userData.color ??= material.color.getHex()
+      const own = part.userData.color as number | undefined
+      material.color.setHex(own === undefined ? tint : mixTint(own, tint))
     })
   }
 
   /** Darkens every tile no soldier sees, and whatever stands on it. Before the landing nothing is fogged. */
   function drawFog(battle: Battle, snap = false): void {
-    fog.clear()
+    const shapes = new Shapes()
     const seen = battle.phase === 'deploy' ? null : visibleTiles(battle)
     const tint = (tile: number) => (!seen || seen[tile] ? 0xffffff : COLOR.dim)
     seen?.forEach((lit, i) => {
-      if (!lit) diamond(fog, i % GRID, Math.floor(i / GRID)).fill({ color: COLOR.fog, alpha: 0.55 })
+      if (!lit) diamond(shapes, i % GRID, Math.floor(i / GRID), COLOR.fog, 0.55, DECAL_LIFT * 3)
     })
+    lay(fog, shapes)
     // Mid-beat, a glow stays where its slide left it; the battle already holds where the alien ends up.
     const lurking = seen ? battle.units.filter((u) => u.hp > 0 && !u.civilian && !revealed(battle, u)) : []
     const ids = new Set(lurking.map((u) => u.id))
     for (const [id, glow] of glows) {
       if (ids.has(id)) continue
-      glow.node.destroy()
+      lurk.remove(glow.node)
       glows.delete(id)
     }
     for (const unit of lurking) {
       let glow = glows.get(unit.id)
       if (!glow) {
-        const node = new Graphics()
-        for (const [scale, alpha] of [[1, 0.12], [0.65, 0.14], [0.35, 0.16]]) node.ellipse(0, 0, (TILE_W / 2) * scale, (TILE_H / 2) * scale).fill({ color: COLOR.lurk, alpha })
-        lurk.addChild(node)
+        const shapes = new Shapes()
+        for (const [scale, alpha] of [[1, 0.12], [0.65, 0.14], [0.35, 0.16]]) shapes.disc(0, 0, DECAL_LIFT * 4, (TILE_W / 2 / ACROSS) * scale, (TILE_W / 2 / ACROSS) * scale, COLOR.lurk, alpha)
+        const node = shapes.build().mesh
+        lurk.add(node)
         glow = { node, tile: unit }
         glows.set(unit.id, glow)
       } else if (!snap) continue
       glow.tile = { x: unit.x, y: unit.y }
-      glow.node.position.copyFrom(toWorld(unit.x, unit.y))
+      const p = spot(unit.x, unit.y)
+      glow.node.position.set(p.x, p.y, p.z)
     }
-    for (const { node, tiles: lit } of scenery) node.tint = !seen || lit.some((tile) => seen[tile]) ? 0xffffff : COLOR.dim
-    for (const sprite of sprites.values()) sprite.node.tint = tint(Math.round(sprite.tile.y) * GRID + Math.round(sprite.tile.x))
+    for (const { node, tiles: lit } of scenery) dim(node, !seen || lit.some((tile) => seen[tile]) ? 0xffffff : COLOR.dim)
+    for (const sprite of sprites.values()) (sprite.body.material as SpriteMaterial).color.setHex(tint(Math.round(sprite.tile.y) * GRID + Math.round(sprite.tile.x)))
   }
-
 
   /** Tints every tile of acid or fire, marks every tile of caltrops, and rings each unit rooted or charged. */
   function drawAcid(battle: Battle): void {
-    acid.clear()
-    for (const pool of battle.acid) diamond(acid, pool.x, pool.y).fill({ color: COLOR.acid, alpha: 0.45 })
-    for (const pool of battle.fire) diamond(acid, pool.x, pool.y).fill({ color: COLOR.fire, alpha: 0.5 })
+    const shapes = new Shapes()
+    for (const pool of battle.acid) diamond(shapes, pool.x, pool.y, COLOR.acid, 0.45)
+    for (const pool of battle.fire) diamond(shapes, pool.x, pool.y, COLOR.fire, 0.5)
     // Caltrops: a scatter of spikes across the tile.
     for (const tile of battle.caltrops) {
-      const c = toWorld(tile.x, tile.y)
-      for (const [dx, dy] of [[-12, -2], [0, -6], [12, -2], [-6, 4], [6, 4]]) acid.poly([c.x + dx, c.y + dy - 4, c.x + dx + 3, c.y + dy + 1, c.x + dx - 3, c.y + dy + 1]).fill(COLOR.spike)
+      const at = spot(tile.x, tile.y)
+      for (const [dx, dz] of [[-0.25, 0.1], [0, -0.2], [0.25, 0.1], [-0.12, 0.25], [0.12, 0.25]]) shapes.spike(at.x + dx, at.z + dz, at.y, 0.05, { x: at.x + dx, y: at.y + tall(5), z: at.z + dz }, COLOR.spike)
     }
     for (const unit of battle.units.filter((u) => u.hp > 0 && revealed(battle, u))) {
-      if (unit.rooted > 0) diamond(acid, unit.x, unit.y).stroke({ color: COLOR.rooted, width: 3, alpha: 0.9 })
-      if (unit.booming > 0) diamond(acid, unit.x, unit.y).stroke({ color: COLOR.booming, width: 2, alpha: 0.9 })
+      if (unit.rooted > 0) ring(shapes, unit.x, unit.y, COLOR.rooted, 3, 0.9)
+      if (unit.booming > 0) ring(shapes, unit.x, unit.y, COLOR.booming, 2, 0.9)
     }
+    lay(acid, shapes)
   }
 
   /** Makes the sprites match the battle exactly. */
@@ -573,26 +838,10 @@ export async function createView(): Promise<View> {
       const soldier = run.soldiers.find((s) => s.id === unit.soldier)
       const sprite = sprites.get(unit.id) ?? create(unit, soldier ? level(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : letter(unit))
       place(sprite, { x: unit.x, y: unit.y })
-      sprite.node.alpha = 1
-      drawHp(sprite, unit.hp, unit.armor)
+      fade(sprite, 1)
+      sprite.drawHp(unit.hp, unit.armor)
     }
   }
-
-  /** Calls `frame` with progress 0..1 each rendered frame for `ms`. */
-  const tween = (ms: number, frame: (t: number) => void) =>
-    new Promise<void>((done) => {
-      let elapsed = 0
-      const tick = (ticker: Ticker) => {
-        elapsed += ticker.elapsedMS
-        const t = Math.min(elapsed / ms, 1)
-        frame(t)
-        if (t === 1) {
-          app.ticker.remove(tick)
-          done()
-        }
-      }
-      app.ticker.add(tick)
-    })
 
   /** The camera's glide under way; a new one takes over from wherever the camera is, so two never fight over it. */
   let glides = 0
@@ -603,39 +852,40 @@ export async function createView(): Promise<View> {
    */
   function follow(points: Tile[] | Camera, ms = CAMERA_MS): Promise<void> {
     const from = camera
-    const to = Array.isArray(points) ? framing(points) : points
+    const to = Array.isArray(points) ? framing(points, camera.yaw) : points
     const mine = ++glides
     return tween(ms, (t) => {
       if (mine !== glides) return
       const ease = t * t * (3 - 2 * t)
-      look({ x: from.x + (to.x - from.x) * ease, y: from.y + (to.y - from.y) * ease, zoom: from.zoom * (to.zoom / from.zoom) ** ease })
+      const at = (a: number, b: number) => a + (b - a) * ease
+      look({ x: at(from.x, to.x), y: at(from.y, to.y), z: at(from.z, to.z), zoom: from.zoom * (to.zoom / from.zoom) ** ease, yaw: at(from.yaw, to.yaw) })
     })
   }
 
-  const chest = (sprite: Sprite): Tile => ({ x: sprite.node.x, y: sprite.node.y - CHEST })
+  const chest = (sprite: Sprite): Tile => ({ x: sprite.at.x, y: sprite.at.y - CHEST })
 
   /** Words over a unit saying what just happened to it. */
-  function callout(text: string, color: number, over: Sprite, size = 13): Text {
-    const mark = new Text({ text, style: { fill: color, fontSize: size, fontWeight: 'bold', fontFamily: 'sans-serif', stroke: { color: 0x10141c, width: 3 } } })
-    mark.anchor.set(0.5, 1)
-    mark.position.set(over.node.x, over.node.y - 48)
-    labels.addChild(mark)
+  function callout(text: string, color: number, over: Sprite, size = 13): Label {
+    const at = { x: over.at.x, y: over.at.y - 48 }
+    const mark: Label = { text, color, size, at: () => at, rise: 1, outline: 3, alpha: 1 }
+    labels.add(mark)
     return mark
   }
 
   /** A shot's result: a miss, or a hit or crit with its damage. */
-  function shotCallout(e: Extract<GameEvent, { type: 'shot' }>, over: Sprite): Text {
+  function shotCallout(e: Extract<GameEvent, { type: 'shot' }>, over: Sprite): Label {
     if (!e.hit) return callout('MISS', COLOR.miss, over)
     return e.crit ? callout(`CRIT -${e.damage}`, COLOR.crit, over, 18) : callout(`HIT -${e.damage}`, COLOR.hit, over)
   }
 
   /** Floats a callout up and away. It does not hold up the next beat. */
-  function float(mark: Text): void {
-    const from = mark.y
+  function float(mark: Label): void {
+    const from = mark.at()
     void tween(CALLOUT_MS, (t) => {
-      mark.y = from - 34 * t
+      const at = { x: from.x, y: from.y - 34 * t }
+      mark.at = () => at
       mark.alpha = Math.min(1, 3 * (1 - t))
-    }).then(() => mark.destroy())
+    }).then(() => labels.delete(mark))
   }
 
   /** How long `sprite` takes to walk `path` from where it stands: unseen, the squad creeps. */
@@ -647,24 +897,27 @@ export async function createView(): Promise<View> {
   }
 
   /** Slides an unfound alien's glow along its path through the fog. */
-  function glide(glow: { node: Graphics; tile: Tile }, path: Tile[], ms = MS_PER_TILE * ground([glow.tile, ...path])): Promise<void> {
+  function glide(glow: { node: Object3D; tile: Tile }, path: Tile[], ms = MS_PER_TILE * ground([glow.tile, ...path])): Promise<void> {
     const points = [glow.tile, ...path]
     glow.tile = path.at(-1)!
     return tween(ms, (t) => {
       const at = along(points, t)
-      glow.node.position.copyFrom(toWorld(at.x, at.y))
+      const p = spot(at.x, at.y)
+      glow.node.position.set(p.x, p.y, p.z)
     })
   }
 
   /** Jolts the camera, fading out over `ms`. */
   function shake(power: number, ms = 240): Promise<void> {
     if (power === 0) return Promise.resolve()
-    const at = camera
     return tween(ms, (t) => {
-      look(at)
-      world.position.x += (Math.random() * 2 - 1) * power * (1 - t)
-      world.position.y += (Math.random() * 2 - 1) * power * (1 - t)
-    }).then(() => look(at))
+      jolt.x = (Math.random() * 2 - 1) * power * (1 - t)
+      jolt.y = (Math.random() * 2 - 1) * power * (1 - t)
+      look(camera)
+    }).then(() => {
+      jolt.x = jolt.y = 0
+      look(camera)
+    })
   }
 
   /** Projectiles fly from the muzzle at `a` to each of `ends`. */
@@ -707,11 +960,11 @@ export async function createView(): Promise<View> {
   /** The attacker winds back, lunges in, rakes the target with a slash per bolt, and steps back. */
   async function strike(from: Sprite, to: Sprite, gun: Weapon, ends: Tile[], hit: boolean): Promise<void> {
     const home = toWorld(from.tile.x, from.tile.y)
-    const dx = to.node.x - home.x
-    const dy = to.node.y - home.y
+    const dx = to.at.x - home.x
+    const dy = to.at.y - home.y
     const len = Math.hypot(dx, dy) || 1
     const reach = Math.min(len * 0.55, 40)
-    const nudge = (d: number) => from.node.position.set(home.x + (dx / len) * d, home.y + (dy / len) * d)
+    const nudge = (d: number) => shift(from, { x: home.x + (dx / len) * d, y: home.y + (dy / len) * d })
     await tween(gun.ms, (t) => nudge(-gun.flash * t))
     await tween(gun.ms * 0.6, (t) => nudge(-gun.flash + (reach + gun.flash) * t * t))
     await tween(gun.ms * 1.5, (t) => {
@@ -750,7 +1003,7 @@ export async function createView(): Promise<View> {
     const { hit, crit } = e
     const a = chest(from)
     // A miss flies past above the target.
-    const aim = hit ? chest(to) : { x: to.node.x + 10, y: to.node.y - CHEST - 26 }
+    const aim = hit ? chest(to) : { x: to.at.x + 10, y: to.at.y - CHEST - 26 }
     const len = Math.hypot(aim.x - a.x, aim.y - a.y) || 1
     const dir = { x: (aim.x - a.x) / len, y: (aim.y - a.y) / len }
     const ends = Array.from({ length: gun.bolts }, (_, i) => {
@@ -768,11 +1021,10 @@ export async function createView(): Promise<View> {
       fx.clear()
       return
     }
-    drawHp(to, ...after)
+    to.drawHp(...after)
     const power = crit ? 2 : 1
     const home = toWorld(to.tile.x, to.tile.y)
-    const scale = to.node.scale.x
-    to.node.scale.set(scale * 1.2, scale * 0.8)
+    squash(to, 1.2, 0.8)
     await tween(gun.hitstop * power, () => {
       fx.clear().circle(aim.x, aim.y, 10 * power).fill({ color: 0xffffff, alpha: 0.9 })
     })
@@ -780,17 +1032,17 @@ export async function createView(): Promise<View> {
     const kick = gun.kick * power
     void tween(IMPACT_MS * 1.6, (t) => {
       const push = kick * Math.sin(Math.PI * Math.min(1, t * 1.4)) * (1 - t)
-      to.node.position.set(home.x + dir.x * push, home.y + dir.y * push)
-      to.node.scale.set(scale * (1.2 - 0.2 * t), scale * (0.8 + 0.2 * t))
+      shift(to, { x: home.x + dir.x * push, y: home.y + dir.y * push })
+      squash(to, 1.2 - 0.2 * t, 0.8 + 0.2 * t)
     })
     await burst(aim, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, power)
-    to.node.position.copyFrom(home)
-    to.node.scale.set(scale)
+    place(to, to.tile)
+    squash(to, 1, 1)
     fx.clear()
   }
 
   /** What a gear effect did to a unit, in a word: the effect's name, and the health it gave or took. */
-  function effectCallout(e: Extract<GameEvent, { type: 'effect' }>, over: Sprite): Text {
+  function effectCallout(e: Extract<GameEvent, { type: 'effect' }>, over: Sprite): Label {
     const word = effectName(e.effect).toUpperCase()
     return callout(e.amount === 0 ? word : `${word} ${e.amount > 0 ? '+' : ''}${e.amount}`, e.amount > 0 ? COLOR.heal : e.amount < 0 ? COLOR.crit : COLOR.hit, over)
   }
@@ -811,13 +1063,21 @@ export async function createView(): Promise<View> {
     for (const hit of e.hits) {
       const sprite = sprites.get(hit.target)
       if (!sprite) continue
-      drawHp(sprite, ...vitals(battle, hit.target))
+      sprite.drawHp(...vitals(battle, hit.target))
       float(callout(`ROCKET -${hit.damage}`, COLOR.crit, sprite))
     }
     await tween(BLAST_MS, (t) => {
       fx.clear().ellipse(b.x, b.y, (BLAST_RADIUS + 0.7) * TILE_W * t, (BLAST_RADIUS + 0.7) * TILE_H * t).fill({ color: COLOR.crit, alpha: 0.8 * (1 - t) })
     })
     fx.clear()
+  }
+
+  /** Runs `play` with a sketch of its own drawn over the scene, removed once it is done. */
+  async function drawing(play: (sketch: Sketch) => Promise<void>): Promise<void> {
+    const sketch = new Sketch()
+    drops.add(sketch)
+    await play(sketch)
+    drops.delete(sketch)
   }
 
   /**
@@ -828,68 +1088,69 @@ export async function createView(): Promise<View> {
     const soldiers = battle.units.filter((u) => u.side === 'human' && !u.civilian)
     const hot = battle.breach
     if (soldiers.length === 0) return
-    for (const unit of soldiers) sprites.get(unit.id)!.node.alpha = 0
+    for (const unit of soldiers) fade(sprites.get(unit.id)!, 0)
     await follow(soldiers.map((u) => ({ x: u.x, y: u.y })))
     if (battle.landed === 'stealth') return parachute(soldiers)
     await Promise.all(
-      soldiers.map(async (unit, i) => {
-        const sprite = sprites.get(unit.id)!
-        const ground = { x: sprite.node.x, y: sprite.node.y }
-        const pod = new Graphics()
-        world.addChildAt(pod, world.getChildIndex(fx))
-        await tween(i * POD_STAGGER_MS, () => {})
-        await tween(POD_FALL_MS, (t) => {
-          const y = ground.y - POD_HEIGHT * (1 - t * t)
-          pod.clear()
-          pod.moveTo(ground.x, y - 160).lineTo(ground.x, y - 30).stroke({ color: COLOR.crit, width: 12, alpha: 0.6 })
-          pod.moveTo(ground.x, y - 90).lineTo(ground.x, y - 30).stroke({ color: 0xffe08a, width: 5 })
-          pod.ellipse(ground.x, ground.y, 16 * t, 8 * t).fill({ color: 0x000000, alpha: 0.4 })
-          pod.roundRect(ground.x - 14, y - 44, 28, 44, 12).fill(0xc9d3e3).stroke({ color: 0x10141c, width: 3 })
-          pod.rect(ground.x - 6, y - 34, 12, 8).fill(0x6fb7ff)
-        })
-        sprite.node.alpha = 1
-        await tween(POD_DUST_MS, (t) => {
-          pod.clear()
-          pod.ellipse(ground.x, ground.y, 14 + (hot ? 70 : 40) * t, 7 + (hot ? 35 : 20) * t).fill({ color: hot ? COLOR.crit : 0xb8a888, alpha: 0.7 * (1 - t) })
-          pod.roundRect(ground.x - 14, ground.y - 44 + 44 * t, 28, 44 * (1 - t), 12).fill({ color: 0xc9d3e3, alpha: 1 - t })
-          if (hot) world.position.x += Math.sin(t * 60) * 3 * (1 - t)
-        })
-        pod.destroy()
-      }),
+      soldiers.map((unit, i) =>
+        drawing(async (pod) => {
+          const sprite = sprites.get(unit.id)!
+          const ground = sprite.at
+          await tween(i * POD_STAGGER_MS, () => {})
+          await tween(POD_FALL_MS, (t) => {
+            const y = ground.y - POD_HEIGHT * (1 - t * t)
+            pod.clear()
+            pod.moveTo(ground.x, y - 160).lineTo(ground.x, y - 30).stroke({ color: COLOR.crit, width: 12, alpha: 0.6 })
+            pod.moveTo(ground.x, y - 90).lineTo(ground.x, y - 30).stroke({ color: 0xffe08a, width: 5 })
+            pod.ellipse(ground.x, ground.y, 16 * t, 8 * t).fill({ color: 0x000000, alpha: 0.4 })
+            pod.roundRect(ground.x - 14, y - 44, 28, 44, 12).fill(0xc9d3e3).stroke({ color: 0x10141c, width: 3 })
+            pod.rect(ground.x - 6, y - 34, 12, 8).fill(0x6fb7ff)
+          })
+          fade(sprite, 1)
+          await tween(POD_DUST_MS, (t) => {
+            pod.clear()
+            pod.ellipse(ground.x, ground.y, 14 + (hot ? 70 : 40) * t, 7 + (hot ? 35 : 20) * t).fill({ color: hot ? COLOR.crit : 0xb8a888, alpha: 0.7 * (1 - t) })
+            pod.roundRect(ground.x - 14, ground.y - 44 + 44 * t, 28, 44 * (1 - t), 12).fill({ color: 0xc9d3e3, alpha: 1 - t })
+            if (hot) {
+              jolt.x = Math.sin(t * 60) * 3 * (1 - t)
+              look(camera)
+            }
+          })
+        }),
+      ),
     )
+    jolt.x = 0
     look(camera)
   }
 
   /** A stealth insertion: each soldier drifts down under a canopy, swaying, and lands without a sound. */
   async function parachute(soldiers: Unit[]): Promise<void> {
     await Promise.all(
-      soldiers.map(async (unit, i) => {
-        const sprite = sprites.get(unit.id)!
-        const ground = { x: sprite.node.x, y: sprite.node.y }
-        const chute = new Graphics()
-        world.addChildAt(chute, world.getChildIndex(fx))
-        await tween(i * POD_STAGGER_MS, () => {})
-        sprite.node.alpha = 1
-        await tween(CHUTE_FALL_MS, (t) => {
-          const sway = Math.sin(t * Math.PI * 3) * 10 * (1 - t)
-          const x = ground.x + sway
-          const y = ground.y - CHUTE_HEIGHT * (1 - t)
-          sprite.node.position.set(x, y)
-          chute.clear()
-          chute.ellipse(ground.x, ground.y, 14 * t, 7 * t).fill({ color: 0x000000, alpha: 0.35 })
-          // Lines from the soldier's shoulders up to the canopy.
-          chute.moveTo(x - 6, y - 34).lineTo(x - 22, y - 74).moveTo(x + 6, y - 34).lineTo(x + 22, y - 74).stroke({ color: 0xd8dde6, width: 1.5, alpha: 0.9 })
-          chute.moveTo(x - 26, y - 72).arc(x, y - 72, 26, Math.PI, 0).closePath().fill(0x4a5a3c).stroke({ color: 0x2b3424, width: 2 })
-        })
-        sprite.node.position.set(ground.x, ground.y)
-        await tween(CHUTE_FOLD_MS, (t) => {
-          chute.clear()
-          chute.moveTo(ground.x - 26, ground.y - 72 + 60 * t).arc(ground.x + 20 * t, ground.y - 72 + 60 * t, 26 * (1 - t / 2), Math.PI, 0).closePath().fill({ color: 0x4a5a3c, alpha: 1 - t })
-        })
-        chute.destroy()
-      }),
+      soldiers.map((unit, i) =>
+        drawing(async (chute) => {
+          const sprite = sprites.get(unit.id)!
+          const ground = sprite.at
+          await tween(i * POD_STAGGER_MS, () => {})
+          fade(sprite, 1)
+          await tween(CHUTE_FALL_MS, (t) => {
+            const sway = Math.sin(t * Math.PI * 3) * 10 * (1 - t)
+            const x = ground.x + sway
+            const y = ground.y - CHUTE_HEIGHT * (1 - t)
+            shift(sprite, { x, y })
+            chute.clear()
+            chute.ellipse(ground.x, ground.y, 14 * t, 7 * t).fill({ color: 0x000000, alpha: 0.35 })
+            // Lines from the soldier's shoulders up to the canopy.
+            chute.moveTo(x - 6, y - 34).lineTo(x - 22, y - 74).moveTo(x + 6, y - 34).lineTo(x + 22, y - 74).stroke({ color: 0xd8dde6, width: 1.5, alpha: 0.9 })
+            chute.moveTo(x - 26, y - 72).arc(x, y - 72, 26, Math.PI, 0).closePath().fill(0x4a5a3c).stroke({ color: 0x2b3424, width: 2 })
+          })
+          place(sprite, sprite.tile)
+          await tween(CHUTE_FOLD_MS, (t) => {
+            chute.clear()
+            chute.moveTo(ground.x - 26, ground.y - 72 + 60 * t).arc(ground.x + 20 * t, ground.y - 72 + 60 * t, 26 * (1 - t / 2), Math.PI, 0).closePath().fill({ color: 0x4a5a3c, alpha: 1 - t })
+          })
+        }),
+      ),
     )
-    look(camera)
   }
 
   /** Plays a beat in order. Moves in a row play together; moves by unseen aliens are skipped. */
@@ -923,7 +1184,7 @@ export async function createView(): Promise<View> {
           const unit = battle.units.find((u) => u.id === at.id)
           return unit && !sprites.has(unit.id) ? [create({ ...unit, x: at.x, y: at.y }, 0, letter(unit))] : []
         })
-        await tween(REVEAL_MS, (t) => appeared.forEach((sprite) => (sprite.node.alpha = t)))
+        await tween(REVEAL_MS, (t) => appeared.forEach((sprite) => fade(sprite, t)))
         const first = sprites.get(e.units[0]?.id ?? -1)
         if (e.type === 'sighted' && first) float(callout('UNAWARE · HOLD FIRE', COLOR.miss, first, 18))
         if (e.type === 'reveal' && e.ambush && first) float(callout('AMBUSH!', COLOR.hit, first, 18))
@@ -959,7 +1220,7 @@ export async function createView(): Promise<View> {
         })
         fx.clear()
         if (e.type === 'spit') {
-          drawHp(to, ...vitals(battle, e.target))
+          to.drawHp(...vitals(battle, e.target))
           drawAcid(battle)
           float(callout(`ACID -${e.damage}`, COLOR.acid, to))
         } else float(callout('PANICKED', COLOR.psi, to))
@@ -967,18 +1228,18 @@ export async function createView(): Promise<View> {
         const on = sprites.get(e.id)
         if (!on) continue
         await follow([on.tile])
-        if (e.type === 'hurt') drawHp(on, ...vitals(battle, e.id))
+        if (e.type === 'hurt') on.drawHp(...vitals(battle, e.id))
         float(e.type === 'frozen' ? callout(battle.units.find((u) => u.id === e.id)?.side === 'alien' ? 'STUNNED' : 'TOO SHAKEN TO ACT', COLOR.psi, on) : callout(`${e.cause.toUpperCase()} -${e.amount}`, e.cause === 'acid' ? COLOR.acid : e.cause === 'impact' ? COLOR.crit : COLOR.psi, on))
       } else if (e.type === 'spawn') {
         const unit = battle.units.find((u) => u.id === e.unit.id)
         if (!unit || !revealed(battle, unit)) continue
         await follow([e.unit])
         const born = create({ ...unit, x: e.unit.x, y: e.unit.y }, 0, letter(unit))
-        await tween(REVEAL_MS, (t) => (born.node.alpha = t))
+        await tween(REVEAL_MS, (t) => fade(born, t))
       } else if (e.type === 'effect') {
         const on = sprites.get(e.id)
         if (!on) continue
-        drawHp(on, ...vitals(battle, e.id))
+        on.drawHp(...vitals(battle, e.id))
         // A demolishing hit has already wrecked the cover in the battle; show it as the hit lands.
         if (e.effect === 'demolish') drawTerrain(battle)
         float(effectCallout(e, on))
@@ -986,7 +1247,7 @@ export async function createView(): Promise<View> {
         const sprite = sprites.get(e.id)
         if (!sprite) continue
         float(callout(e.type === 'saved' ? 'SAVED' : 'LIFTED OFF', COLOR.heal, sprite))
-        await tween(DEATH_MS, (t) => (sprite.node.alpha = 1 - t))
+        await tween(DEATH_MS, (t) => fade(sprite, 1 - t))
         remove(e.id)
       } else if (e.type === 'found') {
         const on = sprites.get(e.id)
@@ -998,20 +1259,20 @@ export async function createView(): Promise<View> {
         const to = sprites.get(e.target)
         if (!to) continue
         await follow([to.tile])
-        drawHp(to, ...vitals(battle, e.target))
+        to.drawHp(...vitals(battle, e.target))
         float(callout(`HEAL +${e.amount}`, COLOR.heal, to))
       } else if (e.type === 'death') {
         const sprite = sprites.get(e.id)
         if (!sprite) continue
-        await tween(DEATH_MS, (t) => (sprite.node.alpha = 1 - t))
+        await tween(DEATH_MS, (t) => fade(sprite, 1 - t))
         remove(e.id)
       }
     }
   }
 
-  app.canvas.addEventListener('pointermove', (e) => {
+  canvas.addEventListener('pointermove', (e) => {
     const zone = zoneAt(e.offsetX, e.offsetY)
-    app.canvas.style.cursor = zone === null ? 'default' : 'pointer'
+    canvas.style.cursor = zone === null ? 'default' : 'pointer'
     if (zone === hovered || !shown) return
     hovered = zone
     drawMarks(shown)
@@ -1024,12 +1285,21 @@ export async function createView(): Promise<View> {
     return [{ x: zone.x - reach, y: zone.y - reach }, { x: zone.x + reach, y: zone.y + reach }, ...(toward ? [toward] : [])]
   }
 
+  /** The camera framing `tiles`, raised so the landing panel below covers none of it; null frames the whole map. */
+  function above(tiles: Tile[] | null, yaw = YAW): Camera {
+    if (tiles === null) return { ...OVERVIEW, yaw }
+    const framed = framing(tiles, yaw)
+    const { up } = axes(yaw)
+    const lift = -PANEL / framed.zoom / ACROSS
+    return { ...framed, x: framed.x + up.x * lift, y: framed.y + up.y * lift, z: framed.z + up.z * lift }
+  }
+
+  resize()
   return {
-    canvas: app.canvas,
+    canvas,
     zoneAt,
-    frame(tiles, ms = FOCUS_MS) {
-      const framed = tiles === null ? OVERVIEW : framing(tiles)
-      return follow({ ...framed, y: framed.y + (tiles === null ? 0 : PANEL / framed.zoom) }, ms)
+    frame(tiles, ms = FOCUS_MS, turn = 0) {
+      return follow(above(tiles, YAW + turn), ms)
     },
     showTeams(n) {
       teams = n
@@ -1043,22 +1313,20 @@ export async function createView(): Promise<View> {
       if (shown?.phase !== 'deploy') return
       selected = zone
       drawMarks(shown)
-      const framed = zone === null ? OVERVIEW : framing(zoneView(shown, shown.zones[zone]))
-      // Raised, so the landing panel below covers none of it.
-      void follow({ ...framed, y: framed.y + (zone === null ? 0 : PANEL / framed.zoom) }, FOCUS_MS)
+      void follow(zone === null ? OVERVIEW : above(zoneView(shown, shown.zones[zone])), FOCUS_MS)
     },
     async show(run, events, animate) {
       soldiers = run.soldiers
       fx.clear()
       const battle = run.battle
       if (!battle) return
-      world.visible = true
+      scene.visible = true
       const fresh = battle !== shown
       if (fresh) setBattle(battle)
       drawMarks(battle)
-      // A new battle opens flying in from high above, down to the whole map.
+      // A new battle opens flying in from high above, turning, down to the whole map.
       if (fresh && battle.phase === 'deploy') {
-        look({ x: 0, y: -HEIGHT, zoom: FIT / 4 })
+        look(SKY)
         void follow(OVERVIEW, FLY_MS)
       }
       if (animate) await play(battle, events)
@@ -1070,7 +1338,7 @@ export async function createView(): Promise<View> {
       if (landed && animate) await dropPods(battle)
       if (!animate) {
         if (battle.phase !== 'deploy') look(WHOLE_MAP)
-        labels.removeChildren().forEach((child) => child.destroy())
+        labels.clear()
         for (const e of events) {
           if (e.type === 'effect' && sprites.has(e.id)) effectCallout(e, sprites.get(e.id)!)
           if (e.type === 'heal' && sprites.has(e.target)) callout(`HEAL +${e.amount}`, COLOR.heal, sprites.get(e.target)!)
@@ -1090,7 +1358,13 @@ export async function createView(): Promise<View> {
           if (e.with.length > 0) callout(e.with.map((effect) => effectName(effect).toUpperCase()).join(' · '), 0xffffff, from)
         }
       }
-      app.render()
+      render()
     },
   }
+}
+
+/** Colour `own` darkened by `tint`, channel by channel, as a tint multiplies. */
+function mixTint(own: number, tint: number): number {
+  const ch = (shift: number) => Math.round((((own >> shift) & 255) * ((tint >> shift) & 255)) / 255) << shift
+  return ch(16) | ch(8) | ch(0)
 }
