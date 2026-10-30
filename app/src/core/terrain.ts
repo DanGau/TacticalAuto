@@ -36,14 +36,6 @@ export interface Terrain {
   /** The part of the world it stands in, and the place there it is named for. */
   region: RegionId
   city: string
-  /**
-   * The tiles of the battlefield: an irregular patch in the middle of the map. Each tile beyond it is void, but the
-   * town goes on there, as `sprawl` holds: the ground and props the patch was cut from.
-   */
-  outside: boolean[]
-  sprawl: { ground: Ground[]; props: Prop[] }
-  /** The smallest rectangle holding every tile of the battlefield. */
-  bounds: Rect
 }
 
 /** The kinds of place a zone's battles may be fought in. */
@@ -96,11 +88,6 @@ const PLOTS: Record<(typeof ZONE_TERRAINS)[number], { roads: [number, number]; p
 
 /** Hills each kind of place has. */
 const HILLS: Record<TerrainKind, number> = { town: 2, city: 1, countryside: 3, industrial: 1, ruins: 2, compound: 2, hive: 3 }
-
-/** The battlefield's half-width, in tiles, at its narrowest and widest; the town goes on around it. */
-const REACH: [number, number] = [24, 36]
-/** The fewest tiles of town kept past the battlefield on every side, so no view of it reaches the map's edge. */
-const SPRAWL = 10
 
 /**
  * A battlefield of the given kind, in the manner of XCOM 2's plots and parcels: roads cut the map into lots,
@@ -537,50 +524,12 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     }
   }
 
-  /**
-   * Cuts the battlefield from the middle of the plot: a patch of a size and ragged shape of its own, the town going on
-   * past it on every side.
-   */
-  function carve(): { outside: boolean[]; sprawl: Terrain['sprawl']; bounds: Rect } {
-    const sprawl = { ground: [...ground], props: [...props] }
-    const c = { x: size / 2 + between(-2, 2), y: size / 2 + between(-2, 2) }
-    const rx = between(...REACH)
-    const ry = between(...REACH)
-    // The edge wobbles: two waves of bulges and bays around it.
-    const waves = [{ k: between(2, 4), phase: random(rng) * 6.3, depth: 0.1 + random(rng) * 0.1 }, { k: between(5, 8), phase: random(rng) * 6.3, depth: 0.04 + random(rng) * 0.05 }]
-    const outside = Array.from({ length: size * size }, (_, t) => {
-      const dx = (t % size) + 0.5 - c.x
-      const dy = Math.floor(t / size) + 0.5 - c.y
-      const angle = Math.atan2(dy, dx)
-      const edge = 1 + waves.reduce((sum, w) => sum + w.depth * Math.sin(w.k * angle + w.phase), 0)
-      const rim = Math.min(t % size, Math.floor(t / size), size - 1 - (t % size), size - 1 - Math.floor(t / size))
-      return Math.hypot(dx / rx, dy / ry) > edge || rim < SPRAWL
-    })
-    const bounds: Rect = { x1: size, y1: size, x2: 0, y2: 0 }
-    outside.forEach((out, t) => {
-      const x = t % size
-      const y = Math.floor(t / size)
-      if (!out) {
-        bounds.x1 = Math.min(bounds.x1, x)
-        bounds.y1 = Math.min(bounds.y1, y)
-        bounds.x2 = Math.max(bounds.x2, x)
-        bounds.y2 = Math.max(bounds.y2, y)
-        return
-      }
-      ground[t] = 'void'
-      props[t] = 'void'
-    })
-    return { outside, sprawl, bounds }
-  }
-
   /** Lays the twist on the finished plot: narrow ground cuts it to a shape, fuel scatters tanks. */
   function finish(): Terrain {
-    const cut = carve()
     if (twist === 'narrow') {
       // The shapes cut from the battlefield, about its middle.
-      const { x1: bx1, y1: by1, x2: bx2, y2: by2 } = cut.bounds
-      const span = Math.min(bx2 - bx1, by2 - by1)
-      const mid = { x: (bx1 + bx2 + 1) / 2, y: (by1 + by2 + 1) / 2 }
+      const span = size - 1
+      const mid = { x: size / 2, y: size / 2 }
       const half = span / 2
       const shapes = [
         // A corridor, a third of the map wide, across it either way.
@@ -605,11 +554,9 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
       })
     }
     connect()
-    const { x1, y1, x2, y2 } = cut.bounds
-    if (twist === 'fuel') for (let i = 0; i < scaled(scaled(14)); i++) put(between(x1 + 1, x2 - 1), between(y1 + 1, y2 - 1), 'fuel')
-    // The town past the battlefield keeps its hills.
-    const height = hills().map((h, t) => (ground[t] === 'void' && !cut.outside[t] ? 0 : h))
-    return { ground, props, north, west, height, region, city, ...cut }
+    if (twist === 'fuel') for (let i = 0; i < scaled(scaled(14)); i++) put(between(1, size - 2), between(1, size - 2), 'fuel')
+    const height = hills().map((h, t) => (ground[t] === 'void' ? 0 : h))
+    return { ground, props, north, west, height, region, city }
   }
 }
 

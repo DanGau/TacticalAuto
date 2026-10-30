@@ -358,9 +358,6 @@ export interface Battle {
   west: Edge[]
   region: Terrain['region']
   city: string
-  outside: boolean[]
-  sprawl: Terrain['sprawl']
-  bounds: Terrain['bounds']
   pods: Pod[]
   /** Once-per-battle effects of the whole squad already used. */
   used: Effect[]
@@ -1076,7 +1073,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   sealPockets(battle)
   if (goal === 'escape') {
     // Ambushed at one corner, with the ways out ESCAPE_SPAN across toward the far one: there, and halfway along either side.
-    const { x1, y1, x2, y2 } = battle.bounds
+    const [x1, y1, x2, y2] = [0, 0, GRID - 1, GRID - 1]
     const corners = [{ x: x1 + 2, y: y1 + 2 }, { x: x2 - 2, y: y1 + 2 }, { x: x2 - 2, y: y2 - 2 }, { x: x1 + 2, y: y2 - 2 }]
     const corner = randomInt(battle, corners.length)
     const start = edgeNear(battle, corners[corner])

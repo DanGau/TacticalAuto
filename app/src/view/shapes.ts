@@ -1,4 +1,4 @@
-import { BufferGeometry, CanvasTexture, Color, type Material, DoubleSide, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, Sprite, SpriteMaterial } from 'three'
+import { BufferGeometry, CanvasTexture, type Material, DoubleSide, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, Sprite, SpriteMaterial } from 'three'
 
 /** A point in the world: x and z on the ground, along a tile's x and y; y up. */
 export interface Point3 {
@@ -268,22 +268,5 @@ void main() {
     )
   }
   material.customProgramCacheKey = () => 'dither'
-  return fade
-}
-
-/**
- * Lets a material sink into the night: at `fade` below 1 its colour is mixed toward `night`, so it melts into the
- * background as one smooth whole. Returns the handle that sets it, 0 to 1.
- */
-export function sinkable(material: Material, night: number): { value: number } {
-  const fade = { value: 1 }
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.fade = fade
-    shader.uniforms.night = { value: new Color(night) }
-    shader.fragmentShader = shader.fragmentShader
-      .replace('void main() {', 'uniform float fade;\nuniform vec3 night;\nvoid main() {')
-      .replace(/}\s*$/, '  gl_FragColor.rgb = mix(night, gl_FragColor.rgb, fade);\n}')
-  }
-  material.customProgramCacheKey = () => 'sink'
   return fade
 }

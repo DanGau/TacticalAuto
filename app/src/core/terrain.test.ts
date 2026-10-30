@@ -26,8 +26,8 @@ test.each(cases)('%s map %i: cover matches its props and every open tile can be 
 /** The share of tiles of the first four maps of a kind that `count` counts. */
 function share(kind: (typeof TERRAIN_KINDS)[number], count: (battle: ReturnType<typeof createBattle>, tile: number) => boolean): number {
   const battles = [1, 2, 3, 4].map((seed) => createBattle(seed, kind, [], []))
-  const hits = battles.reduce((sum, battle) => sum + battle.cover.filter((_, tile) => !battle.outside[tile] && count(battle, tile)).length, 0)
-  return hits / battles.reduce((sum, battle) => sum + battle.outside.filter((out) => !out).length, 0)
+  const hits = battles.reduce((sum, battle) => sum + battle.cover.filter((_, tile) => count(battle, tile)).length, 0)
+  return hits / (battles.length * GRID * GRID)
 }
 
 test('each kind of place is itself: the countryside is the most open, a city is more indoors than a town, a yard has the most crates; water is no part of a place', () => {
@@ -53,8 +53,8 @@ test('a satellite stands in a walled compound with a gate on every side, and the
   const compound = createBattle(2, 'compound', [], [])
   expect([...compound.north, ...compound.west].filter((edge) => edge === 'wall').length).toBeGreaterThan(40)
   const hive = createBattle(2, 'hive', [], [])
-  expect(hive.ground.every((ground, t) => hive.outside[t] || ground === 'hive')).toBe(true)
-  expect(hive.props.every((prop, t) => hive.outside[t] || prop === 'none' || prop === 'spire' || prop === 'growth')).toBe(true)
+  expect(hive.ground.every((ground) => ground === 'hive')).toBe(true)
+  expect(hive.props.every((prop) => prop === 'none' || prop === 'spire' || prop === 'growth')).toBe(true)
   expect([...hive.north, ...hive.west].every((edge) => edge === 'none')).toBe(true)
 })
 
@@ -65,9 +65,3 @@ test('some battlefields are split by water, which no one can stand in, though sh
   for (const b of wet) b.ground.forEach((g, t) => g === 'water' && expect(b.cover[t]).toBe(1))
 })
 
-test('a battlefield is some 3000 tiles, ragged, with town left past it on every side', () => {
-  const battles = TERRAIN_KINDS.flatMap((kind) => [1, 2, 3, 4].map((seed) => createBattle(seed, kind, [], [])))
-  const areas = battles.map((b) => b.outside.filter((out) => !out).length)
-  expect(areas.reduce((a, b) => a + b) / areas.length).toBeGreaterThan(2500)
-  for (const { bounds } of battles) expect(Math.min(bounds.x1, bounds.y1, GRID - 1 - bounds.x2, GRID - 1 - bounds.y2)).toBeGreaterThanOrEqual(10)
-})

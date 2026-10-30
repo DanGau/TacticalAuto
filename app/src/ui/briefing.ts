@@ -31,10 +31,9 @@ const SWING = 1.4
  * The turn that looks at `at` from the battlefield's middle: the town between in the foreground, and past the
  * subject the town going on, not the map's edge.
  */
-function facing(battle: Battle, at: Tile): number {
-  const { x1, y1, x2, y2 } = battle.bounds
-  const dx = (x1 + x2) / 2 - at.x
-  const dz = (y1 + y2) / 2 - at.y
+function facing(at: Tile): number {
+  const dx = GRID / 2 - at.x
+  const dz = GRID / 2 - at.y
   if (Math.hypot(dx, dz) < 4) return -SWING / 2
   const turn = Math.atan2(dx, dz) - YAW
   const wrapped = turn - 2 * Math.PI * Math.round(turn / (2 * Math.PI))
@@ -141,7 +140,7 @@ export async function brief(view: View, battle: Battle): Promise<void> {
   const all = shots(battle)
   const first = all[0].tiles
   const middle = (tiles: Tile[]) => ({ x: (tiles[0].x + tiles[1].x) / 2, y: (tiles[0].y + tiles[1].y) / 2 })
-  const turn = first ? facing(battle, middle(first)) : -SWING / 2
+  const turn = first ? facing(middle(first)) : -SWING / 2
   // An establishing shot to open on: low and wide over the town, swung further round, through the haze.
   void view.frame(null, 0, { turn: turn - 0.5, pitch: -0.3, fov: 42, haze: 1 })
   /** A slow wait that a skip cuts short. */
