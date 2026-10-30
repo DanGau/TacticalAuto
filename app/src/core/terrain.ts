@@ -1,3 +1,4 @@
+import { REGIONS, regionsFor, type Region, type RegionId } from './regions'
 import { random, randomInt } from './rng'
 
 import type { Twist } from './twists'
@@ -31,6 +32,17 @@ export interface Terrain {
   props: Prop[]
   north: Edge[]
   west: Edge[]
+  /** The part of the world it stands in, and the place there it is named for. */
+  region: RegionId
+  city: string
+  /**
+   * The tiles of the battlefield: an irregular patch in the middle of the map. Each tile beyond it is void, but the
+   * town goes on there, as `sprawl` holds: the ground and props the patch was cut from.
+   */
+  outside: boolean[]
+  sprawl: { ground: Ground[]; props: Prop[] }
+  /** The smallest rectangle holding every tile of the battlefield. */
+  bounds: Rect
 }
 
 /** The kinds of place a zone's battles may be fought in. */
@@ -53,7 +65,7 @@ export const TERRAIN_TEXT: Record<TerrainKind, { name: string; text: string }> =
 export const TERRAIN_KINDS = Object.keys(TERRAIN_TEXT) as TerrainKind[]
 
 /** A rectangle of tiles, edges included. */
-interface Rect {
+export interface Rect {
   x1: number
   y1: number
   x2: number
@@ -78,17 +90,22 @@ const PLOTS: Record<(typeof ZONE_TERRAINS)[number], { roads: [number, number]; p
 /** Hills each kind of place has. */
 const HILLS: Record<TerrainKind, number> = { town: 2, city: 1, countryside: 3, industrial: 1, ruins: 2, compound: 2, hive: 3 }
 
-/** Width of a road. */
-const ROAD = 2
-/** A building is at least this many tiles on a side, and a house at most MAX_HOUSE. */
-const MIN_BUILDING = 4
-const MAX_HOUSE = 8
+/** The battlefield's half-width, in tiles, at its narrowest and widest; the town goes on around it. */
+const REACH: [number, number] = [14, 21]
+/** A canal is crossed by a bridge every this many tiles. */
+const BRIDGE_EVERY = 7
 
 /**
  * A battlefield of the given kind, in the manner of XCOM 2's plots and parcels: roads cut the map into lots,
  * and each lot is filled with one place. Vehicles stand on the roads.
  */
 export function generateTerrain(rng: { rng: number }, size: number, kind: TerrainKind, twist: Twist | null = null): Terrain {
+  const options = regionsFor(kind)
+  const region = options[randomInt(rng, options.length)]
+  const R: Region = REGIONS[region]
+  const city = R.cities[randomInt(rng, R.cities.length)]
+  const ROAD = R.road
+  const [MIN_BUILDING, MAX_HOUSE] = R.building
   const ground = Array<Ground>(size * size).fill(kind === 'countryside' ? 'grass' : 'pavement')
   const props = Array<Prop>(size * size).fill('none')
   const north = Array<Edge>(size * size).fill('none')
@@ -148,18 +165,34 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     for (let i = Math.round((w * h) / 9); i > 0; i--) put(between(b.x1, b.x2), between(b.y1, b.y2), furniture[randomInt(rng, furniture.length)])
   }
 
-  /** A house in a yard of grass, with the odd tree and fence. */
+  /**
+   * A house in a yard of grass, with the odd tree and fence, kept back from its lot's edge by the region's setback.
+   * Where the region builds them, it wraps a courtyard, or stands as a long slab of flats.
+   */
   function house(lot: Rect): void {
-    const w = between(MIN_BUILDING, Math.min(MAX_HOUSE, lot.x2 - lot.x1 - 1))
-    const h = between(MIN_BUILDING, Math.min(MAX_HOUSE, lot.y2 - lot.y1 - 1))
-    const x1 = between(lot.x1 + 1, lot.x2 - w)
-    const y1 = between(lot.y1 + 1, lot.y2 - h)
+    const back = Math.min(R.setback, Math.floor((Math.min(lot.x2 - lot.x1, lot.y2 - lot.y1) - MIN_BUILDING) / 2))
+    const roomX = lot.x2 - lot.x1 + 1 - 2 * back
+    const roomY = lot.y2 - lot.y1 + 1 - 2 * back
+    let w = between(MIN_BUILDING, Math.max(MIN_BUILDING, Math.min(MAX_HOUSE, roomX)))
+    let h = between(MIN_BUILDING, Math.max(MIN_BUILDING, Math.min(MAX_HOUSE, roomY)))
+    // A slab: four deep, as long as the lot allows.
+    if (R.slabs) [w, h] = roomX >= roomY ? [Math.min(MAX_HOUSE, roomX), MIN_BUILDING] : [MIN_BUILDING, Math.min(MAX_HOUSE, roomY)]
+    w = Math.min(w, roomX)
+    h = Math.min(h, roomY)
+    const x1 = between(lot.x1 + back, lot.x2 - back - w + 1)
+    const y1 = between(lot.y1 + back, lot.y2 - back - h + 1)
     const b: Rect = { x1, y1, x2: x1 + w - 1, y2: y1 + h - 1 }
-    building(b, 3, ['crate'])
+    building(b, R.windowEvery, ['crate'])
+    if (R.courtyards && w >= 7 && h >= 7) {
+      const yard: Rect = { x1: b.x1 + 2, y1: b.y1 + 2, x2: b.x2 - 2, y2: b.y2 - 2 }
+      building(yard, 99, ['tree'])
+      pave(yard, 'grass')
+      each(yard, (x, y) => (props[y * size + x] = chance(0.2 * R.green) ? 'tree' : 'none'))
+    }
     each(lot, (x, y) => {
       if (x >= b.x1 && x <= b.x2 && y >= b.y1 && y <= b.y2) return
       ground[y * size + x] = 'grass'
-      if (chance(0.06)) put(x, y, chance(0.5) ? 'tree' : 'fence')
+      if (chance(0.06 * R.green)) put(x, y, chance(0.5) ? 'tree' : 'fence')
     })
   }
 
@@ -219,7 +252,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
   function park(lot: Rect): void {
     pave(lot, 'grass')
     each(lot, (x, y) => {
-      if (chance(0.14)) put(x, y, 'tree')
+      if (chance(0.14 * R.green)) put(x, y, 'tree')
       else if (chance(0.03)) put(x, y, 'rubble')
     })
   }
@@ -280,7 +313,8 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
 
   /** A satellite compound: a walled yard with gates, a control room, the dish, and stores; scrub outside. */
   function compound(): void {
-    const yard: Rect = { x1: 7, y1: 6, x2: size - 9, y2: size - 10 }
+    const mid = Math.floor(size / 2)
+    const yard: Rect = { x1: mid - 9, y1: mid - 10, x2: mid + 7, y2: mid + 6 }
     building(yard, 6, ['crate', 'crate', 'stack'])
     pave(yard, 'pavement')
     // More gates than a house has doors, one on each side.
@@ -319,7 +353,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
    */
   function hills(): number[] {
     const height = Array<number>(size * size).fill(0)
-    for (let i = HILLS[kind]; i > 0; i--) {
+    for (let i = Math.round(HILLS[kind] * R.hills * ((size * size) / 1024)); i > 0; i--) {
       const c = { x: between(0, size - 1), y: between(0, size - 1) }
       const reach = between(4, 7)
       each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => {
@@ -354,8 +388,13 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
   }
   const plot = PLOTS[kind]
 
-  /** Where `count` roads cross the map, spread evenly with some drift. */
-  const roadsAt = (count: number) => Array.from({ length: count }, (_, i) => Math.round(((i + 1) * size) / (count + 1)) - 1 + between(-3, 3))
+  /** Where roads cross the map, `count` of them a plot holds, the region's spacing apart times `stretch`; none if it holds none. */
+  const roadsAt = (count: number, stretch: number, from = 0, to = size - 1) => {
+    const roads: number[] = []
+    if (count === 0) return roads
+    for (let at = from + between(2, Math.round(R.spacing[0] * stretch)); at < to - ROAD - 2; at += Math.round(between(...R.spacing) * stretch) + ROAD) roads.push(at)
+    return roads
+  }
   /** The stretches the roads leave between them, each one tile back from a road. */
   const stretches = (roads: number[]) => {
     const starts = [0, ...roads.map((road) => road + ROAD + 1)]
@@ -363,30 +402,50 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     return starts.map((start, i) => [start, ends[i]])
   }
 
-  const [roadsX, roadsY] = plot.roads.map(roadsAt)
+  const roadsX = roadsAt(plot.roads[0], 1)
   for (const x of roadsX) pave({ x1: x, y1: 0, x2: x + ROAD - 1, y2: size - 1 }, 'road')
-  for (const y of roadsY) pave({ x1: 0, y1: y, x2: size - 1, y2: y + ROAD - 1 }, 'road')
-  // Vehicles on the roads, lying along them.
-  for (let i = 2; i < size - 2; i += 2) {
+  // Cross streets run the width of the map, or in a staggered region start afresh in each stretch between streets.
+  const columns = stretches(roadsX)
+  const shared = roadsAt(plot.roads[1], R.stretch)
+  const rows = columns.map(([x1, x2]) => {
+    const ys = R.staggered ? roadsAt(plot.roads[1], R.stretch) : shared
+    for (const y of ys) pave({ x1: Math.max(0, x1 - 1), y1: y, x2: Math.min(size - 1, x2 + 1), y2: y + ROAD - 1 }, 'road')
+    return ys
+  })
+  // Vehicles on the roads, lying along them, but on a canal.
+  for (let i = 2; i < size - 2 && !R.canals; i += 2) {
     for (const x of roadsX) {
       if (!chance(0.2)) continue
       const lane = x + randomInt(rng, ROAD)
       put(lane, i, 'car')
       put(lane, i + 1, 'car')
     }
-    for (const y of roadsY) {
-      if (!chance(0.2)) continue
-      const lane = y + randomInt(rng, ROAD)
-      const vehicle = chance(0.25) ? 'truck' : 'car'
-      put(i, lane, vehicle)
-      put(i + 1, lane, vehicle)
-    }
+    columns.forEach(([x1, x2], c) => {
+      if (i < x1 || i + 1 > x2) return
+      for (const y of rows[c]) {
+        if (!chance(0.2)) continue
+        const lane = y + randomInt(rng, ROAD)
+        const vehicle = chance(0.25) ? 'truck' : 'car'
+        put(i, lane, vehicle)
+        put(i + 1, lane, vehicle)
+      }
+    })
   }
   // In ruins, rubble lies across the roads.
   if (kind === 'ruins') each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => void (ground[y * size + x] === 'road' && chance(0.08) && put(x, y, 'rubble')))
-  for (const [x1, x2] of stretches(roadsX)) {
-    for (const [y1, y2] of stretches(roadsY)) block({ x1, y1, x2, y2 })
-  }
+  columns.forEach(([x1, x2], c) => {
+    for (const [y1, y2] of stretches(rows[c])) block({ x1, y1, x2, y2 })
+  })
+  // A canal quarter's streets are water, bridged every few tiles and where streets cross.
+  if (R.canals)
+    each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => {
+      const t = y * size + x
+      if (ground[t] !== 'road') return
+      const crossing = roadsX.some((r) => x >= r && x < r + ROAD) && rows.some((ys) => ys.some((r) => y >= r && y < r + ROAD))
+      if (crossing || (x % BRIDGE_EVERY < 2 && y % BRIDGE_EVERY < 2)) return
+      ground[t] = 'water'
+      props[t] = 'water'
+    })
 
   /** Clears a tile of what stands on it and its walls, and sets its ground; water also fills it. */
   const clear = (x: number, y: number, with_: Ground) => {
@@ -491,23 +550,66 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
       for (let t = end; t !== lost; t = from.get(t)!) {
         const [edges, at] = edgeOf(t, from.get(t)!)
         edges[at] = 'none'
-        if (props[t] !== 'none') props[t] = 'none'
-        if (props[from.get(t)!] !== 'none') props[from.get(t)!] = 'none'
+        // Water on the way is bridged.
+        for (const at of [t, from.get(t)!]) {
+          if (ground[at] === 'water') ground[at] = 'road'
+          props[at] = 'none'
+        }
       }
     }
   }
 
+  /**
+   * Cuts the battlefield from the middle of the plot: a patch of a size and ragged shape of its own, the town going on
+   * past it on every side.
+   */
+  function carve(): { outside: boolean[]; sprawl: Terrain['sprawl']; bounds: Rect } {
+    const sprawl = { ground: [...ground], props: [...props] }
+    const c = { x: size / 2 + between(-2, 2), y: size / 2 + between(-2, 2) }
+    const rx = between(...REACH)
+    const ry = between(...REACH)
+    // The edge wobbles: two waves of bulges and bays around it.
+    const waves = [{ k: between(2, 4), phase: random(rng) * 6.3, depth: 0.1 + random(rng) * 0.1 }, { k: between(5, 8), phase: random(rng) * 6.3, depth: 0.04 + random(rng) * 0.05 }]
+    const outside = Array.from({ length: size * size }, (_, t) => {
+      const dx = (t % size) + 0.5 - c.x
+      const dy = Math.floor(t / size) + 0.5 - c.y
+      const angle = Math.atan2(dy, dx)
+      const edge = 1 + waves.reduce((sum, w) => sum + w.depth * Math.sin(w.k * angle + w.phase), 0)
+      return Math.hypot(dx / rx, dy / ry) > edge
+    })
+    const bounds: Rect = { x1: size, y1: size, x2: 0, y2: 0 }
+    outside.forEach((out, t) => {
+      const x = t % size
+      const y = Math.floor(t / size)
+      if (!out) {
+        bounds.x1 = Math.min(bounds.x1, x)
+        bounds.y1 = Math.min(bounds.y1, y)
+        bounds.x2 = Math.max(bounds.x2, x)
+        bounds.y2 = Math.max(bounds.y2, y)
+        return
+      }
+      ground[t] = 'void'
+      props[t] = 'void'
+    })
+    return { outside, sprawl, bounds }
+  }
+
   /** Lays the twist on the finished plot: narrow ground cuts it to a shape, fuel scatters tanks. */
   function finish(): Terrain {
+    const cut = carve()
     if (twist === 'narrow') {
-      const half = size / 2
+      // The shapes cut from the battlefield, about its middle.
+      const { x1: bx1, y1: by1, x2: bx2, y2: by2 } = cut.bounds
+      const span = Math.min(bx2 - bx1, by2 - by1)
+      const mid = { x: (bx1 + bx2 + 1) / 2, y: (by1 + by2 + 1) / 2 }
+      const half = span / 2
       const shapes = [
         // A corridor, a third of the map wide, across it either way.
-        (x: number, y: number) => Math.abs((vertical ? x : y) - half) > size / 5,
+        (x: number, y: number) => Math.abs((vertical ? x - mid.x : y - mid.y)) > span / 5,
         // A corner: one quarter gone, and a bit more.
-        (x: number, y: number) => (cx ? x < size * 0.45 : x >= size * 0.55) && (cy ? y < size * 0.45 : y >= size * 0.55),
+        (x: number, y: number) => (cx ? x < mid.x - span * 0.05 : x >= mid.x + span * 0.05) && (cy ? y < mid.y - span * 0.05 : y >= mid.y + span * 0.05),
         // An island: everything beyond a circle.
-        (x: number, y: number) => Math.hypot(x + 0.5 - half, y + 0.5 - half) > half - 1,
+        (x: number, y: number) => Math.hypot(x + 0.5 - mid.x, y + 0.5 - mid.y) > half - 1,
       ]
       const vertical = chance(0.5)
       const cx = chance(0.5)
@@ -522,10 +624,12 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
         if (y + 1 < size) north[at + size] = 'none'
         if (x + 1 < size) west[at + 1] = 'none'
       })
-      connect()
     }
-    if (twist === 'fuel') for (let i = 0; i < 14; i++) put(between(1, size - 2), between(1, size - 2), 'fuel')
-    const height = hills().map((h, t) => (ground[t] === 'void' ? 0 : h))
-    return { ground, props, north, west, height }
+    connect()
+    const { x1, y1, x2, y2 } = cut.bounds
+    if (twist === 'fuel') for (let i = 0; i < 14; i++) put(between(x1 + 1, x2 - 1), between(y1 + 1, y2 - 1), 'fuel')
+    // The town past the battlefield keeps its hills.
+    const height = hills().map((h, t) => (ground[t] === 'void' && !cut.outside[t] ? 0 : h))
+    return { ground, props, north, west, height, region, city, ...cut }
   }
 }

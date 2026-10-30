@@ -7,6 +7,8 @@ const at = { x: 10, y: 10 }
 /** A map whose only cover is `cover` on the tile north of `at`. */
 function map(cover: Cover): Battle {
   const battle = createBattle(1, 'town', [], [])
+  battle.ground.fill('pavement')
+  battle.props.fill('none')
   battle.cover.fill(0)
   battle.height.fill(0)
   battle.north.fill('none')

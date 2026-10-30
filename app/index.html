@@ -14,6 +14,18 @@
       .roster { margin-top: 8px; padding: 8px 12px; max-width: 420px; background: #171d29d9; border: 1px solid #3a465c; border-radius: 6px; line-height: 1.5; font-size: 13px; }
       #panel { position: fixed; inset: 0; zoom: calc(var(--ui, 1) * var(--shrink, 1)); overflow: hidden; box-sizing: border-box; padding: 14px max(24px, calc(50% - 600px)) 18px; background: #171d29; }
       #panel[hidden], #drop[hidden] { display: none; }
+      /* The briefing as a film: bars across the top and bottom, a muted grade, and the edges sunk into dark. */
+      body::before, body::after { content: ''; position: fixed; left: 0; right: 0; z-index: 4; height: 0; background: #000; transition: height 0.9s ease-in-out; pointer-events: none; }
+      body::before { top: 0; }
+      body::after { bottom: 0; }
+      body.cinema::before, body.cinema::after { height: 11vh; }
+      canvas { transition: filter 1.2s ease-in-out; }
+      body.cinema canvas:first-of-type { filter: saturate(0.8) contrast(1.12) brightness(0.95); }
+      body.cinema .brief { bottom: 1.5vh; background: none; }
+      .vignette { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: radial-gradient(ellipse at 58% 42%, transparent 45%, rgba(0, 0, 0, 0.55) 100%); opacity: 0; transition: opacity 1.2s ease-in-out; }
+      body.cinema .vignette { opacity: 1; }
+      #hud { transition: opacity 0.6s; }
+      body.cinema #hud { opacity: 0; }
       .brief { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5; width: min(560px, calc(100vw - 32px)); box-sizing: border-box; padding: 10px 16px; border-radius: 8px; background: rgba(10, 13, 19, 0.85); color: #e8e2c8; font-size: 16px; line-height: 1.5; pointer-events: none; animation: fade 0.4s; }
       .brief p { margin: 0; animation: fade 0.6s; }
       .brief p:not(:last-child) { color: #9aa6bd; font-size: 14px; }
@@ -209,6 +221,7 @@
     </style>
   </head>
   <body>
+    <div class="vignette"></div>
     <div id="hud"><span id="status"></span></div>
     <div id="drop" hidden></div>
     <div id="panel"></div>

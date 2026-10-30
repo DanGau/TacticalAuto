@@ -28,7 +28,8 @@ export function buildOutskirts(battle: Battle): Group {
   // Scenery is drawn from the ground's own layout, so it stays put when the battle redraws.
   let seed = battle.ground.reduce((h, ground, i) => (h * 31 + ground.length * (i + 7)) | 0, 17)
   const rand = () => ((seed = (seed * 1103515245 + 12345) | 0) >>> 8) / 16777216
-  const gone = (x: number, y: number) => x < 0 || y < 0 || x >= GRID || y >= GRID || battle.ground[y * GRID + x] === 'void'
+  // The town past the battlefield is ground; only the map's edge and a chasm fall away.
+  const gone = (x: number, y: number) => x < 0 || y < 0 || x >= GRID || y >= GRID || (battle.ground[y * GRID + x] === 'void' && !battle.outside[y * GRID + x])
   const across = (px: number) => px / ACROSS
   const fall = tall(FALL)
 

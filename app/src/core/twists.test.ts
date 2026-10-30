@@ -18,6 +18,7 @@ function duel(twist: Twist | null): Battle {
   deploy(run, zoneOf(run.battle!, 'stealth'))
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist })
+  battle.ground.fill('pavement')
   battle.cover.fill(0)
   battle.props.fill('none')
   battle.height.fill(0)

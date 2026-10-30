@@ -3,7 +3,7 @@ import { expect, test } from 'vitest'
 import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, PACKS, REGEN_HEAL, type AlienKind } from './aliens'
 import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
-import { isSoldier, ACID_DAMAGE, alienUnit, mechUnit, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, type Battle, type Unit } from './battle'
+import { isSoldier, ACID_DAMAGE, alienUnit, mechUnit, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, GRID, type Battle, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 
 test('a mission musters packs its depth allows, for exactly its force, and a lone scout only to use up the last of it', () => {
@@ -33,6 +33,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   deploy(run, zone)
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [] })
+  battle.ground.fill('pavement')
   battle.cover.fill(0)
   battle.height.fill(0)
   battle.props.fill('none')
@@ -151,8 +152,8 @@ test("the first pod a concealed squad sights is ambushed: it does not move to co
   // An aim that hits only with the ambush bonus, against an alien that would otherwise walk to cover.
   soldier.stats = { ...soldier.stats, move: 0, aim: 1 - AMBUSH_AIM, close: 0, range: 7 }
   aliens[0].hp = aliens[0].stats.hp = 99
-  battle.props[14 * 32 + 10] = 'stack'
-  battle.cover[14 * 32 + 10] = 2
+  battle.props[14 * GRID + 10] = 'stack'
+  battle.cover[14 * GRID + 10] = 2
   soldier.x = 10
   soldier.y = 4
   // Stops 7 tiles off: inside the squad's notice, outside the patrol's.
@@ -173,7 +174,7 @@ test('a pod that notices the squad first stalks it unseen, then gives itself awa
   battle.concealed = true
   soldier.stats = { ...soldier.stats, move: 0, range: 0 }
   // The trooper looks down from a hill: it notices the soldier from farther than the soldier notices it.
-  for (let y = 13; y < 18; y++) for (let x = 8; x < 13; x++) battle.height[y * 32 + x] = 2
+  for (let y = 13; y < 18; y++) for (let x = 8; x < 13; x++) battle.height[y * GRID + x] = 2
   aliens[0].stats = { ...aliens[0].stats, move: 0, range: 8 }
   const events = until((all) => all.some((e) => e.type === 'shot' && e.id === aliens[0].id))
   expect(events.findIndex((e) => e.type === 'reveal')).toBeLessThan(events.findIndex((e) => e.type === 'shot'))
@@ -308,7 +309,7 @@ test("a blademaster charges in and strikes from the next tile; a parry deflects 
 
 test('a psionic attack passes through a wall and ignores cover; a demolishing hit wrecks the cover around its target; twin guns fire twice', () => {
   const psi = arena([{ kind: 'trooper', x: 10, y: 13 }])
-  psi.battle.cover[12 * 32 + 10] = 2
+  psi.battle.cover[12 * GRID + 10] = 2
   psi.soldier.effects = ['psionic']
   psi.soldier.stats = { ...psi.soldier.stats, range: 6, move: 0 }
   psi.aliens[0].stats = { ...psi.aliens[0].stats, move: 0, range: 0 }
@@ -316,13 +317,13 @@ test('a psionic attack passes through a wall and ignores cover; a demolishing hi
   expect(psi.until(has('shot'))).toContainEqual(expect.objectContaining({ type: 'shot', id: psi.soldier.id, hit: true }))
 
   const demo = arena([{ kind: 'trooper', x: 10, y: 13 }])
-  demo.battle.cover[14 * 32 + 10] = 1
+  demo.battle.cover[14 * GRID + 10] = 1
   demo.soldier.effects = ['demolish']
   demo.soldier.stats = { ...demo.soldier.stats, move: 0 }
   demo.aliens[0].stats = { ...demo.aliens[0].stats, move: 0, range: 0 }
   demo.aliens[0].hp = demo.aliens[0].stats.hp = 99
   expect(demo.until(has('shot'))).toContainEqual({ type: 'effect', id: demo.aliens[0].id, effect: 'demolish', amount: 0 })
-  expect(demo.battle.cover[14 * 32 + 10]).toBe(0)
+  expect(demo.battle.cover[14 * GRID + 10]).toBe(0)
 
   const twin = arena([{ kind: 'trooper', x: 10, y: 13 }])
   twin.soldier.effects = ['twin']

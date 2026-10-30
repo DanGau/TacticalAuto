@@ -1,4 +1,4 @@
-import { CanvasTexture, CircleGeometry, ColorManagement, LinearSRGBColorSpace, Group, Mesh, MeshBasicMaterial, Object3D, OrthographicCamera, Raycaster, Scene, Sprite as Billboard, SpriteMaterial, Vector2, Vector3, WebGLRenderer } from 'three'
+import { AdditiveBlending, BoxGeometry, CanvasTexture, CircleGeometry, ColorManagement, Fog, LinearSRGBColorSpace, Group, Mesh, MeshBasicMaterial, Object3D, PerspectiveCamera, Raycaster, Scene, Sprite as Billboard, SpriteMaterial, Vector2, Vector3, WebGLRenderer } from 'three'
 import { BLAST_RADIUS, distance, GRID, nearestAlien, revealed, PLANS, ZONE_NAMES, ZONE_RADIUS, type Battle, type Tile, type Unit } from '../core/battle'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
@@ -7,6 +7,7 @@ import type { GameEvent } from '../core/combat'
 import { level, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
 import type { Edge, Ground, Prop } from '../core/terrain'
+import { LOOKS, type Look } from './looks'
 import { buildOutskirts } from './outskirts'
 import { blob, css, shade, Shapes, Sketch, type Point3 } from './shapes'
 import { ACROSS, LEVEL, PITCH, TILE_H, TILE_W, tall, YAW } from './space'
@@ -93,6 +94,7 @@ const COLOR = {
   uplink: 0xffd84d,
 }
 
+/** Each ground's colour, where its region's look gives none. */
 const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x15161a, hive: 0x2a1838, water: 0x1d5f5c, void: 0x000000 }
 
 /** A box standing on a tile: how much of the tile it covers, how tall it is on screen, and its top colour. */
@@ -135,6 +137,11 @@ const PROP_BOXES: Record<Exclude<Prop, 'none' | 'tree' | 'car'>, Box[]> = {
     { wide: 0.35, deep: 0.35, base: 16, up: 3, color: 0xf1c40f },
   ],
 }
+
+/** How tall a wall is drawn in screen pixels, before its region's look scales it. */
+const EDGE_UP = 28
+/** How bright the town past the battlefield is against it. */
+const BEYOND = 0.62
 
 /** How thick a wall is, as a share of a tile. */
 const WALL_THICK = 0.14
@@ -195,9 +202,9 @@ const spot = (x: number, y: number): Point3 => ({ x, y: LEVEL * (heights[Math.ro
 /** The world point the camera's plane is measured from: the middle of the map, on the ground. */
 const ORIGIN = { x: (GRID - 1) / 2, y: 0, z: (GRID - 1) / 2 }
 
-/** The camera's axes for a turn of `yaw`: toward it, and to the right and up across its picture. */
-function axes(yaw: number): { back: Vector3; right: Vector3; up: Vector3 } {
-  const back = new Vector3(Math.cos(PITCH) * Math.sin(yaw), Math.sin(PITCH), Math.cos(PITCH) * Math.cos(yaw))
+/** The camera's axes for a turn of `yaw` and a tilt of `pitch`: toward it, and to the right and up across its picture. */
+function axes(yaw: number, pitch = PITCH): { back: Vector3; right: Vector3; up: Vector3 } {
+  const back = new Vector3(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw))
   const right = new Vector3(Math.cos(yaw), 0, -Math.sin(yaw))
   return { back, right, up: new Vector3().crossVectors(back, right) }
 }
@@ -245,13 +252,34 @@ interface Sprite {
   ally: boolean
 }
 
-/** What the camera shows: the world point at the screen's centre, a zoom, and its turn about the vertical. */
+/**
+ * What the camera shows: the world point at the screen's centre; a zoom, the screen size of what stands there; its
+ * turn about the vertical and tilt down from level; its lens's field of view in degrees; and how thick the haze that
+ * sinks the distance into the night. At the still lens the view is all but flat, as an isometric map is.
+ */
 interface Camera {
   x: number
   y: number
   z: number
   zoom: number
   yaw: number
+  pitch: number
+  fov: number
+  haze: number
+}
+
+/** The still camera's lens: so narrow, and so far off, that the map is drawn all but flat. */
+const STILL_FOV = 0.25
+/** How far the haze reaches past what the camera looks at, in world units, at its thinnest and thickest. */
+const HAZE_REACH = [400, 26]
+
+/** A shot's camera, against the still camera: how much more it turns and tilts, its lens, its haze, and the third of the screen its subject sits on, -1 left to 1 right. */
+export interface Shot {
+  turn?: number
+  pitch?: number
+  fov?: number
+  haze?: number
+  third?: number
 }
 
 /** The camera that shows the picture point `at` at the screen's centre, aimed at the ground `height` units up. */
@@ -260,22 +288,20 @@ function aim(at: Tile, zoom: number, yaw = YAW, height = 0): Camera {
   const p = new Vector3(ORIGIN.x, ORIGIN.y, ORIGIN.z).addScaledVector(right, at.x / ACROSS).addScaledVector(up, -at.y / ACROSS)
   // Slid along the line of sight, which leaves the picture as it is, onto the ground.
   p.addScaledVector(back, (height - p.y) / back.y)
-  return { x: p.x, y: p.y, z: p.z, zoom, yaw }
+  return { x: p.x, y: p.y, z: p.z, zoom, yaw, pitch: PITCH, fov: STILL_FOV, haze: 0 }
 }
 
-const WHOLE_MAP = aim({ x: 0, y: 0 }, FIT)
-/** The whole map before the landing, shrunk and raised to clear the landing panel below it. */
-const OVERVIEW = aim({ x: 0, y: 70 }, FIT * 0.82)
-/** Where a new battle's fly-in starts: high above, turned away from where it settles. */
-const SKY = aim({ x: 0, y: -HEIGHT }, FIT / 4, YAW - 0.6)
 
-/** Words over the map, drawn in the camera's picture: a landing zone's name, or a callout over a unit. */
+/** The opening shot of a new battle, which the briefing flies on from. */
+const OPENING: Shot = { turn: -1.1, pitch: -0.32, fov: 42, haze: 1 }
+
+/** Words over the map: a landing zone's name, or a callout over a unit. */
 interface Label {
   text: string
   color: number
   size: number
-  /** Where it stands, in the camera's picture. */
-  at: () => Tile
+  /** Where it stands: a world point, or a point in the still camera's picture. */
+  at: () => Point3 | Tile
   /** Share of its height that stands above `at`. */
   rise: number
   outline: number
@@ -299,8 +325,10 @@ export interface View {
   hideZones(hidden: boolean): void
   /** On a rescue, shows where each of `teams` teams would land. */
   showTeams(teams: number): void
-  /** Glides the camera to frame the given tiles, above the landing panel, turned `turn` radians from still; null pulls back to the whole map. */
-  frame(tiles: Tile[] | null, ms?: number, turn?: number): Promise<void>
+  /** Glides the camera to frame the given tiles as `shot` says, above the landing panel; null pulls back to the whole map. */
+  frame(tiles: Tile[] | null, ms?: number, shot?: Shot): Promise<void>
+  /** Lights a beam over the tile the briefing is on, so it stands out from the night; null puts it out. */
+  spotlight(tile: Tile | null): void
 }
 
 export async function createView(): Promise<View> {
@@ -319,7 +347,7 @@ export async function createView(): Promise<View> {
   const ctx = overlay.getContext('2d')!
 
   const scene = new Scene()
-  const eye = new OrthographicCamera()
+  const eye = new PerspectiveCamera()
   /** The world past the battlefield: scenery beyond its far edges, cliffs falling from its near ones. */
   const outskirts = new Group()
   /** The ground, and the props, walls and windows standing on it. */
@@ -330,7 +358,11 @@ export async function createView(): Promise<View> {
   const fog = new Group()
   const lurk = new Group()
   const units = new Group()
-  scene.add(outskirts, terrain, zones, acid, fog, lurk, units)
+  /** The briefing's beam of light over what it shows. */
+  const beam = new Group()
+  scene.add(outskirts, terrain, zones, acid, fog, lurk, units, beam)
+  const haze = new Fog(0x10141c, 1, 2)
+  scene.fog = haze
   zones.renderOrder = 1
   // Nothing shows until a battle exists.
   scene.visible = false
@@ -351,7 +383,7 @@ export async function createView(): Promise<View> {
   const scenery: { node: Object3D; tiles: number[] }[] = []
   /** The battle on screen. */
   let shown: Battle | null = null
-  let camera = WHOLE_MAP
+  let camera = aim({ x: 0, y: 0 }, FIT)
   /** Screen pixels the picture is jolted by, as a blow lands. */
   const jolt = { x: 0, y: 0 }
   /** Whether the battle last shown was waiting for the landing, so the next one shown plays it. */
@@ -383,18 +415,26 @@ export async function createView(): Promise<View> {
     camera = to
     // Cameras are framed for a WIDTH by HEIGHT screen; the window scales them to fill it.
     const units = scale() * ACROSS
-    const { back, right, up } = axes(to.yaw)
+    const { back, right, up } = axes(to.yaw, to.pitch)
     const p = new Vector3(to.x, to.y, to.z).addScaledVector(right, -jolt.x / units).addScaledVector(up, jolt.y / units)
-    eye.position.copy(p).addScaledVector(back, 100)
+    // Far enough off that the lens frames, at what the camera looks at, what a flat map would at this zoom.
+    const away = innerHeight / 2 / units / Math.tan(((to.fov / 2) * Math.PI) / 180)
+    eye.position.copy(p).addScaledVector(back, away)
     eye.up.copy(up)
     eye.lookAt(p)
-    eye.left = -innerWidth / 2 / units
-    eye.right = innerWidth / 2 / units
-    eye.top = innerHeight / 2 / units
-    eye.bottom = -innerHeight / 2 / units
-    eye.near = 1
-    eye.far = 400
+    eye.fov = to.fov
+    eye.aspect = innerWidth / innerHeight
+    eye.near = Math.max(0.05, away - 300)
+    eye.far = away + 300
     eye.updateProjectionMatrix()
+    haze.near = away + 2
+    haze.far = away + 2 + HAZE_REACH[0] * (HAZE_REACH[1] / HAZE_REACH[0]) ** to.haze
+  }
+
+  /** Where a world point shows on the screen, in pixels. */
+  function onScreen(p: Point3): Tile {
+    const v = new Vector3(p.x, p.y, p.z).project(eye)
+    return { x: ((v.x + 1) / 2) * innerWidth, y: ((1 - v.y) / 2) * innerHeight }
   }
 
   /** The camera that frames the given tiles, zoomed in no closer than life size. */
@@ -432,19 +472,22 @@ export async function createView(): Promise<View> {
     ctx.setTransform(k * dpr, 0, 0, k * dpr, (innerWidth / 2 - middle.x * k + jolt.x) * dpr, (innerHeight / 2 - middle.y * k + jolt.y) * dpr)
     for (const drop of drops) drop.draw(ctx)
     fx.draw(ctx)
-    for (const label of [...marks, ...labels]) write(label)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    for (const label of [...marks, ...labels]) write(label, k, middle)
   }
 
-  function write(label: Label): void {
-    const at = label.at()
-    ctx.font = `bold ${label.size}px sans-serif`
+  /** Writes a label on the screen, its size scaled by `k`, a point in the picture placed as the picture's `middle` is centred. */
+  function write(label: Label, k: number, middle: Tile): void {
+    const where = label.at()
+    const at = 'z' in where ? onScreen(where) : { x: innerWidth / 2 + (where.x - middle.x) * k + jolt.x, y: innerHeight / 2 + (where.y - middle.y) * k + jolt.y }
+    ctx.font = `bold ${label.size * k}px sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
     ctx.lineJoin = 'round'
     ctx.globalAlpha = label.alpha
-    const y = at.y - label.rise * label.size * 1.2
+    const y = at.y - label.rise * label.size * k * 1.2
     ctx.strokeStyle = css(COLOR.line)
-    ctx.lineWidth = label.outline
+    ctx.lineWidth = label.outline * k
     ctx.strokeText(label.text, at.x, y)
     ctx.fillStyle = css(label.color)
     ctx.fillText(label.text, at.x, y)
@@ -606,44 +649,79 @@ export async function createView(): Promise<View> {
   }
 
   /**
-   * Builds the prop on a tile. A prop that continues onto the tile above or below, such as a car parked along y,
-   * is turned to lie that way; the two halves of a car share a colour.
+   * Adds the prop on a tile to `shapes`, and any leaves to `blobs`. A prop that continues onto the tile above or
+   * below, such as a car parked along y, is turned to lie that way; the two halves of a car share a colour.
    */
-  function buildProp(battle: Battle, tile: number): void {
-    const prop = battle.props[tile] as Exclude<Prop, 'none'>
+  function addProp(props: Prop[], tile: number, shapes: Shapes, blobs: Object3D[]): void {
+    const prop = props[tile] as Exclude<Prop, 'none'>
     const x = tile % GRID
     const y = Math.floor(tile / GRID)
     const at = spot(x, y)
-    const shapes = new Shapes()
     if (prop === 'tree') {
       const trunk = 2 / ACROSS
       shapes.box(x - trunk, y - trunk, x + trunk, y + trunk, at.y, at.y + tall(16), 0x5b4630)
       const off = 4 / ACROSS / Math.SQRT2
-      return stand(shapes, [blob({ x, y: at.y + tall(24), z: y }, 14 / ACROSS, 0x2f6b3c), blob({ x: x - off, y: at.y + tall(28), z: y + off }, 8 / ACROSS, 0x3d8049)], [tile])
+      blobs.push(blob({ x, y: at.y + tall(24), z: y }, 14 / ACROSS, 0x2f6b3c), blob({ x: x - off, y: at.y + tall(28), z: y + off }, 8 / ACROSS, 0x3d8049))
+      return
     }
-    const same = (other: number) => other >= 0 && other < GRID * GRID && battle.props[other] === prop
+    const same = (other: number) => other >= 0 && other < GRID * GRID && props[other] === prop
     const alongX = (tile % GRID > 0 && same(tile - 1)) || (tile % GRID < GRID - 1 && same(tile + 1))
     const alongY = !alongX && (same(tile - GRID) || same(tile + GRID))
     // The first tile of the run the prop lies in.
     const head = alongY ? (same(tile - GRID) ? tile - GRID : tile) : tile % GRID > 0 && same(tile - 1) ? tile - 1 : tile
     for (const box of prop === 'car' ? carBoxes(head) : PROP_BOXES[prop]) addBox(shapes, x, at.y, y, alongY ? { ...box, wide: box.deep, deep: box.wide } : box)
-    stand(shapes, [], [tile])
   }
 
-  /** Builds the battle's ground, props, walls and windows afresh. They change only when a blast wrecks them. */
+  /**
+   * Each building's wall colour, by tile: a floor tile joins the floor tiles beside it into a building, and each
+   * building takes the next of the region's wall colours.
+   */
+  function buildingColours(battle: Battle, look: Look): Map<number, number> {
+    const colour = new Map<number, number>()
+    let next = 0
+    battle.sprawl.ground.forEach((g, start) => {
+      if (g !== 'floor' || colour.has(start)) return
+      const paint = look.walls[next++ % look.walls.length]
+      const room = [start]
+      colour.set(start, paint)
+      for (const t of room)
+        for (const n of [t - 1, t + 1, t - GRID, t + GRID]) {
+          if (n < 0 || n >= GRID * GRID || colour.has(n) || battle.sprawl.ground[n] !== 'floor' || Math.abs((n % GRID) - (t % GRID)) > 1) continue
+          colour.set(n, paint)
+          room.push(n)
+        }
+    })
+    return colour
+  }
+
+  /**
+   * Builds the battle's ground, props, walls and windows afresh, in its region's look. They change only when a blast
+   * wrecks them. The town past the battlefield is built dimmer, as one piece no fog touches.
+   */
   function drawTerrain(battle: Battle): void {
     scenery.length = 0
     terrain.clear()
     outskirts.clear()
     outskirts.add(buildOutskirts(battle))
+    const look = LOOKS[battle.region]
+    const paint = buildingColours(battle, look)
+    /** A wall's colour: the building's on either side of it. */
+    const wallColour = (a: number, b: number) => paint.get(a) ?? paint.get(b) ?? look.walls[0]
+    const lift = look.up / EDGE_UP
+    const edgeBoxes = (edge: Exclude<Edge, 'none'>, color: number) => EDGE_BOXES[edge].map((box) => ({ ...box, base: box.base * lift, up: box.up * lift, color: box.alpha ? look.glass : color }))
     const ground = new Shapes()
+    const beyond = new Shapes()
+    const beyondBlobs: Object3D[] = []
     for (let tile = 0; tile < GRID * GRID; tile++) {
-      // Off the battlefield there is nothing to draw.
-      if (battle.ground[tile] === 'void') continue
+      const out = battle.outside[tile]
+      const kind = out ? battle.sprawl.ground[tile] : battle.ground[tile]
+      // Where the ground falls away there is nothing to draw.
+      if (kind === 'void') continue
       const x = tile % GRID
       const y = Math.floor(tile / GRID)
       const top = LEVEL * battle.height[tile]
-      const color = GROUND_COLOR[battle.ground[tile]]
+      const base = kind === 'floor' ? look.floor : (look.ground[kind] ?? GROUND_COLOR[kind])
+      const color = out ? shade(base, BEYOND) : base
       // The faces a raised tile shows above its lower neighbours.
       const drop = (nx: number, ny: number) => (onGridTile(nx, ny) ? Math.max(0, battle.height[tile] - battle.height[ny * GRID + nx]) * LEVEL : 0)
       const sides = [
@@ -654,36 +732,56 @@ export async function createView(): Promise<View> {
       ] as const
       for (const [ax, az, bx, bz, fall, light] of sides) if (fall > 0) ground.quad({ x: ax, y: top, z: az }, { x: bx, y: top, z: bz }, { x: bx, y: top - fall, z: bz }, { x: ax, y: top - fall, z: az }, shade(color, light))
       ground.flat(x - 0.5, y - 0.5, x + 0.5, y + 0.5, top, highland(color, battle.height[tile]))
-      for (const [ax, az, bx, bz] of [
-        [x - 0.5, y - 0.5, x + 0.5, y - 0.5],
-        [x - 0.5, y - 0.5, x - 0.5, y + 0.5],
-      ])
-        ground.line({ x: ax, y: top + 0.002, z: az }, { x: bx, y: top + 0.002, z: bz }, COLOR.line, 0.5)
+      if (!out)
+        for (const [ax, az, bx, bz] of [
+          [x - 0.5, y - 0.5, x + 0.5, y - 0.5],
+          [x - 0.5, y - 0.5, x - 0.5, y + 0.5],
+        ])
+          ground.line({ x: ax, y: top + 0.002, z: az }, { x: bx, y: top + 0.002, z: bz }, COLOR.line, 0.5)
     }
     const built = ground.build()
     // The ground is the terrain's first child, which a click on the map is tested against.
     terrain.add(built.mesh)
     if (built.lines) terrain.add(built.lines)
     for (let tile = 0; tile < GRID * GRID; tile++) {
-      if (battle.ground[tile] === 'void') continue
+      const out = battle.outside[tile]
+      const props = out ? battle.sprawl.props : battle.props
+      if ((out ? battle.sprawl.ground : battle.ground)[tile] === 'void') continue
       const x = tile % GRID
       const y = Math.floor(tile / GRID)
-      if (battle.props[tile] !== 'none') buildProp(battle, tile)
-      // A wall stands on the edge it divides this tile from its neighbour by.
+      const at = spot(x, y)
       const north = battle.north[tile]
       const west = battle.west[tile]
-      const at = spot(x, y)
+      if (out) {
+        if (props[tile] !== 'none') addProp(props, tile, beyond, beyondBlobs)
+        if (north !== 'none') for (const box of edgeBoxes(north, wallColour(tile, tile - GRID))) addBox(beyond, x, at.y, y - 0.5, box)
+        if (west !== 'none') for (const box of edgeBoxes(west, wallColour(tile, tile - 1))) addBox(beyond, x - 0.5, at.y, y, { ...box, wide: box.deep, deep: box.wide })
+        continue
+      }
+      if (props[tile] !== 'none') {
+        const shapes = new Shapes()
+        const blobs: Object3D[] = []
+        addProp(props, tile, shapes, blobs)
+        stand(shapes, blobs, [tile])
+      }
+      // A wall stands on the edge it divides this tile from its neighbour by.
       if (north !== 'none') {
         const shapes = new Shapes()
-        for (const box of EDGE_BOXES[north]) addBox(shapes, x, at.y, y - 0.5, box)
+        for (const box of edgeBoxes(north, wallColour(tile, tile - GRID))) addBox(shapes, x, at.y, y - 0.5, box)
         stand(shapes, [], [tile, tile - GRID])
       }
       if (west !== 'none') {
         const shapes = new Shapes()
-        for (const box of EDGE_BOXES[west]) addBox(shapes, x - 0.5, at.y, y, { ...box, wide: box.deep, deep: box.wide })
+        for (const box of edgeBoxes(west, wallColour(tile, tile - 1))) addBox(shapes, x - 0.5, at.y, y, { ...box, wide: box.deep, deep: box.wide })
         stand(shapes, [], [tile, tile - 1])
       }
     }
+    const town = new Group()
+    const { mesh, lines } = beyond.build()
+    town.add(mesh, ...beyondBlobs)
+    if (lines) town.add(lines)
+    dim(town, shade(0xffffff, BEYOND))
+    terrain.add(town)
   }
 
   /** Clears the board for a new battle. */
@@ -698,7 +796,7 @@ export async function createView(): Promise<View> {
   }
 
   /** Words over a tile, `rise` of their height above it. */
-  const label = (text: string, tile: Tile, color: number, size = 44): Label => ({ text, color, size, at: () => toWorld(tile.x, tile.y), rise: size === 44 ? 0.8 : 0, outline: 6, alpha: 1 })
+  const label = (text: string, tile: Tile, color: number, size = 44): Label => ({ text, color, size, at: () => spot(tile.x, tile.y), rise: size === 44 ? 0.8 : 0, outline: 6, alpha: 1 })
 
   /** Replaces the marks on the ground in `layer` with `shapes`. */
   function lay(layer: Group, shapes: Shapes): void {
@@ -858,7 +956,9 @@ export async function createView(): Promise<View> {
       if (mine !== glides) return
       const ease = t * t * (3 - 2 * t)
       const at = (a: number, b: number) => a + (b - a) * ease
-      look({ x: at(from.x, to.x), y: at(from.y, to.y), z: at(from.z, to.z), zoom: from.zoom * (to.zoom / from.zoom) ** ease, yaw: at(from.yaw, to.yaw) })
+      // Zoom and lens change by the same factor each frame, so pulling out reads as steady as pushing in.
+      const by = (a: number, b: number) => a * (b / a) ** ease
+      look({ x: at(from.x, to.x), y: at(from.y, to.y), z: at(from.z, to.z), zoom: by(from.zoom, to.zoom), yaw: at(from.yaw, to.yaw), pitch: at(from.pitch, to.pitch), fov: by(from.fov, to.fov), haze: at(from.haze, to.haze) })
     })
   }
 
@@ -880,7 +980,7 @@ export async function createView(): Promise<View> {
 
   /** Floats a callout up and away. It does not hold up the next beat. */
   function float(mark: Label): void {
-    const from = mark.at()
+    const from = mark.at() as Tile
     void tween(CALLOUT_MS, (t) => {
       const at = { x: from.x, y: from.y - 34 * t }
       mark.at = () => at
@@ -1285,21 +1385,53 @@ export async function createView(): Promise<View> {
     return [{ x: zone.x - reach, y: zone.y - reach }, { x: zone.x + reach, y: zone.y + reach }, ...(toward ? [toward] : [])]
   }
 
-  /** The camera framing `tiles`, raised so the landing panel below covers none of it; null frames the whole map. */
-  function above(tiles: Tile[] | null, yaw = YAW): Camera {
-    if (tiles === null) return { ...OVERVIEW, yaw }
-    const framed = framing(tiles, yaw)
-    const { up } = axes(yaw)
+  /** The camera that frames the whole battlefield. */
+  function wholeMap(yaw = YAW): Camera {
+    const { x1, y1, x2, y2 } = shown!.bounds
+    return framing([{ x: x1, y: y1 }, { x: x2, y: y1 }, { x: x1, y: y2 }, { x: x2, y: y2 }], yaw)
+  }
+
+  /**
+   * The camera framing `tiles` as `shot` says, raised so the landing panel below covers none of it; null frames the
+   * whole map. A subject on a third is set off the centre, the screen's other two thirds left open before it.
+   */
+  function above(tiles: Tile[] | null, shot: Shot = {}): Camera {
+    const yaw = YAW + (shot.turn ?? 0)
+    const framed = tiles === null ? wholeMap(yaw) : framing(tiles, yaw)
+    const { up, right } = axes(yaw)
     const lift = -PANEL / framed.zoom / ACROSS
-    return { ...framed, x: framed.x + up.x * lift, y: framed.y + up.y * lift, z: framed.z + up.z * lift }
+    const aside = -((shot.third ?? 0) * WIDTH) / 6 / framed.zoom / ACROSS
+    return {
+      ...framed,
+      x: framed.x + up.x * lift + right.x * aside,
+      y: framed.y + up.y * lift,
+      z: framed.z + up.z * lift + right.z * aside,
+      pitch: PITCH + (shot.pitch ?? 0),
+      fov: shot.fov ?? STILL_FOV,
+      haze: shot.haze ?? 0,
+    }
   }
 
   resize()
   return {
     canvas,
     zoneAt,
-    frame(tiles, ms = FOCUS_MS, turn = 0) {
-      return follow(above(tiles, YAW + turn), ms)
+    frame(tiles, ms = FOCUS_MS, shot = {}) {
+      return follow(above(tiles, shot), ms)
+    },
+    spotlight(tile) {
+      beam.clear()
+      if (!tile) return
+      const at = spot(tile.x, tile.y)
+      // A warm shaft against the cool night, brightest at its foot.
+      for (const [wide, high, alpha] of [[1.6, 14, 0.1], [0.7, 18, 0.16], [0.25, 22, 0.3]]) {
+        const shaft = new Mesh(new BoxGeometry(wide, high, wide), new MeshBasicMaterial({ color: COLOR.hit, transparent: true, opacity: alpha, blending: AdditiveBlending, depthWrite: false, fog: false }))
+        shaft.position.set(at.x, at.y + high / 2, at.z)
+        beam.add(shaft)
+      }
+      const pool = new Mesh(new CircleGeometry(2.2, 32).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: COLOR.hit, transparent: true, opacity: 0.22, blending: AdditiveBlending, depthWrite: false, fog: false }))
+      pool.position.set(at.x, at.y + DECAL_LIFT * 5, at.z)
+      beam.add(pool)
     },
     showTeams(n) {
       teams = n
@@ -1313,7 +1445,7 @@ export async function createView(): Promise<View> {
       if (shown?.phase !== 'deploy') return
       selected = zone
       drawMarks(shown)
-      void follow(zone === null ? OVERVIEW : above(zoneView(shown, shown.zones[zone])), FOCUS_MS)
+      void follow(above(zone === null ? null : zoneView(shown, shown.zones[zone])), FOCUS_MS)
     },
     async show(run, events, animate) {
       soldiers = run.soldiers
@@ -1326,8 +1458,9 @@ export async function createView(): Promise<View> {
       drawMarks(battle)
       // A new battle opens flying in from high above, turning, down to the whole map.
       if (fresh && battle.phase === 'deploy') {
-        look(SKY)
-        void follow(OVERVIEW, FLY_MS)
+        // An establishing shot: low over the far side of the town, looking in across its rooftops through the haze.
+        look(above(null, OPENING))
+        void follow(above(null), FLY_MS)
       }
       if (animate) await play(battle, events)
       sync(run, battle)
@@ -1337,7 +1470,7 @@ export async function createView(): Promise<View> {
       deploying = battle.phase === 'deploy'
       if (landed && animate) await dropPods(battle)
       if (!animate) {
-        if (battle.phase !== 'deploy') look(WHOLE_MAP)
+        if (battle.phase !== 'deploy') look(wholeMap())
         labels.clear()
         for (const e of events) {
           if (e.type === 'effect' && sprites.has(e.id)) effectCallout(e, sprites.get(e.id)!)

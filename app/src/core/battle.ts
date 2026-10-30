@@ -5,11 +5,11 @@ import type { Resist } from './keywords'
 import { random, randomInt } from './rng'
 import { CIVILIAN_HP, CIVILIANS, type Goal } from './goals'
 import type { Twist } from './twists'
-import { EDGE_COVER, generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Prop, type TerrainKind } from './terrain'
+import { EDGE_COVER, generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
 
 export type { Cover }
 
-export const GRID = 32
+export const GRID = 50
 /** A battle still running at this beat ends as a draw. */
 export const MAX_BEATS = 1000
 /** Damage a crit adds. */
@@ -317,6 +317,11 @@ export interface Battle {
   /** What stands on each tile's north edge and west edge; read them with edgeBetween. */
   north: Edge[]
   west: Edge[]
+  region: Terrain['region']
+  city: string
+  outside: boolean[]
+  sprawl: Terrain['sprawl']
+  bounds: Terrain['bounds']
   pods: Pod[]
   /** Once-per-battle effects of the whole squad already used. */
   used: Effect[]
@@ -898,11 +903,13 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   sealPockets(battle)
   if (goal === 'escape') {
     // Ambushed at one corner, with the ways out across the map at the far one and the edges beside it.
-    const corners = [{ x: 2, y: 2 }, { x: GRID - 3, y: 2 }, { x: GRID - 3, y: GRID - 3 }, { x: 2, y: GRID - 3 }]
+    const { x1, y1, x2, y2 } = battle.bounds
+    const corners = [{ x: x1 + 2, y: y1 + 2 }, { x: x2 - 2, y: y1 + 2 }, { x: x2 - 2, y: y2 - 2 }, { x: x1 + 2, y: y2 - 2 }]
     const corner = randomInt(battle, corners.length)
     const far = corners[(corner + 2) % corners.length]
+    const mid = { x: (x1 + x2) >> 1, y: (y1 + y2) >> 1 }
     battle.start = openNear(battle, corners[corner])
-    for (const exit of [far, { x: far.x, y: GRID >> 1 }, { x: GRID >> 1, y: far.y }]) battle.zones.push(openNear(battle, exit))
+    for (const exit of [far, { x: far.x, y: mid.y }, { x: mid.x, y: far.y }]) battle.zones.push(openNear(battle, exit))
   }
 
   const centres: Tile[] = []

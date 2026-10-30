@@ -2,16 +2,44 @@ import { ALIENS } from '../core/aliens'
 import { GRID, heightAt, type Battle, type Tile } from '../core/battle'
 import type { Prop } from '../core/terrain'
 import { GOALS } from '../core/goals'
+import { REGIONS } from '../core/regions'
 import { TWISTS } from '../core/twists'
-import type { View } from '../view/view'
+import { YAW } from '../view/space'
+import type { Shot as CameraShot, View } from '../view/view'
 
 /** How long the briefing holds on each thing it shows. */
 const DWELL_MS = 1800
 /** How long the camera takes to fly in, and to glide between shots. */
 const FLY_MS = 2400
 const GLIDE_MS = 1400
-/** Radians the camera turns at each stop on the objective. */
-const TURN = 0.18
+/** How long the camera takes to settle onto the flat map at the end, or once skipped, and how far it drifts round while holding on a stop. */
+const SETTLE_MS = 2600
+const SKIP_MS = 700
+const DRIFT = 0.09
+
+/**
+ * The camera on the `i`th stop on the objective: swung round to one side of it and low, a narrow lens through haze, so
+ * the town between stands in the foreground and the distance fades; each stop swings further round, its subject on
+ * the other third, leaving room on the side the camera moves toward.
+ */
+const objective = (turn: number, i: number): Required<CameraShot> => ({ turn: turn + 0.35 * i, pitch: -0.14 + 0.06 * i, fov: 32 - 6 * i, haze: 0.7, third: i % 2 === 0 ? 1 : -1 })
+
+/** How far the camera may swing from still, either way, so settling back never spins it round. */
+const SWING = 1.4
+
+/**
+ * The turn that looks at `at` from the battlefield's middle: the town between in the foreground, and past the
+ * subject the town going on, not the map's edge.
+ */
+function facing(battle: Battle, at: Tile): number {
+  const { x1, y1, x2, y2 } = battle.bounds
+  const dx = (x1 + x2) / 2 - at.x
+  const dz = (y1 + y2) / 2 - at.y
+  if (Math.hypot(dx, dz) < 4) return -SWING / 2
+  const turn = Math.atan2(dx, dz) - YAW
+  const wrapped = turn - 2 * Math.PI * Math.round(turn / (2 * Math.PI))
+  return Math.max(-SWING, Math.min(SWING, wrapped))
+}
 /** Lines the caption keeps, the newest last. */
 const LINES = 3
 /** Tiles around a thing the briefing frames, and whose ground it names. */
@@ -83,11 +111,12 @@ export function shots(battle: Battle): Shot[] {
           : biggest
             ? [biggest]
             : []
-  const lines = at.map((t, i) => `${i === 0 ? `Objective: ${goal.text}. ` : ''}${pod(t)}${ground(battle, t)}.`)
+  const where = `${battle.city}, ${REGIONS[battle.region].name.toLowerCase()}. `
+  const lines = at.map((t, i) => `${i === 0 ? `${where}Objective: ${goal.text}. ` : ''}${pod(t)}${ground(battle, t)}.`)
   const twist = battle.twist && TWISTS[battle.twist]
   const choice = battle.goal === 'rescue' ? 'Choose how to split the squad.' : battle.goal === 'raid' ? 'Choose how many caches to go for.' : battle.start ? 'Choose the way out.' : 'Choose where to land.'
   const last = `${twist ? `${twist.icon} ${twist.name}: ${twist.text}. ` : ''}${choice}`
-  return [...at.map((t, i): Shot => ({ tiles: around(t), line: lines[i] })), { tiles: null, line: at.length === 0 ? `Objective: ${goal.text}. ${last}` : last, zones: true }]
+  return [...at.map((t, i): Shot => ({ tiles: around(t), line: lines[i] })), { tiles: null, line: at.length === 0 ? `${where}Objective: ${goal.text}. ${last}` : last, zones: true }]
 }
 
 /** Flies the camera in over the mission before a landing, adding a line on each thing it shows. Any click ends it early. */
@@ -108,21 +137,37 @@ export async function brief(view: View, battle: Battle): Promise<void> {
   addEventListener('pointerdown', skip, { once: true, capture: true })
   view.hideZones(true)
   document.getElementById('drop')!.classList.add('briefing')
+  document.body.classList.add('cinema')
   const all = shots(battle)
-  for (const shot of all) {
+  const first = all[0].tiles
+  const middle = (tiles: Tile[]) => ({ x: (tiles[0].x + tiles[1].x) / 2, y: (tiles[0].y + tiles[1].y) / 2 })
+  const turn = first ? facing(battle, middle(first)) : -SWING / 2
+  // An establishing shot to open on: low and wide over the town, swung further round, through the haze.
+  void view.frame(null, 0, { turn: turn - 0.5, pitch: -0.3, fov: 42, haze: 1 })
+  /** A slow wait that a skip cuts short. */
+  const hold = (ms: number) => new Promise<void>((done) => ((wake = done), setTimeout(done, ms)))
+  for (const [i, shot] of all.entries()) {
     if (skipped) break
-    if (shot.zones) view.hideZones(false)
     const line = document.createElement('p')
     line.textContent = shot.line
     caption.append(line)
     while (caption.childElementCount > LINES) caption.firstElementChild!.remove()
-    // The first glide flies in from high above, slowly; the camera turns as it goes, and settles still on the whole map.
-    await view.frame(shot.tiles, shot === all[0] ? FLY_MS : GLIDE_MS, shot.tiles ? TURN * (all.indexOf(shot) + 1) : 0)
-    await new Promise<void>((done) => {
-      wake = done
-      setTimeout(done, DWELL_MS)
-    })
+    if (!shot.tiles) break
+    // Each stop on the objective is lit, framed on a third, its subject turned to as the camera swings round it; the
+    // camera never stops, drifting on while it holds.
+    const angle = objective(turn, i)
+    view.spotlight(middle(shot.tiles))
+    await Promise.race([view.frame(shot.tiles, i === 0 ? FLY_MS : GLIDE_MS, angle), hold(i === 0 ? FLY_MS : GLIDE_MS)])
+    if (skipped) break
+    void view.frame(shot.tiles, DWELL_MS, { ...angle, turn: angle.turn + DRIFT, fov: angle.fov * 0.9 })
+    await hold(DWELL_MS)
   }
+  // The last shot settles from the lens's depth onto the flat map, the landing zones showing as it lands.
+  view.spotlight(null)
+  document.body.classList.remove('cinema')
+  await view.frame(null, skipped ? SKIP_MS : SETTLE_MS)
+  view.hideZones(false)
+  if (!skipped) await hold(DWELL_MS / 2)
   removeEventListener('pointerdown', skip, { capture: true })
   caption.remove()
   button.remove()
