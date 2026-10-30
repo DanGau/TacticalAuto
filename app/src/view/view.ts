@@ -1036,7 +1036,7 @@ export async function createView(): Promise<View> {
             const lift = Math.max(a.y, b.y) + DECAL_LIFT * 3
             tint.band({ ...a, y: lift }, { ...b, y: lift }, 4 / ACROSS, battle.uplink ? COLOR.uplink : COLOR.contact, 0.9)
           }
-          marks.push(label(battle.goal === 'rescue' ? `Team ${i + 1}` : `${ZONE_NAMES[i]} ${PLANS[battle.plans[i]].icon}`, zone, 0xffffff))
+          marks.push(label(battle.goal === 'rescue' ? `Team ${i + 1}` : [ZONE_NAMES[i], PLANS[battle.plans[i]].icon].filter(Boolean).join(' '), zone, 0xffffff))
         })
       battle.pods.forEach((_, pod) => {
         const members = battle.units.filter((u) => u.pod === pod)

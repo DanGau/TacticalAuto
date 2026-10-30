@@ -670,7 +670,8 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 
 /** What each plan is called, and what it does, for the player. */
 export const PLANS: Record<Plan, { name: string; icon: string; text: string }> = {
-  march: { name: 'Quiet approach', icon: '🥾', text: 'Move in unseen from the edge, clear of every pod, and creep in to set ambushes' },
+  // The plain way in, from the edge, unseen, needs no name.
+  march: { name: '', icon: '', text: '' },
   hot: { name: 'Hot drop', icon: '☄️', text: 'Land right on a pod: the drop pods hit it and it is ambushed, but every other pod hears and converges' },
   stealth: { name: 'Parachute drop', icon: '🪂', text: 'Drop unseen anywhere clear of every pod, deep in, and creep in to set ambushes' },
   decap: { name: 'Decapitation', icon: '🗡️', text: 'Land on the commander: it is ambushed, but every guard converges on the squad' },

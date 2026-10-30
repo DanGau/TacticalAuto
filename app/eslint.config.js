@@ -15,7 +15,7 @@ export default tseslint.config(
   layer('core', '\./', 'core/ imports only core/. Pass data in instead.'),
   layer('bots', '\./|\.\./core/', 'bots/ imports only bots/ and core/.'),
   layer('sim', '\./|\.\./(core|bots)/|node:|esbuild$', 'sim/ imports only sim/, bots/, core/, node builtins and esbuild.'),
-  layer('{view,ui}', '\./|\.\./(core|view|ui)/|three$', 'view/ and ui/ import only view/, ui/, core/ and three.'),
+  layer('{view,ui}', '\./|\.\./(core|view|ui)/|three$|d3-geo$|topojson-(client|specification)$|world-atlas/', 'view/ and ui/ import only view/, ui/, core/, three, and d3-geo with its map data.'),
   {
     files: ['src/core/**/*.ts'],
     ignores: ['**/*.test.ts'],

@@ -16,8 +16,10 @@
     "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
+    "@types/d3-geo": "^3.1.1",
     "@types/node": "^26.6.4",
     "@types/three": "^0.180.0",
+    "@types/topojson-client": "^3.1.5",
     "esbuild": "^0.28.2",
     "eslint": "^10.12.0",
     "playwright": "^1.63.0",
@@ -28,6 +30,9 @@
     "vitest": "^5.0.3"
   },
   "dependencies": {
-    "three": "^0.180.0"
+    "d3-geo": "^3.1.1",
+    "three": "^0.180.0",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
   }
 }

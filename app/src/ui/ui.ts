@@ -62,12 +62,12 @@ function drop(battle: Battle, zone: number | null, teams: number, greed: number)
   if (battle.start) return escapes(battle, zone)
   if (battle.goal === 'rescue') return splits(battle, teams)
   if (battle.goal === 'raid') return raids(battle, greed)
-  const zones = battle.plans.map((plan, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}">${ZONE_NAMES[i]} ${PLANS[plan].icon} ${PLANS[plan].name}</button>`)
+  const zones = battle.plans.map((plan, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}">${[ZONE_NAMES[i], PLANS[plan].icon, PLANS[plan].name].filter(Boolean).join(' ')}</button>`)
   const overview = `<button data-zone="" class="overview ${zone === null ? 'on' : ''}" title="Whole map">🗺️</button>`
   const detail =
     zone === null
       ? '<small>Pick a landing zone to fly to it.</small>'
-      : `<p>${PLANS[battle.plans[zone]].text}.</p>${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
+      : `${PLANS[battle.plans[zone]].text ? `<p>${PLANS[battle.plans[zone]].text}.</p>` : ''}${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
   const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
   return `${twist}<div class="zones">${zones.join('')}${overview}</div>${detail}`
 }

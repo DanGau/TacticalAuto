@@ -1,6 +1,10 @@
 import { along, arc, type LonLat } from '../core/world'
 import type { Run } from '../core/run'
-import { COASTS } from './coasts'
+import { geoContains, geoDistance, geoOrthographic, geoPath, type GeoPermissibleObjects } from 'd3-geo'
+import { feature } from 'topojson-client'
+import type { Topology } from 'topojson-specification'
+import land110 from 'world-atlas/land-110m.json'
+import land50 from 'world-atlas/land-50m.json'
 
 /** The globe's radius at its farthest and nearest, in pixels. */
 const FAR = 120
@@ -49,65 +53,54 @@ export interface View {
   turn: number
 }
 
-/** Projects the globe seen from `view` into a window `size`: where a place falls on the page, and whether it faces the viewer. */
+/** The world's land at two levels of detail: coarse for the whole globe, fine once the view closes in. */
+const COARSE = feature(land110 as unknown as Topology, (land110 as unknown as Topology).objects.land) as unknown as GeoPermissibleObjects
+const FINE = feature(land50 as unknown as Topology, (land50 as unknown as Topology).objects.land) as unknown as GeoPermissibleObjects
+/** The radius in pixels past which the fine land is drawn. */
+const DETAIL = 900
+
+/**
+ * Projects the globe seen from `view` into a window `size`: where a place falls on the page and whether it faces the
+ * viewer, and `path`, which draws shapes on it clipped at the horizon.
+ */
 function projection({ centre, r, turn }: View, size: Size) {
-  const { w } = size
-  const { middle: mid } = open(size)
-  const [l0, p0] = [centre[0] * RAD, centre[1] * RAD]
-  const [cos, sin] = [Math.cos(turn), Math.sin(turn)]
-  return ([lon, lat]: LonLat) => {
-    const [l, p] = [lon * RAD, lat * RAD]
-    const cosc = Math.sin(p0) * Math.sin(p) + Math.cos(p0) * Math.cos(p) * Math.cos(l - l0)
-    let x = Math.cos(p) * Math.sin(l - l0)
-    let y = -(Math.cos(p0) * Math.sin(p) - Math.sin(p0) * Math.cos(p) * Math.cos(l - l0))
-    // A place round the back is drawn on the rim, so a coast crossing it is cut along the horizon.
-    if (cosc < 0) {
-      const len = Math.hypot(x, y) || 1
-      x /= len
-      y /= len
-    }
-    return { x: w / 2 + (x * cos - y * sin) * r, y: mid + (x * sin + y * cos) * r, front: cosc >= 0 }
+  const lens = geoOrthographic()
+    .rotate([-centre[0], -centre[1], -turn / RAD])
+    .scale(r)
+    .translate([size.w / 2, open(size).middle])
+    .clipAngle(90)
+    .precision(0.5)
+  const project = (at: LonLat) => {
+    const [x, y] = lens(at)!
+    return { x, y, front: geoDistance(at, centre) < Math.PI / 2 }
   }
+  return Object.assign(project, { path: geoPath(lens) })
 }
 
-/** Points along the globe's rim, seen from `view` in a window `size`, from where `a` lies on it round the shorter way to `b`. */
-function rim(a: { x: number; y: number }, b: { x: number; y: number }, { r }: View, size: Size): string {
-  const { w } = size
-  const h2 = open(size).middle
-  const [from, to] = [Math.atan2(a.y - h2, a.x - w / 2), Math.atan2(b.y - h2, b.x - w / 2)]
-  let sweep = to - from
-  if (sweep > Math.PI) sweep -= 2 * Math.PI
-  if (sweep < -Math.PI) sweep += 2 * Math.PI
-  const steps = Math.ceil(Math.abs(sweep) / 0.05)
-  let d = ''
-  for (let i = 1; i < steps; i++) {
-    const t = from + (sweep * i) / steps
-    d += `L${(w / 2 + Math.cos(t) * r).toFixed(1)},${(h2 + Math.sin(t) * r).toFixed(1)}`
-  }
-  return d
+/** Whether each place stands on land, as found. */
+const ashore = new Map<string, boolean>()
+const onLand = (at: LonLat) => {
+  const key = at.join()
+  if (!ashore.has(key)) ashore.set(key, geoContains(FINE, at))
+  return ashore.get(key)!
 }
 
 /**
- * A line of places as an SVG path, broken where it passes round the back. A closed one, a coast, runs round the rim
- * while it is behind, so no edge of it cuts across the globe's face.
+ * A made-up island under a stop out at sea, `size` pixels round, its shore wobbling by a seed from where it stands, so
+ * the way across reads as island hopping.
  */
-function line(project: ReturnType<typeof projection>, places: LonLat[], close = false, view?: View, size?: Size): string {
-  let d = ''
-  let pen = false
-  let last: ReturnType<ReturnType<typeof projection>> | null = null
-  for (const at of [...places, ...(close ? [places[0]] : [])]) {
-    const p = project(at)
-    if (!p.front && !close) {
-      pen = false
-      continue
-    }
-    if (last && !last.front && !p.front && view && size) d += rim(last, p, view, size)
-    d += `${pen ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`
-    pen = true
-    last = p
-  }
-  return d + (close ? 'Z' : '')
+function island(p: { x: number; y: number }, at: LonLat, size: number): string {
+  const seed = Math.abs(Math.sin(at[0] * 12.9898 + at[1] * 78.233)) * 43758.5453
+  const points = Array.from({ length: 24 }, (_, i) => {
+    const angle = (i / 24) * 2 * Math.PI
+    const reach = size * (0.85 + 0.18 * Math.sin(seed + angle * 2) + 0.08 * Math.sin(seed * 1.7 + angle * 5))
+    return `${(p.x + Math.cos(angle) * reach * 1.3).toFixed(1)},${(p.y + Math.sin(angle) * reach).toFixed(1)}`
+  })
+  return `<path class="land" d="M${points.join('L')}Z"/>`
 }
+
+/** A line through `places` as an SVG path, cut where it passes round the back. */
+const line = (project: ReturnType<typeof projection>, places: LonLat[]) => project.path({ type: 'LineString', coordinates: places }) ?? ''
 
 /** The place in the middle of `places`, on the globe. */
 function middle(places: LonLat[]): LonLat {
@@ -205,9 +198,7 @@ export function glide(root: HTMLElement, from: View | null): void {
 /** The globe's insides: air, sea, graticule and coasts, under `over`, with `pins` laid on top. */
 function sphere(view: View, size: Size, over: string, pins: string): string {
   const project = projection(view, size)
-  const coasts = COASTS.filter((ring) => ring.some((at) => project(at).front))
-    .map((ring) => `<path class="land" d="${line(project, ring, true, view, size)}"/>`)
-    .join('')
+  const coasts = `<path class="land" d="${project.path(view.r > DETAIL ? FINE : COARSE) ?? ''}"/>`
   const graticule = [
     ...Array.from({ length: 12 }, (_, i) => Array.from({ length: 37 }, (_, k): LonLat => [i * 30, -90 + k * 5])),
     ...Array.from({ length: 5 }, (_, i) => Array.from({ length: 73 }, (_, k): LonLat => [-180 + k * 5, -60 + i * 30])),
@@ -312,9 +303,13 @@ function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: LonLat[
       return b && a.front && b.front ? [`<path class="trail${lit ? ' lit' : picking ? ' dim' : ''}" d="M${a.x},${a.y}L${b.x},${b.y}"/>`] : []
     }),
   )
+  const isles = pins.flatMap((pin) => {
+    const p = placed.get(pin.id)!
+    return pin.html && p.front && !onLand(pin.at) ? [island(p, pin.at, pin.choice ? 34 : 22)] : []
+  })
   const stops = pins.flatMap((pin) => {
     const p = placed.get(pin.id)!
     return p.front ? [`<div class="cell${pin.squad ? ' squad' : ''}${pin.choice ? ' choice' : ''}${picking && !pin.lit && !pin.squad ? ' dim' : ''}" style="${spot(p)}">${pin.html}</div>`] : []
   })
-  return sphere(view, size, `<path class="walked" d="${line(project, walked)}"/>${trails.join('')}${homeMark}${cities.join('')}`, stops.join('') + chopper(project(focus)))
+  return sphere(view, size, `${isles.join('')}<path class="walked" d="${line(project, walked)}"/>${trails.join('')}${homeMark}${cities.join('')}`, stops.join('') + chopper(project(focus)))
 }
