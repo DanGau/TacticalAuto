@@ -16,7 +16,8 @@ import { drawTwist, type Twist } from './twists'
 import { random, randomInt } from './rng'
 import { TRAITS, type Trait, type TraitId } from './traits'
 import { REGION_IDS, REGIONS, type RegionId } from './regions'
-import { arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
+import { TOWNS } from './towns'
+import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
 
 /** Access keys needed to find the alien source; each is won at a satellite, at the end of a leg. */
 export const KEYS = 3
@@ -102,6 +103,9 @@ export interface MapNode {
   row: number
   next: number[]
   stop: Stop | null
+  /** The town the stop is at, and where it lies; set once the route is plotted. */
+  town: string | null
+  at: LonLat | null
 }
 
 /**
@@ -441,6 +445,7 @@ export function recruit(run: Run, index: number): void {
   const soldier = run.recruits[index]
   run.recruits = []
   run.route = plotRoute(run, soldier.home!)
+  run.route.forEach((stage, l) => placeLeg(run, run.legs[l], stage))
   drawStops(run)
   soldier.id = run.nextSoldier++
   run.soldiers.push(soldier)
@@ -480,6 +485,70 @@ function plotRoute(run: Run, home: City): Stage[] {
   route.push({ continent: null, from: from.at, to: HUB, hero: null })
   return route
 }
+
+/**
+ * Sets each stop of a leg on the way across its continent, as a traveller would plan the trip: each column of stops
+ * a step along the way from where the leg begins to its hero's city, the steps of uneven length, each row to one
+ * side or the other in order, so no two trails cross. A real town near where a stop falls takes it. The leg ends at
+ * the hero's city; the hub's leg at the hub.
+ */
+function placeLeg(run: Run, leg: Leg, stage: Stage): void {
+  const end = leg.columns.length - 1
+  leg.columns[end][0].at = stage.to.at
+  leg.columns[end][0].town = stage.to.name
+  if (!stage.continent) return
+  // A flat map of the way, x along it from start to end and y across it, in degrees.
+  const scale = Math.cos(((stage.from[1] + stage.to.at[1]) / 2) * (Math.PI / 180))
+  const flat = ([lon, lat]: LonLat) => {
+    let dlon = lon - stage.from[0]
+    if (dlon > 180) dlon -= 360
+    if (dlon < -180) dlon += 360
+    return { x: dlon * scale, y: lat - stage.from[1] }
+  }
+  const goal = flat(stage.to.at)
+  const length = Math.hypot(goal.x, goal.y) || 1
+  const towns = TOWNS[stage.continent]
+    .filter(([name]) => name !== stage.to.name)
+    .map(([name, at]) => {
+      const p = flat(at)
+      return { name, at, t: (p.x * goal.x + p.y * goal.y) / length / length, d: (p.y * goal.x - p.x * goal.y) / length }
+    })
+  const used = new Set<string>()
+  const step = 1 / (end + 1)
+  const gap = Math.max(MIN_ROW_GAP, length * ROW_SPREAD)
+  leg.columns.slice(0, end).forEach((column, c) => {
+    // Each column a step along the way, some steps longer than others.
+    const t = (c + 1 + (random(run) - 0.5) * 0.6) * step
+    for (const node of column) {
+      const d = (node.row - (MAP_ROWS - 1) / 2 + (random(run) - 0.5) * 0.4) * gap
+      // A town near where the stop falls takes it; else it is out in the open between towns.
+      const near = towns
+        .filter((town) => !used.has(town.name) && Math.hypot((town.t - t) * length, town.d - d) < Math.min(gap, step * length) * SNAP)
+        .sort((a, b) => Math.hypot((a.t - t) * length, a.d - d) - Math.hypot((b.t - t) * length, b.d - d))[0]
+      if (near) used.add(near.name)
+      node.town = near?.name ?? null
+      node.at = near?.at ?? offset(stage, t, d)
+    }
+  })
+}
+
+/** How near a town must lie to where a stop falls to take it, as a share of the gap between stops; and the least gap between rows, in degrees. */
+const SNAP = 0.45
+const MIN_ROW_GAP = 1.2
+
+/** The place a share `t` of the way along a stage, `d` degrees to its left. */
+function offset(stage: Stage, t: number, d: number): LonLat {
+  const at = along(stage.from, stage.to.at, t)
+  const ahead = along(stage.from, stage.to.at, Math.min(1, t + 0.01))
+  const scale = Math.cos(at[1] * (Math.PI / 180))
+  const dx = (ahead[0] - at[0]) * scale
+  const dy = ahead[1] - at[1]
+  const len = Math.hypot(dx, dy) || 1
+  return [at[0] + ((-dy / len) * d) / scale, at[1] + (dx / len) * d]
+}
+
+/** How far apart a leg's rows of stops lie across its way, as a share of its length. */
+const ROW_SPREAD = 0.07
 
 /** How near a continent's nearest city lies to `at`, in degrees round the globe. */
 const nearest = (id: ContinentId, at: LonLat) => Math.min(...CONTINENTS[id].cities.map((c) => arc(c.at, at)))
@@ -568,9 +637,9 @@ function drawShape(run: Run): MapNode[][] {
   }
   const rows = edges.map((column) => [...column.keys()].sort((a, b) => a - b))
   const nodes = rows.map((column, c) =>
-    column.map((row): MapNode => ({ row, stop: null, next: c === LEG_STOPS - 1 ? [0] : [...edges[c].get(row)!].sort((a, b) => a - b).map((r) => rows[c + 1].indexOf(r)) })),
+    column.map((row): MapNode => ({ row, stop: null, town: null, at: null, next: c === LEG_STOPS - 1 ? [0] : [...edges[c].get(row)!].sort((a, b) => a - b).map((r) => rows[c + 1].indexOf(r)) })),
   )
-  return [...nodes, [{ row: Math.floor(MAP_ROWS / 2), next: [], stop: null }]]
+  return [...nodes, [{ row: Math.floor(MAP_ROWS / 2), next: [], stop: null, town: null, at: null }]]
 }
 
 /** Fills the stops of the leg under way: its first column battles, the rest drawn at random, each battle mustered for where it stands. */
@@ -586,6 +655,8 @@ function drawStops(run: Run): void {
       let roll = random(run)
       const kind = c === 0 ? undefined : (Object.keys(STOP_CHANCE) as (keyof typeof STOP_CHANCE)[]).find((k) => (roll -= STOP_CHANCE[k]) < 0)
       node.stop = c === LEG_STOPS ? { ...fixed('key', 'compound'), ...placed(run, 'compound'), city: run.route[run.keys].to.name } : kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], { ...run, stop: c })
+      // A stop is named for the town it is at.
+      if (node.town) node.stop.city = node.town
     }
   })
 }
@@ -673,7 +744,7 @@ export function createRun(seed: number): Run {
     doctrines: [],
   }
   offerRecruits(run)
-  run.legs = Array.from({ length: KEYS + 1 }, (_, k) => ({ columns: k === KEYS ? [[{ row: Math.floor(MAP_ROWS / 2), next: [], stop: null }]] : drawShape(run), path: [] }))
+  run.legs = Array.from({ length: KEYS + 1 }, (_, k) => ({ columns: k === KEYS ? [[{ row: Math.floor(MAP_ROWS / 2), next: [], stop: null, town: null, at: null }]] : drawShape(run), path: [] }))
   run.phase = 'recruit'
   const resists = Object.keys(RESISTS) as Resist[]
   run.bosses = Array.from({ length: KEYS + 1 }, () => resists[randomInt(run, resists.length)])

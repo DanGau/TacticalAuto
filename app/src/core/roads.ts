@@ -5,7 +5,7 @@ import { createRun, legOf, type Run, type Stop } from './run'
 /** For tests: lays the rest of the leg as a road of `stops` one after another, the first entered, then the satellite. */
 export function road(run: Run, stops: Stop[]): void {
   const leg = legOf(run)
-  leg.columns = [...leg.columns.slice(0, run.stop), ...stops.map((stop) => [{ row: 2, next: [0], stop }]), leg.columns.at(-1)!]
+  leg.columns = [...leg.columns.slice(0, run.stop), ...stops.map((stop) => [{ row: 2, next: [0], stop, town: null, at: null }]), leg.columns.at(-1)!]
   leg.path = [...leg.path.slice(0, run.stop), 0]
 }
 

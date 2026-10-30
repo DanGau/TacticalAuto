@@ -189,8 +189,8 @@ test('once every alert alien is dead, the squad slips back into stealth', () => 
   battle.pods.push({ name: 'Far', revealed: false, alert: false, stalking: false, ambushed: false, surprised: false, stalked: 0, waypoint: { x: 30, y: 30 } })
   battle.concealed = false
   until((all) => all.some((e) => e.type === 'death'))
-  until(() => battle.turn === 'human')
-  expect(battle.concealed).toBe(true)
+  until(() => battle.concealed)
+  expect(battle.pods[1].alert).toBe(false)
 })
 
 test('backstab adds damage against a target with no cover; shredder destroys armor before the damage lands', () => {

@@ -657,7 +657,7 @@ export const PLANS: Record<Plan, { name: string; icon: string; text: string }> =
   decap: { name: 'Decapitation', icon: '🗡️', text: 'Land on the commander: it is ambushed, but every guard converges on the squad' },
   overwatch: { name: 'Overwatch', icon: '🔭', text: "Land on high ground at range from the commander; its pod sees the squad coming" },
   bait: { name: 'Bait', icon: '🪤', text: 'Land far off: the guards come for the squad, leaving the commander alone' },
-  uplink: { name: 'Uplink', icon: '📡', text: 'Land beside this uplink and hold it' },
+  uplink: { name: 'Drop on the uplink', icon: '📡', text: 'The drop pods land right beside the uplink' },
   escape: { name: 'Way out', icon: '🚁', text: 'Break out toward this escape zone' },
   team: { name: 'Team', icon: '👥', text: 'Where a team lands' },
 }
@@ -695,7 +695,6 @@ export function land(battle: Battle, zone: Tile, teams = 1): void {
   const commander = battle.units.find((u) => u.target)
   if (plan === 'overwatch' && commander) Object.assign(battle.pods[commander.pod!], { revealed: true, alert: true })
   if (plan === 'bait') battle.pods.forEach((pod, i) => i !== commander?.pod && (pod.waypoint = zone))
-  if (plan === 'uplink') battle.uplink = zone
   // On an escape the zone is where the squad makes for. The Hunter has found it; the packs across the ways out are
   // in sight but have yet to notice it.
   if (battle.start) {
@@ -744,20 +743,27 @@ function planZones(battle: Battle, centres: Tile[]): void {
     battle.zones.push(zone)
     battle.plans.push(plan)
   }
+  const held = (effect: RelicEffect) => battle.reserve.some((r) => r.effects.includes(effect))
   const goal = battle.goal
   if (goal === 'escape') battle.plans = battle.zones.map((): Plan => 'escape')
   // A rescue lands wherever its teams scatter to: zones far apart, one for each team it might split into.
   else if (goal === 'rescue') while (battle.zones.length < TEAMS) add(spacedTile(battle, [...battle.units.filter((u) => u.side === 'alien'), ...battle.zones], 2 * ZONE_CLEARANCE, 'edge'), 'team')
-  else if (goal === 'hold') while (battle.zones.length < ZONES) add(distinct('inner'), 'uplink')
-  else if (goal === 'assassinate') {
+  else if (goal === 'hold') {
+    // The uplink stands within; the squad comes at it from the edge, or with drop pods, lands on it.
+    battle.uplink = clear('inner')
+    if (held('dropPods')) add(battle.uplink, 'uplink')
+    while (battle.zones.length < ZONES) add(distinct(), 'march')
+  } else if (goal === 'assassinate') {
     const commander = battle.units.find((u) => u.target)!
-    add({ x: commander.x, y: commander.y }, 'decap')
+    // Landing on the commander takes drop pods, and on high ground over it parachutes; else the squad comes in from the edge.
+    if (held('dropPods')) add({ x: commander.x, y: commander.y }, 'decap')
     // The highest open tile at range from the commander, clear of its guards.
     const ring = Array.from({ length: GRID * GRID }, (_, t) => ({ x: t % GRID, y: Math.floor(t / GRID) })).filter(
       (t) => !blocked(battle, t.x, t.y) && distance(t, commander) >= 7 && distance(t, commander) <= 10 && battle.units.every((u) => u.side !== 'alien' || distance(u, t) >= 4) && joined(t),
     )
-    add(ring.length > 0 ? ring.reduce((a, b) => (heightAt(battle, b) > heightAt(battle, a) ? b : a)) : clear(), 'overwatch')
+    if (held('canopies')) add(ring.length > 0 ? ring.reduce((a, b) => (heightAt(battle, b) > heightAt(battle, a) ? b : a)) : clear(), 'overwatch')
     add(spacedTile(battle, [commander, ...battle.zones], 2 * ZONE_CLEARANCE, 'edge'), 'bait')
+    while (battle.zones.length < ZONES) add(distinct(), 'march')
   } else if (goal === 'raid') {
     // A raid lands once, clear of the guards; its choice is how many caches to go for. Each stands by a pod, guarded.
     add(distinct(), 'march')
@@ -765,7 +771,6 @@ function planZones(battle: Battle, centres: Tile[]): void {
   } else {
     // Exterminate: quiet approaches from the edge; Orbital Drop Pods make one a hot drop onto a pod, Night Canopies one a
     // parachute drop anywhere within.
-    const held = (effect: RelicEffect) => battle.reserve.some((r) => r.effects.includes(effect))
     if (held('dropPods') && centres.length > 0) add(centres[randomInt(battle, centres.length)], 'hot')
     if (held('canopies')) add(distinct('anywhere'), 'stealth')
     while (battle.zones.length < ZONES) add(distinct(), 'march')

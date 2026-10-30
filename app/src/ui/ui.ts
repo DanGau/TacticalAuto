@@ -238,7 +238,16 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     else if (target.dataset.recruit) recruit = Number(target.dataset.recruit)
     else if (target.dataset.seen) seen = shown!.report
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
-    else if (target.dataset.pick) picked = Number(target.dataset.pick)
+    else if (target.dataset.pick) {
+      // A stop tapped once is picked to look at; tapped again, the squad sets out for it.
+      const index = Number(target.dataset.pick)
+      if (picked !== index) picked = index
+      else {
+        picked = null
+        act({ type: 'go', index })
+        return
+      }
+    }
     else if (target.dataset.gear) gear = target.dataset.gear as 'keep' | 'sell'
     else if (target.dataset.open) {
       // Clicking the soldier open closes it.

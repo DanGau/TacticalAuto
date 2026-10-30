@@ -10,8 +10,8 @@ import { FEATS } from '../core/feats'
 import { PATHS, SKILLS } from '../core/skills'
 import { TERRAIN_TEXT } from '../core/terrain'
 import { TWISTS, type Twist } from '../core/twists'
-import { CONTINENTS } from '../core/world'
-import { globe, pinAt, type Pin } from './globe'
+import { CONTINENTS, type LonLat } from '../core/world'
+import { globe, type Pin } from './globe'
 import { decisions } from './aftermath'
 import { alienName, button, describe, gearCard, keywordChips, resistChip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
 
@@ -56,7 +56,7 @@ const FOG = '<span class="node fog">?</span>'
 
 
 /** How many stops ahead of the squad the map shows. */
-const SIGHT = 3
+const SIGHT = 2
 
 /**
  * The run as a globe: where the squad stands, then the stops it can still reach, up to SIGHT ahead, pinned along its
@@ -79,12 +79,15 @@ function runMap(run: Run, picked: number | null): string {
     }
   }
   const pins: Pin[] = []
+  /** The stops the squad took on this leg, in order. */
+  const path: LonLat[] = []
   let focus = run.route[run.keys].from
   run.legs.forEach((leg, l) => {
     const walked = (c: number) => l < run.keys || (l === run.keys && (c < run.stop || (c === run.stop && here !== null)))
-    // Where the squad stands: the stop under way, or else the last it took. The way behind it is not shown.
+    // Where the squad stands: the stop under way, or else the last it took.
     const standing = (c: number) => l === run.keys && (here ? c === run.stop : c === run.stop - 1)
-    const shown = (c: number, i: number) => (walked(c) ? standing(c) && leg.path[c] === i : reach[l][c].has(i) && l * (LEG_STOPS + 1) + c <= at + SIGHT)
+    // On the leg under way the stops taken stay shown, the way the squad came across the continent.
+    const shown = (c: number, i: number) => (walked(c) ? l === run.keys && leg.path[c] === i : reach[l][c].has(i) && l * (LEG_STOPS + 1) + c <= at + SIGHT)
     leg.columns.forEach((column, c) =>
       column.forEach((node, i) => {
         if (!shown(c, i)) return
@@ -94,7 +97,8 @@ function runMap(run: Run, picked: number | null): string {
         const icon = !node.stop ? (c === leg.columns.length - 1 ? stopIcon(run, { kind: l === KEYS ? 'final' : 'key' } as Stop) : FOG) : stopIcon(run, node.stop, state)
         const html = open.includes(i) && l === run.keys && c === run.stop ? `<button class="option${i === picked ? ' picked' : ''}" data-pick="${i}">${icon}</button>` : icon
         const squad = taken && standing(c)
-        const pin = { id: `${l}-${c}-${i}`, at: pinAt(run, l, c, node.row), html, next, squad }
+        const pin = { id: `${l}-${c}-${i}`, at: node.at ?? run.route[l].to.at, html, next, squad, lit: l === run.keys && c === run.stop && i === picked }
+        if (taken) path.push(pin.at)
         if (squad) focus = pin.at
         pins.push(pin)
       }),
@@ -102,7 +106,9 @@ function runMap(run: Run, picked: number | null): string {
   })
   const stage = run.route[run.keys]
   const banner = stage.hero ? `Leg ${run.keys + 1} of ${KEYS}: across ${CONTINENTS[stage.continent!].name} to ${stage.hero.name}, waiting in ${stage.to.name}, ${stage.to.country}.` : 'The last leg: to the alien hub under the Antarctic ice.'
-  return `<p class="progress">${banner}</p><div class="map">${globe(run, pins, focus)}</div>`
+  // The way on from the picked stop lights up, stop by stop.
+  for (const pin of pins) if (pin.lit) for (const id of pin.next) pins.forEach((p) => p.id === id && (p.lit = true))
+  return `<p class="progress">${banner}</p><div class="map">${globe(run, pins, focus, path, picked !== null)}</div>`
 }
 
 /** The words on the button that travels to the next stop. */
@@ -160,12 +166,11 @@ function mapView(run: Run, picked: number | null): string {
   if (run.phase === 'event') return eventView(run)
   const node = current(run)
   const ahead = picked !== null && ways(run).includes(picked) ? legOf(run).columns[run.stop][picked].stop : null
-  if (!node && !ahead) return `${run.report ? '' : decisions(run)}<h2>Choose where to go next. Click a stop to see what waits there and where it leads.</h2>${runMap(run, null)}`
+  if (!node && !ahead) return `${run.report ? '' : decisions(run)}<h2>Choose where to go next. Tap a stop to see what waits there and where it leads.</h2>${runMap(run, null)}`
   if (!node)
     return `${run.report ? '' : decisions(run)}<h2>${where(run, ahead!)}</h2>
     ${runMap(run, picked)}
-    <p class="progress">Click another stop to compare, or set out.</p>
-    <button class="travel" data-action='${JSON.stringify({ type: 'go', index: picked })}'>Set out for this stop</button>`
+    <p class="progress">Tap it again to set out, or tap another stop to compare.</p>`
   const next = nextStop(run)!
   const here = node.stop!
   return `${run.report ? '' : decisions(run)}<h2>${where(run, here)}</h2>

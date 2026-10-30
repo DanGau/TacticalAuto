@@ -23,13 +23,13 @@ test('every battle on the leg under way has its aliens mustered in advance; no o
   for (const node of run.legs[0].columns.flat()) expect(node.stop!.packs.length > 0).toBe(node.stop!.kind === 'battle')
 })
 
-test('a hold offers three uplinks to hold, keeps half its packs back as waves, and is won by lasting', () => {
+test('a hold sets its uplink within, the squad coming at it from the edge; it keeps half its packs back as waves, and is won by lasting', () => {
   const run = before('hold')
   const battle = run.battle!
-  expect(battle.plans).toEqual(['uplink', 'uplink', 'uplink'])
+  expect(battle.plans).toEqual(['march', 'march', 'march'])
+  expect(battle.uplink).not.toBeNull()
   expect(battle.waves).toHaveLength(1)
   deploy(run, 1)
-  expect(battle.uplink).toEqual(battle.zones[1])
   battle.held = HOLD_ROUNDS
   stepBattle(battle)
   expect(battle).toMatchObject({ phase: 'over', winner: 'human' })
