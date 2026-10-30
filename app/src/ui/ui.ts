@@ -2,7 +2,7 @@ import { recruits, story, title } from './menu'
 import type { Action } from '../core/apply'
 import { nextStop, skillOffers, type Report, type Run } from '../core/run'
 import type { View } from '../view/view'
-import { choice, joined, runEnd, skillChoice, stopReport } from './aftermath'
+import { choice, joined, loot, modal, runEnd, skillChoice, stopReport } from './aftermath'
 import { ALIENS } from '../core/aliens'
 import { RELICS, type Relic } from '../core/relics'
 import { known } from './intro'
@@ -148,6 +148,9 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   /** The report whose joining hero has been met, and the soldier whose skill choice is open. */
   let met: Report | null = null
   let ability: number | null = null
+  /** The crates opened on the debrief shown, whether a pop-up has been over it, and the crate open now. */
+  let opened: { report: Report | null; crates: Set<number>; still: boolean } = { report: null, crates: new Set(), still: false }
+  let crate: number | null = null
   let html = ''
 
   /** The run's phase when the panel was last drawn. */
@@ -165,8 +168,12 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     // After a fight: a hero joining, then the debrief, where each soldier owed a skill chooses it, then the rewards.
     if (report && seen !== report && report.soldiers.length > 0) {
       if (report.hired && met !== report) return joined(run, report.hired)
+      if (opened.report !== report) opened = { report, crates: new Set(), still: false }
       const learner = run.soldiers.find((s) => s.id === ability && skillOffers(s).length > 0)
-      return learner ? skillChoice(run, learner) : stopReport(run, report)
+      // A pop-up opened over it leaves the debrief at rest behind: nothing in it plays again.
+      if (learner || crate !== null) opened.still = true
+      const debrief = stopReport(run, report, opened.crates, opened.still)
+      return learner ? debrief + modal(skillChoice(run, learner)) : crate !== null ? debrief + loot(run, crate) : debrief
     }
     if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run, gear)}`
     if (run.phase === 'shop' || run.phase === 'event') {
@@ -311,6 +318,11 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     else if (target.dataset.seen) seen = shown!.report
     else if (target.dataset.met) met = shown!.report
     else if (target.dataset.ability) ability = Number(target.dataset.ability)
+    else if (target.dataset.crate) crate = Number(target.dataset.crate)
+    else if (target.dataset.shut) {
+      opened.crates.add(Number(target.dataset.shut))
+      crate = null
+    }
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
     else if (target.dataset.pick) {
       // A stop tapped once is picked to look at; tapped again, the squad sets out for it.

@@ -286,6 +286,30 @@
       .joined h1 { font-size: 52px; margin: 8px 0 0; animation: rise 0.6s 0.4s both; }
       .joined > :not(.portrait):not(h1) { animation: rise 0.6s 0.8s both; }
       .joined .feats { display: flex; gap: 6px; justify-content: center; }
+      /* A debrief seen once, a pop-up closed over it, stands still. */
+      .debrief.still, .debrief.still * { animation: none !important; }
+      .debrief.still .fill { width: var(--to); }
+      .crates { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+      .crate { font-size: 34px; padding: 4px 10px; background: none; border-color: #ffd166; animation: wiggle 1.4s ease-in-out infinite; }
+      @keyframes wiggle { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(-10deg); } 85% { transform: rotate(10deg); } 95% { transform: rotate(-5deg); } }
+      /* A pop-up over the debrief: the ability choice, or a crate opening. */
+      .modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: #0a0d13cc; animation: fade 0.25s; }
+      .modal .sheet { max-width: min(900px, 92vw); text-align: center; }
+      .loot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; --glow: #9aa6bd; }
+      .loot.rare { --glow: #4da3ff; }
+      .loot.epic { --glow: #c77dff; }
+      .loot .box { font-size: 96px; animation: shake 0.7s ease-in-out, pop 0.35s 0.7s ease-in forwards; }
+      .loot .burst { position: absolute; top: 60px; left: 50%; width: 520px; height: 520px; margin: -260px; border-radius: 50%; background: repeating-conic-gradient(var(--glow) 0 8deg, transparent 8deg 24deg); -webkit-mask-image: radial-gradient(closest-side, #000, transparent); mask-image: radial-gradient(closest-side, #000, transparent); opacity: 0; animation: rays 6s linear infinite, glowin 0.4s 0.8s forwards; pointer-events: none; }
+      .loot .prize { position: relative; min-width: 260px; margin-top: -110px; padding: 14px 18px; border-radius: 10px; background: #1d2433; box-shadow: 0 0 30px var(--glow); opacity: 0; animation: reveal 0.5s 0.95s cubic-bezier(0.2, 1.6, 0.4, 1) forwards; }
+      .loot .said { display: flex; align-items: center; gap: 10px; opacity: 0; animation: appear 0.4s 1.5s forwards; }
+      .loot .said .portrait { width: 44px; height: 44px; font-size: 24px; }
+      .loot button { opacity: 0; animation: appear 0.4s 1.8s forwards; }
+      @keyframes appear { from { transform: translateY(8px); } to { opacity: 1; transform: none; } }
+      @keyframes glowin { to { opacity: 0.55; } }
+      @keyframes shake { 20%, 60% { transform: rotate(-12deg) scale(1.05); } 40%, 80% { transform: rotate(12deg) scale(1.1); } }
+      @keyframes pop { to { transform: scale(1.8); opacity: 0; } }
+      @keyframes rays { to { transform: rotate(360deg); } }
+      @keyframes reveal { from { opacity: 0; transform: translateY(30px) scale(0.5); } to { opacity: 1; transform: none; } }
       .debrief button[data-seen] { min-width: 200px; margin-top: 8px; }
       .stage.second { margin-top: 12px; animation-delay: 1.2s; }
       .stage.third { margin-top: 12px; animation-delay: 2.8s; }

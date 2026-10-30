@@ -15,7 +15,7 @@ const BADGES: Record<ClassId, string> = { assault: '🔫', heavy: '🚀', sniper
  * A soldier's card: class badge, name, and an experience bar filling with what the battle earned, flaring on a level
  * gained; gear the soldier chose to wear drops onto it; feats first pulled off below. Hovering a note tells it.
  */
-function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
+function soldierCard(run: Run, soldier: Report['soldiers'][number], opened: Set<number>): string {
   const before = level({ xp: soldier.xpBefore })
   const after = level({ xp: soldier.xpAfter })
   const filled = (xp: number) => Math.min(100, (100 * (xp - xpFor(before))) / (xpFor(before + 1) - xpFor(before)))
@@ -23,7 +23,10 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
   const gained = soldier.xpAfter - soldier.xpBefore
   const up = after > before && !soldier.downed
   const badge = soldier.downed ? '<b class="up">Downed · cloned anew</b>' : up ? `<b class="down promoted">Level ${after}!</b>` : ''
-  const worn = run.decisions.filter((d) => d.soldier === soldier.name && d.kept).map((d) => `<div class="gear won ${d.gear.rarity}" title="${gearText(d.gear)}&#10;${d.line}"><small>${d.gear.slot}</small> <b>${d.gear.name}</b></div>`)
+  // Each find is a crate on its finder's card until opened; then what was worn shows on the card.
+  const finds = run.decisions.flatMap((d, i) => (d.soldier === soldier.name ? [{ d, i }] : []))
+  const crates = finds.filter(({ i }) => !opened.has(i)).map(({ i }) => `<button class="crate" data-crate="${i}" title="Open">🎁</button>`)
+  const worn = finds.filter(({ d, i }) => d.kept && opened.has(i)).map(({ d }) => `<div class="gear won ${d.gear.rarity}" title="${gearText(d.gear)}&#10;${d.line}"><small>${d.gear.slot}</small> <b>${d.gear.name}</b></div>`)
   const feats = soldier.feats.map((id) => `<li class="feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</li>`)
   const live = run.soldiers.find((s) => s.name === soldier.name)
   const choose = live && skillOffers(live).length > 0 ? `<button class="decide" data-ability="${live.id}">Choose ability</button>` : ''
@@ -31,7 +34,7 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
     <div class="who"><span class="portrait">${soldier.cls ? BADGES[soldier.cls] : '🪖'}</span><span><b>${soldier.name}</b><br><small>Level ${before}${cls ? ` · ${cls}` : ''}</small></span></div>
     <div class="bar"><div class="fill" style="--from: ${filled(soldier.xpBefore)}%; --to: ${filled(soldier.xpAfter)}%"></div></div>
     ${gained > 0 ? `<small class="gained" title="${soldier.earned.map((e) => `${e.label}: +${e.xp}`).join('&#10;')}">+${gained} xp</small>` : ''} ${badge}
-    ${worn.join('')}
+    ${crates.length > 0 ? `<div class="crates">${crates.join('')}</div>` : ''}${worn.join('')}
     ${feats.length > 0 ? `<ul class="notes">${feats.join('')}</ul>` : ''}
     ${choose}
   </div>`
@@ -53,9 +56,28 @@ export function joined(run: Run, name: string): string {
   </div>`
 }
 
+/** A pop-up over the debrief, `html` inside it. */
+export const modal = (html: string) => `<div class="modal"><div class="sheet">${html}</div></div>`
+
+/**
+ * A crate opened, in a pop-up: it shakes, bursts in its gear's rarity, and the gear rises out of it; then its finder
+ * says what they do with it.
+ */
+export function loot(run: Run, index: number): string {
+  const { soldier: name, gear, kept, line } = run.decisions[index]
+  const finder = run.soldiers.find((s) => s.name === name)
+  return modal(`<div class="loot ${gear.rarity}">
+    <div class="burst"></div>
+    <span class="box">🎁</span>
+    <div class="prize gear ${gear.rarity}"><small>${gear.rarity} ${gear.slot}</small><br><b>${gear.name}</b><br><small>${gearText(gear)}</small></div>
+    <p class="said"><span class="portrait">${finder?.cls ? BADGES[finder.cls] : '🪖'}</span><span><b>${name}</b>: “${line}” <span class="${kept ? 'down' : 'supplies'}">${kept ? 'Equipped' : `Sold +${SELL[gear.rarity]}`}</span></span></p>
+    <button class="decide" data-shut="${index}">Nice</button>
+  </div>`)
+}
+
 /** Finds sold off, each a line paying out its supplies. */
-function sales(run: Run): string {
-  const sold = run.decisions.filter((d) => !d.kept)
+function sales(run: Run, opened: Set<number>): string {
+  const sold = run.decisions.filter((d, i) => !d.kept && opened.has(i))
   return sold.length > 0 ? `<div class="sales">${sold.map(({ gear, line }) => `<p class="sold" title="${line}">🪙 Sold <span class="${gear.rarity}">${gear.name}</span> <b class="supplies chaching" style="--paid: ${SELL[gear.rarity]}"></b></p>`).join('')}</div>` : ''
 }
 
@@ -122,14 +144,14 @@ export function choice(run: Run, pick: 'keep' | 'sell' | null = null): string {
  * The summary after a stop, once its choices are made, revealed top to bottom: the threat, what was gained, the squad
  * if it fought, and a button to go on.
  */
-export function stopReport(run: Run, report: Report): string {
+export function stopReport(run: Run, report: Report, opened: Set<number> = new Set(), still = false): string {
   const { before, after } = report.threat
   const threat = after === before ? '' : `<span class="note">${signed(after - before)}</span>`
   // The hero just joined stands with the squad that fought.
   const hero = run.soldiers.find((s) => s.name === report.hired)
   const all = [...report.soldiers, ...(hero ? [{ id: hero.id, name: hero.name, cls: hero.cls, xpBefore: hero.xp, xpAfter: hero.xp, downed: false, earned: [], feats: [] }] : [])]
-  const squad = report.soldiers.length > 0 ? `<div class="stage second"><div class="squad">${all.map((s) => soldierCard(run, s)).join('')}</div>${sales(run)}</div>` : ''
-  return `<div class="debrief">
+  const squad = report.soldiers.length > 0 ? `<div class="stage second"><div class="squad">${all.map((s) => soldierCard(run, s, opened)).join('')}</div>${sales(run, opened)}</div>` : ''
+  return `<div class="debrief${still ? ' still' : ''}">
     ${title(report)}
     <div class="stage">
       <p>Threat ${threatBar(after, Math.max(0, after - before))}${threat}</p>
@@ -138,7 +160,7 @@ export function stopReport(run: Run, report: Report): string {
       ${squad ? '' : decisions(run)}
     </div>
     ${squad}
-    <div class="stage ${squad ? 'third' : 'second'}"><button data-seen="report"${run.soldiers.some((s) => skillOffers(s).length > 0) ? ' disabled' : ''}>Continue</button></div>
+    <div class="stage ${squad ? 'third' : 'second'}"><button data-seen="report"${run.soldiers.some((s) => skillOffers(s).length > 0) || run.decisions.some((_, i) => !opened.has(i)) ? ' disabled' : ''}>Continue</button></div>
   </div>`
 }
 
