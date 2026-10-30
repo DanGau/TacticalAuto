@@ -11,7 +11,7 @@ import { visibleTiles } from '../core/sight'
 import type { Edge, Ground, Prop } from '../core/terrain'
 import { LOOKS, type FenceStyle, type Look } from './looks'
 import { addRoof } from './roofs'
-import { buildOutskirts } from './outskirts'
+import { buildOutskirts, SCENERY } from './outskirts'
 import { blob, css, ditherable, shade, Shapes, sinkable, Sketch, type Point3 } from './shapes'
 import { ACROSS, LEVEL, PITCH, TILE_H, TILE_W, tall, YAW } from './space'
 import { weaponOf, type Weapon } from './weapons'
@@ -26,6 +26,8 @@ const NIGHT = 0x10141c
 const CHEST = 18
 /** Zoom that shows the whole map. */
 const FIT = Math.min(WIDTH / (GRID * TILE_W), HEIGHT / (GRID * TILE_H + 80))
+/** Screen pixels a press moves before it pans the camera. */
+const DRAG_PX = 6
 /** Screen pixels kept clear around what the camera frames. */
 const MARGIN = 220
 
@@ -35,7 +37,7 @@ const FOCUS_MS = 700
 const FLY_MS = 1600
 /** Screen pixels the landing panel takes from the bottom of the canvas. */
 const PANEL = 110
-/** Screen pixels kept clear around the whole battlefield, which sits in the middle of the screen above the panel. */
+/** Screen pixels kept clear around what is in play, which sits in the middle of the screen above the panel. */
 const WHOLE_MARGIN = PANEL - 20
 /** A drop pod's fall, the burst of dust as it lands, the gap between pods, and the height it falls from in world pixels. */
 const POD_FALL_MS = 800
@@ -1163,7 +1165,7 @@ export async function createView(): Promise<View> {
    */
   function follow(points: Tile[] | Camera, ms = CAMERA_MS): Promise<void> {
     const from = camera
-    const to = Array.isArray(points) ? framing(points, camera.yaw) : points
+    const to = clamped(Array.isArray(points) ? framing(points, camera.yaw) : points)
     const mine = ++glides
     return tween(ms, (t) => {
       if (mine !== glides) return
@@ -1625,7 +1627,28 @@ export async function createView(): Promise<View> {
     }
   }
 
+  // Dragging pans the still camera; the next glide to the action takes it back. A drag is not a click.
+  let drag: { x: number; y: number; moved: boolean } | null = null
+  canvas.addEventListener('pointerdown', (e) => (drag = { x: e.clientX, y: e.clientY, moved: false }))
+  addEventListener('pointerup', () => setTimeout(() => (drag = null)))
+  canvas.addEventListener(
+    'click',
+    (e) => {
+      if (drag?.moved) e.stopImmediatePropagation()
+    },
+    { capture: true },
+  )
   canvas.addEventListener('pointermove', (e) => {
+    if (drag && (drag.moved || Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > DRAG_PX) && camera.fov <= STILL_FOV) {
+      drag.moved = true
+      const { right, up } = axes(camera.yaw, camera.pitch)
+      const per = scale() * ACROSS
+      const dx = -(e.clientX - drag.x) / per
+      const dy = (e.clientY - drag.y) / per
+      Object.assign(drag, { x: e.clientX, y: e.clientY })
+      glides++
+      look(clamped({ ...camera, x: camera.x + right.x * dx + up.x * dy, y: camera.y + up.y * dy, z: camera.z + right.z * dx + up.z * dy }))
+    }
     const zone = zoneAt(e.offsetX, e.offsetY)
     canvas.style.cursor = zone === null ? 'default' : 'pointer'
     if (zone === hovered || !shown) return
@@ -1640,24 +1663,44 @@ export async function createView(): Promise<View> {
     return [{ x: zone.x - reach, y: zone.y - reach }, { x: zone.x + reach, y: zone.y + reach }, ...(toward ? [toward] : [])]
   }
 
-  /** The camera that frames the whole battlefield, its own tiles filling the screen. */
-  function wholeMap(yaw = YAW): Camera {
+  /**
+   * The camera framing what is in play: before the landing its zones, pods and goals; after it, the squad and the
+   * aliens it has found.
+   */
+  function inPlay(yaw = YAW): Camera {
     const battle = shown!
-    const tiles = battle.outside.flatMap((out, t) => (out ? [] : [{ x: t % GRID, y: Math.floor(t / GRID) }]))
-    return framing(tiles, yaw, WHOLE_MARGIN)
+    const goals = [battle.uplink, battle.escape, battle.start, ...battle.caches].filter((t): t is Tile => t !== null)
+    const units = battle.units.filter((u) => u.side === 'human' || battle.phase === 'deploy' || revealed(battle, u))
+    return framing([...(battle.phase === 'deploy' ? battle.zones : []), ...goals, ...units], yaw, WHOLE_MARGIN)
   }
 
   /**
-   * The camera framing `tiles` as `shot` says, raised so the landing panel below covers none of it; null frames the
-   * whole map. A subject on a third is set off the centre, the screen's other two thirds left open before it.
+   * The still camera `to` moved only as far in, and over, as keeps everything it shows within the town drawn round
+   * the map, so the screen never reaches past it. A wide lens shows the far distance by design, and is left alone.
+   */
+  function clamped(to: Camera): Camera {
+    if (to.fov > STILL_FOV) return to
+    const s = Math.min(innerWidth / WIDTH, innerHeight / HEIGHT)
+    // The ground the screen shows, in tiles from its centre to its farthest corner at zoom 1, whichever way it turns.
+    const corner = Math.hypot(innerWidth / 2 / s / ACROSS, innerHeight / 2 / s / ACROSS / Math.sin(to.pitch))
+    const half = (GRID - 1) / 2 + SCENERY
+    const zoom = Math.max(to.zoom, corner / half)
+    const reach = corner / zoom
+    const within = (v: number) => Math.min(GRID - 1 + SCENERY - reach, Math.max(reach - SCENERY, v))
+    return { ...to, x: within(to.x), z: within(to.z), zoom }
+  }
+
+  /**
+   * The camera framing `tiles` as `shot` says, raised so the landing panel below covers none of it; null frames what
+   * is in play. A subject on a third is set off the centre, the screen's other two thirds left open before it.
    */
   function above(tiles: Tile[] | null, shot: Shot = {}): Camera {
     const yaw = YAW + (shot.turn ?? 0)
-    const framed = tiles === null ? wholeMap(yaw) : framing(tiles, yaw)
+    const framed = tiles === null ? inPlay(yaw) : framing(tiles, yaw)
     const { up, right } = axes(yaw)
     const lift = -(tiles === null ? PANEL / 2 : PANEL) / framed.zoom / ACROSS
     const aside = -((shot.third ?? 0) * WIDTH) / 6 / framed.zoom / ACROSS
-    return {
+    return clamped({
       ...framed,
       x: framed.x + up.x * lift + right.x * aside,
       y: framed.y + up.y * lift,
@@ -1665,7 +1708,7 @@ export async function createView(): Promise<View> {
       pitch: PITCH + (shot.pitch ?? 0),
       fov: shot.fov ?? STILL_FOV,
       haze: shot.haze ?? 0,
-    }
+    })
   }
 
   resize()
@@ -1714,7 +1757,7 @@ export async function createView(): Promise<View> {
       const fresh = battle !== shown
       if (fresh) setBattle(battle)
       drawMarks(battle)
-      // A new battle opens flying in from high above, turning, down to the whole map.
+      // A new battle opens flying in from high above, turning, down to what is in play.
       if (fresh && battle.phase === 'deploy') {
         // An establishing shot: low over the far side of the town, looking in across its rooftops through the haze.
         look(above(null, OPENING))
@@ -1728,7 +1771,7 @@ export async function createView(): Promise<View> {
       deploying = battle.phase === 'deploy'
       if (landed && animate) await dropPods(battle)
       if (!animate) {
-        if (battle.phase !== 'deploy') look(wholeMap())
+        if (battle.phase !== 'deploy') look(clamped(inPlay()))
         labels.clear()
         for (const e of events) {
           if (e.type === 'effect' && sprites.has(e.id)) effectCallout(e, sprites.get(e.id)!)

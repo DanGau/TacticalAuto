@@ -64,3 +64,10 @@ test('some battlefields are split by water, which no one can stand in, though sh
   expect(wet.length).toBeGreaterThan(0)
   for (const b of wet) b.ground.forEach((g, t) => g === 'water' && expect(b.cover[t]).toBe(1))
 })
+
+test('a battlefield is some 3000 tiles, ragged, with town left past it on every side', () => {
+  const battles = TERRAIN_KINDS.flatMap((kind) => [1, 2, 3, 4].map((seed) => createBattle(seed, kind, [], [])))
+  const areas = battles.map((b) => b.outside.filter((out) => !out).length)
+  expect(areas.reduce((a, b) => a + b) / areas.length).toBeGreaterThan(2500)
+  for (const { bounds } of battles) expect(Math.min(bounds.x1, bounds.y1, GRID - 1 - bounds.x2, GRID - 1 - bounds.y2)).toBeGreaterThanOrEqual(10)
+})

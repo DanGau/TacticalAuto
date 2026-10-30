@@ -6,7 +6,7 @@ import { blob, mix, shade, Shapes } from './shapes'
 import { ACROSS, LEVEL, tall } from './space'
 
 /** Tiles of scenery drawn past the map on every side, and of bare ground past that, fading into the night. */
-const REACH = 14
+export const SCENERY = 14
 const PLAIN = 160
 /** How far, in screen pixels seen from the still camera, a cliff falls before it fades into the depths. */
 const FALL = 230
@@ -92,8 +92,8 @@ export function buildOutskirts(battle: Battle): Group {
       if (past(x, y) <= 0) continue
       shapes.flat(x - 0.5, y - 0.5, x + 0.5, y + 0.5, 0, shade(land, 0.9))
     }
-  for (let y = -REACH; y < GRID + REACH; y += 2)
-    for (let x = -REACH; x < GRID + REACH; x += 2) {
+  for (let y = -SCENERY; y < GRID + SCENERY; y += 2)
+    for (let x = -SCENERY; x < GRID + SCENERY; x += 2) {
       if (past(x, y) < 3) continue
       const lot = { x: x + Math.floor(rand() * 2), y }
       // Before the map, toward the still camera, the scenery stays low, so it hides nothing.

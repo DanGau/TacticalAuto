@@ -9,7 +9,7 @@ import { EDGE_COVER, generateTerrain, PROP_COVER, type Cover, type Edge, type Gr
 
 export type { Cover }
 
-export const GRID = 50
+export const GRID = 96
 /** A battle still running at this beat ends as a draw. */
 export const MAX_BEATS = 1000
 /** Damage a crit adds. */
@@ -498,10 +498,12 @@ export function edgeBetween(battle: Battle, a: Tile, b: Tile): Edge {
 export function passable(battle: Battle, from: Tile, to: Tile): boolean {
   if (from.x === to.x || from.y === to.y) return edgeBetween(battle, from, to) === 'none'
   // Both ways round the corner: through the tile beside `from` on `to`'s column, and through the one on its row.
-  const open = (ax: number, ay: number, bx: number, by: number) =>
-    (ay === by ? battle.west[ay * GRID + Math.max(ax, bx)] : battle.north[Math.max(ay, by) * GRID + ax]) === 'none'
-  return open(from.x, from.y, to.x, from.y) && open(to.x, from.y, to.x, to.y) && open(from.x, from.y, from.x, to.y) && open(from.x, to.y, to.x, to.y)
+  return open(battle, from.x, from.y, to.x, from.y) && open(battle, to.x, from.y, to.x, to.y) && open(battle, from.x, from.y, from.x, to.y) && open(battle, from.x, to.y, to.x, to.y)
 }
+
+/** Whether nothing stands on the line between neighbouring tiles a and b. */
+const open = (battle: Battle, ax: number, ay: number, bx: number, by: number) =>
+  (ay === by ? battle.west[ay * GRID + Math.max(ax, bx)] : battle.north[Math.max(ay, by) * GRID + ax]) === 'none'
 
 /**
  * A battle's walking graph and the distance fields found on it. Both follow from terrain and the units that never move,
@@ -516,12 +518,16 @@ function walkGraph(battle: Battle) {
   const fixed = still.map((u) => u.y * GRID + u.x).join()
   let walk = walks.get(battle)
   if (walk?.fixed === fixed) return walk
+  const walls = new Set(still.map((u) => u.y * GRID + u.x))
   const into = Array.from({ length: GRID * GRID }, (_, t) => {
     const tile = { x: t % GRID, y: Math.floor(t / GRID) }
-    return NEIGHBORS.flatMap(([dx, dy]): [number, number][] => {
+    const steps: [number, number][] = []
+    for (const [dx, dy] of NEIGHBORS) {
       const from = { x: tile.x + dx, y: tile.y + dy }
-      return onGrid(from.x, from.y) && coverAt(battle, from.x, from.y) === 0 && !still.some((u) => u.x === from.x && u.y === from.y) && passable(battle, tile, from) ? [[from.y * GRID + from.x, stepCost(battle, from, tile)]] : []
-    })
+      const f = from.y * GRID + from.x
+      if (onGrid(from.x, from.y) && battle.cover[f] === 0 && !walls.has(f) && passable(battle, tile, from)) steps.push([f, stepCost(battle, from, tile)])
+    }
+    return steps
   })
   walk = { fixed, into, fields: new Map() }
   walks.set(battle, walk)
@@ -550,6 +556,23 @@ export function walkingDistances(battle: Battle, goal: Tile): readonly number[] 
   }
   fields.set(start, field)
   return field
+}
+
+/** Whether a unit could walk from `start` to each tile, ignoring units that move. */
+function reachableFrom(battle: Battle, start: Tile): boolean[] {
+  const { into } = walkGraph(battle)
+  const out: number[][] = into.map(() => [])
+  into.forEach((froms, t) => froms.forEach(([f]) => out[f].push(t)))
+  const reached = Array<boolean>(GRID * GRID).fill(false)
+  const queue = [start.y * GRID + start.x]
+  reached[queue[0]] = true
+  for (const t of queue)
+    for (const n of out[t]) {
+      if (reached[n]) continue
+      reached[n] = true
+      queue.push(n)
+    }
+  return reached
 }
 
 /** Whether nothing may stand on the tile: it is off the grid, cover, or occupied. */
@@ -795,7 +818,9 @@ function planZones(battle: Battle, centres: Tile[]): void {
   const clear = (within: Within = 'edge') => spacedTile(battle, [...battle.units, ...battle.zones], ZONE_CLEARANCE, within)
   // A zone the squad can walk off and the aliens can walk to: high ground may be a ledge with no way down.
   const anchor = centres[0]
-  const joined = (t: Tile) => !anchor || (walkingDistances(battle, anchor)[t.y * GRID + t.x] < Infinity && walkingDistances(battle, t)[anchor.y * GRID + anchor.x] < Infinity)
+  const toAnchor = anchor && walkingDistances(battle, anchor)
+  const fromAnchor = anchor && reachableFrom(battle, anchor)
+  const joined = (t: Tile) => !anchor || (toAnchor![t.y * GRID + t.x] < Infinity && fromAnchor![t.y * GRID + t.x])
   // Zones clear of every pod differ in kind, one each in turn: the highest ground over the aliens, the heaviest cover,
   // the nearest to them. Which suits a squad depends on who is in it.
   const kinds = [(i: ReturnType<typeof zoneInfo>) => i.high, (i: ReturnType<typeof zoneInfo>) => i.cover, (i: ReturnType<typeof zoneInfo>) => -i.contact]
@@ -983,6 +1008,8 @@ const GUARD_SHARE = 0.25
 /** The most teams a rescue can split the squad into. */
 export const TEAMS = 4
 
+/** How far an escape's ways out lie from where the squad is ambushed, along each axis. */
+const ESCAPE_SPAN = 30
 /** How far from the squad and the ways out an escape's Hunter starts. */
 const HUNTER_START = 12
 
@@ -1042,14 +1069,15 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   }
   sealPockets(battle)
   if (goal === 'escape') {
-    // Ambushed at one corner, with the ways out across the map at the far one and the edges beside it.
+    // Ambushed at one corner, with the ways out ESCAPE_SPAN across toward the far one: there, and halfway along either side.
     const { x1, y1, x2, y2 } = battle.bounds
     const corners = [{ x: x1 + 2, y: y1 + 2 }, { x: x2 - 2, y: y1 + 2 }, { x: x2 - 2, y: y2 - 2 }, { x: x1 + 2, y: y2 - 2 }]
     const corner = randomInt(battle, corners.length)
-    const far = corners[(corner + 2) % corners.length]
-    const mid = { x: (x1 + x2) >> 1, y: (y1 + y2) >> 1 }
-    battle.start = edgeNear(battle, corners[corner])
-    for (const exit of [far, { x: far.x, y: mid.y }, { x: mid.x, y: far.y }]) battle.zones.push(edgeNear(battle, exit))
+    const start = edgeNear(battle, corners[corner])
+    const dx = Math.sign(corners[(corner + 2) % corners.length].x - start.x) * ESCAPE_SPAN
+    const dy = Math.sign(corners[(corner + 2) % corners.length].y - start.y) * ESCAPE_SPAN
+    battle.start = start
+    for (const [kx, ky] of [[1, 1], [1, 0.5], [0.5, 1]]) battle.zones.push(openNear(battle, { x: Math.round(start.x + dx * kx), y: Math.round(start.y + dy * ky) }))
   }
 
   const centres: Tile[] = []

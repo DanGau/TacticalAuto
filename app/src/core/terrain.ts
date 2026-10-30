@@ -98,7 +98,9 @@ const PLOTS: Record<(typeof ZONE_TERRAINS)[number], { roads: [number, number]; p
 const HILLS: Record<TerrainKind, number> = { town: 2, city: 1, countryside: 3, industrial: 1, ruins: 2, compound: 2, hive: 3 }
 
 /** The battlefield's half-width, in tiles, at its narrowest and widest; the town goes on around it. */
-const REACH: [number, number] = [14, 21]
+const REACH: [number, number] = [24, 36]
+/** The fewest tiles of town kept past the battlefield on every side, so no view of it reaches the map's edge. */
+const SPRAWL = 10
 
 /**
  * A battlefield of the given kind, in the manner of XCOM 2's plots and parcels: roads cut the map into lots,
@@ -111,6 +113,8 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
   const city = place?.city ?? R.cities[randomInt(rng, R.cities.length)]
   /** Width of a bridge over a river. */
   const ROAD = 2
+  /** Scales a length given for a 50-tile plot to this one. */
+  const scaled = (tiles: number) => Math.round((tiles * size) / 50)
   const [MIN_BUILDING, MAX_HOUSE] = R.building
   const ground = Array<Ground>(size * size).fill(kind === 'countryside' ? 'grass' : 'pavement')
   const props = Array<Prop>(size * size).fill('none')
@@ -349,7 +353,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
   /** The alien hive: clusters of spires and growths on ground nothing human made. */
   function hive(): void {
     ground.fill('hive')
-    const clusters = Array.from({ length: 14 }, () => ({ x: between(0, size - 1), y: between(0, size - 1), reach: between(2, 4) }))
+    const clusters = Array.from({ length: scaled(scaled(14)) }, () => ({ x: between(0, size - 1), y: between(0, size - 1), reach: between(2, 4) }))
     each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => {
       const dense = clusters.some((c) => Math.max(Math.abs(c.x - x), Math.abs(c.y - y)) <= c.reach)
       if (chance(dense ? 0.33 : 0.03)) put(x, y, chance(0.45) ? 'spire' : 'growth')
@@ -446,20 +450,20 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     // A river splits the map; a few bridges are the only ways across.
     river: () => {
       const path = wander()
-      const bridges = [between(3, 9), between(13, 18), between(22, size - 4)].filter(() => chance(0.8))
-      if (bridges.length === 0) bridges.push(between(12, 19))
+      const bridges = [between(3, scaled(9)), between(scaled(13), scaled(18)), between(scaled(22), size - 4)].filter(() => chance(0.8))
+      if (bridges.length === 0) bridges.push(between(scaled(12), scaled(19)))
       band(chance(0.5), (i) => path[i], 3, (i) => (bridges.some((b) => i >= b && i < b + ROAD) ? 'road' : 'water'))
     },
     // Water takes one side of the map, along a ragged shore.
     coast: () => {
-      const shore = wander().map((at) => Math.min(at, 6))
+      const shore = wander().map((at) => Math.min(at, scaled(6)))
       const vertical = chance(0.5)
       for (let i = 0; i < size; i++) for (let d = 0; d < shore[i]; d++) clear(vertical ? d : i, vertical ? i : d, 'water')
     },
     // A blast crater: an open bowl of scorched ground in the middle, ringed by rubble, where no one has cover.
     crater: () => {
-      const c = { x: between(12, size - 13), y: between(12, size - 13) }
-      const reach = between(5, 7)
+      const c = { x: between(scaled(12), size - scaled(13)), y: between(scaled(12), size - scaled(13)) }
+      const reach = between(scaled(5), scaled(7))
       each({ x1: 0, y1: 0, x2: size - 1, y2: size - 1 }, (x, y) => {
         const d = Math.hypot(x - c.x, y - c.y)
         if (d <= reach) clear(x, y, 'scorched')
@@ -470,7 +474,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     lanes: () => {
       const vertical = chance(0.5)
       for (const at of [Math.floor(size / 3) + between(-2, 2), Math.floor((2 * size) / 3) + between(-2, 2)]) {
-        const gaps = [between(2, 8), between(13, 18), between(23, size - 3)]
+        const gaps = [between(2, scaled(8)), between(scaled(13), scaled(18)), between(scaled(23), size - 3)]
         for (let i = 0; i < size; i++) {
           const edge = gaps.some((g) => i >= g && i < g + 2) ? 'none' : 'wall'
           if (vertical) west[i * size + at] = edge
@@ -549,7 +553,8 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
       const dy = Math.floor(t / size) + 0.5 - c.y
       const angle = Math.atan2(dy, dx)
       const edge = 1 + waves.reduce((sum, w) => sum + w.depth * Math.sin(w.k * angle + w.phase), 0)
-      return Math.hypot(dx / rx, dy / ry) > edge
+      const rim = Math.min(t % size, Math.floor(t / size), size - 1 - (t % size), size - 1 - Math.floor(t / size))
+      return Math.hypot(dx / rx, dy / ry) > edge || rim < SPRAWL
     })
     const bounds: Rect = { x1: size, y1: size, x2: 0, y2: 0 }
     outside.forEach((out, t) => {
@@ -601,7 +606,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     }
     connect()
     const { x1, y1, x2, y2 } = cut.bounds
-    if (twist === 'fuel') for (let i = 0; i < 14; i++) put(between(x1 + 1, x2 - 1), between(y1 + 1, y2 - 1), 'fuel')
+    if (twist === 'fuel') for (let i = 0; i < scaled(scaled(14)); i++) put(between(x1 + 1, x2 - 1), between(y1 + 1, y2 - 1), 'fuel')
     // The town past the battlefield keeps its hills.
     const height = hills().map((h, t) => (ground[t] === 'void' && !cut.outside[t] ? 0 : h))
     return { ground, props, north, west, height, region, city, ...cut }

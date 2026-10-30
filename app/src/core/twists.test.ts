@@ -56,9 +56,11 @@ test('no twist on the first leg; each later leg opens its own twists, and only t
 
 test('narrow ground leaves void off the battlefield, which blocks walking but neither sight nor shelters', () => {
   const terrain = generateTerrain({ rng: 5 }, GRID, 'town', 'narrow')
-  const gone = terrain.ground.filter((g) => g === 'void').length
-  expect(gone).toBeGreaterThan(GRID * GRID * 0.2)
-  expect(gone).toBeLessThan(GRID * GRID * 0.8)
+  // Of the battlefield's patch, the narrowing takes some but not all.
+  const patch = terrain.outside.filter((out) => !out).length
+  const gone = terrain.ground.filter((g, t) => g === 'void' && !terrain.outside[t]).length
+  expect(gone).toBeGreaterThan(patch * 0.1)
+  expect(gone).toBeLessThan(patch * 0.8)
   const battle = duel(null)
   battle.props[11 * GRID + 10] = 'void'
   battle.cover[11 * GRID + 10] = 1
