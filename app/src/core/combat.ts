@@ -257,26 +257,36 @@ function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: S
 
 /**
  * The cheapest path to each tile the unit can reach with `move`, climbing costing more, cheapest first,
- * starting with the empty path. Any first step is in reach.
+ * starting with the empty path. Any first step is in reach. Of equally cheap paths to a tile, the one that turns least
+ * is kept, so a unit walks straight rather than weaving.
  */
 function paths(battle: Battle, unit: Unit, move: number): Tile[][] {
   const best = new Map([[unit.y * GRID + unit.x, 0]])
-  const buckets: Tile[][][] = [[[]]]
+  const turns = new Map([[unit.y * GRID + unit.x, 0]])
+  const buckets: { path: Tile[]; turns: number }[][] = [[{ path: [], turns: 0 }]]
   const found: Tile[][] = []
   for (let cost = 0; cost < buckets.length; cost++) {
-    for (const path of buckets[cost] ?? []) {
+    for (const { path, turns: bends } of buckets[cost] ?? []) {
       const from = path.at(-1) ?? unit
-      if (best.get(from.y * GRID + from.x) !== cost) continue
+      const key = from.y * GRID + from.x
+      if (best.get(key) !== cost || turns.get(key) !== bends) continue
+      // Settled: a later entry for the tile with as few turns is a duplicate.
+      turns.set(key, -1)
       found.push(path)
+      const back = path.at(-2) ?? (path.length > 0 ? unit : null)
       for (const [dx, dy] of NEIGHBORS) {
         const x = from.x + dx
         const y = from.y + dy
         if (blocked(battle, x, y) || !passable(battle, from, { x, y })) continue
         const next = cost + stepCost(battle, from, { x, y })
+        const bent = bends + (back && (from.x - back.x !== dx || from.y - back.y !== dy) ? 1 : 0)
+        const known = best.get(y * GRID + x) ?? Infinity
         // A first step is always within reach of a unit that can move, so a climb dearer than its move cannot wall it in.
-        if ((next > move && !(cost === 0 && move > 0)) || next >= (best.get(y * GRID + x) ?? Infinity)) continue
+        if (next > move && !(cost === 0 && move > 0)) continue
+        if (next > known || (next === known && !(bent < (turns.get(y * GRID + x) ?? Infinity)))) continue
         best.set(y * GRID + x, next)
-        ;(buckets[next] ??= []).push([...path, { x, y }])
+        turns.set(y * GRID + x, bent)
+        ;(buckets[next] ??= []).push({ path: [...path, { x, y }], turns: bent })
       }
     }
   }

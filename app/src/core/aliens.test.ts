@@ -535,12 +535,14 @@ test('a soldier with no shot and an enemy that could reach it prepares, and shoo
   expect(battle.turn).toBe('alien')
 })
 
-test('a soldier with nothing in reach sprints, moving again in place of attacking', () => {
+test('a soldier with nothing in reach sprints, moving again in place of attacking, in a straight line', () => {
   const { battle, soldier, until } = arena([{ kind: 'trooper', x: 10, y: 45 }])
   const events = until((all) => all.some((e) => e.type === 'order')).slice(-2)
   expect(events).toContainEqual({ type: 'order', id: soldier.id, order: 'sprint' })
   const walked = events.find((e) => e.type === 'move' && e.id === soldier.id)
   expect(walked?.type === 'move' && walked.path.length).toBeGreaterThan(soldier.stats.move)
+  // On open ground it walks straight, not weaving.
+  expect(walked?.type === 'move' && walked.path.every((t) => t.x === 10)).toBe(true)
   expect(stepBattle(battle).some((e) => e.type === 'shot' && e.id === soldier.id)).toBe(false)
 })
 
