@@ -83,8 +83,8 @@ export function buildOutskirts(battle: Battle): Group {
     group.add(blob({ x: x - across(4 * size) / Math.SQRT2, y: base + tall(22 * size), z: y + across(4 * size) / Math.SQRT2 }, across(7 * size), look.blocks[1]))
   }
 
-  // Bare ground under it all, out to where the haze swallows it, and a street's width round the map before the scenery starts.
-  shapes.flat(-PLAIN, -PLAIN, GRID + PLAIN, GRID + PLAIN, -0.01, shade(look.rock, 0.45))
+  // Bare ground under it all, low enough that it never fights the ground above it for depth, out to where the haze swallows it, and a street's width round the map before the scenery starts.
+  shapes.flat(-PLAIN, -PLAIN, GRID + PLAIN, GRID + PLAIN, -0.3, shade(look.rock, 0.45))
   for (let y = -2; y < GRID + 2; y++)
     for (let x = -2; x < GRID + 2; x++) {
       if (past(x, y) <= 0) continue

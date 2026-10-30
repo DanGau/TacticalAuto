@@ -37,17 +37,20 @@ export const WEAPONS = {
   plasma: { ...base, style: 'orb', color: 0x7dff6a, core: 0xeaffd8, width: 5, ms: 260, flash: 9, hitstop: 50, kick: 4, sparks: 8 },
   claw: { ...base, style: 'strike', color: 0xd6ffc8, width: 2, ms: 90, bolts: 3, flash: 4, hitstop: 40, kick: 4, sparks: 4 },
   maul: { ...base, style: 'strike', color: 0xffe0a0, width: 6, ms: 140, flash: 12, hitstop: 120, shake: 8, kick: 12, sparks: 12 },
+  /** A blademaster's sword: two quick cuts. */
+  blade: { ...base, style: 'strike', color: 0xe8f4ff, width: 3, ms: 110, bolts: 2, flash: 8, hitstop: 70, shake: 3, kick: 8, sparks: 8 },
   lance: { ...base, style: 'beam', color: 0xc77dff, core: 0xffe6ff, width: 7, ms: 420, flash: 18, hitstop: 110, shake: 9, kick: 10, sparks: 14 },
 } satisfies Record<string, Weapon>
 
 const CLASS_WEAPON: Record<ClassId, keyof typeof WEAPONS> = { assault: 'shotgun', heavy: 'minigun', sniper: 'rail', support: 'rifle', engineer: 'arc' }
 
-/** The weapon a unit attacks with: a soldier's by class, an alien's by kind, a boss's lance, a mech's cannons. */
-export function weaponOf(unit: Unit, cls: ClassId | null): Weapon {
+/** The weapon a unit attacks with: a soldier's by class, or a blade if the squad are `blademasters`; an alien's by kind, a boss's lance, a mech's cannons. */
+export function weaponOf(unit: Unit, cls: ClassId | null, blademasters = false): Weapon {
   if (unit.boss) return WEAPONS.lance
   if (unit.kind === 'swarmling') return WEAPONS.claw
   if (unit.kind === 'brute') return WEAPONS.maul
   if (unit.kind) return WEAPONS.plasma
   if (unit.summoner !== null) return WEAPONS.cannon
+  if (blademasters && unit.soldier !== null) return WEAPONS.blade
   return WEAPONS[cls ? CLASS_WEAPON[cls] : 'rifle']
 }

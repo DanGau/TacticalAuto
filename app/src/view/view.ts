@@ -10,12 +10,15 @@ import type { Edge, Ground, Prop } from '../core/terrain'
 import { LOOKS, type FenceStyle, type Look } from './looks'
 import { addRoof } from './roofs'
 import { buildOutskirts } from './outskirts'
-import { blob, css, ditherable, shade, Shapes, Sketch, type Point3 } from './shapes'
+import { blob, css, ditherable, shade, Shapes, sinkable, Sketch, type Point3 } from './shapes'
 import { ACROSS, LEVEL, PITCH, TILE_H, TILE_W, tall, YAW } from './space'
 import { weaponOf, type Weapon } from './weapons'
 
 export const WIDTH = 1280
 export const HEIGHT = 720
+
+/** The night the world sits in: the background, and what the distance fades into. */
+const NIGHT = 0x10141c
 
 /** Height above the ground that shots leave and land. */
 const CHEST = 18
@@ -409,7 +412,7 @@ export async function createView(): Promise<View> {
   const renderer = new WebGLRenderer({ antialias: true })
   renderer.outputColorSpace = LinearSRGBColorSpace
   renderer.setPixelRatio(devicePixelRatio)
-  renderer.setClearColor(0x10141c)
+  renderer.setClearColor(NIGHT)
   const canvas = renderer.domElement
   /** Shots, sparks, pods and words, drawn over the scene in the camera's picture. */
   const overlay = document.createElement('canvas')
@@ -433,7 +436,7 @@ export async function createView(): Promise<View> {
   /** The briefing's beam of light over what it shows. */
   const beam = new Group()
   scene.add(outskirts, terrain, zones, acid, fog, lurk, units, beam)
-  const haze = new Fog(0x10141c, 1, 2)
+  const haze = new Fog(NIGHT, 1, 2)
   scene.fog = haze
   zones.renderOrder = 1
   // Nothing shows until a battle exists.
@@ -447,8 +450,9 @@ export async function createView(): Promise<View> {
   const labels = new Set<Label>()
 
   const sprites = new Map<number, Sprite>()
-  /** The squad of the run shown, for each soldier's class. */
+  /** The squad of the run shown, for each soldier's class, and whether it fights with blades. */
   let soldiers: Run['soldiers'] = []
+  let blademasters = false
   /** A red glow under each alien the squad hasn't found, by unit id. */
   const glows = new Map<number, { node: Object3D; tile: Tile }>()
   /** Each prop, wall and window on the board, with the tiles that light it: it is lit when a soldier sees any of them. */
@@ -459,7 +463,8 @@ export async function createView(): Promise<View> {
   let roofs: { tiles: Set<number>; fade: { value: number }; mesh: Mesh }[] = []
   /** The tile the briefing is lighting, which no roof hides. */
   let lit: Tile | null = null
-  /** The fades of everything past the battlefield, which only the briefing's wide lens shows. */
+  /** The town past the battlefield, and the fades of it and of the world beyond, which only the briefing's wide lens shows. */
+  let town = new Group()
   let surroundings: { value: number }[] = []
   /** The tiles the squad sees, by index; null before the landing. */
   let seen: boolean[] | null = null
@@ -558,7 +563,7 @@ export async function createView(): Promise<View> {
     // Past the battlefield fades in as the lens widens from still, and is gone in the game's view.
     const wide = Math.min(1, Math.max(0, (camera.fov - STILL_FOV) / SURROUNDINGS_FOV))
     for (const fade of surroundings) fade.value = wide
-    outskirts.visible = wide > 0
+    outskirts.visible = town.visible = wide > 0
     const step = ms / FADE_MS
     const toward = (fade: { value: number }, target: number) => (fade.value = fade.value < target ? Math.min(target, fade.value + step) : Math.max(target, fade.value - step))
     const keys = [...sprites.values()].map((s) => ({ x: Math.round(s.tile.x), y: Math.round(s.tile.y) }))
@@ -825,6 +830,8 @@ export async function createView(): Promise<View> {
       if (battle.place === 'ruins') return
       const paint = look.roofs ? look.roofs[i % look.roofs.length] : shade(colour.get(room[0])!, 0.72)
       const inside = room.some((t) => !battle.outside[t])
+      // A building the battlefield's edge cuts is roofed tile by tile, each part fading with its own side of the edge.
+      const cut = inside && room.some((t) => battle.outside[t])
       const shapes = inside ? new Shapes() : beyond
       const y = spot(room[0] % GRID, Math.floor(room[0] / GRID)).y + top
       const xs = room.map((t) => t % GRID)
@@ -836,13 +843,13 @@ export async function createView(): Promise<View> {
       const rand = () => ((seed = (seed * 1103515245 + 12345) | 0) >>> 8) / 16777216
       // Weathered, no two roofs quite the same shade.
       const worn = shade(paint, 0.85 + rand() * 0.3)
-      if (square) addRoof(shapes, look.roof[pick(room[0], look.roof.length)], footing, worn, colour.get(room[0])!, eave, rand)
-      else for (const t of room) shapes.flat((t % GRID) - 0.5 - eave, Math.floor(t / GRID) - 0.5 - eave, (t % GRID) + 0.5 + eave, Math.floor(t / GRID) + 0.5 + eave, y, paint)
+      if (square && !cut) addRoof(shapes, look.roof[pick(room[0], look.roof.length)], footing, worn, colour.get(room[0])!, eave, rand)
+      else for (const t of room) (battle.outside[t] ? beyond : shapes).flat((t % GRID) - 0.5 - eave, Math.floor(t / GRID) - 0.5 - eave, (t % GRID) + 0.5 + eave, Math.floor(t / GRID) + 0.5 + eave, y, worn)
       if (!inside) return
       const { mesh } = shapes.build()
       terrain.add(mesh)
       scenery.push({ node: mesh, tiles: room })
-      roofs.push({ tiles: new Set(room), fade: ditherable(mesh.material as MeshBasicMaterial), mesh })
+      roofs.push({ tiles: new Set(room.filter((t) => !battle.outside[t])), fade: ditherable(mesh.material as MeshBasicMaterial), mesh })
     })
   }
 
@@ -937,7 +944,7 @@ export async function createView(): Promise<View> {
       }
     }
     addRoofs(battle, look, rooms, paint, tall(EDGE_UP * lift + CAP_UP) + 0.01, beyond)
-    const town = new Group()
+    town = new Group()
     const { mesh, lines } = beyond.build()
     town.add(mesh, ...beyondBlobs)
     if (lines) town.add(lines)
@@ -947,7 +954,7 @@ export async function createView(): Promise<View> {
     for (const group of [town, outskirts])
       group.traverse((part) => {
         const material = (part as Mesh).material as MeshBasicMaterial | undefined
-        if (material) surroundings.push(ditherable(material))
+        if (material) surroundings.push(sinkable(material, NIGHT))
       })
   }
 
@@ -1463,7 +1470,7 @@ export async function createView(): Promise<View> {
         if (!from || !to) continue
         await follow([from.tile, to.tile])
         const shooter = battle.units.find((u) => u.id === e.id)!
-        await shoot(from, to, e, vitals(battle, e.target), weaponOf(shooter, soldiers.find((s) => s.id === shooter.soldier)?.cls ?? null))
+        await shoot(from, to, e, vitals(battle, e.target), weaponOf(shooter, soldiers.find((s) => s.id === shooter.soldier)?.cls ?? null, blademasters))
         // Crumbling cover has already broken in the battle; show it as the hit lands.
         if (battle.twist === 'crumbling' && e.damage > 0) drawTerrain(battle)
       } else if (e.type === 'rocket') {
@@ -1617,6 +1624,7 @@ export async function createView(): Promise<View> {
     },
     async show(run, events, animate) {
       soldiers = run.soldiers
+      blademasters = run.doctrines.includes('blades')
       fx.clear()
       const battle = run.battle
       if (!battle) return
