@@ -12,7 +12,7 @@ import { TWISTS } from '../core/twists'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
 import { decisions } from './aftermath'
-import { alienName, button, describe, gearCard, keywordChips, resistChip, gearText, keyRow, STOP_NAMES, threatBar } from './html'
+import { alienName, button, describe, gearCard, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
 export const TABS = ['Map', 'Base', 'Barracks'] as const
@@ -232,7 +232,6 @@ export function overworld(run: Run, tab: Tab, open: number | null, picked: numbe
   return `
     <div class="header">
       <div class="tabs">${tabs.join('')}</div>
-      <span>Keys ${keyRow(run.keys)}</span>
       <span>Threat ${threatBar(run.threat)}</span>
       <span>${run.keys === KEYS ? 'Source' : 'Guardian'} ${resistChip(run.bosses[run.keys])}</span>
       <b class="supplies">${run.supplies} ${run.supplies === 1 ? 'supply' : 'supplies'}</b>

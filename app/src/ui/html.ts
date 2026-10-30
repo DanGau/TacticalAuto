@@ -3,7 +3,7 @@ import { EFFECTS, type Gear } from '../core/gear'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import type { Stats } from '../core/battle'
 import { KEYWORDS, RESISTS, type Keyword, type Resist } from '../core/keywords'
-import { KEYS, THREAT_MAX, type Mission, type StopKind } from '../core/run'
+import { THREAT_MAX, type Mission, type StopKind } from '../core/run'
 
 /** A button that performs `action` when clicked. */
 export const button = (action: Action, label: string, cls = '', enabled = true) =>
@@ -31,7 +31,6 @@ export function threatBar(threat: number, landed = 0): string {
 }
 
 /** The access keys, won and still to win. */
-export const keyRow = (keys: number) => `<span class="keys">${'◆'.repeat(keys)}${'◇'.repeat(KEYS - keys)}</span>`
 
 /** What each stat is called. */
 export const STAT_NAMES: Record<keyof Stats, string> = { hp: 'Health', armor: 'Armor', aim: 'Aim', damage: 'Damage', range: 'Range', move: 'Move', crit: 'Crit', close: 'Aim per tile closer' }

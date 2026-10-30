@@ -6,7 +6,7 @@ import { RELICS, type RelicId } from '../core/relics'
 import { KEYS, level, SELL, skillOffers, soldierStats, xpFor, squadKeywords, type Report, type Run, type Soldier } from '../core/run'
 import { PATHS, SKILLS } from '../core/skills'
 import { TRAITS } from '../core/traits'
-import { button, describe, gearCard, gearText, keyRow, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
+import { button, describe, gearCard, gearText, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
 
 /** Each class's badge; a soldier not yet promoted wears a helmet. */
 const BADGES: Record<ClassId, string> = { assault: '🔫', heavy: '🚀', sniper: '🎯', support: '⛑️', engineer: '🔧' }
@@ -133,7 +133,6 @@ export function stopReport(run: Run, report: Report): string {
     ${title(report)}
     <div class="stage">
       <p>Threat ${threatBar(after, Math.max(0, after - before))}${threat}</p>
-      ${report.key ? `<p class="keys">Access key won ${keyRow(run.keys)} ${run.keys === KEYS ? 'The alien source is found.' : ''}</p>` : ''}
       ${report.rescued !== null ? `<p class="down">${report.rescued} of ${CIVILIANS} civilians rescued</p>` : ''}
       ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : report.supplies < 0 ? `<p class="up">${report.supplies} supplies for the soldiers downed</p>` : ''}
       ${squad ? '' : decisions(run)}
@@ -145,5 +144,5 @@ export function stopReport(run: Run, report: Report): string {
 
 export function runEnd(run: Run): string {
   if (run.phase === 'won') return `<h1 class="down">The source is destroyed. Earth is saved.</h1><button id="again">New run</button>`
-  return `<h1 class="up">Earth has fallen</h1><h2>Lost: ${STOP_NAMES[run.mission!.kind]}, with ${run.keys} of ${KEYS} keys</h2><button id="again">New run</button>`
+  return `<h1 class="up">Earth has fallen</h1><h2>Lost: ${STOP_NAMES[run.mission!.kind]}, with ${run.soldiers.length} of ${KEYS + 1} heroes</h2><button id="again">New run</button>`
 }
