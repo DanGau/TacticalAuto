@@ -301,7 +301,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (!target || target.disabled || flying) return
     if (target.id === 'again') location.href = location.pathname
     else if (target.id === 'start') started = true
-    else if (target.id === 'begin') told = true
+    else if (target.id === 'begin' || target.dataset.begin !== undefined) told = true
     else if (target.dataset.recruit) {
       // A city tapped once shows who waits there; tapped again, the run begins there.
       const index = Number(target.dataset.recruit)

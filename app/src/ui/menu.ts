@@ -23,7 +23,7 @@ const STORY = [
 
 /** The story told in lines that fade in one after another, then a button on to the first choice. */
 export function story(): string {
-  return `<div class="menu story">
+  return `<button class="skip" data-begin>Skip ⏭</button><div class="menu story">
     ${STORY.map((line, i) => `<p style="animation-delay: ${0.3 + i * 1.4}s">${line}</p>`).join('')}
     <button id="begin" class="decide" style="animation-delay: ${0.3 + STORY.length * 1.4}s">Choose where to begin</button>
   </div>`
