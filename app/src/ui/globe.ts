@@ -1,3 +1,4 @@
+import { plane } from '../core/plane'
 import { along, arc, type LonLat } from '../core/world'
 import type { Run } from '../core/run'
 import { geoCentroid, geoContains, geoDistance, geoOrthographic, geoPath, type GeoPermissibleObjects } from 'd3-geo'
@@ -41,6 +42,9 @@ export interface Pin {
   lit: boolean
   /** Whether the squad has passed it; the view need not keep it in frame. */
   past: boolean
+  /** How far along the run its column is, and its place across the column, in order. */
+  layer: number
+  order: number
 }
 
 /**
@@ -227,27 +231,89 @@ function sphere(view: View, size: Size, over: string, pins: string): string {
     ${pins}`
 }
 
-/** The fewest pixels between two stops' middles, so each is a tap of its own. */
+/** The fewest pixels between two stops' middles across a column, so each is a tap of its own. */
 const ROOM = 54
+/** The fewest pixels from one column of stops to the next up the page, and the most a column spreads up and down. */
+const RISE = 72
+const BAND = 16
+/** How steeply a trail across the page climbs at least: up for each pixel across. */
+const SLANT = 0.7
 
-/** Pushes stops standing closer than ROOM apart, a few rounds over, the squad's own stop holding still. */
-function budge(stops: { p: { x: number; y: number }; fixed: boolean }[]): void {
-  for (let round = 0; round < 8; round++)
-    for (const [i, a] of stops.entries())
-      for (const b of stops.slice(i + 1)) {
-        const [dx, dy] = [b.p.x - a.p.x, b.p.y - a.p.y]
+/**
+ * Lays stops out so the map reads at a glance: each column a band of its own, the next one up the page above it, and
+ * in each its stops in order across, ROOM apart. Then trails between neighbouring columns never cross, nor run through
+ * a stop. Each stop moves as little as that takes; the squad's holds still.
+ */
+function untangle(stops: { p: { x: number; y: number }; layer: number; order: number; fixed: boolean }[], lines: [number, number][]): void {
+  const layers = [...new Set(stops.map((s) => s.layer))].sort((a, b) => a - b).map((layer) => stops.filter((s) => s.layer === layer).sort((a, b) => a.order - b.order))
+  // Which way across the page the order runs, as most columns have it.
+  const lean = layers.reduce((sum, column) => sum + column.reduce((t, s, i) => t + (i > 0 ? s.p.x - column[i - 1].p.x : 0), 0), 0)
+  const dir = lean < 0 ? -1 : 1
+  for (const column of layers) {
+    if (column.some((s) => s.fixed)) continue
+    // Across: each ROOM past the last, then all shifted back by as much as they moved on average.
+    const was = column.map((s) => s.p.x * dir)
+    const now = was.map((x) => x)
+    for (let i = 1; i < now.length; i++) now[i] = Math.max(now[i], now[i - 1] + ROOM)
+    const shift = was.reduce((sum, x, i) => sum + x - now[i], 0) / now.length
+    column.forEach((s, i) => (s.p.x = (now[i] + shift) * dir))
+  }
+  // Each column a band, BAND deep about its middle, at least RISE above the column before, out from the squad's both ways.
+  const at = Math.max(0, layers.findIndex((column) => column.some((s) => s.fixed)))
+  for (const column of layers) {
+    if (column.some((s) => s.fixed)) continue
+    const ys = column.map((s) => s.p.y).sort((a, b) => a - b)
+    const mid = ys[Math.floor(ys.length / 2)]
+    for (const s of column) s.p.y = Math.min(mid + BAND / 2, Math.max(mid - BAND / 2, s.p.y))
+  }
+  // A trail far across climbs as steeply as SLANT has it.
+  const rise = (a: { p: { x: number } }, b: { p: { x: number } }) => Math.max(RISE, SLANT * Math.abs(a.p.x - b.p.x))
+  const linked = (a: (typeof stops)[number], b: (typeof stops)[number]) => lines.some(([u, v]) => (stops[u] === a && stops[v] === b) || (stops[u] === b && stops[v] === a))
+  for (let k = at + 1; k < layers.length; k++) {
+    const over = Math.max(...layers[k].flatMap((s) => layers[k - 1].map((r) => s.p.y - r.p.y + (linked(r, s) ? rise(r, s) : RISE))))
+    if (over > 0) for (const s of layers[k]) s.p.y -= over
+  }
+  for (let k = at - 1; k >= 0; k--) {
+    const under = Math.max(...layers[k].flatMap((s) => layers[k + 1].map((r) => r.p.y - s.p.y + (linked(r, s) ? rise(r, s) : RISE))))
+    if (under > 0) for (const s of layers[k]) s.p.y += under
+  }
+  // A stop a trail fans past too near steps out of its way, and stops that crowd step apart.
+  for (let round = 0; round < 12; round++) {
+    budge(stops)
+    for (const [a, b] of lines)
+      for (const [k, s] of stops.entries()) {
+        if (k === a || k === b || s.fixed) continue
+        const [u, v] = [stops[a].p, stops[b].p]
+        const t = Math.max(0, Math.min(1, ((s.p.x - u.x) * (v.x - u.x) + (s.p.y - u.y) * (v.y - u.y)) / ((v.x - u.x) ** 2 + (v.y - u.y) ** 2 || 1)))
+        const [dx, dy] = [s.p.x - u.x - t * (v.x - u.x), s.p.y - u.y - t * (v.y - u.y)]
         const d = Math.hypot(dx, dy)
-        if (d >= ROOM) continue
-        // Stops on the same spot part sideways.
-        const [ux, uy] = d > 0.01 ? [dx / d, dy / d] : [1, 0]
-        const push = ROOM - d
-        const [sa, sb] = a.fixed ? [0, 1] : b.fixed ? [1, 0] : [0.5, 0.5]
-        a.p.x -= ux * push * sa
-        a.p.y -= uy * push * sa
-        b.p.x += ux * push * sb
-        b.p.y += uy * push * sb
+        if (d >= CLEAR) continue
+        const [nx, ny] = d > 0.01 ? [dx / d, dy / d] : [-(v.y - u.y) / Math.hypot(v.x - u.x, v.y - u.y), (v.x - u.x) / Math.hypot(v.x - u.x, v.y - u.y)]
+        s.p.x += nx * (CLEAR - d)
+        s.p.y += ny * (CLEAR - d)
       }
+  }
 }
+
+/** Pushes stops standing closer than ROOM apart, the squad's own holding still. */
+function budge(stops: { p: { x: number; y: number }; fixed: boolean }[]): void {
+  for (const [i, a] of stops.entries())
+    for (const b of stops.slice(i + 1)) {
+      const [dx, dy] = [b.p.x - a.p.x, b.p.y - a.p.y]
+      const d = Math.hypot(dx, dy)
+      if (d >= ROOM || (a.fixed && b.fixed)) continue
+      // Stops on the same spot part sideways.
+      const [ux, uy] = d > 0.01 ? [dx / d, dy / d] : [1, 0]
+      const [sa, sb] = a.fixed ? [0, 1] : b.fixed ? [1, 0] : [0.5, 0.5]
+      a.p.x -= ux * (ROOM - d) * sa
+      a.p.y -= uy * (ROOM - d) * sa
+      b.p.x += ux * (ROOM - d) * sb
+      b.p.y += uy * (ROOM - d) * sb
+    }
+}
+
+/** The fewest pixels between a stop's middle and a trail not its own. */
+const CLEAR = 30
 
 /** Where on the page a place falls, as CSS. */
 const spot = (p: { x: number; y: number }) => `left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px`
@@ -274,27 +340,49 @@ export function places(size: Size, all: { at: LonLat; html: string; chosen: bool
  * far in gold, the hero cities, and the stops pinned along the way, trails dotted from where the squad stands to each
  * choice and on from them. The choices pulse.
  */
-export function globe(size: Size, run: Run, pins: Pin[], focus: LonLat, path: LonLat[], picking: boolean): string {
-  // Framed on where the squad stands and the stops ahead; the stops passed may fall off the edge.
-  const ahead = pins.filter((p) => !p.past).map((p) => p.at)
-  const choices = pins.filter((p) => p.choice).map((p) => p.at)
-  const target = framed([focus, ...ahead], size, [focus, run.route[run.keys].to.at], ahead, [focus, ...choices])
-  // Stops are pushed apart once, as the settled view shows them; mid-glide the push shrinks and turns with the globe,
-  // so a stop slides steadily rather than jostling.
-  const project = projection(target, size)
-  const at = new Map(pins.map((pin) => [pin.id, project(pin.at)]))
-  const moved = new Map([...at].map(([id, p]) => [id, { ...p }]))
-  budge(pins.filter((pin) => at.get(pin.id)!.front).map((pin) => ({ p: moved.get(pin.id)!, fixed: pin.squad })))
-  const pushed = new Map([...at].map(([id, p]) => [id, { x: moved.get(id)!.x - p.x, y: moved.get(id)!.y - p.y }]))
+export function globe(size: Size, run: Run, pins: Pin[], focus: LonLat, path: string[], picking: boolean): string {
+  const { target, pushed } = layout(size, run, pins, focus)
   return keep(size, target, (view) => drawRun(size, run, pins, focus, path, picking, view, target, pushed))
 }
 
+/**
+ * The flight map's settled view, and how far each stop is moved from where it stands to lay the map out clearly: once,
+ * as the settled view shows them; mid-glide the move shrinks and turns with the globe, so a stop slides steadily rather
+ * than jostling.
+ */
+export function layout(size: Size, run: Run, pins: Pin[], focus: LonLat): { target: View; placed: Map<string, { x: number; y: number; front: boolean }>; pushed: Map<string, { x: number; y: number }> } {
+  // Framed on where the squad stands and the stops ahead; the stops passed may fall off the edge.
+  const ahead = pins.filter((p) => !p.past).map((p) => p.at)
+  const choices = pins.filter((p) => p.choice).map((p) => p.at)
+  // The leg leads up the page where the view looks: along the great circle it follows, at the point nearest the view's middle.
+  const { from, to } = run.route[run.keys]
+  const flat = plane(from, to.at)
+  const t = Math.min(1, Math.max(0, (flat(middle([focus, ...ahead])).x - flat(from).x) / (flat(to.at).x - flat(from).x || 1)))
+  const up: [LonLat, LonLat] = [along(from, to.at, Math.max(0, t - 0.02)), along(from, to.at, Math.min(1, t + 0.02))]
+  const target = framed([focus, ...ahead], size, up, ahead, [focus, ...choices])
+  const shown = pins.filter((pin) => projection(target, size)(pin.at).front)
+  const index = new Map(shown.map((pin, i) => [pin.id, i]))
+  const lines = shown.flatMap((pin) => pin.next.flatMap((id): [number, number][] => (index.has(id) ? [[index.get(pin.id)!, index.get(id)!]] : [])))
+  // Laid out, the stops ahead may spill out of the window; then the view draws back until they fit.
+  const { middle: mid, half } = open(size)
+  for (let tries = 0; ; tries++) {
+    const project = projection(target, size)
+    const at = new Map(pins.map((pin) => [pin.id, project(pin.at)]))
+    const placed = new Map([...at].map(([id, p]) => [id, { ...p }]))
+    untangle(shown.map((pin) => ({ p: placed.get(pin.id)!, layer: pin.layer, order: pin.order, fixed: pin.squad })), lines)
+    const seen = shown.filter((pin) => !pin.past).map((pin) => placed.get(pin.id)!)
+    const spill = Math.max(...seen.map((p) => Math.max(Math.abs(p.x - size.w / 2) / (size.w / 2 - MARGIN / 2), Math.abs(p.y - mid) / (half - MARGIN / 2))))
+    if (spill <= 1 || tries === 3 || target.r <= FAR) return { target, placed, pushed: new Map([...at].map(([id, p]) => [id, { x: placed.get(id)!.x - p.x, y: placed.get(id)!.y - p.y }])) }
+    target.r = Math.max(FAR, target.r / spill / 1.2)
+  }
+}
+
 /** The run's globe seen from `view`. */
-function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: LonLat[], picking: boolean, view: View, target: View, pushed: Map<string, { x: number; y: number }>): string {
+function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: string[], picking: boolean, view: View, target: View, pushed: Map<string, { x: number; y: number }>): string {
   const stage = run.route[run.keys]
   const project = projection(view, size)
-  // The journey so far: each leg crossed, then this one up to where the squad stands.
-  const walked = [...run.route.slice(0, run.keys).flatMap((s) => way(s.from, s.to.at)), ...[stage.from, ...path].flatMap((at, i, all) => (i === 0 ? [] : way(all[i - 1], at)))]
+  // The journey so far: each leg crossed, then this one up to where the squad stands, through its stops as laid out.
+  const crossed = run.route.slice(0, run.keys).flatMap((s) => way(s.from, s.to.at))
   const home = run.soldiers[0]?.home
   const start = home && project(home.at)
   const homeMark = home && start?.front ? `<g class="city reached"><circle cx="${start.x}" cy="${start.y}" r="5"/><text x="${start.x + 10}" y="${start.y + 4}">⌂ ${home.name}</text></g>` : ''
@@ -312,6 +400,8 @@ function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: LonLat[
     p.x += (x * Math.cos(spin) - y * Math.sin(spin)) * scale
     p.y += (x * Math.sin(spin) + y * Math.cos(spin)) * scale
   }
+  const leg = [project(stage.from), ...path.map((id) => placed.get(id)!)].filter((p) => p.front)
+  const walked = `${line(project, crossed)}${leg.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join('')}`
   const trails = pins.flatMap((pin) =>
     pin.next.flatMap((id) => {
       const [a, b] = [placed.get(pin.id)!, placed.get(id)]
@@ -328,5 +418,5 @@ function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: LonLat[
     const p = placed.get(pin.id)!
     return p.front ? [`<div class="cell${pin.squad ? ' squad' : ''}${pin.choice ? ' choice' : ''}${picking && !pin.lit && !pin.squad ? ' dim' : ''}" style="${spot(p)}">${pin.html}</div>`] : []
   })
-  return sphere(view, size, `${isles.join('')}<path class="walked" d="${line(project, walked)}"/>${trails.join('')}${homeMark}${cities.join('')}`, stops.join('') + chopper(project(focus)))
+  return sphere(view, size, `${isles.join('')}<path class="walked" d="${walked}"/>${trails.join('')}${homeMark}${cities.join('')}`, stops.join('') + chopper(project(focus)))
 }

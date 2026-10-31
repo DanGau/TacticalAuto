@@ -55,10 +55,10 @@ const FOG = '<span class="node fog">?</span>'
 const SIGHT = 2
 
 /**
- * The run as a globe: where the squad stands, then the stops it can still reach, up to SIGHT ahead, pinned along its
- * way across the continent. Stops it passed by, and stops beyond sight, stay hidden.
+ * The run's flight map: where the squad stands, then the stops it can still reach, up to SIGHT ahead, pinned along its
+ * way across the continent, and the stops it took this leg. Stops it passed by, and stops beyond sight, stay hidden.
  */
-function runMap(run: Run, picked: number | null): string {
+export function flight(run: Run, picked: number | null): { pins: Pin[]; focus: LonLat; path: string[] } {
   const here = current(run)
   const open = here ? [] : ways(run)
   const at = run.keys * (LEG_STOPS + 1) + run.stop
@@ -70,7 +70,7 @@ function runMap(run: Run, picked: number | null): string {
   for (let c = run.stop; c < columns.length - 1; c++) for (const i of reach[run.keys][c]) for (const k of columns[c][i].next) reach[run.keys][c + 1].add(k)
   const pins: Pin[] = []
   /** The stops the squad took on this leg, in order. */
-  const path: LonLat[] = []
+  const path: string[] = []
   let focus = run.route[run.keys].from
   run.legs.forEach((leg, l) => {
     const walked = (c: number) => l < run.keys || (l === run.keys && (c < run.stop || (c === run.stop && here !== null)))
@@ -90,20 +90,27 @@ function runMap(run: Run, picked: number | null): string {
         const setIn = squad && here !== null
         const choice = setIn || (open.includes(i) && l === run.keys && c === run.stop)
         const html = setIn ? `<button class="option picked" data-in>${icon}</button>` : choice ? `<button class="option${i === picked ? ' picked' : ''}" data-pick="${i}">${icon}</button>` : icon
-        const pin = { id: `${l}-${c}-${i}`, at: node.at ?? run.route[l].to.at, html, next, squad, choice, past: taken && !squad, lit: squad ? picked !== null : choice && i === picked }
-        if (taken) path.push(pin.at)
+        const pin = { id: `${l}-${c}-${i}`, at: node.at ?? run.route[l].to.at, layer: l * (LEG_STOPS + 1) + c, order: i, html, next, squad, choice, past: taken && !squad, lit: squad ? picked !== null : choice && i === picked }
+        if (taken) path.push(pin.id)
         if (squad) focus = pin.at
         pins.push(pin)
       }),
     )
   })
   // At a leg's start the squad stands in the city it set out from, its trails reaching to each choice.
-  if (!pins.some((p) => p.squad)) pins.push({ id: 'from', at: focus, html: '', next: open.map((i) => `${run.keys}-0-${i}`), squad: true, choice: false, past: false, lit: picked !== null })
+  if (!pins.some((p) => p.squad)) pins.push({ id: 'from', at: focus, layer: run.keys * (LEG_STOPS + 1) - 1, order: 0, html: '', next: open.map((i) => `${run.keys}-0-${i}`), squad: true, choice: false, past: false, lit: picked !== null })
   // The way on from the picked stop lights up, stop by stop.
   for (const pin of pins) if (pin.lit && !pin.squad) for (const id of pin.next) pins.forEach((p) => p.id === id && (p.lit = true))
-  // The map fills the screen under the header and headings.
-  // The stops keep clear of the header above and the stop's card below.
-  return `${squadStrip(run)}<div class="map flight">${globe({ w: innerWidth, h: innerHeight, top: 70, bottom: 70 }, run, pins, focus, path, picked !== null)}</div>`
+  return { pins, focus, path }
+}
+
+/** The window the flight map is seen through: the whole screen, its stops clear of the header above and the stop's card below. */
+export const flightSize = (w: number, h: number) => ({ w, h, top: 70, bottom: 70 })
+
+/** The run as a globe, the flight map pinned on it. */
+function runMap(run: Run, picked: number | null): string {
+  const { pins, focus, path } = flight(run, picked)
+  return `${squadStrip(run)}<div class="map flight">${globe(flightSize(innerWidth, innerHeight), run, pins, focus, path, picked !== null)}</div>`
 }
 
 /** The squad at a glance over the map: each soldier's badge over a health bar, red at half or less. */

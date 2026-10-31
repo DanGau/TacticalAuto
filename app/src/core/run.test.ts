@@ -83,8 +83,14 @@ function travelling(stops: StopKind[], risk: Risk = 'standard'): Run {
   return run
 }
 
+/** Takes the first way on, if the squad has passed its stop. */
+function onward(run: Run): void {
+  if (!current(run)) apply(run, { type: 'go', index: ways(run)[0] })
+}
+
 /** Travels to the next stop, a battle, and ends it with `winner`: the losing side is down to the last unit. */
 function fight(run: Run, winner: Side): void {
+  onward(run)
   apply(run, { type: 'advance' })
   // Clear of the barrage, which costs threat.
   deploy(run, run.battle!.barrage === 0 ? 1 : 0)
@@ -213,6 +219,7 @@ test('soldiers left downed on a field the squad did not hold are taken, and a re
   const [free, held] = run.soldiers
   expect(run).toMatchObject({ phase: 'overworld', captives: [held.id], stop: 1 })
   expect(run.report!.soldiers).toMatchObject([{ taken: false }, { taken: true }])
+  onward(run)
   expect(nextStop(run)).toBe('recovery')
   apply(run, { type: 'advance' })
   const battle = run.battle!
@@ -235,6 +242,7 @@ test('soldiers left downed on a field the squad did not hold are taken, and a re
 
 test('on a recovery, a soldier who reaches a held squadmate gets them up at half health to fight', () => {
   const run = leftBehind()
+  onward(run)
   apply(run, { type: 'advance' })
   deploy(run, 0)
   const battle = run.battle!
@@ -286,6 +294,7 @@ test('a supply drop and a cache are collected on arrival, each adding threat', (
   apply(run, { type: 'advance' })
   expect(run).toMatchObject({ phase: 'overworld', supplies: START_SUPPLIES + DROP_SUPPLIES, threat: STOP_THREAT, stop: 1 })
   expect(run.report).toMatchObject({ stop: 'supply', supplies: DROP_SUPPLIES, soldiers: [] })
+  onward(run)
   apply(run, { type: 'advance' })
   expect(run).toMatchObject({ report: { stop: 'cache' } })
   expect(run.finds).toHaveLength(1)
@@ -322,6 +331,7 @@ test('soldiers keep their health between battles, heal TRAVEL_HEAL for each stop
   expect(health(run, hurt)).toBe(3)
   expect(health(run, fallen)).toBe(1)
   expect(run.report!.soldiers).toMatchObject([{ hp: 3, maxHp: most }, { hp: 1 }])
+  onward(run)
   apply(run, { type: 'advance' })
   expect(run.battle!.reserve.find((r) => r.soldier === hurt.id)!.hp).toBe(3 + TRAVEL_HEAL)
 })
@@ -336,6 +346,7 @@ test('at a medic every soldier heals fully; at full health the squad takes a bon
   apply(run, { type: 'choose', index: 0 })
   expect(run.soldiers[0].wounds).toBe(0)
   expect(run.met).toEqual([])
+  onward(run)
   apply(run, { type: 'advance' })
   expect(can()).toEqual([1, 2, 3])
   const xp = run.soldiers[0].xp
@@ -350,6 +361,7 @@ test('after the stops of a leg comes its satellite: winning it wins a key, a her
     fight(run, 'human')
     while (skillOffers(run.soldiers[0]).length > 0) apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
   }
+  onward(run)
   expect(current(run)!.stop).toMatchObject({ kind: 'key', terrain: 'compound' })
   expect(nextStop(run)).toBe('key')
   expect(run.soldiers).toHaveLength(1)
@@ -450,6 +462,7 @@ test.each(['human', 'alien'] as const)('with every key won the squad is four, on
   }
   expect(run.soldiers).toHaveLength(KEYS + 1)
   expect(run.relics).toHaveLength(KEYS)
+  onward(run)
   expect(current(run)!.stop).toMatchObject({ kind: 'final', terrain: 'hive' })
   run.threat = 0
   fight(run, winner)
