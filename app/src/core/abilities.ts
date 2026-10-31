@@ -6,7 +6,7 @@ import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { has, foes, shootable, nearest, immune, silenced, spend, enemiesOf, onTile, FIRE_TURNS } from './fighters'
+import { has, hostage, foes, shootable, nearest, immune, silenced, spend, enemiesOf, onTile, FIRE_TURNS } from './fighters'
 import { walk, bestPath, paths, exposure } from './pathing'
 import { canShoot, lineOfSight } from './sight'
 import { wound, knockback, SLAM_DAMAGE } from './wound'
@@ -83,10 +83,10 @@ export function polymorph(battle: Battle, unit: Unit, seen: Set<number>): GameEv
   return [{ type: 'effect', id: target.id, effect: 'polymorph', amount: 0 }]
 }
 
-/** Spit: the nearest soldier the spitter can shoot is hit without a roll, and acid is left on its tile. */
+/** Spit: the nearest unit but a hostage the spitter can shoot is hit without a roll, and acid is left on its tile. */
 export function spit(battle: Battle, unit: Unit): GameEvent[] {
   const target = nearest(
-    battle.units.filter((u) => u.side !== unit.side && !u.cloaked && canShoot(battle, unit, u, unit.stats.range)),
+    battle.units.filter((u) => u.side !== unit.side && !u.cloaked && !hostage(battle, u) && canShoot(battle, unit, u, unit.stats.range)),
     unit,
   )
   if (!target) return []

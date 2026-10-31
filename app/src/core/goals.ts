@@ -37,7 +37,7 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
   },
   vip: {
     name: 'VIP rescue',
-    text: `A VIP is trapped in a building, under guard. Breach it, reach them, and escort them to the extraction zone that then appears. The aliens shoot the VIP whenever they can. Lose the VIP and the mission is lost`,
+    text: `A VIP is trapped in a building, under guard. Breach it, clear the aliens fighting near them, reach them, and escort them to the extraction zone that then appears. The aliens shoot the VIP whenever they can. Lose the VIP and the mission is lost`,
     reward: 'supplies and a relic, no gear',
     force: 2,
     weight: 1,

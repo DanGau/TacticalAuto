@@ -5,6 +5,8 @@ import { stepBattle } from './combat'
 import { goalOf } from './pathing'
 import { UPLINK_REACH } from './fighters'
 import { vipOf } from './fighters'
+import { escortVip, FREE_REACH } from './sides'
+import { wound } from './wound'
 import type { GameEvent } from './combat-event'
 import { WAVE_REACH } from './upkeep'
 import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, RESCUE_QUORUM, type Goal } from './goals'
@@ -266,6 +268,8 @@ test('no one shot kills a commander from full health; brought low, it blinks awa
   const battle = run.battle!
   enterAt(run, 0)
   const commander = battle.units.find((u) => u.target)!
+  // An entrance's impact would hurt it first.
+  battle.opening = false
   battle.units = battle.units.filter((u) => u.side !== 'alien' || u === commander)
   battle.pods[commander.pod!] = { ...battle.pods[commander.pod!], revealed: true, engaged: true }
   const soldier = battle.units.find(isSoldier)!
@@ -307,6 +311,27 @@ test('a soldier near the VIP breaches, catching the guards; beside them it frees
   while (battle.vip === 'breached') stepBattle(battle)
   expect(battle.vip).toBe('freed')
   expect(edgeDepths(battle)[battle.extract!.y * GRID + battle.extract!.x]).toBeLessThanOrEqual(INNER)
+})
+
+test('a held VIP takes no harm, and no one frees a VIP while an alien in the fight stands near', () => {
+  const run = before('vip')
+  const battle = run.battle!
+  enterAt(run, 0)
+  const vip = vipOf(battle)!
+  wound(battle, vip, 99, [])
+  expect(vip.hp).toBe(vip.stats.hp)
+  const soldier = battle.units.find(isSoldier)!
+  Object.assign(soldier, freeTilesNear(battle, vip, 9).find((t) => distance(t, vip) === 1))
+  const guard = battle.units.find((u) => u.side === 'alien')!
+  Object.assign(guard, freeTilesNear(battle, vip, 30).find((t) => distance(t, vip) === FREE_REACH))
+  battle.units = battle.units.filter((u) => u.side !== 'alien' || u === guard)
+  battle.pods[guard.pod!].engaged = true
+  battle.vip = 'breached'
+  escortVip(battle, [soldier])
+  expect(battle.vip).toBe('breached')
+  battle.units = battle.units.filter((u) => u !== guard)
+  escortVip(battle, [soldier])
+  expect(battle.vip).toBe('freed')
 })
 
 test('a VIP rescue is lost with the VIP, and won once the VIP lifts off, for a relic', () => {

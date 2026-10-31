@@ -7,7 +7,7 @@ import { unitAt } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { OVERKILL, type FeatId, type Tally } from './feats'
-import { has, fireproof, chillFrom, foeHas, nearest, immune, onTile } from './fighters'
+import { has, hostage, fireproof, chillFrom, foeHas, nearest, immune, onTile } from './fighters'
 
 /** A soldier's tally for this battle, begun empty. */
 export function tallyOf(battle: Battle, soldier: number): Tally {
@@ -18,11 +18,11 @@ export const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || ta
 
 /**
  * Deals `damage` to a unit: its armor takes it first, then its health. At zero health the unit is removed and its
- * death reported. A burster that dies explodes, and a psion that dies hurts the other aliens of its pod. A pod hurt
+ * death reported; a hostage takes none. A burster that dies explodes, and a psion that dies hurts the other aliens of its pod. A pod hurt
  * engages.
  */
 export function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[], pierce = false, crit = false): void {
-  if (target.hp <= 0) return
+  if (target.hp <= 0 || hostage(battle, target)) return
   if (target.pod !== null) battle.pods[target.pod].engaged = true
   const damage = target.kind === 'wraith' && !crit ? Math.min(dealt, 1) : dealt
   const full = target.hp === target.stats.hp

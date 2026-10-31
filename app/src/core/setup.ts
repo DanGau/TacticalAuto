@@ -1,6 +1,6 @@
 // Creating a battle: the arena, where pods, civilians and goals stand in it, and the entrances by them.
 import { type Battle, type Tile, type Reserve, POD_CLEARANCE, GRID, type Unit, type Alien, type Arena } from './battle'
-import { onGrid, distance, freeTilesNear, walkingDistances, spacedTile, NEIGHBORS, passable, INNER, edgeDepths, openNear, blocked, walks } from './grid'
+import { onGrid, distance, freeTilesNear, walkingDistances, spacedTile, NEIGHBORS, passable, edgeDepths, openNear, blocked, walks } from './grid'
 import { randomInt } from './rng'
 import { alienUnit, civilianUnit } from './spawn'
 import { PROP_COVER, type TerrainKind, type Locale, type Prop } from './terrain'
@@ -49,11 +49,19 @@ export function sealPockets(battle: Battle): void {
   walks.delete(battle)
 }
 
-/** A random open tile under a roof within, or any open tile within if no building stands there. */
-export function indoors(battle: Battle): Tile {
+/**
+ * A random open tile ARENA_REACH within the map's edge, so the arena lies inside it; under a roof if `roofed` and any
+ * building stands there. The margin eases on a map too small for it.
+ */
+export function arenaSpot(battle: Battle, roofed: boolean): Tile {
   const depth = edgeDepths(battle)
-  const inside = battle.ground.flatMap((g, t) => (g === 'floor' && depth[t] > INNER && battle.cover[t] === 0 ? [{ x: t % GRID, y: Math.floor(t / GRID) }] : []))
-  return inside.length > 0 ? inside[randomInt(battle, inside.length)] : spacedTile(battle, [], 0, 'inner')
+  const open = (margin: number, roof: boolean) =>
+    battle.ground.flatMap((g, t) => (g !== 'void' && (!roof || g === 'floor') && depth[t] > margin && battle.cover[t] === 0 ? [{ x: t % GRID, y: Math.floor(t / GRID) }] : []))
+  for (let margin = ARENA_REACH; ; margin--) {
+    const under = roofed ? open(margin, true) : []
+    const spots = under.length > 0 ? under : open(margin, false)
+    if (spots.length > 0) return spots[randomInt(battle, spots.length)]
+  }
 }
 
 /**
@@ -195,7 +203,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   }
   sealPockets(battle)
   // A VIP waits in a building within, a hold's uplink stands within: the arena is about either.
-  const spot = goal === 'vip' ? indoors(battle) : spacedTile(battle, [], 0, 'inner')
+  const spot = arenaSpot(battle, goal === 'vip')
   battle.arena = { x: spot.x, y: spot.y, reach: ARENA_REACH }
   furnish(battle, battle.arena)
   sealPockets(battle)
@@ -224,6 +232,8 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
   })
   if (ambush) {
     deploy(battle, centre)
+    // The Hunter engages first, whichever pod stands nearest.
+    battle.pods.forEach((pod, i) => (pod.engaged = i === 0))
     return battle
   }
   // A rescue's terror is about its last pod: civilians scattered about it, half hiding where they are, half running from the aliens.

@@ -53,10 +53,12 @@ export function spotted(battle: Battle): Set<number> {
   return new Set(battle.units.filter((u) => u.side === 'alien' && revealed(battle, u) && soldiers.some((s) => sees(battle, s, u))).map((u) => u.id))
 }
 
+/** Whether `unit` is a VIP not yet freed: a hostage, kept alive. */
+export const hostage = (battle: Battle, unit: Unit) => unit.civilian === 'vip' && battle.vip !== 'freed'
+
 /** Whether `unit`, standing on `from`, may shoot `target`. Squadsight reaches any spotted alien in a clear line; an elusive target is safe from far off, and a cloaked one from all. */
 export function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: Set<number>): boolean {
-  // A VIP is a hostage, kept alive until freed.
-  if (target.civilian === 'vip' && battle.vip !== 'freed') return false
+  if (hostage(battle, target)) return false
   if (target.cloaked) return false
   if (has(target, 'elusive') && distance(from, target) > ELUSIVE_REACH) return false
   // A psionic attack needs no line of sight, only an alien whose pod is revealed.

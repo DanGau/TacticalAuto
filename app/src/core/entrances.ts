@@ -2,7 +2,7 @@
 import { BARRIER_ARMOR, CHILL_TURNS, ENTRANCES, GRID, IMPACT_REACH, isSoldier, type Battle, type Effect, type Entrance, type RelicEffect, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { SMOKE_TURNS } from './consumables'
-import { blocked, breach, coverAt, distance, edgeBetween, freeTilesNear, heightAt, NEIGHBORS, onGrid, openNear, reachableFrom, walkingDistances, walks } from './grid'
+import { blocked, breach, coverAt, distance, edgeBetween, edgeDepths, freeTilesNear, heightAt, NEIGHBORS, onGrid, openNear, reachableFrom, walkingDistances, walks } from './grid'
 import { has, nearest } from './fighters'
 import { PROP_COVER } from './terrain'
 import { randomInt } from './rng'
@@ -30,6 +30,9 @@ export const CHARGE_BLAST = 3
 /** The nearest an entrance comes to an assassination's commander, and to another entrance. */
 export const COMMANDER_GAP = 12
 export const ENTRY_SPACING = 6
+
+/** How far within the map's edge every entrance lies. */
+export const ENTRY_MARGIN = 4
 
 /**
  * What each entrance is called and does, for the player; and how far from the nearest alien it comes in, and how it
@@ -78,12 +81,13 @@ export function planEntrances(battle: Battle, heart: Tile | null): void {
   const aliens = inView(battle)
   const commander = battle.units.find((u) => u.target)
   const vip = battle.units.find((u) => u.civilian === 'vip')
+  const depth = edgeDepths(battle)
   const near: number[] = []
   const walkable: Tile[] = []
   const open: Tile[] = []
   for (let t = 0; t < GRID * GRID; t++) {
     const tile = { x: t % GRID, y: Math.floor(t / GRID) }
-    if (blocked(battle, tile.x, tile.y) || toCentre[t] === Infinity || !fromCentre[t] || distance(tile, centre) > battle.arena.reach + 8) continue
+    if (blocked(battle, tile.x, tile.y) || depth[t] <= ENTRY_MARGIN || toCentre[t] === Infinity || !fromCentre[t] || distance(tile, centre) > battle.arena.reach + 8) continue
     near[t] = Math.min(...aliens.map((a) => distance(a, tile)))
     walkable.push(tile)
     if (commander && distance(tile, commander) < COMMANDER_GAP) continue

@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { ENTRANCES, isSoldier, type Battle } from './battle'
+import { ENTRANCES, GRID, isSoldier, type Battle } from './battle'
 import { stepBattle } from './combat'
-import { COMMANDER_GAP, STRIKE } from './entrances'
-import { distance, nearestAlien } from './grid'
+import { COMMANDER_GAP, ENTRY_MARGIN, STRIKE } from './entrances'
+import { distance, edgeDepths, nearestAlien } from './grid'
 import type { Goal } from './goals'
 import { current } from './run'
 import { type Run } from './run-state'
@@ -31,6 +31,19 @@ test('a battle offers entrances of different kinds, each by the fight, with ever
       const burrowers = battle.units.filter((u) => u.pod === i).every((u) => u.kind === 'burrower')
       expect(pod.revealed).toBe(!burrowers)
     })
+  }
+})
+
+test('the arena and every entrance lie inside the map, clear of its edge', () => {
+  for (const goal of ['exterminate', 'vip', 'hold', 'rescue', 'assassinate'] as Goal[]) {
+    for (let seed = 1; seed <= 12; seed++) {
+      const { battle } = entering(seed, goal)
+      const { x, y, reach } = battle.arena
+      for (const v of [x - reach, y - reach]) expect(v).toBeGreaterThanOrEqual(0)
+      for (const v of [x + reach, y + reach]) expect(v).toBeLessThan(GRID)
+      const depth = edgeDepths(battle)
+      for (const { at } of battle.entrances) expect(depth[at.y * GRID + at.x]).toBeGreaterThan(ENTRY_MARGIN)
+    }
   }
 })
 

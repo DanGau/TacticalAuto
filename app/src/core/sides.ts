@@ -121,7 +121,8 @@ export function sight(battle: Battle): GameEvent[] {
 
 /**
  * A VIP rescue's steps. The first soldier within BREACH_REACH of the VIP blows in the wall between them, catching the
- * guards: they engage, but do not shoot on their next turn. A soldier beside the VIP frees them: the extraction zone
+ * guards: they engage, but do not shoot on their next turn. A soldier beside the VIP, once no alien in the fight stands
+ * within FREE_REACH of it, frees them: the extraction zone
  * appears at the edge. A VIP at the extraction zone lifts off.
  */
 export function escortVip(battle: Battle, soldiers: Unit[]): GameEvent[] {
@@ -137,7 +138,8 @@ export function escortVip(battle: Battle, soldiers: Unit[]): GameEvent[] {
     for (const pod of new Set(guards.map((u) => u.pod!))) Object.assign(battle.pods[pod], { revealed: true, engaged: true, surprised: true })
     events.push({ type: 'rocket', id: breacher.id, x: at.x, y: at.y, hits: [] })
   }
-  if (battle.vip === 'breached' && soldiers.some((s) => distance(s, vip) <= 1)) {
+  const guarded = battle.units.some((u) => u.side === 'alien' && engaged(battle, u) && distance(u, vip) <= FREE_REACH)
+  if (battle.vip === 'breached' && !guarded && soldiers.some((s) => distance(s, vip) <= 1)) {
     battle.vip = 'freed'
     // Of edge tiles drawn, the one whose walk from the soldier who freed the VIP is nearest VIP_WALK.
     const walk = walkingDistances(battle, nearest(soldiers, vip)!)
@@ -156,8 +158,10 @@ export function escortVip(battle: Battle, soldiers: Unit[]): GameEvent[] {
 }
 
 
-/** How near the VIP a soldier must come to breach its building, and about how far a walk the extraction zone is from it. */
+/** How near the VIP a soldier must come to breach its building, how near no alien in the fight may stand to free them, and about how far a walk the extraction zone is from it. */
 export const BREACH_REACH = 3
+
+export const FREE_REACH = 10
 
 export const VIP_WALK = 24
 
