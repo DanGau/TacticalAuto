@@ -8,7 +8,6 @@ import { vipOf } from './fighters'
 import { escortVip, FREE_REACH } from './sides'
 import { wound } from './wound'
 import type { GameEvent } from './combat-event'
-import { WAVE_REACH } from './upkeep'
 import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, RESCUE_QUORUM, type Goal } from './goals'
 import { GRID, isSoldier } from './battle'
 import { edgeDepths } from './grid'
@@ -79,8 +78,7 @@ test("a hold's waves come in a pack at a time, a short way off the squad, withou
       if (e.type !== 'wave') continue
       wave++
       expect(e.units).toHaveLength(size)
-      const squad = battle.units.filter(isSoldier)
-      for (const at of e.units) expect(Math.min(...squad.map((s) => distance(s, at)))).toBeLessThanOrEqual(WAVE_REACH + 4)
+      for (const at of e.units) expect(Math.min(...battle.gates.map((g) => distance(g, at)))).toBeLessThanOrEqual(4)
     }
   }
   expect(battle.waves).toHaveLength(1)
@@ -159,7 +157,7 @@ function terror(seed: number): Run {
   const run = before('rescue')
   run.battle!.rng = seed
   enterAt(run, 0)
-  for (const s of run.battle!.units.filter(isSoldier)) Object.assign(s, { rooted: 999, stats: { ...s.stats } })
+  for (const s of run.battle!.units.filter(isSoldier)) Object.assign(s, { rooted: 999, ability: null, effects: [], hp: 500, spent: ['throw', 'throw', 'throw'], stats: { ...s.stats, damage: 0, hp: 500 } })
   return run
 }
 
@@ -273,10 +271,10 @@ test('no one shot kills a commander from full health; brought low, it blinks awa
   battle.units = battle.units.filter((u) => u.side !== 'alien' || u === commander)
   battle.pods[commander.pod!] = { ...battle.pods[commander.pod!], revealed: true, engaged: true }
   const soldier = battle.units.find(isSoldier)!
-  Object.assign(soldier, freeTilesNear(battle, commander, 2)[1], { stats: { ...soldier.stats, damage: 99, crit: 1, move: 0 } })
+  Object.assign(soldier, freeTilesNear(battle, commander, 2)[1], { spent: ['throw', 'throw', 'throw'], stats: { ...soldier.stats, damage: 99, crit: 1, move: 0 } })
   Object.assign(battle, { turn: 'human', stage: 'move' })
   const events: GameEvent[] = []
-  while (!events.some((e) => e.type === 'shot' && e.target === commander.id)) events.push(...stepBattle(battle))
+  while (battle.phase === 'battle' && !events.some((e) => e.type === 'shot' && e.target === commander.id)) events.push(...stepBattle(battle))
   expect(commander.hp).toBe(1)
   expect(events).toContainEqual({ type: 'effect', id: commander.id, effect: 'lastStand', amount: 0 })
   expect(events).toContainEqual(expect.objectContaining({ type: 'move', id: commander.id, with: 'blink' }))
@@ -302,13 +300,13 @@ test('a soldier near the VIP breaches, catching the guards; beside them it frees
   enterAt(run, 0)
   const vip = vipOf(battle)!
   const soldier = battle.units.find(isSoldier)!
-  Object.assign(soldier, freeTilesNear(battle, vip, 30).find((t) => distance(t, vip) === 3), { rooted: 999 })
+  Object.assign(soldier, freeTilesNear(battle, vip, 30).find((t) => distance(t, vip) === 3), { rooted: 999, hp: 500, stats: { ...soldier.stats, damage: 50, hp: 500 } })
   const events: GameEvent[] = []
-  while (battle.vip === 'held') events.push(...stepBattle(battle))
+  while (battle.vip === 'held' && battle.phase === 'battle') events.push(...stepBattle(battle))
   expect(events).toContainEqual(expect.objectContaining({ type: 'rocket', id: soldier.id, hits: [] }))
   expect(battle.pods[0]).toMatchObject({ revealed: true, engaged: true })
   Object.assign(soldier, freeTilesNear(battle, vip, 9).find((t) => distance(t, vip) === 1))
-  while (battle.vip === 'breached') stepBattle(battle)
+  while (battle.vip === 'breached' && battle.phase === 'battle') stepBattle(battle)
   expect(battle.vip).toBe('freed')
   expect(edgeDepths(battle)[battle.extract!.y * GRID + battle.extract!.x]).toBeLessThanOrEqual(INNER)
 })

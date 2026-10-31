@@ -105,6 +105,7 @@ export function planEntrances(battle: Battle, heart: Tile | null): void {
   const contact = (t: Tile) => near[t.y * GRID + t.x]
   for (const kind of kinds) {
     if (battle.entrances.length === count) break
+    const approach = battle.approaches[battle.entrances.length] ?? centre
     const { reach, site, fits } = ENTRANCE_KINDS[kind]
     const supported = fits ? open.filter((t) => fits(battle, t)) : open
     if (supported.length === 0) continue
@@ -112,9 +113,9 @@ export function planEntrances(battle: Battle, heart: Tile | null): void {
     let options: Tile[] = []
     for (let widen = 0; options.length === 0 && widen < 8; widen++) options = spaced.filter((t) => contact(t) >= Math.max(3, reach[0] - widen) && contact(t) <= reach[1] + 2 * widen)
     if (options.length === 0) options = spaced.length > 0 ? spaced : supported
-    // Of a sample, the tile its kind ranks best.
-    const sample = Array.from({ length: Math.min(60, options.length) }, () => options[randomInt(battle, options.length)])
-    const at = sample.reduce((a, b) => (site(battle, b) > site(battle, a) ? b : a))
+    // The tile its kind ranks best, nearest the way in the encounter means it to take.
+    const score = (t: Tile) => 2 * site(battle, t) - distance(t, approach)
+    const at = options.reduce((a, b) => (score(b) > score(a) ? b : a))
     battle.entrances.push({ kind, at })
   }
 }

@@ -167,6 +167,7 @@ export type SkillEffect =
   | 'barrier'
   | 'surgeon'
   | 'surge'
+  | 'throw'
   | 'secondWind'
   | 'skirmish'
   | 'reckless'
@@ -411,6 +412,10 @@ export interface Battle {
   entrances: Entrance[]
   entered: Entrance | null
   arena: Arena
+  /** Where the encounter means each entrance to lie, each its own trade: head on, by a ledge, by heaps to hurl. */
+  approaches: Tile[]
+  /** Where reinforcements arrive. */
+  gates: Tile[]
   /** The round the last pod engaged. */
   rallied: number
   /** A soldier whose monologue draws every alien's attention until the round `until` ends; null if none. */

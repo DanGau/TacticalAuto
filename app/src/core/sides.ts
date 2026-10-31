@@ -138,8 +138,8 @@ export function escortVip(battle: Battle, soldiers: Unit[]): GameEvent[] {
     for (const pod of new Set(guards.map((u) => u.pod!))) Object.assign(battle.pods[pod], { revealed: true, engaged: true, surprised: true })
     events.push({ type: 'rocket', id: breacher.id, x: at.x, y: at.y, hits: [] })
   }
-  const guarded = battle.units.some((u) => u.side === 'alien' && engaged(battle, u) && distance(u, vip) <= FREE_REACH)
-  if (battle.vip === 'breached' && !guarded && soldiers.some((s) => distance(s, vip) <= 1)) {
+  const guarded = battle.units.some((u) => u.side === 'alien' && u.stats.move > 0 && engaged(battle, u) && distance(u, vip) <= FREE_REACH)
+  if (battle.vip === 'breached' && !guarded && soldiers.some((s) => distance(s, vip) <= BREACH_REACH)) {
     battle.vip = 'freed'
     // Of edge tiles drawn, the one whose walk from the soldier who freed the VIP is nearest VIP_WALK.
     const walk = walkingDistances(battle, nearest(soldiers, vip)!)

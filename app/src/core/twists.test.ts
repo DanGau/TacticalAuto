@@ -82,7 +82,9 @@ test('crumbling ruins break a level with each hit: a tall object to rubble, rubb
 
 test('a hit on a unit beside a fuel tank sets it off', () => {
   const battle = duel('fuel')
-  const [, alien] = battle.units
+  const [soldier, alien] = battle.units
+  soldier.stats = { ...soldier.stats, damage: 3 }
+  soldier.spent = ['throw', 'throw', 'throw']
   battle.props[12 * GRID + 11] = 'fuel'
   battle.bulk[12 * GRID + 11] = 1
   const events = untilShot(battle)

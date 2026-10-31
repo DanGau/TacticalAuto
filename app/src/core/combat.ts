@@ -24,6 +24,7 @@ import type { GameEvent } from './combat-event'
 import { centreOf, fireproof, has, nearest, spotted, vipOf } from './fighters'
 import { wound } from './wound'
 import { attacksOf, blast, leap, napalm, shoot } from './attack'
+import { leverage } from './objects'
 import { alienAction, cloak, deploy, drone, feed, flashbang, forceField, heal, medkit, polymorph, pulse, secondWind, skirmish, slam, strew } from './abilities'
 import { armed, moveSide, stride } from './sides'
 /**
@@ -78,7 +79,8 @@ function actNext(battle: Battle): GameEvent[] {
     if (healed.length + fired.length > 0) unit.charges--
     const powers = [...pulse(battle, unit, 'warcry'), ...pulse(battle, unit, 'emp'), ...flashbang(battle, unit, seen), ...forceField(battle, unit), ...leap(battle, unit, seen)]
     const slammed = fired.length > 0 ? [] : slam(battle, unit)
-    const struck = fired.length > 0 ? fired : slammed.length > 0 ? slammed : shoot(battle, unit, seen)
+    const levered = fired.length + slammed.length > 0 ? [] : leverage(battle, unit)
+    const struck = fired.length > 0 ? fired : slammed.length > 0 ? slammed : levered.length > 0 ? levered : shoot(battle, unit, seen)
     const acted = [...medkit(unit), ...secondWind(unit), ...polymorph(battle, unit, seen), ...strew(battle, unit, 'caltrops'), ...strew(battle, unit, 'firewall'), ...deploy(battle, unit, seen), ...powers, ...healed, ...thrown, ...struck]
     // What follows an action: a drone's shot, then a skirmisher's step back.
     const events = acted.length > 0 && unit.hp > 0 && attacksOf(unit) === 1 ? [...acted, ...drone(battle, unit), ...skirmish(battle, unit)] : acted

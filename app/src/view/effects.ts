@@ -202,7 +202,7 @@ export async function fireRocket(s: Stage, fx: Sketch, battle: Battle, from: Spr
     const sprite = s.sprites.get(hit.target)
     if (!sprite) continue
     sprite.drawHp(...vitals(battle, hit.target))
-    float(s, callout(s, `${e.fire ? 'NAPALM' : 'ROCKET'} -${hit.damage}`, color, sprite))
+    float(s, callout(s, `${e.label ?? (e.fire ? 'NAPALM' : 'ROCKET')} -${hit.damage}`, color, sprite))
   }
   await s.tween(PACE.blast, (t) => {
     fx.clear().ellipse(b.x, b.y, (BLAST_RADIUS + 0.7) * TILE_W * t, (BLAST_RADIUS + 0.7) * TILE_H * t).fill({ color, alpha: 0.8 * (1 - t) })

@@ -1,14 +1,14 @@
-// Creating a battle: the arena, where pods, civilians and goals stand in it, and the entrances by them.
-import { type Battle, type Tile, type Reserve, POD_CLEARANCE, GRID, type Unit, type Alien, type Arena } from './battle'
-import { onGrid, distance, freeTilesNear, walkingDistances, spacedTile, NEIGHBORS, passable, edgeDepths, openNear, blocked, walks } from './grid'
-import { randomInt } from './rng'
+// Creating a battle: its state, its encounter, the pods, civilians and goals placed by it.
+import { type Battle, type Tile, type Reserve, GRID, type Unit, type Alien } from './battle'
+import { onGrid, distance, freeTilesNear, walkingDistances, spacedTile, NEIGHBORS, passable, openNear, walks } from './grid'
 import { alienUnit, civilianUnit } from './spawn'
-import { PROP_BULK, type TerrainKind, type Locale, type Prop } from './terrain'
+import { PROP_BULK, type TerrainKind, type Locale } from './terrain'
 import type { Rule } from './doctrines'
 import { type Goal, VIP_HP, CIVILIANS, CIVILIAN_HP } from './goals'
 import { generateTerrain } from './terrain-gen'
 import type { Twist } from './twists'
 import { deploy, planEntrances } from './entrances'
+import { ARENA_REACH, designEncounter } from './encounter'
 
 /** Lays each soldier the aliens hold on a recovery beside a pod, in turn. */
 export function holdCaptives(battle: Battle, captives: Reserve[]): void {
@@ -50,21 +50,6 @@ export function sealPockets(battle: Battle): void {
 }
 
 /**
- * A random open tile ARENA_REACH within the map's edge, so the arena lies inside it; under a roof if `roofed` and any
- * building stands there. The margin eases on a map too small for it.
- */
-export function arenaSpot(battle: Battle, roofed: boolean): Tile {
-  const depth = edgeDepths(battle)
-  const open = (margin: number, roof: boolean) =>
-    battle.ground.flatMap((g, t) => (g !== 'void' && (!roof || g === 'floor') && depth[t] > margin && battle.bulk[t] === 0 ? [{ x: t % GRID, y: Math.floor(t / GRID) }] : []))
-  for (let margin = ARENA_REACH; ; margin--) {
-    const under = roofed ? open(margin, true) : []
-    const spots = under.length > 0 ? under : open(margin, false)
-    if (spots.length > 0) return spots[randomInt(battle, spots.length)]
-  }
-}
-
-/**
  * Places a pack as a new pod around `centre`, its post. Every pod is in the open but burrowers, which keep
  * underground; `revealed` false keeps any pod unseen, as a wave coming in.
  */
@@ -91,13 +76,6 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
   return units
 }
 
-/** How far from its centre the arena reaches, and the share of its open ground that objects should stand on. */
-export const ARENA_REACH = 14
-export const ARENA_OBJECTS = 0.1
-
-/** How far from the squad an ambush's Hunter starts. */
-export const HUNTER_START = 10
-
 /** Tiles apart a rescue's civilians start, from each other and the aliens, and the farthest from the terror's heart. */
 export const CIVILIAN_CLEARANCE = 4
 
@@ -106,47 +84,10 @@ export const TERROR_REACH = 10
 /** The supply caches a raid can grab, at most. */
 export const CACHES = 3
 
-/** The objects a region scatters where its arena is bare, low and high; crates and stacks elsewhere. */
-const SCATTER: Partial<Record<TerrainKind, [Prop, Prop]>> = { countryside: ['fence', 'tree'], hive: ['growth', 'spire'] }
-
-/** Scatters objects over the arena until ARENA_OBJECTS of its ground has one, never beside another, so it walls nothing off. */
-function furnish(battle: Battle, arena: Arena): void {
-  const [low, high] = SCATTER[battle.place] ?? ['crate', 'stack']
-  const tiles: number[] = []
-  for (let y = arena.y - arena.reach; y <= arena.y + arena.reach; y++) for (let x = arena.x - arena.reach; x <= arena.x + arena.reach; x++) if (onGrid(x, y) && battle.ground[y * GRID + x] !== 'void') tiles.push(y * GRID + x)
-  let covered = tiles.filter((t) => battle.bulk[t] > 0).length
-  for (let tries = 0; covered < ARENA_OBJECTS * tiles.length && tries < 4 * tiles.length; tries++) {
-    const t = tiles[randomInt(battle, tiles.length)]
-    const x = t % GRID
-    const y = Math.floor(t / GRID)
-    if (battle.bulk[t] > 0 || NEIGHBORS.some(([dx, dy]) => onGrid(x + dx, y + dy) && battle.bulk[(y + dy) * GRID + x + dx] > 0)) continue
-    battle.props[t] = randomInt(battle, 3) === 0 ? high : low
-    battle.bulk[t] = PROP_BULK[battle.props[t]]
-    covered++
-  }
-  walks.delete(battle)
-}
-
-/** A random open tile in the arena the centre walks to, at least `clearance` from every tile in `avoid` and `from` the centre; both ease if the arena is crowded. */
-function arenaTile(battle: Battle, avoid: Tile[], clearance: number, from = 0): Tile {
-  const { arena } = battle
-  const walk = walkingDistances(battle, arena)
-  const r = arena.reach - 2
-  for (let tries = 0; tries < 3000; tries++) {
-    const tile = { x: arena.x - r + randomInt(battle, 2 * r + 1), y: arena.y - r + randomInt(battle, 2 * r + 1) }
-    const ease = Math.floor(tries / 300)
-    if (!onGrid(tile.x, tile.y) || blocked(battle, tile.x, tile.y) || walk[tile.y * GRID + tile.x] === Infinity || distance(tile, arena) < from - ease) continue
-    if (avoid.every((other) => distance(tile, other) >= clearance - ease)) return tile
-  }
-  return spacedTile(battle, avoid, clearance, 'inner')
-}
-
 /**
- * A battle awaiting the squad's entrance. The fight is staged in an arena within: its pods hang out there at their
- * posts, with objects between them, and the entrances lie by them. A VIP rescue's arena is about the VIP, a hold's the
- * uplink; an assassination keeps its commander at the far side. A hold keeps half its packs back as waves; a rescue's
- * civilians are scattered about its last pod. An ambush has no entrance: the squad is down in the arena's middle,
- * the Hunter nearest.
+ * A battle awaiting the squad's entrance, its encounter designed as one piece: see designEncounter. A hold keeps half
+ * its packs back as waves; a rescue's civilians are scattered about its last pod. An ambush has no entrance: the squad
+ * is down in the arena's middle.
  */
 export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale): Battle {
   const holder = { rng: seed }
@@ -187,6 +128,8 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     entrances: [],
     entered: null,
     arena: { x: 0, y: 0, reach: ARENA_REACH },
+    approaches: [],
+    gates: [],
     rallied: 0,
     spotlight: null,
     uplink: null,
@@ -202,34 +145,16 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     captives: [],
   }
   sealPockets(battle)
-  // A VIP waits in a building within, a hold's uplink stands within: the arena is about either.
-  const spot = arenaSpot(battle, goal === 'vip')
-  battle.arena = { x: spot.x, y: spot.y, reach: ARENA_REACH }
-  furnish(battle, battle.arena)
+  const posted = packs.slice(0, goal === 'hold' ? packs.length - battle.waves.length : packs.length)
+  const { spot, posts } = designEncounter(battle, posted, goal)
   sealPockets(battle)
   const centre = openNear(battle, spot)
   const vip = goal === 'vip' ? centre : null
   if (goal === 'hold') battle.uplink = centre
   if (vip) battle.units.push(civilianUnit(battle, vip, VIP_HP, 'vip'))
   const ambush = goal === 'ambush'
-  const around = (reach: number) => {
-    const angle = (2 * Math.PI * randomInt(battle, 360)) / 360
-    const at = (v: number) => Math.max(0, Math.min(GRID - 1, Math.round(v)))
-    return openNear(battle, { x: at(centre.x + reach * Math.cos(angle)), y: at(centre.y + reach * Math.sin(angle)) })
-  }
-  const centres: Tile[] = []
-  packs.slice(0, goal === 'hold' ? packs.length - battle.waves.length : packs.length).forEach((pack, i) => {
-    const post =
-      vip && i === 0
-        ? vip
-        : ambush
-          ? around(i === 0 ? HUNTER_START : HUNTER_START - 2 + randomInt(battle, 6))
-          : goal === 'assassinate' && i === 0
-            ? arenaTile(battle, [], 0, ARENA_REACH - 3)
-            : arenaTile(battle, [...centres, ...(battle.uplink ? [battle.uplink] : [])], POD_CLEARANCE)
-    centres.push(post)
-    placePod(battle, pack, post)
-  })
+  const centres = posts.map((post, i) => (vip && i === 0 ? vip : post))
+  posted.forEach((pack, i) => placePod(battle, pack, centres[i]))
   if (ambush) {
     deploy(battle, centre)
     // The Hunter engages first, whichever pod stands nearest.
@@ -246,7 +171,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     }
   }
   // A raid's caches each stand by a pod, guarded.
-  if (goal === 'raid') battle.caches = Array.from({ length: CACHES }, (_, i) => (centres[i] ? (freeTilesNear(battle, centres[i], 4)[3] ?? centres[i]) : arenaTile(battle, centres, 4)))
+  if (goal === 'raid') battle.caches = Array.from({ length: CACHES }, (_, i) => (centres[i] ? (freeTilesNear(battle, centres[i], 4)[3] ?? centres[i]) : freeTilesNear(battle, spot, 40)[10 * i]))
   planEntrances(battle, heart)
   return battle
 }

@@ -10,7 +10,7 @@ export type GameEvent =
   /** `damage` is 0 if a shield or image took it. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. */
   | { type: 'shot'; id: number; target: number; crit: boolean; damage: number; with: Effect[] }
   /** A rocket, grenade or napalm (`fire`) lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */
-  | { type: 'rocket'; id: number; x: number; y: number; hits: { target: number; damage: number }[]; fire?: true }
+  | { type: 'rocket'; id: number; x: number; y: number; hits: { target: number; damage: number }[]; fire?: true; label?: string }
   | { type: 'heal'; id: number; target: number; amount: number }
   /** An effect of gear, a skill, a relic or a class ability acts on the unit `id`. `amount` is the health it gained, or lost if negative; 0 when neither. */
   | { type: 'effect'; id: number; effect: Effect | Ability; amount: number }

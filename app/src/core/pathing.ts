@@ -11,6 +11,7 @@ import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { vipOf, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, MIRROR_IMAGES, inAura, has, GUARDIAN_REACH, fireproof, enemiesOf, besideFuel, foes, spotlit } from './fighters'
 import { ESCORT_REACH } from './goals'
+import { canHurlFrom } from './objects'
 import { bite, canShoot, sees } from './sight'
 
 /**
@@ -222,6 +223,9 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
 /** How near a civilian an alien must be for the squad to go for it on a rescue. */
 export const PREY_REACH = 8
 
+/** What standing beside something to hurl makes a tile worth, in points of `mine`. */
+const HURL_WORTH = 25
+
 /**
  * What a shot at a civilian is worth to an alien beside the same chance at a soldier: it takes a good shot at a soldier,
  * or a civilian before a poor one, so a squad that hangs back loses civilians.
@@ -275,14 +279,15 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const acid = (end: Tile) => (onTile(battle.acid, end) || (unit.side === 'human' && besideFuel(battle, end)) || (onTile(battle.fire, end) && !fireproof(battle, unit)) ? 1 : 0)
   /**
    * What a soldier's gear makes a tile worth, in points of `mine`: a null field over aliens with abilities, spirit
-   * guardians where aliens will come while the wearer is healthy, a bond beside a squadmate.
+   * guardians where aliens will come while the wearer is healthy, a bond beside a squadmate, something to hurl.
    */
   const role = (end: Tile) =>
     unit.side !== 'human'
       ? 0
       : (has(unit, 'null') ? 15 * enemies.filter((e) => revealed(battle, e) && e.kind !== 'trooper' && distance(end, e) <= NULL_REACH).length : 0) +
         (has(unit, 'guardians') && hurt < WARY ? 8 * enemies.filter((e) => revealed(battle, e) && distance(end, e) <= GUARDIAN_REACH + 2).length : 0) +
-        (has(unit, 'bond') && squadmates.some((u) => distance(u, end) <= 1) ? 15 : 0)
+        (has(unit, 'bond') && squadmates.some((u) => distance(u, end) <= 1) ? 15 : 0) +
+        (canHurlFrom(battle, unit, end) ? HURL_WORTH : 0)
   /** Mirror images left make a wearer bolder: half what comes back counts. */
   const images = has(unit, 'mirror') && unit.spent.filter((e) => e === 'mirror').length < MIRROR_IMAGES ? 0.5 : 1
   const uplink = battle.uplink

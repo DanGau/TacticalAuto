@@ -1,15 +1,14 @@
 // What happens as a side's turn begins: burns, acid, mending, cooldowns, spawns, goals that tick.
 import { REGEN_HEAL, alienStats, ALIENS, NODE_EVERY } from './aliens'
-import { type Battle, AURA_REACH, BURN_DAMAGE, isSoldier, SPAWN_EVERY, type Unit, GRID } from './battle'
+import { type Battle, AURA_REACH, BURN_DAMAGE, isSoldier, SPAWN_EVERY, type Unit } from './battle'
 import { placePod } from './setup'
 import { alienUnit } from './spawn'
 import { openNear, spacedTile } from './grid'
 import { freeTilesNear } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { has, foeHas, onTile, FIRE_TURNS, uplinkReach, EXTRACT_CLEARANCE, silenced, centreOf } from './fighters'
+import { has, foeHas, onTile, FIRE_TURNS, uplinkReach, EXTRACT_CLEARANCE, silenced, centreOf, nearest } from './fighters'
 import { HOLD_ROUNDS, HOLD_WAVE_EVERY } from './goals'
-import { randomInt } from './rng'
 import { wound } from './wound'
 
 /**
@@ -71,13 +70,12 @@ export function upkeep(battle: Battle): GameEvent[] {
     events.push({ type: 'wave', units: [{ id: unit.id, x: unit.x, y: unit.y }] })
   }
   rally(battle)
-  // Waves come in a pack at a time, a short way off the squad; a hold's without end.
+  // Waves come in a pack at a time, at the encounter's gate nearest the squad yet clear of it; a hold's without end.
   const soldiers = battle.units.filter(isSoldier)
   if (battle.waves.length > 0 && soldiers.length > 0 && battle.round % HOLD_WAVE_EVERY === 0) {
     const from = centreOf(soldiers)
-    const angle = (2 * Math.PI * randomInt(battle, 360)) / 360
-    const at = (v: number) => Math.max(0, Math.min(GRID - 1, Math.round(v)))
-    const centre = openNear(battle, { x: at(from.x + WAVE_REACH * Math.cos(angle)), y: at(from.y + WAVE_REACH * Math.sin(angle)) })
+    const clear = battle.gates.filter((g) => distance(g, from) >= WAVE_CLEAR)
+    const centre = openNear(battle, nearest(clear, from) ?? battle.gates.reduce((a, b) => (distance(b, from) > distance(a, from) ? b : a)))
     const wave = battle.waves.shift()!
     if (battle.goal === 'hold') battle.waves.push(wave)
     // It comes in unseen but in the fight, and shows once the squad sights it.
@@ -107,8 +105,8 @@ export function upkeep(battle: Battle): GameEvent[] {
   return events
 }
 
-/** How far from the squad a wave comes in. */
-export const WAVE_REACH = 12
+/** The nearest to the squad a wave comes in. */
+export const WAVE_CLEAR = 7
 
 /** Rounds a pod has the squad to itself before the next joins it. */
 export const RALLY_EVERY = 3

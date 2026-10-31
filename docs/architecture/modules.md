@@ -8,7 +8,9 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 |---|---|
 | `battle.ts` | Battle state types (`Battle`, `Unit`, `Pod`) and the numbers rules share |
 | `grid.ts` | The board: distance, objects, walls, walking costs and routes, free tiles |
-| `setup.ts` | `createBattle`: the arena, pods, civilians, goals |
+| `setup.ts` | `createBattle`: battle state, placing pods, civilians, goals by the encounter |
+| `encounter.ts` | `designEncounter`: the set-piece: arena, overlook, hazard, objects, posts, approaches, gates |
+| `objects.ts` | What heroes do with objects: hurling them, setting off tanks |
 | `entrances.ts` | Entrances: their kinds, where each comes in, what each sets off |
 | `spawn.ts` | Making units: aliens, soldiers, civilians, mechs, drops |
 | `step.ts` | Advances the run's battle a beat; settles it when it ends |
