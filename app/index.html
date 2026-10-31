@@ -64,10 +64,6 @@
       #drop .zones button.on { outline: 2px solid #ffd166; }
       #drop .zones .overview { flex: 0 0 auto; }
       #drop > button { margin-top: 6px; width: 100%; }
-      #drop .tradeoffs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-      #drop .tradeoffs span { padding: 2px 8px; border-radius: 10px; background: #232c3d; border: 1px solid currentColor; cursor: help; }
-      #drop .pro { color: #7ddc8a; }
-      #drop .con { color: #ff8a7a; }
       h1 { margin: 0 0 4px; font-size: 22px; }
       h2 { margin: 16px 0 8px; font-size: 14px; font-weight: normal; color: #9aa6bd; }
       p { margin: 6px 0; }
@@ -82,7 +78,6 @@
       button:hover { background: #32405a; }
       button:disabled { opacity: 0.45; cursor: default; }
       button:disabled:hover { background: #263042; }
-      button.lastStand, button.final { border-color: #ff6b5e; }
 
       .header { display: flex; align-items: center; gap: 24px; position: relative; z-index: 2; }
       /* Flight: the map fills the screen under the header and what floats over it. */
@@ -125,11 +120,8 @@
       .recruit .trait { display: flex; flex-direction: column; gap: 2px; margin-top: auto; padding-top: 8px; border-top: 1px solid #3a465c; }
       .recruit.chosen { outline: 2px solid #ffd84d; background: #35496b; }
       .note { font-size: 12px; color: #9aa6bd; white-space: nowrap; }
-      .arrow { color: #5d6577; }
       .chip { padding: 4px 10px; border: 1px solid #4a5a78; border-radius: 12px; white-space: nowrap; }
       .chip.feat { border-color: #ffd84d; color: #ffd84d; cursor: help; }
-      .progress { margin: 4px 0; opacity: 0.7; }
-      .trails { position: absolute; left: 0; top: 0; pointer-events: none; }
       /* The run map: a globe, the stops pinned over it. */
       .map { display: flex; justify-content: center; padding: 4px 0 8px; }
       .globe { position: relative; flex: none; overflow: hidden; }
@@ -152,9 +144,6 @@
       .globe .cell { position: absolute; transform: translate(-50%, -50%); z-index: 1; }
       .map .node { display: inline-block; font-size: 16px; width: 30px; height: 30px; line-height: 30px; border-width: 2px; flex: none; }
       .map .node sup { font-size: 9px; }
-      .trails path { fill: none; stroke: #4a5670; stroke-width: 2.5; stroke-dasharray: 1 7; stroke-linecap: round; }
-      .trails path.open { stroke: #ffd166; }
-      .trails path.walked { stroke: #a8b3c8; stroke-dasharray: 6 4; }
       .node.done { opacity: 0.55; }
       .node.here { box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; }
       .globe .cell.choice { z-index: 2; }
@@ -190,7 +179,6 @@
       @keyframes part { from { opacity: 1; transform: scale(1.6); } to { opacity: 0; transform: scale(4); } }
       @keyframes pulse { 50% { box-shadow: 0 0 0 5px #ffd166aa, 0 0 22px #ffd166; } }
       .map .node.fog { color: #6b7690; border: 2px dashed #4a5670; font-size: 14px; font-weight: bold; }
-      .nodes { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 8px; }
       .node { font-size: 26px; width: 44px; height: 44px; line-height: 44px; text-align: center; border-radius: 50%; border: 3px solid #888; background: #1d2433; }
       .node.safe { border-color: #7ddc5a; }
       .node.dangerous { border-color: #ff6b5e; }
@@ -201,7 +189,6 @@
       button.travel { min-width: 320px; text-align: left; line-height: 1.5; }
       .buy { display: flex; flex: 1; flex-direction: column; gap: 4px; }
       .buy button.card { flex: 1; }
-      button.travel.key, button.travel.final { border-color: #c77dff; }
 
 
       .squad { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
@@ -240,7 +227,7 @@
       .gear.epic { border-color: #c77dff; }
       .gear.epic > small:first-child, .slot.epic b { color: #c77dff; }
       div.gear { padding: 8px 12px; border: 1px solid; border-radius: 6px; background: #263042; line-height: 1.5; }
-      .drop { display: inline-block; min-width: 260px; }
+      .stats td.down, .stats td.up { font-weight: bold; }
       .slot { display: block; margin-top: 6px; padding: 5px 10px; border: 1px solid; border-radius: 4px; background: #1d2433; }
       .stash { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
       .who { display: block; width: 100%; padding: 4px 8px; text-align: left; background: none; border-color: transparent; line-height: 1.4; }
@@ -248,11 +235,6 @@
       .details { display: flex; gap: 24px; align-items: flex-start; }
       .details .stats { width: 260px; flex: none; }
       .details > div { flex: 1; }
-      .compare { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
-      .compare .gear { width: 260px; }
-      .compare .stats { width: auto; }
-      .compare .stats td { text-align: left; padding: 2px 8px; }
-      .compare .arrow, .stats td.down, .stats td.up { font-weight: bold; }
 
       .keywords { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
       .kw { padding: 1px 8px; border: 1px solid; border-radius: 10px; font-size: 11px; opacity: 0.75; }
@@ -342,14 +324,12 @@
       .stage.second { margin-top: 12px; animation-delay: 1.2s; }
       .stage.third { margin-top: 12px; animation-delay: 2.8s; }
       @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
-      .cleared { color: #7ddc5a; animation: clear 0.8s 0.7s both; }
-      @keyframes clear { to { opacity: 0.25; } }
       .landed { display: inline-block; color: #ffd84d; animation: land 0.6s 0.6s both; }
       @keyframes land { from { opacity: 0; transform: scale(3); } }
       @media (max-width: 900px) {
         body { font-size: 12px; }
         #panel { padding: 8px 12px; }
-        .choices, .squad, .compare, .details, .header { flex-wrap: wrap; }
+        .choices, .squad, .details, .header { flex-wrap: wrap; }
         .stash { grid-template-columns: repeat(2, 1fr); }
       }
     </style>
