@@ -23,14 +23,22 @@ export interface RunResult {
 /** More player actions than any run takes: a run past it is stuck, and fails instead of hanging. */
 export const MAX_ACTIONS = 10000
 
-/** Plays a run to its end, taking each action from `next` when the run waits for the player. */
+/**
+ * Plays a run to its end, taking each action from `next` when the run waits for the player, and in a battle once each
+ * squad turn while the kit holds a consumable.
+ */
 function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = []): { run: Run; result: RunResult } {
   const run = createRun(seed)
   run.doctrines.push(...doctrines)
   const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], actions: [] }
   let clock = { next: 0, done: 0 }
+  /** The battle and alien turn count at which the bot last chose whether to use a consumable. */
+  let asked: [Run['battle'], number] = [null, -1]
   while (run.phase !== 'won' && run.phase !== 'lost') {
-    if (run.phase === 'battle' && run.battle!.phase === 'battle') {
+    const battle = run.battle
+    const choosing = run.phase === 'battle' && battle!.phase === 'battle' && battle!.turn === 'human' && run.kit.length > 0 && (asked[0] !== battle || asked[1] !== battle!.round)
+    if (choosing) asked = [battle, battle!.round]
+    if (run.phase === 'battle' && battle!.phase === 'battle' && !choosing) {
       const played = timedFlow(run, clock)
       clock = played.clock
       for (const event of played.events) {

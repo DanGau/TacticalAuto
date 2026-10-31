@@ -1,4 +1,6 @@
 import { land, STRIKE } from './battle'
+import { foesInSight } from './combat'
+import { CONSUMABLES, KIT_SLOTS } from './consumables'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
 import { advance, buyWare, current, equipFind, GEAR_PRICE, go, mend, nextStop, recruit, sellFind, skillOffers, takeRelic, takeSkill, THREAT_MAX, TRAVEL_HEAL, ways, type Run } from './run'
 
@@ -9,6 +11,8 @@ export type Action =
   | { type: 'gear'; index: number; soldier: number }
   /** Shop: buy the relic at `index` of shop.relics. */
   | { type: 'buy'; index: number }
+  /** Shop: buy the consumable at `index` of shop.consumables, into the kit. */
+  | { type: 'consumable'; index: number }
   /** Shop: pay to lower the threat, once. */
   | { type: 'bribe' }
   /** Shop: leave for the road. */
@@ -21,6 +25,10 @@ export type Action =
   | { type: 'advance' }
   /** Deploy phase: land the squad on the zone at `zone` of battle.zones and begin the battle; the barrage's zone costs threat. */
   | { type: 'land'; zone: number }
+  /** Battle, landing or fighting: use the consumable at `index` of run.kit; it takes effect at the next beat. */
+  | { type: 'use'; index: number }
+  /** Battle: fight on without using a consumable, when asked to choose. */
+  | { type: 'wait' }
   /** On a raid, in place of a landing zone: how many supply caches the squad goes for before it lifts off. */
   | { type: 'grab'; caches: number }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
@@ -37,6 +45,17 @@ export type Result = { ok: true } | { ok: false; reason: string }
 const ok: Result = { ok: true }
 const no = (reason: string): Result => ({ ok: false, reason })
 
+/**
+ * Whether the consumable at `index` of the kit can be used now: in a battle, one aimed at the aliens only once one in
+ * the fight is in sight, one aimed at the squad from the landing on.
+ */
+export function canUse(run: Run, index: number): boolean {
+  const id = run.kit[index]
+  const battle = run.battle
+  if (!id || run.phase !== 'battle' || !battle || battle.phase === 'over' || battle.primed.includes(id)) return false
+  return CONSUMABLES[id].on === 'squad' || (battle.phase === 'battle' && foesInSight(battle).length > 0)
+}
+
 /** The only way a player changes state. A rejected action leaves state untouched. */
 export function apply(run: Run, action: Action): Result {
   if (action.type === 'recruit') {
@@ -46,6 +65,16 @@ export function apply(run: Run, action: Action): Result {
     return ok
   }
   if (run.phase === 'recruit') return no('choose a recruit first')
+  if (action.type === 'use' || action.type === 'wait') {
+    if (run.phase !== 'battle' || run.battle?.phase === 'over') return no('not in a battle')
+    if (action.type === 'use') {
+      if (!canUse(run, action.index)) return no('cannot use that now')
+      const id = run.kit.splice(action.index, 1)[0]
+      run.threat = Math.min(run.threat + (CONSUMABLES[id].threat ?? 0), THREAT_MAX)
+      run.battle!.primed.push(id)
+    }
+    return ok
+  }
   if (action.type === 'grab') {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy' || battle.goal !== 'raid') return no('not raiding')
@@ -85,23 +114,31 @@ export function apply(run: Run, action: Action): Result {
     }
     return ok
   }
-  if (action.type === 'gear' || action.type === 'buy' || action.type === 'bribe' || action.type === 'leave') {
+  if (action.type === 'gear' || action.type === 'buy' || action.type === 'consumable' || action.type === 'bribe' || action.type === 'leave') {
     const shop = run.shop
     if (run.phase !== 'shop' || !shop) return no('not in a shop')
     if (action.type === 'gear') {
       const ware = shop.wares[action.index]
-      if (!ware) return no('no such gear for sale')
+      if (!ware || ware.sold) return no('no such gear for sale')
       const soldier = run.soldiers.find((s) => s.id === action.soldier)
       if (!soldier) return no('no such soldier')
-      if (GEAR_PRICE[ware.rarity as keyof typeof GEAR_PRICE] > run.supplies) return no('not enough supplies')
+      if (GEAR_PRICE[ware.gear.rarity as keyof typeof GEAR_PRICE] > run.supplies) return no('not enough supplies')
       buyWare(run, action.index, soldier)
     } else if (action.type === 'buy') {
       const relic = shop.relics[action.index]
-      if (!relic) return no('no such relic for sale')
+      if (!relic || relic.sold) return no('no such relic for sale')
       if (RELIC_PRICE > run.supplies) return no('not enough supplies')
       run.supplies -= RELIC_PRICE
-      run.relics.push(relic)
-      shop.relics.splice(action.index, 1)
+      run.relics.push(relic.id)
+      relic.sold = true
+    } else if (action.type === 'consumable') {
+      const item = shop.consumables[action.index]
+      if (!item || item.sold) return no('no such consumable for sale')
+      if (CONSUMABLES[item.id].price > run.supplies) return no('not enough supplies')
+      if (run.kit.length >= KIT_SLOTS) return no('the kit is full')
+      run.supplies -= CONSUMABLES[item.id].price
+      run.kit.push(item.id)
+      item.sold = true
     } else if (action.type === 'bribe') {
       if (shop.bribed) return no('already bribed')
       if (BRIBE.price > run.supplies) return no('not enough supplies')

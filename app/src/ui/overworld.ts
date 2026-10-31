@@ -5,6 +5,7 @@ import { SLOTS } from '../core/gear'
 import { DOCTRINES } from '../core/doctrines'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
+import { CONSUMABLES, KIT_SLOTS } from '../core/consumables'
 import { current, legOf, GEAR_PRICE, KEYS, LEG_STOPS, ways, charges, equipped, health, level, missionAt, huntForce, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
 import { FEATS } from '../core/feats'
 import { PATHS, SKILLS } from '../core/skills'
@@ -132,25 +133,35 @@ function where(run: Run, stop: Stop): string {
   return `${GOALS[stop.goal].name} · ${RISKS[stop.risk].name}${stop.twist ? ` · ${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}` : ''}`
 }
 
-/** A shop: gear, each with a button per soldier to buy it for, relics, a bribe, and the way out. */
+const PURCHASED = '<small class="purchased">Purchased</small>'
+
+/** A shop: gear, each with a button per soldier to buy it for, relics, consumables, a bribe, and the way out. What is bought keeps its place, greyed out. */
 function shopView(run: Run): string {
   const shop = run.shop!
   const held = squadKeywords(run)
-  const wares = shop.wares.map((gear, index) => {
+  const wares = shop.wares.map(({ gear, sold }, index) => {
     const price = GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
     const buyers = run.soldiers.map((s) => {
       const old = s.gear[gear.slot]
-      return button({ type: 'gear', index, soldier: s.id }, `${badge(s.cls)} ${s.name}`, 'buyer', price <= run.supplies, old ? `Replaces ${old.name}` : `Empty ${gear.slot} slot`)
+      return button({ type: 'gear', index, soldier: s.id }, `${badge(s.cls)} ${s.name}`, 'buyer', !sold && price <= run.supplies, old ? `Replaces ${old.name}` : `Empty ${gear.slot} slot`)
     })
-    return `<div class="card gear ${gear.rarity}">${gearCard(gear, held)}<br><small>${price} supplies, for:</small><div class="buyers">${buyers.join('')}</div></div>`
+    return `<div class="card gear ${gear.rarity}${sold ? ' bought' : ''}">${gearCard(gear, held)}<br>${sold ? PURCHASED : `<small>${price} supplies, for:</small>`}<div class="buyers">${buyers.join('')}</div></div>`
   })
-  const relics = shop.relics.map((id, index) =>
-    `<div class="buy">${button({ type: 'buy', index }, `<small>relic · ${RELIC_PRICE} supplies</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic', RELIC_PRICE <= run.supplies)}</div>`,
+  const relics = shop.relics.map(({ id, sold }, index) =>
+    `<div class="buy">${button({ type: 'buy', index }, `${sold ? PURCHASED : `<small>relic · ${RELIC_PRICE} supplies</small>`}<br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, `card relic${sold ? ' bought' : ''}`, !sold && RELIC_PRICE <= run.supplies)}</div>`,
   )
-  const bribe = button({ type: 'bribe' }, `<b>Bribe the patrols</b><br>-${BRIBE.threat} threat<br><small>${BRIBE.price} supplies, once</small>`, '', !shop.bribed && BRIBE.price <= run.supplies && run.threat > 0)
+  const full = run.kit.length >= KIT_SLOTS
+  const consumables = shop.consumables.map(({ id, sold }, index) => {
+    const item = CONSUMABLES[id]
+    const line = sold ? PURCHASED : `<small>${full ? 'kit full' : `consumable · ${item.price} supplies`}${item.threat ? ` · <span class="up">+${item.threat} threat on use</span>` : ''}</small>`
+    return button({ type: 'consumable', index }, `${line}<br><b>${item.icon} ${item.name}</b><br>${describe(item.text, item.tags, held)}`, `card consumable${sold ? ' bought' : ''}`, !sold && !full && item.price <= run.supplies)
+  })
+  const bribe = button({ type: 'bribe' }, `${shop.bribed ? PURCHASED : `<small>${BRIBE.price} supplies, once</small>`}<br><b>Bribe the patrols</b><br>-${BRIBE.threat} threat`, shop.bribed ? 'bought' : '', !shop.bribed && BRIBE.price <= run.supplies && run.threat > 0)
+  const kit = run.kit.map((k) => `<span title="${CONSUMABLES[k].text}">${CONSUMABLES[k].icon} ${CONSUMABLES[k].name}</span>`).join(', ') || 'empty'
   return `<h2>A shop. Each piece is one of a kind.</h2>
     <div class="choices">${wares.join('')}</div>
     <div class="choices">${relics.join('')}${bribe}</div>
+    <div class="choices">${consumables.join('')}<p class="kit">Kit ${run.kit.length}/${KIT_SLOTS}: ${kit}</p></div>
     <button class="travel" data-action='${JSON.stringify({ type: 'leave' })}'>Leave the shop</button>`
 }
 
@@ -181,8 +192,10 @@ function mapView(run: Run, picked: number | null): string {
 function baseView(run: Run): string {
   const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags)}</div>`)
   const doctrines = run.doctrines.map((id) => `<div class="gear doctrine"><small>doctrine</small><br><b>${DOCTRINES[id].name}</b><br>${DOCTRINES[id].text}</div>`)
+  const kit = run.kit.map((id) => `<div class="gear"><small>consumable · on the ${CONSUMABLES[id].on}</small><br><b>${CONSUMABLES[id].icon} ${CONSUMABLES[id].name}</b><br>${describe(CONSUMABLES[id].text, CONSUMABLES[id].tags)}</div>`)
   const held = squadKeywords(run)
-  return `${relics.length + doctrines.length + held.length === 0 ? '<h2>Relics and doctrines the squad gains show here.</h2>' : ''}
+  return `${relics.length + doctrines.length + held.length + kit.length === 0 ? '<h2>Relics, doctrines and consumables the squad gains show here.</h2>' : ''}
+    ${kit.length > 0 ? `<h2>Consumables ${kit.length}/${KIT_SLOTS}</h2><div class="stash">${kit.join('')}</div>` : ''}
     ${held.length > 0 ? `<h2>Keywords</h2>${keywordChips(held, held)}` : ''}
     ${doctrines.length > 0 ? `<h2>Doctrines</h2><div class="stash">${doctrines.join('')}</div>` : ''}
     ${relics.length > 0 ? `<h2>Relics</h2><div class="stash">${relics.join('')}</div>` : ''}`

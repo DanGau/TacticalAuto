@@ -3,6 +3,7 @@ import { CLASSES } from '../core/classes'
 import { FEATS, type Tally } from '../core/feats'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
+import { CONSUMABLES } from '../core/consumables'
 import { health, KEYS, level, SELL, skillOffers, soldierStats, xpFor, squadKeywords, type Report, type Run, type Soldier } from '../core/run'
 import { PATHS, SKILLS } from '../core/skills'
 import { TRAITS } from '../core/traits'
@@ -151,6 +152,7 @@ export function stopReport(run: Run, report: Report, still = false): string {
       <p>Threat ${threatBar(after, Math.max(0, after - before))}${threat}</p>
       ${report.rescued !== null ? `<p class="down">${report.rescued} of ${CIVILIANS} civilians rescued</p>` : ''}
       ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : ''}
+      ${report.found ? `<p class="supplies">Found ${CONSUMABLES[report.found].icon} ${CONSUMABLES[report.found].name}: ${CONSUMABLES[report.found].text}</p>` : ''}
     </div>
     ${squad}
     <div class="stage ${squad ? 'third' : 'second'}"><button data-seen="report"${owed ? ' disabled' : ''}>Continue</button></div>

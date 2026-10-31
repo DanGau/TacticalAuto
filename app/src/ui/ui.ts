@@ -7,6 +7,8 @@ import { TWISTS } from '../core/twists'
 import { PLANS, STRIKE, ZONE_NAMES, type Battle } from '../core/battle'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { button, STOP_NAMES } from './html'
+import { canUse } from '../core/apply'
+import { CONSUMABLES, KIT_SLOTS } from '../core/consumables'
 import { overworld, type Tab } from './overworld'
 import { glide, viewNow } from './globe'
 
@@ -50,11 +52,34 @@ function raids(battle: Battle, greed: number): string {
   return `<div class="zones">${buttons.join('')}</div><p>${what}</p>${button({ type: 'grab', caches: greed }, `Go for ${greed}`)}`
 }
 
+/**
+ * The consumables carried into a battle, a slot each: one usable now uses it at a click; one readied on the landing
+ * screen waits, lit, for the landing.
+ */
+function kit(run: Run): string {
+  const battle = run.battle!
+  const readied = battle.primed.map((id) => `<button class="primed" disabled title="${CONSUMABLES[id].text}">${CONSUMABLES[id].icon} ${CONSUMABLES[id].name}<small>${battle.phase === 'deploy' ? 'on landing' : 'now'}</small></button>`)
+  const held = run.kit.map((id, index) => {
+    const item = CONSUMABLES[id]
+    const usable = canUse(run, index)
+    const when = !usable ? 'once aliens are in the fight' : battle.phase === 'deploy' ? 'ready for the landing' : 'use now'
+    return button({ type: 'use', index }, `${item.icon} ${item.name}<small>${when}${item.threat ? ` · +${item.threat} threat` : ''}</small>`, '', usable).replace('<button', `<button title="${item.text}"`)
+  })
+  const empty = Array.from({ length: Math.max(0, KIT_SLOTS - readied.length - held.length) }, () => '<button class="empty" disabled>Empty slot</button>')
+  return [...readied, ...held, ...empty].join('')
+}
+
 /** Turns clicks into actions and hands them to `act`. */
 export function createUi(view: View, act: (action: Action) => void): Ui {
   const statusLine = document.getElementById('status')!
   const overlay = document.getElementById('panel')!
   const dropPanel = document.getElementById('drop')!
+  const kitPanel = document.getElementById('kit')!
+  let kitHtml = ''
+  kitPanel.addEventListener('click', (e) => {
+    const target = (e.target as HTMLElement).closest('button')
+    if (target?.dataset.action && !target.disabled) act(JSON.parse(target.dataset.action) as Action)
+  })
   /** The landing zone chosen in the deploy phase, and the battle it was chosen in. */
   let zone: number | null = null
   /** The caches chosen to go for on a raid. */
@@ -278,9 +303,17 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (battle && (halves % 2 === 1) !== (battle.turn === 'alien')) dial.style.setProperty('--turn', `${++halves * 180}deg`)
   }
 
+  function showKit(run: Run): void {
+    const shown = run.phase === 'battle' && !!run.battle && run.battle.phase !== 'over' && run.kit.length + run.battle.primed.length > 0
+    kitPanel.hidden = !shown
+    const next = shown ? kit(run) : ''
+    if (next !== kitHtml) kitPanel.innerHTML = kitHtml = next
+  }
+
   return {
     update(run) {
       statusLine.innerHTML = status(run)
+      showKit(run)
       turnDial(run)
       render(run)
       showDrop(run)

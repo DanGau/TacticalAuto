@@ -49,6 +49,15 @@
       .intro p { max-width: 520px; color: #9aa6bd; font-style: italic; }
       .intro button { margin-top: 12px; }
       @keyframes fade { from { opacity: 0; } }
+      #kit { position: absolute; top: 100px; right: 12px; display: flex; flex-direction: column; gap: 6px; width: 180px; }
+      #kit[hidden] { display: none; }
+      #kit button { text-align: left; padding: 6px 8px; font-size: 14px; line-height: 1.3; }
+      #kit button small { display: block; color: #9aa6bd; }
+      #kit button.primed { outline: 2px solid #ffd166; }
+      #kit .empty { opacity: 0.35; border-style: dashed; }
+      .bought, button.bought:disabled { opacity: 0.3; filter: grayscale(1); }
+      .purchased { color: #ffd166; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+      .choices .kit { flex: 1; margin: 0; align-self: center; color: #9aa6bd; }
       #drop { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); box-sizing: border-box; padding: 10px 14px; background: #171d29ee; border: 1px solid #3a465c; border-radius: 8px; line-height: 1.5; }
       #drop .zones { display: flex; gap: 8px; align-items: center; }
       #drop .zones button { flex: 1; white-space: nowrap; padding: 6px 8px; }
@@ -350,6 +359,7 @@
     <div id="hud"><span id="status"></span></div>
     <div id="dial" hidden><div class="spin"><div class="half ally">Allied<br />turn</div><div class="half enemy">Enemy<br />turn</div></div></div>
     <div id="drop" hidden></div>
+    <div id="kit" hidden></div>
     <div id="panel"></div>
     <button id="fullscreen" title="Full screen">⛶</button>
     <script type="module" src="/src/main.ts"></script>

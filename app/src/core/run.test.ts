@@ -49,6 +49,7 @@ import { PATHS, SKILLS } from './skills'
 import { atKey, road, deploy, begun } from './roads'
 import { TRAITS } from './traits'
 import { RELICS } from './relics'
+import { KIT_SLOTS, SHOP_CONSUMABLES } from './consumables'
 
 /** A run whose first soldier has learned its first skill, so the overworld waits. */
 function started(): Run {
@@ -546,7 +547,7 @@ test('a satellite won offers three relics; a relic held changes the run', () => 
   expect(paid(['contact']).finds.every((find) => find.rarity !== 'common')).toBe(true)
 })
 
-test('a shop stocks one-of-a-kind gear for the soldier the player picks, relics the squad lacks, and a bribe, each sold once; and is left for the road', () => {
+test('a shop stocks one-of-a-kind gear for the soldier the player picks, relics the squad lacks, consumables, and a bribe, each sold once and kept in its place; and is left for the road', () => {
   const run = travelling(['shop', 'battle'])
   const buyer = run.soldiers[0].id
   expect(apply(run, { type: 'gear', index: 0, soldier: buyer })).toEqual({ ok: false, reason: 'not in a shop' })
@@ -554,26 +555,34 @@ test('a shop stocks one-of-a-kind gear for the soldier the player picks, relics 
   expect(run).toMatchObject({ phase: 'shop', threat: STOP_THREAT })
   const shop = run.shop!
   expect(shop.wares).toHaveLength(SHOP_WARES)
-  expect(new Set(shop.wares.map((w) => w.effect)).size).toBe(SHOP_WARES)
-  expect(shop.wares.every((w) => w.rarity !== 'common')).toBe(true)
+  expect(new Set(shop.wares.map((w) => w.gear.effect)).size).toBe(SHOP_WARES)
+  expect(shop.wares.every((w) => w.gear.rarity !== 'common')).toBe(true)
   expect(shop.relics).toHaveLength(SHOP_RELICS)
   run.supplies = 100
-  const gear = shop.wares[0]
+  const { gear } = shop.wares[0]
   const old = run.soldiers[0].gear[gear.slot]
   expect(apply(run, { type: 'gear', index: 0, soldier: buyer })).toEqual({ ok: true })
   expect(run.soldiers[0].gear[gear.slot]).toBe(gear)
   expect(run.supplies).toBe(100 - GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] + (old ? SELL[old.rarity] : 0))
-  expect(shop.wares).toHaveLength(SHOP_WARES - 1)
+  expect(shop.wares).toHaveLength(SHOP_WARES)
+  expect(shop.wares[0]).toEqual({ gear, sold: true })
+  expect(apply(run, { type: 'gear', index: 0, soldier: buyer }).ok).toBe(false)
   const last = SHOP_RELICS - 1
-  const relic = shop.relics[last]
+  const relic = shop.relics[last].id
   expect(apply(run, { type: 'buy', index: last })).toEqual({ ok: true })
   expect(run.relics).toContain(relic)
+  expect(shop.relics[last]).toEqual({ id: relic, sold: true })
   expect(apply(run, { type: 'buy', index: last }).ok).toBe(false)
+  expect(new Set(shop.consumables.map((c) => c.id)).size).toBe(SHOP_CONSUMABLES)
+  run.kit = Array(KIT_SLOTS - 1).fill('medkit')
+  expect(apply(run, { type: 'consumable', index: 0 })).toEqual({ ok: true })
+  expect(run.kit.at(-1)).toBe(shop.consumables[0].id)
+  expect(apply(run, { type: 'consumable', index: 1 })).toEqual({ ok: false, reason: 'the kit is full' })
   expect(apply(run, { type: 'bribe' })).toEqual({ ok: true })
   expect(run.threat).toBe(0)
   expect(apply(run, { type: 'bribe' }).ok).toBe(false)
   run.supplies = 0
-  expect(apply(run, { type: 'gear', index: 0, soldier: buyer })).toEqual({ ok: false, reason: 'not enough supplies' })
+  expect(apply(run, { type: 'gear', index: 1, soldier: buyer })).toEqual({ ok: false, reason: 'not enough supplies' })
   apply(run, { type: 'leave' })
   expect(run).toMatchObject({ phase: 'overworld', shop: null, stop: 1 })
 })

@@ -5,6 +5,7 @@ import type { Resist } from './keywords'
 import { random, randomInt } from './rng'
 import { CIVILIAN_HP, CIVILIAN_MOVE, CIVILIANS, type Goal } from './goals'
 import type { Twist } from './twists'
+import type { ConsumableId } from './consumables'
 import { EDGE_COVER, generateTerrain, PROP_COVER, type Cover, type Edge, type Ground, type Locale, type Prop, type Terrain, type TerrainKind } from './terrain'
 
 export type { Cover }
@@ -379,6 +380,8 @@ export interface Battle {
   pods: Pod[]
   /** Once-per-battle effects of the whole squad already used. */
   used: Effect[]
+  /** Consumables the player has used, taking effect at the next beat. */
+  primed: ConsumableId[]
   /** True while no living pod is alert to the squad. */
   concealed: boolean
   /** Set by a landing on the hot zone until the drop pods' impact lands, as the battle's first beat. */
@@ -880,8 +883,24 @@ function planZones(battle: Battle, centres: Tile[]): void {
 export const POD_REACH = 4
 /** The damage Impact Charges add to the drop pods' impact. */
 export const POD_BLAST = 3
+/**
+ * Lands a unit of `stats` that never moves, fighting for `owner`'s side, on the free tile nearest `spot` where it cuts no
+ * ground off from `owner`; none if there is no such tile.
+ */
+export function dropUnit(battle: Battle, owner: Unit, stats: Stats, spot: Tile, effects: Effect[] = []): Unit | undefined {
+  const open = walkingDistances(battle, owner).filter(Number.isFinite).length
+  for (const tile of freeTilesNear(battle, spot, 6)) {
+    const unit = mechUnit(battle, owner, stats, effects, tile)
+    battle.units.push(unit)
+    if (walkingDistances(battle, owner).filter(Number.isFinite).length >= open - 1) return unit
+    battle.units.splice(battle.units.indexOf(unit), 1)
+  }
+}
+
 /** A drop turret: it never moves, and shoots far and true. */
-const TURRET: Stats = { ...BASE_STATS, hp: 8, aim: 0.7, damage: 3, range: 7, move: 0, crit: 0.1 }
+export const TURRET: Stats = { ...BASE_STATS, hp: 8, aim: 0.7, damage: 3, range: 7, move: 0, crit: 0.1 }
+/** A holo-decoy: tough, unmoving, and harmless. */
+export const DECOY: Stats = { ...BASE_STATS, hp: 10, armor: 2, aim: 0, damage: 0, range: 0, move: 0, crit: 0 }
 
 /**
  * What the squad's drop pod relics do where it lands: hurt, strip or chill the aliens near, raise full cover beside each
@@ -896,17 +915,7 @@ function dropRelics(battle: Battle, squad: Unit[], spots: Tile[]): void {
       if (held('podShred')) alien.armor = 0
       if (held('podFrost') && !alien.resists.includes('frost')) alien.chilled = CHILL_TURNS
     }
-    if (held('podTurret')) {
-      const owner = squad.find((u) => distance(u, spot) <= ZONE_RADIUS) ?? squad[0]
-      const open = walkingDistances(battle, owner).filter(Number.isFinite).length
-      // The nearest free tile where the turret, which never moves, cuts no ground off from the squad.
-      for (const tile of freeTilesNear(battle, spot, 6)) {
-        const turret = mechUnit(battle, owner, TURRET, [], tile)
-        battle.units.push(turret)
-        if (walkingDistances(battle, owner).filter(Number.isFinite).length >= open - 1) break
-        battle.units.splice(battle.units.indexOf(turret), 1)
-      }
-    }
+    if (held('podTurret')) dropUnit(battle, squad.find((u) => distance(u, spot) <= ZONE_RADIUS) ?? squad[0], TURRET, spot)
   }
   if (!held('podWall')) return
   walks.delete(battle)
@@ -1044,6 +1053,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     cover: terrain.props.map((prop) => PROP_COVER[prop]),
     pods: [],
     used: [],
+    primed: [],
     concealed: true,
     acid: [],
     fire: [],

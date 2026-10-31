@@ -4,6 +4,7 @@ import { ALIENS, alienStats, muster, type AlienKind } from './aliens'
 import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, GOALS, type Goal } from './goals'
 import { BASE_STATS, createBattle, holdCaptives, type Alien, type Battle, type Reserve, type Stats } from './battle'
 import { CLASSES, type ClassId } from './classes'
+import { CONSUMABLE_DROP, CONSUMABLE_IDS, KIT_SLOTS, SHOP_CONSUMABLES, type ConsumableId } from './consumables'
 import { DOCTRINES, type Doctrine, type DoctrineId } from './doctrines'
 import type { EventId } from './events'
 import { FEATS, type FeatId, type Tally } from './feats'
@@ -168,6 +169,8 @@ export interface Report {
   hired: string | null
   /** Civilians kept alive on a rescue; null on any other stop. */
   rescued: number | null
+  /** A consumable the stop turned up, now in the kit. */
+  found: ConsumableId | null
 }
 
 /** Experience from one source. */
@@ -176,10 +179,11 @@ export interface Earned {
   xp: number
 }
 
-/** A shop's stock, each item gone once bought, and whether its bribe is spent. */
+/** A shop's stock, each item staying in its place once sold, and whether its bribe is spent. */
 export interface Shop {
-  wares: Gear[]
-  relics: RelicId[]
+  wares: { gear: Gear; sold: boolean }[]
+  relics: { id: RelicId; sold: boolean }[]
+  consumables: { id: ConsumableId; sold: boolean }[]
   bribed: boolean
 }
 
@@ -219,6 +223,8 @@ export interface Run {
   finds: Gear[]
   nextGear: number
   relics: RelicId[]
+  /** Consumables carried, at most KIT_SLOTS, each used once in a battle. */
+  kit: ConsumableId[]
   /** Relics to choose from in the reward phase. */
   relicOffers: RelicId[]
   /** At the run's start, the recruits to choose the first soldier from. */
@@ -310,12 +316,16 @@ export function stockShop(run: Run): Shop {
   const relics = offerable(run.relics)
   const stocked: RelicId[] = []
   while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(relics.splice(randomInt(run, relics.length), 1)[0])
-  return { wares, relics: stocked, bribed: false }
+  const kinds = [...CONSUMABLE_IDS]
+  const consumables = Array.from({ length: SHOP_CONSUMABLES }, () => ({ id: kinds.splice(randomInt(run, kinds.length), 1)[0], sold: false }))
+  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), consumables, bribed: false }
 }
 
 /** Buys the ware at `index` for `soldier` to wear. The caller checks it is affordable. */
 export function buyWare(run: Run, index: number, soldier: Soldier): void {
-  const [gear] = run.shop!.wares.splice(index, 1)
+  const ware = run.shop!.wares[index]
+  ware.sold = true
+  const { gear } = ware
   run.supplies -= GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
   wear(run, soldier, gear)
 }
@@ -752,6 +762,7 @@ export function createRun(seed: number): Run {
     finds: [],
     nextGear: 1,
     relics: [],
+    kit: [],
     relicOffers: [],
     recruits: [],
     route: [],
@@ -809,7 +820,7 @@ export function advance(run: Run): void {
     const supplies = stop === 'supply' ? DROP_SUPPLIES : 0
     run.supplies += supplies
     if (stop === 'cache') dropGear(run, run.relics.some((id) => (RELICS[id] as Relic).rareGear))
-    run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, key: false, soldiers: [], hired: null, rescued: null }
+    run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, key: false, soldiers: [], hired: null, rescued: null, found: null }
     passStop(run)
     settle(run)
     return
@@ -895,11 +906,13 @@ export function endBattle(run: Run): void {
   const byGoal = { exterminate: risk.drops, assassinate: Math.max(1, risk.drops), hold: 0, rescue: 0, raid: 0, ambush: 0, recover: 0 }[mission.goal]
   const drops = won && mission.kind !== 'final' && mission.kind !== 'recovery' ? (mission.kind === 'battle' ? byGoal : 1) : 0
   for (let i = 0; i < drops; i++) dropGear(run, (risk.rareGear && i === 0) || mission.kind !== 'battle' || held.some((relic) => relic.rareGear))
+  const found = won && mission.kind !== 'final' && run.kit.length < KIT_SLOTS && random(run) < CONSUMABLE_DROP ? CONSUMABLE_IDS[randomInt(run, CONSUMABLE_IDS.length)] : null
+  if (found) run.kit.push(found)
   const key = won && mission.kind === 'key'
   // Each hero extracted joins the squad.
   const hero = run.route[run.keys]?.hero
   const hired = key && hero && !run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).noRecruits) ? join(run, hero).name : null
-  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, soldiers, hired, rescued }
+  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, soldiers, hired, rescued, found }
 
   // Losing the hero's extraction, an ambush, a recovery or the hub loses the run, as does a wipe.
   if (mission.kind === 'final' || (mission.kind !== 'battle' && !won) || wiped) {

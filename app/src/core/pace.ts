@@ -53,6 +53,7 @@ export function beatMs(events: GameEvent[], pace: Map<number, number>, shown: Se
     else if (e.type === 'reveal' || e.type === 'wave' || e.type === 'sighted') ms += e.units.some((u) => shown.has(u.id)) ? PACE.reveal : 0
     else if (e.type === 'spawn' || e.type === 'freed') ms += shown.has(e.unit.id) ? PACE.reveal : 0
     else if (e.type === 'death' || e.type === 'saved' || e.type === 'escaped') ms += PACE.death
+    else if (e.type === 'used') ms += PACE.reveal
   }
   return ms + walk
 }

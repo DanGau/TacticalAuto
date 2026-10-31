@@ -3,6 +3,7 @@ import { BLAST_RADIUS, distance, GRID, nearestAlien, revealed, PLANS, ZONE_NAMES
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { effectName } from '../core/effects'
+import { CONSUMABLES } from '../core/consumables'
 import { UPLINK_REACH, type GameEvent } from '../core/combat'
 import { EXTRACT_REACH } from '../core/goals'
 import { instant, overlaps, PACE, walkMs } from '../core/pace'
@@ -1553,6 +1554,15 @@ export async function createView(): Promise<View> {
       } else if (e.type === 'feed') {
         const on = sprites.get(e.id)
         if (on) float(callout(`FED +${e.damage}`, COLOR.crit, on))
+      } else if (e.type === 'used') {
+        const word = CONSUMABLES[e.consumable].name.toUpperCase()
+        for (const id of e.on) {
+          const on = sprites.get(id)
+          if (!on) continue
+          on.drawHp(...vitals(battle, id))
+          float(callout(word, COLOR.heal, on))
+        }
+        await tween(PACE.reveal, () => {})
       } else if (e.type === 'heal') {
         const to = sprites.get(e.target)
         if (!to) continue

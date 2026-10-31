@@ -1,4 +1,6 @@
-import type { Action } from '../core/apply'
+import { canUse, type Action } from '../core/apply'
+import { foesInSight } from '../core/combat'
+import { CONSUMABLES, KIT_SLOTS } from '../core/consumables'
 import { STRIKE, zoneInfo, type Battle, type Stance } from '../core/battle'
 import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
@@ -97,12 +99,37 @@ const LANDS = {
 
 /** Purchases the run can pay for now: gear, each for the soldier it does the most for, then relics. */
 const affordable = (run: Run): Action[] => [
-  ...run.shop!.wares.flatMap((ware, index): Action[] => {
-    const soldier = fitFor(run, ware, false)
-    return GEAR_PRICE[ware.rarity as keyof typeof GEAR_PRICE] <= run.supplies && soldier !== null ? [{ type: 'gear', index, soldier }] : []
+  ...run.shop!.wares.flatMap(({ gear, sold }, index): Action[] => {
+    const soldier = sold ? null : fitFor(run, gear, false)
+    return GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] <= run.supplies && soldier !== null ? [{ type: 'gear', index, soldier }] : []
   }),
-  ...run.shop!.relics.flatMap((_, index): Action[] => (RELIC_PRICE <= run.supplies ? [{ type: 'buy', index }] : [])),
+  ...run.shop!.relics.flatMap((relic, index): Action[] => (!relic.sold && RELIC_PRICE <= run.supplies ? [{ type: 'buy', index }] : [])),
+  ...run.shop!.consumables.flatMap((item, index): Action[] => (!item.sold && run.kit.length < KIT_SLOTS && CONSUMABLES[item.id].price <= run.supplies ? [{ type: 'consumable', index }] : [])),
 ]
+
+/** Aliens in the fight that make a consumable worth using, or a boss. */
+const CRISIS = 3
+
+/**
+ * A squad turn's use of the kit: a medkit once a soldier is badly hurt; anything else once a fight is big, or a boss
+ * is in it: an airstrike only with room for its threat, stims only with health to spare.
+ */
+function useKit(run: Run): Action {
+  const battle = run.battle!
+  const squad = battle.units.filter((u) => u.side === 'human' && u.soldier !== null)
+  const foes = foesInSight(battle)
+  const hurt = squad.some((u) => u.hp <= u.stats.hp * 0.4)
+  const crisis = foes.length >= CRISIS || foes.some((u) => u.boss)
+  const index = run.kit.findIndex((id, i) => {
+    if (!canUse(run, i)) return false
+    if (id === 'medkit') return hurt
+    if (!crisis) return false
+    if (id === 'airstrike') return run.threat + CONSUMABLES.airstrike.threat! < THREAT_MAX
+    if (id === 'stims') return squad.every((u) => u.hp > 4)
+    return true
+  })
+  return index >= 0 ? { type: 'use', index } : { type: 'wait' }
+}
 
 /** The squad's health as a share of its most. */
 const squadHealth = (run: Run) => run.soldiers.reduce((sum, s) => sum + health(run, s), 0) / run.soldiers.reduce((sum, s) => sum + soldierStats(run, s).hp, 0)
@@ -126,7 +153,7 @@ interface Strategy {
 /** The options of the event under way the squad can take, by index. */
 const takeable = (run: Run) => EVENTS[run.event!].options.flatMap((option, i) => (!option.can || option.can(run) ? [i] : []))
 
-/** A spending bot's next purchase in a shop: a relic, then gear, then a bribe once threat builds. */
+/** A spending bot's next purchase in a shop: a relic, then gear, then a consumable, then a bribe once threat builds. */
 function shop(run: Run): Action {
   const buys = affordable(run)
   const buy = buys.find((a) => a.type === 'buy') ?? buys[0]
@@ -139,6 +166,7 @@ function shop(run: Run): Action {
 const play =
   ({ risk, pick, land, build, events }: Strategy): Bot =>
   (run, rng) => {
+    if (run.phase === 'battle' && run.battle!.phase === 'battle') return useKit(run)
     if (run.phase === 'reward') return reward(run, rng, PICKS[pick])
     // A bold bot takes a recruit with a trait, any other the plain one.
     if (run.phase === 'recruit') return { type: 'recruit', index: run.recruits.findIndex((r) => (events === 'bold') === (r.trait !== null)) }
@@ -168,6 +196,10 @@ const play =
 
 /** Chooses every option at random; in a shop, builds or leaves at a coin flip. Decides finds as decideFind says. */
 const randomBot: Bot = (run, rng) => {
+  if (run.phase === 'battle' && run.battle!.phase === 'battle') {
+    const usable = run.kit.flatMap((_, i) => (canUse(run, i) ? [i] : []))
+    return usable.length > 0 && randomInt(rng, 4) === 0 ? { type: 'use', index: usable[randomInt(rng, usable.length)] } : { type: 'wait' }
+  }
   if (run.phase === 'reward') return reward(run, rng, PICKS.random)
   if (run.phase === 'recruit') return { type: 'recruit', index: randomInt(rng, run.recruits.length) }
   if (run.phase === 'battle' && run.battle!.goal === 'raid') return { type: 'grab', caches: 1 + randomInt(rng, run.battle!.caches.length) }

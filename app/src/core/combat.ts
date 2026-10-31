@@ -3,6 +3,7 @@ import { OVERKILL, type FeatId, type Tally } from './feats'
 import { TUNING } from './tuning'
 import { PARRY_CHANCE } from './doctrines'
 import { FUEL_DAMAGE } from './twists'
+import { AIRSTRIKE, HEAL, PLATING, RAGE, SMOKE_TURNS, STIMS, type ConsumableId } from './consumables'
 import {
   crumble,
   onGrid,
@@ -104,6 +105,9 @@ import {
   type Tile,
   type Unit,
   wreck,
+  dropUnit,
+  TURRET,
+  DECOY,
   unaware,
   coverAt,
 } from './battle'
@@ -157,6 +161,8 @@ export type GameEvent =
   /** A boss spawns a swarmling, or an engineer deploys a mech. */
   | { type: 'spawn'; id: number; unit: { id: number; x: number; y: number } }
   | { type: 'death'; id: number }
+  /** The player uses a consumable, acting on the units `on`. */
+  | { type: 'used'; consumable: ConsumableId; on: number[] }
   | { type: 'end'; winner: Side | null }
 
 /**
@@ -1740,11 +1746,75 @@ function act(battle: Battle): GameEvent[] {
   return []
 }
 
+/** Aliens in the fight the squad sees: revealed, and alert to it. */
+export const foesInSight = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.pod !== null && battle.pods[u.pod].revealed && battle.pods[u.pod].alert)
+
+/** What a consumable does as it is used. */
+function useConsumable(battle: Battle, id: ConsumableId): GameEvent[] {
+  const squad = battle.units.filter(isSoldier)
+  const foes = foesInSight(battle)
+  const events: GameEvent[] = []
+  const used = (on: Unit[]) => events.unshift({ type: 'used', consumable: id, on: on.map((u) => u.id) })
+  const boost = (stats: Partial<Stats>) => {
+    for (const u of squad) u.stats = { ...u.stats, ...Object.fromEntries(Object.entries(stats).map(([k, v]) => [k, u.stats[k as keyof Stats] + v])) }
+  }
+  if (id === 'airstrike') {
+    const centre = nearest(foes, centreOf(squad))
+    if (!centre) return []
+    const caught = battle.units.filter((u) => u.side === 'alien' && distance(u, centre) <= AIRSTRIKE.radius)
+    used([centre])
+    events.push({ type: 'rocket', id: centre.id, x: centre.x, y: centre.y, hits: caught.map((u) => ({ target: u.id, damage: AIRSTRIKE.damage })) })
+    wreck(battle, centre, AIRSTRIKE.radius)
+    for (const u of caught) wound(battle, u, AIRSTRIKE.damage, events)
+  } else if (id === 'medkit') {
+    used(squad)
+    for (const u of squad) u.hp = Math.min(u.stats.hp, u.hp + HEAL)
+  } else if (id === 'stims') {
+    used(squad)
+    boost(STIMS.stats)
+    for (const u of squad) u.hp = Math.max(1, u.hp - STIMS.cost)
+  } else if (id === 'rage') {
+    used(squad)
+    boost(RAGE)
+  } else if (id === 'plating') {
+    used(squad)
+    for (const u of squad) u.armor += PLATING
+  } else if (id === 'sentry' || id === 'decoy') {
+    const owner = squad[0]
+    if (!owner) return []
+    const toward = nearest(battle.units.filter((u) => u.side === 'alien'), owner)
+    // The decoy stands a few tiles toward the aliens; the turret beside the squad.
+    const spot = id === 'decoy' && toward ? { x: owner.x + Math.sign(toward.x - owner.x) * 3, y: owner.y + Math.sign(toward.y - owner.y) * 3 } : owner
+    const unit = dropUnit(battle, owner, id === 'sentry' ? TURRET : DECOY, { x: Math.max(0, Math.min(GRID - 1, spot.x)), y: Math.max(0, Math.min(GRID - 1, spot.y)) }, id === 'decoy' ? ['taunt'] : [])
+    if (!unit) return []
+    used([unit])
+    events.push({ type: 'spawn', id: owner.id, unit: { id: unit.id, x: unit.x, y: unit.y } })
+  } else {
+    const struck = foes.filter((u) =>
+      id === 'flashbang' ? !u.boss : id === 'cryo' ? !u.resists.includes('frost') : id === 'firebomb' ? !fireproof(battle, u) : id === 'painter' ? !u.resists.includes('mark') : true,
+    )
+    used(struck)
+    for (const u of struck) {
+      if (id === 'flashbang') u.panicked = true
+      else if (id === 'smoke') u.suppressed = SMOKE_TURNS
+      else if (id === 'cryo') u.chilled = CHILL_TURNS
+      else if (id === 'firebomb') u.burning = BURN_TURNS
+      else u.marked = true
+    }
+  }
+  return events
+}
+
+/** What the player's consumables do, used since the last beat. */
+function unleash(battle: Battle): GameEvent[] {
+  return battle.primed.splice(0).flatMap((id) => useConsumable(battle, id))
+}
+
 /** Advances a battle one beat: a side's simultaneous move, or one unit's action. Does nothing outside the battle phase. */
 export function stepBattle(battle: Battle): GameEvent[] {
   if (battle.phase !== 'battle') return []
   battle.beat++
-  const events = act(battle)
+  const events = battle.primed.length > 0 ? unleash(battle) : act(battle)
   const humans = battle.units.some(isSoldier)
   // Aliens left to beat: none once the commander falls, for the rest flee.
   const fled = battle.goal === 'assassinate' && !battle.units.some((u) => u.target)
