@@ -2,9 +2,10 @@ import type { GameEvent } from './combat-event'
 
 /** How long the view takes to play each kind of event, in ms. The view animates by these; the sim times battles by them. */
 export const PACE = {
-  /** A unit walking one tile, and how much slower the squad creeps while unseen. */
+  /** An alien walking one tile; a soldier dashing one, quick and decisive; the squad creeping one while unseen. */
   tile: 110,
-  creep: 1.8,
+  dash: 55,
+  creep: 200,
   /** The longest a side's moves take: everyone walks together and arrives together, a long way briskly. */
   march: 700,
   /** Units appearing, and dying or leaving. */
@@ -14,8 +15,8 @@ export const PACE = {
   attack: 450,
   /** Between the starts of one attack and the next in a side's attack stage, so each attack reads on its own. */
   stagger: 380,
-  /** The pause as the turn passes to the other side. */
-  turn: 600,
+  /** The pause as the turn passes to the other side, while its banner sweeps across. */
+  turn: 700,
   psi: 320,
   rocket: 320,
   blast: 380,
@@ -27,6 +28,9 @@ export const overlaps = (events: GameEvent[]) => events.some((e) => e.type === '
 /** Events the view shows at once, as a word over a unit or a change of marks, without waiting on them. */
 const INSTANT = new Set<GameEvent['type']>(['order', 'feed', 'effect', 'carried', 'grabbed', 'extract', 'frozen', 'hurt', 'heal'])
 export const instant = (e: GameEvent) => INSTANT.has(e.type)
+
+/** A unit's ms per tile. */
+export const tilePace = (ally: boolean, concealed: boolean) => (!ally ? PACE.tile : concealed ? PACE.creep : PACE.dash)
 
 /** Tiles walked along `path`, each step's length, the first counted as one. */
 export const walked = (path: { x: number; y: number }[]) => path.reduce((sum, p, i) => sum + (i === 0 ? 1 : Math.hypot(p.x - path[i - 1].x, p.y - path[i - 1].y)), 0)

@@ -356,6 +356,11 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const shot = enemies.some((e) => shootable(battle, unit, end, e, seen))
   if (unit.side === 'human' && shot && !battle.concealed && !setting && !battle.extract && !carrying(battle, unit)) battle.strides[unit.id] = move - costOf(battle, unit, path)
   if (unit.side !== 'human' || battle.concealed || setting || shot) return path
+  // A soldier no alien can reach next turn dashes on to a shot, if one is within a dash.
+  if (!battle.extract && !carrying(battle, unit) && threat(end) === 0) {
+    const dash = choose(move + DASH_MOVE)
+    if (enemies.some((e) => shootable(battle, unit, dash.at(-1) ?? unit, e, seen))) return dash
+  }
   unit.order = orderFor(battle, unit, { wary, exposed: theirs(end) > 0, threatened: threat(end) > 0 })
   if (unit.order !== 'sprint') return path
   // Sprinting, it moves again; a sprint that gets it no nearer is no sprint.
@@ -447,3 +452,5 @@ export function walk(unit: Unit, path: Tile[], events: GameEvent[]): void {
 
 /** Share of its move a soldier walks while the squad is unseen. */
 export const CREEP = 0.6
+/** Tiles further a soldier may dash in the fight to reach a shot. */
+const DASH_MOVE = 3

@@ -20,6 +20,8 @@ const FLIGHT_MS = 1100
 export interface Ui {
   /** Shows `run` in the status line and the panel. */
   update(run: Run): void
+  /** Sweeps the phase banner for an ambush the squad springs, or one sprung on it. */
+  announce(battle: Battle, sprung: 'squad' | 'aliens'): void
 }
 
 function status(run: Run): string {
@@ -300,7 +302,33 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   function turnDial(run: Run): void {
     const battle = run.phase === 'battle' && run.battle?.phase === 'battle' ? run.battle : null
     dial.hidden = !battle
-    if (battle && (halves % 2 === 1) !== (battle.turn === 'alien')) dial.style.setProperty('--turn', `${++halves * 180}deg`)
+    if (battle && (halves % 2 === 1) !== (battle.turn === 'alien')) {
+      dial.style.setProperty('--turn', `${++halves * 180}deg`)
+      announce(battle)
+    }
+  }
+
+  const banner = document.getElementById('phase')!
+  /** Sweeps the banner for the turn that begins, or for an ambush sprung by the squad or on it: whose turn, and who is caught off guard. */
+  function announce(battle: Battle, sprung?: 'squad' | 'aliens'): void {
+    const fighting = battle.pods.filter((p) => p.revealed && p.alert)
+    const [kind, title, line] =
+      sprung === 'squad'
+        ? ['ambush', 'AMBUSH', 'Surprise round: the squad opens fire; the aliens will reel']
+        : sprung === 'aliens'
+          ? ['enemy', 'AMBUSHED', 'The aliens caught the squad unawares']
+          : battle.turn === 'human'
+        ? fighting.some((p) => p.ambushed)
+          ? ['ambush', 'AMBUSH', 'Surprise round: the squad strikes first']
+          : ['ally', 'YOUR TURN', '']
+        : fighting.some((p) => p.reeling)
+          ? ['ambush', 'ENEMY TURN', 'Ambushed aliens reel: half move, no attack']
+          : ['enemy', 'ENEMY TURN', '']
+    banner.className = kind
+    banner.querySelector('b')!.textContent = title
+    banner.querySelector('small')!.textContent = line
+    void banner.offsetWidth
+    banner.classList.add('on')
   }
 
   function showKit(run: Run): void {
@@ -311,6 +339,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   }
 
   return {
+    announce,
     update(run) {
       statusLine.innerHTML = status(run)
       showKit(run)

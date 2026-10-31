@@ -110,9 +110,14 @@ if (!params.has('manual')) {
     if (state.phase === 'battle' && state.battle?.phase === 'battle') {
       const side = state.battle.turn
       const events = step(state)
+      // A beat that passes the turn opens the new side's turn: the old side's attacks finish, then the banner sweeps across.
+      if (state.battle?.turn !== side) {
+        await view.settle()
+        ui.update(state)
+        await new Promise((done) => setTimeout(done, PACE.turn))
+      }
+      for (const e of events) if (e.type === 'reveal' && (e.ambush || e.stalked)) ui.announce(state.battle!, e.ambush ? 'squad' : 'aliens')
       await show(events, true)
-      // The turn passes with a breath, so each side's turn reads as its own.
-      if (state.battle?.turn !== side) await new Promise((done) => setTimeout(done, PACE.turn))
       // The battle waits while the player meets each new kind of alien.
       for (const kind of newcomers(state.battle, events)) await introduce(kind)
     } else await new Promise(requestAnimationFrame)

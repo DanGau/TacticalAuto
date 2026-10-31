@@ -11,6 +11,7 @@ Test every new mechanic against these. Each cites where it comes from.
 7. **Show the change.** Players feel feedback, not numbers. After a battle, show the gain first and the aliens' answer second, each as a visible change to the board. [5]
 8. **Squeeze and release.** Tension must be followed by relief the player earned, and the alien advance after a win is the next squeeze. [5]
 9. **Rewards that point a build.** A reward that is strong everywhere makes runs alike; one that pays only if the player builds around it makes them differ. Offer a few at a time and make the choice permanent, so each pick matters for the whole run. Relics here are chosen one of three and kept; each skill a soldier learns is kept and opens the next ones in its class's tree. [6]
+10. **Whose turn, at a glance.** A phase banner and the screen's edge in the side's colour mark each turn as it passes; an ambush names who strikes first, and aliens caught off guard say so over their heads until they recover. Heroes dash where the fight needs them rather than crawl: a soldier with no shot dashes on to one. [7] [8]
 
 ## Events
 
@@ -32,3 +33,5 @@ A test checks what it can: every event has a choice, ends in one always open, an
 4. [Meta progression with gradual tutorial in roguelike games](https://notes.hamatti.org/Gaming/Video-games/Meta-progression-with-gradual-tutorial-in-roguelike-games)
 5. [Positive and negative feedback loops in game design](https://bugnet.io/blog/positive-and-negative-feedback-loops-in-game-design)
 6. [Identifying directional relic signals](https://sts2.untapped.gg/en/articles/directional-relic-signals)
+7. [Fire Emblem Wiki: Turn](https://fireemblemwiki.org/wiki/Turn)
+8. [Movement & momentum in Midnight Suns](https://twinfinite.net/guides/movement-momentum-in-midnight-suns-explained/)

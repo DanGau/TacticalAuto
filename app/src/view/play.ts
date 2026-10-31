@@ -4,7 +4,7 @@ import { revealed, type Battle, type Order, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { CONSUMABLES } from '../core/consumables'
 import { effectName } from '../core/effects'
-import { instant, PACE, walkMs } from '../core/pace'
+import { instant, PACE, tilePace, walkMs } from '../core/pace'
 import { attackOf } from './attacks'
 import { drawTerrain } from './board'
 import { along, lerp, spot } from './camera'
@@ -49,7 +49,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       // Each walks the whole way it went, from where it stood.
       const paths = new Map<number, Tile[]>()
       for (const m of group) if (m.type === 'move' && (sprites.has(m.id) || glows.has(m.id))) paths.set(m.id, [...(paths.get(m.id) ?? []), ...m.path])
-      const pace = (id: number) => PACE.tile * (battle.concealed && sprites.get(id)?.ally ? PACE.creep : 1)
+      const pace = (id: number) => tilePace(!!sprites.get(id)?.ally, battle.concealed)
       const ms = walkMs([...paths].map(([id, path]) => ({ path, pace: pace(id) })))
       const walks = [...paths].map(([id, path]) => (sprites.has(id) ? walk(s, sprites.get(id)!, path, ms) : glide(s, glows.get(id)!, path, ms)))
       for (const m of group) if (m.type === 'move' && m.with && sprites.has(m.id)) float(s, callout(s, effectName(m.with, s.kit()).toUpperCase(), 0xffffff, sprites.get(m.id)!))

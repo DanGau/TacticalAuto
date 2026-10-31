@@ -40,6 +40,8 @@ export interface View {
    * Once landed, fog darkens every tile no soldier sees.
    */
   show(run: Run, events: GameEvent[], animate: boolean): Promise<void>
+  /** Resolves once every attack begun has finished. */
+  settle(): Promise<void>
   /** The landing zone under a point on the canvas as displayed, as an index into battle.zones; null when there is none to choose. */
   zoneAt(sx: number, sy: number): number | null
   /** Before the landing, glides the camera to a landing zone and marks its way in; null pulls back to the whole map. */
@@ -185,6 +187,7 @@ export async function createView(): Promise<View> {
       drawMarks(s, shown)
       void s.follow(above(zone === null ? null : zoneView(shown, shown.zones[zone])), FOCUS_MS)
     },
+    settle: () => attacks,
     async show(run, events, animate) {
       const { fx, sprites } = s
       s.soldiers = run.soldiers

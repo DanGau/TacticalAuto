@@ -55,6 +55,11 @@ export function drawMarks(s: Stage, battle: Battle): void {
   if (vip) marks.push(label('⭐ VIP', vip, COLOR.vip, 28))
   // Soldiers down where they fell; a recovery's captives are held.
   for (const body of battle.downed.filter((d) => d.carrier === null)) marks.push(label(battle.captives.some((c) => c.soldier === body.soldier) ? '⛓ HELD' : '✚ DOWNED', body, COLOR.contact, 22))
+  // Aliens caught off guard say so over their heads until they recover.
+  for (const u of battle.units) {
+    const pod = u.pod === null ? null : battle.pods[u.pod]
+    if (pod?.revealed && (pod.reeling || pod.surprised)) marks.push(label(pod.reeling ? '💫 REELING' : '❗ SURPRISED', u, COLOR.crit, 16))
+  }
   if (battle.phase === 'deploy') {
     if (!s.briefing)
       battle.zones.forEach((zone, i) => {

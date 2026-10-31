@@ -71,6 +71,7 @@ const skills = {
   slam: { name: 'Ground Slam', role: 'control', text: `Once per battle, with two or more aliens beside it, in place of an attack: ${SLAM_HIT} damage to each, hurling them ${SLAM_TILES} tiles back`, effect: 'slam', after: ['suppression'] },
   intimidate: { name: 'Intimidate', role: 'control', text: `Once per battle, with two or more aliens within ${STUN_REACH} tiles, it roars: each is stunned and loses its next action; a boss stands firm`, effect: 'warcry', after: ['suppression', 'taunt'] },
   overwatch: { name: 'Overwatch', role: 'power', text: 'Attacks an alien that moves in its sights on the alien turn', effect: 'overwatch', after: ['steadfast', 'suppression'] },
+  charge: { name: 'Bull Rush', role: 'control', text: `Once per battle, charges onto the thickest knot of aliens within twice its move: ${LEAP_DAMAGE} damage to each alien beside where it lands, and they are rooted`, effect: 'leap', after: ['slam'] },
   // Sniper
   steady: { name: 'Steady Aim', role: 'power', text: 'If it did not move this turn, it rolls twice to hit and takes the better', effect: 'steady' },
   mark: { name: "Hunter's Mark", role: 'power', tags: ['mark'], text: `A target it hits is marked: every later hit on it does ${TUNING.markDamage} more damage`, effect: 'mark' },
@@ -84,6 +85,7 @@ const skills = {
   volley: { name: 'Volley', role: 'power', text: 'A hit also does half its damage to every alien beside the target', effect: 'volley', after: ['mark', 'slayer'] },
   decoy: { name: 'Decoy', role: 'guard', text: 'Begins each battle with 2 holograms of itself; each hit on it has a 50% chance to pop one instead', effect: 'mirror', after: ['ghost'] },
   vanish: { name: 'Vanish', role: 'guard', text: 'Once per battle, when hit to half health or less, it blinks to the safest tile within 5', effect: 'blink', after: ['ghost'] },
+  relocate: { name: 'Relocate', role: 'guard', text: 'After it acts, it moves up to 2 tiles to where the aliens have the worst shot at it', effect: 'skirmish', after: ['ghost', 'vanish'] },
   longshot: { name: 'Longshot', role: 'power', text: '+2 range', stats: { range: 2 }, after: ['ghost', 'steady'] },
   tranq: { name: 'Tranquilizer Dart', role: 'control', text: 'Once per battle, the toughest alien it can shoot, a boss aside, falls asleep and loses its next action', effect: 'polymorph', after: ['kneecap'] },
   charged: { name: 'Charged Rounds', role: 'control', text: 'Its hits charge the target: if it moves on its next turn, it takes 3 damage', effect: 'booming', after: ['kneecap'] },
@@ -144,6 +146,7 @@ const skills = {
   coldEye: { name: 'Cold Eye', role: 'power', text: '+10% aim', stats: { aim: 0.1 }, after: ['permafrost'] },
   longRange: { name: 'Long Barrel', role: 'power', text: '+2 range', stats: { range: 2 }, after: ['permafrost', 'iceArmor'] },
   frostAura: { name: 'Frost Aura', role: 'guard', tags: ['frost'], text: 'Whoever hits it is chilled', effect: 'rime', after: ['iceArmor'] },
+  glide: { name: 'Ice Glide', role: 'guard', text: 'After it acts, it slides up to 2 tiles to where the aliens have the worst shot at it', effect: 'skirmish', after: ['iceArmor'] },
   cryostasis: { name: 'Cryostasis', role: 'guard', text: 'Once per battle, survives a killing hit at 1 health', effect: 'lastStand', after: ['iceArmor'] },
 } satisfies Record<string, Skill>
 
@@ -153,12 +156,12 @@ export const SKILLS: Record<SkillId, Skill> = skills
 /** Each class's tree: the skills its soldiers learn from, roots first. */
 export const TREES: Record<ClassId, SkillId[]> = {
   assault: ['bloodlust', 'reflexes', 'leap', 'rage', 'cleave', 'surge', 'reckless', 'skirmish', 'secondWind', 'unbreakable', 'hurl', 'hamstring', 'sprinter', 'backstab'],
-  heavy: ['arsenal', 'bulwark', 'suppression', 'bigBlast', 'shredder', 'concussion', 'taunt', 'steadfast', 'reactive', 'slam', 'intimidate', 'overwatch'],
-  sniper: ['steady', 'mark', 'ghost', 'kneecap', 'headshot', 'doubleTap', 'assassinate', 'slayer', 'hollowPoint', 'volley', 'decoy', 'vanish', 'longshot', 'tranq', 'charged'],
+  heavy: ['arsenal', 'bulwark', 'suppression', 'bigBlast', 'shredder', 'concussion', 'taunt', 'steadfast', 'reactive', 'slam', 'intimidate', 'overwatch', 'charge'],
+  sniper: ['steady', 'mark', 'ghost', 'kneecap', 'headshot', 'doubleTap', 'assassinate', 'slayer', 'hollowPoint', 'volley', 'decoy', 'vanish', 'longshot', 'tranq', 'charged', 'relocate'],
   engineer: ['titan', 'swarm', 'launcher', 'hardlight', 'plating', 'rebuild', 'servos', 'detonate', 'spotter', 'linked', 'hive', 'shock', 'emp'],
   support: ['fieldKit', 'inspire', 'barrier', 'flashbang', 'surgeon', 'revive', 'vitality', 'haste', 'drone', 'forceField', 'ward', 'bane', 'gravBeam', 'nullifier'],
   pyro: ['tanks', 'tinder', 'fireSuit', 'firewall', 'inferno', 'backdraft', 'asbestos', 'searing', 'flashpoint', 'smolder', 'burningAura', 'phoenixHeart', 'blastWave', 'blinding', 'afterburner'],
-  cryo: ['icebreak', 'permafrost', 'iceArmor', 'frostbreak', 'coldSteel', 'deepFreeze', 'avalanche', 'rimeLock', 'coldEye', 'longRange', 'frostAura', 'cryostasis'],
+  cryo: ['icebreak', 'permafrost', 'iceArmor', 'frostbreak', 'coldSteel', 'deepFreeze', 'avalanche', 'rimeLock', 'coldEye', 'longRange', 'frostAura', 'cryostasis', 'glide'],
 }
 
 /** A class's roots: the skills a recruit may arrive knowing. */
