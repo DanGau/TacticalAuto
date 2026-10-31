@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { ENTRANCES, GRID, isSoldier, type Battle } from './battle'
 import { stepBattle } from './combat'
-import { COMMANDER_GAP, ENTRY_MARGIN, STRIKE } from './entrances'
+import { COMMANDER_GAP, ENTRANCE_KINDS, ENTRY_MARGIN, STRIKE } from './entrances'
 import { distance, edgeDepths, nearestAlien } from './grid'
 import type { Goal } from './goals'
 import { current } from './run'
@@ -31,6 +31,20 @@ test('a battle offers entrances of different kinds, each by the fight, with ever
       const burrowers = battle.units.filter((u) => u.pod === i).every((u) => u.kind === 'burrower')
       expect(pod.revealed).toBe(!burrowers)
     })
+  }
+})
+
+test('every battlefield offers three entrances, each where the ground supports it: a door at a doorway, a wall at a wall, a skylight under a roof, a rope on high ground', () => {
+  for (const terrain of ['town', 'city', 'countryside', 'industrial', 'ruins', 'hive'] as const) {
+    for (let seed = 1; seed <= 12; seed++) {
+      const run = begun(seed)
+      apply(run, { type: 'go', index: 1 })
+      Object.assign(current(run)!.stop!, { goal: 'exterminate', terrain })
+      apply(run, { type: 'advance' })
+      const battle = run.battle!
+      expect(battle.entrances).toHaveLength(ENTRANCES)
+      for (const { kind, at } of battle.entrances) expect(ENTRANCE_KINDS[kind].fits?.(battle, at) ?? true).toBe(true)
+    }
   }
 })
 

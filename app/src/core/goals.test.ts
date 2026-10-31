@@ -172,8 +172,8 @@ test('a rescue goes in among the civilians, every pod in sight', () => {
 })
 
 test('on a rescue aliens with no soldier to fight kill civilians', () => {
-  const run = terror(1)
-  const battle = run.battle!
+  const battle = terror(1).battle!
+  for (const s of battle.units.filter(isSoldier)) Object.assign(s, { cloaked: 99, stats: { ...s.stats, range: 0 } })
   const civilians = new Set(battle.units.filter((u) => u.civilian).map((u) => u.id))
   let killed = 0
   while (battle.phase === 'battle' && battle.round < 10) for (const e of stepBattle(battle)) if (e.type === 'death' && civilians.has(e.id)) killed++
