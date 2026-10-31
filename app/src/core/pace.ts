@@ -18,6 +18,8 @@ export const PACE = {
   attack: 450,
   /** Between the starts of one attack and the next in a side's attack stage, so each attack reads on its own. */
   stagger: 380,
+  /** Between a hero's weapon attack and its secondary: one combo, tighter than a stagger. */
+  combo: 260,
   /** The pause as the turn passes to the other side. */
   turn: 700,
   psi: 320,
@@ -27,6 +29,9 @@ export const PACE = {
 
 /** Whether a beat is one attack of a side's attack stage, which the next beat may start over. */
 export const overlaps = (events: GameEvent[]) => events.some((e) => e.type === 'shot' || e.type === 'rocket' || e.type === 'spit' || e.type === 'panic')
+
+/** How long after a beat's attack starts the next may: a combo's first blow leads straight into the second. */
+export const staggerOf = (events: GameEvent[]) => (events.some((e) => e.type === 'shot' && e.opens) ? PACE.combo : PACE.stagger)
 
 /** Events the view shows at once, as a word over a unit or a change of marks, without waiting on them. */
 const INSTANT = new Set<GameEvent['type']>(['order', 'feed', 'effect', 'carried', 'grabbed', 'extract', 'frozen', 'hurt', 'heal', 'cloak'])
@@ -76,9 +81,9 @@ export interface Clock {
   done: number
 }
 
-/** The clock once a beat lasting `ms` plays: an attack starts at once and lets the next start a stagger later; anything else waits for all before it. */
-export function tick(clock: Clock, ms: number, attack: boolean): Clock {
+/** The clock once a beat lasting `ms` plays: an attack starts at once and lets the next start `stagger` later; anything else waits for all before it. */
+export function tick(clock: Clock, ms: number, attack: boolean, stagger: number = PACE.stagger): Clock {
   const start = attack ? clock.next : clock.done
   const end = start + ms
-  return { next: attack ? start + Math.min(ms, PACE.stagger) : end, done: Math.max(clock.done, end) }
+  return { next: attack ? start + Math.min(ms, stagger) : end, done: Math.max(clock.done, end) }
 }

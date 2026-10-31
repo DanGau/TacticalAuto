@@ -1,4 +1,5 @@
 // A battle's state: units, pods, the board, and the numbers its rules share.
+import type { SecondaryId } from './secondaries'
 import { type AlienKind } from './aliens'
 import type { Tally } from './feats'
 import type { DoctrineEffect, Rule } from './doctrines'
@@ -232,6 +233,7 @@ export interface Alien {
 
 /** A soldier waiting to land. */
 export interface Reserve {
+  secondary?: SecondaryId
   soldier: number
   stats: Stats
   /** Health it lands with. */
@@ -289,6 +291,8 @@ export interface Unit {
   civilian: 'hider' | 'runner' | 'vip' | null
   /** For a mech, the soldier id of the engineer who deployed it, credited with what it does; null for any other unit. */
   summoner: number | null
+  /** A hero's attack after its weapon's. */
+  secondary?: SecondaryId
   /** Whether the unit loses its next action. */
   panicked: boolean
   /** Whether the unit has moved this turn. */

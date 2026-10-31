@@ -1,6 +1,8 @@
 // A side's simultaneous move: sighting pods, walking, sentries, overwatch, burrowers.
+import type { Secondary } from './secondaries'
+import { aiming } from './fighters'
 import { shoot } from './attack'
-import { type Battle, engaged, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, revealed, ENGAGE_REACH, STANDOFF } from './battle'
+import { GRID, type Battle, engaged, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, revealed, ENGAGE_REACH, STANDOFF } from './battle'
 import { opening } from './entrances'
 import { soldierUnit } from './spawn'
 import { breach } from './grid'
@@ -26,6 +28,7 @@ export function moveSide(battle: Battle): GameEvent[] {
   for (const unit of battle.units) {
     if (unit.side !== battle.turn || unit.hp <= 0) continue
     const path = unit.civilian ? fleePath(battle, unit) : engaged(battle, unit) ? fightPath(battle, unit) : []
+    if (path.length === 0 && unit.civilian === 'vip') events.push(...squeezePast(battle, unit))
     if (path.length === 0 && unit.order) events.push({ type: 'order', id: unit.id, order: unit.order })
     if (path.length === 0) continue
     // A sentry fires as the alien turns to go.
@@ -181,15 +184,28 @@ export function sentries(battle: Battle, unit: Unit, watched: Set<number>): Game
   return events
 }
 
+/** A freed VIP with no way on in a narrow way swaps places with the soldier beside it who stands nearer the way out. */
+function squeezePast(battle: Battle, vip: Unit): GameEvent[] {
+  if (battle.vip !== 'freed' || !battle.extract) return []
+  const toExtract = walkingDistances(battle, battle.extract)
+  const score = (t: Tile) => toExtract[t.y * GRID + t.x]
+  const soldier = battle.units.find((u) => isSoldier(u) && distance(u, vip) <= 1 && score(u) < score(vip))
+  if (!soldier) return []
+  const [was, to] = [{ x: vip.x, y: vip.y }, { x: soldier.x, y: soldier.y }]
+  Object.assign(vip, to)
+  Object.assign(soldier, was)
+  return [{ type: 'move', id: vip.id, path: [to] }, { type: 'move', id: soldier.id, path: [was] }]
+}
+
 /**
  * A soldier's walk between or after its attacks, within the move it has left: with `toShot`, to the nearest tile with a
- * shot, if it has none here; else a Deadeye backs out of arm's reach. Never
+ * shot (of `secondary`, if given), if it has none here; else a Deadeye backs out of arm's reach. Never
  * into harm, off the uplink, or into sight of a pod not yet revealed.
  */
-export function stride(battle: Battle, unit: Unit, seen: Set<number>, toShot: boolean): GameEvent[] {
+export function stride(battle: Battle, unit: Unit, seen: Set<number>, toShot: boolean, secondary?: Secondary): GameEvent[] {
   const left = battle.strides[unit.id] ?? 0
   const enemies = enemiesOf(battle, unit)
-  const shotFrom = (end: Tile) => enemies.some((e) => shootable(battle, unit, end, e, seen))
+  const shotFrom = (end: Tile) => enemies.some((e) => shootable(battle, aiming(unit, secondary), end, e, seen))
   if (left <= 0 || unit.hp <= 0 || (toShot ? shotFrom(unit) : unit.stance !== 'standoff')) return []
   const unseen = battle.units.filter((u) => u.side !== unit.side && !revealed(battle, u))
   const reach = uplinkReach(battle)

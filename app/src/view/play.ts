@@ -5,7 +5,7 @@ import type { GameEvent } from '../core/combat-event'
 import { CONSUMABLES } from '../core/consumables'
 import { effectName } from '../core/effects'
 import { instant, PACE, strolls, tilePace, walkMs } from '../core/pace'
-import { attackOf } from './attacks'
+import { attackOf, finisher, opener, secondaryAttack } from './attacks'
 import { drawTerrain } from './board'
 import { along, lerp, spot } from './camera'
 import { callout, chest, drawing, effectCallout, fireRocket, float, playShot } from './effects'
@@ -100,7 +100,9 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const shooter = battle.units.find((u) => u.id === e.id)
       if (!from || !to || !shooter) continue
       const after = vitals(battle, e.target)
-      await drawing(s, (fx) => playShot(s, fx, from, to, e, after, attackOf(shooter, s.soldiers.find((m) => m.id === shooter.soldier)?.gear.weapon?.weapon ?? null, s.blademasters)))
+      const weapon = attackOf(shooter, s.soldiers.find((m) => m.id === shooter.soldier)?.gear.weapon?.weapon ?? null, s.blademasters)
+      const gun = e.secondary ? finisher(secondaryAttack(e.secondary)) : e.opens ? opener(weapon) : weapon
+      await drawing(s, (fx) => playShot(s, fx, from, to, e, after, gun))
       // Crumbling ruins have already broken in the battle; show it as the hit lands.
       if (battle.twist === 'crumbling' && e.damage > 0) drawTerrain(s, battle)
     } else if (e.type === 'rocket') {

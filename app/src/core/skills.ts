@@ -46,12 +46,12 @@ export interface Skill {
 
 const skills = {
   // Assault
-  bloodlust: { name: 'Bloodlust', role: 'power', tags: ['kill'], text: 'A kill grants one more attack', effect: 'frenzy' },
+  bloodlust: { name: 'Bloodlust', role: 'power', tags: ['kill'], text: 'A kill grants one more attack with its weapon', effect: 'frenzy' },
   reflexes: { name: 'Reflexes', role: 'guard', text: 'Takes 1 less damage from each hit', effect: 'dodge' },
   leap: { name: 'Heroic Leap', role: 'control', text: `Once per battle, leaps onto the thickest knot of aliens within twice its move: ${LEAP_DAMAGE} damage to each alien beside where it lands, and they are rooted`, effect: 'leap' },
   rage: { name: 'Rage', role: 'power', text: '+2 damage while at half health or less', effect: 'rage', after: ['bloodlust'] },
   cleave: { name: 'Cleave', role: 'power', tags: ['kill'], text: 'A kill does 2 damage to every alien beside the one killed', effect: 'cleave', after: ['bloodlust'] },
-  surge: { name: 'Action Surge', role: 'power', text: 'Once per battle, it attacks once more in a turn', effect: 'surge', after: ['bloodlust', 'rage'] },
+  surge: { name: 'Action Surge', role: 'power', text: 'Once per battle, it attacks once more with its weapon in a turn', effect: 'surge', after: ['bloodlust', 'rage'] },
   reckless: { name: 'Reckless Attack', role: 'power', text: '+1 damage, and aliens do 1 more damage to it', effect: 'reckless', after: ['rage'] },
   skirmish: { name: 'Skirmisher', role: 'guard', text: 'After it acts, it moves up to 2 tiles away from the aliens', effect: 'skirmish', after: ['reflexes'] },
   secondWind: { name: 'Second Wind', role: 'guard', text: 'Once per battle, at half health or less, it heals 5 and still attacks', effect: 'secondWind', after: ['reflexes'] },
@@ -80,7 +80,7 @@ const skills = {
   elusive: { name: 'Elusive', role: 'guard', text: 'Aliens more than 4 tiles away cannot shoot it', effect: 'elusive' },
   kneecap: { name: 'Kneecap', role: 'control', text: 'Its hits root the target: it cannot move on its next turn', effect: 'snare' },
   headshot: { name: 'Headshot', role: 'power', tags: ['crit'], text: 'Crits do 2 more damage', effect: 'headshot', after: ['steady'] },
-  doubleTap: { name: 'Double Tap', role: 'power', text: 'If it did not move this turn, it attacks a third time', effect: 'doubleTap', after: ['steady'] },
+  doubleTap: { name: 'Double Tap', role: 'power', text: 'If it did not move this turn, it attacks a third time, with its weapon', effect: 'doubleTap', after: ['steady'] },
   assassinate: { name: 'Assassinate', role: 'power', tags: ['crit'], text: 'A hit on a target at full health is a crit', effect: 'assassinate', after: ['steady', 'headshot'] },
   slayer: { name: 'Colossus Slayer', role: 'power', text: '+2 damage to a target already wounded', effect: 'slayer', after: ['mark'] },
   hollowPoint: { name: 'Piercing Rounds', role: 'power', text: "Its shots ignore the target's armor", effect: 'pierce', after: ['mark'] },

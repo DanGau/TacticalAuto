@@ -64,7 +64,7 @@ export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: str
   piercing: { slot: 'weapon', prefix: 'Piercing', text: "Ignores the target's armor" },
   vampiric: { slot: 'weapon', prefix: 'Leeching', text: 'Each hit heals the shooter 1' },
   executioner: { slot: 'weapon', prefix: 'Merciless', text: '+2 damage to targets at half health or less', tags: ['kill'] },
-  chain: { slot: 'weapon', prefix: 'Frenzied', text: 'A kill grants one more shot', tags: ['kill'], epic: true },
+  chain: { slot: 'weapon', prefix: 'Frenzied', text: 'A kill grants one more attack with this weapon', tags: ['kill'], epic: true },
   thorns: { slot: 'armor', prefix: 'Barbed', text: 'Whoever hits the wearer takes 1 damage' },
   shield: { slot: 'armor', prefix: 'Warded', text: 'Absorbs the first hit each battle', tags: ['ward'] },
   rime: { slot: 'armor', prefix: 'Rimeguard', text: 'Whoever hits the wearer is chilled', tags: ['frost', 'ward'] },

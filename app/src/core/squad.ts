@@ -1,4 +1,5 @@
 // Soldiers: experience and levels, skills, stats and health, and hiring.
+import type { SecondaryId } from './secondaries'
 import type { Lasting } from './base'
 import { type Battle, type Stats, BASE_STATS } from './battle'
 import { CLASSES, type ClassId } from './classes'
@@ -105,6 +106,9 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
   for (const id of run.doctrines) Object.assign(stats, (DOCTRINES[id] as Doctrine).set)
   return stats
 }
+
+/** The attack a soldier follows its weapon with: by its class, a sidearm without one. */
+export const secondaryOf = (soldier: Soldier): SecondaryId => (soldier.cls ? CLASSES[soldier.cls].secondary : 'sidearm')
 
 /** The weapon a soldier wields, if any. */
 export const weaponOf = (soldier: Soldier) => (soldier.gear.weapon?.weapon ? WEAPONS[soldier.gear.weapon.weapon] : null)

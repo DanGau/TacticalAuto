@@ -66,7 +66,7 @@ const doctrines = {
     effect: 'demolish',
     weapon: true,
   },
-  gunslingers: { name: 'Gunslingers', text: 'Every hero has 1 less damage and 2 less range, but fires a third shot each turn', stats: { damage: -1, range: -2 }, effect: 'twin', weapon: true },
+  gunslingers: { name: 'Gunslingers', text: 'Every hero has 1 less damage and 2 less range, but fires its weapon a third time each turn', stats: { damage: -1, range: -2 }, effect: 'twin', weapon: true },
 } satisfies Record<string, Doctrine>
 
 export type DoctrineId = keyof typeof doctrines

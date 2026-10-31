@@ -1,4 +1,5 @@
 // Questions every combat module asks about units in a fight: whose enemy, nearest, has what, can shoot.
+import type { Secondary } from './secondaries'
 import { AURA_REACH, BURN_TURNS, type Battle, CHILL_TURNS, type Effect, ELUSIVE_REACH, GRID, LINGER_TURNS, type Tile, type Unit, engaged, isSoldier, revealed } from './battle'
 import { onGrid, spacedTile, walkingDistances } from './grid'
 import { NEIGHBORS } from './grid'
@@ -57,6 +58,9 @@ export function spotted(battle: Battle): Set<number> {
 export const hostage = (battle: Battle, unit: Unit) => unit.civilian === 'vip' && battle.vip !== 'freed'
 
 /** Whether `unit`, standing on `from`, may shoot `target`. Squadsight reaches any spotted alien in a clear line; an elusive target is safe from far off, and a cloaked one from all. */
+/** The unit as it aims a secondary: only that reach counts, no squadsight. */
+export const aiming = (unit: Unit, secondary?: Secondary): Unit => (secondary ? { ...unit, ability: null, stats: { ...unit.stats, range: secondary.range } } : unit)
+
 export function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: Set<number>): boolean {
   if (hostage(battle, target)) return false
   if (target.cloaked) return false

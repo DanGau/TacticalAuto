@@ -177,6 +177,7 @@ test('backstab adds damage against a target with no alien beside it; shredder de
 test('a soldier on overwatch shoots an alien that moves in its sights on the alien turn', () => {
   const { soldier, aliens, until } = arena([{ kind: 'swarmling', x: 10, y: 22 }])
   soldier.effects = ['overwatch']
+  soldier.secondary = undefined
   soldier.stats = { ...soldier.stats, move: 0, range: 4 }
   aliens[0].hp = aliens[0].stats.hp = 99
   const events = until((all) => all.some((e) => e.type === 'shot' && e.id === soldier.id))

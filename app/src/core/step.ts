@@ -2,7 +2,7 @@
 import { revealed } from './battle'
 import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
-import { beatMs, overlaps, PACE, tick, tilePace, type Clock } from './pace'
+import { beatMs, overlaps, PACE, staggerOf, tick, tilePace, type Clock } from './pace'
 import type { Run } from './run-state'
 import { endBattle } from './debrief'
 
@@ -23,5 +23,5 @@ export function timedFlow(run: Run, clock: Clock): { events: GameEvent[]; clock:
   const pace = new Map(units.map((u) => [u.id, tilePace(u.side === 'human')]))
   const shown = new Set(units.filter((u) => revealed(battle!, u)).map((u) => u.id))
   const passed = battle?.turn !== side ? clock.done + PACE.turn : null
-  return { events, clock: tick(passed === null ? clock : { next: passed, done: passed }, beatMs(events, pace, shown), overlaps(events)) }
+  return { events, clock: tick(passed === null ? clock : { next: passed, done: passed }, beatMs(events, pace, shown), overlaps(events), staggerOf(events)) }
 }

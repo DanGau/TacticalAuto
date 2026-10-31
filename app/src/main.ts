@@ -45,6 +45,8 @@ export interface Debug {
   apply(action: Action): Result
   /** Advances n beats, shows the result without animation, and returns the state. */
   step(n: number): Run
+  /** Plays n beats animated. */
+  watch(n: number): Promise<void>
   /** Runs `code` with `state` bound to the live run, shows the result, and returns the state. */
   edit(code: string): Run
 }
@@ -95,6 +97,9 @@ window.debug = {
     for (let i = 0; i < n; i++) events = step(state)
     void show(events, false)
     return structuredClone(state)
+  },
+  async watch(n) {
+    for (let i = 0; i < n; i++) await show(step(state), true)
   },
   edit(code) {
     new Function('state', code)(state)

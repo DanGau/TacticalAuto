@@ -1,4 +1,5 @@
 import { ALIENS, DANGERS, type AlienKind } from '../core/aliens'
+import { SECONDARIES, secondaryText } from '../core/secondaries'
 import { CLASSES } from '../core/classes'
 import { GOALS } from '../core/goals'
 import { SLOTS } from '../core/gear'
@@ -16,7 +17,7 @@ import { huntForce } from '../core/missions'
 import { RISKS } from '../core/missions'
 import { GEAR_PRICE } from '../core/rewards'
 import { squadKeywords } from '../core/squad'
-import { soldierStats } from '../core/squad'
+import { secondaryOf, soldierStats, weaponOf } from '../core/squad'
 import { health } from '../core/squad'
 import { charges } from '../core/squad'
 import { equipped } from '../core/squad'
@@ -259,6 +260,8 @@ function details(run: Run, soldier: Soldier): string {
   const stats = soldierStats(run, soldier)
   const skills = soldier.skills.map((id) => `<p class="described"><b>${SKILLS[id].name}.</b> ${describe(SKILLS[id].text, SKILLS[id].tags)}</p>`)
   const uses = charges(run, soldier)
+  const secondary = SECONDARIES[secondaryOf(soldier)]
+  const attacks = `<p><b>Each turn: ${weaponOf(soldier)?.name ?? 'bare hands'}, then ${secondary.name}.</b> ${secondaryText(secondary)}</p>`
   const gear = equipped(soldier).map((g) => `<div class="gear ${g.rarity}">${gearCard(g)}</div>`)
   const feats = soldier.feats.map((id) => `<span class="chip feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</span>`)
   return `<h2>${soldier.name} · ${xpFor(r + 1) - soldier.xp} experience to level ${r + 1}</h2>
@@ -268,7 +271,7 @@ function details(run: Run, soldier: Soldier): string {
         <tr><td>Crit</td><td>${Math.round(100 * stats.crit)}%</td><td>Move</td><td>${stats.move}</td></tr>
         <tr><td>Damage</td><td>${stats.damage}</td><td>Range</td><td>${stats.range}</td></tr>
       </table>
-      <div>${cls ? `<p>${cls.stanceText}.</p><p><b>${cls.abilityName}${uses > 0 ? ` ×${uses}` : ''}.</b> ${cls.abilityText}.</p>` : ''}${skills.join('')}${feats.length > 0 ? `<p>${feats.join(' ')}</p>` : ''}</div>
+      <div>${attacks}${cls ? `<p>${cls.stanceText}.</p><p><b>${cls.abilityName}${uses > 0 ? ` ×${uses}` : ''}.</b> ${cls.abilityText}.</p>` : ''}${skills.join('')}${feats.length > 0 ? `<p>${feats.join(' ')}</p>` : ''}</div>
       ${gear.join('')}
     </div>`
 }

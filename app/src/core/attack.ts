@@ -10,8 +10,9 @@ import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import { PARRY_SOAK } from './doctrines'
+import { FRAG_SPLASH, type Secondary } from './secondaries'
 import type { GameEvent } from './combat-event'
-import { onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS, spotlit } from './fighters'
+import { aiming, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS, spotlit } from './fighters'
 import { wound, knockback } from './wound'
 import { TUNING } from './tuning'
 import { bite, MIN_DAMAGE, odds } from './sight'
@@ -58,10 +59,11 @@ export const VOLATILE_DAMAGE = 2
  * A shot, which always lands, at the enemy the unit can shoot and hurt most, a civilian counting PREY_WORTH; the nearest, then the lowest id, wins a tie.
  * An alien that can shoot a taunting soldier, or one in the spotlight, must. With `only`, the shot is at that enemy or not at all.
  * The effects of both units' gear and skills, and of relics, apply. `granted` names the effect that gave a shot
- * beyond the unit's own; such a shot grants no further one.
+ * beyond the unit's own; such a shot grants no further one. A `secondary` attacks in place of the weapon: its reach, damage and effect.
  */
-export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, only?: Unit): GameEvent[] {
-  const inReach = (only ? [only] : battle.units).filter((other) => other.side !== unit.side && shootable(battle, unit, unit, other, seen))
+export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, only?: Unit, secondary?: Secondary): GameEvent[] {
+  const aim = aiming(unit, secondary)
+  const inReach = (only ? [only] : battle.units).filter((other) => other.side !== unit.side && shootable(battle, aim, unit, other, seen))
   const taunting = inReach.filter((other) => has(other, 'taunt') || spotlit(battle, other))
   // Aliens spread their fire: a healthier soldier is the likelier target, so wounds fall across the squad.
   const spread = (other: Unit) => (unit.side === 'alien' && !other.civilian ? SPREAD * (other.hp / other.stats.hp) : 0)
@@ -106,6 +108,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const base = unit.kind === 'mirror' ? Math.max(unit.stats.damage, ...battle.units.filter(isSoldier).map((s) => s.stats.damage)) : unit.stats.damage
   const dealt =
     base +
+    (secondary?.damage ?? 0) +
     gain -
     blunted +
     (inAura(battle, unit, 'inspire') ? INSPIRE_DAMAGE : 0) +
@@ -132,7 +135,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(unit.fury > 0, 'bloodRite', unit.fury)
   let damage = base > 0 ? Math.max(MIN_DAMAGE, dealt) : Math.max(0, dealt)
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0
-  const pierced = unseen || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) + when(enemy.chilled > 0, 'frostbreak', 1) > 0
+  const pierced = unseen || secondary?.effect === 'pierce' || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) + when(enemy.chilled > 0, 'frostbreak', 1) > 0
   const left = enemy.hp + (pierced ? 0 : enemy.armor)
   if (has(enemy, 'mirror') && enemy.spent.filter((e) => e === 'mirror').length < MIRROR_IMAGES) {
     damage = 0
@@ -148,7 +151,9 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   }
   // Those beside the target, for a volley or a cleave, as they stand before the hit.
   const beside = battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1)
-  events.unshift({ type: 'shot', id: unit.id, target: enemy.id, crit, damage, with: used })
+  // The weapon's attack of a turn with a secondary still to come opens a combo.
+  const opens = !secondary && !granted && isSoldier(unit) && battle.actor === unit.id && battle.attacks < attacksOf(unit)
+  events.unshift({ type: 'shot', id: unit.id, target: enemy.id, crit, damage, with: used, ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}) })
   if (battle.twist === 'crumbling' && damage > 0) crumble(battle, enemy, unit)
   // A bonded squadmate beside the target takes the hit in its place.
   const guard = battle.units.find((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && has(u, 'bond') && distance(u, enemy) <= 1)
@@ -262,12 +267,29 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     wreck(battle, enemy)
     events.push({ type: 'effect', id: enemy.id, effect: 'demolish', amount: 0 })
   }
+  if (secondary && damage > 0) secondaryHit(battle, unit, enemy, beside, secondary, events)
   if (enemy.kind === 'brute' && enemy.hp > 0 && unit.hp > 0) charge(battle, enemy, unit, events)
   return [...events, ...again(battle, unit, seen, granted, enemy.hp <= 0)]
 }
 
+/** What a secondary's hit also does. */
+function secondaryHit(battle: Battle, unit: Unit, enemy: Unit, beside: Unit[], { effect }: Secondary, events: GameEvent[]): void {
+  if (effect === 'splash') {
+    for (const other of beside.filter((u) => u.hp > 0)) {
+      events.push({ type: 'hurt', id: other.id, amount: FRAG_SPLASH, cause: 'impact' })
+      wound(battle, other, FRAG_SPLASH, events)
+    }
+  }
+  if (enemy.hp <= 0) return
+  if (effect === 'knock') knockback(battle, unit, enemy, events)
+  if (effect === 'mark' && !enemy.resists.includes('mark')) enemy.marked = true
+  if (effect === 'suppress') enemy.suppressed = 2
+  if (effect === 'burn' && !fireproof(battle, enemy)) enemy.burning = burnFrom(unit)
+  if (effect === 'root') enemy.rooted = CHILL_TURNS
+}
+
 /**
- * The one more shot a shot may grant: after a kill, to a soldier with frenzy or a frenzied weapon; else to one with
+ * The one more attack, always the weapon's, a shot may grant: after a kill, to a soldier with frenzy or a frenzied weapon; else to one with
  * double tap who did not move; else, once per battle, to one with action surge.
  */
 export function again(battle: Battle, unit: Unit, seen: Set<number>, granted: Effect | undefined, killed: boolean): GameEvent[] {

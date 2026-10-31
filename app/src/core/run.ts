@@ -1,5 +1,6 @@
 // A run's journey: creating it, the route and each leg's map of stops, and moving along it.
 import { type Reserve } from './battle'
+import { secondaryOf } from './squad'
 import { createBattle } from './setup'
 import { holdCaptives } from './setup'
 import { CLASSES } from './classes'
@@ -403,6 +404,7 @@ export function advance(run: Run): void {
     hp: health(run, s),
     ability: s.cls && CLASSES[s.cls].ability,
     charges: charges(run, s),
+    secondary: secondaryOf(s),
     stance: doctrines.find((d) => d.stance)?.stance ?? weaponOf(s)?.stance ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
     effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)].flatMap((w) => w?.effect ?? []),...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))

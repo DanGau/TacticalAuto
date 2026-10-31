@@ -1,4 +1,5 @@
 // Soldier classes: stats, positioning, and the ability each uses unprompted.
+import type { SecondaryId } from './secondaries'
 import { CLOAK_DAMAGE, CLOAK_TURNS, MECH_STATS, type Ability, type Stance, type Stats } from './battle'
 
 /** What a hero becomes at first promotion: stat changes, a way of positioning, and one ability used unprompted. */
@@ -13,6 +14,8 @@ export interface SoldierClass {
   abilityText: string
   /** Times per battle the ability can be used; 0 for one always in effect. */
   charges: number
+  /** The attack after its weapon's each turn. */
+  secondary: SecondaryId
 }
 
 const classes = {
@@ -25,6 +28,7 @@ const classes = {
     abilityName: 'Run and Gun',
     abilityText: 'Moves twice as far when that is the only way to reach a shot',
     charges: 0,
+    secondary: 'frag',
   },
   heavy: {
     name: 'Powerhouse',
@@ -35,6 +39,7 @@ const classes = {
     abilityName: 'Rocket',
     abilityText: 'Once per battle, in place of a shot, blasts two or more aliens standing together',
     charges: 1,
+    secondary: 'shieldThrow',
   },
   sniper: {
     name: 'Deadeye',
@@ -45,6 +50,7 @@ const classes = {
     abilityName: 'Squadsight',
     abilityText: 'Shoots any alien a squadmate sees, at any distance, given a clear line',
     charges: 0,
+    secondary: 'pistol',
   },
   support: {
     name: 'Beacon',
@@ -55,6 +61,7 @@ const classes = {
     abilityName: 'Medic',
     abilityText: 'Twice per battle, heals a badly wounded soldier nearby, and still shoots',
     charges: 2,
+    secondary: 'flare',
   },
   engineer: {
     name: 'Gadgeteer',
@@ -65,6 +72,7 @@ const classes = {
     abilityName: 'Deploy Mech',
     abilityText: `Once per battle, once aliens are in sight, deploys a frail combat mech beside it, ${MECH_STATS.hp} health, that every alien able to shoot it must shoot, and still shoots`,
     charges: 1,
+    secondary: 'shockCoil',
   },
   pyro: {
     name: 'Pyro',
@@ -75,6 +83,7 @@ const classes = {
     abilityName: 'Napalm',
     abilityText: 'Twice per battle, in place of a shot, sprays napalm over two or more aliens standing together: 3 damage, and they burn on ground set alight',
     charges: 2,
+    secondary: 'flameBurst',
   },
   cryo: {
     name: 'Cryo',
@@ -85,6 +94,7 @@ const classes = {
     abilityName: 'Cryo Rounds',
     abilityText: 'Its hits chill the target',
     charges: 0,
+    secondary: 'iceShard',
   },
   phantom: {
     name: 'Phantom',
@@ -95,6 +105,7 @@ const classes = {
     abilityName: 'Cloak',
     abilityText: `Twice per battle, in place of its attacks when aliens can shoot it, it cloaks: no alien sees or targets it for ${CLOAK_TURNS} turns. Its next attack, out of cloak, ignores armor, has +${CLOAK_DAMAGE} damage, and reveals it`,
     charges: 2,
+    secondary: 'knives',
   },
 } satisfies Record<string, SoldierClass>
 

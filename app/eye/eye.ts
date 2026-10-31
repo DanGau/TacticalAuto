@@ -129,6 +129,8 @@ const commands: Record<string, Command> = {
       },
       [expression, max],
     ),
+  /** watch <n>: plays n beats animated, in the background, for screenshots to catch. */
+  watch: (page, n) => page.evaluate((n) => void debug.watch(n), Number(n)),
   /** click <x> <y>: clicks a screen point, to test the UI itself. */
   async click(page, x, y) {
     await page.mouse.click(Number(x), Number(y))

@@ -22,13 +22,14 @@ import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { centreOf, fireproof, has, nearest, spotted, vipOf } from './fighters'
+import { SECONDARIES } from './secondaries'
 import { wound } from './wound'
 import { attacksOf, blast, leap, napalm, shoot } from './attack'
 import { leverage } from './objects'
 import { alienAction, cloak, deploy, drone, feed, flashbang, forceField, heal, medkit, polymorph, pulse, secondWind, skirmish, slam, strew } from './abilities'
 import { armed, moveSide, stride } from './sides'
 /**
- * The next attack of the side on turn: a soldier makes SOLDIER_ATTACKS a turn, an alien one. A panicked soldier loses its turn; a phantom may cloak in place of its attacks.
+ * The next attack of the side on turn: a soldier makes SOLDIER_ATTACKS a turn, its weapon's then its secondary, an alien one. A panicked soldier loses its turn; a phantom may cloak in place of its attacks.
  * An alien does what its kind does in place of a shot, if anything. Otherwise, first come what does not cost the
  * shot: a medkit, a medic's heal, a grenade. Then a rocket, when its moment has come, or else a shot.
  * Empty when no unit is left.
@@ -39,11 +40,12 @@ function actNext(battle: Battle): GameEvent[] {
     if (unit.side !== battle.turn || unit.id < battle.shooter || unit.civilian || !armed(battle, unit)) continue
     if (unit.id === battle.shooter) {
       if (battle.attacks >= attacksOf(unit)) continue
-      // A further attack: a walk to a shot if it has none, the shot, then what follows the last, ending with a step back.
+      // The secondary: a walk to a shot if it has none, the shot, then what follows the last, ending with a step back.
       battle.attacks++
       battle.actor = unit.id
-      const events = [...stride(battle, unit, seen, true)]
-      events.push(...shoot(battle, unit, seen))
+      const secondary = unit.secondary && SECONDARIES[unit.secondary]
+      const events = [...stride(battle, unit, seen, true, secondary)]
+      events.push(...shoot(battle, unit, seen, undefined, undefined, secondary))
       if (battle.attacks >= attacksOf(unit) && unit.hp > 0) events.push(...drone(battle, unit), ...skirmish(battle, unit), ...stride(battle, unit, seen, false))
       battle.actor = null
       if (events.length === 0) continue
@@ -80,7 +82,11 @@ function actNext(battle: Battle): GameEvent[] {
     const powers = [...pulse(battle, unit, 'warcry'), ...pulse(battle, unit, 'emp'), ...flashbang(battle, unit, seen), ...forceField(battle, unit), ...leap(battle, unit, seen)]
     const slammed = fired.length > 0 ? [] : slam(battle, unit)
     const levered = fired.length + slammed.length > 0 ? [] : leverage(battle, unit)
-    const struck = fired.length > 0 ? fired : slammed.length > 0 ? slammed : levered.length > 0 ? levered : shoot(battle, unit, seen)
+    const primary = fired.length > 0 ? fired : slammed.length > 0 ? slammed : levered.length > 0 ? levered : shoot(battle, unit, seen)
+    // A hero its weapon cannot bring to bear still has its secondary, and that is its turn's attacking.
+    const fallback = primary.length === 0 && unit.secondary && unit.stats.range > 0 && unit.stats.damage > 0 ? shoot(battle, unit, seen, undefined, undefined, SECONDARIES[unit.secondary]) : []
+    if (fallback.length > 0) battle.attacks = attacksOf(unit)
+    const struck = [...primary, ...fallback]
     const acted = [...medkit(unit), ...secondWind(unit), ...polymorph(battle, unit, seen), ...strew(battle, unit, 'caltrops'), ...strew(battle, unit, 'firewall'), ...deploy(battle, unit, seen), ...powers, ...healed, ...thrown, ...struck]
     // What follows an action: a drone's shot, then a skirmisher's step back.
     const events = acted.length > 0 && unit.hp > 0 && attacksOf(unit) === 1 ? [...acted, ...drone(battle, unit), ...skirmish(battle, unit)] : acted

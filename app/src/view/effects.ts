@@ -3,6 +3,7 @@ import { BLAST_RADIUS, type Battle, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { effectName } from '../core/effects'
 import { PACE } from '../core/pace'
+import { SECONDARIES } from '../core/secondaries'
 import type { Attack } from './attacks'
 import { lerp } from './camera'
 import { drawFog } from './marks'
@@ -17,12 +18,13 @@ import type { Label, Sprite, Stage } from './stage'
 const CHEST = 18
 const IMPACT_MS = 140
 const CALLOUT_MS = 900
+const FINISH_LIFT = 44
 
 export const chest = (sprite: Sprite): Tile => ({ x: sprite.at.x, y: sprite.at.y - CHEST })
 
 /** Words over a unit saying what just happened to it. */
-export function callout(s: Stage, text: string, color: number, over: Sprite, size = 13): Label {
-  const at = { x: over.at.x, y: over.at.y - 48 }
+export function callout(s: Stage, text: string, color: number, over: Sprite, size = 13, lift = 0): Label {
+  const at = { x: over.at.x, y: over.at.y - 48 - lift }
   const mark: Label = { text, color, size, at: () => at, rise: 1, outline: 3, alpha: 1 }
   s.labels.add(mark)
   return mark
@@ -30,7 +32,9 @@ export function callout(s: Stage, text: string, color: number, over: Sprite, siz
 
 /** A shot's result: a hit or crit with its damage. */
 export function shotCallout(s: Stage, e: Extract<GameEvent, { type: 'shot' }>, over: Sprite): Label {
-  return e.crit ? callout(s, `CRIT -${e.damage}`, COLOR.crit, over, 18) : callout(s, `HIT -${e.damage}`, COLOR.hit, over)
+  // A combo's second blow reads over the first, and bigger, so both can be counted.
+  const lift = e.secondary ? FINISH_LIFT : 0
+  return e.crit ? callout(s, `CRIT -${e.damage}`, COLOR.crit, over, e.secondary ? 22 : 18, lift) : callout(s, `HIT -${e.damage}`, COLOR.hit, over, e.secondary ? 18 : 13, lift)
 }
 
 /** What a gear effect did to a unit, in a word: the effect's name, and the health it gave or took. */
@@ -80,6 +84,7 @@ function fire(s: Stage, fx: Sketch, a: Tile, ends: Tile[], gun: Attack): Promise
       if (local === 0) return
       // The muzzle flash: a burst at the barrel that dies as the round leaves.
       if (local < 0.3) fx.circle(a.x, a.y, gun.flash * (1 - local / 0.3)).fill({ color: gun.core, alpha: 0.9 })
+      const lift = (gun.arc ?? 0) * Math.sin(Math.PI * local)
       if (gun.style === 'bolt') {
         const head = lerp(a, b, local)
         const tail = lerp(a, b, Math.max(0, local - 0.35))
@@ -89,9 +94,11 @@ function fire(s: Stage, fx: Sketch, a: Tile, ends: Tile[], gun: Attack): Promise
       } else if (gun.style === 'orb') {
         for (let k = 4; k >= 0; k--) {
           const at = lerp(a, b, Math.max(0, local - k * 0.05))
+          at.y -= lift
           fx.circle(at.x, at.y, gun.width * 2 * (1 - k * 0.15)).fill({ color: gun.color, alpha: 0.07 * (5 - k) })
         }
         const head = lerp(a, b, local)
+        head.y -= lift
         fx.circle(head.x, head.y, gun.width).fill(gun.color).circle(head.x, head.y, gun.width / 2).fill(gun.core)
       } else {
         // A beam charges at the muzzle, then fires all at once and thins away.
@@ -163,6 +170,7 @@ export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e
   fx.clear()
   float(s, shotCallout(s, e, to))
   // What of the shooter's shaped the shot, named over the shooter.
+  if (e.secondary) float(s, callout(s, SECONDARIES[e.secondary].name.toUpperCase(), COLOR.crit, from, 15, FINISH_LIFT))
   if (e.with.length > 0) float(s, callout(s, e.with.map((effect) => effectName(effect, s.kit()).toUpperCase()).join(' · '), 0xffffff, from))
   to.drawHp(...after)
   const power = crit ? 2 : 1
@@ -178,7 +186,7 @@ export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e
     shift(s, to, { x: home.x + dir.x * push, y: home.y + dir.y * push })
     squash(to, 1.2 - 0.2 * t, 0.8 + 0.2 * t)
   })
-  await burst(s, fx, mark, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, power)
+  await burst(s, fx, mark, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, e.secondary ? power * 1.6 : power)
   place(s, to, to.tile)
   squash(to, 1, 1)
   fx.clear()

@@ -1,4 +1,5 @@
 // The title screen, story and recruit choice.
+import { SECONDARIES, secondaryText } from '../core/secondaries'
 import { CLASSES } from '../core/classes'
 import type { Run } from '../core/run-state'
 import type { Soldier } from '../core/run-state'
@@ -36,7 +37,8 @@ function card(recruit: Soldier, index: number, chosen: number | null): string {
   const cls = CLASSES[recruit.cls!]
   const trait: Trait | null = recruit.trait ? TRAITS[recruit.trait] : null
   const quirk = trait ? `<b>${trait.name}</b><span class="down">${trait.pro}</span><span class="up">${trait.con}</span>` : '<b>Steady</b><small>No quirks</small>'
-  const named = [{ name: cls.abilityName, text: cls.abilityText }, ...recruit.skills.map((id) => SKILLS[id])]
+  const secondary = SECONDARIES[cls.secondary]
+  const named = [{ name: cls.abilityName, text: cls.abilityText }, { name: secondary.name, text: `Secondary attack. ${secondaryText(secondary)}` }, ...recruit.skills.map((id) => SKILLS[id])]
   return `<button data-recruit="${index}" class="card recruit${index === chosen ? ' chosen' : ''}">
     <small>${cls.name}</small>
     <b class="name">${recruit.name}</b>

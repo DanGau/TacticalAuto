@@ -4,7 +4,7 @@ import { BLAST_RADIUS, ENTRY_RADIUS, revealed, type Battle, type Tile } from '..
 import type { GameEvent } from '../core/combat-event'
 import { effectName } from '../core/effects'
 import { distance, nearestAlien } from '../core/grid'
-import { overlaps, PACE } from '../core/pace'
+import { overlaps, staggerOf } from '../core/pace'
 import type { Run } from '../core/run-state'
 import { drawTerrain } from './board'
 import { axes, clamped, DECAL_LIFT, framing, setHeights, spot, STILL_FOV, WIDTH, type Camera, type Shot } from './camera'
@@ -211,7 +211,7 @@ export async function createView(): Promise<View> {
         // An attack lets the next start a stagger later, so a side's attacks land one after another; the beat after them settles the picture.
         const playing = play(s, battle, events)
         attacks = Promise.all([attacks, playing]).then(() => {})
-        await Promise.race([playing, s.tween(PACE.stagger, () => {})])
+        await Promise.race([playing, s.tween(staggerOf(events), () => {})])
         return
       }
       if (animate) {
