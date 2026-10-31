@@ -14,7 +14,7 @@ import type { Edge, Ground, Prop } from '../core/terrain'
 import { LOOKS, type FenceStyle, type Look } from './looks'
 import { addRoof } from './roofs'
 import { buildChasm } from './chasm'
-import { blob, css, ditherable, shade, Shapes, Sketch, type Point3 } from './shapes'
+import { blob, css, ditherable, empty, shade, Shapes, Sketch, tinted, type Point3 } from './shapes'
 import { ACROSS, LEVEL, PITCH, TILE_H, TILE_W, tall, YAW } from './space'
 import { attackOf, type Attack } from './attacks'
 
@@ -791,7 +791,7 @@ export async function createView(): Promise<View> {
   /** Builds the shapes into a node of the scenery, which fog can dim; a wall, standing `wall`, can thin as a unit passes behind it. */
   function stand(shapes: Shapes, blobs: Object3D[], lit: number[], wall?: Tile): void {
     const node = new Group()
-    const { mesh, lines } = shapes.build()
+    const { mesh, lines } = shapes.build(!!wall)
     node.add(mesh, ...blobs)
     if (lines) node.add(lines)
     terrain.add(node)
@@ -862,7 +862,7 @@ export async function createView(): Promise<View> {
       const worn = shade(paint, 0.85 + rand() * 0.3)
       if (square) addRoof(shapes, look.roof[pick(room[0], look.roof.length)], footing, worn, colour.get(room[0])!, eave, rand)
       else for (const t of room) shapes.flat((t % GRID) - 0.5 - eave, Math.floor(t / GRID) - 0.5 - eave, (t % GRID) + 0.5 + eave, Math.floor(t / GRID) + 0.5 + eave, y, worn)
-      const { mesh } = shapes.build()
+      const { mesh } = shapes.build(true)
       terrain.add(mesh)
       scenery.push({ node: mesh, tiles: room })
       roofs.push({ tiles: new Set(room), box: footing, fade: ditherable(mesh.material as MeshBasicMaterial), mesh })
@@ -877,8 +877,8 @@ export async function createView(): Promise<View> {
     scenery.length = 0
     walls = []
     roofs = []
-    terrain.clear()
-    chasm.clear()
+    empty(terrain)
+    empty(chasm)
     chasm.add(buildChasm(battle))
     const look = LOOKS[battle.region]
     const { rooms, colour: paint } = buildings(battle, look)
@@ -955,7 +955,7 @@ export async function createView(): Promise<View> {
     selected = null
     for (const id of [...sprites.keys()]) remove(id)
     glows.clear()
-    lurk.clear()
+    empty(lurk)
     drawTerrain(battle)
   }
 
@@ -964,7 +964,7 @@ export async function createView(): Promise<View> {
 
   /** Replaces the marks on the ground in `layer` with `shapes`. */
   function lay(layer: Group, shapes: Shapes): void {
-    layer.clear()
+    empty(layer)
     const { mesh } = shapes.build()
     mesh.renderOrder = layer.renderOrder
     layer.add(mesh)
@@ -1045,6 +1045,8 @@ export async function createView(): Promise<View> {
     node.traverse((part) => {
       const material = (part as Mesh).material as MeshBasicMaterial | SpriteMaterial | undefined
       if (!material) return
+      // A shared material is swapped for the shared one of the tint.
+      if (material.userData.kind) return void ((part as Mesh).material = tinted(material.userData.kind, tint))
       // A blob's material holds its own colour, so it is dimmed from that; a box's colours are its vertices'.
       if (part instanceof Billboard) part.userData.color ??= material.color.getHex()
       const own = part.userData.color as number | undefined

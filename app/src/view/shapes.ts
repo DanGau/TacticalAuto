@@ -1,4 +1,4 @@
-import { BufferGeometry, CanvasTexture, type Material, DoubleSide, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, Sprite, SpriteMaterial } from 'three'
+import { type Object3D, BufferGeometry, CanvasTexture, type Material, DoubleSide, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, Sprite, SpriteMaterial } from 'three'
 
 /** A point in the world: x and z on the ground, along a tile's x and y; y up. */
 export interface Point3 {
@@ -97,22 +97,49 @@ export class Shapes {
     return this
   }
 
-  /** The triangles as one mesh, and the lines as another; a mesh whose colour multiplies its own, so it can be tinted. */
-  build(): { mesh: Mesh; lines: LineSegments | null } {
+  /**
+   * The triangles as one mesh, and the lines as another, each colour multiplied by its material's, so it can be tinted.
+   * Meshes share their material unless `own`, which a mesh to be dithered needs.
+   */
+  build(own = false): { mesh: Mesh; lines: LineSegments | null } {
     const geometry = new BufferGeometry()
     geometry.setAttribute('position', new Float32BufferAttribute(this.tris, 3))
     geometry.setAttribute('color', new Float32BufferAttribute(this.colors, 4))
-    const translucent = this.colors.some((c, i) => i % 4 === 3 && c < 1)
-    const mesh = new Mesh(geometry, new MeshBasicMaterial({ vertexColors: true, side: DoubleSide, transparent: translucent, depthWrite: !translucent }))
+    const kind = this.colors.some((c, i) => i % 4 === 3 && c < 1) ? 'translucent' : 'opaque'
+    const mesh = new Mesh(geometry, own ? vertexMaterial(kind) : tinted(kind))
     let lines: LineSegments | null = null
     if (this.lines.length > 0) {
       const g = new BufferGeometry()
       g.setAttribute('position', new Float32BufferAttribute(this.lines, 3))
       g.setAttribute('color', new Float32BufferAttribute(this.lineColors, 4))
-      lines = new LineSegments(g, new LineBasicMaterial({ vertexColors: true, transparent: true }))
+      lines = new LineSegments(g, tinted('line'))
     }
     return { mesh, lines }
   }
+}
+
+type Kind = 'opaque' | 'translucent' | 'line'
+
+const vertexMaterial = (kind: Kind) =>
+  kind === 'line'
+    ? new LineBasicMaterial({ vertexColors: true, transparent: true })
+    : // One pass: three draws a translucent double-sided mesh twice otherwise, recompiling its program each time.
+      new MeshBasicMaterial({ vertexColors: true, side: DoubleSide, forceSinglePass: true, transparent: kind === 'translucent', depthWrite: kind === 'opaque' })
+
+/** Materials shared by every mesh of a kind and tint: thousands of meshes, a handful of materials to compile and switch. */
+const materials = new Map<string, MeshBasicMaterial | LineBasicMaterial>()
+
+/** The shared material of vertex colours of `kind`, tinted `tint`. */
+export function tinted(kind: Kind, tint = 0xffffff): MeshBasicMaterial | LineBasicMaterial {
+  const key = `${kind}:${tint}`
+  let material = materials.get(key)
+  if (!material) {
+    material = vertexMaterial(kind)
+    material.color.setHex(tint)
+    material.userData.kind = kind
+    materials.set(key, material)
+  }
+  return material
 }
 
 /** A soft-edged white dot, tinted per use: smoke, fire, lights and leaves. */
@@ -269,4 +296,14 @@ void main() {
   }
   material.customProgramCacheKey = () => 'dither'
   return fade
+}
+
+/** Empties `group`, freeing what its meshes held on the GPU but the shared materials. */
+export function empty(group: Object3D): void {
+  group.traverse((part) => {
+    if (part === group || !(part instanceof Mesh || part instanceof LineSegments || part instanceof Sprite)) return
+    if (!(part instanceof Sprite)) part.geometry.dispose()
+    if (!part.material.userData.kind) part.material.dispose()
+  })
+  group.clear()
 }
