@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import type { GameEvent } from './combat'
+import type { GameEvent } from './combat-event'
 import { beatMs, PACE, tick } from './pace'
 
 const move = (id: number, tiles: number): GameEvent => ({ type: 'move', id, path: Array.from({ length: tiles }, (_, i) => ({ x: i, y: 0 })) })

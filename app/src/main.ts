@@ -1,5 +1,5 @@
 import { apply, type Action, type Result } from './core/apply'
-import type { GameEvent } from './core/combat'
+import type { GameEvent } from './core/combat-event'
 import { createRun, type Run } from './core/run'
 import { step } from './core/step'
 import { PACE } from './core/pace'

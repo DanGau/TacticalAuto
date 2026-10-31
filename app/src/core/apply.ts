@@ -1,4 +1,5 @@
-import { land, STRIKE } from './battle'
+import { STRIKE } from './setup'
+import { land } from './setup'
 import { foesInSight } from './combat'
 import { CONSUMABLES, KIT_SLOTS } from './consumables'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'

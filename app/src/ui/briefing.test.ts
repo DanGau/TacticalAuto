@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import { ALIENS } from '../core/aliens'
-import { BASE_STATS, createBattle, type Alien } from '../core/battle'
+import { BASE_STATS, type Alien } from '../core/battle'
+import { createBattle } from '../core/setup'
 import { GOALS, type Goal } from '../core/goals'
 import { shots, STOPS } from './briefing'
 

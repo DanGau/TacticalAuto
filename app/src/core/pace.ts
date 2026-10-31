@@ -1,4 +1,4 @@
-import type { GameEvent } from './combat'
+import type { GameEvent } from './combat-event'
 
 /** How long the view takes to play each kind of event, in ms. The view animates by these; the sim times battles by them. */
 export const PACE = {

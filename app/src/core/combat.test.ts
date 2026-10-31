@@ -3,7 +3,8 @@ import { expect, test } from 'vitest'
 import { deploy, begun } from './roads'
 import { apply } from './apply'
 import { HASTE_MOVE, isSoldier, revealed, SOLDIER_ATTACKS, type Battle } from './battle'
-import { stepBattle, type GameEvent } from './combat'
+import { stepBattle } from './combat'
+import type { GameEvent } from './combat-event'
 import { detects } from './sight'
 
 function battle(seed: number): Battle {

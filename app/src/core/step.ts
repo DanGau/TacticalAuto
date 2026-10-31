@@ -1,5 +1,6 @@
 import { revealed } from './battle'
-import { stepBattle, type GameEvent } from './combat'
+import { stepBattle } from './combat'
+import type { GameEvent } from './combat-event'
 import { beatMs, overlaps, PACE, tick, type Clock } from './pace'
 import { endBattle, type Run } from './run'
 

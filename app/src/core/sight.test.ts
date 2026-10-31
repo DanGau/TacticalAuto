@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest'
-import { BASE_STATS, COVER_DEFENSE, createBattle, GRID, HIGH_AIM, HIGH_SIGHT, passable, SIGHT, wreck, type Battle, type Cover } from './battle'
+import { BASE_STATS, COVER_DEFENSE, GRID, SIGHT, type Battle, type Cover } from './battle'
+import { createBattle } from './setup'
+import { passable } from './grid'
+import { wreck } from './grid'
+import { HIGH_AIM } from './grid'
+import { HIGH_SIGHT } from './grid'
 import { coverAgainst, lineOfSight, odds, sees } from './sight'
 
 const at = { x: 10, y: 10 }

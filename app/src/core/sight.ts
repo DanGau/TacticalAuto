@@ -1,5 +1,12 @@
 import { FORTIFIED_DEFENSE } from './doctrines'
-import { COVER_DEFENSE, coverAt, HUNKER_DEFENSE, distance, edgeBetween, GRID, heightAt, HIGH_AIM, HIGH_SIGHT, onGrid, SIGHT, type Battle, type Cover, type Stats, type Tile, type Unit } from './battle'
+import { COVER_DEFENSE, HUNKER_DEFENSE, GRID, SIGHT, type Battle, type Cover, type Stats, type Tile, type Unit } from './battle'
+import { edgeBetween } from './grid'
+import { coverAt } from './grid'
+import { HIGH_AIM } from './grid'
+import { HIGH_SIGHT } from './grid'
+import { heightAt } from './grid'
+import { onGrid } from './grid'
+import { distance } from './grid'
 import { EDGE_COVER } from './terrain'
 import { FOG_SIGHT, NIGHT_DETECT } from './twists'
 

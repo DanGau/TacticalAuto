@@ -1,5 +1,10 @@
-import { POD_BLAST, POD_REACH, type RelicEffect, type Stats } from './battle'
-import { BEACON_REACH, BOUNTY_DAMAGE, KILLZONE, RELAY_REACH } from './combat'
+import { type RelicEffect, type Stats } from './battle'
+import { POD_BLAST } from './setup'
+import { POD_REACH } from './setup'
+import { BEACON_REACH } from './fighters'
+import { BOUNTY_DAMAGE } from './fighters'
+import { KILLZONE } from './fighters'
+import { RELAY_REACH } from './fighters'
 import { TUNING } from './tuning'
 import type { Keyword } from './keywords'
 

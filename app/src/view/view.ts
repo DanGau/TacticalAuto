@@ -1,10 +1,14 @@
-import { AdditiveBlending, BoxGeometry, CanvasTexture, CircleGeometry, ColorManagement, Fog, LinearSRGBColorSpace, Group, Mesh, MeshBasicMaterial, Object3D, PerspectiveCamera, Raycaster, Scene, Sprite as Billboard, SpriteMaterial, Vector2, Vector3, WebGLRenderer } from 'three'
-import { BLAST_RADIUS, distance, GRID, nearestAlien, revealed, PLANS, ZONE_NAMES, ZONE_RADIUS, type Battle, type Order, type Tile, type Unit } from '../core/battle'
+import { AdditiveBlending, BoxGeometry, CanvasTexture, CircleGeometry, ColorManagement, Fog, LinearSRGBColorSpace, Group, Mesh, MeshBasicMaterial, type Object3D, PerspectiveCamera, Raycaster, Scene, Sprite as Billboard, SpriteMaterial, Vector2, Vector3, WebGLRenderer } from 'three'
+import { BLAST_RADIUS, GRID, revealed, ZONE_NAMES, ZONE_RADIUS, type Battle, type Order, type Tile, type Unit } from '../core/battle'
+import { PLANS } from '../core/setup'
+import { nearestAlien } from '../core/grid'
+import { distance } from '../core/grid'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { effectName } from '../core/effects'
 import { CONSUMABLES } from '../core/consumables'
-import { UPLINK_REACH, type GameEvent } from '../core/combat'
+import { UPLINK_REACH } from '../core/fighters'
+import type { GameEvent } from '../core/combat-event'
 import { EXTRACT_REACH } from '../core/goals'
 import { instant, overlaps, PACE, walkMs } from '../core/pace'
 import { fence, RISE_MS } from './fences'
@@ -372,7 +376,6 @@ function aim(at: Tile, zoom: number, yaw = YAW, height = 0): Camera {
   p.addScaledVector(back, (height - p.y) / back.y)
   return { x: p.x, y: p.y, z: p.z, zoom, yaw, pitch: PITCH, fov: STILL_FOV, haze: 0 }
 }
-
 
 /** The opening shot of a new battle, which the briefing flies on from. */
 const OPENING: Shot = { turn: -1.1, pitch: -0.32, fov: 42, haze: 1 }

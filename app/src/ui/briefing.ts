@@ -1,5 +1,6 @@
 import { ALIENS } from '../core/aliens'
-import { GRID, heightAt, type Battle, type Tile } from '../core/battle'
+import { GRID, type Battle, type Tile } from '../core/battle'
+import { heightAt } from '../core/grid'
 import type { Prop } from '../core/terrain'
 import { GOALS } from '../core/goals'
 import { REGIONS } from '../core/regions'

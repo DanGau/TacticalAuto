@@ -1,5 +1,9 @@
 import { expect, test } from 'vitest'
-import { createBattle, GRID, NEIGHBORS, onGrid, passable } from './battle'
+import { GRID } from './battle'
+import { createBattle } from './setup'
+import { passable } from './grid'
+import { onGrid } from './grid'
+import { NEIGHBORS } from './grid'
 import { PROP_COVER, TERRAIN_KINDS, ZONE_TERRAINS } from './terrain'
 
 const cases = TERRAIN_KINDS.flatMap((kind) => [1, 2].map((seed) => [kind, seed] as const))

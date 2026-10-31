@@ -1,0 +1,137 @@
+// Questions every combat module asks about units in a fight: whose enemy, nearest, has what, can shoot.
+import { AURA_REACH, BURN_TURNS, type Battle, CHILL_TURNS, type Effect, GHOST_REACH, GRID, LINGER_TURNS, type Tile, type Unit, alert, isSoldier, revealed, unaware } from './battle'
+import { onGrid } from './grid'
+import { NEIGHBORS } from './grid'
+import { distance } from './grid'
+import { EXTRACT_REACH } from './goals'
+import { lineOfSight, canShoot, sees } from './sight'
+
+/**
+ * The enemies a unit acts against. Aliens know every soldier. Soldiers know the revealed aliens;
+ * with none revealed they track every alien, which leads the squad to a contact.
+ */
+export function enemiesOf(battle: Battle, unit: Unit): Unit[] {
+  const others = battle.units.filter((u) => u.side !== unit.side)
+  const known = others.filter((u) => revealed(battle, u))
+  return known.length > 0 ? known : others
+}
+
+/** The unit in `units` nearest to `from`; the lowest id wins a tie. */
+export function nearest<T extends Tile>(units: T[], from: Tile): T | undefined {
+  let best: T | undefined
+  for (const unit of units) if (!best || distance(from, unit) < distance(from, best)) best = unit
+  return best
+}
+
+export const has = (unit: Unit, effect: Effect) => unit.effects.includes(effect)
+
+/** Whether a unit's foes include one with `effect`: a squad relic, or a soldier's gear, working on the aliens. */
+export const foeHas = (battle: Battle, unit: Unit, effect: Effect) => battle.units.some((u) => u.side !== unit.side && u.hp > 0 && has(u, effect))
+
+/** Whether an alien stands in a null field, where it cannot spit, panic, spawn or burst. */
+export const silenced = (battle: Battle, unit: Unit) => battle.units.some((u) => u.side !== unit.side && has(u, 'null') && distance(u, unit) <= NULL_REACH)
+
+export const NULL_REACH = 3
+
+export const onTile = (pools: Tile[], unit: Tile) => pools.some((pool) => pool.x === unit.x && pool.y === unit.y)
+
+/** Turns a target `unit` sets burning burns, and one it chills stays chilled. */
+export const burnFrom = (unit: Unit) => BURN_TURNS + (has(unit, 'smolder') ? LINGER_TURNS : 0)
+
+export const chillFrom = (unit: Unit) => CHILL_TURNS + (has(unit, 'permafrost') ? LINGER_TURNS : 0)
+
+/** Uses a once-per-battle effect. False if the unit lacks it or has used it. */
+export function spend(unit: Unit, effect: Effect): boolean {
+  if (!has(unit, effect) || unit.spent.includes(effect)) return false
+  unit.spent.push(effect)
+  return true
+}
+
+/** Ids of the revealed aliens some soldier sees now. */
+export function spotted(battle: Battle): Set<number> {
+  const soldiers = battle.units.filter(isSoldier)
+  return new Set(battle.units.filter((u) => u.side === 'alien' && revealed(battle, u) && soldiers.some((s) => sees(battle, s, u))).map((u) => u.id))
+}
+
+/** Whether `unit`, standing on `from`, may shoot `target`. Squadsight reaches any spotted alien in a clear line; a ghost is safe from far off. */
+export function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: Set<number>): boolean {
+  // Soldiers hold their fire on a pod they are setting an ambush on, until it is sprung.
+  if (unit.side === 'human' && unaware(battle, target)) return false
+  // A VIP is a hostage, kept alive until freed.
+  if (target.civilian === 'vip' && battle.vip !== 'freed') return false
+  if (has(target, 'ghost') && distance(from, target) > GHOST_REACH) return false
+  // A psionic attack needs no line of sight, only an alien whose pod is revealed.
+  if (has(unit, 'psionic') && revealed(battle, target) && distance(from, target) <= unit.stats.range) return true
+  if (canShoot(battle, from, target, unit.stats.range)) return true
+  return unit.ability === 'squadsight' && seen.has(target.id) && lineOfSight(battle, from, target)
+}
+
+/** The aliens a soldier's powers may act on: revealed and alert, so a pod it is stalking is left be. */
+export const foes = (battle: Battle, unit: Unit) => battle.units.filter((u) => u.side !== unit.side && !u.civilian && revealed(battle, u) && alert(battle, u))
+
+/** Whether a unit cannot burn: by its nature, a fire suit, or in the rain. */
+export const fireproof = (battle: Battle, unit: Unit) => unit.resists.includes('burn') || has(unit, 'fireSuit') || battle.twist === 'rain'
+
+/** Whether a fuel tank stands beside a tile. */
+export const besideFuel = (battle: Battle, tile: Tile) => NEIGHBORS.some(([dx, dy]) => onGrid(tile.x + dx, tile.y + dy) && battle.props[(tile.y + dy) * GRID + tile.x + dx] === 'fuel')
+
+/** Whether a unit is proof against panic, acid, or a blast: by its own steadfastness, or for panic and acid, by a ward on it or near it. */
+export function immune(battle: Battle, unit: Unit, to: 'panic' | 'acid' | 'blast'): boolean {
+  return has(unit, 'steadfast') || (to !== 'blast' && (has(unit, 'ward') || inAura(battle, unit, 'ward')))
+}
+
+/** Whether a squadmate of `unit` with the aura `effect` stands within its reach. */
+export function inAura(battle: Battle, unit: Unit, effect: Effect): boolean {
+  return battle.units.some((u) => u.side === unit.side && u !== unit && has(u, effect) && distance(u, unit) <= AURA_REACH)
+}
+
+/** A VIP rescue's VIP, while on the field. */
+export const vipOf = (battle: Battle) => battle.units.find((u) => u.civilian === 'vip')
+
+/** Soldiers down and not carried. */
+export const lying = (battle: Battle) => battle.downed.filter((d) => d.carrier === null)
+
+export const carrying = (battle: Battle, unit: Unit) => battle.downed.some((d) => d.carrier === unit.id)
+
+/** On a hold, how far from the uplink a soldier may stand and still defend it; Relay Booster widens it. */
+export const UPLINK_REACH = 3
+
+export const RELAY_REACH = 2
+
+export const uplinkReach = (battle: Battle) => UPLINK_REACH + (battle.units.some((u) => isSoldier(u) && has(u, 'relay')) ? RELAY_REACH : 0)
+
+/** How far from the uplink a hold's extraction zone appears. */
+export const EXTRACT_CLEARANCE = 12
+
+/** How near the extraction zone lifts a soldier off; a Signal Flare widens it. */
+export const FLARE_REACH = 3
+
+export const extractReach = (battle: Battle) => EXTRACT_REACH + (battle.units.some((u) => isSoldier(u) && has(u, 'flare')) ? FLARE_REACH : 0)
+
+/** The tile at the middle of some units. */
+export function centreOf(units: Unit[]): Tile {
+  const mean = (pick: (unit: Unit) => number) => Math.round(units.reduce((sum, unit) => sum + pick(unit), 0) / units.length)
+  return { x: mean((u) => u.x), y: mean((u) => u.y) }
+}
+
+/** Whether some living alien is alert to the squad. */
+export const hunted = (battle: Battle) => battle.units.some((u) => u.side === 'alien' && alert(battle, u))
+
+/** Alien turns fire lies on a tile. */
+export const FIRE_TURNS = 2
+
+/** Reach of spirit guardians, of a blink, and of a null field. */
+export const GUARDIAN_REACH = 2
+
+/** Mirror images a wearer begins a battle with, and the chance a hit pops one instead. */
+export const MIRROR_IMAGES = 2
+
+/** What Killing Ground adds to an ambush's aim and crit, Bounty Rounds to hits on a boss, and how far an Evac Beacon gets a civilian out from. */
+export const KILLZONE = 0.15
+
+export const BOUNTY_DAMAGE = 3
+
+export const BEACON_REACH = 3
+
+/** Alien turns after which the aliens still unseen patrol toward the squad, and soldiers no longer hang back out of reach. */
+export const RESTLESS_ROUND = 25

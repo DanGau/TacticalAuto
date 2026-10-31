@@ -1,6 +1,6 @@
 import { ALIENS, type AlienKind } from '../core/aliens'
 import type { Battle } from '../core/battle'
-import type { GameEvent } from '../core/combat'
+import type { GameEvent } from '../core/combat-event'
 
 const KEY = 'metAliens'
 

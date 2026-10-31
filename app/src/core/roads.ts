@@ -1,5 +1,7 @@
 import { apply, type Result } from './apply'
-import { spacedTile, ZONE_CLEARANCE, type Battle, type Plan } from './battle'
+import { ZONE_CLEARANCE, type Battle } from './battle'
+import { type Plan } from './battle'
+import { spacedTile } from './grid'
 import { createRun, legOf, type Run, type Stop } from './run'
 
 /** For tests: lays the rest of the leg as a road of `stops` one after another, the first entered, then the satellite. */
