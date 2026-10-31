@@ -4,12 +4,14 @@ import { CLOAK_DAMAGE, SHADOW_DAMAGE, type Battle } from './battle'
 import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
 import { enterAt, begun } from './roads'
+import { current } from './run'
 
 /** Plays a battle with every soldier a phantom, calling `check` with each beat's events and the battle before it. */
 function play(seed: number, check: (events: GameEvent[], before: Battle) => void): Battle {
   const run = begun(seed)
   for (const s of run.soldiers) Object.assign(s, { cls: 'phantom', skills: ['shadowStrike'] })
   apply(run, { type: 'go', index: 1 })
+  current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })
   enterAt(run, 0)
   const state = run.battle!
@@ -25,7 +27,6 @@ function play(seed: number, check: (events: GameEvent[], before: Battle) => void
 test('phantoms cloak, no alien targets a cloaked one, and an attack out of cloak hits harder and breaks it', () => {
   let cloaks = 0
   let strikes = 0
-  // Seeds whose first battle is no raid, which waits on the player's choice.
   for (const seed of [1, 2, 4, 5, 6, 7, 10, 14]) {
     const end = play(seed, (events, before) => {
       const cloaked = (id: number) => !!before.units.find((u) => u.id === id)?.cloaked

@@ -252,7 +252,7 @@ export const PACKS: Pack[] = [
   { name: 'Patrol', kinds: ['trooper', 'trooper'], cost: 2, from: 0 },
   { name: 'Swarm', kinds: ['swarmling', 'swarmling', 'swarmling', 'swarmling'], cost: 2, from: 0 },
   { name: 'Acid team', kinds: ['spitter', 'spitter', 'trooper'], cost: 3, from: 1 },
-  { name: 'Hunting pack', kinds: ['spitter', 'swarmling', 'swarmling'], cost: 2, from: 1 },
+  { name: 'Hunting pack', kinds: ['spitter', 'swarmling', 'swarmling'], cost: 2, from: 0 },
   { name: 'Brood', kinds: ['burster', 'burster', 'swarmling', 'swarmling'], cost: 3, from: 2 },
   { name: 'Shock troop', kinds: ['brute', 'swarmling', 'swarmling'], cost: 3, from: 2 },
   { name: 'Siege team', kinds: ['brute', 'spitter'], cost: 3, from: 3 },

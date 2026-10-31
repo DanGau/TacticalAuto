@@ -253,7 +253,7 @@ function offset(stage: Stage, t: number, d: number): LonLat {
 const nearest = (id: ContinentId, at: LonLat) => Math.min(...CONTINENTS[id].cities.map((c) => arc(c.at, at)))
 
 /** How likely a stop past a leg's first column is to be each kind other than a battle; the rest are battles. */
-export const STOP_CHANCE = { unknown: 0.25, shop: 0.1, medic: 0.1, supply: 0.08, cache: 0.08 }
+export const STOP_CHANCE = { unknown: 0.25, shop: 0.1, medic: 0.1, supply: 0.08, cache: 0.04 }
 
 /**
  * The shape of a leg's map: trails start apart and wander a row up, down or on each column, never crossing, and

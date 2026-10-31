@@ -16,11 +16,11 @@ import { ZONE_TERRAINS, type TerrainKind } from './terrain'
 import { CONTINENTS } from './world'
 import { drawTwist } from './twists'
 
-/** What each risk means for a battle: how many aliens it has and what it pays. */
-export const RISKS: Record<Risk, { name: string; aliens: number; supplies: number; drops: number; rareGear: boolean; text: string }> = {
-  safe: { name: 'Quiet', aliens: -1, supplies: 1, drops: 0, rareGear: false, text: 'Fewer aliens, and no gear' },
-  standard: { name: 'Contested', aliens: 0, supplies: 2, drops: 1, rareGear: false, text: 'A fair fight' },
-  dangerous: { name: 'Overrun', aliens: 1, supplies: TUNING.dangerSupplies, drops: 2, rareGear: true, text: 'More aliens, and two pieces of gear, one rare or better' },
+/** What each risk means for a battle: how many aliens it has, what it pays, and the chance it drops gear on the goals that do. */
+export const RISKS: Record<Risk, { name: string; aliens: number; supplies: number; gear: number; rareGear: boolean; text: string }> = {
+  safe: { name: 'Quiet', aliens: -1, supplies: 1, gear: 0, rareGear: false, text: 'Fewer aliens, and no gear' },
+  standard: { name: 'Contested', aliens: 0, supplies: 2, gear: 0.5, rareGear: false, text: 'A fair fight, and an even chance of gear' },
+  dangerous: { name: 'Overrun', aliens: 1, supplies: TUNING.dangerSupplies, gear: 1, rareGear: true, text: 'More aliens, and a piece of rare or better gear' },
 }
 
 /** What an assassination's commander has over a trooper, its guards, and the depth from which it has one more. */

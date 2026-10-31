@@ -148,7 +148,8 @@ test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone
   fight(run, 'human')
   expect(run).toMatchObject({ threat: STOP_THREAT, stop: 1 })
   expect(run.supplies).toBeGreaterThanOrEqual(START_SUPPLIES + RISKS[risk].supplies)
-  expect(run.finds).toHaveLength(RISKS[risk].drops)
+  expect(run.finds.length).toBeLessThanOrEqual(1)
+  if (RISKS[risk].gear !== 0.5) expect(run.finds).toHaveLength(RISKS[risk].gear)
   if (RISKS[risk].rareGear) expect(run.finds[0].rarity).not.toBe('common')
   expect(run.report).toMatchObject({ stop: 'battle', won: true, threat: { before: 0, after: STOP_THREAT }, key: false, hired: null })
   const [report] = run.report!.soldiers

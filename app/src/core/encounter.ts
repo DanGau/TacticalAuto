@@ -82,14 +82,13 @@ function clearArena(battle: Battle, arena: Arena, kept: Set<number>): void {
       const t = y * GRID + x
       const indoors = battle.ground[t] === 'floor'
       const razed = d <= ARENA_REACH && battle.place !== 'compound' && !kept.has(t)
+      // A tile's north and west edges may be the walls of a kept building beside it.
+      if (razed && !kept.has(t - GRID)) battle.north[t] = 'none'
+      if (razed && !kept.has(t - 1)) battle.west[t] = 'none'
       if (battle.ground[t] === 'void' || battle.ground[t] === 'water' || (indoors && !razed)) continue
       battle.props[t] = 'none'
       battle.bulk[t] = 0
-      if (!razed) continue
       if (indoors) battle.ground[t] = 'pavement'
-      // A tile's north and west edges may be the walls of a kept building beside it.
-      if (!kept.has(t - GRID)) battle.north[t] = 'none'
-      if (!kept.has(t - 1)) battle.west[t] = 'none'
     }
   }
 }
