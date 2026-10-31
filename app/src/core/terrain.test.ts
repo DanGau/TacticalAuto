@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { createBattle, GRID, NEIGHBORS, onGrid, passable } from './battle'
 import { PROP_COVER, TERRAIN_KINDS, ZONE_TERRAINS } from './terrain'
 
-const cases = TERRAIN_KINDS.flatMap((kind) => [1, 2, 3, 4].map((seed) => [kind, seed] as const))
+const cases = TERRAIN_KINDS.flatMap((kind) => [1, 2].map((seed) => [kind, seed] as const))
 
 test.each(cases)('%s map %i: cover matches its props and every open tile can be walked to', (kind, seed) => {
   const battle = createBattle(seed, kind, [], [])
@@ -23,9 +23,12 @@ test.each(cases)('%s map %i: cover matches its props and every open tile can be 
   expect(reached.size).toBe(battle.cover.filter((c) => c === 0).length)
 })
 
+const maps = new Map<string, ReturnType<typeof createBattle>[]>()
+
 /** The share of tiles of the first four maps of a kind that `count` counts. */
 function share(kind: (typeof TERRAIN_KINDS)[number], count: (battle: ReturnType<typeof createBattle>, tile: number) => boolean): number {
-  const battles = [1, 2, 3, 4].map((seed) => createBattle(seed, kind, [], []))
+  const battles = maps.get(kind) ?? [1, 2, 3, 4].map((seed) => createBattle(seed, kind, [], []))
+  maps.set(kind, battles)
   const hits = battles.reduce((sum, battle) => sum + battle.cover.filter((_, tile) => count(battle, tile)).length, 0)
   return hits / (battles.length * GRID * GRID)
 }

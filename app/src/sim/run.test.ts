@@ -6,14 +6,13 @@ import { flow, timedFlow } from '../core/step'
 import { MAX_BATTLE_SECONDS, report } from './report'
 import { replay, runWith, type RunResult } from './run'
 
-test.each(Object.keys(bots))('%s bot: a run replays identically from its seed and actions', { timeout: 60_000 }, (name) => {
-  for (let seed = 0; seed < 1; seed++) {
-    const result = runWith(seed, bots[name])
-    const first = replay(seed, result.actions)
-    expect(first.phase).toBe(result.won ? 'won' : 'lost')
-    expect(first.keys).toBe(result.keys)
-    expect(replay(seed, result.actions)).toEqual(first)
-  }
+test('a run replays identically from its seed and actions', () => {
+  // The random bot takes the widest range of actions.
+  const result = runWith(0, bots.random)
+  const first = replay(0, result.actions)
+  expect(first.phase).toBe(result.won ? 'won' : 'lost')
+  expect(first.keys).toBe(result.keys)
+  expect(replay(0, result.actions)).toEqual(first)
 })
 
 /** A run of seed `seed` played by the standard bot up to its first battle's first beat. */

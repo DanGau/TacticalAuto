@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DoctrineId } from '../core/doctrines'
 import type { TUNING } from '../core/tuning'
+import type { RunResult } from './run'
 
 export type Tuning = typeof TUNING
 
@@ -18,7 +19,7 @@ const BUNDLE = (() => {
 
 /** Heap each sim process may use, in MB. */
 const HEAP_MB = 512
-/** Seeds sent to a process at a time: what a crash costs, and how often memory is checked. */
+/** Most seeds sent to a process at a time: what a crash costs, and how often memory is checked. */
 const BATCH = 10
 /** Times a batch is retried on a fresh process before the run fails. */
 const RETRIES = 3
@@ -37,17 +38,26 @@ export interface PoolOptions {
   memoryMb?: number
 }
 
+/** Each bot's win rate over `runs` seeds from `start`, with `tuning` in place. */
+export async function winRates(bots: string[], runs: number, start: number, tuning: Tuning, options: PoolOptions = {}): Promise<Record<string, number>> {
+  const played = await playAll(bots, runs, start, tuning, options)
+  return Object.fromEntries(bots.map((bot) => [bot, played[bot].filter((r) => r.won).length / runs]))
+}
+
 /**
- * Each bot's win rate over `runs` seeds from `start`, with `tuning` in place, played on up to `threads` child processes.
+ * Each bot's runs, by seed, over `runs` seeds from `start`, with `tuning` in place, played on up to `threads` child
+ * processes. Results come back without their actions.
  * Under memory pressure the pool retires processes down to one and grows back once it eases; a process that dies has
  * its batch retried on a fresh one.
  */
-export async function winRates(bots: string[], runs: number, start: number, tuning: Tuning, options: PoolOptions = {}): Promise<Record<string, number>> {
+export async function playAll(bots: string[], runs: number, start: number, tuning: Tuning, options: PoolOptions = {}): Promise<Record<string, RunResult[]>> {
   const { threads = availableParallelism() - 1, doctrines = [], memoryMb = (totalmem() / MB) * 0.6 } = options
   const jobs = bots.flatMap((bot) => Array.from({ length: runs }, (_, i) => ({ bot, seed: start + i })))
-  const batches = Array.from({ length: Math.ceil(jobs.length / BATCH) }, (_, id) => ({ id, jobs: jobs.slice(id * BATCH, (id + 1) * BATCH), tries: 0 }))
+  // Fewer seeds a batch when there are too few to keep every process busy.
+  const size = Math.max(1, Math.min(BATCH, Math.ceil(jobs.length / Math.max(1, threads))))
+  const batches = Array.from({ length: Math.ceil(jobs.length / size) }, (_, id) => ({ id, jobs: jobs.slice(id * size, (id + 1) * size), tries: 0 }))
   const queue = [...batches]
-  const won: { bot: string; won: boolean }[] = []
+  const played: { bot: string; result: RunResult }[] = []
   let left = batches.length
   let target = Math.max(1, threads)
   let shrunk = 0
@@ -79,16 +89,17 @@ export async function winRates(bots: string[], runs: number, start: number, tuni
       const proc = fork(BUNDLE, { execArgv: [`--max-old-space-size=${HEAP_MB}`, '--no-maglev'], stdio: ['ignore', 'inherit', 'inherit', 'ipc'] })
       procs.set(proc, { rss: 0 })
       proc.send({ tuning, doctrines })
-      proc.on('message', (m: { ready: true } | { id: number; won: typeof won; rss: number }) => {
+      proc.on('message', (m: { ready: true } | { id: number; played: typeof played; rss: number }) => {
         if (failed) return
         if ('ready' in m) return give(proc)
         const state = procs.get(proc)!
-        won.push(...m.won)
+        played.push(...m.played)
         state.rss = m.rss
         state.batch = undefined
         if (--left === 0) {
           stop()
-          return resolve(Object.fromEntries(bots.map((bot) => [bot, won.filter((r) => r.bot === bot && r.won).length / runs])))
+          const bySeed = (bot: string) => played.filter((p) => p.bot === bot).map((p) => p.result).sort((a, b) => a.seed - b.seed)
+          return resolve(Object.fromEntries(bots.map((bot) => [bot, bySeed(bot)])))
         }
         if (pressured() && procs.size > 1) {
           target = procs.size - 1

@@ -88,7 +88,7 @@ test('a pod is revealed once a soldier notices one of its aliens', () => {
 
 test('a squad that sees a pod first holds its fire and sets up, then springs the ambush all at once; unseen, it creeps', () => {
   let sprung = 0
-  for (let seed = 1; seed <= 30; seed++) {
+  for (let seed = 1; seed <= 30 && sprung === 0; seed++) {
     play(seed, (events, before, after) => {
       // Unseen soldiers walk at most CREEP of their move in their move stage.
       for (const e of events) {

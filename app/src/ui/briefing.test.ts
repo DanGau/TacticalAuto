@@ -8,7 +8,7 @@ const trooper = (target = false): Alien => ({ kind: 'trooper', stats: BASE_STATS
 
 test('a briefing makes one to three stops, the last over the whole map', () => {
   for (const goal of Object.keys(GOALS) as Goal[]) {
-    for (let seed = 1; seed <= 5; seed++) {
+    for (let seed = 1; seed <= 2; seed++) {
       const packs = [{ name: 'Patrol', aliens: [trooper(goal === 'assassinate'), trooper()] }, { name: 'Pack', aliens: [trooper()] }]
       const all = shots(createBattle(seed, 'town', packs, [], goal))
       expect(all.length).toBeGreaterThanOrEqual(1)

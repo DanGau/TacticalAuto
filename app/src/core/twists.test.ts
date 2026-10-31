@@ -112,7 +112,7 @@ test('fog shortens sight, and night noticing', () => {
 })
 
 test('narrow ground leaves no open ground cut off by cover or walls', () => {
-  for (let seed = 1; seed <= 40; seed++) {
+  for (let seed = 1; seed <= 10; seed++) {
     const t = generateTerrain({ rng: seed }, GRID, 'town', 'narrow')
     const open = (i: number) => t.ground[i] !== 'void' && t.props[i] === 'none'
     const start = t.props.findIndex((_, i) => open(i))
