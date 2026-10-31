@@ -14,7 +14,7 @@ const met: Set<AlienKind> = (() => {
 })()
 
 /** Whether the player knows this kind: it needs no introduction, or has had one. */
-export const known = (kind: AlienKind) => !ALIENS[kind].intro || met.has(kind)
+const known = (kind: AlienKind) => !ALIENS[kind].intro || met.has(kind)
 
 /** The kinds the player has not met among the aliens `events` brought into view. */
 export function newcomers(battle: Battle, events: GameEvent[]): AlienKind[] {

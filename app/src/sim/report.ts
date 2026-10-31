@@ -13,9 +13,16 @@ export interface Report {
   /** Mean access keys won, of KEYS. */
   meanKeys: number
   meanBattles: number
+  /** Seconds a battle takes to play in the view: the median, the 90th percentile, and the longest. */
+  seconds: { median: number; p90: number; max: number }
+  /** Battles past MAX_BATTLE_SECONDS, which the report warns of without failing. */
+  warnings: string[]
   /** Failed health thresholds. Any entry fails the batch. */
   failures: string[]
 }
+
+/** Seconds a battle may take to play in the view before the report warns. */
+export const MAX_BATTLE_SECONDS = 60
 
 export function report(results: RunResult[]): Report {
   const mean = (value: (r: RunResult) => number) => Math.round((10 * results.reduce((sum, r) => sum + value(r), 0)) / results.length) / 10
@@ -23,6 +30,10 @@ export function report(results: RunResult[]): Report {
   const failures: string[] = []
   const drawn = results.filter((r) => r.draws > 0)
   if (drawn.length > 0) failures.push(`battles hit the beat limit undecided in seeds ${drawn.map((r) => r.seed).join(', ')}`)
+  const timed = results.flatMap((r) => r.durations.map((ms) => ({ seed: r.seed, s: ms / 1000 }))).sort((a, b) => a.s - b.s)
+  const at = (q: number) => Math.round(timed[Math.min(timed.length - 1, Math.floor(q * timed.length))]?.s ?? 0)
+  const slow = timed.filter((t) => t.s > MAX_BATTLE_SECONDS)
+  const warnings = slow.length > 0 ? [`${slow.length} of ${timed.length} battles play longer than ${MAX_BATTLE_SECONDS}s, in seeds ${[...new Set(slow.map((t) => t.seed))].join(', ')}`] : []
   return {
     runs: results.length,
     wins: results.filter((r) => r.won).length,
@@ -33,6 +44,8 @@ export function report(results: RunResult[]): Report {
     lostToFinal: lost('final'),
     meanKeys: mean((r) => r.keys),
     meanBattles: mean((r) => r.battles),
+    seconds: { median: at(0.5), p90: at(0.9), max: at(1) },
+    warnings,
     failures,
   }
 }
@@ -49,6 +62,8 @@ export function formatReport(r: Report): string {
     `lost final mission  ${percent(r.lostToFinal)}`,
     `mean keys won       ${r.meanKeys} of ${KEYS}`,
     `mean battles        ${r.meanBattles}`,
+    `battle seconds      median ${r.seconds.median}, p90 ${r.seconds.p90}, max ${r.seconds.max}`,
+    ...r.warnings.map((w) => `WARN                ${w}`),
     ...r.failures.map((f) => `FAIL                ${f}`),
   ].join('\n')
 }

@@ -1064,7 +1064,7 @@ function moveSide(battle: Battle): GameEvent[] {
  */
 /** A soldier's tally for this battle, begun empty. */
 export function tallyOf(battle: Battle, soldier: number): Tally {
-  return (battle.tally[soldier] ??= { dealt: 0, kills: 0, taken: 0, feats: [] })
+  return (battle.tally[soldier] ??= { dealt: 0, kills: 0, taken: 0, shots: 0, hits: 0, feats: [] })
 }
 
 const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || tally.feats.push(id)
@@ -1413,6 +1413,11 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   if (hit && has(enemy, 'parry') && distance(unit, enemy) > 1 && random(battle) < PARRY_CHANCE) {
     hit = false
     events.push({ type: 'effect', id: enemy.id, effect: 'parry', amount: 0 })
+  }
+  if (unit.soldier !== null) {
+    const tally = tallyOf(battle, unit.soldier)
+    tally.shots++
+    if (hit) tally.hits++
   }
   if (!hit) {
     // A ricochet bounces a miss to another alien near the target, for one more roll.

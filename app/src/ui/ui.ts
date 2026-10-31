@@ -3,18 +3,13 @@ import type { Action } from '../core/apply'
 import { nextStop, skillOffers, type Report, type Run } from '../core/run'
 import type { View } from '../view/view'
 import { choice, joined, loot, modal, runEnd, skillChoice, stopReport } from './aftermath'
-import { ALIENS } from '../core/aliens'
-import { RELICS, type Relic } from '../core/relics'
-import { known } from './intro'
 import { TWISTS } from '../core/twists'
 import { PLANS, STRIKE, ZONE_NAMES, type Battle } from '../core/battle'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
-import { DETECT, PATROL_DETECT } from '../core/sight'
-import { alienName, button, resistChip, STOP_NAMES, tip } from './html'
+import { button, STOP_NAMES } from './html'
 import { overworld, type Tab } from './overworld'
 import { glide, viewNow } from './globe'
 
-const SIDE = { human: 'Humans', alien: 'Aliens' }
 /** How long the helicopter takes to fly between stops, in milliseconds. */
 const FLIGHT_MS = 1100
 
@@ -23,38 +18,14 @@ export interface Ui {
   update(run: Run): void
 }
 
-/**
- * What the squad faces: each pod by name with its members, then what each kind present does. A pod with a kind the
- * player has not met is an unknown contact, unless the squad has a recon uplink.
- */
-function roster(run: Run): string {
-  const battle = run.battle!
-  const aliens = battle.units.filter((u) => u.side === 'alien')
-  const recon = run.relics.some((id) => (RELICS[id] as Relic).recon)
-  const pods = battle.pods.map((pod, index) => {
-    const members = aliens.filter((u) => u.pod === index)
-    if (!recon && members.some((u) => !known(u.kind!))) return `<div><b>Unknown contact:</b> ${members.length}</div>`
-    const names = [...new Set(members.map((u) => (u.boss ? 'Boss' : ALIENS[u.kind!].name)))]
-    const counted = names.map((name) => {
-      const count = members.filter((u) => (u.boss ? 'Boss' : ALIENS[u.kind!].name) === name).length
-      return count === 1 ? name : `${count} ${name}s`
-    })
-    return `<div><b>${pod.name}:</b> ${counted.join(', ')}</div>`
-  })
-  const kinds = [...new Set(aliens.filter((u) => !u.boss).map((u) => u.kind!))].filter((kind) => recon || known(kind))
-  const boss = aliens.find((u) => u.boss)
-  const rules = [...(boss ? [`${tip('Boss', 'Tough and armored, hits hard and far, and spawns swarmlings')}${boss.resists.map(resistChip).join('')}`] : []), ...kinds.map((kind) => alienName(kind))]
-  return `${pods.join('')}<hr><div>${rules.join(' · ')}</div><hr><div>${tip('Stealth', `Soldiers notice an unseen alien within ${DETECT} tiles; a patrol notices a soldier within ${PATROL_DETECT}. Cover and holding still shrink that reach; high ground stretches it. Whoever notices first ambushes: a caught pod is easier to hit, and a pod that notices the squad first stalks it unseen and opens fire with the same bonus. Once every alert alien is dead, the squad is unseen again`)}</div>`
-}
-
 function status(run: Run): string {
   const battle = run.battle
   if (run.phase !== 'battle' || !battle) return ''
   const mission = run.mission!
   const title = mission.kind === 'battle' || mission.kind === 'ambush' || mission.kind === 'recovery' ? `${GOALS[mission.goal].name}: ${GOALS[mission.goal].text}` : STOP_NAMES[mission.kind]
-  if (battle.phase === 'deploy') return `${title}<div class="roster">${roster(run)}</div>`
+  if (battle.phase === 'deploy') return title
   const rounds = battle.extract ? ` · ${battle.escaped.length} lifted off` : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
-  return `${title}${rounds} · ${SIDE[battle.turn]}' turn${battle.concealed ? ' · unseen' : ''}`
+  return `${title}${rounds}${battle.concealed ? ' · unseen' : ''}`
 }
 
 /** Before the landing: a button per zone that flies the camera there, one back to the whole map, and the chosen zone's plan. */
@@ -303,9 +274,20 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     render(shown!)
   })
 
+  const dial = document.getElementById('dial')!
+  /** Half turns the dial has made: it only ever spins on, so a swap never jumps back. */
+  let halves = 0
+  /** Shows whose turn it is on the dial in battle: the sphere turns its half for that side to the front. */
+  function turnDial(run: Run): void {
+    const battle = run.phase === 'battle' && run.battle?.phase === 'battle' ? run.battle : null
+    dial.hidden = !battle
+    if (battle && (halves % 2 === 1) !== (battle.turn === 'alien')) dial.style.setProperty('--turn', `${++halves * 180}deg`)
+  }
+
   return {
     update(run) {
       statusLine.innerHTML = status(run)
+      turnDial(run)
       render(run)
       showDrop(run)
     },

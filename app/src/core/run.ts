@@ -6,7 +6,7 @@ import { BASE_STATS, createBattle, holdCaptives, type Alien, type Battle, type R
 import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type Doctrine, type DoctrineId } from './doctrines'
 import type { EventId } from './events'
-import { FEATS, type FeatId } from './feats'
+import { FEATS, type FeatId, type Tally } from './feats'
 import { EFFECTS, generateGear, SLOTS, type Gear, type Slot } from './gear'
 import { RESISTS, type Keyword, type Resist } from './keywords'
 import { offerable, RELIC_OFFERS, RELICS, type Relic, type RelicId } from './relics'
@@ -174,9 +174,9 @@ export interface Report {
   /**
    * Every soldier in the squad when a battle began, with the class each has after it; empty for an event. A taken
    * soldier was left downed on the field, and the aliens hold it. `earned` is what its experience came from; `feats`,
-   * those first pulled off.
+   * those first pulled off; `tally`, what it did in the battle.
    */
-  soldiers: { id: number; name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; taken: boolean; earned: Earned[]; feats: FeatId[]; hp: number; maxHp: number }[]
+  soldiers: { id: number; name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; taken: boolean; earned: Earned[]; feats: FeatId[]; hp: number; maxHp: number; tally: Tally }[]
   /** The name of the hero the stop added to the squad. */
   hired: string | null
   /** Civilians kept alive on a rescue; null on any other stop. */
@@ -888,8 +888,8 @@ export function advance(run: Run): void {
 }
 
 /** What a soldier earns from a battle, after the feats it ends the battle with are recorded. */
-function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | null): { earned: Earned[]; feats: FeatId[] } {
-  const tally = battle.tally[soldier.id] ?? { dealt: 0, kills: 0, taken: 0, feats: [] }
+function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | null): { earned: Earned[]; feats: FeatId[]; tally: Tally } {
+  const tally = battle.tally[soldier.id] ?? { dealt: 0, kills: 0, taken: 0, shots: 0, hits: 0, feats: [] }
   // A soldier lifted off has left the field.
   const unit = battle.units.find((u) => u.soldier === soldier.id)
   if (won && tally.taken === 0) tally.feats.push('untouched')
@@ -905,7 +905,7 @@ function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | 
     { label: `${saved} civilians saved`, xp: saved * XP.civilian },
     ...feats.map((id) => ({ label: FEATS[id].name, xp: XP.feat })),
   ]
-  return { earned: earned.filter((e) => e.xp > 0), feats }
+  return { earned: earned.filter((e) => e.xp > 0), feats, tally }
 }
 
 /**
@@ -927,13 +927,13 @@ export function endBattle(run: Run): void {
   const rescued = mission.goal === 'rescue' ? battle.saved + battle.units.filter((u) => u.civilian).length : null
   const soldiers = run.soldiers.map((s) => {
     const xpBefore = s.xp
-    const { earned, feats } = earn(battle, s, won, rescued)
+    const { earned, feats, tally } = earn(battle, s, won, rescued)
     s.xp += earned.reduce((sum, e) => sum + e.xp, 0)
     // Health carries on: what it ends standing or lifted off with; downed, it comes back at 1.
     const maxHp = soldierStats(run, s).hp
     const hp = Math.max(1, Math.min(maxHp, battle.units.find((u) => u.soldier === s.id)?.hp ?? battle.lifted[s.id] ?? 0))
     s.wounds = maxHp - hp
-    return { id: s.id, name: s.name, cls: s.cls, xpBefore, xpAfter: s.xp, taken: run.captives.includes(s.id), earned, feats, hp, maxHp }
+    return { id: s.id, name: s.name, cls: s.cls, xpBefore, xpAfter: s.xp, taken: run.captives.includes(s.id), earned, feats, hp, maxHp, tally }
   })
 
   const before = run.threat

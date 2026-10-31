@@ -5,6 +5,7 @@ import { CLASSES } from '../core/classes'
 import { effectName } from '../core/effects'
 import { UPLINK_REACH, type GameEvent } from '../core/combat'
 import { EXTRACT_REACH } from '../core/goals'
+import { instant, overlaps, PACE, walkMs } from '../core/pace'
 import { fence, RISE_MS } from './fences'
 import { level, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
@@ -51,20 +52,12 @@ const MARCH_MS = 900
 const MARCH_FROM = 3
 const POD_STAGGER_MS = 160
 const POD_HEIGHT = 400
-const MS_PER_TILE = 110
-/** How much slower soldiers walk while the squad is unseen. */
-const CREEP_PACE = 1.8
-const REVEAL_MS = 450
 const IMPACT_MS = 140
-const DEATH_MS = 260
 const CALLOUT_MS = 900
 /** A health pip's size on screen, the step from one pip to the next, and the width of a row of ten. */
 const PIP = 5
 const PIP_STEP = 6
 const PIP_ROW = 10 * PIP_STEP - 1
-const PSI_MS = 320
-const ROCKET_MS = 320
-const BLAST_MS = 380
 /** World units a unit's picture stands toward the camera from its feet, so the ground it stands on never cuts it. */
 const STANDOFF = 0.6
 /** A unit's picture, in screen pixels about its feet, and the pixels per one drawn, for a crisp edge. */
@@ -1160,16 +1153,13 @@ export async function createView(): Promise<View> {
     }).then(() => labels.delete(mark))
   }
 
-  /** How long `sprite` takes to walk `path` from where it stands: unseen, the squad creeps. */
-  const walkMs = (sprite: Sprite, path: Tile[]) => MS_PER_TILE * (shown?.concealed && sprite.ally ? CREEP_PACE : 1) * ground([sprite.tile, ...path])
-
-  function walk(sprite: Sprite, path: Tile[], ms = walkMs(sprite, path)): Promise<void> {
+  function walk(sprite: Sprite, path: Tile[], ms: number): Promise<void> {
     const points = [sprite.tile, ...path]
     return tween(ms, (t) => place(sprite, along(points, t)))
   }
 
   /** Slides an unfound alien's glow along its path through the fog. */
-  function glide(glow: { node: Object3D; tile: Tile }, path: Tile[], ms = MS_PER_TILE * ground([glow.tile, ...path])): Promise<void> {
+  function glide(glow: { node: Object3D; tile: Tile }, path: Tile[], ms: number): Promise<void> {
     const points = [glow.tile, ...path]
     glow.tile = path.at(-1)!
     return tween(ms, (t) => {
@@ -1193,7 +1183,7 @@ export async function createView(): Promise<View> {
   }
 
   /** Projectiles fly from the muzzle at `a` to each of `ends`. */
-  function fire(a: Tile, ends: Tile[], gun: Weapon): Promise<void> {
+  function fire(fx: Sketch, a: Tile, ends: Tile[], gun: Weapon): Promise<void> {
     const total = gun.ms + gun.stagger * (ends.length - 1)
     return tween(total, (t) => {
       fx.clear()
@@ -1230,7 +1220,7 @@ export async function createView(): Promise<View> {
   }
 
   /** The attacker winds back, lunges in, rakes the target with a slash per bolt, and steps back. */
-  async function strike(from: Sprite, to: Sprite, gun: Weapon, ends: Tile[], hit: boolean): Promise<void> {
+  async function strike(fx: Sketch, from: Sprite, to: Sprite, gun: Weapon, ends: Tile[], hit: boolean): Promise<void> {
     const home = toWorld(from.tile.x, from.tile.y)
     const dx = to.at.x - home.x
     const dy = to.at.y - home.y
@@ -1255,7 +1245,7 @@ export async function createView(): Promise<View> {
   }
 
   /** Sparks fly off the impact point, onward from the shot, and a ring spreads. */
-  function burst(at: Tile, dir: Tile, color: number, count: number, size: number): Promise<void> {
+  function burst(fx: Sketch, at: Tile, dir: Tile, color: number, count: number, size: number): Promise<void> {
     const sparks = Array.from({ length: count }, () => {
       const angle = Math.atan2(dir.y, dir.x) + (Math.random() - 0.5) * 2.2
       const speed = (20 + Math.random() * 30) * size
@@ -1271,7 +1261,7 @@ export async function createView(): Promise<View> {
    * A shot plays as its weapon: the projectile or lunge, then on a hit a freeze on the blow with the target squashed and
    * flashing, a camera jolt, a knockback and sparks, all harder on a crit. A miss sails past and ricochets.
    */
-  async function shoot(from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: [number, number], gun: Weapon): Promise<void> {
+  async function shoot(fx: Sketch, from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: [number, number], gun: Weapon): Promise<void> {
     const { hit, crit } = e
     const a = chest(from)
     // A miss flies past above the target.
@@ -1282,14 +1272,14 @@ export async function createView(): Promise<View> {
       const off = gun.bolts === 1 ? 0 : (i / (gun.bolts - 1) - 0.5) * gun.spread + (Math.random() - 0.5) * gun.spread * 0.3
       return { x: aim.x - dir.y * off, y: aim.y + dir.x * off }
     })
-    if (gun.style === 'strike') await strike(from, to, gun, ends, hit)
-    else await fire(a, ends, gun)
+    if (gun.style === 'strike') await strike(fx, from, to, gun, ends, hit)
+    else await fire(fx, a, ends, gun)
     fx.clear()
     float(shotCallout(e, to))
     // What of the shooter's shaped the shot, named over the shooter.
     if (e.with.length > 0) float(callout(e.with.map((effect) => effectName(effect).toUpperCase()).join(' · '), 0xffffff, from))
     if (!hit) {
-      if (gun.style !== 'strike') await burst(aim, dir, COLOR.miss, 3, 0.5)
+      if (gun.style !== 'strike') await burst(fx, aim, dir, COLOR.miss, 3, 0.5)
       fx.clear()
       return
     }
@@ -1307,7 +1297,7 @@ export async function createView(): Promise<View> {
       shift(to, { x: home.x + dir.x * push, y: home.y + dir.y * push })
       squash(to, 1.2 - 0.2 * t, 0.8 + 0.2 * t)
     })
-    await burst(aim, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, power)
+    await burst(fx, aim, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, power)
     place(to, to.tile)
     squash(to, 1, 1)
     fx.clear()
@@ -1320,12 +1310,12 @@ export async function createView(): Promise<View> {
   }
 
   /** A rocket, or napalm in flame's colour, flies from `from` to its tile and bursts, wounding every unit it caught. With no `from`, something burst where it stood. */
-  async function fireRocket(battle: Battle, from: Sprite | undefined, e: Extract<GameEvent, { type: 'rocket' }>): Promise<void> {
+  async function fireRocket(fx: Sketch, battle: Battle, from: Sprite | undefined, e: Extract<GameEvent, { type: 'rocket' }>): Promise<void> {
     const b = toWorld(e.x, e.y)
     const color = e.fire ? COLOR.fire : COLOR.crit
     if (from) {
       const a = chest(from)
-      await tween(ROCKET_MS, (t) => {
+      await tween(PACE.rocket, (t) => {
         const at = lerp(a, b, t)
         fx.clear().circle(at.x, at.y, 5).fill(color)
       })
@@ -1339,7 +1329,7 @@ export async function createView(): Promise<View> {
       sprite.drawHp(...vitals(battle, hit.target))
       float(callout(`${e.fire ? 'NAPALM' : 'ROCKET'} -${hit.damage}`, color, sprite))
     }
-    await tween(BLAST_MS, (t) => {
+    await tween(PACE.blast, (t) => {
       fx.clear().ellipse(b.x, b.y, (BLAST_RADIUS + 0.7) * TILE_W * t, (BLAST_RADIUS + 0.7) * TILE_H * t).fill({ color, alpha: 0.8 * (1 - t) })
     })
     fx.clear()
@@ -1448,40 +1438,41 @@ export async function createView(): Promise<View> {
     )
   }
 
+  /** The attacks of the stage under way, which the next beat that is not an attack waits for. */
+  let attacks = Promise.resolve()
+
+  /** Where the squad stands: the camera keeps to it, and never leaves it for action elsewhere. */
+  const squad = (battle: Battle): Tile[] => battle.units.filter((u) => u.side === 'human' && !u.civilian)
+
   /** Plays a beat in order. Moves in a row play together; moves by unseen aliens are skipped. */
   async function play(battle: Battle, events: GameEvent[]): Promise<void> {
-    const calm = events.every((e) => e.type === 'move' || e.type === 'sighted' || e.type === 'reveal')
     for (let i = 0; i < events.length; i++) {
       const e = events[i]
       if (e.type === 'move') {
-        const moves = []
-        for (; events[i]?.type === 'move'; i++) moves.push(events[i] as Extract<GameEvent, { type: 'move' }>)
+        // Moves in a row, and the instant events among them, play as one: everyone walks together, then the words show.
+        const group: GameEvent[] = []
+        for (; events[i] && (events[i].type === 'move' || instant(events[i])); i++) group.push(events[i])
         i--
-        const seen = moves.filter((m) => sprites.has(m.id))
-        const gliding = moves.filter((m) => glows.has(m.id))
-        // Before a fight everyone walks the whole beat, the camera with them, so nobody stops to wait; in one, the camera finds the movers first.
-        const ms = calm ? Math.max(...seen.map((m) => walkMs(sprites.get(m.id)!, m.path)), ...gliding.map((m) => MS_PER_TILE * ground([glows.get(m.id)!.tile, ...m.path]))) : undefined
-        const glides = gliding.map((m) => glide(glows.get(m.id)!, m.path, ms))
-        if (seen.length === 0) {
-          await Promise.all(glides)
-          continue
-        }
-        const framing = follow(seen.flatMap((m) => [sprites.get(m.id)!.tile, m.path.at(-1)!]))
-        for (const m of seen) if (m.with) float(callout(effectName(m.with).toUpperCase(), 0xffffff, sprites.get(m.id)!))
-        if (!calm) await framing
-        await Promise.all([framing, ...glides, ...seen.map((m) => walk(sprites.get(m.id)!, m.path, ms))])
+        // Each walks the whole way it went, from where it stood.
+        const paths = new Map<number, Tile[]>()
+        for (const m of group) if (m.type === 'move' && (sprites.has(m.id) || glows.has(m.id))) paths.set(m.id, [...(paths.get(m.id) ?? []), ...m.path])
+        const pace = (id: number) => PACE.tile * (battle.concealed && sprites.get(id)?.ally ? PACE.creep : 1)
+        const ms = walkMs([...paths].map(([id, path]) => ({ path, pace: pace(id) })))
+        const walks = [...paths].map(([id, path]) => (sprites.has(id) ? walk(sprites.get(id)!, path, ms) : glide(glows.get(id)!, path, ms)))
+        for (const m of group) if (m.type === 'move' && m.with && sprites.has(m.id)) float(callout(effectName(m.with).toUpperCase(), 0xffffff, sprites.get(m.id)!))
+        await Promise.all([follow(squad(battle), Math.max(ms, CAMERA_MS)), ...walks])
         // The fog lifts where the squad arrived, before any pod it uncovered appears.
         drawFog(battle)
+        await play(battle, group.filter((m) => m.type !== 'move'))
       } else if (e.type === 'reveal' || e.type === 'wave' || e.type === 'sighted') {
         // A wave the squad cannot see yet stays off screen, and the camera stays where it is.
         if (e.type === 'wave' && !e.units.some((at) => battle.units.some((u) => u.id === at.id && revealed(battle, u)))) continue
-        await follow(e.units)
         // A pod already in sight, its ambush sprung or the squad spotted, stays as it is.
         const appeared = e.units.flatMap((at) => {
           const unit = battle.units.find((u) => u.id === at.id)
           return unit && !sprites.has(unit.id) ? [create({ ...unit, x: at.x, y: at.y }, 0, letter(unit))] : []
         })
-        await tween(REVEAL_MS, (t) => appeared.forEach((sprite) => fade(sprite, t)))
+        await tween(PACE.reveal, (t) => appeared.forEach((sprite) => fade(sprite, t)))
         const first = sprites.get(e.units[0]?.id ?? -1)
         if (e.type === 'sighted' && first) float(callout('UNAWARE · HOLD FIRE', COLOR.miss, first, 18))
         if (e.type === 'reveal' && e.ambush && first) float(callout('AMBUSH! CAUGHT OFF GUARD', COLOR.hit, first, 18))
@@ -1491,31 +1482,30 @@ export async function createView(): Promise<View> {
         const from = sprites.get(e.id)
         const to = sprites.get(e.target)
         if (!from || !to) continue
-        await follow([from.tile, to.tile])
         const shooter = battle.units.find((u) => u.id === e.id)!
-        await shoot(from, to, e, vitals(battle, e.target), weaponOf(shooter, soldiers.find((s) => s.id === shooter.soldier)?.cls ?? null, blademasters))
+        const after = vitals(battle, e.target)
+        await drawing((fx) => shoot(fx, from, to, e, after, weaponOf(shooter, soldiers.find((s) => s.id === shooter.soldier)?.cls ?? null, blademasters)))
         // Crumbling cover has already broken in the battle; show it as the hit lands.
         if (battle.twist === 'crumbling' && e.damage > 0) drawTerrain(battle)
       } else if (e.type === 'rocket') {
         const from = sprites.get(e.id)
         if (!from && !e.hits.some((hit) => sprites.has(hit.target))) continue
-        await follow(from ? [from.tile, e] : [e])
-        await fireRocket(battle, from, e)
+        await drawing((fx) => fireRocket(fx, battle, from, e))
       } else if (e.type === 'spit' || e.type === 'panic') {
         const from = sprites.get(e.id)
         const to = sprites.get(e.target)
         if (!from || !to) continue
-        await follow([from.tile, to.tile])
         const a = chest(from)
         const b = chest(to)
         const color = e.type === 'spit' ? COLOR.acid : COLOR.psi
-        await tween(PSI_MS, (t) => {
-          const head = lerp(a, b, t)
-          // Spit arcs as a blob; panic reaches out as a beam.
-          if (e.type === 'spit') fx.clear().circle(head.x, head.y - 30 * Math.sin(Math.PI * t), 5).fill(color)
-          else fx.clear().moveTo(a.x, a.y).lineTo(head.x, head.y).stroke({ color, width: 2, alpha: 0.8 })
-        })
-        fx.clear()
+        await drawing((fx) =>
+          tween(PACE.psi, (t) => {
+            const head = lerp(a, b, t)
+            // Spit arcs as a blob; panic reaches out as a beam.
+            if (e.type === 'spit') fx.clear().circle(head.x, head.y - 30 * Math.sin(Math.PI * t), 5).fill(color)
+            else fx.clear().moveTo(a.x, a.y).lineTo(head.x, head.y).stroke({ color, width: 2, alpha: 0.8 })
+          }),
+        )
         if (e.type === 'spit') {
           to.drawHp(...vitals(battle, e.target))
           drawAcid(battle)
@@ -1527,15 +1517,13 @@ export async function createView(): Promise<View> {
       } else if (e.type === 'frozen' || e.type === 'hurt') {
         const on = sprites.get(e.id)
         if (!on) continue
-        await follow([on.tile])
         if (e.type === 'hurt') on.drawHp(...vitals(battle, e.id))
         float(e.type === 'frozen' ? callout(battle.units.find((u) => u.id === e.id)?.side === 'alien' ? 'STUNNED' : 'TOO SHAKEN TO ACT', COLOR.psi, on) : callout(`${e.cause.toUpperCase()} -${e.amount}`, e.cause === 'acid' ? COLOR.acid : e.cause === 'impact' ? COLOR.crit : COLOR.psi, on))
       } else if (e.type === 'spawn') {
         const unit = battle.units.find((u) => u.id === e.unit.id)
         if (!unit || !revealed(battle, unit)) continue
-        await follow([e.unit])
         const born = create({ ...unit, x: e.unit.x, y: e.unit.y }, 0, letter(unit))
-        await tween(REVEAL_MS, (t) => fade(born, t))
+        await tween(PACE.reveal, (t) => fade(born, t))
       } else if (e.type === 'effect') {
         const on = sprites.get(e.id)
         if (!on) continue
@@ -1547,7 +1535,7 @@ export async function createView(): Promise<View> {
         const sprite = sprites.get(e.id)
         if (!sprite) continue
         float(callout(e.type === 'saved' ? 'SAVED' : 'LIFTED OFF', COLOR.heal, sprite))
-        await tween(DEATH_MS, (t) => fade(sprite, 1 - t))
+        await tween(PACE.death, (t) => fade(sprite, 1 - t))
         remove(e.id)
       } else if (e.type === 'carried') {
         const on = sprites.get(e.id)
@@ -1557,26 +1545,23 @@ export async function createView(): Promise<View> {
         const unit = battle.units.find((u) => u.id === e.unit.id)
         drawMarks(battle)
         if (!unit) continue
-        await follow([e.unit])
         const freed = create({ ...unit, x: e.unit.x, y: e.unit.y }, 0, letter(unit))
-        await tween(REVEAL_MS, (t) => fade(freed, t))
+        await tween(PACE.reveal, (t) => fade(freed, t))
         float(callout('FREED', COLOR.heal, freed))
       } else if (e.type === 'extract') {
         drawMarks(battle)
-        await follow([e])
       } else if (e.type === 'feed') {
         const on = sprites.get(e.id)
         if (on) float(callout(`FED +${e.damage}`, COLOR.crit, on))
       } else if (e.type === 'heal') {
         const to = sprites.get(e.target)
         if (!to) continue
-        await follow([to.tile])
         to.drawHp(...vitals(battle, e.target))
         float(callout(`HEAL +${e.amount}`, COLOR.heal, to))
       } else if (e.type === 'death') {
         const sprite = sprites.get(e.id)
         if (!sprite) continue
-        await tween(DEATH_MS, (t) => fade(sprite, 1 - t))
+        await tween(PACE.death, (t) => fade(sprite, 1 - t))
         remove(e.id)
         drawMarks(battle)
       }
@@ -1717,7 +1702,17 @@ export async function createView(): Promise<View> {
       }
       // An ambush opens already in the fight, on the squad.
       if (fresh && battle.phase !== 'deploy') look(clamped(inPlay()))
-      if (animate) await play(battle, events)
+      if (animate && overlaps(events) && !events.some((e) => e.type === 'end')) {
+        // An attack lets the next start a stagger later, so a side's attacks land in quick succession; the beat after them settles the picture.
+        const playing = play(battle, events)
+        attacks = Promise.all([attacks, playing]).then(() => {})
+        await Promise.race([playing, tween(PACE.stagger, () => {})])
+        return
+      }
+      if (animate) {
+        await attacks
+        await play(battle, events)
+      }
       sync(run, battle)
       if (events.some((e) => e.type === 'rocket' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(battle)
       drawFog(battle, true)

@@ -1,6 +1,6 @@
 import type { Stats } from '../core/battle'
 import { CLASSES } from '../core/classes'
-import { FEATS } from '../core/feats'
+import { FEATS, type Tally } from '../core/feats'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { health, KEYS, level, SELL, skillOffers, soldierStats, xpFor, squadKeywords, type Report, type Run, type Soldier } from '../core/run'
@@ -138,6 +138,20 @@ export function choice(run: Run, pick: 'keep' | 'sell' | null = null): string {
   return skillChoice(run, run.soldiers.find((s) => skillOffers(s).length > 0)!)
 }
 
+/** What each soldier did in the battle, a row each, the squad's best in each column but damage taken marked. */
+export function battleStats(report: Report): string {
+  const columns: [string, (t: Tally) => number, string?][] = [
+    ['Damage dealt', (t) => t.dealt],
+    ['Kills', (t) => t.kills],
+    ['Damage taken', (t) => t.taken],
+    ['Hits', (t) => t.hits],
+    ['Accuracy', (t) => (t.shots > 0 ? Math.round((100 * t.hits) / t.shots) : 0), '%'],
+  ]
+  const best = columns.map(([name, value]) => (name === 'Damage taken' ? null : Math.max(1, ...report.soldiers.map((s) => value(s.tally)))))
+  const rows = report.soldiers.map((s) => `<tr><td><span class="portrait">${badge(s.cls)}</span>${s.name}</td>${columns.map(([, value, unit], i) => `<td class="${value(s.tally) === best[i] ? 'best' : ''}">${value(s.tally)}${unit ?? ''}</td>`).join('')}</tr>`)
+  return `<table class="tally"><tr><th></th>${columns.map(([name]) => `<th>${name}</th>`).join('')}</tr>${rows.join('')}</table>`
+}
+
 /**
  * The summary after a stop, once its choices are made, revealed top to bottom: the threat, what was gained, the squad
  * if it fought, and a button to go on.
@@ -147,8 +161,8 @@ export function stopReport(run: Run, report: Report, opened: Set<number> = new S
   const threat = after === before ? '' : `<span class="note">${signed(after - before)}</span>`
   // The hero just joined stands with the squad that fought.
   const hero = run.soldiers.find((s) => s.name === report.hired)
-  const all = [...report.soldiers, ...(hero ? [{ id: hero.id, name: hero.name, cls: hero.cls, xpBefore: hero.xp, xpAfter: hero.xp, taken: false, earned: [], feats: [], hp: health(run, hero), maxHp: soldierStats(run, hero).hp }] : [])]
-  const squad = report.soldiers.length > 0 ? `<div class="stage second"><div class="squad">${all.map((s) => soldierCard(run, s, opened)).join('')}</div>${sales(run, opened)}</div>` : ''
+  const all = [...report.soldiers, ...(hero ? [{ id: hero.id, name: hero.name, cls: hero.cls, xpBefore: hero.xp, xpAfter: hero.xp, taken: false, earned: [], feats: [], hp: health(run, hero), maxHp: soldierStats(run, hero).hp, tally: { dealt: 0, kills: 0, taken: 0, shots: 0, hits: 0, feats: [] } }] : [])]
+  const squad = report.soldiers.length > 0 ? `<div class="stage second">${battleStats(report)}<div class="squad">${all.map((s) => soldierCard(run, s, opened)).join('')}</div>${sales(run, opened)}</div>` : ''
   // Continue waits only on crates shown: a find with no card to open it on is listed instead.
   const shown = new Set(report.soldiers.length > 0 ? all.map((s) => s.name) : [])
   const sealed = run.decisions.some((d, i) => shown.has(d.soldier) && !opened.has(i))

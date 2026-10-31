@@ -1,7 +1,7 @@
 import { apply, type Action, type Result } from './core/apply'
 import type { GameEvent } from './core/combat'
 import { createRun, type Run } from './core/run'
-import { step } from './core/step'
+import { flow, step } from './core/step'
 import { brief } from './ui/briefing'
 import { introduce, newcomers } from './ui/intro'
 import { createUi } from './ui/ui'
@@ -101,21 +101,12 @@ window.debug = {
 
 await show([], false)
 
-/** While the squad is unseen, steps beats of moves until the turn comes back round, so the squad and the aliens move as one. */
-function flow(): GameEvent[] {
-  const battle = state.battle!
-  const side = battle.turn
-  const events: GameEvent[] = step(state)
-  while (!events.some((e) => e.type !== 'move') && battle.phase === 'battle' && battle.concealed && battle.turn !== side) events.push(...step(state))
-  return events
-}
-
 // With ?manual, the battle advances only through debug.step, so the model sees every beat it asks for.
 if (!params.has('manual')) {
   for (;;) {
     await showing
     if (state.phase === 'battle' && state.battle?.phase === 'battle') {
-      const events = state.battle.concealed ? flow() : step(state)
+      const events = flow(state)
       await show(events, true)
       // The battle waits while the player meets each new kind of alien.
       for (const kind of newcomers(state.battle, events)) await introduce(kind)

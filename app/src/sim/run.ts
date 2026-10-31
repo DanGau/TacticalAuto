@@ -1,7 +1,7 @@
 import type { Bot } from '../bots/bots'
 import { apply, type Action } from '../core/apply'
 import { createRun, type Mission, type Run } from '../core/run'
-import { step } from '../core/step'
+import { timedFlow } from '../core/step'
 import type { DoctrineId } from '../core/doctrines'
 
 export interface RunResult {
@@ -14,6 +14,8 @@ export interface RunResult {
   battles: number
   /** Battles that hit the beat limit undecided. */
   draws: number
+  /** How long each battle takes to play in the view, in ms. */
+  durations: number[]
   /** With the seed, enough to replay the run. */
   actions: Action[]
 }
@@ -25,13 +27,18 @@ export const MAX_ACTIONS = 10000
 function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = []): { run: Run; result: RunResult } {
   const run = createRun(seed)
   run.doctrines.push(...doctrines)
-  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, actions: [] }
+  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], actions: [] }
+  let clock = { next: 0, done: 0 }
   while (run.phase !== 'won' && run.phase !== 'lost') {
     if (run.phase === 'battle' && run.battle!.phase === 'battle') {
-      for (const event of step(run)) {
+      const played = timedFlow(run, clock)
+      clock = played.clock
+      for (const event of played.events) {
         if (event.type !== 'end') continue
         result.battles++
         if (event.winner === null) result.draws++
+        result.durations.push(clock.done)
+        clock = { next: 0, done: 0 }
       }
       continue
     }

@@ -17,8 +17,14 @@
       /* The panels are laid out for a 1280 by 720 window and scale with it. */
       body > :not(canvas, script) { zoom: var(--ui, 1); }
       #hud { position: absolute; top: 12px; left: 12px; pointer-events: none; }
-      .roster hr { border: 0; border-top: 1px solid #3a465c; margin: 6px 0; }
-      .roster { margin-top: 8px; padding: 8px 12px; max-width: 420px; background: #171d29d9; border: 1px solid #3a465c; border-radius: 6px; line-height: 1.5; font-size: 13px; }
+      /* The turn dial: a sphere, its allied half and its enemy half, that turns the side whose turn it is to the front. */
+      #dial { position: absolute; top: 12px; right: 12px; width: 76px; height: 76px; perspective: 320px; pointer-events: none; }
+      #dial[hidden] { display: none; }
+      #dial .spin { position: absolute; inset: 0; transform-style: preserve-3d; transform: rotateY(var(--turn, 0deg)); transition: transform 0.9s cubic-bezier(0.65, 0, 0.35, 1); }
+      #dial .half { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; backface-visibility: hidden; color: #fff; font: bold 10px/1.2 sans-serif; letter-spacing: 1px; text-align: center; text-transform: uppercase; text-shadow: 0 1px 2px #0008; }
+      #dial .ally { background: radial-gradient(circle at 50% 50%, #4f9be0, #1d4f86 70%, #0d2440); }
+      #dial .enemy { transform: rotateY(180deg); background: radial-gradient(circle at 50% 50%, #e0574a, #8a2a22 70%, #3d0f0b); }
+      #dial::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #ffffff59, transparent 42%), radial-gradient(circle at 50% 50%, transparent 58%, #0007 100%); box-shadow: 0 2px 10px #0009; }
       #panel { position: fixed; inset: 0; zoom: calc(var(--ui, 1) * var(--shrink, 1)); overflow: hidden; box-sizing: border-box; padding: 14px max(24px, calc(50% - 600px)) 18px; background: #171d29; }
       #panel[hidden], #drop[hidden] { display: none; }
       /* The briefing as a film: bars across the top and bottom, a muted grade, and the edges sunk into dark. */
@@ -286,6 +292,12 @@
       .debrief h1 { font-size: 40px; margin-bottom: 8px; }
       .debrief .squad { justify-content: center; gap: 20px; }
       .debrief .soldier { width: 280px; padding: 20px; }
+      .tally { margin: 0 auto 14px; font-size: 14px; }
+      .tally th { padding: 2px 14px; color: #9aa6bd; font-weight: normal; }
+      .tally td { padding: 3px 14px; text-align: center; }
+      .tally td:first-child { display: flex; align-items: center; gap: 8px; text-align: left; white-space: nowrap; }
+      .debrief .tally .portrait { width: 26px; height: 26px; font-size: 14px; border-width: 2px; }
+      .tally td.best { color: #ffd166; font-weight: bold; }
       .debrief .who { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
       .debrief .portrait { width: 96px; height: 96px; font-size: 50px; border-width: 3px; }
       .debrief .soldier .bar { height: 12px; margin-top: 10px; }
@@ -331,13 +343,13 @@
         #panel { padding: 8px 12px; }
         .choices, .squad, .compare, .details, .header { flex-wrap: wrap; }
         .stash { grid-template-columns: repeat(2, 1fr); }
-        .roster { max-width: 240px; font-size: 11px; padding: 4px 8px; }
       }
     </style>
   </head>
   <body>
     <div class="vignette"></div>
     <div id="hud"><span id="status"></span></div>
+    <div id="dial" hidden><div class="spin"><div class="half ally">Allied<br />turn</div><div class="half enemy">Enemy<br />turn</div></div></div>
     <div id="drop" hidden></div>
     <div id="panel"></div>
     <button id="fullscreen" title="Full screen">⛶</button>

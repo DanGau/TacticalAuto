@@ -389,7 +389,7 @@ test('experience follows what a soldier did: kills and damage its own, feats onl
     apply(run, { type: 'advance' })
     deploy(run, 0)
     const b = run.battle!
-    b.tally[soldier.id] = { dealt: 12, kills: 3, taken: 4, feats: ['hatTrick'] }
+    b.tally[soldier.id] = { dealt: 12, kills: 3, taken: 4, shots: 0, hits: 0, feats: ['hatTrick'] }
     b.units = b.units.filter((u) => u.side === 'human')
     Object.assign(b, { phase: 'over', winner: 'human' })
     endBattle(run)
