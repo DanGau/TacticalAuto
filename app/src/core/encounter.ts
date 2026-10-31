@@ -5,15 +5,14 @@ import { blocked, edgeDepths, NEIGHBORS, onGrid, openNear, walks } from './grid'
 import { randomInt } from './rng'
 import { PROP_BULK, type Prop, type TerrainKind } from './terrain'
 
-/** How far from its centre the arena reaches, how far its heart is cleared for the fight, and the share of its ground objects stand on. */
+/** How far from its centre the arena reaches, and how far out the camera shows it clear of props. */
 export const ARENA_REACH = 14
-export const ARENA_CLEAR = 9
-export const ARENA_OBJECTS = 0.06
+const SIGHT_CLEAR = 22
 
 /** Where an encounter's fight flows, in tiles along its axis from the ways in toward the overlook, and across it. */
 type Mark = [along: number, across: number]
 
-/** The objects heroes find, low and tall, by where the fight is. */
+/** The objects heroes find in the heaps, low and tall, by where the fight is. */
 const SCATTER: Partial<Record<TerrainKind, [Prop, Prop]>> = { countryside: ['crate', 'tree'], hive: ['growth', 'spire'], city: ['car', 'stack'], town: ['car', 'crate'] }
 
 /** The overlook, a rise the aliens hold; the ledge, a low rise by a flank way in; the fuel tanks between the first pods. */
@@ -58,17 +57,39 @@ function arenaSpot(battle: Battle, roofed: boolean): Tile {
   }
 }
 
-/** Opens a fighting space at the arena's heart: what stood there comes down, water and the void aside. */
-function clearHeart(battle: Battle, arena: Arena): void {
-  for (let y = arena.y - ARENA_CLEAR; y <= arena.y + ARENA_CLEAR; y++) {
-    for (let x = arena.x - ARENA_CLEAR; x <= arena.x + ARENA_CLEAR; x++) {
-      if (!onGrid(x, y) || Math.hypot(x - arena.x, y - arena.y) > ARENA_CLEAR) continue
+/** The floor tiles joined to `at`, if it stands on floor: the building it is in. */
+function buildingAt(battle: Battle, at: Tile): Set<number> {
+  const building = new Set<number>()
+  const queue = [at]
+  for (const { x, y } of queue) {
+    const t = y * GRID + x
+    if (!onGrid(x, y) || battle.ground[t] !== 'floor' || building.has(t)) continue
+    building.add(t)
+    queue.push(...NEIGHBORS.slice(0, 4).map(([dx, dy]) => ({ x: x + dx, y: y + dy })))
+  }
+  return building
+}
+
+/**
+ * Opens the ground for the fight. Outdoor props come down out to SIGHT_CLEAR, water and the void aside; so, within the
+ * arena, do buildings, but for `kept` and a compound's walls.
+ */
+function clearArena(battle: Battle, arena: Arena, kept: Set<number>): void {
+  for (let y = arena.y - SIGHT_CLEAR; y <= arena.y + SIGHT_CLEAR; y++) {
+    for (let x = arena.x - SIGHT_CLEAR; x <= arena.x + SIGHT_CLEAR; x++) {
+      const d = Math.hypot(x - arena.x, y - arena.y)
+      if (!onGrid(x, y) || d > SIGHT_CLEAR) continue
       const t = y * GRID + x
-      if (battle.ground[t] === 'void' || battle.ground[t] === 'water') continue
-      if (battle.ground[t] === 'floor') battle.ground[t] = 'pavement'
+      const indoors = battle.ground[t] === 'floor'
+      const razed = d <= ARENA_REACH && battle.place !== 'compound' && !kept.has(t)
+      if (battle.ground[t] === 'void' || battle.ground[t] === 'water' || (indoors && !razed)) continue
       battle.props[t] = 'none'
       battle.bulk[t] = 0
-      battle.north[t] = battle.west[t] = 'none'
+      if (!razed) continue
+      if (indoors) battle.ground[t] = 'pavement'
+      // A tile's north and west edges may be the walls of a kept building beside it.
+      if (!kept.has(t - GRID)) battle.north[t] = 'none'
+      if (!kept.has(t - 1)) battle.west[t] = 'none'
     }
   }
 }
@@ -95,13 +116,13 @@ function stand(battle: Battle, at: Tile, prop: Prop): boolean {
 
 /**
  * Sets the arena and lays out the encounter for `goal`. Returns the arena's centre, a post for each pack, and on a
- * rescue the terror's heart. A VIP's building and a satellite's compound stay standing; elsewhere the heart is cleared.
+ * rescue the terror's heart. A VIP's building and a satellite's compound stay standing; all else in the arena comes down, and the props around it.
  */
 export function designEncounter(battle: Battle, packs: { aliens: Alien[] }[], goal: Goal): { spot: Tile; posts: Tile[] } {
   const spot = arenaSpot(battle, goal === 'vip')
   const arena = { x: spot.x, y: spot.y, reach: ARENA_REACH }
   battle.arena = arena
-  if (goal !== 'vip' && battle.place !== 'compound') clearHeart(battle, arena)
+  clearArena(battle, arena, goal === 'vip' ? buildingAt(battle, spot) : new Set())
   // The axis the fight flows along: of eight headings, the first whose both ends lie on the map, from a random start.
   const start = randomInt(battle, 8)
   const headings = Array.from({ length: 8 }, (_, i) => ((start + i) * Math.PI) / 4)
@@ -118,12 +139,6 @@ export function designEncounter(battle: Battle, packs: { aliens: Alien[] }[], go
   // The hive holds nothing human: its hazard is its own growth.
   for (const mark of HAZARD) stand(battle, raw(mark), battle.place === 'hive' ? 'growth' : 'fuel')
   for (const [i, mark] of HEAPS.entries()) stand(battle, raw(mark), i % 3 === 2 ? tall : low)
-  // Then scatter, to the arena's share of objects, out past the heaps.
-  const area = Math.PI * ARENA_REACH * ARENA_REACH
-  for (let tries = 0, placed = HAZARD.length + HEAPS.length; placed < ARENA_OBJECTS * area && tries < 400; tries++) {
-    const mark: Mark = [randomInt(battle, 2 * ARENA_REACH + 1) - ARENA_REACH, randomInt(battle, 2 * ARENA_REACH + 1) - ARENA_REACH]
-    if (Math.hypot(...mark) <= ARENA_REACH && stand(battle, raw(mark), randomInt(battle, 3) === 0 ? tall : low)) placed++
-  }
   walks.delete(battle)
   battle.approaches = APPROACHES.map((m) => raw(m))
   battle.gates = GATES.map((m) => openNear(battle, raw(m)))

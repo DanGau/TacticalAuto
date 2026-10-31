@@ -5,7 +5,7 @@ import { distance } from './grid'
 import { leverage, THROW_DAMAGE } from './objects'
 import { begun, enterAt } from './roads'
 import { current } from './run'
-import { ARENA_CLEAR } from './encounter'
+import { ARENA_REACH } from './encounter'
 import { FUEL_DAMAGE } from './twists'
 
 function duel() {
@@ -14,7 +14,7 @@ function duel() {
   current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })
   const clear = run.battle!
-  const walled = clear.north.some((e, t) => e !== 'none' && distance({ x: t % GRID, y: Math.floor(t / GRID) }, clear.arena) < ARENA_CLEAR / 2)
+  const walled = clear.north.some((e, t) => e !== 'none' && distance({ x: t % GRID, y: Math.floor(t / GRID) }, clear.arena) < ARENA_REACH / 2)
   enterAt(run, 0)
   const battle = run.battle!
   const soldier = battle.units.find(isSoldier)!

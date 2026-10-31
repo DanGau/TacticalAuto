@@ -14,7 +14,9 @@ function landed(relics: RelicId[]): Run {
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  const { entrances, units } = run.battle!
+  const contact = (i: number) => Math.min(...units.filter((u) => u.side === 'alien').map((u) => distance(u, entrances[i].at)))
+  enterAt(run, entrances.reduce((best, _, i) => (contact(i) < contact(best) ? i : best), 0))
   return run
 }
 

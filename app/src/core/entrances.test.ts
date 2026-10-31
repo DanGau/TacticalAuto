@@ -184,8 +184,8 @@ test('a big explosion and a stolen kill are style only, and shooting first hurts
     const run = entering()
     const before = run.battle.units.filter((u) => u.side === 'alien').map((u) => u.hp)
     enterAt(run, entranceOf(run.battle, kind))
-    expect(stepBattle(run.battle).some((e) => e.type === 'hurt')).toBe(false)
     expect(run.battle.units.filter((u) => u.side === 'alien').map((u) => u.hp)).toEqual(before)
+    expect(stepBattle(run.battle).some((e) => e.type === 'hurt')).toBe(false)
   }
   const run = entering()
   const index = entranceOf(run.battle, 'han')
