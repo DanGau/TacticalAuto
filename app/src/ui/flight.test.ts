@@ -8,14 +8,21 @@ import { flight, flightSize } from './overworld'
 /** What makes the flight map, as the screen shows it, hard to read; a stop's trail may pass no nearer to another than CLEAR. */
 function tangled(run: Run, w: number, h: number): string[] {
   const { pins, focus, path } = flight(run, null)
-  const { placed } = layout(flightSize(w, h), run, pins, focus)
+  const size = flightSize(w, h)
+  const { placed, target } = layout(size, run, pins, focus)
   const shown = pins.filter((pin) => placed.get(pin.id)!.front)
   const index = new Map(shown.map((pin, i) => [pin.id, i]))
   const lines = shown.flatMap((pin) => pin.next.flatMap((id): [number, number][] => (index.has(id) ? [[index.get(pin.id)!, index.get(id)!]] : [])))
   // The way walked this leg runs through the stops taken.
   const walked = path.filter((id) => index.has(id))
   lines.push(...walked.slice(1).map((id, i): [number, number] => [index.get(walked[i])!, index.get(id)!]))
-  return tangles(shown.map((pin) => placed.get(pin.id)!), lines, CLEAR, ROOM)
+  // No stop on screen floats off the globe into space: each stands within its face.
+  const centre = { x: size.w / 2, y: size.top + (size.h - size.top - size.bottom) / 2 }
+  const off = shown
+    .map((pin) => ({ pin, p: placed.get(pin.id)! }))
+    .filter(({ p }) => p.x >= 0 && p.x <= size.w && p.y >= 0 && p.y <= size.h && Math.hypot(p.x - centre.x, p.y - centre.y) > target.r)
+    .map(({ pin }) => `stop ${pin.id} off the globe`)
+  return [...off, ...tangles(shown.map((pin) => placed.get(pin.id)!), lines, CLEAR, ROOM)]
 }
 
 const CLEAR = 22

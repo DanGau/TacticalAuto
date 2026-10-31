@@ -365,6 +365,9 @@ export function layout(size: Size, run: Run, pins: Pin[], focus: LonLat): { targ
   const lines = shown.flatMap((pin) => pin.next.flatMap((id): [number, number][] => (index.has(id) ? [[index.get(pin.id)!, index.get(id)!]] : [])))
   // Laid out, the stops ahead may spill out of the window; then the view draws back until they fit.
   const { middle: mid, half } = open(size)
+  // The globe always covers the window, so every stop on screen stands on its face.
+  const floor = Math.hypot(size.w / 2, Math.max(mid, size.h - mid))
+  target.r = Math.max(target.r, floor)
   for (let tries = 0; ; tries++) {
     const project = projection(target, size)
     const at = new Map(pins.map((pin) => [pin.id, project(pin.at)]))
@@ -372,8 +375,8 @@ export function layout(size: Size, run: Run, pins: Pin[], focus: LonLat): { targ
     untangle(shown.map((pin) => ({ p: placed.get(pin.id)!, layer: pin.layer, order: pin.order, fixed: pin.squad })), lines)
     const seen = shown.filter((pin) => !pin.past).map((pin) => placed.get(pin.id)!)
     const spill = Math.max(...seen.map((p) => Math.max(Math.abs(p.x - size.w / 2) / (size.w / 2 - MARGIN / 2), Math.abs(p.y - mid) / (half - MARGIN / 2))))
-    if (spill <= 1 || tries === 3 || target.r <= FAR) return { target, placed, pushed: new Map([...at].map(([id, p]) => [id, { x: placed.get(id)!.x - p.x, y: placed.get(id)!.y - p.y }])) }
-    target.r = Math.max(FAR, target.r / spill / 1.2)
+    if (spill <= 1 || tries === 3 || target.r <= floor) return { target, placed, pushed: new Map([...at].map(([id, p]) => [id, { x: placed.get(id)!.x - p.x, y: placed.get(id)!.y - p.y }])) }
+    target.r = Math.max(floor, target.r / spill / 1.2)
   }
 }
 
@@ -409,10 +412,11 @@ function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: string[
       return b && a.front && b.front ? [`<path class="trail${lit ? ' lit' : picking ? ' dim' : ''}" d="M${a.x},${a.y}L${b.x},${b.y}"/>`] : []
     }),
   )
-  // A stop that shows over water, pushed there to stand clear or set out at sea, stands on a speck of island.
+  // A stop that shows over water on the globe's face, pushed there to stand clear or set out at sea, stands on a speck of island.
   const isles = pins.flatMap((pin) => {
     const p = placed.get(pin.id)!
-    return pin.html && p.front && !onLand(project.invert(p.x, p.y)) ? [island(p, pin.at, pin.choice ? 24 : 18)] : []
+    const face = Math.hypot(p.x - size.w / 2, p.y - open(size).middle) < view.r - 24
+    return pin.html && p.front && face && !onLand(project.invert(p.x, p.y)) ? [island(p, pin.at, pin.choice ? 24 : 18)] : []
   })
   const stops = pins.flatMap((pin) => {
     const p = placed.get(pin.id)!
