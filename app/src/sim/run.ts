@@ -4,8 +4,18 @@ import { apply, type Action } from '../core/apply'
 import { createRun } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Mission } from '../core/run-state'
+import { health } from '../core/squad'
 import { timedFlow } from '../core/step'
 import type { DoctrineId } from '../core/doctrines'
+
+/** A battle's toll: the leg it was on, the squad's most health, its health at the start and end, and soldiers downed. */
+export interface Toll {
+  leg: number
+  most: number
+  before: number
+  after: number
+  downed: number
+}
 
 export interface RunResult {
   seed: number
@@ -19,6 +29,8 @@ export interface RunResult {
   draws: number
   /** How long each battle takes to play in the view, in ms. */
   durations: number[]
+  /** Each battle's toll on the squad's health. */
+  tolls: Toll[]
   /** With the seed, enough to replay the run. */
   actions: Action[]
 }
@@ -33,12 +45,15 @@ const MAX_ACTIONS = 10000
 function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = []): { run: Run; result: RunResult } {
   const run = createRun(seed)
   run.doctrines.push(...doctrines)
-  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], actions: [] }
+  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], tolls: [], actions: [] }
   let clock = { next: 0, done: 0 }
   /** The battle and alien turn count at which the bot last chose whether to use a consumable. */
   let asked: [Run['battle'], number] = [null, -1]
+  /** The battle under way, its leg, and the squad's health as it began. */
+  let begun: [Run['battle'], number, number] = [null, 0, 0]
   while (run.phase !== 'won' && run.phase !== 'lost') {
     const battle = run.battle
+    if (run.phase === 'battle' && begun[0] !== battle) begun = [battle, run.keys, run.soldiers.reduce((sum, s) => sum + health(run, s), 0)]
     const choosing = run.phase === 'battle' && battle!.phase === 'battle' && battle!.turn === 'human' && run.kit.length > 0 && (asked[0] !== battle || asked[1] !== battle!.round)
     if (choosing) asked = [battle, battle!.round]
     if (run.phase === 'battle' && battle!.phase === 'battle' && !choosing) {
@@ -49,6 +64,8 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
         result.battles++
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
+        const fought = run.report!.soldiers
+        result.tolls.push({ leg: begun[1], most: fought.reduce((sum, s) => sum + s.maxHp, 0), before: begun[2], after: fought.reduce((sum, s) => sum + s.hp, 0), downed: battle!.downed.length })
         clock = { next: 0, done: 0 }
       }
       continue

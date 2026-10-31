@@ -1,7 +1,7 @@
 // Turns run results into a report, with its balance bands and warnings.
 import type { Goal } from '../core/goals'
 import { KEYS } from '../core/run'
-import type { RunResult } from './run'
+import type { RunResult, Toll } from './run'
 
 export interface Report {
   runs: number
@@ -16,6 +16,8 @@ export interface Report {
   meanBattles: number
   /** Seconds a battle takes to play in the view: the median, the 90th percentile, and the longest. */
   seconds: { median: number; p90: number; max: number }
+  /** What battles cost the squad, as shares of its most health in percent: lost and left, each by mean, and left by leg; points lost; soldiers downed a battle; battles ended under 75%. */
+  attrition: { lost: number; hp: number; points: number; downed: number; worn: number; legs: number[] }
   /** Battles past MAX_BATTLE_SECONDS, which the report warns of without failing. */
   warnings: string[]
   /** Failed health thresholds. Any entry fails the batch. */
@@ -35,6 +37,9 @@ export function report(results: RunResult[]): Report {
   const at = (q: number) => Math.round(timed[Math.min(timed.length - 1, Math.floor(q * timed.length))]?.s ?? 0)
   const slow = timed.filter((t) => t.s > MAX_BATTLE_SECONDS)
   const warnings = slow.length > 0 ? [`${slow.length} of ${timed.length} battles play longer than ${MAX_BATTLE_SECONDS}s, in seeds ${[...new Set(slow.map((t) => t.seed))].join(', ')}`] : []
+  const tolls = results.flatMap((r) => r.tolls)
+  const share = (of: Toll[], value: (t: Toll) => number) => Math.round((100 * of.reduce((sum, t) => sum + value(t) / t.most, 0)) / Math.max(1, of.length))
+  const each = (value: (t: Toll) => number) => tolls.reduce((sum, t) => sum + value(t), 0) / Math.max(1, tolls.length)
   return {
     runs: results.length,
     wins: results.filter((r) => r.won).length,
@@ -46,6 +51,14 @@ export function report(results: RunResult[]): Report {
     meanKeys: mean((r) => r.keys),
     meanBattles: mean((r) => r.battles),
     seconds: { median: at(0.5), p90: at(0.9), max: at(1) },
+    attrition: {
+      lost: share(tolls, (t) => t.before - t.after),
+      hp: share(tolls, (t) => t.after),
+      points: Math.round(10 * each((t) => t.before - t.after)) / 10,
+      downed: Math.round(100 * each((t) => t.downed)) / 100,
+      worn: Math.round(100 * each((t) => (t.after < 0.75 * t.most ? 1 : 0))),
+      legs: Array.from({ length: KEYS + 1 }, (_, leg) => share(tolls.filter((t) => t.leg === leg), (t) => t.after)),
+    },
     warnings,
     failures,
   }
@@ -64,6 +77,8 @@ export function formatReport(r: Report): string {
     `mean keys won       ${r.meanKeys} of ${KEYS}`,
     `mean battles        ${r.meanBattles}`,
     `battle seconds      median ${r.seconds.median}, p90 ${r.seconds.p90}, max ${r.seconds.max}`,
+    `squad health        loses ${r.attrition.lost}% (${r.attrition.points}) a battle, ends at ${r.attrition.hp}%; ${r.attrition.worn}% of battles end under 75%; ${r.attrition.downed} downed a battle`,
+    `ends at, by leg     ${r.attrition.legs.map((n) => `${n}%`).join(', ')}`,
     ...r.warnings.map((w) => `WARN                ${w}`),
     ...r.failures.map((f) => `FAIL                ${f}`),
   ].join('\n')

@@ -134,6 +134,12 @@ const commands: Record<string, Command> = {
     await page.mouse.click(Number(x), Number(y))
     return page.evaluate(() => debug.snapshot())
   },
+  /** tap <selector>: clicks the first element matching, as a player's tap. */
+  async tap(page, selector) {
+    await page.locator(selector).first().click({ force: true })
+  },
+  /** viewport <w> <h>: resizes the page for the rest of a playbook, to see phone widths. */
+  viewport: (page, w, h) => page.setViewportSize({ width: Number(w), height: Number(h) }),
   /** hover <x> <y>: moves the mouse to a screen point. */
   async hover(page, x, y) {
     await page.mouse.move(Number(x), Number(y))
