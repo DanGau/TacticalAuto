@@ -1,5 +1,5 @@
 /** What a battle asks of the squad. Each pays differently, so where the squad goes shapes what it builds. */
-export type Goal = 'exterminate' | 'assassinate' | 'hold' | 'rescue' | 'raid' | 'ambush' | 'recover'
+export type Goal = 'exterminate' | 'assassinate' | 'hold' | 'rescue' | 'vip' | 'raid' | 'ambush' | 'recover'
 
 /** Rounds the squad must hold the uplink before it can extract. */
 export const HOLD_ROUNDS = 6
@@ -17,6 +17,10 @@ export const CIVILIANS_PER_THREAT = 4
 /** A rescue is won, and pays, only when more than this many civilians are saved. */
 export const RESCUE_QUORUM = CIVILIANS / 2
 
+/** The health of a VIP, and how near a soldier it keeps once freed. */
+export const VIP_HP = 12
+export const ESCORT_REACH = 2
+
 /** `from` is the leg a goal is first drawn on: a lone first soldier meets no hold or assassination. */
 export const GOALS: Record<Goal, { name: string; text: string; reward: string; force: number; weight: number; from: number }> = {
   exterminate: { name: 'Exterminate', text: 'Kill every alien', reward: 'supplies and gear', force: 0, weight: 3, from: 0 },
@@ -24,11 +28,19 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
   hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as ever larger waves come in from the edges, then get every soldier left to the extraction zone`, reward: 'a relic, no gear', force: -4, weight: 1, from: 1 },
   rescue: {
     name: 'Rescue',
-    text: `A terror site: aliens are killing ${CIVILIANS} civilians. Hiders, squat and amber, take cover and stay put; runners, tall and pale, flee the aliens; and harvesters raise the dead as husks. Aliens hunt civilians once the squad sights them, so the squad fights them as one. A soldier who reaches a civilian gets them out. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
+    text: `A terror site: aliens are killing ${CIVILIANS} civilians. Hiders, squat and amber, take cover and stay put; runners, tall and pale, flee the aliens; and harvesters raise the dead as husks. The squad drops in among them, in contact: aliens shoot civilians when they have no good shot at a soldier, so push in. A soldier who reaches a civilian gets them out. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
     reward: 'supplies and experience, no gear',
-    force: -4,
+    force: 3,
     weight: 1,
     from: 0,
+  },
+  vip: {
+    name: 'VIP rescue',
+    text: `A VIP is trapped in a building, under guard. Breach it, reach them, and escort them to the extraction zone that then appears; every pod hears and comes. The aliens shoot the VIP whenever they can. Lose the VIP and the mission is lost`,
+    reward: 'supplies and a relic, no gear',
+    force: 2,
+    weight: 1,
+    from: 1,
   },
   raid: { name: 'Supply raid', text: 'Guarded supply caches. Choose how many to go for; each pays supplies, and each beyond the first adds a threat', reward: 'supplies by the cache, no gear', force: -1, weight: 1, from: 0 },
   // Never drawn: a full threat turns the next stop into an ambush.

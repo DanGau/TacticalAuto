@@ -85,7 +85,8 @@ function travelling(stops: StopKind[], risk: Risk = 'standard'): Run {
 /** Travels to the next stop, a battle, and ends it with `winner`: the losing side is down to the last unit. */
 function fight(run: Run, winner: Side): void {
   apply(run, { type: 'advance' })
-  deploy(run, 0)
+  // Clear of the barrage, which costs threat.
+  deploy(run, run.battle!.barrage === 0 ? 1 : 0)
   const battle = run.battle!
   for (const u of battle.units.filter((u) => isSoldier(u) && winner === 'alien')) battle.downed.push({ soldier: u.soldier!, x: u.x, y: u.y, carrier: null })
   battle.units = battle.units.filter((u) => u.side === winner)

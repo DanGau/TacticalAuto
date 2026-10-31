@@ -4,6 +4,7 @@ import { TUNING } from './tuning'
 import { PARRY_CHANCE } from './doctrines'
 import { FUEL_DAMAGE } from './twists'
 import { AIRSTRIKE, HEAL, PLATING, RAGE, SMOKE_TURNS, STIMS, type ConsumableId } from './consumables'
+import { ESCORT_REACH } from './goals'
 import {
   crumble,
   onGrid,
@@ -257,6 +258,8 @@ function spotted(battle: Battle): Set<number> {
 function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: Set<number>): boolean {
   // Soldiers hold their fire on a pod they are setting an ambush on, until it is sprung.
   if (unit.side === 'human' && unaware(battle, target)) return false
+  // A VIP is a hostage, kept alive until freed.
+  if (target.civilian === 'vip' && battle.vip !== 'freed') return false
   if (has(target, 'ghost') && distance(from, target) > GHOST_REACH) return false
   // A psionic attack needs no line of sight, only an alien whose pod is revealed.
   if (has(unit, 'psionic') && revealed(battle, target) && distance(from, target) <= unit.stats.range) return true
@@ -438,13 +441,17 @@ function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
 
 /**
  * Where a side's units close on when they have no shot, by the battle's goal. Soldiers share one, so the squad moves
- * together: on a hold, the uplink, then the extraction zone; on an assassination, the commander once sighted; else the
- * alien nearest the squad's centre; on a rescue, the civilian or alien hunting one nearest it. On a hold the aliens
- * close on the uplink, then the squad; on a rescue an alien fights a soldier it sees, else, once the squad has sighted
- * it, hunts a civilian within PREY_REACH, else closes on the squad; otherwise an alien closes on the human nearest itself.
+ * together: on a hold, the uplink, then the extraction zone; on a VIP rescue, the VIP, then the extraction zone; on an
+ * assassination, the commander once sighted; else the alien nearest the squad's centre; on a rescue, the alien nearest a
+ * civilian, or with none near one, the civilian nearest the squad. On a hold the aliens
+ * close on the uplink, then the squad; otherwise an alien closes on the soldier nearest itself, shooting civilians on
+ * the way.
  */
 export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
-  if (enemies.length === 0) return undefined
+  // The squad goes for the VIP until it reaches them.
+  const vip = vipOf(battle)
+  if (vip && unit.side === 'human' && battle.vip !== 'freed') return vip
+  if (enemies.length === 0 && !(battle.extract && unit.side === 'human')) return undefined
   // Getting out, a soldier with its hands free goes for the nearest squadmate down first.
   if (battle.extract && unit.side === 'human') return (!carrying(battle, unit) && nearest(lying(battle), unit)) || battle.extract
   const captive = unit.side === 'human' && nearest(lying(battle).filter((d) => battle.captives.some((r) => r.soldier === d.soldier)), unit)
@@ -453,20 +460,36 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
   if (battle.goal === 'raid' && unit.side === 'human' && battle.caches.length > 0) return battle.caches.reduce((a, b) => (distance(b, unit) < distance(a, unit) ? b : a))
   // On a hold an alien makes for the uplink, then from its zone goes for the squad, so no stand-off lasts.
   if (battle.uplink) return unit.side === 'alien' && distance(unit, battle.uplink) <= UPLINK_REACH ? nearest(enemies, unit) : battle.uplink
-  const civilians = battle.units.filter((u) => u.civilian)
-  if (unit.side === 'alien' && civilians.length > 0) {
-    const fighters = enemies.filter((e) => !e.civilian && sees(battle, unit, e))
-    const prey = revealed(battle, unit) ? civilians.filter((c) => distance(c, unit) <= PREY_REACH) : []
-    return nearest(fighters.length > 0 ? fighters : prey.length > 0 ? prey : enemies.filter((e) => !e.civilian), unit) ?? nearest(civilians, unit)
-  }
-  if (unit.side === 'alien') return nearest(enemies, unit)
+  const civilians = battle.units.filter((u) => u.civilian && u.civilian !== 'vip')
+  if (unit.side === 'alien') return nearest(enemies.filter((e) => !e.civilian), unit) ?? nearest(enemies, unit)
   const squad = centreOf(battle.units.filter(isSoldier))
-  if (civilians.length > 0) return nearest([...civilians, ...enemies.filter((e) => !e.civilian && revealed(battle, e) && alert(battle, e) && civilians.some((c) => distance(c, e) <= PREY_REACH))], squad)
+  if (civilians.length > 0) {
+    // The squad goes for the alien nearest a civilian, nearest the squad among equals, before civilians no alien is near.
+    const prey = (e: Unit) => Math.min(...civilians.map((c) => distance(c, e)))
+    const hunters = enemies.filter((e) => prey(e) <= PREY_REACH).sort((a, b) => prey(a) - prey(b) || distance(a, squad) - distance(b, squad))
+    return hunters[0] ?? nearest(civilians, squad)
+  }
   return enemies.find((u) => u.target && revealed(battle, u)) ?? nearest(enemies, squad)
 }
 
-/** How near a civilian must be for an alien with no soldier in sight to hunt it; farther off, it makes for the squad. */
+/** How near a civilian an alien must be for the squad to go for it on a rescue. */
 const PREY_REACH = 8
+
+/**
+ * What a shot at a civilian is worth to an alien beside the same chance at a soldier: it takes a good shot at a soldier,
+ * or a civilian before a poor one, so a squad that hangs back loses civilians.
+ */
+const PREY_WORTH = 0.25
+/** What a shot at a VIP is worth to an alien beside the same chance at a soldier: it takes any it can get. */
+const VIP_WORTH = 1.5
+/** What a hit chance at `target` is worth to an alien. */
+const preyed = (target: Unit, hit: number) => (target.civilian === 'vip' ? VIP_WORTH * hit : target.civilian ? PREY_WORTH * hit : hit)
+
+/** A VIP rescue's VIP, while on the field. */
+export const vipOf = (battle: Battle) => battle.units.find((u) => u.civilian === 'vip')
+/** How near the VIP a soldier must come to breach its building, and about how far a walk the extraction zone is from it. */
+const BREACH_REACH = 3
+const VIP_WALK = 24
 
 /** Soldiers down and not carried. */
 const lying = (battle: Battle) => battle.downed.filter((d) => d.carrier === null)
@@ -509,7 +532,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const mine = (end: Tile) => {
     const chances = enemies
       .filter((enemy) => shootable(battle, unit, end, enemy, seen))
-      .map((enemy) => odds(battle, end, enemy, unit.stats, has(unit, 'piercing')).hit * (flanker && coverAgainst(battle, enemy, end) === 0 ? 1.5 : 1))
+      .map((enemy) => preyed(enemy, odds(battle, end, enemy, unit.stats, has(unit, 'piercing')).hit) * (flanker && coverAgainst(battle, enemy, end) === 0 ? 1.5 : 1))
     return Math.round(100 * Math.max(0, ...chances))
   }
   const theirs = (end: Tile) => exposure(battle, enemies, end)
@@ -551,8 +574,11 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   /** Tiles `end` is ahead of the unit's place in the formation. */
   const ahead = (end: Tile) => Math.max(0, slot - toGoal[end.y * GRID + end.x])
   /** 0 if a soldier ending its move on `end` gets a civilian out, else 1: a rescuer takes that chance over a shot. */
-  const rescuable = unit.side === 'human' ? battle.units.filter((u) => u.civilian && revealed(battle, u)) : []
+  const rescuable = unit.side === 'human' ? battle.units.filter((u) => u.civilian && u.civilian !== 'vip') : []
   const saves = (end: Tile) => (rescuable.some((c) => distance(c, end) <= 1) ? 0 : 1)
+  const ward = battle.vip === 'freed' && unit.side === 'human' && enemies.some((e) => e.side === 'alien') ? vipOf(battle) : undefined
+  /** Tiles `end` is more than a step beyond ESCORT_REACH of the VIP the squad escorts. */
+  const escort = (end: Tile) => (ward ? Math.max(0, distance(end, ward) - ESCORT_REACH - 1) : 0)
   const quarry = enemies.filter((e) => unaware(battle, e))
   /** Whether the squad is setting an ambush: it sees a pod unaware of it, and no alert alien. */
   const setting = unit.side === 'human' && quarry.length > 0 && !enemies.some((e) => revealed(battle, e) && alert(battle, e))
@@ -576,14 +602,16 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
         stray: stray(end),
         shelter: coverAgainst(battle, end, goal),
         stalled: toGoal[end.y * GRID + end.x] >= toGoal[unit.y * GRID + unit.x] ? 1 : 0,
-        careful: unit.side === 'human' && battle.round < RESTLESS_ROUND,
+        // A rescue is no time for care: every turn costs civilians.
+        careful: unit.side === 'human' && battle.round < RESTLESS_ROUND && battle.goal !== 'rescue',
         threat: threat(end),
       }
       // A wary unit ranks every tile by the exchange of fire, so one with no shot and no risk can win.
       // No unit ends its move in acid if it can help it.
       // On a hold, a soldier stands its ground at the uplink before anything else.
       // Getting out, a soldier makes for the way out as fast as it can.
-      const first = [battle.extract && unit.side === 'human' ? spot.toGoal : 0, leash(end), acid(end), provokes(end), saves(end)]
+      // Escorting, a soldier keeps by the VIP.
+      const first = [escort(end), battle.extract && unit.side === 'human' ? spot.toGoal : 0, leash(end), acid(end), provokes(end), saves(end)]
       // Setting an ambush: unnoticed first, then a shot at the pod, then the best cover against it, then nearer.
       if (setting) return [...first, noticed(end), lays(end) ? 0 : 1, -coverAgainst(battle, end, goal), steps]
       if (wary && unit.stance !== 'standoff' && inContact) return [...first, 0, ...WITH_SHOT[unit.stance](spot), spot.toGoal]
@@ -601,9 +629,7 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
   const full = Math.ceil(Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0)) / (carrying(battle, unit) || reeling ? 2 : 1))
   // Unseen, a soldier creeps.
   // Unless it wears Ghost Weave.
-  // An alien hunting civilians, with no soldier in sight, stalks them at a patrol's pace; a harvester runs them down.
-  const stalking = unit.side === 'alien' && unit.kind !== 'harvester' && battle.units.some((u) => u.civilian && u.x === goal.x && u.y === goal.y)
-  const move = unit.side === 'human' && battle.concealed && !has(unit, 'ghost') ? Math.ceil(full * CREEP) : stalking ? Math.min(full, PATROL_MOVE) : full
+  const move = unit.side === 'human' && battle.concealed && !has(unit, 'ghost') ? Math.ceil(full * CREEP) : full
   const path = choose(move)
   if (unit.ability === 'runAndGun' && !battle.concealed && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
   const end = path.at(-1) ?? unit
@@ -641,11 +667,24 @@ const hideout = (battle: Battle, tile: Tile) =>
 
 /** A civilian's path. A hider makes for the best cover in reach and stays there; a runner goes away from the nearest alien until SAFE from all, then toward the nearest soldier. */
 function fleePath(battle: Battle, unit: Unit): Tile[] {
+  if (unit.civilian === 'vip') return battle.vip === 'freed' ? escapePath(battle, unit) : []
   if (unit.civilian === 'hider') return hideout(battle, unit) > 0 ? [] : bestPath(paths(battle, unit, unit.stats.move), unit, (end, steps) => [-hideout(battle, end), steps])
   const aliens = battle.units.filter((u) => u.side === 'alien')
   const soldier = nearest(battle.units.filter(isSoldier), unit)
   const toSquad = soldier ? walkingDistances(battle, soldier) : null
   return bestPath(paths(battle, unit, unit.stats.move), unit, (end) => [SAFE - Math.min(SAFE, ...aliens.map((a) => distance(a, end))), toSquad ? toSquad[end.y * GRID + end.x] : 0])
+}
+
+/** A freed VIP's path: toward the extraction zone, away from the aliens' shots and, while any is in sight, never beyond ESCORT_REACH of a soldier. */
+function escapePath(battle: Battle, unit: Unit): Tile[] {
+  const toExtract = walkingDistances(battle, battle.extract!)
+  const soldiers = battle.units.filter(isSoldier)
+  const aliens = battle.units.filter((u) => u.side === 'alien' && revealed(battle, u))
+  // With no alien left in sight it makes straight for the way out.
+  return bestPath(paths(battle, unit, unit.stats.move), unit, (end) => [
+    aliens.length > 0 ? Math.max(0, Math.min(...soldiers.map((s) => distance(s, end))) - ESCORT_REACH) : 0,
+    toExtract[end.y * GRID + end.x] + Math.round(exposure(battle, aliens, end) / 10),
+  ])
 }
 
 /** The path an alien takes while its pod is unaware: toward the pod's waypoint, slowly, unless it guards its post. */
@@ -751,8 +790,9 @@ function sight(battle: Battle): GameEvent[] {
     battle.units.push(unit)
     events.push({ type: 'freed', id: rescuer.id, unit: { id: unit.id, x: unit.x, y: unit.y } })
   }
-  // A soldier at the extraction zone lifts off, with whoever it carries.
-  for (const soldier of battle.extract ? soldiers.filter((s) => distance(s, battle.extract!) <= extractReach(battle)) : []) {
+  events.push(...escortVip(battle, soldiers))
+  // A soldier at the extraction zone lifts off, with whoever it carries, once any VIP has.
+  for (const soldier of battle.extract && battle.vip !== 'freed' ? soldiers.filter((s) => distance(s, battle.extract!) <= extractReach(battle)) : []) {
     battle.units.splice(battle.units.indexOf(soldier), 1)
     battle.escaped.push(soldier.soldier!, ...battle.downed.filter((d) => d.carrier === soldier.id).map((d) => d.soldier))
     battle.lifted[soldier.soldier!] = soldier.hp
@@ -767,12 +807,47 @@ function sight(battle: Battle): GameEvent[] {
   }
   // A soldier, or a mech it called down, beside a civilian gets them out.
   const squad = battle.units.filter((u) => u.side === 'human' && !u.civilian)
-  for (const civilian of battle.units.filter((u) => u.civilian && squad.some((s) => distance(s, u) <= (has(s, 'beacon') ? BEACON_REACH : 1)))) {
+  for (const civilian of battle.units.filter((u) => u.civilian && u.civilian !== 'vip' && squad.some((s) => distance(s, u) <= (has(s, 'beacon') ? BEACON_REACH : 1)))) {
     battle.units.splice(battle.units.indexOf(civilian), 1)
     battle.saved++
     events.push({ type: 'saved', id: civilian.id })
   }
   battle.concealed = !hunted(battle)
+  return events
+}
+
+/**
+ * A VIP rescue's steps. The first soldier within BREACH_REACH of the VIP blows in the wall between them, catching the
+ * guards: they do not shoot on their next turn. A soldier beside the VIP frees them: the extraction zone appears at the
+ * edge and every pod comes for the squad. A VIP at the extraction zone lifts off.
+ */
+function escortVip(battle: Battle, soldiers: Unit[]): GameEvent[] {
+  const vip = vipOf(battle)
+  if (!vip) return []
+  const events: GameEvent[] = []
+  const breacher = battle.vip === 'held' && nearest(soldiers.filter((s) => distance(s, vip) <= BREACH_REACH), vip)
+  if (breacher) {
+    battle.vip = 'breached'
+    const at = { x: vip.x + Math.sign(breacher.x - vip.x), y: vip.y + Math.sign(breacher.y - vip.y) }
+    wreck(battle, at)
+    const guards = battle.units.filter((u) => u.side === 'alien' && distance(u, vip) <= BREACH_REACH + 2)
+    for (const pod of new Set(guards.map((u) => u.pod!))) Object.assign(battle.pods[pod], { revealed: true, alert: true, surprised: true })
+    events.push({ type: 'rocket', id: breacher.id, x: at.x, y: at.y, hits: [] })
+  }
+  if (battle.vip === 'breached' && soldiers.some((s) => distance(s, vip) <= 1)) {
+    battle.vip = 'freed'
+    // Of edge tiles drawn, the one whose walk from the VIP is nearest VIP_WALK.
+    const walk = walkingDistances(battle, vip)
+    const off = (t: Tile) => Math.abs(walk[t.y * GRID + t.x] - VIP_WALK)
+    battle.extract = Array.from({ length: 40 }, () => spacedTile(battle, [vip], EXTRACT_CLEARANCE, 'edge')).reduce((a, b) => (off(b) < off(a) ? b : a))
+    for (const pod of battle.pods) Object.assign(pod, { alert: true, guard: false, waypoint: { x: vip.x, y: vip.y } })
+    events.push({ type: 'extract', ...battle.extract })
+  }
+  if (battle.vip === 'freed' && distance(vip, battle.extract!) <= extractReach(battle)) {
+    battle.vip = 'out'
+    battle.units.splice(battle.units.indexOf(vip), 1)
+    events.push({ type: 'escaped', id: vip.id })
+  }
   return events
 }
 
@@ -1361,7 +1436,7 @@ function inAura(battle: Battle, unit: Unit, effect: Effect): boolean {
 }
 
 /**
- * A shot at the enemy the unit can shoot and is likeliest to hit; the nearest, then the lowest id, wins a tie.
+ * A shot at the enemy the unit can shoot and is likeliest to hit, a civilian counting PREY_WORTH; the nearest, then the lowest id, wins a tie.
  * An alien that can shoot a taunting soldier must. With `only`, the shot is at that enemy or not at all.
  * The effects of both units' gear and skills, and of relics, apply. `granted` names the effect that gave a shot
  * beyond the unit's own; such a shot grants no further one.
@@ -1370,12 +1445,11 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
   const piercing = has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic')
   const chanceAt = (target: Unit) => odds(battle, unit, target, unit.stats, piercing)
   const inReach = (only ? [only] : battle.units).filter((other) => other.side !== unit.side && shootable(battle, unit, unit, other, seen))
-  // An alien with a soldier in reach fights it; only with none, and once sighted, does it turn on civilians.
-  const fighters = inReach.filter((other) => !other.civilian)
   const taunting = inReach.filter((other) => has(other, 'taunt'))
+  const value = (other: Unit) => preyed(other, chanceAt(other).hit) + worth(battle, unit, other)
   let enemy: Unit | undefined
-  for (const other of taunting.length > 0 ? taunting : fighters.length > 0 || !revealed(battle, unit) ? fighters : inReach) {
-    const gain = enemy ? chanceAt(other).hit + worth(battle, unit, other) - chanceAt(enemy).hit - worth(battle, unit, enemy) : 1
+  for (const other of taunting.length > 0 ? taunting : inReach) {
+    const gain = enemy ? value(other) - value(enemy) : 1
     if (gain > 0 || (gain === 0 && distance(unit, other) < distance(unit, enemy!))) enemy = other
   }
   if (!enemy) return []
@@ -1818,14 +1892,17 @@ export function stepBattle(battle: Battle): GameEvent[] {
   const humans = battle.units.some(isSoldier)
   // Aliens left to beat: none once the commander falls, for the rest flee.
   const fled = battle.goal === 'assassinate' && !battle.units.some((u) => u.target)
-  const aliens = !fled && (battle.units.some((u) => u.side === 'alien') || battle.waves.length > 0)
+  // A VIP rescue is not done until the VIP is out.
+  const aliens = !fled && (battle.units.some((u) => u.side === 'alien') || battle.waves.length > 0 || (battle.vip !== null && battle.vip !== 'out'))
   // A rescue is over once no civilian is left to save: won if any were. A raid is won once it has the caches it came for.
   const emptied = battle.goal === 'rescue' && !battle.units.some((u) => u.civilian)
   const loaded = battle.goal === 'raid' && battle.grabbed >= battle.greed
-  if (!humans || !aliens || emptied || loaded || battle.beat >= MAX_BEATS) {
+  // A VIP rescue is lost with the VIP.
+  const lost = battle.vip !== null && battle.vip !== 'out' && !vipOf(battle)
+  if (!humans || !aliens || emptied || loaded || lost || battle.beat >= MAX_BEATS) {
     battle.phase = 'over'
     // With every alien beaten the squad has won, even if its last soldier fell to the same blast.
-    battle.winner = !aliens || loaded || emptied || (!humans && battle.escaped.length > 0) ? 'human' : humans ? null : 'alien'
+    battle.winner = lost ? 'alien' : !aliens || loaded || emptied || (!humans && battle.escaped.length > 0) ? 'human' : humans ? null : 'alien'
     // A rescue is won only by saving more than RESCUE_QUORUM: those got out, and those alive once no alien is left.
     if (battle.goal === 'rescue' && battle.winner === 'human' && battle.saved + battle.units.filter((u) => u.civilian).length <= RESCUE_QUORUM) battle.winner = 'alien'
     events.push({ type: 'end', winner: battle.winner })

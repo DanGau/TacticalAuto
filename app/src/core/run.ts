@@ -903,7 +903,7 @@ export function endBattle(run: Run): void {
   const supplies = won ? risk.supplies * (mission.goal === 'raid' ? battle.grabbed : 1) + (rescued ?? 0) * (CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.civilianSupplies ?? 0), 0)) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
   run.supplies += supplies
   // A won battle drops gear by its goal; a key mission's, an ambush's, and the first of an Overrun battle's is rare or better.
-  const byGoal = { exterminate: risk.drops, assassinate: Math.max(1, risk.drops), hold: 0, rescue: 0, raid: 0, ambush: 0, recover: 0 }[mission.goal]
+  const byGoal = { exterminate: risk.drops, assassinate: Math.max(1, risk.drops), hold: 0, rescue: 0, vip: 0, raid: 0, ambush: 0, recover: 0 }[mission.goal]
   const drops = won && mission.kind !== 'final' && mission.kind !== 'recovery' ? (mission.kind === 'battle' ? byGoal : 1) : 0
   for (let i = 0; i < drops; i++) dropGear(run, (risk.rareGear && i === 0) || mission.kind !== 'battle' || held.some((relic) => relic.rareGear))
   const found = won && mission.kind !== 'final' && run.kit.length < KIT_SLOTS && random(run) < CONSUMABLE_DROP ? CONSUMABLE_IDS[randomInt(run, CONSUMABLE_IDS.length)] : null
@@ -927,8 +927,8 @@ export function endBattle(run: Run): void {
     onward(run)
   }
   if (mission.kind === 'battle') passStop(run)
-  // A satellite, an ambush, a hold or an Overrun battle won offers relics.
-  if (won && (mission.kind === 'key' || mission.kind === 'ambush' || (mission.kind === 'battle' && (mission.goal === 'hold' || mission.risk === 'dangerous')))) {
+  // A satellite, an ambush, a hold, a VIP rescue or an Overrun battle won offers relics.
+  if (won && (mission.kind === 'key' || mission.kind === 'ambush' || (mission.kind === 'battle' && (mission.goal === 'hold' || mission.goal === 'vip' || mission.risk === 'dangerous')))) {
     const pool = offerable(run.relics)
     // The first offer builds on a keyword the squad already has, when one can.
     const held = squadKeywords(run)

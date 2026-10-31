@@ -27,7 +27,8 @@ function status(run: Run): string {
   const title = mission.kind === 'battle' || mission.kind === 'ambush' || mission.kind === 'recovery' ? `${GOALS[mission.goal].name}: ${GOALS[mission.goal].text}` : STOP_NAMES[mission.kind]
   if (battle.phase === 'deploy') return title
   const rounds = battle.extract ? ` · ${battle.escaped.length} lifted off` : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
-  return `${title}${rounds}${battle.concealed ? ' · unseen' : ''}`
+  const vip = battle.vip ? ` · the VIP ${{ held: 'held', breached: 'held', freed: 'with the squad', out: 'lifted off' }[battle.vip]}` : ''
+  return `${title}${vip}${rounds}${battle.concealed ? ' · unseen' : ''}`
 }
 
 /** Before the landing: a button per zone that flies the camera there, one back to the whole map, and the chosen zone's plan. */

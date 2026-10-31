@@ -1,9 +1,9 @@
 import { PATHS } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { goalOf, stepBattle, UPLINK_REACH, type GameEvent } from './combat'
+import { goalOf, stepBattle, UPLINK_REACH, vipOf, type GameEvent } from './combat'
 import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, RESCUE_QUORUM, type Goal } from './goals'
-import { distance, edgeDepths, freeTilesNear, GRID, INNER, isSoldier, revealed } from './battle'
+import { distance, edgeDepths, freeTilesNear, GRID, INNER, isSoldier } from './battle'
 import { road, deploy, begun } from './roads'
 import { endBattle, LOSS_THREAT, RISKS, START_SUPPLIES, STOP_THREAT, THREAT_MAX, XP, type Run } from './run'
 
@@ -134,42 +134,31 @@ test('a rescue is won, and pays, only with more than RESCUE_QUORUM civilians sav
   }
 })
 
-/** A rescue whose squad has landed rooted and harmless, so only the aliens act on the civilians; `sighted`, every pod is in sight and alert. */
-function terror(seed: number, sighted = true): Run {
+/** A rescue whose squad has landed rooted and harmless, so only the aliens act on the civilians. */
+function terror(seed: number): Run {
   const run = before('rescue')
   run.battle!.rng = seed
   deploy(run, 0)
   for (const s of run.battle!.units.filter(isSoldier)) Object.assign(s, { rooted: 999, stats: { ...s.stats, aim: -10 } })
-  if (sighted) for (const pod of run.battle!.pods) Object.assign(pod, { revealed: true, alert: true })
   return run
 }
 
-test('on a rescue aliens leave civilians be until the squad sights them', () => {
-  const run = terror(1, false)
+test('a rescue lands among the civilians, in contact: every pod is in sight and fighting, and the squad is never concealed', () => {
+  const run = before('rescue')
   const battle = run.battle!
-  expect(battle.pods.some((p) => p.revealed)).toBe(false)
-  expect(battle.units.filter((u) => u.civilian).every((u) => revealed(battle, u))).toBe(true)
-  const civilians = new Set(battle.units.filter((u) => u.civilian).map((u) => u.id))
-  while (battle.phase === 'battle' && battle.round < 10) {
-    const sighted = new Set(battle.units.filter((u) => u.side === 'alien' && revealed(battle, u)).map((u) => u.id))
-    for (const e of stepBattle(battle)) if (e.type === 'shot' && civilians.has(e.target)) expect(sighted.has(e.id)).toBe(true)
-  }
+  const civilians = battle.units.filter((u) => u.civilian)
+  for (const zone of battle.zones) expect(Math.min(...civilians.map((c) => distance(c, zone)))).toBeLessThanOrEqual(14)
+  deploy(run, 0)
+  expect(battle.pods.every((p) => p.revealed && p.alert)).toBe(true)
+  expect(battle.concealed).toBe(false)
 })
 
-test('on a rescue sighted aliens with no soldier to fight kill civilians', () => {
+test('on a rescue aliens with no soldier to fight kill civilians', () => {
   const run = terror(1)
   const battle = run.battle!
   const civilians = new Set(battle.units.filter((u) => u.civilian).map((u) => u.id))
   let killed = 0
-  while (battle.phase === 'battle' && battle.round < 10) {
-    const soldiers = battle.units.filter(isSoldier)
-    for (const e of stepBattle(battle)) {
-      if (e.type === 'death' && civilians.has(e.id)) killed++
-      // An alien that sees a soldier fights it rather than a civilian.
-      const alien = e.type === 'shot' && civilians.has(e.target) ? battle.units.find((u) => u.id === e.id) : undefined
-      if (alien) expect(soldiers.some((s) => distance(s, alien) <= alien.stats.range)).toBe(false)
-    }
-  }
+  while (battle.phase === 'battle' && battle.round < 10) for (const e of stepBattle(battle)) if (e.type === 'death' && civilians.has(e.id)) killed++
   expect(killed).toBeGreaterThan(0)
 })
 
@@ -192,7 +181,7 @@ test('a rescue mixes civilians who hide, taking cover and staying put, with civi
   expect(ran).toBe(true)
 })
 
-test('on a rescue a soldier makes for an alien hunting a civilian when it is nearer than any civilian', () => {
+test('on a rescue a soldier makes for the alien nearest a civilian, and with none near one, for the nearest civilian', () => {
   const run = before('rescue')
   deploy(run, 0)
   const battle = run.battle!
@@ -201,7 +190,7 @@ test('on a rescue a soldier makes for an alien hunting a civilian when it is nea
   const civilian = battle.units.find((u) => u.civilian)!
   battle.units = battle.units.filter((u) => u === soldier || u === alien || u === civilian)
   Object.assign(battle.pods[alien.pod!], { revealed: true, alert: true })
-  const tiles = freeTilesNear(battle, soldier, 600)
+  const tiles = freeTilesNear(battle, soldier, 3000)
   Object.assign(alien, tiles.find((t) => distance(t, soldier) === 10))
   Object.assign(civilian, tiles.find((t) => distance(t, alien) === 6 && distance(t, soldier) === 14))
   expect(goalOf(battle, soldier, [alien])).toBe(alien)
@@ -270,4 +259,58 @@ test('no one shot kills a commander from full health; brought low, it blinks awa
   expect(commander.hp).toBe(1)
   expect(events).toContainEqual({ type: 'effect', id: commander.id, effect: 'lastStand', amount: 0 })
   expect(events).toContainEqual(expect.objectContaining({ type: 'move', id: commander.id, with: 'blink' }))
+})
+
+test('a VIP rescue: the VIP waits within under guard, the squad landing as on an exterminate; the aliens leave a held VIP be', () => {
+  const run = before('vip')
+  const battle = run.battle!
+  const vip = vipOf(battle)!
+  expect(battle.vip).toBe('held')
+  expect(edgeDepths(battle)[vip.y * GRID + vip.x]).toBeGreaterThan(INNER)
+  expect(battle.pods[0].guard).toBe(true)
+  expect(Math.min(...battle.units.filter((u) => u.pod === 0).map((u) => distance(u, vip)))).toBeLessThanOrEqual(2)
+  expect(battle.plans).toEqual(['march', 'march', 'march'])
+  deploy(run, 0)
+  for (const pod of battle.pods) Object.assign(pod, { revealed: true, alert: true })
+  while (battle.round < 4 && battle.phase === 'battle') for (const e of stepBattle(battle)) expect(e.type === 'shot' && e.target === vip.id).toBe(false)
+  expect(battle.units).toContain(vip)
+})
+
+test('a soldier near the VIP breaches, catching the guards; beside them it frees them, and every pod comes as the extraction zone appears', () => {
+  const run = before('vip')
+  const battle = run.battle!
+  deploy(run, 0)
+  const vip = vipOf(battle)!
+  const soldier = battle.units.find(isSoldier)!
+  Object.assign(soldier, freeTilesNear(battle, vip, 30).find((t) => distance(t, vip) === 3), { rooted: 999 })
+  const events: GameEvent[] = []
+  while (battle.vip === 'held') events.push(...stepBattle(battle))
+  expect(events).toContainEqual(expect.objectContaining({ type: 'rocket', id: soldier.id, hits: [] }))
+  expect(battle.pods[0]).toMatchObject({ revealed: true, alert: true })
+  Object.assign(soldier, freeTilesNear(battle, vip, 9).find((t) => distance(t, vip) === 1))
+  while (battle.vip === 'breached') stepBattle(battle)
+  expect(battle.vip).toBe('freed')
+  expect(edgeDepths(battle)[battle.extract!.y * GRID + battle.extract!.x]).toBeLessThanOrEqual(INNER)
+  expect(battle.pods.every((p) => p.alert && !p.guard)).toBe(true)
+})
+
+test('a VIP rescue is lost with the VIP, and won once the VIP and the squad lift off, for a relic', () => {
+  const lost = before('vip')
+  deploy(lost, 0)
+  lost.battle!.units = lost.battle!.units.filter((u) => u.civilian !== 'vip')
+  stepBattle(lost.battle!)
+  expect(lost.battle!.winner).toBe('alien')
+
+  const run = before('vip')
+  const battle = run.battle!
+  deploy(run, 0)
+  battle.units = battle.units.filter((u) => u.side !== 'alien')
+  // With no alien left the squad still has to get the VIP out.
+  stepBattle(battle)
+  expect(battle.phase).toBe('battle')
+  while (battle.phase === 'battle' && battle.beat < 900) stepBattle(battle)
+  expect(battle.vip).toBe('out')
+  expect(battle.winner).toBe('human')
+  endBattle(run)
+  expect(run.relicOffers).toHaveLength(3)
 })

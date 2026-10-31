@@ -70,6 +70,7 @@ const DECAL_LIFT = 0.02
 const COLOR = {
   hider: 0xe0a24a,
   runner: 0xe8e2c8,
+  vip: 0x6ec8ff,
   mech: 0x9aa9bf,
   human: 0x4da3ff,
   alien: 0x7ddc5a,
@@ -731,6 +732,13 @@ export async function createView(): Promise<View> {
         else if (unit.civilian === 'runner') g.roundRect(-6, -34, 12, 34, 6)
         else g.roundRect(-9, -30, 18, 30, 6)
         g.fill()
+        // A VIP wears a gold star.
+        if (unit.civilian === 'vip') {
+          g.fillStyle = css(COLOR.uplink)
+          g.beginPath()
+          for (let i = 0; i < 10; i++) g.lineTo((i % 2 ? 3 : 7) * Math.sin((i * Math.PI) / 5), -17 - (i % 2 ? 3 : 7) * Math.cos((i * Math.PI) / 5))
+          g.fill()
+        }
         g.fillStyle = css(COLOR.human)
         for (let i = 0; i < pips; i++) {
           g.beginPath()
@@ -986,6 +994,8 @@ export async function createView(): Promise<View> {
     if (battle.uplink) marks.push(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
     if (battle.extract) marks.push(label('🚁 EXTRACT', battle.extract, COLOR.uplink, 28))
     for (const cache of battle.caches) marks.push(label('📦', cache, COLOR.uplink, 24))
+    const vip = battle.vip === 'held' && battle.units.find((u) => u.civilian === 'vip')
+    if (vip) marks.push(label('⭐ VIP', vip, COLOR.vip, 28))
     // Soldiers down where they fell; a recovery's captives are held.
     for (const body of battle.downed.filter((d) => d.carrier === null)) marks.push(label(battle.captives.some((c) => c.soldier === body.soldier) ? '⛓ HELD' : '✚ DOWNED', body, COLOR.contact, 22))
     if (battle.phase === 'deploy') {
