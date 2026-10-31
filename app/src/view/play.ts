@@ -11,7 +11,7 @@ import { along, lerp, spot } from './camera'
 import { callout, chest, drawing, effectCallout, fireRocket, float, playShot } from './effects'
 import { drawAcid, drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
-import { cloakLook, create, fade, letter, place, remove, vitals } from './sprites'
+import { cloakLook, create, fade, letter, place, remove, squash, vitals } from './sprites'
 import { CAMERA_MS, type Sprite, type Stage } from './stage'
 
 /** What a soldier's order says over it. */
@@ -20,9 +20,23 @@ const ORDERS: Record<Order, string> = { hunker: 'ðŸ›¡ HUNKER DOWN', prepare: 'ðŸ
 /** Where the squad stands: the camera keeps to it, and never leaves it for action elsewhere. */
 export const squad = (battle: Battle): Tile[] => battle.units.filter((u) => u.side === 'human' && !u.civilian)
 
-function walk(s: Stage, sprite: Sprite, path: Tile[], ms: number): Promise<void> {
+/** How far along a walk a unit is at time `t`: it gathers speed, carries it, and slows to a stop. */
+const momentum = (t: number) => t * t * t * (t * (6 * t - 15) + 10)
+
+/** How much a unit stretches into its stride at full speed, and squashes as its weight lands, and for how long, in ms. */
+const LEAN = 0.07
+const SETTLE = 0.1
+const SETTLE_MS = 160
+
+async function walk(s: Stage, sprite: Sprite, path: Tile[], ms: number): Promise<void> {
   const points = [sprite.tile, ...path]
-  return s.tween(ms, (t) => place(s, sprite, along(points, t)))
+  await s.tween(ms, (t) => {
+    place(s, sprite, along(points, momentum(t)))
+    const lean = LEAN * Math.sin(Math.PI * t)
+    squash(sprite, 1 - lean, 1 + lean)
+  })
+  // The weight lands after the walk, while whatever comes next begins.
+  void s.tween(SETTLE_MS, (t) => squash(sprite, 1 + SETTLE * (1 - t), 1 - SETTLE * (1 - t)))
 }
 
 /** Slides an unfound alien's glow along its path through the fog. */
@@ -30,7 +44,7 @@ function glide(s: Stage, glow: { node: Object3D; tile: Tile }, path: Tile[], ms:
   const points = [glow.tile, ...path]
   glow.tile = path.at(-1)!
   return s.tween(ms, (t) => {
-    const at = along(points, t)
+    const at = along(points, momentum(t))
     const p = spot(at.x, at.y)
     glow.node.position.set(p.x, p.y, p.z)
   })

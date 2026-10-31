@@ -3,11 +3,11 @@ import type { GameEvent } from './combat-event'
 
 /** How long the view takes to play each kind of event, in ms. The view animates by these; the sim times battles by them. */
 export const PACE = {
-  /** An alien walking one tile; a soldier dashing one, quick and decisive. */
+  /** An alien walking one tile; a soldier running one, with weight. */
   tile: 110,
-  dash: 55,
-  /** The longest a side's moves take: everyone walks together and arrives together, a long way briskly. */
-  march: 700,
+  dash: 130,
+  /** The longest a side's moves take: everyone walks together and arrives together. */
+  march: 1300,
   /** Units appearing, and dying or leaving. */
   reveal: 450,
   death: 260,
