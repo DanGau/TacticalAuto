@@ -1,5 +1,5 @@
 // Actions in place of a shot: alien powers, and soldier skills and gear.
-import { type Battle, type Effect, type Unit, BLAST_RADIUS, isSoldier, FORCE_FIELD_REACH, FORCE_FIELD_ARMOR, SLAM_HIT, SLAM_TILES, STUN_REACH, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN, SURGEON_HEAL, MEDIC_REACH, MEDIC_HEAL, SECOND_WIND_HEAL, revealed, DRONE_REACH, DRONE_DAMAGE, SKIRMISH_MOVE, MEDKIT_HEAL, TITAN_HEALTH, PLATING_ARMOR, MECH_STATS, DRONE_STATS, type Stats, type SkillEffect, alert } from './battle'
+import { type Battle, type Effect, type Unit, BLAST_RADIUS, CLOAK_TURNS, isSoldier, FORCE_FIELD_REACH, FORCE_FIELD_ARMOR, SLAM_HIT, SLAM_TILES, STUN_REACH, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN, SURGEON_HEAL, MEDIC_REACH, MEDIC_HEAL, SECOND_WIND_HEAL, revealed, DRONE_REACH, DRONE_DAMAGE, SKIRMISH_MOVE, MEDKIT_HEAL, TITAN_HEALTH, PLATING_ARMOR, MECH_STATS, DRONE_STATS, type Stats, type SkillEffect, alert } from './battle'
 import { mechUnit } from './spawn'
 import { freeTilesNear } from './grid'
 import { onGrid } from './grid'
@@ -86,7 +86,7 @@ export function polymorph(battle: Battle, unit: Unit, seen: Set<number>): GameEv
 /** Spit: the nearest soldier the spitter can shoot is hit without a roll, and acid is left on its tile. */
 export function spit(battle: Battle, unit: Unit): GameEvent[] {
   const target = nearest(
-    battle.units.filter((u) => u.side !== unit.side && canShoot(battle, unit, u, unit.stats.range)),
+    battle.units.filter((u) => u.side !== unit.side && !u.cloaked && canShoot(battle, unit, u, unit.stats.range)),
     unit,
   )
   if (!target) return []
@@ -99,7 +99,7 @@ export function spit(battle: Battle, unit: Unit): GameEvent[] {
 /** Panic: when ready, the psion panics the soldier in reach and sight with the best aim not already panicked. */
 export function panic(battle: Battle, unit: Unit): GameEvent[] {
   if (unit.cooldown > 0) return []
-  const targets = battle.units.filter((u) => u.side !== unit.side && !u.panicked && !immune(battle, u, 'panic') && distance(unit, u) <= PSI_RANGE && lineOfSight(battle, unit, u))
+  const targets = battle.units.filter((u) => u.side !== unit.side && !u.cloaked && !u.panicked && !immune(battle, u, 'panic') && distance(unit, u) <= PSI_RANGE && lineOfSight(battle, unit, u))
   const target = targets.reduce<Unit | undefined>((best, u) => (!best || u.stats.aim > best.stats.aim ? u : best), undefined)
   if (!target) return []
   target.panicked = true
@@ -233,3 +233,23 @@ export function strew(battle: Battle, unit: Unit, effect: 'caltrops' | 'firewall
 export const CALTROP_RANGE = 6
 
 export const CALTROP_LATE = 2
+
+/** Cloaks a unit for CLOAK_TURNS. */
+export function cloakOn(unit: Unit): GameEvent {
+  unit.cloaked = CLOAK_TURNS
+  return { type: 'cloak', id: unit.id, on: true }
+}
+
+/**
+ * Cloak: in place of its attacks, a phantom with a cloak left and none on cloaks once aliens can shoot it and it is
+ * wounded, two can, or it has no shot of its own.
+ */
+export function cloak(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
+  if (unit.ability !== 'cloak' || unit.charges <= 0 || unit.cloaked) return []
+  const aliens = foes(battle, unit)
+  const threats = aliens.filter((u) => shootable(battle, u, u, unit, seen)).length
+  const shot = aliens.some((u) => shootable(battle, unit, unit, u, seen))
+  if (threats === 0 || (shot && threats < 2 && unit.hp > unit.stats.hp / 2)) return []
+  unit.charges--
+  return [cloakOn(unit)]
+}

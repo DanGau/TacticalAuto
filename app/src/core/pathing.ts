@@ -255,8 +255,9 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
       .map((enemy) => preyed(enemy, odds(battle, end, enemy, unit.stats, has(unit, 'piercing')).hit) * (flanker && coverAgainst(battle, enemy, end) === 0 ? 1.5 : 1))
     return Math.round(100 * Math.max(0, ...chances))
   }
-  const theirs = (end: Tile) => exposure(battle, enemies, end)
-  const threat = unit.side === 'human' ? threats(battle, enemies) : () => 0
+  // A cloaked unit fears no shot.
+  const theirs = (end: Tile) => (unit.cloaked ? 0 : exposure(battle, enemies, end))
+  const threat = unit.side === 'human' && !unit.cloaked ? threats(battle, enemies) : () => 0
   const squadmates = battle.units.filter((u) => u.side === unit.side && u !== unit && !u.civilian)
   const hurt = 1 - unit.hp / unit.stats.hp
   const wary = unit.side === 'human' && battle.round < RESTLESS_ROUND && hurt >= WARY && squadmates.some((u) => u.hp / u.stats.hp > 1 - WARY)

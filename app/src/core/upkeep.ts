@@ -26,6 +26,7 @@ export function upkeep(battle: Battle): GameEvent[] {
     if (unit.chilled > 0) unit.chilled--
     if (unit.rooted > 0) unit.rooted--
     if (unit.booming > 0) unit.booming--
+    if (unit.cloaked && --unit.cloaked === 0) events.push({ type: 'cloak', id: unit.id, on: false })
     if (has(unit, 'vitality')) {
       for (const mate of battle.units.filter((u) => u.side === unit.side && u !== unit && u.hp < u.stats.hp && distance(u, unit) <= AURA_REACH)) {
         mate.hp++

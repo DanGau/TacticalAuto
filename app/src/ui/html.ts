@@ -39,7 +39,7 @@ export const STOP_NAMES: Record<StopKind | Mission['kind'], string> = {
 export const healthBar = (hp: number, max: number, armor = 0) =>
   `<div class="health" title="Health ${hp} of ${max}${armor > 0 ? `, and ${armor} armor, which takes damage first and is whole again each fight` : ''}">♥ ${hp}/${max}${armor > 0 ? ` <span class="armor">⛨ ${armor}</span>` : ''}<div class="bar"><div style="width: ${(100 * hp) / (max + armor)}%"></div><div class="armor" style="left: ${(100 * max) / (max + armor)}%; width: ${(100 * armor) / (max + armor)}%"></div></div></div>`
 
-const BADGES: Record<ClassId, string> = { assault: '🔫', heavy: '🚀', sniper: '🎯', support: '⛑️', engineer: '🔧', pyro: '🔥', cryo: '❄️' }
+const BADGES: Record<ClassId, string> = { assault: '🔫', heavy: '🚀', sniper: '🎯', support: '⛑️', engineer: '🔧', pyro: '🔥', cryo: '❄️', phantom: '👻' }
 
 /** A class's badge; a soldier not yet promoted wears a helmet. */
 export const badge = (cls?: ClassId | null) => (cls ? BADGES[cls] : '🪖')

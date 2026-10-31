@@ -51,6 +51,22 @@ export function fade(sprite: Sprite, alpha: number): void {
   ;(sprite.shadow.material as MeshBasicMaterial).opacity = 0.4 * alpha
 }
 
+/** The faintest and fullest a cloaked unit shows as it shimmers. */
+const CLOAK_ALPHA = [0.25, 0.55]
+
+/** Cloaks a sprite or uncloaks it: cloaked, it shows tinted and faint, and shimmers each frame. */
+export function cloakLook(sprite: Sprite, on: boolean): void {
+  sprite.cloaked = on
+  ;(sprite.body.material as SpriteMaterial).color.set(on ? COLOR.cloak : 0xffffff)
+  if (!on) fade(sprite, 1)
+}
+
+/** A cloaked sprite's opacity at `now` ms, flickering between faint and fuller. */
+export function shimmer(sprite: Sprite, now: number): void {
+  const [low, high] = CLOAK_ALPHA
+  fade(sprite, low + (high - low) * (0.5 + 0.5 * Math.sin(now / 140 + sprite.tile.x)) * (0.75 + 0.25 * Math.sin(now / 37)))
+}
+
 /** A unit's health and armor in the battle; none of either once it is gone. */
 export const vitals = (battle: Battle, id: number): [number, number] => {
   const unit = battle.units.find((u) => u.id === id)
@@ -86,6 +102,7 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
     at: { x: 0, y: 0 },
     scale: unit.boss ? 1.6 : unit.target ? 1.3 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1,
     ally,
+    cloaked: false,
     drawHp(hp, armor) {
       g.setTransform(BODY_RES, 0, 0, BODY_RES, BODY.left * BODY_RES, BODY.up * BODY_RES)
       g.clearRect(-BODY.left, -BODY.up, 2 * BODY.left, BODY.up + BODY.down)
@@ -153,6 +170,7 @@ export function sync(s: Stage, run: Run, battle: Battle): void {
     const soldier = run.soldiers.find((member) => member.id === unit.soldier)
     const sprite = s.sprites.get(unit.id) ?? create(s, unit, soldier ? level(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : letter(unit))
     place(s, sprite, { x: unit.x, y: unit.y })
+    cloakLook(sprite, !!unit.cloaked)
     fade(sprite, 1)
     sprite.drawHp(unit.hp, unit.armor)
   }

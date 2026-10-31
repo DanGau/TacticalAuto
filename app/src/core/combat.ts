@@ -24,10 +24,10 @@ import type { GameEvent } from './combat-event'
 import { centreOf, fireproof, has, nearest, spotted, vipOf } from './fighters'
 import { wound } from './wound'
 import { attacksOf, blast, leap, napalm, shoot } from './attack'
-import { alienAction, deploy, drone, feed, flashbang, forceField, heal, medkit, polymorph, pulse, secondWind, skirmish, slam, strew } from './abilities'
+import { alienAction, cloak, deploy, drone, feed, flashbang, forceField, heal, medkit, polymorph, pulse, secondWind, skirmish, slam, strew } from './abilities'
 import { armed, moveSide, stride } from './sides'
 /**
- * The next attack of the side on turn: a soldier makes SOLDIER_ATTACKS a turn, an alien one. A panicked soldier loses its turn.
+ * The next attack of the side on turn: a soldier makes SOLDIER_ATTACKS a turn, an alien one. A panicked soldier loses its turn; a phantom may cloak in place of its attacks.
  * An alien does what its kind does in place of a shot, if anything. Otherwise, first come what does not cost the
  * shot: a medkit, a medic's heal, a grenade. Then a rocket, when its moment has come, or else a shot.
  * Empty when no unit is left.
@@ -53,6 +53,12 @@ function actNext(battle: Battle): GameEvent[] {
       battle.shooter = unit.id
       battle.attacks = attacksOf(unit)
       return [{ type: 'frozen', id: unit.id }]
+    }
+    const cloaked = cloak(battle, unit, seen)
+    if (cloaked.length > 0) {
+      battle.shooter = unit.id
+      battle.attacks = attacksOf(unit)
+      return cloaked
     }
     const special = alienAction(battle, unit)
     if (special) {

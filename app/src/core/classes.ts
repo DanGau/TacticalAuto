@@ -1,5 +1,5 @@
 // Soldier classes: stats, positioning, and the ability each uses unprompted.
-import { MECH_STATS, type Ability, type Stance, type Stats } from './battle'
+import { CLOAK_AIM, CLOAK_DAMAGE, CLOAK_TURNS, MECH_STATS, type Ability, type Stance, type Stats } from './battle'
 
 /** What a soldier becomes at first promotion: stat changes, a way of positioning, and one ability used unprompted. */
 export interface SoldierClass {
@@ -85,6 +85,16 @@ const classes = {
     abilityName: 'Cryo Rounds',
     abilityText: 'Its hits chill the target',
     charges: 0,
+  },
+  phantom: {
+    name: 'Phantom',
+    stats: { move: 1, damage: 1, hp: -1 },
+    stance: 'rush',
+    stanceText: 'Closes in, unseen, for the strike',
+    ability: 'cloak',
+    abilityName: 'Cloak',
+    abilityText: `Twice per battle, in place of its attacks when aliens can shoot it, it cloaks: no alien sees or targets it for ${CLOAK_TURNS} turns. Its next attack, out of cloak, has +${CLOAK_AIM * 100}% aim and +${CLOAK_DAMAGE} damage, and reveals it`,
+    charges: 2,
   },
 } satisfies Record<string, SoldierClass>
 

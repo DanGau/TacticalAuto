@@ -32,6 +32,8 @@ export type GameEvent =
   | { type: 'panic'; id: number; target: number }
   /** A soldier with no shot takes a standard action in place of attacking. */
   | { type: 'order'; id: number; order: Order }
+  /** A unit cloaks, or its cloak breaks. */
+  | { type: 'cloak'; id: number; on: boolean }
   /** A panicked soldier loses its action. */
   | { type: 'frozen'; id: number }
   /** A unit is hurt by acid underfoot, or by the death of the psion of its pod. */

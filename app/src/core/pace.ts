@@ -26,7 +26,7 @@ export const PACE = {
 export const overlaps = (events: GameEvent[]) => events.some((e) => e.type === 'shot' || e.type === 'rocket' || e.type === 'spit' || e.type === 'panic')
 
 /** Events the view shows at once, as a word over a unit or a change of marks, without waiting on them. */
-const INSTANT = new Set<GameEvent['type']>(['order', 'feed', 'effect', 'carried', 'grabbed', 'extract', 'frozen', 'hurt', 'heal'])
+const INSTANT = new Set<GameEvent['type']>(['order', 'feed', 'effect', 'carried', 'grabbed', 'extract', 'frozen', 'hurt', 'heal', 'cloak'])
 export const instant = (e: GameEvent) => INSTANT.has(e.type)
 
 /** A unit's ms per tile. */

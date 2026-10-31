@@ -8,6 +8,7 @@ import { RISE_MS, type fence } from './fences'
 import { COLOR, NIGHT } from './palette'
 import { css, Sketch, type Point3 } from './shapes'
 import { ACROSS } from './space'
+import { shimmer } from './sprites'
 
 export interface Sprite {
   /** The unit's feet, with its shadow; its picture stands on them, facing the camera. */
@@ -24,6 +25,8 @@ export interface Sprite {
   scale: number
   /** Whether it fights for the squad, so its health shows in the ally colour. */
   ally: boolean
+  /** Whether it is cloaked, so it shimmers, faint, for the player alone. */
+  cloaked: boolean
 }
 
 /** Words over the map: a landing zone's name, or a callout over a unit. */
@@ -137,6 +140,7 @@ export class Stage {
       const ms = now - last
       last = now
       for (const tick of [...this.ticks]) tick(ms)
+      for (const sprite of this.sprites.values()) if (sprite.cloaked) shimmer(sprite, now)
       for (const f of this.standing.values()) {
         f.time.value = now / 1000
         f.rise.value = Math.min(1, f.rise.value + ms / RISE_MS)

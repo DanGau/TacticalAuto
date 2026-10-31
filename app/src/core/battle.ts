@@ -100,6 +100,11 @@ export const FORCE_FIELD_ARMOR = 4
 export const FORCE_FIELD_REACH = 4
 export const TITAN_HEALTH = 3
 export const PLATING_ARMOR = 3
+/** Own turns a cloak lasts unbroken, and the aim and damage an attack out of cloak adds, and Shadow Strike on top. */
+export const CLOAK_TURNS = 2
+export const CLOAK_AIM = 0.3
+export const CLOAK_DAMAGE = 3
+export const SHADOW_DAMAGE = 2
 /** The letters landing zones go by, in battle.zones order. */
 export const ZONE_NAMES = 'ABC'
 /** Landing zones offered to the squad. */
@@ -137,7 +142,7 @@ export const MECH_STATS: Stats = { ...BASE_STATS, hp: 3, aim: 0.65, crit: 0.1, r
 export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, aim: 0.65, crit: 0.1, range: 4, move: 6 }
 
 /** Something a unit does unprompted beyond moving and shooting; each is described where combat applies it. */
-export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' | 'napalm' | 'cryo'
+export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' | 'napalm' | 'cryo' | 'cloak'
 
 /** Something a piece of gear does; gear.ts says what each does. */
 export type GearEffect = 'frostbite' | 'tracer' | 'rime' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'thorns' | 'shield' | 'regen' | 'lastStand' | 'medkit' | 'grenade' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'mirror' | 'bond' | 'guardians' | 'blink' | 'polymorph' | 'null' | 'snare' | 'booming' | 'tether' | 'caltrops'
@@ -207,6 +212,10 @@ export type SkillEffect =
   | 'flashbang'
   | 'forceField'
   | 'firewall'
+  | 'shadowStrike'
+  | 'vanish'
+  | 'daze'
+  | 'afterimage'
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'podBlast' | 'podShred' | 'podFrost' | 'podWall' | 'podTurret' | 'dropPods' | 'canopies' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
@@ -299,6 +308,8 @@ export interface Unit {
   cooldown: number
   /** What a soldier with no shot does this turn in place of attacking, until its next turn; null otherwise. */
   order: Order | null
+  /** Own turns its cloak has left: no enemy sees or targets it. Unset or 0 when not cloaked. */
+  cloaked?: number
 }
 
 /**

@@ -1,5 +1,6 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
-import { type Battle, type Unit, SUPPRESS_AIM, SPOTTER_AIM, SLAYER_DAMAGE, SEARING_DAMAGE, RECKLESS_AIM, RAGE_DAMAGE, isSoldier, INSPIRE_AIM, HURL_TILES, HURL_DAMAGE, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_CHANCE, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_AIM, BURN_TURNS, BULWARK_DEFENSE, BANE_REACH, BANE_AIM, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE } from './battle'
+import { type Battle, type Unit, SUPPRESS_AIM, SPOTTER_AIM, SLAYER_DAMAGE, SEARING_DAMAGE, RECKLESS_AIM, RAGE_DAMAGE, isSoldier, INSPIRE_AIM, HURL_TILES, HURL_DAMAGE, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_CHANCE, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_AIM, BURN_TURNS, BULWARK_DEFENSE, BANE_REACH, BANE_AIM, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_AIM, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
+import { cloakOn } from './abilities'
 import { freeTilesNear } from './grid'
 import { blocked } from './grid'
 import { walkingDistances } from './grid'
@@ -81,8 +82,15 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (taunting.length > 0 && taunting.length < inReach.length) events.push({ type: 'effect', id: enemy.id, effect: 'taunt', amount: 0 })
   const chance = chanceAt(enemy)
   const baned = battle.units.some((u) => u.side !== unit.side && has(u, 'bane') && distance(u, unit) <= BANE_REACH)
+  // An attack out of cloak strikes surer and harder, and breaks the cloak.
+  const unseen = !!unit.cloaked
+  if (unseen) {
+    unit.cloaked = 0
+    events.push({ type: 'cloak', id: unit.id, on: false })
+  }
   const toHit =
     chance.hit +
+    (unseen ? CLOAK_AIM : 0) +
     (inAura(battle, unit, 'inspire') ? INSPIRE_AIM : 0) +
     when(true, 'reckless', RECKLESS_AIM) +
     (has(enemy, 'reckless') ? RECKLESS_AIM : 0) +
@@ -125,6 +133,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   let damage =
     base +
     (unit.kind === 'feeder' ? unit.fury : 0) +
+    (unseen ? CLOAK_DAMAGE + when(true, 'shadowStrike', SHADOW_DAMAGE) : 0) +
     (crit ? CRIT_BONUS + when(true, 'headshot', HEADSHOT_DAMAGE) : 0) +
     when(enemy.hp <= enemy.stats.hp / 2, 'executioner', EXECUTE_BONUS) +
     when(coverAgainst(battle, enemy, unit) === 0, 'backstab', BACKSTAB_DAMAGE) +
@@ -219,7 +228,13 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     enemy.booming = CHILL_TURNS
     events.push({ type: 'effect', id: enemy.id, effect: 'booming', amount: 0 })
   }
+  if (enemy.hp > 0 && unseen && !enemy.boss && when(true, 'daze', 1)) {
+    enemy.panicked = true
+    events.push({ type: 'effect', id: enemy.id, effect: 'daze', amount: 0 })
+  }
+  if (enemy.hp <= 0 && unseen && when(true, 'afterimage', 1)) events.push(cloakOn(unit))
   if (enemy.hp > 0 && enemy.hp <= enemy.stats.hp / 2 && spend(enemy, 'blink')) blink(battle, enemy, events)
+  if (enemy.hp > 0 && enemy.hp <= enemy.stats.hp / 2 && !enemy.cloaked && spend(enemy, 'vanish')) events.push(cloakOn(enemy))
   if (enemy.hp <= 0 && when(true, 'momentum', 1)) unit.armor++
   if (enemy.hp <= 0 && when(true, 'bloodRite', 1)) unit.fury++
   if (enemy.hp > 0 && when(true, 'suppress', 1)) enemy.suppressed = 2

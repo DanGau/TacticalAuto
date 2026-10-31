@@ -32,6 +32,8 @@ export const COLOR = {
   rooted: 0x8fd14f,
   booming: 0xff9a3d,
   psi: 0xff6bd6,
+  /** A cloaked unit's tint. */
+  cloak: 0x8fe8ff,
   contact: 0xff6b5e,
   /** Health left and lost, on an ally and on an enemy. */
   allyHp: 0x4fe08a,

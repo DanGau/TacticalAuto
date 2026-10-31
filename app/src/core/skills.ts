@@ -9,6 +9,7 @@ import {
   LINGER_TURNS,
   PLATING_ARMOR,
   SEARING_DAMAGE,
+  SHADOW_DAMAGE,
   SLAM_HIT,
   SLAM_TILES,
   STUN_REACH,
@@ -149,6 +150,18 @@ const skills = {
   frostAura: { name: 'Frost Aura', role: 'guard', tags: ['frost'], text: 'Whoever hits it is chilled', effect: 'rime', after: ['iceArmor'] },
   glide: { name: 'Ice Glide', role: 'guard', text: 'After it acts, it slides up to 2 tiles to where the aliens have the worst shot at it', effect: 'skirmish', after: ['iceArmor'] },
   cryostasis: { name: 'Cryostasis', role: 'guard', text: 'Once per battle, survives a killing hit at 1 health', effect: 'lastStand', after: ['iceArmor'] },
+  // Phantom
+  shadowStrike: { name: 'Shadow Strike', role: 'power', text: `Its attack out of cloak does ${SHADOW_DAMAGE} more damage`, effect: 'shadowStrike' },
+  vanish: { name: 'Vanish', role: 'guard', text: 'Once per battle, when hit to half health or less, it cloaks', effect: 'vanish' },
+  daze: { name: 'Unseen Blade', role: 'control', text: 'A hit out of cloak stuns the target: it loses its next action; a boss stands firm', effect: 'daze' },
+  deepCloak: { name: 'Deep Cloak', role: 'power', text: 'One more cloak each battle', charges: 1, after: ['shadowStrike'] },
+  afterimage: { name: 'Afterimage', role: 'power', tags: ['kill'], text: 'A kill out of cloak cloaks it again', effect: 'afterimage', after: ['shadowStrike', 'deepCloak'] },
+  knifeWork: { name: 'Knife Work', role: 'power', text: '+2 damage to a target with no cover against the attack', effect: 'backstab', after: ['shadowStrike'] },
+  phaseShift: { name: 'Phase Shift', role: 'guard', text: 'One hit in four against it misses instead', effect: 'dodge', after: ['vanish'] },
+  fadeOut: { name: 'Fade Out', role: 'guard', text: 'After it acts, it moves up to 2 tiles to where the aliens have the worst shot at it', effect: 'skirmish', after: ['vanish'] },
+  shadowStep: { name: 'Shadow Step', role: 'power', text: '+2 move', stats: { move: 2 }, after: ['fadeOut', 'shadowStrike'] },
+  garrote: { name: 'Garrote', role: 'control', text: 'Its hits root the target: it cannot move on its next turn', effect: 'snare', after: ['daze'] },
+  smokeBomb: { name: 'Smoke Bomb', role: 'control', text: 'Once per battle, throws a smoke bomb at two or more aliens standing together it can attack: each is stunned and loses its next action; a boss stands firm', effect: 'flashbang', after: ['daze', 'vanish'] },
 } satisfies Record<string, Skill>
 
 export type SkillId = keyof typeof skills
@@ -162,6 +175,7 @@ export const TREES: Record<ClassId, SkillId[]> = {
   engineer: ['titan', 'swarm', 'launcher', 'hardlight', 'plating', 'rebuild', 'servos', 'detonate', 'spotter', 'linked', 'hive', 'shock', 'emp'],
   support: ['fieldKit', 'inspire', 'barrier', 'flashbang', 'surgeon', 'revive', 'vitality', 'haste', 'drone', 'forceField', 'ward', 'bane', 'gravBeam', 'nullifier'],
   pyro: ['tanks', 'tinder', 'fireSuit', 'firewall', 'inferno', 'backdraft', 'asbestos', 'searing', 'flashpoint', 'smolder', 'burningAura', 'phoenixHeart', 'blastWave', 'blinding', 'afterburner'],
+  phantom: ['shadowStrike', 'vanish', 'daze', 'deepCloak', 'afterimage', 'knifeWork', 'phaseShift', 'fadeOut', 'shadowStep', 'garrote', 'smokeBomb'],
   cryo: ['icebreak', 'permafrost', 'iceArmor', 'frostbreak', 'coldSteel', 'deepFreeze', 'avalanche', 'rimeLock', 'coldEye', 'longRange', 'frostAura', 'cryostasis', 'glide'],
 }
 

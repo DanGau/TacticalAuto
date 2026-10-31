@@ -11,7 +11,7 @@ import { along, lerp, spot } from './camera'
 import { callout, chest, drawing, effectCallout, fireRocket, float, playShot } from './effects'
 import { drawAcid, drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
-import { create, fade, letter, place, remove, vitals } from './sprites'
+import { cloakLook, create, fade, letter, place, remove, vitals } from './sprites'
 import { CAMERA_MS, type Sprite, type Stage } from './stage'
 
 /** What a soldier's order says over it. */
@@ -103,6 +103,11 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
     } else if (e.type === 'order') {
       const on = sprites.get(e.id)
       if (on) float(s, callout(s, ORDERS[e.order], COLOR.hit, on, 16))
+    } else if (e.type === 'cloak') {
+      const on = sprites.get(e.id)
+      if (!on) continue
+      cloakLook(on, e.on)
+      float(s, callout(s, e.on ? 'CLOAKED' : 'DECLOAKED', COLOR.cloak, on, 16))
     } else if (e.type === 'frozen' || e.type === 'hurt') {
       const on = sprites.get(e.id)
       if (!on) continue
