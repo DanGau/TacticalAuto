@@ -464,6 +464,8 @@ export async function createView(): Promise<View> {
   /** The squad of the run shown, for each soldier's class, and whether it fights with blades. */
   let soldiers: Run['soldiers'] = []
   let blademasters = false
+  /** The skills and weapons the squad has, which name the effects shown at work. */
+  const kit = () => ({ skills: soldiers.flatMap((s) => s.skills), weapons: soldiers.flatMap((s) => s.gear.weapon?.weapon ?? []) })
   /** A red glow under each alien the squad hasn't found, by unit id. */
   const glows = new Map<number, { node: Object3D; tile: Tile }>()
   /** Each prop, wall and window on the board, with the tiles that light it: it is lit when a soldier sees any of them. */
@@ -1288,7 +1290,7 @@ export async function createView(): Promise<View> {
     fx.clear()
     float(shotCallout(e, to))
     // What of the shooter's shaped the shot, named over the shooter.
-    if (e.with.length > 0) float(callout(e.with.map((effect) => effectName(effect).toUpperCase()).join(' · '), 0xffffff, from))
+    if (e.with.length > 0) float(callout(e.with.map((effect) => effectName(effect, kit()).toUpperCase()).join(' · '), 0xffffff, from))
     if (!hit) {
       if (gun.style !== 'strike') await burst(fx, aim, dir, COLOR.miss, 3, 0.5)
       fx.clear()
@@ -1316,7 +1318,7 @@ export async function createView(): Promise<View> {
 
   /** What a gear effect did to a unit, in a word: the effect's name, and the health it gave or took. */
   function effectCallout(e: Extract<GameEvent, { type: 'effect' }>, over: Sprite): Label {
-    const word = effectName(e.effect).toUpperCase()
+    const word = effectName(e.effect, kit()).toUpperCase()
     return callout(e.amount === 0 ? word : `${word} ${e.amount > 0 ? '+' : ''}${e.amount}`, e.amount > 0 ? COLOR.heal : e.amount < 0 ? COLOR.crit : COLOR.hit, over)
   }
 
@@ -1470,7 +1472,7 @@ export async function createView(): Promise<View> {
         const pace = (id: number) => PACE.tile * (battle.concealed && sprites.get(id)?.ally ? PACE.creep : 1)
         const ms = walkMs([...paths].map(([id, path]) => ({ path, pace: pace(id) })))
         const walks = [...paths].map(([id, path]) => (sprites.has(id) ? walk(sprites.get(id)!, path, ms) : glide(glows.get(id)!, path, ms)))
-        for (const m of group) if (m.type === 'move' && m.with && sprites.has(m.id)) float(callout(effectName(m.with).toUpperCase(), 0xffffff, sprites.get(m.id)!))
+        for (const m of group) if (m.type === 'move' && m.with && sprites.has(m.id)) float(callout(effectName(m.with, kit()).toUpperCase(), 0xffffff, sprites.get(m.id)!))
         await Promise.all([follow(squad(battle), Math.max(ms, CAMERA_MS)), ...walks])
         // The fog lifts where the squad arrived, before any pod it uncovered appears.
         drawFog(battle)
@@ -1758,7 +1760,7 @@ export async function createView(): Promise<View> {
           const b = chest(to)
           fx.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: e.crit ? COLOR.crit : e.hit ? COLOR.hit : COLOR.miss, width: 3 })
           shotCallout(e, to)
-          if (e.with.length > 0) callout(e.with.map((effect) => effectName(effect).toUpperCase()).join(' · '), 0xffffff, from)
+          if (e.with.length > 0) callout(e.with.map((effect) => effectName(effect, kit()).toUpperCase()).join(' · '), 0xffffff, from)
         }
       }
       render()

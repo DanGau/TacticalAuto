@@ -4,14 +4,14 @@ import { isSoldier } from './battle'
 import { foesInSight } from './combat'
 import { AIRSTRIKE, CONSUMABLES, HEAL } from './consumables'
 import { begun, deploy, road } from './roads'
-import { PATHS } from './skills'
+import { roots } from './skills'
 import { step } from './step'
 import type { Run } from './run'
 
 /** A run at a battle's landing, carrying `kit`. */
 function landing(kit: Run['kit']): Run {
   const run = begun(3)
-  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
+  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   apply(run, { type: 'go', index: 0 })
   road(run, [{ kind: 'battle', risk: 'standard', goal: 'exterminate', terrain: 'town', twist: null, packs: [{ name: 'Patrol', kinds: ['trooper', 'trooper', 'trooper'] }] }])
   apply(run, { type: 'advance' })

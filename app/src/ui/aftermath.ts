@@ -5,9 +5,9 @@ import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { CONSUMABLES } from '../core/consumables'
 import { health, KEYS, level, SELL, skillOffers, soldierStats, xpFor, squadKeywords, type Report, type Run, type Soldier } from '../core/run'
-import { PATHS, SKILLS } from '../core/skills'
+import { SKILLS } from '../core/skills'
 import { TRAITS } from '../core/traits'
-import { badge, button, describe, gearCard, gearText, healthBar, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
+import { badge, button, describe, ROLES, gearCard, gearText, healthBar, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
 
 /**
  * A soldier's card: class badge, name, weapon, and an experience bar filling with what the battle earned, flaring on a
@@ -39,13 +39,12 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
 /** A hero joining the squad, alone on its screen: who they are, where from, and what they bring. */
 export function joined(run: Run, name: string): string {
   const hero = run.soldiers.find((s) => s.name === name)!
-  const path = PATHS[hero.cls!].find((p) => p.core === hero.skills[0])
   const trait = hero.trait ? TRAITS[hero.trait] : null
   const named = hero.skills.map((id) => `<span class="chip" title="${SKILLS[id].text}">${SKILLS[id].name}</span>`)
   return `<div class="debrief joined">
     <span class="portrait">${badge(hero.cls)}</span>
     <h1 class="down">${hero.name} joins</h1>
-    <p>${CLASSES[hero.cls!].name}${path ? ` · ${path.name}` : ''} · level ${level(hero)} · 🌍 ${hero.home?.name ?? ''}</p>
+    <p>${CLASSES[hero.cls!].name} · level ${level(hero)} · 🌍 ${hero.home?.name ?? ''}</p>
     <p class="feats">${named.join('')}</p>
     ${trait ? `<p><b>${trait.name}</b> <span class="down">${trait.pro}</span> <span class="up">${trait.con}</span></p>` : ''}
     <button class="decide" data-met="report">Continue</button>
@@ -101,12 +100,11 @@ function findChoice(run: Run): string {
   return `<h2>Gear found. Who takes it?${more}</h2><div class="gear ${run.finds[0].rarity}">${gearCard(run.finds[0], squadKeywords(run))}</div>${takers(run, 0)}`
 }
 
-/** A skill for a soldier to learn: one of its path's next pair, each told by what it does now and nothing after. */
+/** A skill for a soldier to learn: one of each role its tree has opened, each told by what it does now and nothing after. */
 export function skillChoice(run: Run, soldier: Soldier): string {
   const held = squadKeywords(run)
-  const path = PATHS[soldier.cls!].find((p) => p.core === soldier.skills[0])!
-  const card = (id: (typeof soldier.skills)[number], index: number) => button({ type: 'skill', soldier: soldier.id, index }, `<b>${SKILLS[id].name}</b><br>${describe(SKILLS[id].text, SKILLS[id].tags, held)}`, 'card skill')
-  return `<h2><b class="supplies">${soldier.name}</b>, ${path.name} ${CLASSES[soldier.cls!].name}, reached level ${soldier.skills.length + 1}. Choose one; the other is lost.</h2>
+  const card = (id: (typeof soldier.skills)[number], index: number) => button({ type: 'skill', soldier: soldier.id, index }, `<small>${ROLES[SKILLS[id].role]}</small><br><b>${SKILLS[id].name}</b><br>${describe(SKILLS[id].text, SKILLS[id].tags, held)}`, 'card skill')
+  return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name}, reached level ${soldier.skills.length + 1}. Choose one; each choice opens more of the tree.</h2>
     <div class="choices">${skillOffers(soldier).map(card).join('')}</div>`
 }
 

@@ -44,8 +44,9 @@ import {
   health,
   TRAVEL_HEAL,
   SELL,
+  MAX_SKILLS,
 } from './run'
-import { PATHS, SKILLS } from './skills'
+import { roots, SKILLS, TREES } from './skills'
 import { atKey, road, deploy, begun } from './roads'
 import { TRAITS } from './traits'
 import { RELICS } from './relics'
@@ -54,7 +55,7 @@ import { KIT_SLOTS, SHOP_CONSUMABLES } from './consumables'
 /** A run whose first soldier has learned its first skill, so the overworld waits. */
 function started(): Run {
   const run = begun(1)
-  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
+  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   return run
 }
 
@@ -99,7 +100,7 @@ test('a run begins with one level 1 recruit on a path of its class, choosing whe
   const run = begun(1)
   expect(run.soldiers).toHaveLength(1)
   expect(level(run.soldiers[0])).toBe(1)
-  expect(PATHS[run.soldiers[0].cls!].map((p) => p.core)).toContain(run.soldiers[0].skills[0])
+  expect(roots(run.soldiers[0].cls!)).toContain(run.soldiers[0].skills[0])
   expect(run).toMatchObject({ phase: 'overworld', soldiers: [{ skills: [expect.anything()] }] })
   const leg = legOf(run)
   expect(leg.columns).toHaveLength(LEG_STOPS + 1)
@@ -372,7 +373,7 @@ test("each leg crosses a continent to a hero in one of its cities, who joins sea
   fight(run, 'human')
   expect(run.soldiers[1]).toBe(hero)
   expect(level(hero)).toBeGreaterThan(1)
-  expect(PATHS[hero.cls!].map((p) => p.core)).toContain(hero.skills[0])
+  expect(roots(hero.cls!)).toContain(hero.skills[0])
   expect(skillOffers(hero)).toEqual([])
 })
 
@@ -488,7 +489,7 @@ test('a key mission has one boss, with an escort for each key already won', () =
   }
 })
 
-const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: { weapon: null, armor: null, utility: null }, trait: null, home: null, wounds: 0, ...extra })
+const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: { weapon: null, armor: null, utility: null }, trait: null, home: null, wounds: 0, seed: 0, ...extra })
 
 test('stats add class, level, skills and relics to the base', () => {
   const run = begun(1)
@@ -511,22 +512,42 @@ test('levels never stop: each takes more experience than the last', () => {
   }
 })
 
-test('a soldier chooses one of each pair along its path; past the last, levels add stats only', () => {
+test('each level offers one guard, one control and one power skill its tree has opened, the same until chosen; past the last, levels add stats only', () => {
   const run = begun(1)
   const [soldier] = run.soldiers
-  const other = PATHS[soldier.cls!][1]
-  soldier.skills = [other.core]
   expect(skillOffers(soldier)).toEqual([])
-  // Two levels gained at once are chosen one after the other, along the path taken.
-  soldier.xp = xpFor(3)
+  soldier.xp = xpFor(MAX_SKILLS + 5)
   run.phase = 'reward'
-  expect(skillOffers(soldier)).toEqual(other.tiers[0])
-  apply(run, { type: 'skill', soldier: soldier.id, index: 0 })
-  expect(skillOffers(soldier)).toEqual(other.tiers[1])
-  apply(run, { type: 'skill', soldier: soldier.id, index: 1 })
-  expect(soldier.skills).toEqual([other.core, other.tiers[0][0], other.tiers[1][1]])
-  soldier.xp = xpFor(9)
+  const seen = new Set<string>()
+  for (let n = 1; n < MAX_SKILLS; n++) {
+    const offers = skillOffers(soldier)
+    expect(skillOffers(soldier)).toEqual(offers)
+    expect(offers.map((id) => SKILLS[id].role)).toEqual(['guard', 'control', 'power'])
+    for (const id of offers) {
+      expect(TREES[soldier.cls!]).toContain(id)
+      expect(soldier.skills).not.toContain(id)
+      expect(!SKILLS[id].after || SKILLS[id].after.some((a) => soldier.skills.includes(a as never))).toBe(true)
+      seen.add(id)
+    }
+    apply(run, { type: 'skill', soldier: soldier.id, index: n % 3 })
+  }
+  expect(soldier.skills).toHaveLength(MAX_SKILLS)
   expect(skillOffers(soldier)).toEqual([])
+  // Two soldiers of a class are offered different things.
+  const offered = (seed: number) => skillOffers({ ...soldier, skills: soldier.skills.slice(0, 1), seed })
+  expect(Array.from({ length: 8 }, (_, seed) => offered(seed).join()).some((o) => o !== offered(0).join())).toBe(true)
+})
+
+test("every class's tree holds roots of each role, at least three skills of each, and opens each skill from skills in that tree", () => {
+  for (const cls of Object.keys(TREES) as (keyof typeof TREES)[]) {
+    const tree = TREES[cls]
+    for (const role of ['guard', 'control', 'power'] as const) {
+      expect(roots(cls).some((id) => SKILLS[id].role === role)).toBe(true)
+      expect(tree.filter((id) => SKILLS[id].role === role).length).toBeGreaterThanOrEqual(3)
+    }
+    for (const id of tree) for (const a of SKILLS[id].after ?? []) expect(tree).toContain(a)
+  }
+  expect(new Set(Object.values(TREES).flat()).size).toBe(Object.keys(SKILLS).length)
 })
 
 test('a satellite won offers three relics; a relic held changes the run', () => {
@@ -592,7 +613,7 @@ test('an unknown stop turns out a battle, a shop, or an event met once a run, wh
   const kinds = new Set<string>()
   for (let seed = 0; seed < 40; seed++) {
     const run = begun(seed)
-    run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
+    run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
     enter(run, 'standard', ['unknown', 'battle'])
     apply(run, { type: 'advance' })
     kinds.add(run.phase)

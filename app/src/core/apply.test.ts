@@ -1,4 +1,4 @@
-import { PATHS } from './skills'
+import { roots } from './skills'
 import { expect, test } from 'vitest'
 import { TUNING } from './tuning'
 import { deploy, zoneOf, begun } from './roads'
@@ -10,7 +10,7 @@ import { current, type Run } from './run'
 /** A run choosing where to land for its first battle. */
 function landing(seed = 1): Run & { battle: Battle } {
   const run = begun(seed)
-  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
+  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })
@@ -61,7 +61,7 @@ test('landing puts the whole squad on open tiles by the zone and begins the batt
 
 test('actions outside their phase are rejected and change nothing', () => {
   const run = begun(1)
-  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
+  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   const before = structuredClone(run)
   expect(apply(run, { type: 'recruit', index: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 }).ok).toBe(false)

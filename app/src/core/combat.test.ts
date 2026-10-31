@@ -1,4 +1,4 @@
-import { PATHS } from './skills'
+import { roots } from './skills'
 import { expect, test } from 'vitest'
 import { deploy, begun } from './roads'
 import { apply } from './apply'
@@ -8,7 +8,7 @@ import { detects } from './sight'
 
 function battle(seed: number): Battle {
   const run = begun(seed)
-  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
+  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   deploy(run, 0)

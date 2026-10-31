@@ -12,7 +12,7 @@ import { EFFECTS, generateGear, SLOTS, starterRifle, type Gear, type Slot } from
 import { MELEE_RANGE, WEAPONS } from './weapons'
 import { RESISTS, type Keyword, type Resist } from './keywords'
 import { offerable, RELIC_OFFERS, RELICS, type Relic, type RelicId } from './relics'
-import { PATHS, SKILLS, type SkillId } from './skills'
+import { roots, SKILLS, TREES, type Role, type SkillId } from './skills'
 import { ZONE_TERRAINS, type TerrainKind } from './terrain'
 import { drawTwist, type Twist } from './twists'
 import { random, randomInt } from './rng'
@@ -146,6 +146,8 @@ export interface Soldier {
   home: City | null
   /** Health lost and not yet healed; it carries from battle to battle. */
   wounds: number
+  /** Draws the skills it is offered at each level. */
+  seed: number
 }
 
 /** What the last stop changed, for the player to review. */
@@ -262,15 +264,25 @@ function total(run: Run, effect: (source: Lasting) => number | undefined): numbe
   return sources.reduce((sum, source) => sum + (effect(source) ?? 0), 0)
 }
 
+/** Skills a soldier knows at most: a root, then one more at each level until it has this many. */
+export const MAX_SKILLS = 4
+/** Skills a level offers to choose from: one of each role while the tree has one open. */
+export const OFFERS = 3
+const ROLES: Role[] = ['guard', 'control', 'power']
+
 /**
- * The skills a soldier chooses the next from, or none if no choice is owed. A soldier arrives with the core of one of
- * its class's two paths; at each next level it learns one of that path's next pair.
+ * The skills a soldier chooses the next from, or none if no choice is owed: from those its class's tree has opened to
+ * it, one of each role when one is open, filled from the rest, drawn by its own seed so the offer stays put until
+ * chosen. A skill passed over may be offered again.
  */
 export function skillOffers(soldier: Soldier): SkillId[] {
-  if (!soldier.cls) return []
-  const path = PATHS[soldier.cls].find((p) => p.core === soldier.skills[0])
-  if (!path || soldier.skills.length >= Math.min(level(soldier), 1 + path.tiers.length)) return []
-  return path.tiers[soldier.skills.length - 1]
+  if (!soldier.cls || soldier.skills.length >= Math.min(level(soldier), MAX_SKILLS)) return []
+  const known = (id: string) => soldier.skills.includes(id as SkillId)
+  const open = TREES[soldier.cls].filter((id) => !known(id) && (SKILLS[id].after?.some(known) ?? true))
+  const rng = { rng: soldier.seed + soldier.skills.length }
+  const drawn = open.map((id) => ({ id, at: random(rng) })).sort((a, b) => a.at - b.at).map((d) => d.id)
+  const offers = ROLES.flatMap((role) => drawn.find((id) => SKILLS[id].role === role) ?? [])
+  return [...offers, ...drawn.filter((id) => !offers.includes(id))].slice(0, OFFERS)
 }
 
 /** Learns the offered skill at `index`. */
@@ -418,7 +430,9 @@ function draft(run: Run, taken: ClassId[]): Soldier {
     name,
     xp: xpFor(1),
     cls,
-    skills: [PATHS[cls][randomInt(run, 2)].core],
+    skills: [roots(cls)[randomInt(run, roots(cls).length)]],
+    // Read, not drawn: the seed costs the run no draw.
+    seed: run.rng,
     feats: [],
     gear: { weapon: starterRifle(run.nextGear++), armor: null, utility: null },
     trait: null,

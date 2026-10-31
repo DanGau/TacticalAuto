@@ -4,7 +4,7 @@ import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
 import { coverAt, crumble, GRID, type Battle } from './battle'
 import { stepBattle, type GameEvent } from './combat'
-import { PATHS } from './skills'
+import { roots } from './skills'
 import { coverAgainst, detects, sees } from './sight'
 import { generateTerrain } from './terrain'
 import { drawTwist, FUEL_DAMAGE, TWISTS, type Twist } from './twists'
@@ -12,7 +12,7 @@ import { drawTwist, FUEL_DAMAGE, TWISTS, type Twist } from './twists'
 /** A soldier at (10, 10) and a trooper at (10, 12) on open, flat ground, with `twist`. */
 function duel(twist: Twist | null): Battle {
   const run = begun(1)
-  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
+  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   deploy(run, zoneOf(run.battle!, 'stealth'))

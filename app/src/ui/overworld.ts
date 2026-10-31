@@ -8,7 +8,7 @@ import { RELICS, type Relic } from '../core/relics'
 import { CONSUMABLES, KIT_SLOTS } from '../core/consumables'
 import { current, legOf, GEAR_PRICE, KEYS, LEG_STOPS, ways, charges, equipped, health, level, missionAt, huntForce, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
 import { FEATS } from '../core/feats'
-import { PATHS, SKILLS } from '../core/skills'
+import { SKILLS } from '../core/skills'
 import { TWISTS } from '../core/twists'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
@@ -218,7 +218,7 @@ function soldierCard(run: Run, soldier: Soldier, open: number | null): string {
   </button>`
 }
 
-/** Everything about one soldier: progress, stats, how the class fights, its path and skills, its feats, and what the gear does. */
+/** Everything about one soldier: progress, stats, how the class fights, its skills, its feats, and what the gear does. */
 function details(run: Run, soldier: Soldier): string {
   const r = level(soldier)
   const cls = soldier.cls && CLASSES[soldier.cls]
@@ -226,9 +226,8 @@ function details(run: Run, soldier: Soldier): string {
   const skills = soldier.skills.map((id) => `<p class="described"><b>${SKILLS[id].name}.</b> ${describe(SKILLS[id].text, SKILLS[id].tags)}</p>`)
   const uses = charges(run, soldier)
   const gear = equipped(soldier).map((g) => `<div class="gear ${g.rarity}">${gearCard(g)}</div>`)
-  const path = soldier.cls && PATHS[soldier.cls].find((p) => p.core === soldier.skills[0])
   const feats = soldier.feats.map((id) => `<span class="chip feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</span>`)
-  return `<h2>${soldier.name}${path ? `, ${path.name}` : ''} · ${xpFor(r + 1) - soldier.xp} experience to level ${r + 1}</h2>
+  return `<h2>${soldier.name} · ${xpFor(r + 1) - soldier.xp} experience to level ${r + 1}</h2>
     <div class="details">
       <table class="stats">
         <tr><td>Health</td><td>${health(run, soldier)}/${stats.hp}</td><td>Armor</td><td>${stats.armor}</td></tr>

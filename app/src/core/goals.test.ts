@@ -1,4 +1,4 @@
-import { PATHS } from './skills'
+import { roots } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { goalOf, stepBattle, UPLINK_REACH, vipOf, type GameEvent } from './combat'
@@ -10,7 +10,7 @@ import { endBattle, LOSS_THREAT, RISKS, START_SUPPLIES, STOP_THREAT, THREAT_MAX,
 /** A run about to fight a battle of `goal`, with three packs to muster. */
 function before(goal: Goal): Run {
   const run = begun(1)
-  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
+  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   apply(run, { type: 'go', index: 1 })
   const patrol = { name: 'Patrol', kinds: ['trooper', 'trooper'] as const }
   road(run, [{ kind: 'battle', risk: 'standard', goal, terrain: 'town', twist: null, packs: [patrol, patrol, patrol].map((p) => ({ ...p, kinds: [...p.kinds] })) }])

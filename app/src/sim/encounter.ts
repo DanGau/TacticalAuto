@@ -37,7 +37,7 @@ function encounter(seed: number, mission: Encounter, leg: number, squad: Squad):
   for (const soldier of run.soldiers) {
     soldier.xp = xpFor(levels)
     // Skills owed are learned at random.
-    while (skillOffers(soldier).length > 0) soldier.skills.push(skillOffers(soldier)[randomInt(run, 2)])
+    while (skillOffers(soldier).length > 0) soldier.skills.push(skillOffers(soldier)[randomInt(run, skillOffers(soldier).length)])
     if (squad === 'strong') for (const slot of SLOTS) soldier.gear[slot] = rare(run, slot)
   }
   if (squad === 'strong') for (let i = 0; i <= leg; i++) run.relics.push(offerable(run.relics)[randomInt(run, offerable(run.relics).length)])

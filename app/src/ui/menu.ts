@@ -1,6 +1,6 @@
 import { CLASSES } from '../core/classes'
 import type { Run, Soldier } from '../core/run'
-import { PATHS, SKILLS } from '../core/skills'
+import { SKILLS } from '../core/skills'
 import { TRAITS, type Trait } from '../core/traits'
 import { places } from './globe'
 
@@ -29,15 +29,14 @@ export function story(): string {
   </div>`
 }
 
-/** A recruit as a card to pick: class, path, home and trait at a glance; hovering an ability or skill tells what it does. */
+/** A recruit as a card to pick: class, first skill, home and trait at a glance; hovering an ability or skill tells what it does. */
 function card(recruit: Soldier, index: number, chosen: number | null): string {
   const cls = CLASSES[recruit.cls!]
-  const path = PATHS[recruit.cls!].find((p) => p.core === recruit.skills[0])!
   const trait: Trait | null = recruit.trait ? TRAITS[recruit.trait] : null
   const quirk = trait ? `<b>${trait.name}</b><span class="down">${trait.pro}</span><span class="up">${trait.con}</span>` : '<b>Steady</b><small>No quirks</small>'
   const named = [{ name: cls.abilityName, text: cls.abilityText }, ...recruit.skills.map((id) => SKILLS[id])]
   return `<button data-recruit="${index}" class="card recruit${index === chosen ? ' chosen' : ''}">
-    <small>${cls.name} · ${path.name}</small>
+    <small>${cls.name}</small>
     <b class="name">${recruit.name}</b>
     <small class="home">🌍 ${recruit.home!.name}, ${recruit.home!.country}</small>
     <span class="feats">${named.map((n, i) => `<span class="chip ${i === 0 ? 'feat' : ''}" title="${n.text}">${n.name}</span>`).join('')}</span>

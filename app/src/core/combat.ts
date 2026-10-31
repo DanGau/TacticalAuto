@@ -49,6 +49,15 @@ import {
   SUPPRESS_AIM,
   SURGEON_HEAL,
   TITAN_HEALTH,
+  unitAt,
+  LEAP_DAMAGE,
+  SLAM_HIT,
+  SLAM_TILES,
+  STUN_REACH,
+  FORCE_FIELD_ARMOR,
+  FORCE_FIELD_REACH,
+  HURL_TILES,
+  HURL_DAMAGE,
   PLATING_ARMOR,
   MECH_STATS,
   DRONE_STATS,
@@ -456,8 +465,9 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
   if (battle.extract && unit.side === 'human') return (!carrying(battle, unit) && nearest(lying(battle), unit)) || battle.extract
   const captive = unit.side === 'human' && nearest(lying(battle).filter((d) => battle.captives.some((r) => r.soldier === d.soldier)), unit)
   if (captive) return captive
-  // A raider makes for the nearest cache until it has as many as it came for.
-  if (battle.goal === 'raid' && unit.side === 'human' && battle.caches.length > 0) return battle.caches.reduce((a, b) => (distance(b, unit) < distance(a, unit) ? b : a))
+  // A raider makes for the nearest cache it can walk to until it has as many as it came for; walled off from all, it fights.
+  const caches = battle.goal === 'raid' && unit.side === 'human' ? battle.caches.filter((c) => walkingDistances(battle, c)[unit.y * GRID + unit.x] < Infinity) : []
+  if (caches.length > 0) return caches.reduce((a, b) => (distance(b, unit) < distance(a, unit) ? b : a))
   // On a hold an alien makes for the uplink, then from its zone goes for the squad, so no stand-off lasts.
   if (battle.uplink) return unit.side === 'alien' && distance(unit, battle.uplink) <= UPLINK_REACH ? nearest(enemies, unit) : battle.uplink
   const civilians = battle.units.filter((u) => u.civilian && u.civilian !== 'vip')
@@ -647,11 +657,12 @@ function fightPath(battle: Battle, unit: Unit): Tile[] {
 
 /**
  * The standard action a soldier with no shot takes in place of attacking, or none. One with an ability that needs no
- * shot keeps it. A wary soldier in an enemy's sights hunkers; one an enemy could come within range of next turn
- * prepares; any other sprints toward the fight, or for the way out.
+ * shot, or a leap that would reach the aliens, keeps it. A wary soldier in an enemy's sights hunkers; one an enemy
+ * could come within range of next turn prepares; any other sprints toward the fight, or for the way out.
  */
 function orderFor(battle: Battle, unit: Unit, { wary, exposed, threatened }: { wary: boolean; exposed: boolean; threatened: boolean }): Order | null {
   if (unit.charges > 0 && (unit.ability === 'medic' || unit.ability === 'mech')) return null
+  if (leapTo(battle, unit)) return null
   // A carrier cannot sprint.
   if (battle.extract) return carrying(battle, unit) ? null : 'sprint'
   if (wary && exposed) return 'hunker'
@@ -905,23 +916,27 @@ function deploy(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
   })
 }
 
-/** Caltrops: once per battle, an alien closing in finds the tiles between it and the carrier strewn with them. */
-function strew(battle: Battle, unit: Unit): GameEvent[] {
-  if (!has(unit, 'caltrops') || unit.spent.includes('caltrops')) return []
+/**
+ * Caltrops and Firewall: once per battle, an alien closing in finds the tiles between it and the soldier strewn with
+ * caltrops, or set alight.
+ */
+function strew(battle: Battle, unit: Unit, effect: 'caltrops' | 'firewall'): GameEvent[] {
+  if (!has(unit, effect) || unit.spent.includes(effect)) return []
   const rusher = nearest(
     battle.units.filter((u) => u.side !== unit.side && revealed(battle, u) && alert(battle, u) && distance(u, unit) <= CALTROP_RANGE && distance(u, unit) > CALTROP_LATE),
     unit,
   )
   if (!rusher) return []
-  unit.spent.push('caltrops')
+  unit.spent.push(effect)
   const centre = { x: unit.x + 2 * Math.sign(rusher.x - unit.x), y: unit.y + 2 * Math.sign(rusher.y - unit.y) }
   for (const [dx, dy] of [[0, 0], ...NEIGHBORS]) {
     const tile = { x: centre.x + dx, y: centre.y + dy }
-    if (tile.x >= 0 && tile.y >= 0 && tile.x < GRID && tile.y < GRID && !onTile(battle.caltrops, tile)) battle.caltrops.push(tile)
+    if (!onGrid(tile.x, tile.y)) continue
+    if (effect === 'caltrops' && !onTile(battle.caltrops, tile)) battle.caltrops.push(tile)
+    if (effect === 'firewall' && !onTile(battle.fire, tile)) battle.fire.push({ ...tile, turns: FIRE_TURNS })
   }
-  return [{ type: 'effect', id: unit.id, effect: 'caltrops', amount: 0 }]
+  return [{ type: 'effect', id: unit.id, effect, amount: 0 }]
 }
-
 /** Alien turns after which the aliens still unseen patrol toward the squad, and soldiers no longer hang back out of reach. */
 const RESTLESS_ROUND = 25
 
@@ -1243,20 +1258,131 @@ function charge(battle: Battle, brute: Unit, shooter: Unit, events: GameEvent[])
 }
 
 /**
- * A thundering hit knocks the target a tile straight back from the shooter; if something stops it, it slams into that
- * instead. With `way` -1, a tethered hit pulls it a tile toward the shooter, if the tile is free.
+ * A knockback: the target is driven `tiles` straight back from `unit`; if something stops it, it slams into that for
+ * `slam` damage, and an alien it slams into takes as much. With `way` -1, a tethered hit pulls it a tile toward the
+ * shooter, as far as the way is free.
  */
-function knockback(battle: Battle, unit: Unit, target: Unit, events: GameEvent[], way = 1): void {
-  const to = { x: target.x + way * Math.sign(target.x - unit.x), y: target.y + way * Math.sign(target.y - unit.y) }
-  if (!blocked(battle, to.x, to.y) && passable(battle, target, to)) {
-    target.x = to.x
-    target.y = to.y
-    events.push({ type: 'move', id: target.id, path: [to], with: way > 0 ? 'thunder' : 'tether' })
-    return
+function knockback(battle: Battle, unit: Unit, target: Unit, events: GameEvent[], way = 1, tiles = 1, slam = SLAM_DAMAGE, effect: Effect = way > 0 ? 'thunder' : 'tether'): void {
+  const step = { x: way * Math.sign(target.x - unit.x), y: way * Math.sign(target.y - unit.y) }
+  const path: Tile[] = []
+  let stopped = false
+  for (let i = 0; i < tiles && !stopped; i++) {
+    const from = path.at(-1) ?? target
+    const to = { x: from.x + step.x, y: from.y + step.y }
+    stopped = blocked(battle, to.x, to.y) || !passable(battle, from, to)
+    if (!stopped) path.push(to)
   }
-  if (way < 0) return
-  events.push({ type: 'effect', id: target.id, effect: 'thunder', amount: -SLAM_DAMAGE })
-  wound(battle, target, SLAM_DAMAGE, events)
+  const end = path.at(-1)
+  if (end) {
+    target.x = end.x
+    target.y = end.y
+    events.push({ type: 'move', id: target.id, path, with: effect })
+  }
+  if (!stopped || way < 0) return
+  const into = unitAt(battle, target.x + step.x, target.y + step.y)
+  events.push({ type: 'effect', id: target.id, effect, amount: -slam })
+  wound(battle, target, slam, events)
+  if (into && into.side === target.side) {
+    events.push({ type: 'effect', id: into.id, effect, amount: -slam })
+    wound(battle, into, slam, events)
+  }
+}
+/** The aliens a soldier's powers may act on: revealed and alert, so a pod it is stalking is left be. */
+const foes = (battle: Battle, unit: Unit) => battle.units.filter((u) => u.side !== unit.side && !u.civilian && revealed(battle, u) && alert(battle, u))
+
+/** Where Heroic Leap would land: the free tile within twice the soldier's move beside the most foes, and those foes. */
+function leapTo(battle: Battle, unit: Unit): { to: Tile; caught: Unit[] } | null {
+  if (!has(unit, 'leap') || unit.spent.includes('leap')) return null
+  const all = foes(battle, unit)
+  let best: { to: Tile; caught: Unit[] } | null = null
+  for (const foe of all.filter((f) => distance(f, unit) <= 2 * unit.stats.move)) {
+    for (const [dx, dy] of NEIGHBORS) {
+      const to = { x: foe.x + dx, y: foe.y + dy }
+      if (blocked(battle, to.x, to.y) || onTile(battle.acid, to) || onTile(battle.fire, to)) continue
+      const caught = all.filter((f) => distance(f, to) <= 1)
+      if (caught.length > (best?.caught.length ?? 0)) best = { to, caught }
+    }
+  }
+  return best
+}
+
+/**
+ * Heroic Leap: once per battle, onto two or more foes, or onto one when it has nothing to attack from where it stands.
+ * Each foe beside the landing is hurt and rooted.
+ */
+function leap(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
+  const jump = leapTo(battle, unit)
+  const idle = !battle.units.some((u) => u.side !== unit.side && shootable(battle, unit, unit, u, seen))
+  if (!jump || (jump.caught.length < 2 && !idle)) return []
+  unit.spent.push('leap')
+  Object.assign(unit, { x: jump.to.x, y: jump.to.y, moved: true })
+  const events: GameEvent[] = [{ type: 'move', id: unit.id, path: [jump.to], with: 'leap' }]
+  for (const foe of jump.caught) {
+    foe.rooted = CHILL_TURNS
+    events.push({ type: 'effect', id: foe.id, effect: 'leap', amount: -LEAP_DAMAGE })
+    wound(battle, foe, LEAP_DAMAGE, events)
+  }
+  return events
+}
+
+/** Ground Slam: once per battle, with two or more foes beside it, in place of an attack, it hurts each and hurls it back. */
+function slam(battle: Battle, unit: Unit): GameEvent[] {
+  if (!has(unit, 'slam') || unit.spent.includes('slam')) return []
+  const beside = foes(battle, unit).filter((u) => distance(u, unit) <= 1)
+  if (beside.length < 2) return []
+  unit.spent.push('slam')
+  const events: GameEvent[] = [{ type: 'rocket', id: unit.id, x: unit.x, y: unit.y, hits: beside.map((u) => ({ target: u.id, damage: SLAM_HIT })) }]
+  for (const foe of beside) {
+    wound(battle, foe, SLAM_HIT, events)
+    if (foe.hp > 0) knockback(battle, unit, foe, events, 1, SLAM_TILES, SLAM_DAMAGE, 'slam')
+  }
+  return events
+}
+
+/** Stuns each of `caught`, a boss aside: it loses its next action. */
+function stun(caught: Unit[], effect: Effect): GameEvent[] {
+  return caught
+    .filter((u) => !u.boss)
+    .map((u) => {
+      u.panicked = true
+      return { type: 'effect', id: u.id, effect, amount: 0 }
+    })
+}
+
+/**
+ * Intimidate and EMP Pulse: once per battle, with two or more foes within STUN_REACH of the soldier, or for an EMP of
+ * its machines too, each is stunned.
+ */
+function pulse(battle: Battle, unit: Unit, effect: 'warcry' | 'emp'): GameEvent[] {
+  if (!has(unit, effect) || unit.spent.includes(effect)) return []
+  const centres = [unit, ...(effect === 'emp' ? battle.units.filter((u) => u.summoner !== null && u.summoner === unit.soldier) : [])]
+  const caught = foes(battle, unit).filter((u) => !u.boss && centres.some((c) => distance(c, u) <= STUN_REACH))
+  if (caught.length < 2) return []
+  unit.spent.push(effect)
+  return stun(caught, effect)
+}
+
+/** Flashbang: once per battle, at the foe it can attack with the most foes beside it, two or more, stunning each. */
+function flashbang(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
+  if (!has(unit, 'flashbang') || unit.spent.includes('flashbang')) return []
+  const all = foes(battle, unit).filter((u) => !u.boss)
+  const knots = all.filter((u) => shootable(battle, unit, unit, u, seen)).map((centre) => all.filter((u) => distance(u, centre) <= BLAST_RADIUS))
+  const caught = knots.reduce<Unit[]>((best, knot) => (knot.length > best.length ? knot : best), [])
+  if (caught.length < 2) return []
+  unit.spent.push('flashbang')
+  return stun(caught, 'flashbang')
+}
+
+/** Force Field: once per battle, the most wounded soldier within reach at half health or less gains armor. */
+function forceField(battle: Battle, unit: Unit): GameEvent[] {
+  if (!has(unit, 'forceField') || unit.spent.includes('forceField')) return []
+  const mate = battle.units
+    .filter((u) => isSoldier(u) && u.side === unit.side && u.hp <= u.stats.hp / 2 && distance(u, unit) <= FORCE_FIELD_REACH)
+    .reduce<Unit | undefined>((worst, u) => (!worst || u.hp < worst.hp ? u : worst), undefined)
+  if (!mate) return []
+  unit.spent.push('forceField')
+  mate.armor += FORCE_FIELD_ARMOR
+  return [{ type: 'effect', id: mate.id, effect: 'forceField', amount: 0 }]
 }
 
 /** Blink: the unit vanishes to the free tile within reach where the enemy's best shot at it is worst. */
@@ -1594,7 +1720,8 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     enemy.panicked = true
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'stasis') ? 'stasis' : 'deepFreeze', amount: 0 })
   }
-  if (enemy.hp > 0 && damage > 0 && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
+  if (enemy.hp > 0 && damage > 0 && distance(unit, enemy) <= 1 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
+  else if (enemy.hp > 0 && damage > 0 && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
   if (enemy.hp > 0 && damage > 0 && when(true, 'tether', 1)) knockback(battle, unit, enemy, events, -1)
   if (enemy.hp > 0 && when(true, 'snare', 1)) {
     enemy.rooted = CHILL_TURNS
@@ -1749,7 +1876,10 @@ function actNext(battle: Battle): GameEvent[] {
     const fired =
       unit.charges <= 0 ? [] : unit.ability === 'rocket' ? blast(battle, unit, seen, ROCKET_DAMAGE, has(unit, 'bigBlast') ? BIG_BLAST_RADIUS : BLAST_RADIUS) : unit.ability === 'napalm' ? napalm(battle, unit, seen) : []
     if (healed.length + fired.length > 0) unit.charges--
-    const acted = [...medkit(unit), ...secondWind(unit), ...polymorph(battle, unit, seen), ...strew(battle, unit), ...deploy(battle, unit, seen), ...healed, ...thrown, ...(fired.length > 0 ? fired : shoot(battle, unit, seen))]
+    const powers = [...pulse(battle, unit, 'warcry'), ...pulse(battle, unit, 'emp'), ...flashbang(battle, unit, seen), ...forceField(battle, unit), ...leap(battle, unit, seen)]
+    const slammed = fired.length > 0 ? [] : slam(battle, unit)
+    const struck = fired.length > 0 ? fired : slammed.length > 0 ? slammed : shoot(battle, unit, seen)
+    const acted = [...medkit(unit), ...secondWind(unit), ...polymorph(battle, unit, seen), ...strew(battle, unit, 'caltrops'), ...strew(battle, unit, 'firewall'), ...deploy(battle, unit, seen), ...powers, ...healed, ...thrown, ...struck]
     // What follows an action: a drone's shot, then a skirmisher's step back.
     const events = acted.length > 0 && unit.hp > 0 && attacksOf(unit) === 1 ? [...acted, ...drone(battle, unit), ...skirmish(battle, unit)] : acted
     battle.actor = null

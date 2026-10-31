@@ -1,4 +1,4 @@
-import { PATHS, SKILLS } from './skills'
+import { roots } from './skills'
 import { expect, test } from 'vitest'
 import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
@@ -43,7 +43,7 @@ test('any soldier wields any weapon: a melee one reaches the next tile and charg
 /** A run whose soldier has learned its first skill and found `gear`. */
 function withFind(gear: Omit<Gear, 'id'>): Run {
   const run = begun(1)
-  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
+  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   run.finds.push({ id: 1, ...gear })
   run.phase = 'reward'
   return run
@@ -73,7 +73,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   battle.units = [soldier, alien]
   battle.pods.forEach((pod) => Object.assign(pod, { revealed: true, alert: true }))
   // A soldier of no class in particular: it holds its ground and has no ability or class skill.
-  Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, effects: soldier.effects.filter((e) => !Object.values(SKILLS).some((s) => s.effect === e)) })
+  Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, effects: gear.effect ? [gear.effect] : [] })
   Object.assign(alien, { kind: 'trooper', x: 10, y: 11, hp: 99, armor: 0, target: false, stats: { ...alienStats('trooper', 0, 0), hp: 99, armor: 0, aim: 2, crit: 0 } })
   return { battle, soldier, alien, step: () => stepBattle(battle) }
 }
@@ -197,12 +197,13 @@ test('a volatile kill bursts on the aliens beside it', () => {
   expect(events).toContainEqual({ type: 'effect', id: other.id, effect: 'volatile', amount: -2 })
 })
 
-test('a thundering hit knocks the target back, or slams it into what stops it', () => {
+test('a thundering hit knocks the target back, or slams it into what stops it, an alien it slams into taking as much', () => {
   const d = armed(['thunder'])
   const events = untilAlienShoots(d)
   expect(events).toContainEqual({ type: 'move', id: d.alien.id, path: [{ x: 10, y: 12 }], with: 'thunder' })
-  another(d, 0, 1)
-  expect(effectsOf(untilAlienShoots(d), 'thunder')).toEqual(Array(SOLDIER_ATTACKS).fill({ type: 'effect', id: d.alien.id, effect: 'thunder', amount: -1 }))
+  const behind = another(d, 0, 1)
+  const slam = [{ type: 'effect', id: d.alien.id, effect: 'thunder', amount: -1 }, { type: 'effect', id: behind.id, effect: 'thunder', amount: -1 }]
+  expect(effectsOf(untilAlienShoots(d), 'thunder')).toEqual(Array(SOLDIER_ATTACKS).fill(slam).flat())
 })
 
 test('mirror images pop in place of hits, two at most', () => {

@@ -1,9 +1,9 @@
-import { PATHS } from './skills'
+import { roots } from './skills'
 import { expect, test } from 'vitest'
 import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, PACKS, REGEN_HEAL, type AlienKind } from './aliens'
 import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
-import { isSoldier, reshaped, ACID_DAMAGE, alienUnit, mechUnit, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, GRID, HUNKER_DEFENSE, MECH_STATS, DRONE_STATS, TITAN_HEALTH, type Battle, type Unit } from './battle'
+import { isSoldier, reshaped, ACID_DAMAGE, alienUnit, mechUnit, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, GRID, HUNKER_DEFENSE, MECH_STATS, DRONE_STATS, TITAN_HEALTH, distance, LEAP_DAMAGE, SLAM_HIT, SLAM_TILES, HURL_DAMAGE, type Battle, type Unit } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { odds } from './sight'
 
@@ -26,7 +26,7 @@ test('a mission musters packs its depth allows, for exactly its force, and a lon
  */
 function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }[]): { battle: Battle; soldier: Unit; aliens: Unit[]; until: (done: (events: GameEvent[]) => boolean) => GameEvent[] } {
   const run = begun(1)
-  run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
+  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   // A cold zone, so no drop pod impact lands in the fight.
@@ -557,4 +557,46 @@ test('a soldier closing in stops short of where a known enemy could walk into ra
   while (battle.turn === 'alien' || !battle.units.some((u) => u === soldier && u.moved)) stepBattle(battle)
   expect(Math.abs(soldier.y - aliens[0].y)).toBeGreaterThan(reach)
   expect(soldier.y).toBeGreaterThan(10)
+})
+
+test('Heroic Leap lands a soldier in a knot of aliens, hurting and rooting each beside it', () => {
+  const { soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 16 }, { kind: 'trooper', x: 11, y: 16 }])
+  Object.assign(soldier, { effects: ['leap'], stats: { ...soldier.stats, damage: 0, range: 1, move: 4 } })
+  const events = until((all) => all.some((e) => e.type === 'move' && e.with === 'leap'))
+  expect(Math.max(...aliens.map((a) => distance(a, soldier)))).toBe(1)
+  for (const alien of aliens) expect(alien).toMatchObject({ hp: alien.stats.hp - LEAP_DAMAGE, rooted: expect.any(Number) })
+  expect(events.filter((e) => e.type === 'effect' && e.effect === 'leap')).toHaveLength(2)
+  expect(soldier.spent).toContain('leap')
+})
+
+test('Ground Slam hurts every alien beside the soldier and hurls each back; Hurl throws one far into whatever stops it', () => {
+  const slam = arena([{ kind: 'trooper', x: 10, y: 11 }, { kind: 'trooper', x: 11, y: 10 }])
+  Object.assign(slam.soldier, { effects: ['slam'], stats: { ...slam.soldier.stats, damage: 0, move: 0 } })
+  slam.until((all) => all.some((e) => e.type === 'rocket' && e.id === slam.soldier.id))
+  for (const alien of slam.aliens) {
+    expect(alien.hp).toBeLessThanOrEqual(alien.stats.hp - SLAM_HIT)
+    expect(distance(alien, slam.soldier)).toBe(1 + SLAM_TILES)
+  }
+
+  const hurl = arena([{ kind: 'trooper', x: 10, y: 11 }])
+  Object.assign(hurl.soldier, { effects: ['hurl'], stats: { ...hurl.soldier.stats, damage: 1, range: 1 } })
+  hurl.aliens[0].stats = { ...hurl.aliens[0].stats, hp: 99, move: 0 }
+  hurl.aliens[0].hp = 99
+  // A wall two tiles behind it stops the throw short.
+  hurl.battle.north[13 * GRID + 10] = 'wall'
+  reshaped(hurl.battle)
+  hurl.until((all) => all.some((e) => e.type === 'move' && e.with === 'hurl'))
+  expect(hurl.aliens[0]).toMatchObject({ x: 10, y: 12, hp: 99 - 1 - HURL_DAMAGE })
+})
+
+test('Intimidate stuns every alien near the soldier but a boss; Force Field armors a squadmate in trouble', () => {
+  const { soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 12 }, { kind: 'trooper', x: 12, y: 10 }, { kind: 'trooper', x: 8, y: 10, boss: true }])
+  Object.assign(soldier, { effects: ['warcry'], stats: { ...soldier.stats, move: 0 } })
+  const events = until((all) => all.some((e) => e.type === 'effect' && e.effect === 'warcry'))
+  expect(events.filter((e) => e.type === 'effect' && e.effect === 'warcry').map((e) => (e as { id: number }).id)).toEqual([aliens[0].id, aliens[1].id])
+
+  const field = arena([{ kind: 'trooper', x: 10, y: 20 }])
+  Object.assign(field.soldier, { effects: ['forceField'], hp: 10 })
+  field.until((all) => all.some((e) => e.type === 'effect' && e.effect === 'forceField'))
+  expect(field.soldier.spent).toContain('forceField')
 })
