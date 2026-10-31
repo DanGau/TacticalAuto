@@ -7,7 +7,7 @@ export const HOLD_ROUNDS = 6
 /** How near the extraction zone a soldier must come to lift off. */
 export const EXTRACT_REACH = 3
 /** Alien turns between waves on a hold or a recovery. */
-export const HOLD_WAVE_EVERY = 3
+export const HOLD_WAVE_EVERY = 2
 /** Civilians on a rescue, the health of each, how far each flees in a turn, and the supplies each saved pays. */
 export const CIVILIANS = 10
 export const CIVILIAN_HP = 8
@@ -26,10 +26,10 @@ export const ESCORT_REACH = 2
 export const GOALS: Record<Goal, { name: string; text: string; reward: string; force: number; weight: number; from: number }> = {
   exterminate: { name: 'Exterminate', text: 'Kill every alien', reward: 'supplies and gear', force: 0, weight: 3, from: 0 },
   assassinate: { name: 'Assassinate', text: 'Kill the commander, armored and guarded, which blinks away when wounded; the rest flee', reward: 'supplies and rare gear', force: -3, weight: 1, from: 1 },
-  hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as ever larger waves come in from the edges, then get every soldier left to the extraction zone`, reward: 'a relic, no gear', force: -4, weight: 1, from: 1 },
+  hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as packs come at it one after another, then get every soldier left to the extraction zone`, reward: 'a relic, no gear', force: -4, weight: 1, from: 1 },
   rescue: {
     name: 'Rescue',
-    text: `A terror site: aliens are killing ${CIVILIANS} civilians. Hiders, squat and amber, take cover and stay put; runners, tall and pale, flee the aliens; and harvesters raise the dead as husks. The squad drops in among them, in contact: aliens shoot civilians when they have no good shot at a soldier, so push in. A soldier who reaches a civilian gets them out. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
+    text: `A terror site: aliens are killing ${CIVILIANS} civilians. Hiders, squat and amber, take cover and stay put; runners, tall and pale, flee the aliens; and harvesters raise the dead as husks. The squad bursts in among them: aliens shoot civilians when they have no good shot at a soldier, so push in. A soldier who reaches a civilian gets them out. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
     reward: 'supplies and experience, no gear',
     force: 3,
     weight: 1,
@@ -37,7 +37,7 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
   },
   vip: {
     name: 'VIP rescue',
-    text: `A VIP is trapped in a building, under guard. Breach it, reach them, and escort them to the extraction zone that then appears; every pod hears and comes. The aliens shoot the VIP whenever they can. Lose the VIP and the mission is lost`,
+    text: `A VIP is trapped in a building, under guard. Breach it, reach them, and escort them to the extraction zone that then appears. The aliens shoot the VIP whenever they can. Lose the VIP and the mission is lost`,
     reward: 'supplies and a relic, no gear',
     force: 2,
     weight: 1,

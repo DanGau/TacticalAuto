@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { alienStats } from './aliens'
-import { deploy, zoneOf, begun } from './roads'
+import { enterAt, entranceOf, begun } from './roads'
 import { apply } from './apply'
 import { GRID, type Battle } from './battle'
 import { crumble } from './grid'
@@ -18,7 +18,7 @@ function duel(twist: Twist | null): Battle {
   run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
-  deploy(run, zoneOf(run.battle!, 'deep'))
+  enterAt(run, entranceOf(run.battle!, 'rappel'))
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist })
   battle.ground.fill('pavement')
@@ -30,7 +30,7 @@ function duel(twist: Twist | null): Battle {
   const soldier = battle.units.find((u) => u.side === 'human' && !u.civilian)!
   const alien = battle.units.find((u) => u.side === 'alien')!
   battle.units = [soldier, alien]
-  battle.pods.forEach((pod) => Object.assign(pod, { revealed: true, alert: true }))
+  battle.pods.forEach((pod) => Object.assign(pod, { revealed: true, engaged: true }))
   Object.assign(soldier, { x: 10, y: 10, effects: [], stats: { ...soldier.stats, move: 0, range: 8 } })
   Object.assign(alien, { kind: 'trooper', x: 10, y: 12, hp: 99, armor: 0, target: false, stats: { ...alienStats('trooper', 0, 0), hp: 99, armor: 0, move: 0 } })
   return battle

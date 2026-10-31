@@ -53,6 +53,12 @@ export function wreck(battle: Battle, centre: Tile, radius = BLAST_RADIUS): void
   }
 }
 
+/** Knocks down the walls and windows on every side of the tiles within `radius` of `centre`, leaving props standing. */
+export function breach(battle: Battle, centre: Tile, radius = 1): void {
+  walks.delete(battle)
+  for (let y = centre.y - radius; y <= centre.y + radius + 1; y++) for (let x = centre.x - radius; x <= centre.x + radius + 1; x++) if (onGrid(x, y)) battle.north[y * GRID + x] = battle.west[y * GRID + x] = 'none'
+}
+
 /**
  * Breaks down a level the cover sheltering `at` from a shot from `from`: a wall to a window, a window to nothing,
  * high cover to rubble, low cover to nothing. Water and void stay as they are.

@@ -4,7 +4,7 @@ import type { Keyword } from './keywords'
 /**
  * One-use items the squad carries into battle, as Slay the Spire's potions: bought at shops, now and then found, and
  * used by the player at any point of a battle. One aimed at the aliens needs an alien in the fight in sight; one aimed
- * at the squad can be readied on the landing screen, to take effect as the squad lands.
+ * at the squad can be readied on the entrance screen, to take effect as the squad goes in.
  */
 export type ConsumableId = 'airstrike' | 'medkit' | 'stims' | 'plating' | 'rage' | 'flashbang' | 'smoke' | 'cryo' | 'firebomb' | 'painter' | 'sentry' | 'decoy'
 

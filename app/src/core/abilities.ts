@@ -1,5 +1,5 @@
 // Actions in place of a shot: alien powers, and soldier skills and gear.
-import { type Battle, type Effect, type Unit, BLAST_RADIUS, CLOAK_TURNS, isSoldier, FORCE_FIELD_REACH, FORCE_FIELD_ARMOR, SLAM_HIT, SLAM_TILES, STUN_REACH, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN, SURGEON_HEAL, MEDIC_REACH, MEDIC_HEAL, SECOND_WIND_HEAL, revealed, DRONE_REACH, DRONE_DAMAGE, SKIRMISH_MOVE, MEDKIT_HEAL, TITAN_HEALTH, PLATING_ARMOR, MECH_STATS, DRONE_STATS, type Stats, type SkillEffect, alert } from './battle'
+import { type Battle, type Effect, type Unit, BLAST_RADIUS, CLOAK_TURNS, isSoldier, FORCE_FIELD_REACH, FORCE_FIELD_ARMOR, SLAM_HIT, SLAM_TILES, STUN_REACH, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN, SURGEON_HEAL, MEDIC_REACH, MEDIC_HEAL, SECOND_WIND_HEAL, revealed, DRONE_REACH, DRONE_DAMAGE, SKIRMISH_MOVE, MEDKIT_HEAL, TITAN_HEALTH, PLATING_ARMOR, MECH_STATS, DRONE_STATS, type Stats, type SkillEffect, engaged } from './battle'
 import { mechUnit } from './spawn'
 import { freeTilesNear } from './grid'
 import { onGrid } from './grid'
@@ -214,7 +214,7 @@ export function deploy(battle: Battle, unit: Unit, seen: Set<number>): GameEvent
 export function strew(battle: Battle, unit: Unit, effect: 'caltrops' | 'firewall'): GameEvent[] {
   if (!has(unit, effect) || unit.spent.includes(effect)) return []
   const rusher = nearest(
-    battle.units.filter((u) => u.side !== unit.side && revealed(battle, u) && alert(battle, u) && distance(u, unit) <= CALTROP_RANGE && distance(u, unit) > CALTROP_LATE),
+    battle.units.filter((u) => u.side !== unit.side && revealed(battle, u) && engaged(battle, u) && distance(u, unit) <= CALTROP_RANGE && distance(u, unit) > CALTROP_LATE),
     unit,
   )
   if (!rusher) return []

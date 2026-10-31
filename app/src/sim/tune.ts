@@ -35,7 +35,7 @@ const MEANING: Record<keyof Tuning, string> = {
   accelerantDamage: 'Damage Accelerant Gel adds to hits on a burning target',
   shatterDamage: 'Damage Shatterglass Edge adds to hits on a chilled target',
   thermalDamage: 'Damage Thermal Shock Core adds to hits on a target both burning and chilled',
-  impactDamage: "Damage drop pods deal to each alien near a soldier landing in a breach",
+  impactDamage: "Damage an entrance's impact deals each alien it hits",
   dangerSupplies: 'Supplies an overrun zone pays',
   hunt: 'The share of its own force the hunt adds to a battle at full threat',
 }

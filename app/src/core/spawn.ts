@@ -1,6 +1,6 @@
 // Making units for a battle: aliens, soldiers, civilians, and mechs and drops an owner brings.
 import { NODE_SPAWNS, HATCH_TURNS } from './aliens'
-import { type Battle, type Alien, type Tile, type Unit, SPAWN_EVERY, type Stats, type Effect, BASE_STATS, type Reserve } from './battle'
+import { type Battle, type Alien, type Tile, type Unit, SPAWN_EVERY, type Stats, type Effect, BASE_STATS, type Reserve, GRID } from './battle'
 import { CIVILIAN_MOVE } from './goals'
 import { walkingDistances, freeTilesNear } from './grid'
 
@@ -48,21 +48,23 @@ export function civilianUnit(battle: Battle, tile: Tile, hp: number, kind: NonNu
   return { id: battle.nextId++, side: 'human', ...tile, hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: kind, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null }
 }
 
-/** A soldier's unit, landing from the reserve on `tile`. */
+/** A soldier's unit, coming in from the reserve on `tile`. */
 export function soldierUnit(battle: Battle, soldier: Reserve, tile: Tile): Unit {
   return { id: battle.nextId++, side: 'human', ...tile, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: null, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null, ...soldier }
 }
 
 /**
  * Lands a unit of `stats` that never moves, fighting for `owner`'s side, on the free tile nearest `spot` where it cuts no
- * ground off from `owner`; none if there is no such tile.
+ * ground off from `owner` nor cuts a squadmate off from it; none if there is no such tile.
  */
 export function dropUnit(battle: Battle, owner: Unit, stats: Stats, spot: Tile, effects: Effect[] = []): Unit | undefined {
   const open = walkingDistances(battle, owner).filter(Number.isFinite).length
+  const mates = battle.units.filter((u) => u.side === owner.side && u !== owner && u.stats.move > 0)
   for (const tile of freeTilesNear(battle, spot, 6)) {
     const unit = mechUnit(battle, owner, stats, effects, tile)
     battle.units.push(unit)
-    if (walkingDistances(battle, owner).filter(Number.isFinite).length >= open - 1) return unit
+    const walk = walkingDistances(battle, owner)
+    if (walk.filter(Number.isFinite).length >= open - 1 && mates.every((m) => walk[m.y * GRID + m.x] < Infinity)) return unit
     battle.units.splice(battle.units.indexOf(unit), 1)
   }
 }

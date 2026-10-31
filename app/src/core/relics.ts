@@ -1,7 +1,6 @@
 // Relics: what each does, and which may be offered.
 import { type RelicEffect, type Stats } from './battle'
-import { POD_BLAST } from './setup'
-import { POD_REACH } from './setup'
+import { CHARGE_BLAST, CHARGE_REACH, LIMELIGHT_ROUNDS } from './entrances'
 import { BEACON_REACH } from './fighters'
 import { BOUNTY_DAMAGE } from './fighters'
 import { RELAY_REACH } from './fighters'
@@ -26,7 +25,7 @@ export interface Relic {
   supplies?: number
   /** Whether every piece of gear found is rare or better. */
   rareGear?: boolean
-  /** Whether the map names the aliens of each zone, not only how dangerous they are. */
+  /** Whether the flight map names the aliens of each stop, not only how dangerous they are. */
   recon?: boolean
   /** Added to the supplies each civilian saved pays. */
   civilianSupplies?: number
@@ -45,7 +44,7 @@ const relics = {
   echo: { name: 'Echo Chamber', text: 'Every class ability with limited uses has one more', charges: 1 },
   drones: { name: 'Scavenger Drones', text: 'Each won battle pays 1 more supply', supplies: 1 },
   contact: { name: 'Black Market Contact', text: 'Every piece of gear found is rare or better', rareGear: true },
-  uplink: { name: 'Recon Uplink', text: 'The map names the aliens of each zone, not only how dangerous they are', recon: true },
+  uplink: { name: 'Recon Uplink', text: 'The flight map names the aliens of each stop, not only how dangerous they are', recon: true },
   accelerant: { name: 'Accelerant Gel', text: `Hits on a burning target do +${TUNING.accelerantDamage} damage`, tags: ['burn'], effect: 'accelerant' },
   wildfire: { name: 'Wildfire Spores', text: 'An alien that dies burning sets every alien beside it burning', tags: ['burn', 'kill'], effect: 'wildfire' },
   salamander: { name: 'Salamander Sigil', text: 'Crits set the target burning', tags: ['crit', 'burn'], effect: 'ignite' },
@@ -67,15 +66,14 @@ const relics = {
   net: { name: "Hunter's Net", text: 'Hits on a rooted alien do +2 damage', effect: 'net' },
   glacial: { name: 'Glacial Snare', text: 'Chilling an alien roots it too', tags: ['frost'], effect: 'glacial' },
   juggernaut: { name: 'Juggernaut Servos', text: '+1 damage while the soldier has armor left', tags: ['ward'], effect: 'armored' },
-  // The drop pods: each makes where the squad lands matter more.
-  impact: { name: 'Impact Charges', text: `Every landing's drop pods hurt each alien within ${POD_REACH} tiles for ${TUNING.impactDamage + POD_BLAST}`, effect: 'podBlast' },
-  shredder: { name: 'Shredder Pods', text: `Every landing's drop pods strip the armor from each alien within ${POD_REACH} tiles and hurt it`, tags: ['ward'], effect: 'podShred' },
-  cryopods: { name: 'Cryo Pods', text: `Every landing's drop pods chill each alien within ${POD_REACH} tiles and hurt it`, tags: ['frost'], effect: 'podFrost' },
-  bulwark: { name: 'Bulwark Pods', text: 'The drop pods stand as full cover beside each soldier, toward the nearest alien', effect: 'podWall' },
-  turrets: { name: 'Turret Drop', text: 'A turret lands with each team: it never moves, and shoots far and true', effect: 'podTurret' },
-  // Landings.
-  dropPods: { name: 'Orbital Drop Pods', text: 'A landing may come down hot on a pod: the pod beneath cannot shoot on its first turn, but every other pod hears and converges', effect: 'dropPods' },
-  canopies: { name: 'Night Canopies', text: 'A landing may be a parachute drop anywhere clear of every pod, deep within', effect: 'canopies' },
+  // Entrances: each makes how the squad comes in matter more.
+  encore: { name: 'Encore', text: 'Every battle offers one more entrance', effect: 'encore' },
+  limelight: { name: 'Limelight', text: `Every battle offers Land and Monologue, and its taunt holds ${LIMELIGHT_ROUNDS} rounds longer`, effect: 'limelight' },
+  charges: { name: 'Breaching Charges', text: `Every entrance blasts each alien within ${CHARGE_REACH} tiles for ${TUNING.impactDamage + CHARGE_BLAST}`, effect: 'entryBlast' },
+  shredder: { name: 'Shredder Charges', text: `Every entrance strips the armor from each alien within ${CHARGE_REACH} tiles and hurts it`, tags: ['ward'], effect: 'entryShred' },
+  cryo: { name: 'Cryo Charges', text: `Every entrance chills each alien within ${CHARGE_REACH} tiles and hurts it`, tags: ['frost'], effect: 'entryFrost' },
+  bulwark: { name: 'Pop-up Barricades', text: 'Full cover springs up beside each soldier as it comes in, toward the nearest alien', effect: 'entryWall' },
+  turrets: { name: 'Turret Drop', text: 'A turret comes in with the squad: it never moves, and shoots far and true', effect: 'entryTurret' },
   // The goals.
   beacon: { name: 'Evac Beacon', text: `A soldier gets a civilian out from ${BEACON_REACH} tiles away`, effect: 'beacon' },
   charity: { name: 'Refugee Network', text: 'Each civilian saved pays 1 more supply', civilianSupplies: 1 },
@@ -87,8 +85,8 @@ const relics = {
 export type RelicId = keyof typeof relics
 export const RELICS: Record<RelicId, Relic> = relics
 
-/** The relic each needs held before it is offered: the drop pods' relics need the pods. */
-export const REQUIRES: Partial<Record<RelicId, RelicId>> = { impact: 'dropPods', shredder: 'dropPods', cryopods: 'dropPods', bulwark: 'dropPods', turrets: 'dropPods' }
+/** The relic each needs held before it is offered: the other charges need Breaching Charges. */
+export const REQUIRES: Partial<Record<RelicId, RelicId>> = { shredder: 'charges', cryo: 'charges' }
 
 /** Relics that may be offered to a squad holding `held`: those it lacks whose requirement it holds. */
 export function offerable(held: RelicId[]): RelicId[] {

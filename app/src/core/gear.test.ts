@@ -1,6 +1,6 @@
 import { roots } from './skills'
 import { expect, test } from 'vitest'
-import { deploy, zoneOf, begun } from './roads'
+import { enterAt, entranceOf, begun } from './roads'
 import { apply } from './apply'
 import { CHILL_TURNS, CRIT_BONUS, SEARING_DAMAGE, SOLDIER_ATTACKS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
 import { alienUnit } from './spawn'
@@ -60,9 +60,9 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   // War drums pay off only on a kill, so they leave a duel as it is.
-  // A cold zone, so no drop pod impact lands in the fight.
-  const zone = zoneOf(run.battle!, 'deep')
-  deploy(run, zone)
+  // An entrance that sets nothing off.
+  const zone = entranceOf(run.battle!, 'rappel')
+  enterAt(run, zone)
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist: null })
   battle.ground.fill('pavement')
@@ -75,7 +75,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   const soldier = battle.units.find((u) => u.soldier === run.soldiers[0].id)!
   const alien = battle.units.find((u) => u.side === 'alien')!
   battle.units = [soldier, alien]
-  battle.pods.forEach((pod) => Object.assign(pod, { revealed: true, alert: true }))
+  battle.pods.forEach((pod) => Object.assign(pod, { revealed: true, engaged: true }))
   // A soldier of no class in particular: it holds its ground and has no ability or class skill.
   Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, effects: gear.effect ? [gear.effect] : [] })
   Object.assign(alien, { kind: 'trooper', x: 10, y: 11, hp: 99, armor: 0, target: false, stats: { ...alienStats('trooper', 0, 0), hp: 99, armor: 0, aim: 2, crit: 0 } })

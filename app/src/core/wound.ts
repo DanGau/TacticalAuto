@@ -18,10 +18,12 @@ export const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || ta
 
 /**
  * Deals `damage` to a unit: its armor takes it first, then its health. At zero health the unit is removed and its
- * death reported. A burster that dies explodes, and a psion that dies hurts the other aliens of its pod.
+ * death reported. A burster that dies explodes, and a psion that dies hurts the other aliens of its pod. A pod hurt
+ * engages.
  */
 export function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[], pierce = false, crit = false): void {
   if (target.hp <= 0) return
+  if (target.pod !== null) battle.pods[target.pod].engaged = true
   const damage = target.kind === 'wraith' && !crit ? Math.min(dealt, 1) : dealt
   const full = target.hp === target.stats.hp
   // A juggernaut's plate stops a hit whole, and is lost to it.

@@ -1,7 +1,6 @@
 // The stage every part of the view draws on: the scene and its layers, the camera and its glides, the frame loop, and what is on screen.
 import { ColorManagement, Fog, Group, LinearSRGBColorSpace, type Mesh, PerspectiveCamera, Scene, type Sprite as Billboard, type Object3D, Vector3, WebGLRenderer } from 'three'
-import { distance } from '../core/grid'
-import { GRID, ZONE_RADIUS, type Battle, type Tile } from '../core/battle'
+import { ENTRY_RADIUS, GRID, type Battle, type Tile } from '../core/battle'
 import type { Run } from '../core/run-state'
 import { aim, axes, clamped, FIT, framing, HAZE_REACH, HEIGHT, picture, spot, WIDTH, type Camera } from './camera'
 import { RISE_MS, type fence } from './fences'
@@ -29,7 +28,7 @@ export interface Sprite {
   cloaked: boolean
 }
 
-/** Words over the map: a landing zone's name, or a callout over a unit. */
+/** Words over the map: an entrance's name, or a callout over a unit. */
 export interface Label {
   text: string
   color: number
@@ -47,8 +46,6 @@ export const CAMERA_MS = 350
 const STANDOFF = 0.6
 /** How long a roof or wall takes to fade out of the way or back. */
 const FADE_MS = 220
-/** Tiles from anyone on the squad's side within which every roof is cut away. */
-const ROOF_REACH = 5
 /** How solid a wall stays while a unit stands just behind it. */
 const SEE_THROUGH = 0.3
 
@@ -70,7 +67,7 @@ export class Stage {
   readonly chasm = new Group()
   /** The ground, and the props, walls and windows standing on it. */
   readonly terrain = new Group()
-  /** Marks on the ground, in the order they lie: the landing zones' tint, acid and fire, fog, and glows in the fog. */
+  /** Marks on the ground, in the order they lie: the entrances' tint, acid and fire, fog, and glows in the fog. */
   readonly zones = new Group()
   readonly acid = new Group()
   readonly fog = new Group()
@@ -82,10 +79,10 @@ export class Stage {
   readonly fences = new Group()
   standing = new Map<string, ReturnType<typeof fence>>()
 
-  /** Shot effects over the scene, and each landing pod or canopy under way. */
+  /** Shot effects over the scene, and each entrance's props under way. */
   readonly fx = new Sketch()
   readonly drops = new Set<Sketch>()
-  /** Before the landing, the landing zones' names and the contact markers; and the callouts over units. */
+  /** Before the entrance, the entrances' and pods' names; and the callouts over units. */
   marks: Label[] = []
   readonly labels = new Set<Label>()
 
@@ -103,18 +100,18 @@ export class Stage {
   roofs: { tiles: Set<number>; box: { x1: number; y1: number; x2: number; y2: number }; fade: { value: number }; mesh: Mesh }[] = []
   /** The tile the briefing is lighting, which no roof hides. */
   lit: Tile | null = null
-  /** The tiles the squad sees, by index; null before the landing. */
+  /** The tiles the squad sees, by index; null before the entrance. */
   seen: boolean[] | null = null
   /** The battle on screen. */
   shown: Battle | null = null
   camera = aim({ x: 0, y: 0 }, FIT)
   /** Screen pixels the picture is jolted by, as a blow lands. */
   readonly jolt = { x: 0, y: 0 }
-  /** The landing zone under the pointer. */
+  /** The entrance under the pointer. */
   hovered: number | null = null
-  /** The landing zone the camera is on before the landing. */
+  /** The entrance the camera is on before the squad goes in. */
   selected: number | null = null
-  /** Whether the briefing is under way, so the landing zones are hidden. */
+  /** Whether the briefing is under way, so the entrances are hidden. */
   briefing = false
   /** The camera's glide under way; a new one takes over from wherever the camera is, so two never fight over it. */
   glides = 0
@@ -236,9 +233,9 @@ export class Stage {
   }
 
   /**
-   * Fades away each roof within ROOF_REACH of anyone on the squad's side, and each over a tile that matters: a unit's,
-   * the briefing's lit one, or a landing zone's while one is chosen. Thins each wall standing just before a unit toward
-   * the camera, as XCOM cuts its buildings away. The rest fade back.
+   * Fades away each roof within the circle of the arena, where the fight is staged, and each over a tile that
+   * matters: a unit's, the briefing's lit one, or an entrance's while one is chosen. Thins each wall standing just
+   * before a unit toward the camera, as XCOM cuts its buildings away. The rest fade back.
    */
   private cutAway(ms: number): void {
     const { shown } = this
@@ -246,15 +243,14 @@ export class Stage {
     const toward = (fade: { value: number }, target: number) => (fade.value = fade.value < target ? Math.min(target, fade.value + step) : Math.max(target, fade.value - step))
     const keys = [...this.sprites.values()].map((s) => ({ x: Math.round(s.tile.x), y: Math.round(s.tile.y) }))
     if (this.lit) keys.push({ x: Math.round(this.lit.x), y: Math.round(this.lit.y) })
-    // Choosing where to land, the landing zones show whole.
+    // Choosing an entrance, the entrances show whole.
     if (shown?.phase === 'deploy' && !this.briefing)
-      for (const zone of shown.zones)
-        for (let dy = -ZONE_RADIUS; dy <= ZONE_RADIUS; dy++) for (let dx = -ZONE_RADIUS; dx <= ZONE_RADIUS; dx++) if (distance(zone, { x: zone.x + dx, y: zone.y + dy }) <= ZONE_RADIUS) keys.push({ x: zone.x + dx, y: zone.y + dy })
+      for (const { at } of shown.entrances) for (let dy = -ENTRY_RADIUS; dy <= ENTRY_RADIUS; dy++) for (let dx = -ENTRY_RADIUS; dx <= ENTRY_RADIUS; dx++) keys.push({ x: at.x + dx, y: at.y + dy })
     const under = new Set(keys.map((k) => k.y * GRID + k.x))
-    const squad = [...this.sprites.values()].filter((s) => s.ally).map((s) => s.tile)
+    const arena = shown?.arena
     for (const roof of this.roofs) {
       const { x1, y1, x2, y2 } = roof.box
-      const near = squad.some((t) => Math.max(x1 - t.x, t.x - x2, y1 - t.y, t.y - y2) <= ROOF_REACH)
+      const near = arena && Math.hypot(Math.max(x1 - arena.x, 0, arena.x - x2), Math.max(y1 - arena.y, 0, arena.y - y2)) <= arena.reach
       const open = near || [...roof.tiles].some((t) => under.has(t))
       toward(roof.fade, open ? 0 : 1)
       roof.mesh.visible = roof.fade.value > 0

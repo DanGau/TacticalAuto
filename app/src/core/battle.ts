@@ -6,6 +6,7 @@ import type { Resist } from './keywords'
 import { type Goal } from './goals'
 import type { Twist } from './twists'
 import type { ConsumableId } from './consumables'
+import type { EntranceKind } from './entrances'
 import { type Cover, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
 
 export type { Cover }
@@ -19,10 +20,8 @@ export const CRIT_BONUS = 2
 export const COVER_DEFENSE = [0, 0.2, 0.4]
 /** Tiles within which a soldier with line of sight reveals an alien. */
 export const SIGHT = 24
-/** How near a soldier landing in a breach an alien must be to take the drop pods' impact damage. */
-export const IMPACT_REACH = 2
-/** Tiles an alien moves per turn before its pod is revealed. */
-export const PATROL_MOVE = 2
+/** How near the squad an alien must be to take an entrance's impact. */
+export const IMPACT_REACH = 4
 /** Damage a rocket does to every unit within BLAST_RADIUS tiles of where it lands. */
 export const ROCKET_DAMAGE = 4
 export const BLAST_RADIUS = 1
@@ -105,14 +104,14 @@ export const CLOAK_TURNS = 2
 export const CLOAK_AIM = 0.3
 export const CLOAK_DAMAGE = 3
 export const SHADOW_DAMAGE = 2
-/** The letters landing zones go by, in battle.zones order. */
-export const ZONE_NAMES = 'ABC'
-/** Landing zones offered to the squad. */
-export const ZONES = 3
-/** Tiles around a landing zone's centre that count as the zone. */
-export const ZONE_RADIUS = 3
-/** Tiles a landing zone keeps from every alien and from the other zones. */
-export const ZONE_CLEARANCE = 9
+/** Entrances offered to the squad. */
+export const ENTRANCES = 3
+/** Tiles around an entrance that are marked as it, and that its squad comes in on. */
+export const ENTRY_RADIUS = 2
+/** Tiles a pod keeps from the others, and a wave from the squad. */
+export const POD_CLEARANCE = 7
+/** How near a soldier comes to a pod waiting its turn before it engages. */
+export const ENGAGE_REACH = 5
 
 export type Side = 'human' | 'alien'
 
@@ -217,7 +216,7 @@ export type SkillEffect =
   | 'daze'
   | 'afterimage'
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'podBlast' | 'podShred' | 'podFrost' | 'podWall' | 'podTurret' | 'dropPods' | 'canopies' | 'beacon' | 'relay' | 'flare' | 'bounty'
+export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'limelight' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
 export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect
 
@@ -321,19 +320,33 @@ export type Order = 'hunker' | 'prepare' | 'sprint'
 /** Hit chance a hunkered unit takes off shots at it. */
 export const HUNKER_DEFENSE = 0.3
 
-/** A group of aliens. It patrols toward its waypoint, unseen, until a soldier sights a member; then it fights. */
+/**
+ * A group of aliens. It hangs out at its post, alert but waiting its turn, until it engages: then it comes for the
+ * squad and fights. Pods engage one at a time; see rally.
+ */
 interface Pod {
   /** The name of its pack. */
   name: string
-  /** Seen by the squad: drawn, and shot at. */
+  /** Seen by the squad: drawn, and shot at. Every pod is but burrowers underground and waves not yet sighted. */
   revealed: boolean
-  /** Aware of the squad: it hunts the squad and fights. */
-  alert: boolean
-  /** Revealed during the current alien turn, or crashed onto by drop pods, so its members do not shoot until the next. */
+  /** Caught off guard, so its members do not shoot until the aliens' turn ends. */
   surprised: boolean
-  /** Holds its post, unmoving, until it notices the squad or the battle drags on. */
-  guard: boolean
-  waypoint: Tile
+  /** In the fight: coming for the squad. A pod not yet engaged stands at its post and holds its fire. */
+  engaged: boolean
+  post: Tile
+}
+
+/** An entrance the squad may make: how, and the tile it comes in at. */
+export interface Entrance {
+  kind: EntranceKind
+  at: Tile
+}
+
+/** The ground the fight is staged on: where the pods hang out, and the entrances by them. */
+export interface Arena {
+  x: number
+  y: number
+  reach: number
 }
 
 export interface Battle {
@@ -385,10 +398,8 @@ export interface Battle {
   used: Effect[]
   /** Consumables the player has used, taking effect at the next beat. */
   primed: ConsumableId[]
-  /** Set by a landing on the hot zone until the drop pods' impact lands, as the battle's first beat. */
-  breach: boolean
-  /** The zone, by index into zones, whose landing comes with an artillery strike on the pod nearest it; null if none. */
-  barrage: number | null
+  /** Set by the entrance until what it sets off lands, as the battle's first beat. */
+  opening: boolean
   /** Tiles of acid, each with the alien turns it has left. */
   acid: { x: number; y: number; turns: number }[]
   /** Tiles of fire, each with the alien turns it has left. */
@@ -403,8 +414,14 @@ export interface Battle {
   saved: number
   /** On a VIP rescue, whether the VIP waits for the squad, behind its building's walls or past the breach; keeps by it on the way out; or has lifted off. Null otherwise. */
   vip: 'held' | 'breached' | 'freed' | 'out' | null
-  /** Centres of the landing zones on offer in the deploy phase. */
-  zones: Tile[]
+  /** The entrances on offer in the deploy phase, and the one the squad made; null before it enters. */
+  entrances: Entrance[]
+  entered: Entrance | null
+  arena: Arena
+  /** The round the last pod engaged. */
+  rallied: number
+  /** A soldier whose monologue draws every alien's attention until the round `until` ends; null if none. */
+  spotlight: { id: number; until: number } | null
   /** On a hold, the uplink the squad must reach and defend; null otherwise. */
   uplink: Tile | null
   /** On a hold, once it is held, the extraction zone; null otherwise. */
@@ -412,9 +429,6 @@ export interface Battle {
   /** Soldiers lifted off from the extraction zone, by soldier id, and the health each left with; 0 if carried. */
   escaped: number[]
   lifted: Record<number, number>
-  /** What landing at each zone means, in zones order, and the plan the squad landed by; null before it lands. */
-  plans: Plan[]
-  landed: Plan | null
   /** On a raid, the supply caches still on the map, and how many the squad set out to grab and has grabbed. */
   caches: Tile[]
   greed: number
@@ -437,8 +451,8 @@ interface Downed {
 /** Primary attacks a soldier makes each turn; an alien makes one. */
 export const SOLDIER_ATTACKS = 2
 
-/** Whether the unit hunts its enemies: an alien once its pod is alert. Humans always do. */
-export const alert = (battle: Battle, unit: Unit) => unit.pod === null || battle.pods[unit.pod].alert
+/** Whether the unit is in the fight: an alien once its pod engages. Humans always are. */
+export const engaged = (battle: Battle, unit: Unit) => unit.pod === null || battle.pods[unit.pod].engaged
 
 /** A soldier of the squad: not a civilian, nor a mech, which fights for the squad but cannot hold the field alone. */
 export const isSoldier = (unit: Unit) => unit.side === 'human' && unit.soldier !== null
@@ -447,11 +461,3 @@ export const isSoldier = (unit: Unit) => unit.side === 'human' && unit.soldier !
 export function revealed(battle: Battle, unit: Unit): boolean {
   return unit.pod === null || battle.pods[unit.pod].revealed
 }
-
-/**
- * What landing at a zone means. Exterminate and raid: a quiet march in from the edge; with a relic, a hot drop onto a
- * pod or a parachute drop anywhere clear of every pod.
- * Assassinate: a decapitation onto the commander, an overwatch on high ground at range, or bait far off that draws the
- * guards away. Hold: which uplink to hold. Rescue: a quiet march in from the edge.
- */
-export type Plan = 'march' | 'hot' | 'deep' | 'decap' | 'overwatch' | 'bait' | 'uplink'

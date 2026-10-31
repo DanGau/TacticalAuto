@@ -8,9 +8,8 @@ import { skillOffers } from '../core/squad'
 import type { View } from '../view/view'
 import { choice, joined, loot, modal, runEnd, skillChoice, stopReport } from './aftermath'
 import { TWISTS } from '../core/twists'
-import { ZONE_NAMES, type Battle } from '../core/battle'
-import { STRIKE } from '../core/setup'
-import { PLANS } from '../core/setup'
+import { type Battle } from '../core/battle'
+import { ENTRANCE_KINDS, STRIKE } from '../core/entrances'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { button, STOP_NAMES } from './html'
 import { canUse } from '../core/apply'
@@ -37,39 +36,37 @@ function status(run: Run): string {
   return `${title}${vip}${rounds}`
 }
 
-/** Before the landing: a button per zone that flies the camera there, one back to the whole map, and the chosen zone's plan. */
-function drop(battle: Battle, zone: number | null, greed: number): string {
+/** Before the entrance: a button per entrance that flies the camera there, one back to the whole map, and what the chosen one does. */
+function drop(battle: Battle, chosen: number | null, greed: number): string {
   if (battle.goal === 'raid') return raids(battle, greed)
-  const barrage = (i: number) => (i === battle.barrage ? '💥 Barrage' : '')
-  const zones = battle.plans.map((plan, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}">${[ZONE_NAMES[i], PLANS[plan].icon, PLANS[plan].name, barrage(i)].filter(Boolean).join(' ')}</button>`)
-  const overview = `<button data-zone="" class="overview ${zone === null ? 'on' : ''}" title="Whole map">🗺️</button>`
-  const strike = `<p>An artillery strike softens the pod in front: each alien -${STRIKE.damage} health. <span class="up">+${STRIKE.threat} threat</span>.</p>`
-  const detail =
-    zone === null
-      ? '<small>Pick a landing zone to fly to it.</small>'
-      : `${PLANS[battle.plans[zone]].text ? `<p>${PLANS[battle.plans[zone]].text}.</p>` : ''}${zone === battle.barrage ? strike : ''}${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
+  const entrances = battle.entrances.map(({ kind }, i) => `<button data-entrance="${i}" class="${i === chosen ? 'on' : ''}">${ENTRANCE_KINDS[kind].icon} ${ENTRANCE_KINDS[kind].name}</button>`)
+  const overview = `<button data-entrance="" class="overview ${chosen === null ? 'on' : ''}" title="Whole map">🗺️</button>`
+  const kind = chosen === null ? null : battle.entrances[chosen].kind
+  const cost = kind === 'strike' ? ` <span class="up">+${STRIKE.threat} threat</span>` : ''
+  const detail = kind === null ? '<small>Pick an entrance to fly to it.</small>' : `<p>${ENTRANCE_KINDS[kind].text}.${cost}</p>${button({ type: 'enter', entrance: chosen! }, `${ENTRANCE_KINDS[kind].icon} ${ENTRANCE_KINDS[kind].name}!`)}`
   const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
-  return `${twist}<div class="zones">${zones.join('')}${overview}</div>${detail}`
+  return `${twist}<div class="entrances">${entrances.join('')}${overview}</div>${detail}`
 }
 
 /** On a raid: a button per number of caches to go for, then what that pays and costs. */
 function raids(battle: Battle, greed: number): string {
   const buttons = battle.caches.map((_, i) => `<button data-greed="${i + 1}" class="${i + 1 === greed ? 'on' : ''}">📦 ${i + 1}</button>`)
+  const { kind } = battle.entrances[0]
   const what = greed === 1 ? 'Grab the nearest cache and lift off.' : `Grab ${greed} caches before lifting off: ${greed} times the supplies, and ${greed - 1} more threat.`
-  return `<div class="zones">${buttons.join('')}</div><p>${what}</p>${button({ type: 'grab', caches: greed }, `Go for ${greed}`)}`
+  return `<div class="entrances">${buttons.join('')}</div><p>${ENTRANCE_KINDS[kind].icon} <b>${ENTRANCE_KINDS[kind].name}.</b> ${ENTRANCE_KINDS[kind].text}.</p><p>${what}</p>${button({ type: 'grab', caches: greed }, `Go for ${greed}`)}`
 }
 
 /**
- * The consumables carried into a battle, a slot each: one usable now uses it at a click; one readied on the landing
- * screen waits, lit, for the landing.
+ * The consumables carried into a battle, a slot each: one usable now uses it at a click; one readied on the entrance
+ * screen waits, lit, for the entrance.
  */
 function kit(run: Run): string {
   const battle = run.battle!
-  const readied = battle.primed.map((id) => `<button class="primed" disabled title="${CONSUMABLES[id].text}">${CONSUMABLES[id].icon} ${CONSUMABLES[id].name}<small>${battle.phase === 'deploy' ? 'on landing' : 'now'}</small></button>`)
+  const readied = battle.primed.map((id) => `<button class="primed" disabled title="${CONSUMABLES[id].text}">${CONSUMABLES[id].icon} ${CONSUMABLES[id].name}<small>${battle.phase === 'deploy' ? 'on entering' : 'now'}</small></button>`)
   const held = run.kit.map((id, index) => {
     const item = CONSUMABLES[id]
     const usable = canUse(run, index)
-    const when = !usable ? 'once aliens are in the fight' : battle.phase === 'deploy' ? 'ready for the landing' : 'use now'
+    const when = !usable ? 'once aliens are in the fight' : battle.phase === 'deploy' ? 'ready for the entrance' : 'use now'
     return button({ type: 'use', index }, `${item.icon} ${item.name}<small>${when}${item.threat ? ` · +${item.threat} threat` : ''}</small>`, '', usable).replace('<button', `<button title="${item.text}"`)
   })
   const empty = Array.from({ length: Math.max(0, KIT_SLOTS - readied.length - held.length) }, () => '<button class="empty" disabled>Empty slot</button>')
@@ -87,11 +84,11 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     const target = (e.target as HTMLElement).closest('button')
     if (target?.dataset.action && !target.disabled) act(JSON.parse(target.dataset.action) as Action)
   })
-  /** The landing zone chosen in the deploy phase, and the battle it was chosen in. */
-  let zone: number | null = null
+  /** The entrance chosen in the deploy phase, and the battle it was chosen in. */
+  let chosen: number | null = null
   /** The caches chosen to go for on a raid. */
   let greed = 1
-  let zoneBattle: Battle | null = null
+  let choosing: Battle | null = null
   /** The report the player has continued past. */
   let seen: Report | null = null
   let tab: Tab = 'Map'
@@ -174,22 +171,22 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     const battle = run.phase === 'battle' && run.battle?.phase === 'deploy' ? run.battle : null
     dropPanel.hidden = !battle
     if (!battle) return
-    if (battle !== zoneBattle) {
-      zoneBattle = battle
-      zone = null
+    if (battle !== choosing) {
+      choosing = battle
+      chosen = null
       greed = 1
     }
-    dropPanel.innerHTML = drop(battle, zone, greed)
+    dropPanel.innerHTML = drop(battle, chosen, greed)
   }
 
   function choose(next: number | null): void {
-    zone = next
-    view.focus(zone)
+    chosen = next
+    view.focus(chosen)
     showDrop(shown!)
   }
 
   view.canvas.addEventListener('click', (e) => {
-    const at = view.zoneAt(e.offsetX, e.offsetY)
+    const at = view.entranceAt(e.offsetX, e.offsetY)
     if (at !== null) choose(at)
   })
   dropPanel.addEventListener('click', (e) => {
@@ -199,7 +196,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     else if (target.dataset.greed) {
       greed = Number(target.dataset.greed)
       showDrop(shown!)
-    } else choose(target.dataset.zone ? Number(target.dataset.zone) : null)
+    } else choose(target.dataset.entrance ? Number(target.dataset.entrance) : null)
   })
   addEventListener('resize', () => requestAnimationFrame(shrink))
 

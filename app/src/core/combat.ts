@@ -120,8 +120,8 @@ function act(battle: Battle): GameEvent[] {
   return []
 }
 
-/** Aliens in the fight the squad sees: revealed, and alert to it. */
-export const foesInSight = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.pod !== null && battle.pods[u.pod].revealed && battle.pods[u.pod].alert)
+/** Aliens in the fight the squad sees: revealed, and engaged. */
+export const foesInSight = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.pod !== null && battle.pods[u.pod].revealed && battle.pods[u.pod].engaged)
 
 /** What a consumable does as it is used. */
 function useConsumable(battle: Battle, id: ConsumableId): GameEvent[] {
@@ -192,8 +192,8 @@ export function stepBattle(battle: Battle): GameEvent[] {
   const humans = battle.units.some(isSoldier)
   // Aliens left to beat: none once the commander falls, for the rest flee.
   const fled = battle.goal === 'assassinate' && !battle.units.some((u) => u.target)
-  // A VIP rescue is not done until the VIP is out.
-  const aliens = !fled && (battle.units.some((u) => u.side === 'alien') || battle.waves.length > 0 || (battle.vip !== null && battle.vip !== 'out'))
+  // A VIP rescue is done once the VIP is out, and not before.
+  const aliens = !fled && battle.vip !== 'out' && (battle.units.some((u) => u.side === 'alien') || battle.waves.length > 0 || battle.vip !== null)
   // A rescue is over once no civilian is left to save: won if any were. A raid is won once it has the caches it came for.
   const emptied = battle.goal === 'rescue' && !battle.units.some((u) => u.civilian)
   const loaded = battle.goal === 'raid' && battle.grabbed >= battle.greed

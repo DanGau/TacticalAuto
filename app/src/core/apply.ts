@@ -1,6 +1,5 @@
 // The player's actions, checked and applied to the run: the only way a player changes state.
-import { STRIKE } from './setup'
-import { land } from './setup'
+import { enter, STRIKE } from './entrances'
 import { foesInSight } from './combat'
 import { CONSUMABLES, KIT_SLOTS } from './consumables'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
@@ -34,15 +33,15 @@ export type Action =
   | { type: 'choose'; index: number }
   /** Overworld, choosing where to go: enter the stop at `index` of the next column, one the last stop leads to. */
   | { type: 'go'; index: number }
-  /** Overworld, in a zone: travel to the next stop. */
+  /** Overworld: travel to the next stop. */
   | { type: 'advance' }
-  /** Deploy phase: land the squad on the zone at `zone` of battle.zones and begin the battle; the barrage's zone costs threat. */
-  | { type: 'land'; zone: number }
-  /** Battle, landing or fighting: use the consumable at `index` of run.kit; it takes effect at the next beat. */
+  /** Deploy phase: make the entrance at `entrance` of battle.entrances and begin the battle; Danger Close costs threat. */
+  | { type: 'enter'; entrance: number }
+  /** Battle, entering or fighting: use the consumable at `index` of run.kit; it takes effect at the next beat. */
   | { type: 'use'; index: number }
   /** Battle: fight on without using a consumable, when asked to choose. */
   | { type: 'wait' }
-  /** On a raid, in place of a landing zone: how many supply caches the squad goes for before it lifts off. */
+  /** On a raid, in place of a choice of entrance: how many supply caches the squad goes for before it lifts off. */
   | { type: 'grab'; caches: number }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
@@ -60,7 +59,7 @@ const no = (reason: string): Result => ({ ok: false, reason })
 
 /**
  * Whether the consumable at `index` of the kit can be used now: in a battle, one aimed at the aliens only once one in
- * the fight is in sight, one aimed at the squad from the landing on.
+ * the fight is in sight, one aimed at the squad from the entrance screen on.
  */
 export function canUse(run: Run, index: number): boolean {
   const id = run.kit[index]
@@ -93,17 +92,17 @@ export function apply(run: Run, action: Action): Result {
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy' || battle.goal !== 'raid') return no('not raiding')
     if (!Number.isInteger(action.caches) || action.caches < 1 || action.caches > battle.caches.length) return no('no such raid')
     battle.greed = action.caches
-    land(battle, battle.zones[0])
+    enter(battle, battle.entrances[0])
     return ok
   }
-  if (action.type === 'land') {
+  if (action.type === 'enter') {
     const battle = run.battle
-    if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not landing')
+    if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not entering')
     if (battle.goal === 'raid') return no('a raid picks how many caches to grab instead')
-    const zone = battle.zones[action.zone]
-    if (!zone) return no('no such landing zone')
-    if (action.zone === battle.barrage) run.threat = Math.min(run.threat + STRIKE.threat, THREAT_MAX)
-    land(battle, zone)
+    const entrance = battle.entrances[action.entrance]
+    if (!entrance) return no('no such entrance')
+    if (entrance.kind === 'strike') run.threat = Math.min(run.threat + STRIKE.threat, THREAT_MAX)
+    enter(battle, entrance)
     return ok
   }
   if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill') {

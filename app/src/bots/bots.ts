@@ -2,9 +2,8 @@
 import { canUse, type Action } from '../core/apply'
 import { foesInSight } from '../core/combat'
 import { CONSUMABLES, KIT_SLOTS } from '../core/consumables'
-import { type Battle, type Stance } from '../core/battle'
-import { STRIKE } from '../core/setup'
-import { zoneInfo } from '../core/setup'
+import { type Battle } from '../core/battle'
+import { STRIKE, type EntranceKind } from '../core/entrances'
 import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
@@ -84,32 +83,33 @@ function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
 }
 
 /**
- * Whether a zone's ground suits a soldier of `stance`: a sniper wants high ground over the aliens or room to shoot from
- * afar, an assault to start close, anyone else plenty of cover.
+ * What an entrance is worth to a sensible squad: a monologue where civilians or a VIP need sparing, else the surprise
+ * of a charge through the wall, then the hurt the others do; Danger Close is chosen apart, for its threat.
  */
-function suits(stance: Stance, info: ReturnType<typeof zoneInfo>): boolean {
-  if (stance === 'standoff') return info.high > 0 || (info.contact >= 8 && info.contact < Infinity)
-  if (stance === 'rush') return info.contact <= 6
-  return info.cover >= 10
+function sense(battle: Battle, kind: EntranceKind): number {
+  const spare = battle.units.some((u) => u.civilian)
+  return { monologue: spare ? 10 : 2, wall: 6, door: 5, skylight: 4, truck: 4, smoke: 4, rappel: 3, strike: 0 }[kind]
 }
 
-/** Chooses a landing zone. */
-type Land = (run: Run, battle: Battle, rng: { rng: number }) => number
+/** What each entrance that hurts the aliens is worth to a hard-hitting squad. */
+const HURTS: Partial<Record<EntranceKind, number>> = { truck: 3, skylight: 3, door: 2 }
 
-const cover = (battle: Battle, i: number) => zoneInfo(battle, battle.zones[i]).cover
-const best = (battle: Battle, score: (i: number) => number) => battle.zones.reduce((top, _, i) => (score(i) > score(top) ? i : top), 0)
+/** Chooses an entrance. */
+type Enter = (run: Run, battle: Battle, rng: { rng: number }) => number
 
-const LANDS = {
-  random: (_run, battle, rng) => randomInt(rng, battle.zones.length),
-  /** The most cover. */
-  cover: (_run, battle) => best(battle, (i) => cover(battle, i)),
-  /** The least cover: a careless landing. */
-  exposed: (_run, battle) => best(battle, (i) => -cover(battle, i)),
-  /** The hot drop when offered, else the most cover. */
-  hot: (_run, battle) => (battle.plans.includes('hot') ? battle.plans.indexOf('hot') : best(battle, (i) => cover(battle, i))),
-  /** The zone whose ground suits the most of the squad. */
-  fit: (_run, battle) => best(battle, (i) => battle.reserve.filter((r) => suits(r.stance, zoneInfo(battle, battle.zones[i]))).length * 100 + cover(battle, i)),
-} satisfies Record<string, Land>
+const best = (battle: Battle, score: (kind: EntranceKind) => number) => battle.entrances.reduce((top, e, i) => (score(e.kind) > score(battle.entrances[top].kind) ? i : top), 0)
+
+const ENTERS = {
+  random: (_run, battle, rng) => randomInt(rng, battle.entrances.length),
+  /** The most sensible. */
+  sensible: (_run, battle) => best(battle, (kind) => sense(battle, kind)),
+  /** The least: a careless entrance. */
+  careless: (_run, battle) => best(battle, (kind) => -sense(battle, kind)),
+  /** The one that hurts the aliens most. */
+  hard: (_run, battle) => best(battle, (kind) => HURTS[kind] ?? sense(battle, kind) / 10),
+  /** The sensible one, rappelling with snipers enough to use the height. */
+  fit: (_run, battle) => best(battle, (kind) => sense(battle, kind) + (kind === 'rappel' ? 2 * battle.reserve.filter((r) => r.stance === 'standoff').length : 0)),
+} satisfies Record<string, Enter>
 
 /** Purchases the run can pay for now: gear, each for the soldier it does the most for, then relics. */
 const affordable = (run: Run): Action[] => [
@@ -153,13 +153,13 @@ const HURT = 0.6
 const growing = (run: Run): Risk => (run.soldiers.reduce((sum, s) => sum + level(s), 0) / run.soldiers.length >= 3 ? 'dangerous' : 'safe')
 
 /**
- * One way to play: how much danger to take at each choice of way, how to choose offers, where to land, whether to spend at
+ * One way to play: how much danger to take at each choice of way, how to choose offers, how to go in, whether to spend at
  * shops, and how to meet events: boldly, taking the first option the squad can, or cautiously, taking the last.
  */
 interface Strategy {
   risk: Risk | ((run: Run) => Risk)
   pick: keyof typeof PICKS
-  land: keyof typeof LANDS
+  enter: keyof typeof ENTERS
   build: boolean
   events: 'bold' | 'cautious'
 }
@@ -178,22 +178,22 @@ function shop(run: Run): Action {
 
 /** A bot that plays `strategy`, deciding finds as decideFind says. */
 const play =
-  ({ risk, pick, land, build, events }: Strategy): Bot =>
+  ({ risk, pick, enter, build, events }: Strategy): Bot =>
   (run, rng) => {
     if (run.phase === 'battle' && run.battle!.phase === 'battle') return useKit(run)
     if (run.phase === 'reward') return reward(run, rng, PICKS[pick])
     // A bold bot takes a recruit with a trait, any other the plain one.
     if (run.phase === 'recruit') return { type: 'recruit', index: run.recruits.findIndex((r) => (events === 'bold') === (r.trait !== null)) }
-    // The barrage's zone on the hard fights, a key, the final mission or an Overrun battle, while the threat leaves room for it.
+    // Danger Close on the hard fights, a key, the final mission or an Overrun battle, while the threat leaves room for it.
     const hard = run.mission && (run.mission.kind === 'key' || run.mission.kind === 'final' || run.mission.risk === 'dangerous')
-    const barrage = run.battle?.barrage
-    if (run.phase === 'battle' && run.battle!.goal !== 'raid' && hard && barrage != null && run.threat + STRIKE.threat < THREAT_MAX) return { type: 'land', zone: barrage }
+    const strike = run.battle?.entrances.findIndex((e) => e.kind === 'strike') ?? -1
+    if (run.phase === 'battle' && run.battle!.goal !== 'raid' && hard && strike >= 0 && run.threat + STRIKE.threat < THREAT_MAX) return { type: 'enter', entrance: strike }
     // A raid goes for caches by the same appetite.
     if (run.phase === 'battle' && run.battle!.goal === 'raid') {
       const most = run.battle!.caches.length
       return { type: 'grab', caches: Math.max(1, Math.round(most * { safe: 0, standard: 0.5, dangerous: 1 }[typeof risk === 'function' ? risk(run) : risk])) }
     }
-    if (run.phase === 'battle') return { type: 'land', zone: LANDS[land](run, run.battle!, rng) }
+    if (run.phase === 'battle') return { type: 'enter', entrance: ENTERS[enter](run, run.battle!, rng) }
     if (run.phase === 'shop') return build ? shop(run) : { type: 'leave' }
     // At a medic, the first thing it offers: rest when hurt, a bonus at full health.
     if (run.phase === 'event') return { type: 'choose', index: events === 'bold' || run.event === 'medic' ? takeable(run)[0] : takeable(run).at(-1)! }
@@ -217,7 +217,7 @@ const randomBot: Bot = (run, rng) => {
   if (run.phase === 'reward') return reward(run, rng, PICKS.random)
   if (run.phase === 'recruit') return { type: 'recruit', index: randomInt(rng, run.recruits.length) }
   if (run.phase === 'battle' && run.battle!.goal === 'raid') return { type: 'grab', caches: 1 + randomInt(rng, run.battle!.caches.length) }
-  if (run.phase === 'battle') return { type: 'land', zone: LANDS.random(run, run.battle!, rng) }
+  if (run.phase === 'battle') return { type: 'enter', entrance: ENTERS.random(run, run.battle!, rng) }
   if (run.phase === 'event') return { type: 'choose', index: takeable(run)[randomInt(rng, takeable(run).length)] }
   if (run.phase === 'shop') {
     const options = affordable(run)
@@ -234,13 +234,13 @@ const randomBot: Bot = (run, rng) => {
  */
 export const bots: Record<string, Bot> = {
   random: randomBot,
-  careless: play({ risk: 'standard', pick: 'first', land: 'exposed', build: false, events: 'cautious' }),
-  standard: play({ risk: 'standard', pick: 'first', land: 'cover', build: true, events: 'cautious' }),
-  bold: play({ risk: 'standard', pick: 'first', land: 'cover', build: true, events: 'bold' }),
-  safe: play({ risk: 'safe', pick: 'first', land: 'cover', build: true, events: 'cautious' }),
-  dangerous: play({ risk: 'dangerous', pick: 'first', land: 'cover', build: true, events: 'cautious' }),
-  growing: play({ risk: growing, pick: 'first', land: 'cover', build: true, events: 'cautious' }),
-  breacher: play({ risk: 'standard', pick: 'first', land: 'hot', build: true, events: 'cautious' }),
-  synergy: play({ risk: 'standard', pick: 'synergy', land: 'fit', build: true, events: 'cautious' }),
-  expert: play({ risk: growing, pick: 'synergy', land: 'hot', build: true, events: 'cautious' }),
+  careless: play({ risk: 'standard', pick: 'first', enter: 'careless', build: false, events: 'cautious' }),
+  standard: play({ risk: 'standard', pick: 'first', enter: 'sensible', build: true, events: 'cautious' }),
+  bold: play({ risk: 'standard', pick: 'first', enter: 'sensible', build: true, events: 'bold' }),
+  safe: play({ risk: 'safe', pick: 'first', enter: 'sensible', build: true, events: 'cautious' }),
+  dangerous: play({ risk: 'dangerous', pick: 'first', enter: 'sensible', build: true, events: 'cautious' }),
+  growing: play({ risk: growing, pick: 'first', enter: 'sensible', build: true, events: 'cautious' }),
+  breacher: play({ risk: 'standard', pick: 'first', enter: 'hard', build: true, events: 'cautious' }),
+  synergy: play({ risk: 'standard', pick: 'synergy', enter: 'fit', build: true, events: 'cautious' }),
+  expert: play({ risk: growing, pick: 'synergy', enter: 'hard', build: true, events: 'cautious' }),
 }

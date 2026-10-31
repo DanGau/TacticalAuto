@@ -3,7 +3,7 @@ import { apply } from './apply'
 import { CLOAK_DAMAGE, SHADOW_DAMAGE, type Battle } from './battle'
 import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
-import { deploy, begun } from './roads'
+import { enterAt, begun } from './roads'
 
 /** Plays a battle with every soldier a phantom, calling `check` with each beat's events and the battle before it. */
 function play(seed: number, check: (events: GameEvent[], before: Battle) => void): Battle {
@@ -11,7 +11,7 @@ function play(seed: number, check: (events: GameEvent[], before: Battle) => void
   for (const s of run.soldiers) Object.assign(s, { cls: 'phantom', skills: ['shadowStrike'] })
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
-  deploy(run, 0)
+  enterAt(run, 0)
   const state = run.battle!
   // Wounded, a phantom cloaks once any alien can shoot it.
   for (const u of state.units) if (u.ability === 'cloak') u.hp = Math.floor(u.stats.hp / 2)

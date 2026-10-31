@@ -1,0 +1,112 @@
+import { expect, test } from 'vitest'
+import { apply } from './apply'
+import { ENTRANCES, isSoldier, type Battle } from './battle'
+import { stepBattle } from './combat'
+import { COMMANDER_GAP, STRIKE } from './entrances'
+import { distance, nearestAlien } from './grid'
+import type { Goal } from './goals'
+import { current } from './run'
+import { type Run } from './run-state'
+import { begun, entranceOf, enterAt, road } from './roads'
+import { TUNING } from './tuning'
+import { RALLY_EVERY, rally } from './upkeep'
+
+/** A run choosing its entrance for its first battle, of `goal`. */
+function entering(seed = 1, goal: Goal = 'exterminate'): Run & { battle: Battle } {
+  const run = begun(seed)
+  apply(run, { type: 'go', index: 1 })
+  current(run)!.stop!.goal = goal
+  apply(run, { type: 'advance' })
+  return run as Run & { battle: Battle }
+}
+
+test('a battle offers entrances of different kinds, each by the fight, with every alien but burrowers in sight and none yet engaged', () => {
+  for (let seed = 1; seed <= 8; seed++) {
+    const { battle } = entering(seed)
+    expect(battle.entrances).toHaveLength(ENTRANCES)
+    expect(new Set(battle.entrances.map((e) => e.kind)).size).toBe(ENTRANCES)
+    for (const { at } of battle.entrances) expect(distance(at, battle.arena)).toBeLessThanOrEqual(battle.arena.reach + 8)
+    for (const pod of battle.pods) expect(pod.engaged).toBe(false)
+    battle.pods.forEach((pod, i) => {
+      const burrowers = battle.units.filter((u) => u.pod === i).every((u) => u.kind === 'burrower')
+      expect(pod.revealed).toBe(!burrowers)
+    })
+  }
+})
+
+test("an assassination never offers an entrance near the commander", () => {
+  for (let seed = 1; seed <= 8; seed++) {
+    const { battle } = entering(seed, 'assassinate')
+    const commander = battle.units.find((u) => u.target)!
+    for (const { at } of battle.entrances) expect(distance(at, commander)).toBeGreaterThanOrEqual(COMMANDER_GAP)
+  }
+})
+
+test('entering puts the whole squad down by the entrance and engages only the pod nearest', () => {
+  const run = entering()
+  const { at } = run.battle.entrances[0]
+  expect(enterAt(run, 0)).toEqual({ ok: true })
+  const squad = run.battle.units.filter(isSoldier)
+  expect(squad).toHaveLength(run.soldiers.length)
+  for (const unit of squad) expect(distance(unit, at)).toBeLessThanOrEqual(3)
+  const near = nearestAlien(run.battle, at)!.pod!
+  run.battle.pods.forEach((pod, i) => expect(pod.engaged).toBe(i === near))
+  expect(run.battle.phase).toBe('battle')
+})
+
+test('kicking the door hurts the nearest alien, which loses its first action', () => {
+  const run = entering()
+  const at = run.battle.entrances[entranceOf(run.battle, 'door')].at
+  const first = nearestAlien(run.battle, at)!
+  enterAt(run, entranceOf(run.battle, 'door'))
+  expect(stepBattle(run.battle)).toContainEqual({ type: 'hurt', id: first.id, amount: TUNING.impactDamage, cause: 'impact' })
+  expect(first.panicked || first.hp <= 0).toBe(true)
+})
+
+test('through the wall catches the nearest pod surprised', () => {
+  const run = entering()
+  const index = entranceOf(run.battle, 'wall')
+  const pod = nearestAlien(run.battle, run.battle.entrances[index].at)!.pod!
+  enterAt(run, index)
+  expect(run.battle.pods[pod].surprised).toBe(true)
+})
+
+test("a monologue puts the toughest soldier in the spotlight: aliens that can shoot it must", () => {
+  const run = entering()
+  enterAt(run, entranceOf(run.battle, 'monologue'))
+  const speaker = run.battle.units.filter(isSoldier).reduce((a, b) => (b.hp > a.hp ? b : a))
+  expect(run.battle.spotlight).toEqual({ id: speaker.id, until: 2 })
+  expect(stepBattle(run.battle)).toContainEqual({ type: 'effect', id: speaker.id, effect: 'taunt', amount: 0 })
+})
+
+test('Danger Close wounds the nearest pod, never killing one, for threat', () => {
+  const run = entering()
+  const index = entranceOf(run.battle, 'strike')
+  const pod = nearestAlien(run.battle, run.battle.entrances[index].at)!.pod
+  const aliens = run.battle.units.filter((u) => u.side === 'alien')
+  const before = aliens.map((u) => u.hp)
+  const threat = run.threat
+  enterAt(run, index)
+  stepBattle(run.battle)
+  aliens.forEach((u, i) => u.pod === pod && expect(u.hp).toBe(Math.max(1, before[i] - STRIKE.damage)))
+  expect(run.threat).toBe(threat + STRIKE.threat)
+})
+
+test('pods join the fight one at a time: the next once none fighting stands, or RALLY_EVERY rounds on', () => {
+  const run = begun(1)
+  apply(run, { type: 'go', index: 1 })
+  const patrol = () => ({ name: 'Patrol', kinds: ['trooper' as const, 'trooper' as const] })
+  road(run, [{ kind: 'battle', risk: 'standard', goal: 'exterminate', terrain: 'town', twist: null, packs: [patrol(), patrol(), patrol()] }])
+  apply(run, { type: 'advance' })
+  enterAt(run, 0)
+  const battle = run.battle!
+  const waiting = () => battle.pods.filter((p, i) => !p.engaged && battle.units.some((u) => u.pod === i)).length
+  const before = waiting()
+  expect(before).toBe(2)
+  battle.round = RALLY_EVERY - 1
+  rally(battle)
+  expect(waiting()).toBe(before)
+  battle.round = RALLY_EVERY
+  rally(battle)
+  expect(waiting()).toBe(Math.max(0, before - 1))
+})

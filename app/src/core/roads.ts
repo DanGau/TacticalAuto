@@ -1,8 +1,7 @@
-// Test helpers that lay a leg's stops and land the squad.
+// Test helpers that lay a leg's stops and send the squad in.
 import { apply, type Result } from './apply'
-import { ZONE_CLEARANCE, type Battle } from './battle'
-import { type Plan } from './battle'
-import { spacedTile } from './grid'
+import { type Battle } from './battle'
+import { type EntranceKind } from './entrances'
 import { createRun, legOf } from './run'
 import { type Run } from './run-state'
 import { type Stop } from './run-state'
@@ -22,17 +21,16 @@ export function atKey(run: Run): void {
   leg.path = [...Array<number>(run.stop).fill(-1), 0]
 }
 
-/** For tests: lands at `zone`. */
-export function deploy(run: Run, zone: number): Result {
-  return apply(run, { type: 'land', zone })
+/** For tests: makes the entrance at `entrance`. */
+export function enterAt(run: Run, entrance: number): Result {
+  return apply(run, { type: 'enter', entrance })
 }
 
-/** For tests: the index of a zone of `plan`, making zone 0 one if none is: on a pod for a hot drop, else clear of all. */
-export function zoneOf(battle: Battle, plan: Plan): number {
-  if (battle.plans.includes(plan)) return battle.plans.indexOf(plan)
-  const alien = battle.units.find((u) => u.side === 'alien')!
-  battle.zones[0] = plan === 'hot' ? { x: alien.x, y: alien.y } : spacedTile(battle, battle.units, ZONE_CLEARANCE)
-  battle.plans[0] = plan
+/** For tests: the index of an entrance of `kind`, making entrance 0 one where it stands if none is. */
+export function entranceOf(battle: Battle, kind: EntranceKind): number {
+  const found = battle.entrances.findIndex((e) => e.kind === kind)
+  if (found >= 0) return found
+  battle.entrances[0].kind = kind
   return 0
 }
 

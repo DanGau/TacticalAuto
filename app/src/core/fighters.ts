@@ -1,5 +1,5 @@
 // Questions every combat module asks about units in a fight: whose enemy, nearest, has what, can shoot.
-import { AURA_REACH, BURN_TURNS, type Battle, CHILL_TURNS, type Effect, ELUSIVE_REACH, GRID, LINGER_TURNS, type Tile, type Unit, alert, isSoldier, revealed } from './battle'
+import { AURA_REACH, BURN_TURNS, type Battle, CHILL_TURNS, type Effect, ELUSIVE_REACH, GRID, LINGER_TURNS, type Tile, type Unit, engaged, isSoldier, revealed } from './battle'
 import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
@@ -65,8 +65,8 @@ export function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, 
   return unit.ability === 'squadsight' && seen.has(target.id) && lineOfSight(battle, from, target)
 }
 
-/** The aliens a soldier's powers may act on: revealed and alert. */
-export const foes = (battle: Battle, unit: Unit) => battle.units.filter((u) => u.side !== unit.side && !u.civilian && revealed(battle, u) && alert(battle, u))
+/** The aliens a soldier's powers may act on: revealed and in the fight. */
+export const foes = (battle: Battle, unit: Unit) => battle.units.filter((u) => u.side !== unit.side && !u.civilian && revealed(battle, u) && engaged(battle, u))
 
 /** Whether a unit cannot burn: by its nature, a fire suit, or in the rain. */
 export const fireproof = (battle: Battle, unit: Unit) => unit.resists.includes('burn') || has(unit, 'fireSuit') || battle.twist === 'rain'
@@ -113,8 +113,8 @@ export function centreOf(units: Unit[]): Tile {
   return { x: mean((u) => u.x), y: mean((u) => u.y) }
 }
 
-/** Whether some living alien is alert to the squad. */
-export const hunted = (battle: Battle) => battle.units.some((u) => u.side === 'alien' && alert(battle, u))
+/** Whether the unit holds the aliens' attention with its monologue. */
+export const spotlit = (battle: Battle, unit: Unit) => battle.spotlight?.id === unit.id && battle.round <= battle.spotlight.until
 
 /** Alien turns fire lies on a tile. */
 export const FIRE_TURNS = 2
@@ -130,5 +130,5 @@ export const BOUNTY_DAMAGE = 3
 
 export const BEACON_REACH = 3
 
-/** Alien turns after which the aliens still unseen patrol toward the squad, and soldiers no longer hang back out of reach. */
+/** Alien turns after which soldiers no longer hang back out of reach. */
 export const RESTLESS_ROUND = 25

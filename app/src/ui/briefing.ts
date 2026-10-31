@@ -1,4 +1,4 @@
-// The briefing: the camera's tour of a mission before the landing.
+// The briefing: the camera's tour of a mission before the entrance.
 import { ALIENS } from '../core/aliens'
 import { GRID, type Battle, type Tile } from '../core/battle'
 import { heightAt } from '../core/grid'
@@ -47,11 +47,11 @@ const LINES = 3
 /** Tiles around a thing the briefing frames, and whose ground it names. */
 const NEAR = 4
 
-/** A thing the briefing shows: the tiles the camera frames, or the whole map, and a line on it. `zones` shows the landing zones from it on. */
+/** A thing the briefing shows: the tiles the camera frames, or the whole map, and a line on it. `entrances` shows the entrances from it on. */
 interface Shot {
   tiles: Tile[] | null
   line: string
-  zones?: boolean
+  entrances?: boolean
 }
 
 /** The tiles a shot frames tight around `at`. */
@@ -91,8 +91,8 @@ function podLine(battle: Battle, pod: number): string {
 export const STOPS = 3
 
 /**
- * What to show before a landing: tight on the objective, at most two things, naming the ground there, then the whole
- * map, where the landing zones show. The first line names the goal; the last any twist and the choice to make.
+ * What to show before the entrance: tight on the objective, at most two things, naming the ground there, then the whole
+ * map, where the entrances show. The first line names the goal; the last any twist and the choice to make.
  */
 export function shots(battle: Battle): Shot[] {
   const goal = GOALS[battle.goal]
@@ -114,12 +114,12 @@ export function shots(battle: Battle): Shot[] {
   const where = `${battle.city}, ${REGIONS[battle.region].name.toLowerCase()}. `
   const lines = at.map((t, i) => `${i === 0 ? `${where}Objective: ${goal.text}. ` : ''}${pod(t)}${ground(battle, t)}.`)
   const twist = battle.twist && TWISTS[battle.twist]
-  const choice = battle.goal === 'raid' ? 'Choose how many caches to go for.' : 'Choose where to land.'
+  const choice = battle.goal === 'raid' ? 'Choose how many caches to go for.' : 'Choose your entrance.'
   const last = `${twist ? `${twist.icon} ${twist.name}: ${twist.text}. ` : ''}${choice}`
-  return [...at.map((t, i): Shot => ({ tiles: around(t), line: lines[i] })), { tiles: null, line: at.length === 0 ? `${where}Objective: ${goal.text}. ${last}` : last, zones: true }]
+  return [...at.map((t, i): Shot => ({ tiles: around(t), line: lines[i] })), { tiles: null, line: at.length === 0 ? `${where}Objective: ${goal.text}. ${last}` : last, entrances: true }]
 }
 
-/** Flies the camera in over the mission before a landing, adding a line on each thing it shows. Any click ends it early. */
+/** Flies the camera in over the mission before the entrance, adding a line on each thing it shows. Any click ends it early. */
 export async function brief(view: View, battle: Battle): Promise<void> {
   const caption = document.createElement('div')
   caption.className = 'brief'
@@ -135,7 +135,7 @@ export async function brief(view: View, battle: Battle): Promise<void> {
   button.textContent = 'Skip ⏭'
   document.body.append(button)
   addEventListener('pointerdown', skip, { once: true, capture: true })
-  view.hideZones(true)
+  view.hideEntrances(true)
   document.getElementById('drop')!.classList.add('briefing')
   document.body.classList.add('cinema')
   const all = shots(battle)
@@ -162,15 +162,15 @@ export async function brief(view: View, battle: Battle): Promise<void> {
     void view.frame(shot.tiles, DWELL_MS, { ...angle, turn: angle.turn + DRIFT, fov: angle.fov * 0.9 })
     await hold(DWELL_MS)
   }
-  // The last shot settles from the lens's depth onto the flat map, the landing zones showing as it lands.
+  // The last shot settles from the lens's depth onto the flat map, the entrances showing as it lands.
   view.spotlight(null)
   document.body.classList.remove('cinema')
   await view.frame(null, skipped ? SKIP_MS : SETTLE_MS)
-  view.hideZones(false)
+  view.hideEntrances(false)
   if (!skipped) await hold(DWELL_MS / 2)
   removeEventListener('pointerdown', skip, { capture: true })
   caption.remove()
   button.remove()
-  view.hideZones(false)
+  view.hideEntrances(false)
   document.getElementById('drop')!.classList.remove('briefing')
 }

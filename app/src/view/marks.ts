@@ -1,10 +1,10 @@
-// Marks on the ground and over it: landing zones, goals and their fences, acid and fire, fog, and glows of unfound aliens.
+// Marks on the ground and over it: entrances, goals and their fences, acid and fire, fog, and glows of unfound aliens.
 import { type Group, type Mesh, type MeshBasicMaterial, type Object3D, Sprite as Billboard, type SpriteMaterial } from 'three'
-import { GRID, revealed, ZONE_NAMES, ZONE_RADIUS, type Battle, type Tile } from '../core/battle'
+import { ENTRY_RADIUS, GRID, revealed, type Battle, type Tile } from '../core/battle'
 import { UPLINK_REACH } from '../core/fighters'
 import { EXTRACT_REACH } from '../core/goals'
-import { distance, nearestAlien } from '../core/grid'
-import { PLANS } from '../core/setup'
+import { nearestAlien } from '../core/grid'
+import { ENTRANCE_KINDS } from '../core/entrances'
 import { visibleTiles } from '../core/sight'
 import { DECAL_LIFT, spot } from './camera'
 import { fence } from './fences'
@@ -43,7 +43,7 @@ const ring = (shapes: Shapes, x: number, y: number, color: number, width: number
   for (let i = 0; i < 4; i++) shapes.band(c[i], c[(i + 1) % 4], w, color, alpha)
 }
 
-/** Before the landing: tints, names and describes each landing zone, and marks where each pod is. */
+/** Before the entrance: tints and names each entrance, and names each pod in sight. */
 export function drawMarks(s: Stage, battle: Battle): void {
   const { hovered, selected } = s
   const tint = new Shapes()
@@ -62,13 +62,13 @@ export function drawMarks(s: Stage, battle: Battle): void {
   }
   if (battle.phase === 'deploy') {
     if (!s.briefing)
-      battle.zones.forEach((zone, i) => {
-        for (let y = 0; y < GRID; y++) {
-          for (let x = 0; x < GRID; x++) {
-            if (distance(zone, { x, y }) <= ZONE_RADIUS && battle.ground[y * GRID + x] !== 'void') diamond(tint, x, y, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone, 0.8)
+      battle.entrances.forEach(({ kind, at: zone }, i) => {
+        for (let y = zone.y - ENTRY_RADIUS; y <= zone.y + ENTRY_RADIUS; y++) {
+          for (let x = zone.x - ENTRY_RADIUS; x <= zone.x + ENTRY_RADIUS; x++) {
+            if (y >= 0 && x >= 0 && y < GRID && x < GRID && battle.ground[y * GRID + x] !== 'void') diamond(tint, x, y, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone, 0.8)
           }
         }
-        // The selected zone's way in: a line to the uplink, or to the nearest contact.
+        // The selected entrance's way in: a line to the uplink, or to the nearest contact.
         const toward = i === selected && (battle.uplink ?? nearestAlien(battle, zone))
         if (toward) {
           const a = spot(zone.x, zone.y)
@@ -76,17 +76,18 @@ export function drawMarks(s: Stage, battle: Battle): void {
           const lift = Math.max(a.y, b.y) + DECAL_LIFT * 3
           tint.band({ ...a, y: lift }, { ...b, y: lift }, 4 / ACROSS, battle.uplink ? COLOR.uplink : COLOR.contact, 0.9)
         }
-        marks.push(label([ZONE_NAMES[i], PLANS[battle.plans[i]].icon, i === battle.barrage ? '💥' : ''].filter(Boolean).join(' '), zone, 0xffffff))
+        marks.push(label(`${ENTRANCE_KINDS[kind].icon} ${ENTRANCE_KINDS[kind].name}`, zone, 0xffffff, 26))
       })
-    battle.pods.forEach((_, pod) => {
-      const members = battle.units.filter((u) => u.pod === pod)
-      if (members.length > 0) marks.push(label('?', members[0], COLOR.contact), label(battle.pods[pod].name, members[0], COLOR.contact, 20))
+    // Burrowers underground stay hidden.
+    battle.pods.forEach((pod, i) => {
+      const members = battle.units.filter((u) => u.pod === i)
+      if (members.length > 0 && pod.revealed) marks.push(label(pod.name, members[0], COLOR.contact, 20))
     })
   }
   lay(s.zones, tint)
-  // A fence rings each zone in play: the landing zones to choose from, the uplink to hold, the way out.
+  // A fence rings each zone in play: the entrances to choose from, the uplink to hold, the way out.
   const rings: [Tile, number, number][] = []
-  if (battle.phase === 'deploy' && !s.briefing) battle.zones.forEach((zone, i) => rings.push([zone, ZONE_RADIUS, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone]))
+  if (battle.phase === 'deploy' && !s.briefing) battle.entrances.forEach(({ at }, i) => rings.push([at, ENTRY_RADIUS, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone]))
   if (battle.uplink) rings.push([battle.uplink, UPLINK_REACH, COLOR.uplink])
   if (battle.extract) rings.push([battle.extract, EXTRACT_REACH, COLOR.extract])
   const next = new Map<string, ReturnType<typeof fence>>()
@@ -114,7 +115,7 @@ function dim(node: Object3D, tint: number): void {
   })
 }
 
-/** Darkens every tile no soldier sees, and whatever stands on it. Before the landing nothing is fogged. */
+/** Darkens every tile no soldier sees, and whatever stands on it. Before the entrance nothing is fogged. */
 export function drawFog(s: Stage, battle: Battle, snap = false): void {
   const shapes = new Shapes()
   const seen = (s.seen = battle.phase === 'deploy' ? null : visibleTiles(battle))

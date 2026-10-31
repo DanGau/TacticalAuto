@@ -1,6 +1,6 @@
 import { roots } from './skills'
 import { expect, test } from 'vitest'
-import { deploy, begun } from './roads'
+import { enterAt, begun } from './roads'
 import { apply } from './apply'
 import { HASTE_MOVE, isSoldier, revealed, SOLDIER_ATTACKS, type Battle } from './battle'
 import { stepBattle } from './combat'
@@ -13,7 +13,7 @@ function battle(seed: number): Battle {
   run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
-  deploy(run, 0)
+  enterAt(run, 0)
   return run.battle!
 }
 
@@ -61,12 +61,12 @@ test('a turn is one move beat, then an attack per beat in id order, two by each 
   expect(twice).toBeGreaterThan(0)
 })
 
-test('no unit moves farther than its move, and a soldier its dash', () => {
+test('no unit moves farther than its move, and one on the squad its sprint', () => {
   play(2, (events, before) => {
     for (const e of events) {
       if (e.type !== 'move') continue
       const unit = before.units.find((u) => u.id === e.id)!
-      expect(e.path.length).toBeLessThanOrEqual(unit.stats.move + (isSoldier(unit) ? DASH_MOVE : 0))
+      expect(e.path.length).toBeLessThanOrEqual(unit.side === 'human' ? Math.max(2 * unit.stats.move, unit.stats.move + DASH_MOVE) : unit.stats.move)
     }
   })
 })

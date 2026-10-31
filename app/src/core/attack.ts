@@ -11,7 +11,7 @@ import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import { PARRY_CHANCE } from './doctrines'
 import type { GameEvent } from './combat-event'
-import { onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
+import { onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS, spotlit } from './fighters'
 import { tallyOf, wound, knockback } from './wound'
 import { TUNING } from './tuning'
 import { odds, coverAgainst } from './sight'
@@ -55,7 +55,7 @@ export const MIRROR_CHANCE = 0.5
 
 /**
  * A shot at the enemy the unit can shoot and is likeliest to hit, a civilian counting PREY_WORTH; the nearest, then the lowest id, wins a tie.
- * An alien that can shoot a taunting soldier must. With `only`, the shot is at that enemy or not at all.
+ * An alien that can shoot a taunting soldier, or one in the spotlight, must. With `only`, the shot is at that enemy or not at all.
  * The effects of both units' gear and skills, and of relics, apply. `granted` names the effect that gave a shot
  * beyond the unit's own; such a shot grants no further one.
  */
@@ -63,7 +63,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const piercing = has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic')
   const chanceAt = (target: Unit) => odds(battle, unit, target, unit.stats, piercing)
   const inReach = (only ? [only] : battle.units).filter((other) => other.side !== unit.side && shootable(battle, unit, unit, other, seen))
-  const taunting = inReach.filter((other) => has(other, 'taunt'))
+  const taunting = inReach.filter((other) => has(other, 'taunt') || spotlit(battle, other))
   const value = (other: Unit) => preyed(other, chanceAt(other).hit) + worth(battle, unit, other)
   let enemy: Unit | undefined
   for (const other of taunting.length > 0 ? taunting : inReach) {

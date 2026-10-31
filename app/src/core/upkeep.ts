@@ -1,19 +1,20 @@
 // What happens as a side's turn begins: burns, acid, mending, cooldowns, spawns, goals that tick.
 import { REGEN_HEAL, alienStats, ALIENS, NODE_EVERY } from './aliens'
-import { type Battle, AURA_REACH, BURN_DAMAGE, isSoldier, ZONE_CLEARANCE, revealed, SPAWN_EVERY, type Unit } from './battle'
+import { type Battle, AURA_REACH, BURN_DAMAGE, isSoldier, SPAWN_EVERY, type Unit, GRID } from './battle'
 import { placePod } from './setup'
 import { alienUnit } from './spawn'
-import { spacedTile } from './grid'
+import { openNear, spacedTile } from './grid'
 import { freeTilesNear } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { has, foeHas, onTile, FIRE_TURNS, uplinkReach, EXTRACT_CLEARANCE, RESTLESS_ROUND, nearest, silenced } from './fighters'
+import { has, foeHas, onTile, FIRE_TURNS, uplinkReach, EXTRACT_CLEARANCE, silenced, centreOf } from './fighters'
 import { HOLD_ROUNDS, HOLD_WAVE_EVERY } from './goals'
+import { randomInt } from './rng'
 import { wound } from './wound'
 
 /**
- * What happens as a side's turn begins: burning hurts and mending armor heals. On the aliens' turn acid wears off,
- * cooldowns run down, and a boss whose spawn is ready spawns a swarmling.
+ * What happens as a side's turn begins: burning hurts and mending armor heals. On the aliens' turn the next pod may
+ * engage, waves come in, acid wears off, cooldowns run down, and a boss whose spawn is ready spawns a swarmling.
  */
 export function upkeep(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
@@ -69,37 +70,32 @@ export function upkeep(battle: Battle): GameEvent[] {
     battle.units.push(unit)
     events.push({ type: 'wave', units: [{ id: unit.id, x: unit.x, y: unit.y }] })
   }
-  // A long battle makes the aliens still unseen restless: they patrol toward the squad, so no fight is put off for good.
-  if (battle.round >= RESTLESS_ROUND) {
-    const soldiers = battle.units.filter(isSoldier)
-    for (const pod of battle.pods.filter((p) => !p.revealed)) {
-      const member = battle.units.find((u) => battle.pods[u.pod ?? -1] === pod)
-      const near = member && nearest(soldiers, member)
-      if (near) Object.assign(pod, { guard: false, waypoint: { x: near.x, y: near.y } })
-    }
-  }
-  // A hold's waves come in from the edges, without end, each pack one alien larger every time it returns.
-  const hold = battle.goal === 'hold'
-  if (battle.waves.length > 0 && battle.round % HOLD_WAVE_EVERY === 0) {
-    const centre = spacedTile(battle, battle.units.filter(isSoldier), ZONE_CLEARANCE, hold ? 'edge' : 'anywhere')
+  rally(battle)
+  // Waves come in a pack at a time, a short way off the squad; a hold's without end.
+  const soldiers = battle.units.filter(isSoldier)
+  if (battle.waves.length > 0 && soldiers.length > 0 && battle.round % HOLD_WAVE_EVERY === 0) {
+    const from = centreOf(soldiers)
+    const angle = (2 * Math.PI * randomInt(battle, 360)) / 360
+    const at = (v: number) => Math.max(0, Math.min(GRID - 1, Math.round(v)))
+    const centre = openNear(battle, { x: at(from.x + WAVE_REACH * Math.cos(angle)), y: at(from.y + WAVE_REACH * Math.sin(angle)) })
     const wave = battle.waves.shift()!
-    // Once the squad extracts, they stop growing.
-    if (hold) battle.waves.push(battle.extract ? wave : { ...wave, aliens: [...wave.aliens, wave.aliens[0]] })
-    // It comes in unseen but hunting, and shows once the squad sights it.
+    if (battle.goal === 'hold') battle.waves.push(wave)
+    // It comes in unseen but in the fight, and shows once the squad sights it.
     const units = placePod(battle, wave, centre, false)
-    Object.assign(battle.pods.at(-1)!, { alert: true })
+    battle.pods.at(-1)!.engaged = true
     events.push({ type: 'wave', units: units.map(({ id, x, y }) => ({ id, x, y })) })
   }
   battle.acid = battle.acid.map((pool) => ({ ...pool, turns: pool.turns - 1 })).filter((pool) => pool.turns > 0)
   battle.fire = battle.fire.map((pool) => ({ ...pool, turns: pool.turns - 1 })).filter((pool) => pool.turns > 0)
   for (const unit of battle.units.filter((u) => u.side === 'alien')) {
-    // An incubator's time runs only once it is seen.
-    if (unit.cooldown > 0 && (unit.kind !== 'incubator' || revealed(battle, unit))) unit.cooldown--
+    const fighting = battle.pods[unit.pod!].engaged
+    // An incubator's time runs only once it is in the fight.
+    if (unit.cooldown > 0 && (unit.kind !== 'incubator' || fighting)) unit.cooldown--
     if (unit.kind === 'incubator' && unit.cooldown === 0) {
       events.push(...hatch(battle, unit))
       continue
     }
-    if (!unit.spawns || unit.cooldown > 0 || !revealed(battle, unit) || silenced(battle, unit)) continue
+    if (!unit.spawns || unit.cooldown > 0 || !fighting || silenced(battle, unit)) continue
     const [tile] = freeTilesNear(battle, unit, 1)
     if (!tile || (unit.kind === 'hiveNode' && unit.charges <= 0)) continue
     if (unit.kind === 'hiveNode') unit.charges--
@@ -109,6 +105,28 @@ export function upkeep(battle: Battle): GameEvent[] {
     events.push({ type: 'spawn', id: unit.id, unit: { id: spawn.id, x: spawn.x, y: spawn.y } })
   }
   return events
+}
+
+/** How far from the squad a wave comes in. */
+export const WAVE_REACH = 12
+
+/** Rounds a pod has the squad to itself before the next joins it. */
+export const RALLY_EVERY = 3
+
+/**
+ * One pod at a time comes for the squad: the one waiting nearest it engages once no pod in the fight is left standing,
+ * or once RALLY_EVERY rounds have passed since the last joined.
+ */
+export function rally(battle: Battle): void {
+  const soldiers = battle.units.filter(isSoldier)
+  const members = (pod: number) => battle.units.filter((u) => u.pod === pod)
+  const waiting = battle.pods.flatMap((pod, i) => (!pod.engaged && members(i).length > 0 ? [i] : []))
+  if (waiting.length === 0 || soldiers.length === 0) return
+  const fighting = battle.pods.some((pod, i) => pod.engaged && members(i).length > 0)
+  if (fighting && battle.round - battle.rallied < RALLY_EVERY) return
+  const near = (pod: number) => Math.min(...members(pod).flatMap((m) => soldiers.map((s) => distance(m, s))))
+  battle.pods[waiting.reduce((a, b) => (near(b) < near(a) ? b : a))].engaged = true
+  battle.rallied = battle.round
 }
 
 /** An incubator hatches: it is gone, and two brutes of its pod stand where it was. */

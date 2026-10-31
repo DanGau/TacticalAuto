@@ -1,6 +1,6 @@
-// The battle view the UI drives: showing a run's battle, picking and framing landing zones, and panning.
+// The battle view the UI drives: showing a run's battle, picking and framing entrances, and panning.
 import { AdditiveBlending, BoxGeometry, CircleGeometry, Mesh, MeshBasicMaterial, Raycaster, Vector2 } from 'three'
-import { BLAST_RADIUS, revealed, ZONE_RADIUS, type Battle, type Tile } from '../core/battle'
+import { BLAST_RADIUS, ENTRY_RADIUS, revealed, type Battle, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { effectName } from '../core/effects'
 import { distance, nearestAlien } from '../core/grid'
@@ -9,7 +9,7 @@ import type { Run } from '../core/run-state'
 import { drawTerrain } from './board'
 import { axes, clamped, DECAL_LIFT, framing, setHeights, spot, STILL_FOV, WIDTH, type Camera, type Shot } from './camera'
 import { callout, chest, effectCallout, shotCallout } from './effects'
-import { dropPods } from './landing'
+import { makeEntrance } from './entrance'
 import { drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
 import { play, squad } from './play'
@@ -20,10 +20,10 @@ import { empty } from './shapes'
 
 /** Screen pixels a press moves before it pans the camera. */
 const DRAG_PX = 6
-/** How long the camera takes to glide to a landing zone, and to fly in over a new battle. */
+/** How long the camera takes to glide to an entrance, and to fly in over a new battle. */
 const FOCUS_MS = 700
 const FLY_MS = 1600
-/** Screen pixels the landing panel takes from the bottom of the canvas. */
+/** Screen pixels the entrance panel takes from the bottom of the canvas. */
 const PANEL = 110
 /** Screen pixels kept clear around what is in play, which sits in the middle of the screen above the panel. */
 const WHOLE_MARGIN = PANEL - 20
@@ -36,19 +36,19 @@ export interface View {
   /**
    * Shows the run's battle, which `events` produced. Animated, it follows the action with the camera, plays the
    * events, and resolves when they finish. Still, it draws the whole map at once and marks each shot with a line.
-   * Aliens in unrevealed pods are never drawn; before the landing, each pod shows as a contact marker.
+   * Aliens in unrevealed pods are never drawn; before the entrance, every pod but burrowers shows.
    * Once landed, fog darkens every tile no soldier sees.
    */
   show(run: Run, events: GameEvent[], animate: boolean): Promise<void>
   /** Resolves once every attack begun has finished. */
   settle(): Promise<void>
-  /** The landing zone under a point on the canvas as displayed, as an index into battle.zones; null when there is none to choose. */
-  zoneAt(sx: number, sy: number): number | null
-  /** Before the landing, glides the camera to a landing zone and marks its way in; null pulls back to the whole map. */
-  focus(zone: number | null): void
-  /** Hides the landing zones while the briefing flies over the mission, and shows them once it is done. */
-  hideZones(hidden: boolean): void
-  /** Glides the camera to frame the given tiles as `shot` says, above the landing panel; null pulls back to the whole map. */
+  /** The entrance under a point on the canvas as displayed, as an index into battle.entrances; null when there is none to choose. */
+  entranceAt(sx: number, sy: number): number | null
+  /** Before the entrance, glides the camera to one and marks its way in; null pulls back to the whole map. */
+  focus(entrance: number | null): void
+  /** Hides the entrances while the briefing flies over the mission, and shows them once it is done. */
+  hideEntrances(hidden: boolean): void
+  /** Glides the camera to frame the given tiles as `shot` says, above the entrance panel; null pulls back to the whole map. */
   frame(tiles: Tile[] | null, ms?: number, shot?: Shot): Promise<void>
   /** Lights a beam over the tile the briefing is on, so it stands out from the night; null puts it out. */
   spotlight(tile: Tile | null): void
@@ -57,20 +57,20 @@ export interface View {
 export async function createView(): Promise<View> {
   const s = new Stage()
   const { canvas } = s
-  /** Whether the battle last shown was waiting for the landing, so the next one shown plays it. */
+  /** Whether the battle last shown was waiting for the entrance, so the next one shown plays it. */
   let deploying = false
   /** The attacks of the stage under way, which the next beat that is not an attack waits for. */
   let attacks = Promise.resolve()
 
   const raycaster = new Raycaster()
-  function zoneAt(px: number, py: number): number | null {
+  function entranceAt(px: number, py: number): number | null {
     const { shown } = s
     if (shown?.phase !== 'deploy') return null
     raycaster.setFromCamera(new Vector2((px / innerWidth) * 2 - 1, 1 - (py / innerHeight) * 2), s.eye)
     const hit = raycaster.intersectObject(s.terrain.children[0])[0]
     if (!hit) return null
     const tile = { x: Math.round(hit.point.x), y: Math.round(hit.point.z) }
-    const index = shown.zones.findIndex((zone) => distance(zone, tile) <= ZONE_RADIUS)
+    const index = shown.entrances.findIndex(({ at }) => distance(at, tile) <= ENTRY_RADIUS)
     return index < 0 ? null : index
   }
 
@@ -108,33 +108,33 @@ export async function createView(): Promise<View> {
       s.glides++
       s.look(clamped({ ...camera, x: camera.x + right.x * dx + up.x * dy, y: camera.y + up.y * dy, z: camera.z + right.z * dx + up.z * dy }))
     }
-    const zone = zoneAt(e.offsetX, e.offsetY)
-    canvas.style.cursor = zone === null ? 'default' : 'pointer'
-    if (zone === s.hovered || !s.shown) return
-    s.hovered = zone
+    const at = entranceAt(e.offsetX, e.offsetY)
+    canvas.style.cursor = at === null ? 'default' : 'pointer'
+    if (at === s.hovered || !s.shown) return
+    s.hovered = at
     drawMarks(s, s.shown)
   })
 
-  /** What the camera frames for a landing zone: the zone, and the uplink or nearest contact it heads for. */
-  function zoneView(battle: Battle, zone: Tile): Tile[] {
-    const reach = ZONE_RADIUS + 2
+  /** What the camera frames for an entrance: where it comes in, and the uplink or nearest contact it heads for. */
+  function entranceView(battle: Battle, zone: Tile): Tile[] {
+    const reach = ENTRY_RADIUS + 3
     const toward = battle.uplink ?? nearestAlien(battle, zone)
     return [{ x: zone.x - reach, y: zone.y - reach }, { x: zone.x + reach, y: zone.y + reach }, ...(toward ? [toward] : [])]
   }
 
   /**
-   * The camera framing what is in play: before the landing its zones, pods and goals; after it, the squad and the
+   * The camera framing what is in play: before the entrance its entrances, pods and goals; after it, the squad and the
    * aliens it has found.
    */
   function inPlay(yaw = YAW): Camera {
     const battle = s.shown!
     const goals = [battle.uplink, battle.extract, ...battle.caches].filter((t): t is Tile => t !== null)
     const units = battle.units.filter((u) => u.side === 'human' || battle.phase === 'deploy' || revealed(battle, u))
-    return framing([...(battle.phase === 'deploy' ? battle.zones : []), ...goals, ...units], yaw, WHOLE_MARGIN)
+    return framing([...(battle.phase === 'deploy' ? battle.entrances.map((e) => e.at) : []), ...goals, ...units], yaw, WHOLE_MARGIN)
   }
 
   /**
-   * The camera framing `tiles` as `shot` says, raised so the landing panel below covers none of it; null frames what
+   * The camera framing `tiles` as `shot` says, raised so the entrance panel below covers none of it; null frames what
    * is in play. A subject on a third is set off the centre, the screen's other two thirds left open before it.
    */
   function above(tiles: Tile[] | null, shot: Shot = {}): Camera {
@@ -157,7 +157,7 @@ export async function createView(): Promise<View> {
   s.resize()
   return {
     canvas,
-    zoneAt,
+    entranceAt,
     frame(tiles, ms = FOCUS_MS, shot = {}) {
       return s.follow(above(tiles, shot), ms)
     },
@@ -176,16 +176,16 @@ export async function createView(): Promise<View> {
       pool.position.set(at.x, at.y + DECAL_LIFT * 5, at.z)
       s.beam.add(pool)
     },
-    hideZones(hidden) {
+    hideEntrances(hidden) {
       s.briefing = hidden
       if (s.shown) drawMarks(s, s.shown)
     },
-    focus(zone) {
+    focus(entrance) {
       const { shown } = s
       if (shown?.phase !== 'deploy') return
-      s.selected = zone
+      s.selected = entrance
       drawMarks(s, shown)
-      void s.follow(above(zone === null ? null : zoneView(shown, shown.zones[zone])), FOCUS_MS)
+      void s.follow(above(entrance === null ? null : entranceView(shown, shown.entrances[entrance].at)), FOCUS_MS)
     },
     settle: () => attacks,
     async show(run, events, animate) {
@@ -223,7 +223,7 @@ export async function createView(): Promise<View> {
       drawFog(s, battle, true)
       const landed = deploying && battle.phase !== 'deploy'
       deploying = battle.phase === 'deploy'
-      if (landed && animate) await dropPods(s, battle)
+      if (landed && animate) await makeEntrance(s, battle)
       if (!animate) {
         if (battle.phase !== 'deploy') s.look(clamped(inPlay(), squad(battle)))
         s.labels.clear()
