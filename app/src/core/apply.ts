@@ -1,5 +1,5 @@
-import { land, STRIKE, TEAMS } from './battle'
-import { arrive, BRIBE, CREDIT_THREAT, depart, EVENTS, RELIC_PRICE } from './events'
+import { land, STRIKE } from './battle'
+import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
 import { advance, buyWare, current, GEAR_PRICE, go, keepFind, mend, nextStop, recruit, sellFind, skillOffers, takeRelic, takeSkill, THREAT_MAX, TRAVEL_HEAL, ways, type Run } from './run'
 
 export type Action =
@@ -9,8 +9,6 @@ export type Action =
   | { type: 'gear'; index: number }
   /** Shop: buy the relic at `index` of shop.relics. */
   | { type: 'buy'; index: number }
-  /** Shop: take the relic at `index` of shop.relics on credit, for threat instead of supplies. */
-  | { type: 'owe'; index: number }
   /** Shop: pay to lower the threat, once. */
   | { type: 'bribe' }
   /** Shop: leave for the road. */
@@ -21,12 +19,8 @@ export type Action =
   | { type: 'go'; index: number }
   /** Overworld, in a zone: travel to the next stop. */
   | { type: 'advance' }
-  /** Deploy phase: land the squad on the zone at `zone` of battle.zones and begin the battle. */
+  /** Deploy phase: land the squad on the zone at `zone` of battle.zones and begin the battle; the barrage's zone costs threat. */
   | { type: 'land'; zone: number }
-  /** Deploy phase, before landing: call an orbital strike that wounds every alien, for threat. Once a battle. */
-  | { type: 'strike' }
-  /** On a rescue, in place of a landing zone: how many teams the squad splits into, each landing apart. */
-  | { type: 'split'; teams: number }
   /** On a raid, in place of a landing zone: how many supply caches the squad goes for before it lifts off. */
   | { type: 'grab'; caches: number }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
@@ -52,15 +46,6 @@ export function apply(run: Run, action: Action): Result {
     return ok
   }
   if (run.phase === 'recruit') return no('choose a recruit first')
-  if (action.type === 'strike') {
-    const battle = run.battle
-    if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not landing')
-    if (battle.strike) return no('already struck')
-    battle.strike = true
-    run.threat = Math.min(run.threat + STRIKE.threat, THREAT_MAX)
-    for (const alien of battle.units.filter((u) => u.side === 'alien')) alien.hp = Math.max(1, alien.hp - STRIKE.damage)
-    return ok
-  }
   if (action.type === 'grab') {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy' || battle.goal !== 'raid') return no('not raiding')
@@ -69,20 +54,13 @@ export function apply(run: Run, action: Action): Result {
     land(battle, battle.zones[0])
     return ok
   }
-  if (action.type === 'split') {
-    const battle = run.battle
-    if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy' || battle.goal !== 'rescue') return no('not splitting up')
-    if (!Number.isInteger(action.teams) || action.teams < 1 || action.teams > Math.min(TEAMS, battle.reserve.length)) return no('no such split')
-    land(battle, battle.zones[0], action.teams)
-    return ok
-  }
   if (action.type === 'land') {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not landing')
-    if (battle.goal === 'rescue') return no('a rescue splits up instead')
     if (battle.goal === 'raid') return no('a raid picks how many caches to grab instead')
     const zone = battle.zones[action.zone]
     if (!zone) return no('no such landing zone')
+    if (action.zone === battle.barrage) run.threat = Math.min(run.threat + STRIKE.threat, THREAT_MAX)
     land(battle, zone)
     return ok
   }
@@ -103,7 +81,7 @@ export function apply(run: Run, action: Action): Result {
     }
     return ok
   }
-  if (action.type === 'gear' || action.type === 'buy' || action.type === 'owe' || action.type === 'bribe' || action.type === 'leave') {
+  if (action.type === 'gear' || action.type === 'buy' || action.type === 'bribe' || action.type === 'leave') {
     const shop = run.shop
     if (run.phase !== 'shop' || !shop) return no('not in a shop')
     if (action.type === 'gear') {
@@ -116,12 +94,6 @@ export function apply(run: Run, action: Action): Result {
       if (!relic) return no('no such relic for sale')
       if (RELIC_PRICE > run.supplies) return no('not enough supplies')
       run.supplies -= RELIC_PRICE
-      run.relics.push(relic)
-      shop.relics.splice(action.index, 1)
-    } else if (action.type === 'owe') {
-      const relic = shop.relics[action.index]
-      if (!relic) return no('no such relic for sale')
-      run.threat = Math.min(run.threat + CREDIT_THREAT, THREAT_MAX)
       run.relics.push(relic)
       shop.relics.splice(action.index, 1)
     } else if (action.type === 'bribe') {

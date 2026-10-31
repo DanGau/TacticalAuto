@@ -1,10 +1,10 @@
 import type { Action } from '../core/apply'
-import { onTheWay, STRIKE, TEAMS, zoneInfo, type Battle, type Stance } from '../core/battle'
+import { STRIKE, zoneInfo, type Battle, type Stance } from '../core/battle'
 import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { SKILLS } from '../core/skills'
-import { BRIBE, CREDIT_THREAT, EVENTS, RELIC_PRICE } from '../core/events'
+import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { current, danger, GEAR_PRICE, health, legOf, level, skillOffers, soldierStats, squadKeywords, THREAT_MAX, ways, type Risk, type Run } from '../core/run'
 
 /** Chooses the next action whenever the run waits for the player. `rng` is the bot's own, separate from the run's. */
@@ -102,8 +102,6 @@ function shop(run: Run): Action {
   const buys = affordable(run)
   const buy = buys.find((a) => a.type === 'buy') ?? buys[0]
   if (buy) return buy
-  // A relic on credit while the threat is low.
-  if (run.shop!.relics.length > 0 && run.threat + CREDIT_THREAT <= THREAT_MAX / 3) return { type: 'owe', index: 0 }
   if (!run.shop!.bribed && run.supplies >= BRIBE.price && run.threat >= THREAT_MAX / 2) return { type: 'bribe' }
   return { type: 'leave' }
 }
@@ -115,16 +113,10 @@ const play =
     if (run.phase === 'reward') return reward(run, rng, PICKS[pick])
     // A bold bot takes a recruit with a trait, any other the plain one.
     if (run.phase === 'recruit') return { type: 'recruit', index: run.recruits.findIndex((r) => (events === 'bold') === (r.trait !== null)) }
-    // A strike on the hard fights, a key, the final mission or an Overrun battle, while the threat leaves room for it.
+    // The barrage's zone on the hard fights, a key, the final mission or an Overrun battle, while the threat leaves room for it.
     const hard = run.mission && (run.mission.kind === 'key' || run.mission.kind === 'final' || run.mission.risk === 'dangerous')
-    if (run.phase === 'battle' && hard && !run.battle!.strike && run.threat + STRIKE.threat < THREAT_MAX) return { type: 'strike' }
-    // Any bot with a landing plan breaks out the way with the fewest aliens.
-    if (run.phase === 'battle' && run.battle!.start) return { type: 'land', zone: best(run.battle!, (i) => -onTheWay(run.battle!, run.battle!.zones[i]).length) }
-    // A rescue splits the squad by the bot's appetite for risk: a safe bot stays together, a dangerous one scatters.
-    if (run.phase === 'battle' && run.battle!.goal === 'rescue') {
-      const most = Math.min(TEAMS, run.battle!.reserve.length)
-      return { type: 'split', teams: Math.max(1, Math.round(most * { safe: 0, standard: 0.5, dangerous: 1 }[typeof risk === 'function' ? risk(run) : risk])) }
-    }
+    const barrage = run.battle?.barrage
+    if (run.phase === 'battle' && run.battle!.goal !== 'raid' && hard && barrage != null && run.threat + STRIKE.threat < THREAT_MAX) return { type: 'land', zone: barrage }
     // A raid goes for caches by the same appetite.
     if (run.phase === 'battle' && run.battle!.goal === 'raid') {
       const most = run.battle!.caches.length
@@ -149,8 +141,6 @@ const play =
 const randomBot: Bot = (run, rng) => {
   if (run.phase === 'reward') return reward(run, rng, PICKS.random)
   if (run.phase === 'recruit') return { type: 'recruit', index: randomInt(rng, run.recruits.length) }
-  if (run.phase === 'battle' && !run.battle!.strike && randomInt(rng, 2) === 0) return { type: 'strike' }
-  if (run.phase === 'battle' && run.battle!.goal === 'rescue') return { type: 'split', teams: 1 + randomInt(rng, Math.min(TEAMS, run.battle!.reserve.length)) }
   if (run.phase === 'battle' && run.battle!.goal === 'raid') return { type: 'grab', caches: 1 + randomInt(rng, run.battle!.caches.length) }
   if (run.phase === 'battle') return { type: 'land', zone: LANDS.random(run, run.battle!, rng) }
   if (run.phase === 'event') return { type: 'choose', index: takeable(run)[randomInt(rng, takeable(run).length)] }

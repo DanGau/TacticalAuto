@@ -3,7 +3,7 @@ import { expect, test } from 'vitest'
 import { TUNING } from './tuning'
 import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
-import { isSoldier, coverAt, distance, STRIKE, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
+import { isSoldier, coverAt, distance, nearestAlien, STRIKE, ZONE_CLEARANCE, ZONES, type Battle } from './battle'
 import { stepBattle } from './combat'
 import { current, type Run } from './run'
 
@@ -75,20 +75,29 @@ test('actions outside their phase are rejected and change nothing', () => {
   apply(run, { type: 'advance' })
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
   expect(apply(run, { type: 'gear', index: 0 }).ok).toBe(false)
-  // A rescue splits up rather than picking a zone.
-  expect(run.battle!.goal).toBe('rescue')
+  // A rescue offers landing zones like any other battle.
+  expect(run.battle!.zones).toHaveLength(ZONES)
+  expect(apply(run, { type: 'land', zone: 9 }).ok).toBe(false)
+  apply(run, { type: 'land', zone: 0 })
   expect(apply(run, { type: 'land', zone: 0 }).ok).toBe(false)
-  expect(apply(run, { type: 'split', teams: 9 }).ok).toBe(false)
-  apply(run, { type: 'split', teams: 1 })
-  expect(apply(run, { type: 'split', teams: 1 }).ok).toBe(false)
 })
 
-test('an orbital strike before the landing wounds every alien, never killing one, for threat, once', () => {
-  const run = landing()
-  const before = run.battle.units.map((u) => u.hp)
-  const threat = run.threat
-  expect(apply(run, { type: 'strike' })).toEqual({ ok: true })
-  run.battle.units.forEach((u, i) => expect(u.hp).toBe(Math.max(1, before[i] - STRIKE.damage)))
-  expect(run.threat).toBe(threat + STRIKE.threat)
-  expect(apply(run, { type: 'strike' }).ok).toBe(false)
+test('one landing zone carries an artillery strike: it wounds the pod nearest it, never killing one, for threat; other zones cost nothing', () => {
+  for (let seed = 1; seed <= 5; seed++) {
+    const run = landing(seed)
+    const battle = run.battle
+    const barrage = battle.barrage!
+    expect(battle.plans[barrage]).toBe('march')
+    const pod = nearestAlien(battle, battle.zones[barrage])!.pod
+    const aliens = battle.units.filter((u) => u.side === 'alien')
+    const before = aliens.map((u) => u.hp)
+    const threat = run.threat
+    apply(run, { type: 'land', zone: barrage })
+    aliens.forEach((u, i) => expect(u.hp).toBe(u.pod === pod ? Math.max(1, before[i] - STRIKE.damage) : before[i]))
+    expect(run.threat).toBe(threat + STRIKE.threat)
+    const other = landing(seed)
+    const calm = other.threat
+    apply(other, { type: 'land', zone: (barrage + 1) % ZONES })
+    expect(other.threat).toBe(calm)
+  }
 })

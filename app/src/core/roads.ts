@@ -17,9 +17,9 @@ export function atKey(run: Run): void {
   leg.path = [...Array<number>(run.stop).fill(-1), 0]
 }
 
-/** For tests: lands at `zone`, or on a rescue, as one squad. */
+/** For tests: lands at `zone`. */
 export function deploy(run: Run, zone: number): Result {
-  return apply(run, run.battle?.goal === 'rescue' ? { type: 'split', teams: 1 } : { type: 'land', zone })
+  return apply(run, { type: 'land', zone })
 }
 
 /** For tests: the index of a zone of `plan`, making zone 0 one if none is: on a pod for a hot drop, else clear of all. */

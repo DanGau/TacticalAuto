@@ -41,10 +41,10 @@ function encounter(seed: number, mission: Encounter, leg: number, squad: Squad):
     atKey(run)
   } else {
     let stop = drawBattle(run, 'standard')
-    const goal: Goal = mission === 'escape' || mission === 'recover' ? 'exterminate' : mission
+    const goal: Goal = mission === 'ambush' || mission === 'recover' ? 'exterminate' : mission
     for (let tries = 0; stop.goal !== goal && tries < 500; tries++) stop = drawBattle(run, 'standard')
     road(run, [stop])
-    if (mission === 'escape') run.threat = THREAT_MAX
+    if (mission === 'ambush') run.threat = THREAT_MAX
     if (mission === 'recover') run.captives = [run.soldiers.at(-1)!.id]
   }
   apply(run, { type: 'advance' })

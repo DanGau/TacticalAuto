@@ -21,8 +21,6 @@ export interface Encounter {
 
 /** What a shop's relic costs. */
 export const RELIC_PRICE = 8
-/** The threat a shop's relic adds when taken on credit instead. */
-export const CREDIT_THREAT = 4
 /** What a shop's bribe costs, and the threat it takes away. */
 export const BRIBE = { price: 3, threat: 6 }
 /** How likely an unknown stop is to be a battle, and a shop; otherwise it is an event. */

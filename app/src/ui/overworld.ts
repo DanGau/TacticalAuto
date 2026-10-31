@@ -3,7 +3,7 @@ import { CLASSES } from '../core/classes'
 import { GOALS } from '../core/goals'
 import { SLOTS } from '../core/gear'
 import { DOCTRINES } from '../core/doctrines'
-import { BRIBE, CREDIT_THREAT, EVENTS, RELIC_PRICE } from '../core/events'
+import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
 import { current, legOf, GEAR_PRICE, KEYS, LEG_STOPS, ways, charges, equipped, health, level, missionAt, huntForce, nextStop, RISKS, soldierStats, xpFor, squadKeywords, type Muster, type Run, type Soldier, type Stop } from '../core/run'
 import { FEATS } from '../core/feats'
@@ -144,7 +144,7 @@ function shopView(run: Run): string {
     return button({ type: 'gear', index }, `${gearCard(gear, held)}<br><small>for ${soldier.name}${old ? `, replacing ${old.name}` : ''} · ${price} supplies</small>`, `card gear ${gear.rarity}`, price <= run.supplies)
   })
   const relics = shop.relics.map((id, index) =>
-    `<div class="buy">${button({ type: 'buy', index }, `<small>relic · ${RELIC_PRICE} supplies</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic', RELIC_PRICE <= run.supplies)}${button({ type: 'owe', index }, `<small class="up">or on credit: +${CREDIT_THREAT} threat</small>`, 'credit')}</div>`,
+    `<div class="buy">${button({ type: 'buy', index }, `<small>relic · ${RELIC_PRICE} supplies</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic', RELIC_PRICE <= run.supplies)}</div>`,
   )
   const bribe = button({ type: 'bribe' }, `<b>Bribe the patrols</b><br>-${BRIBE.threat} threat<br><small>${BRIBE.price} supplies, once</small>`, '', !shop.bribed && BRIBE.price <= run.supplies && run.threat > 0)
   return `<h2>A shop. Each piece is one of a kind.</h2>
@@ -174,7 +174,7 @@ function mapView(run: Run, picked: number | null): string {
   if (!node) return `${choices}${brief(where(run, ahead!))}${runMap(run, picked)}`
   const next = nextStop(run)!
   const here = node.stop!
-  return `${choices}${brief(next === 'recovery' ? '<b class="up">Recover your soldiers</b>' : next === 'escape' ? '<b class="up">Ambushed: escape</b>' : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
+  return `${choices}${brief(next === 'recovery' ? '<b class="up">Recover your soldiers</b>' : next === 'ambush' ? '<b class="up">Ambushed: survive</b>' : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
     ${runMap(run, null)}`
 }
 

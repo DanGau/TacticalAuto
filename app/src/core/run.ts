@@ -26,7 +26,7 @@ export const LEG_STOPS = 9
 /** Rows a leg's map spreads across, and trails that wander them from start to satellite. */
 export const MAP_ROWS = 5
 const TRAILS = 4
-/** Threat at which the next stop becomes an escape. */
+/** Threat at which the next stop becomes an ambush. */
 export const THREAT_MAX = 24
 /** Threat each stop adds, and what losing a battle adds on top. */
 export const STOP_THREAT = 2
@@ -116,12 +116,12 @@ export interface Leg {
 }
 
 /**
- * A battle to fight. An escape comes when threat is full, and a recovery when the aliens hold soldiers, in place of
+ * A battle to fight. An ambush comes when threat is full, and a recovery when the aliens hold soldiers, in place of
  * the next stop; losing either loses the run, as does losing the final mission. `force` is what the aliens can muster: a trooper costs one, and some kinds
  * cost two or come in pairs.
  */
 export interface Mission {
-  kind: 'battle' | 'key' | 'final' | 'escape' | 'recovery'
+  kind: 'battle' | 'key' | 'final' | 'ambush' | 'recovery'
   goal: Goal
   risk: Risk
   force: number
@@ -595,7 +595,7 @@ export const huntForce = (run: Run, mission: Mission) => Math.round((mission.for
 /** The mission the squad would fight at a stop of the given kind now. Its force follows the leg, and so the size of the squad. */
 export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goal = 'exterminate'): Mission {
   // A recovery's aliens come at a third of their strength, but keep coming.
-  const extra = { battle: 0, key: 1, final: 0, escape: run.keys, recovery: -Math.ceil((2 * TUNING.legForce[run.keys]) / 3) }[kind]
+  const extra = { battle: 0, key: 1, final: 0, ambush: run.keys, recovery: -Math.ceil((2 * TUNING.legForce[run.keys]) / 3) }[kind]
   return { kind, goal, risk, force: Math.max(1, TUNING.legForce[run.keys] + (late(run) ? 1 : 0) + extra + RISKS[risk].aliens + GOALS[goal].force) }
 }
 
@@ -624,11 +624,12 @@ function packsOf(run: Run, mission: Mission, mustered?: Muster[]): { name: strin
   }
   // A terror site's harvesters, more of them deeper along the road.
   if (mission.goal === 'rescue') packs.unshift({ name: 'Harvesters', aliens: Array.from({ length: tier >= HARVESTERS_MORE_FROM ? 2 : 1 }, () => alien('harvester')) })
-  // An escape's champion: a hunter tougher, faster and deadlier than any trooper, that runs the squad down.
-  if (mission.goal === 'escape') {
-    const hunter = alien('trooper')
-    hunter.stats = { ...hunter.stats, hp: hunter.stats.hp + HUNTER.hp, armor: hunter.stats.armor + HUNTER.armor, damage: hunter.stats.damage + HUNTER.damage, move: hunter.stats.move + HUNTER.move, range: hunter.stats.range + 1 }
-    packs.unshift({ name: 'The Hunter', aliens: [{ ...hunter, boss: true, stance: 'rush' }] })
+  // An ambush's Hunter: a mini-boss about half again as strong as the squad's strongest soldier, that runs it down.
+  if (mission.goal === 'ambush') {
+    const best = run.soldiers.map((s) => soldierStats(run, s)).reduce((a, b) => (b.hp * b.damage > a.hp * a.damage ? b : a))
+    const trooper = alien('trooper')
+    const stats: Stats = { ...best, hp: Math.round(best.hp * HUNTER.hp), damage: Math.ceil(best.damage * HUNTER.damage), armor: Math.max(best.armor, trooper.stats.armor) + 1, move: best.move + 1 }
+    packs.unshift({ name: 'The Hunter', aliens: [{ ...trooper, stats, boss: true, stance: 'rush' }] })
   }
   if (boss) {
     const k = run.keys
@@ -642,8 +643,8 @@ function packsOf(run: Run, mission: Mission, mustered?: Muster[]): { name: strin
 /** The depth from which a rescue has a second harvester. */
 const HARVESTERS_MORE_FROM = 2
 
-/** What an escape's hunter adds to a trooper. */
-const HUNTER = { hp: 6, armor: 1, damage: 1, move: 1 }
+/** What an ambush's Hunter multiplies the strongest soldier's health and damage by. */
+const HUNTER = { hp: 1.3, damage: 1.2 }
 
 /** A goal drawn by GOALS' weights, among those the leg of `when` has. */
 function drawGoal(run: Run, when: Run): Goal {
@@ -793,13 +794,13 @@ export function createRun(seed: number): Run {
 }
 
 /**
- * The stop the squad travels to next: a recovery if the aliens hold soldiers, an escape if threat is full, else the
+ * The stop the squad travels to next: a recovery if the aliens hold soldiers, an ambush if threat is full, else the
  * stop it has entered. Null while it chooses.
  */
-export function nextStop(run: Run): StopKind | 'escape' | 'recovery' | null {
+export function nextStop(run: Run): StopKind | 'ambush' | 'recovery' | null {
   const node = current(run)
   if (!node) return null
-  return run.captives.length > 0 ? 'recovery' : run.threat >= THREAT_MAX ? 'escape' : node.stop!.kind
+  return run.captives.length > 0 ? 'recovery' : run.threat >= THREAT_MAX ? 'ambush' : node.stop!.kind
 }
 
 /** A random rarity; `lucky` rules out common. */
@@ -866,7 +867,7 @@ export function advance(run: Run): void {
     settle(run)
     return
   }
-  const goal = stop === 'battle' ? here.goal : stop === 'escape' ? 'escape' : stop === 'recovery' ? 'recover' : 'exterminate'
+  const goal = stop === 'battle' ? here.goal : stop === 'ambush' ? 'ambush' : stop === 'recovery' ? 'recover' : 'exterminate'
   const mission = missionAt(run, stop, stop === 'recovery' ? 'standard' : here.risk, goal)
   run.mission = mission
   run.phase = 'battle'
@@ -937,14 +938,14 @@ export function endBattle(run: Run): void {
 
   const before = run.threat
   const risk = RISKS[mission.risk]
-  // An escape won empties the threat; any other battle is a stop, and adds to it.
-  if (mission.kind === 'escape') run.threat = won ? 0 : run.threat
+  // An ambush won empties the threat; any other battle is a stop, and adds to it.
+  if (mission.kind === 'ambush') run.threat = won ? 0 : run.threat
   else if (mission.kind !== 'recovery') run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT) + (mission.goal === 'raid' ? Math.max(0, battle.greed - 1) : 0) + (rescued === null ? 0 : Math.floor((CIVILIANS - (won ? rescued : 0)) / CIVILIANS_PER_THREAT)), THREAT_MAX)
   const held = run.relics.map((id): Relic => RELICS[id])
   const supplies = won ? risk.supplies * (mission.goal === 'raid' ? battle.grabbed : 1) + (rescued ?? 0) * (CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.civilianSupplies ?? 0), 0)) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
   run.supplies += supplies
-  // A won battle drops gear by its goal; a key mission's, an escape's, and the first of an Overrun battle's is rare or better.
-  const byGoal = { exterminate: risk.drops, assassinate: Math.max(1, risk.drops), hold: 0, rescue: 0, raid: 0, escape: 0, recover: 0 }[mission.goal]
+  // A won battle drops gear by its goal; a key mission's, an ambush's, and the first of an Overrun battle's is rare or better.
+  const byGoal = { exterminate: risk.drops, assassinate: Math.max(1, risk.drops), hold: 0, rescue: 0, raid: 0, ambush: 0, recover: 0 }[mission.goal]
   const drops = won && mission.kind !== 'final' && mission.kind !== 'recovery' ? (mission.kind === 'battle' ? byGoal : 1) : 0
   for (let i = 0; i < drops; i++) dropGear(run, (risk.rareGear && i === 0) || mission.kind !== 'battle' || held.some((relic) => relic.rareGear))
   const key = won && mission.kind === 'key'
@@ -953,12 +954,12 @@ export function endBattle(run: Run): void {
   const hired = key && hero && !run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).noRecruits) ? join(run, hero).name : null
   run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, soldiers, hired, rescued }
 
-  // Losing the hero's extraction, an escape, a recovery or the hub loses the run, as does a wipe.
+  // Losing the hero's extraction, an ambush, a recovery or the hub loses the run, as does a wipe.
   if (mission.kind === 'final' || (mission.kind !== 'battle' && !won) || wiped) {
     run.phase = mission.kind === 'final' && won ? 'won' : 'lost'
     return
   }
-  // An escape stands in front of the stop it interrupted.
+  // An ambush stands in front of the stop it interrupted.
   if (key) {
     run.keys++
     run.stop = 0
@@ -966,8 +967,8 @@ export function endBattle(run: Run): void {
     onward(run)
   }
   if (mission.kind === 'battle') passStop(run)
-  // A satellite, an escape, a hold or an Overrun battle won offers relics.
-  if (won && (mission.kind === 'key' || mission.kind === 'escape' || (mission.kind === 'battle' && (mission.goal === 'hold' || mission.risk === 'dangerous')))) {
+  // A satellite, an ambush, a hold or an Overrun battle won offers relics.
+  if (won && (mission.kind === 'key' || mission.kind === 'ambush' || (mission.kind === 'battle' && (mission.goal === 'hold' || mission.risk === 'dangerous')))) {
     const pool = offerable(run.relics)
     // The first offer builds on a keyword the squad already has, when one can.
     const held = squadKeywords(run)

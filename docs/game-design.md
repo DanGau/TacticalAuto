@@ -6,7 +6,7 @@ Test every new mechanic against these. Each cites where it comes from.
 2. **One choice, two stakes.** XCOM's abduction choice mixes a reward that advances the win with panic that advances the loss; that is why it is tense and still easy to read. Every choice of way here pairs its rewards with the danger of its battles. [1]
 3. **Clear choices, tough decisions.** The player sees what a choice leads to before making it. Difficulty comes from the trade, never from hidden information. [1]
 4. **No lost cycle.** A setback the player cannot recoup starts a spiral they will abandon. Losses here are sudden and decided in a battle; nothing on the map bleeds the player out. [2] [3]
-5. **Spike and recover.** Pressure builds to a visible peak, a battle resolves it, and the pressure resets. An escape is that peak. [3]
+5. **Spike and recover.** Pressure builds to a visible peak, a battle resolves it, and the pressure resets. An ambush is that peak. [3]
 6. **Breadth early, depth later.** Start with few simple options. Unlock more between runs as "you are ready for this", not as a prize: many new options quickly at first, niche ones later. Not built. [4]
 7. **Show the change.** Players feel feedback, not numbers. After a battle, show the gain first and the aliens' answer second, each as a visible change to the board. [5]
 8. **Squeeze and release.** Tension must be followed by relief the player earned, and the alien advance after a win is the next squeeze. [5]

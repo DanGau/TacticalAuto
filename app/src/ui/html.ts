@@ -23,7 +23,7 @@ export const STOP_NAMES: Record<StopKind | Mission['kind'], string> = {
   unknown: '❓ Unknown',
   key: 'Extraction',
   final: 'The alien source',
-  escape: 'Escape',
+  ambush: 'Ambush',
   recovery: 'Recovery',
 }
 
@@ -39,7 +39,7 @@ export const badge = (cls?: ClassId | null) => (cls ? BADGES[cls] : '🪖')
 export function threatBar(threat: number, landed = 0): string {
   const pct = (n: number) => `${(100 * n) / THREAT_MAX}%`
   const meter = `<span class="threat" title="The hunt: the fuller the bar, the more aliens every battle has, up to ${Math.round(100 * TUNING.hunt)}% more. Full, it ambushes the squad"><i style="width:${pct(threat - landed)}"></i><i class="landed" style="width:${pct(landed)}"></i></span>`
-  return `${meter}${threat === THREAT_MAX ? '<b class="up">escape next</b>' : ''}`
+  return `${meter}${threat === THREAT_MAX ? '<b class="up">ambush next</b>' : ''}`
 }
 
 /** The access keys, won and still to win. */

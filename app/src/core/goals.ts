@@ -1,12 +1,11 @@
 /** What a battle asks of the squad. Each pays differently, so where the squad goes shapes what it builds. */
-export type Goal = 'exterminate' | 'assassinate' | 'hold' | 'rescue' | 'raid' | 'escape' | 'recover'
+export type Goal = 'exterminate' | 'assassinate' | 'hold' | 'rescue' | 'raid' | 'ambush' | 'recover'
 
 /** Rounds the squad must hold the uplink before it can extract. */
 export const HOLD_ROUNDS = 6
-/** How near the escape zone a soldier must come to lift off. */
-export const ESCAPE_REACH = 3
-/** Alien turns between waves on an escape, and on a hold or a recovery. */
-export const WAVE_EVERY = 3
+/** How near the extraction zone a soldier must come to lift off. */
+export const EXTRACT_REACH = 3
+/** Alien turns between waves on a hold or a recovery. */
 export const HOLD_WAVE_EVERY = 3
 /** Civilians on a rescue, the health of each, how far each flees in a turn, and the supplies each saved pays. */
 export const CIVILIANS = 10
@@ -25,15 +24,15 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
   hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as ever larger waves come in from the edges, then get every soldier left to the extraction zone`, reward: 'a relic, no gear', force: -4, weight: 1, from: 1 },
   rescue: {
     name: 'Rescue',
-    text: `A terror site: aliens are killing ${CIVILIANS} civilians. Hiders, squat and amber, take cover and stay put; runners, tall and pale, flee the aliens; and harvesters raise the dead as husks. Aliens with no soldier to fight hunt civilians, so land near them. A soldier who reaches one gets them out. Split the squad to reach more. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
+    text: `A terror site: aliens are killing ${CIVILIANS} civilians. Hiders, squat and amber, take cover and stay put; runners, tall and pale, flee the aliens; and harvesters raise the dead as husks. Aliens hunt civilians once the squad sights them, so the squad fights them as one. A soldier who reaches a civilian gets them out. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
     reward: 'supplies and experience, no gear',
     force: -4,
     weight: 1,
     from: 0,
   },
   raid: { name: 'Supply raid', text: 'Guarded supply caches. Choose how many to go for; each pays supplies, and each beyond the first adds a threat', reward: 'supplies by the cache, no gear', force: -1, weight: 1, from: 0 },
-  // Never drawn: a full threat turns the next stop into an escape.
+  // Never drawn: a full threat turns the next stop into an ambush.
   // Never drawn: soldiers left behind turn the next stop into a recovery.
   recover: { name: 'Recovery', text: 'The aliens hold your downed soldiers among their pods, and more keep coming. Reach each to get them up, and kill every alien. Lose and the run is over', reward: 'your soldiers back', force: 0, weight: 0, from: 0 },
-  escape: { name: 'Escape', text: 'Ambushed on patrol and hunted. Get to the escape zone and lift off; any soldier out wins it', reward: 'the threat emptied', force: -7, weight: 0, from: 0 },
+  ambush: { name: 'Survive the ambush', text: 'Hunted down on the road, with no time to plan. Stand and fight the Hunter and its packs to the last alien', reward: 'the threat emptied', force: -7, weight: 0, from: 0 },
 }

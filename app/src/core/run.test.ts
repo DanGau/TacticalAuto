@@ -1,10 +1,10 @@
 import { expect, test } from 'vitest'
 import { TUNING } from './tuning'
 import { apply } from './apply'
-import { freeTilesNear, isSoldier, BASE_STATS, type Side } from './battle'
+import { edgeNear, freeTilesNear, GRID, isSoldier, BASE_STATS, type Side } from './battle'
 import { stepBattle, type GameEvent } from './combat'
 import { CLASSES } from './classes'
-import { CREDIT_THREAT, EVENTS } from './events'
+import { EVENTS } from './events'
 import { coverAgainst, odds } from './sight'
 import { HUB } from './world'
 import {
@@ -254,18 +254,17 @@ test('getting out, a soldier picks up a squadmate down, walks at half its move c
   const run = travelling(['battle', 'battle'])
   hire(run).skills.splice(1)
   run.phase = 'overworld'
-  run.threat = THREAT_MAX
   apply(run, { type: 'advance' })
-  expect(run.mission!.kind).toBe('escape')
   deploy(run, 0)
   const battle = run.battle!
   const [carrier, fallen] = battle.units.filter(isSoldier)
-  // Only the Hunter is left, rooted and harmless, and the carrier cannot kill it: the battle ends only by lifting off.
+  // One alien is left, rooted and harmless, and the carrier cannot kill it: the battle ends only by lifting off.
   Object.assign(carrier, { ability: null, effects: [], stats: { ...carrier.stats, aim: 0, damage: 0 } })
-  const hunter = battle.units.find((u) => u.boss)!
-  Object.assign(hunter, { stats: { ...hunter.stats, aim: 0, damage: 0, move: 0 } })
-  battle.units = [carrier, hunter]
+  const alien = battle.units.find((u) => u.side === 'alien')!
+  Object.assign(alien, { stats: { ...alien.stats, aim: 0, damage: 0, move: 0 } })
+  battle.units = [carrier, alien]
   battle.waves = []
+  battle.extract = edgeNear(battle, { x: GRID - carrier.x, y: GRID - carrier.y })
   battle.downed.push({ soldier: fallen.soldier!, x: carrier.x, y: carrier.y, carrier: null })
   const events: GameEvent[] = []
   for (let beats = 0; beats < 3000 && battle.phase === 'battle'; beats++) events.push(...stepBattle(battle))
@@ -410,12 +409,27 @@ test('experience follows what a soldier did: kills and damage its own, feats onl
   expect(soldier.feats).toEqual(['hatTrick'])
 })
 
-test.each(['human', 'alien'] as const)('full threat puts an escape before the next stop; %s win', (winner) => {
+test('an ambush has no landing: the squad is down at once, every pod alert and closing, the Hunter in sight and half again as strong as its best soldier', () => {
   const run = travelling(['battle', 'battle'])
   run.threat = THREAT_MAX
-  expect(nextStop(run)).toBe('escape')
+  apply(run, { type: 'advance' })
+  const battle = run.battle!
+  expect(battle).toMatchObject({ goal: 'ambush', phase: 'battle', concealed: false, waves: [] })
+  expect(battle.units.filter(isSoldier)).toHaveLength(run.soldiers.length)
+  expect(battle.pods.map((p) => p.alert && p.revealed)).toEqual(battle.pods.map((_, i) => i === 0))
+  expect(battle.pods.every((p) => p.alert)).toBe(true)
+  const hunter = battle.units.find((u) => u.boss)!.stats
+  const best = soldierStats(run, run.soldiers[0])
+  expect(hunter.hp * hunter.damage).toBeGreaterThanOrEqual(1.4 * best.hp * best.damage)
+  expect(hunter.hp * hunter.damage).toBeLessThanOrEqual(1.8 * best.hp * best.damage)
+})
+
+test.each(['human', 'alien'] as const)('full threat puts an ambush before the next stop; %s win', (winner) => {
+  const run = travelling(['battle', 'battle'])
+  run.threat = THREAT_MAX
+  expect(nextStop(run)).toBe('ambush')
   fight(run, winner)
-  expect(run.report!.stop).toBe('escape')
+  expect(run.report!.stop).toBe('ambush')
   if (winner === 'alien') return expect(run.phase).toBe('lost')
   expect(run).toMatchObject({ phase: 'reward', threat: 0, stop: 0 })
   expect(nextStop(run)).toBe('battle')
@@ -559,10 +573,6 @@ test('a shop stocks one-of-a-kind gear fitted to a soldier, relics the squad lac
   expect(apply(run, { type: 'bribe' }).ok).toBe(false)
   run.supplies = 0
   expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: false, reason: 'not enough supplies' })
-  const owed = shop.relics[0]
-  expect(apply(run, { type: 'owe', index: 0 })).toEqual({ ok: true })
-  expect(run.relics).toContain(owed)
-  expect(run).toMatchObject({ supplies: 0, threat: CREDIT_THREAT })
   apply(run, { type: 'leave' })
   expect(run).toMatchObject({ phase: 'overworld', shop: null, stop: 1 })
 })

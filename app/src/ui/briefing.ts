@@ -96,12 +96,10 @@ export function shots(battle: Battle): Shot[] {
   const aliens = battle.units.filter((u) => u.side === 'alien')
   const pod = (at: Tile & { pod?: number | null }) => (at.pod != null ? `${podLine(battle, at.pod)}. ` : '')
   const commander = aliens.find((u) => u.target)
-  // The objective: where the squad is ambushed, the uplink, the commander, the caches, or failing those the biggest pod.
+  // The objective: the uplink, the commander, the caches, or failing those the biggest pod.
   const sizes = battle.pods.map((_, i) => aliens.filter((u) => u.pod === i).length)
   const biggest = aliens.find((u) => u.pod === sizes.indexOf(Math.max(...sizes)))
-  const at: (Tile & { pod?: number | null })[] = battle.start
-    ? [battle.start]
-    : battle.uplink
+  const at: (Tile & { pod?: number | null })[] = battle.uplink
       ? [battle.uplink]
       : commander
         ? [commander]
@@ -113,7 +111,7 @@ export function shots(battle: Battle): Shot[] {
   const where = `${battle.city}, ${REGIONS[battle.region].name.toLowerCase()}. `
   const lines = at.map((t, i) => `${i === 0 ? `${where}Objective: ${goal.text}. ` : ''}${pod(t)}${ground(battle, t)}.`)
   const twist = battle.twist && TWISTS[battle.twist]
-  const choice = battle.goal === 'rescue' ? 'Choose how to split the squad.' : battle.goal === 'raid' ? 'Choose how many caches to go for.' : battle.start ? 'Choose the way out.' : 'Choose where to land.'
+  const choice = battle.goal === 'raid' ? 'Choose how many caches to go for.' : 'Choose where to land.'
   const last = `${twist ? `${twist.icon} ${twist.name}: ${twist.text}. ` : ''}${choice}`
   return [...at.map((t, i): Shot => ({ tiles: around(t), line: lines[i] })), { tiles: null, line: at.length === 0 ? `${where}Objective: ${goal.text}. ${last}` : last, zones: true }]
 }

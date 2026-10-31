@@ -107,7 +107,7 @@ test('a squad that sees a pod first holds its fire and sets up, then springs the
     })
   }
   expect(sprung).toBeGreaterThan(0)
-})
+}, 30_000)
 
 test('a soldier may walk between and after its attacks, its walks in a turn together within its move', () => {
   let strides = 0

@@ -7,7 +7,7 @@ export interface Report {
   wins: number
   lostToBattle: number
   lostToRecovery: number
-  lostToEscape: number
+  lostToAmbush: number
   lostToExtraction: number
   lostToFinal: number
   /** Mean access keys won, of KEYS. */
@@ -28,7 +28,7 @@ export function report(results: RunResult[]): Report {
     wins: results.filter((r) => r.won).length,
     lostToBattle: lost('battle'),
     lostToRecovery: lost('recovery'),
-    lostToEscape: lost('escape'),
+    lostToAmbush: lost('ambush'),
     lostToExtraction: lost('key'),
     lostToFinal: lost('final'),
     meanKeys: mean((r) => r.keys),
@@ -44,7 +44,7 @@ export function formatReport(r: Report): string {
     `wins                ${percent(r.wins)}`,
     `lost a battle       ${percent(r.lostToBattle)}`,
     `lost a recovery     ${percent(r.lostToRecovery)}`,
-    `lost an escape      ${percent(r.lostToEscape)}`,
+    `lost an ambush      ${percent(r.lostToAmbush)}`,
     `lost an extraction  ${percent(r.lostToExtraction)}`,
     `lost final mission  ${percent(r.lostToFinal)}`,
     `mean keys won       ${r.meanKeys} of ${KEYS}`,
@@ -76,7 +76,7 @@ export const ENCOUNTER_BANDS: Record<Encounter, Record<Squad, readonly [number, 
   hold: { weak: [0.3, 0.75], strong: [0.8, 1] },
   rescue: { weak: [0.2, 0.6], strong: [0.85, 1] },
   raid: { weak: [0.5, 0.9], strong: [0.9, 1] },
-  escape: { weak: [0.3, 0.75], strong: [0.75, 1] },
+  ambush: { weak: [0.3, 0.75], strong: [0.75, 1] },
   recover: { weak: [0.3, 0.75], strong: [0.8, 1] },
   key: { weak: [0.3, 0.75], strong: [0.8, 1] },
   final: { weak: [0.1, 0.5], strong: [0.6, 0.95] },

@@ -4,7 +4,7 @@ import { ALIENS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { effectName } from '../core/effects'
 import { UPLINK_REACH, type GameEvent } from '../core/combat'
-import { ESCAPE_REACH } from '../core/goals'
+import { EXTRACT_REACH } from '../core/goals'
 import { fence, RISE_MS } from './fences'
 import { level, type Run } from '../core/run'
 import { visibleTiles } from '../core/sight'
@@ -413,8 +413,6 @@ export interface View {
   focus(zone: number | null): void
   /** Hides the landing zones while the briefing flies over the mission, and shows them once it is done. */
   hideZones(hidden: boolean): void
-  /** On a rescue, shows where each of `teams` teams would land. */
-  showTeams(teams: number): void
   /** Glides the camera to frame the given tiles as `shot` says, above the landing panel; null pulls back to the whole map. */
   frame(tiles: Tile[] | null, ms?: number, shot?: Shot): Promise<void>
   /** Lights a beam over the tile the briefing is on, so it stands out from the night; null puts it out. */
@@ -496,8 +494,6 @@ export async function createView(): Promise<View> {
   let selected: number | null = null
   /** Whether the briefing is under way, so the landing zones are hidden. */
   let briefing = false
-  /** On a rescue, the teams whose landing zones show. */
-  let teams = 1
 
   /** Where a tile falls in the camera's picture. */
   const toWorld = (x: number, y: number): Tile => picture(spot(x, y), camera.yaw)
@@ -659,7 +655,7 @@ export async function createView(): Promise<View> {
 
   const raycaster = new Raycaster()
   function zoneAt(px: number, py: number): number | null {
-    if (shown?.phase !== 'deploy' || shown.goal === 'rescue') return null
+    if (shown?.phase !== 'deploy') return null
     raycaster.setFromCamera(new Vector2((px / innerWidth) * 2 - 1, 1 - (py / innerHeight) * 2), eye)
     const hit = raycaster.intersectObject(terrain.children[0])[0]
     if (!hit) return null
@@ -994,31 +990,27 @@ export async function createView(): Promise<View> {
     const tint = new Shapes()
     marks = []
     if (battle.uplink) marks.push(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
-    if (battle.escape) marks.push(label(battle.goal === 'hold' ? '🚁 EXTRACT' : '🚁 ESCAPE', battle.escape, COLOR.uplink, 28))
+    if (battle.extract) marks.push(label('🚁 EXTRACT', battle.extract, COLOR.uplink, 28))
     for (const cache of battle.caches) marks.push(label('📦', cache, COLOR.uplink, 24))
     // Soldiers down where they fell; a recovery's captives are held.
     for (const body of battle.downed.filter((d) => d.carrier === null)) marks.push(label(battle.captives.some((c) => c.soldier === body.soldier) ? '⛓ HELD' : '✚ DOWNED', body, COLOR.contact, 22))
-    if (battle.start && battle.phase === 'deploy') marks.push(label('⚠ AMBUSHED HERE', battle.start, COLOR.contact, 24))
     if (battle.phase === 'deploy') {
-      // A rescue shows where each of its teams would land.
-      const shownZones = battle.goal === 'rescue' ? battle.zones.slice(0, teams) : battle.zones
       if (!briefing)
-        shownZones.forEach((zone, i) => {
+        battle.zones.forEach((zone, i) => {
           for (let y = 0; y < GRID; y++) {
             for (let x = 0; x < GRID; x++) {
               if (distance(zone, { x, y }) <= ZONE_RADIUS && battle.ground[y * GRID + x] !== 'void') diamond(tint, x, y, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone, 0.8)
             }
           }
           // The selected zone's way in: a line to the uplink, or to the nearest contact.
-          // On an escape, the way out from where the squad is ambushed.
-          const toward = i === selected && (battle.start ?? battle.uplink ?? nearestAlien(battle, zone))
+          const toward = i === selected && (battle.uplink ?? nearestAlien(battle, zone))
           if (toward) {
             const a = spot(zone.x, zone.y)
             const b = spot(toward.x, toward.y)
             const lift = Math.max(a.y, b.y) + DECAL_LIFT * 3
             tint.band({ ...a, y: lift }, { ...b, y: lift }, 4 / ACROSS, battle.uplink ? COLOR.uplink : COLOR.contact, 0.9)
           }
-          marks.push(label(battle.goal === 'rescue' ? `Team ${i + 1}` : [ZONE_NAMES[i], PLANS[battle.plans[i]].icon].filter(Boolean).join(' '), zone, 0xffffff))
+          marks.push(label([ZONE_NAMES[i], PLANS[battle.plans[i]].icon, i === battle.barrage ? '💥' : ''].filter(Boolean).join(' '), zone, 0xffffff))
         })
       battle.pods.forEach((_, pod) => {
         const members = battle.units.filter((u) => u.pod === pod)
@@ -1028,9 +1020,9 @@ export async function createView(): Promise<View> {
     lay(zones, tint)
     // A fence rings each zone in play: the landing zones to choose from, the uplink to hold, the way out.
     const rings: [Tile, number, number][] = []
-    if (battle.phase === 'deploy' && !briefing) (battle.goal === 'rescue' ? battle.zones.slice(0, teams) : battle.zones).forEach((zone, i) => rings.push([zone, ZONE_RADIUS, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone]))
+    if (battle.phase === 'deploy' && !briefing) battle.zones.forEach((zone, i) => rings.push([zone, ZONE_RADIUS, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone]))
     if (battle.uplink) rings.push([battle.uplink, UPLINK_REACH, COLOR.uplink])
-    if (battle.escape) rings.push([battle.escape, ESCAPE_REACH, COLOR.extract])
+    if (battle.extract) rings.push([battle.extract, EXTRACT_REACH, COLOR.extract])
     const next = new Map<string, ReturnType<typeof fence>>()
     for (const [at, reach, color] of rings) {
       const key = `${at.x},${at.y},${reach},${color}`
@@ -1633,7 +1625,7 @@ export async function createView(): Promise<View> {
    */
   function inPlay(yaw = YAW): Camera {
     const battle = shown!
-    const goals = [battle.uplink, battle.escape, battle.start, ...battle.caches].filter((t): t is Tile => t !== null)
+    const goals = [battle.uplink, battle.extract, ...battle.caches].filter((t): t is Tile => t !== null)
     const units = battle.units.filter((u) => u.side === 'human' || battle.phase === 'deploy' || revealed(battle, u))
     return framing([...(battle.phase === 'deploy' ? battle.zones : []), ...goals, ...units], yaw, WHOLE_MARGIN)
   }
@@ -1697,10 +1689,6 @@ export async function createView(): Promise<View> {
       pool.position.set(at.x, at.y + DECAL_LIFT * 5, at.z)
       beam.add(pool)
     },
-    showTeams(n) {
-      teams = n
-      if (shown) drawMarks(shown)
-    },
     hideZones(hidden) {
       briefing = hidden
       if (shown) drawMarks(shown)
@@ -1727,6 +1715,8 @@ export async function createView(): Promise<View> {
         look(above(null, OPENING))
         void follow(above(null), FLY_MS)
       }
+      // An ambush opens already in the fight, on the squad.
+      if (fresh && battle.phase !== 'deploy') look(clamped(inPlay()))
       if (animate) await play(battle, events)
       sync(run, battle)
       if (events.some((e) => e.type === 'rocket' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(battle)

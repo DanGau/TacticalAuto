@@ -266,8 +266,6 @@ export interface Unit {
   civilian: 'hider' | 'runner' | null
   /** For a mech, the soldier id of the engineer who deployed it, credited with what it does; null for any other unit. */
   summoner: number | null
-  /** The team a soldier keeps with, when a rescue splits the squad; 0 otherwise. */
-  team: number
   /** Whether the unit loses its next action. */
   panicked: boolean
   /** Whether the unit has moved this turn. */
@@ -325,7 +323,7 @@ export interface Battle {
   place: TerrainKind
   /** Alien turns begun. */
   round: number
-  /** Packs still to arrive as waves, on a hold or an escape. */
+  /** Packs still to arrive as waves, on a hold or a recovery. */
   waves: { name: string; aliens: Alien[] }[]
   /** The unit whose action is under way, credited with the damage it does; null between actions. */
   actor: number | null
@@ -365,8 +363,8 @@ export interface Battle {
   concealed: boolean
   /** Set by a landing on the hot zone until the drop pods' impact lands, as the battle's first beat. */
   breach: boolean
-  /** Whether an orbital strike was called before the landing. */
-  strike: boolean
+  /** The zone, by index into zones, whose landing comes with an artillery strike on the pod nearest it; null if none. */
+  barrage: number | null
   /** Tiles of acid, each with the alien turns it has left. */
   acid: { x: number; y: number; turns: number }[]
   /** Tiles of fire, each with the alien turns it has left. */
@@ -383,10 +381,9 @@ export interface Battle {
   zones: Tile[]
   /** On a hold, the uplink the squad must reach and defend; null otherwise. */
   uplink: Tile | null
-  /** On an escape, where the squad is ambushed, and the escape zone it chose; null otherwise. */
-  start: Tile | null
-  escape: Tile | null
-  /** Soldiers lifted off from an escape or extraction zone, by soldier id, and the health each left with; 0 if carried. */
+  /** On a hold, once it is held, the extraction zone; null otherwise. */
+  extract: Tile | null
+  /** Soldiers lifted off from the extraction zone, by soldier id, and the health each left with; 0 if carried. */
   escaped: number[]
   lifted: Record<number, number>
   /** What landing at each zone means, in zones order, and the plan the squad landed by; null before it lands. */
@@ -695,17 +692,6 @@ export function edgeNear(battle: Battle, tile: Tile): Tile {
   return best ?? openNear(battle, tile)
 }
 
-/** How far to either side of an escape route its aliens stand. */
-const ROUTE_WIDTH = 5
-
-/** The aliens near the straight way from an escape's start to an escape zone. */
-export function onTheWay(battle: Battle, zone: Tile): Unit[] {
-  const start = battle.start!
-  const steps = Math.max(1, distance(start, zone))
-  const line = Array.from({ length: steps + 1 }, (_, i) => ({ x: Math.round(start.x + ((zone.x - start.x) * i) / steps), y: Math.round(start.y + ((zone.y - start.y) * i) / steps) }))
-  return battle.units.filter((u) => u.side === 'alien' && line.some((tile) => distance(tile, u) <= ROUTE_WIDTH))
-}
-
 /** The alien nearest a tile, if any. */
 export const nearestAlien = (battle: Battle, tile: Tile): Unit | undefined =>
   battle.units.filter((u) => u.side === 'alien').reduce<Unit | undefined>((best, u) => (!best || distance(tile, u) < distance(tile, best) ? u : best), undefined)
@@ -735,31 +721,33 @@ export const PLANS: Record<Plan, { name: string; icon: string; text: string }> =
   overwatch: { name: 'Overwatch', icon: '🔭', text: "Land on high ground at range from the commander; its pod sees the squad coming" },
   bait: { name: 'Bait', icon: '🪤', text: 'Land far off: the guards come for the squad, leaving the commander alone' },
   uplink: { name: 'Drop on the uplink', icon: '📡', text: 'The drop pods land right beside the uplink' },
-  escape: { name: 'Way out', icon: '🚁', text: 'Break out toward this escape zone' },
-  team: { name: 'Team', icon: '👥', text: 'Where a team lands' },
 }
 
 /**
  * What landing at a zone means. Exterminate and raid: a quiet march in from the edge; with a relic, a hot drop onto a
  * pod or a parachute drop anywhere clear of every pod.
  * Assassinate: a decapitation onto the commander, an overwatch on high ground at range, or bait far off that draws the
- * guards away. Hold: which uplink to hold. Escape: which way out. A rescue's zones are where its teams land.
+ * guards away. Hold: which uplink to hold. Rescue: a quiet march in from the edge.
  */
-export type Plan = 'march' | 'hot' | 'stealth' | 'decap' | 'overwatch' | 'bait' | 'uplink' | 'escape' | 'team'
+export type Plan = 'march' | 'hot' | 'stealth' | 'decap' | 'overwatch' | 'bait' | 'uplink'
 
 /** The supply caches a raid can grab, at most. */
 export const CACHES = 3
 
 /**
  * Lands the whole squad on the free tiles nearest the zone's centre, as the zone's plan has it, and begins the battle.
- * Split into `teams`, each team lands at its own zone instead.
  * A hot drop or a decapitation breaches: the pod beneath is caught unaware and loses its first alien turn's shots, its
  * members take the impact in the first beat, and every other pod hears the landing and converges on it. An overwatch
- * alerts the commander's pod; bait draws every other pod to the landing. A hold's zone is the uplink it holds.
+ * alerts the commander's pod; bait draws every other pod to the landing. A hold's zone is the uplink it holds. The
+ * barrage's zone opens with a strike on the pod nearest it.
  */
-export function land(battle: Battle, zone: Tile, teams = 1): void {
+export function land(battle: Battle, zone: Tile): void {
   const plan = battle.plans[battle.zones.indexOf(zone)]
   battle.landed = plan
+  if (battle.zones.indexOf(zone) === battle.barrage) {
+    const pod = nearestAlien(battle, zone)?.pod
+    for (const alien of battle.units.filter((u) => u.side === 'alien' && u.pod === pod)) alien.hp = Math.max(1, alien.hp - STRIKE.damage)
+  }
   if (plan === 'hot' || plan === 'decap') {
     battle.breach = true
     battle.concealed = false
@@ -772,22 +760,12 @@ export function land(battle: Battle, zone: Tile, teams = 1): void {
   const commander = battle.units.find((u) => u.target)
   if (plan === 'overwatch' && commander) Object.assign(battle.pods[commander.pod!], { revealed: true, alert: true })
   if (plan === 'bait') battle.pods.forEach((pod, i) => i !== commander?.pod && (pod.waypoint = zone))
-  // On an escape the zone is where the squad makes for. The Hunter has found it; the packs across the ways out are
-  // in sight but have yet to notice it.
-  if (battle.start) {
-    battle.escape = zone
-    battle.concealed = false
-    battle.pods.forEach((pod, i) => Object.assign(pod, { revealed: true, alert: i === 0 }))
-  }
-  // Split up, each team lands at its own zone, the soldiers dealt among them in turn.
-  const tiles = Array.from({ length: teams }, (_, t) => freeTilesNear(battle, teams > 1 ? battle.zones[t] : (battle.start ?? zone), battle.reserve.length))
-  battle.reserve.forEach((soldier, i) => {
-    battle.units.push(soldierUnit(battle, soldier, tiles[i % teams][Math.floor(i / teams)], i % teams))
-  })
+  const tiles = freeTilesNear(battle, zone, battle.reserve.length)
+  battle.reserve.forEach((soldier, i) => battle.units.push(soldierUnit(battle, soldier, tiles[i])))
   battle.reserve = []
   battle.phase = 'battle'
   const squad = battle.units.filter((u) => u.side === 'human' && !u.civilian)
-  dropRelics(battle, squad, [...new Set(squad.map((u) => (teams > 1 ? battle.zones[u.team] : (battle.start ?? zone))))])
+  dropRelics(battle, squad, [zone])
   // A barrier projector armors every squadmate of its carrier.
   for (const carrier of squad.filter((u) => u.effects.includes('barrier'))) {
     for (const mate of squad) if (mate !== carrier) mate.armor += BARRIER_ARMOR
@@ -805,11 +783,11 @@ export function holdCaptives(battle: Battle, captives: Reserve[]): void {
 }
 
 /** A soldier's unit, landing from the reserve on `tile`. */
-export function soldierUnit(battle: Battle, soldier: Reserve, tile: Tile, team = 0): Unit {
-  return { id: battle.nextId++, side: 'human', ...tile, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: null, summoner: null, team, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null, ...soldier }
+export function soldierUnit(battle: Battle, soldier: Reserve, tile: Tile): Unit {
+  return { id: battle.nextId++, side: 'human', ...tile, armor: soldier.stats.armor, pod: null, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: null, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null, ...soldier }
 }
 
-/** An orbital strike's threat, and the damage it does every alien, never killing one. */
+/** An artillery strike's threat, and the damage it does each alien of the pod it hits, never killing one. */
 export const STRIKE = { threat: 2, damage: 5 }
 
 /** Tiles weighed for each zone of a distinct kind. */
@@ -839,10 +817,7 @@ function planZones(battle: Battle, centres: Tile[]): void {
   }
   const held = (effect: RelicEffect) => battle.reserve.some((r) => r.effects.includes(effect))
   const goal = battle.goal
-  if (goal === 'escape') battle.plans = battle.zones.map((): Plan => 'escape')
-  // A rescue lands wherever its teams scatter to: zones far apart, one for each team it might split into.
-  else if (goal === 'rescue') while (battle.zones.length < TEAMS) add(spacedTile(battle, [...battle.units.filter((u) => u.side === 'alien'), ...battle.zones], 2 * ZONE_CLEARANCE, 'edge'), 'team')
-  else if (goal === 'hold') {
+  if (goal === 'hold') {
     // The uplink stands within; the squad comes at it from the edge, or with drop pods, lands on it.
     battle.uplink = clear('inner')
     if (held('dropPods')) add(battle.uplink, 'uplink')
@@ -863,12 +838,15 @@ function planZones(battle: Battle, centres: Tile[]): void {
     add(distinct(), 'march')
     battle.caches = Array.from({ length: CACHES }, (_, i) => (centres[i] ? (freeTilesNear(battle, centres[i], 4)[3] ?? centres[i]) : clear('inner')))
   } else {
-    // Exterminate: quiet approaches from the edge; Orbital Drop Pods make one a hot drop onto a pod, Night Canopies one a
-    // parachute drop anywhere within.
+    // Exterminate and rescue: quiet approaches from the edge; Orbital Drop Pods make one a hot drop onto a pod, Night
+    // Canopies one a parachute drop anywhere within.
     if (held('dropPods') && centres.length > 0) add(centres[randomInt(battle, centres.length)], 'hot')
     if (held('canopies')) add(distinct('anywhere'), 'stealth')
     while (battle.zones.length < ZONES) add(distinct(), 'march')
   }
+  // One quiet approach comes with an artillery strike on the pod in front of it.
+  const marches = battle.plans.flatMap((plan, i) => (plan === 'march' && goal !== 'raid' ? [i] : []))
+  if (marches.length > 0) battle.barrage = marches[randomInt(battle, marches.length)]
 }
 
 /** How near a landing the drop pods' relics reach aliens. */
@@ -978,7 +956,6 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
     fury: 0,
     civilian: null,
     summoner: null,
-    team: 0,
     panicked: false,
     moved: false,
     suppressed: 0,
@@ -990,7 +967,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, pod: number)
 
 /** A mech built by the engineer `owner`, with `stats` and the `effects` its skills give it, standing on `tile`. */
 export function mechUnit(battle: Battle, owner: Unit, stats: Stats, effects: Effect[], tile: Tile): Unit {
-  return { id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: stats.armor, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'rush', effects, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: null, summoner: owner.soldier, team: battle.units.find((u) => u.soldier === owner.soldier)?.team ?? 0, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null }
+  return { id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: stats.armor, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'rush', effects, spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: null, summoner: owner.soldier, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null }
 }
 
 /** Places a pack as a new pod around `centre`. */
@@ -1001,23 +978,19 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
   return units
 }
 
-/**
- * A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. A hold keeps half its
- * packs back as waves; a rescue is a terror site, its aliens in the open and its civilians fleeing them.
- */
-/** The share of packs, outside an escape's ways out, that hold their post as guards. */
+/** The share of packs that hold their post as guards. */
 const GUARD_SHARE = 0.25
-/** The most teams a rescue can split the squad into. */
-export const TEAMS = 4
-
-/** How far an escape's ways out lie from where the squad is ambushed, along each axis. */
-const ESCAPE_SPAN = 30
-/** How far from the squad and the ways out an escape's Hunter starts. */
-const HUNTER_START = 12
+/** How far from the squad an ambush's Hunter starts. */
+const HUNTER_START = 10
 
 /** Tiles apart a rescue's civilians start, from each other and the aliens. */
 const CIVILIAN_CLEARANCE = 7
 
+/**
+ * A battle awaiting the squad's landing, with terrain, alien pods, and landing zones placed. A hold keeps half its
+ * packs back as waves; a rescue's civilians are scattered among its pods. An ambush has no landing: the squad is
+ * already down at a corner, every pod alert and closing in, the Hunter nearest.
+ */
 export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale): Battle {
   const holder = { rng: seed }
   const terrain = generateTerrain(holder, GRID, kind, twist, place)
@@ -1027,8 +1000,8 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     rules,
     twist,
     round: 0,
-    // An escape's packs after its Hunter, and all of a recovery's, come on a second time, as waves.
-    waves: goal === 'hold' ? packs.slice(Math.ceil(packs.length / 2)) : goal === 'escape' ? packs.slice(1) : goal === 'recover' ? [...packs] : [],
+    // All of a recovery's packs come on a second time, as waves.
+    waves: goal === 'hold' ? packs.slice(Math.ceil(packs.length / 2)) : goal === 'recover' ? [...packs] : [],
     beat: 0,
     phase: 'deploy',
     turn: 'human',
@@ -1055,8 +1028,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     tally: {},
     zones: [],
     uplink: null,
-    start: null,
-    escape: null,
+    extract: null,
     escaped: [],
     lifted: {},
     plans: [],
@@ -1065,46 +1037,40 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     greed: 0,
     grabbed: 0,
     breach: false,
-    strike: false,
+    barrage: null,
     reserve,
     downed: [],
     captives: [],
   }
   sealPockets(battle)
-  if (goal === 'escape') {
-    // Ambushed at one corner, with the ways out ESCAPE_SPAN across toward the far one: there, and halfway along either side.
-    const [x1, y1, x2, y2] = [0, 0, GRID - 1, GRID - 1]
-    const corners = [{ x: x1 + 2, y: y1 + 2 }, { x: x2 - 2, y: y1 + 2 }, { x: x2 - 2, y: y2 - 2 }, { x: x1 + 2, y: y2 - 2 }]
-    const corner = randomInt(battle, corners.length)
-    const start = edgeNear(battle, corners[corner])
-    const dx = Math.sign(corners[(corner + 2) % corners.length].x - start.x) * ESCAPE_SPAN
-    const dy = Math.sign(corners[(corner + 2) % corners.length].y - start.y) * ESCAPE_SPAN
-    battle.start = start
-    for (const [kx, ky] of [[1, 1], [1, 0.5], [0.5, 1]]) battle.zones.push(openNear(battle, { x: Math.round(start.x + dx * kx), y: Math.round(start.y + dy * ky) }))
+  const ambush = goal === 'ambush'
+  // Ambushed where it stands, within: the Hunter in sight a short way off, the packs closing in unseen from around it.
+  const drop = ambush ? spacedTile(battle, [], 0, 'inner') : null
+  const around = (reach: number) => {
+    const angle = 2 * Math.PI * random(battle)
+    const at = (v: number) => Math.max(0, Math.min(GRID - 1, Math.round(v)))
+    return openNear(battle, { x: at(drop!.x + reach * Math.cos(angle)), y: at(drop!.y + reach * Math.sin(angle)) })
   }
-
   const centres: Tile[] = []
   packs.slice(0, goal === 'hold' ? packs.length - battle.waves.length : packs.length).forEach((pack, i) => {
-    // On an escape the Hunter starts far off, and each pack after it stands across one of the ways out.
-    const route = battle.start && i > 0 ? battle.zones[(i - 1) % ZONES] : null
-    const along = route ? 0.4 + 0.4 * random(battle) : 0
-    const centre = route
-      ? openNear(battle, { x: Math.round(battle.start!.x + (route.x - battle.start!.x) * along), y: Math.round(battle.start!.y + (route.y - battle.start!.y) * along) })
-      : battle.start
-        ? spacedTile(battle, [battle.start, ...battle.zones], HUNTER_START)
-        : spacedTile(battle, centres, ZONE_CLEARANCE, 'inner')
+    const centre = !drop ? spacedTile(battle, centres, ZONE_CLEARANCE, 'inner') : around(i === 0 ? HUNTER_START : HUNTER_START + randomInt(battle, HUNTER_START))
     centres.push(centre)
-    // A terror site has no stealth: every alien is in the open and already killing.
-    const terror = goal === 'rescue'
-    placePod(battle, pack, centre, terror, !route && !terror && random(battle) < GUARD_SHARE)
+    placePod(battle, pack, centre, ambush && i === 0, !ambush && random(battle) < GUARD_SHARE)
   })
-  if (goal === 'rescue') {
+  if (drop) {
     battle.concealed = false
+    for (const pod of battle.pods) Object.assign(pod, { alert: true, waypoint: drop })
+    battle.zones = [drop]
+    battle.plans = ['march']
+    land(battle, drop)
+    return battle
+  }
+  if (goal === 'rescue') {
     // Civilians scattered about the map, in the open: half hide where they are, half run from the aliens.
     for (let i = 0; i < CIVILIANS; i++) {
       const tile = spacedTile(battle, battle.units, CIVILIAN_CLEARANCE)
       const stats = { ...BASE_STATS, hp: CIVILIAN_HP, aim: 0, damage: 0, range: 0, move: CIVILIAN_MOVE, crit: 0 }
-      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: i % 2 === 0 ? 'hider' : 'runner', summoner: null, team: 0, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null })
+      battle.units.push({ id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: i % 2 === 0 ? 'hider' : 'runner', summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null })
     }
   }
   planZones(battle, centres)

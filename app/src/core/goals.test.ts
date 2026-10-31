@@ -31,15 +31,15 @@ test('a hold sets its uplink within, the squad coming at it from the edge; once 
   expect(battle.waves).toHaveLength(1)
   deploy(run, 1)
   battle.held = HOLD_ROUNDS
-  while (!battle.escape) stepBattle(battle)
+  while (!battle.extract) stepBattle(battle)
   expect(battle.phase).toBe('battle')
   expect(battle.uplink).toBeNull()
-  const depth = edgeDepths(battle)[battle.escape.y * GRID + battle.escape.x]
+  const depth = edgeDepths(battle)[battle.extract.y * GRID + battle.extract.x]
   expect(depth).toBeLessThanOrEqual(INNER)
   // Waves keep coming as the squad extracts.
   expect(battle.waves.length).toBeGreaterThan(0)
   const soldiers = battle.units.filter(isSoldier)
-  freeTilesNear(battle, battle.escape, soldiers.length).forEach((tile, i) => Object.assign(soldiers[i], tile))
+  freeTilesNear(battle, battle.extract, soldiers.length).forEach((tile, i) => Object.assign(soldiers[i], tile))
   while (battle.phase === 'battle') stepBattle(battle)
   expect(battle.winner).toBe('human')
   expect(battle.escaped).toHaveLength(soldiers.length)
@@ -134,21 +134,31 @@ test('a rescue is won, and pays, only with more than RESCUE_QUORUM civilians sav
   }
 })
 
-/** A rescue whose squad has landed rooted and harmless, so only the aliens act on the civilians. */
-function terror(seed: number): Run {
+/** A rescue whose squad has landed rooted and harmless, so only the aliens act on the civilians; `sighted`, every pod is in sight and alert. */
+function terror(seed: number, sighted = true): Run {
   const run = before('rescue')
   run.battle!.rng = seed
   deploy(run, 0)
   for (const s of run.battle!.units.filter(isSoldier)) Object.assign(s, { rooted: 999, stats: { ...s.stats, aim: -10 } })
+  if (sighted) for (const pod of run.battle!.pods) Object.assign(pod, { revealed: true, alert: true })
   return run
 }
 
-test('a rescue is a terror site: aliens and civilians in the open from the start, and aliens with no soldier to fight kill civilians', () => {
+test('on a rescue aliens leave civilians be until the squad sights them', () => {
+  const run = terror(1, false)
+  const battle = run.battle!
+  expect(battle.pods.some((p) => p.revealed)).toBe(false)
+  expect(battle.units.filter((u) => u.civilian).every((u) => revealed(battle, u))).toBe(true)
+  const civilians = new Set(battle.units.filter((u) => u.civilian).map((u) => u.id))
+  while (battle.phase === 'battle' && battle.round < 10) {
+    const sighted = new Set(battle.units.filter((u) => u.side === 'alien' && revealed(battle, u)).map((u) => u.id))
+    for (const e of stepBattle(battle)) if (e.type === 'shot' && civilians.has(e.target)) expect(sighted.has(e.id)).toBe(true)
+  }
+})
+
+test('on a rescue sighted aliens with no soldier to fight kill civilians', () => {
   const run = terror(1)
   const battle = run.battle!
-  expect(battle.concealed).toBe(false)
-  expect(battle.pods.every((p) => p.revealed && p.alert)).toBe(true)
-  expect(battle.units.filter((u) => u.civilian).every((u) => revealed(battle, u))).toBe(true)
   const civilians = new Set(battle.units.filter((u) => u.civilian).map((u) => u.id))
   let killed = 0
   while (battle.phase === 'battle' && battle.round < 10) {
@@ -190,6 +200,7 @@ test('on a rescue a soldier makes for an alien hunting a civilian when it is nea
   const alien = battle.units.find((u) => u.side === 'alien')!
   const civilian = battle.units.find((u) => u.civilian)!
   battle.units = battle.units.filter((u) => u === soldier || u === alien || u === civilian)
+  Object.assign(battle.pods[alien.pod!], { revealed: true, alert: true })
   const tiles = freeTilesNear(battle, soldier, 600)
   Object.assign(alien, tiles.find((t) => distance(t, soldier) === 10))
   Object.assign(civilian, tiles.find((t) => distance(t, alien) === 6 && distance(t, soldier) === 14))
@@ -218,38 +229,26 @@ test('a civilian a harvester kills rises on the next alien turn as a husk', () =
   expect(battle.units.find((u) => u.kind === 'husk')!.pod).toBe(harvester.pod)
 })
 
-test('on a rescue soldiers reach civilians to get them out, and aliens hunt them', () => {
+test('on a rescue soldiers reach civilians to get them out', () => {
   let saved = 0
-  let shotAt = 0
   for (let seed = 1; seed <= 6; seed++) {
     const run = before('rescue')
     run.battle!.rng = seed
     deploy(run, seed % 3)
     const battle = run.battle!
-    // Only the harvesters, so a lone soldier lives long enough.
+    // Only the harvesters, sighted, so a lone soldier lives long enough.
     battle.units = battle.units.filter((u) => u.side !== 'alien' || u.kind === 'harvester')
-    while (battle.phase === 'battle') {
-      const civilians = new Set(battle.units.filter((u) => u.civilian).map((u) => u.id))
-      for (const e of stepBattle(battle)) {
-        if (e.type === 'saved') saved++
-        if (e.type === 'shot' && civilians.has(e.target)) shotAt++
-      }
-    }
+    for (const pod of battle.pods) Object.assign(pod, { revealed: true, alert: true })
+    while (battle.phase === 'battle') for (const e of stepBattle(battle)) if (e.type === 'saved') saved++
     expect(battle.saved).toBeLessThanOrEqual(CIVILIANS)
   }
   expect(saved).toBeGreaterThan(0)
-  expect(shotAt).toBeGreaterThan(0)
 })
 
-test('a rescue squad split into teams lands each team apart, and left-behind civilians add threat', () => {
+test('left-behind civilians on a lost rescue add threat', () => {
   const run = before('rescue')
-  run.battle!.reserve = [...run.battle!.reserve, ...run.battle!.reserve.map((r) => ({ ...r, soldier: r.soldier + 100 }))]
-  apply(run, { type: 'split', teams: 2 })
+  deploy(run, 0)
   const battle = run.battle!
-  const [a, b] = [0, 1].map((t) => battle.units.filter((u) => isSoldier(u) && u.team === t))
-  expect(a).toHaveLength(1)
-  expect(b).toHaveLength(1)
-  expect(Math.max(Math.abs(a[0].x - b[0].x), Math.abs(a[0].y - b[0].y))).toBeGreaterThan(4)
   const threat = run.threat
   battle.winner = 'alien'
   endBattle(run)

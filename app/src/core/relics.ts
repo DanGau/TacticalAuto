@@ -4,7 +4,7 @@ import { TUNING } from './tuning'
 import type { Keyword } from './keywords'
 
 /**
- * An artifact the squad keeps for the run, taken from three offered after a satellite, a hold or an escape is won.
+ * An artifact the squad keeps for the run, taken from three offered after a satellite, a hold or an ambush is won.
  * It changes every soldier, or how the run pays; `text` says how.
  */
 export interface Relic {
@@ -77,7 +77,7 @@ const relics = {
   beacon: { name: 'Evac Beacon', text: `A soldier gets a civilian out from ${BEACON_REACH} tiles away`, effect: 'beacon' },
   charity: { name: 'Refugee Network', text: 'Each civilian saved pays 1 more supply', civilianSupplies: 1 },
   relay: { name: 'Relay Booster', text: `The uplink's zone reaches ${RELAY_REACH} tiles farther`, effect: 'relay' },
-  flare: { name: 'Signal Flare', text: 'A soldier lifts off from farther from the escape zone', effect: 'flare' },
+  flare: { name: 'Signal Flare', text: 'A soldier lifts off from farther from the extraction zone', effect: 'flare' },
   bounty: { name: 'Bounty Rounds', text: `Hits on a boss, a Guardian or the Hunter, do +${BOUNTY_DAMAGE} damage`, tags: ['kill'], effect: 'bounty' },
 } satisfies Record<string, Relic>
 

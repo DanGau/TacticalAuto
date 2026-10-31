@@ -7,7 +7,7 @@ import { ALIENS } from '../core/aliens'
 import { RELICS, type Relic } from '../core/relics'
 import { known } from './intro'
 import { TWISTS } from '../core/twists'
-import { onTheWay, PLANS, STRIKE, TEAMS, ZONE_NAMES, type Battle, type Unit } from '../core/battle'
+import { PLANS, STRIKE, ZONE_NAMES, type Battle } from '../core/battle'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { DETECT, PATROL_DETECT } from '../core/sight'
 import { alienName, button, resistChip, STOP_NAMES, tip } from './html'
@@ -51,30 +51,25 @@ function status(run: Run): string {
   const battle = run.battle
   if (run.phase !== 'battle' || !battle) return ''
   const mission = run.mission!
-  const title = mission.kind === 'battle' || mission.kind === 'escape' || mission.kind === 'recovery' ? `${GOALS[mission.goal].name}: ${GOALS[mission.goal].text}` : STOP_NAMES[mission.kind]
+  const title = mission.kind === 'battle' || mission.kind === 'ambush' || mission.kind === 'recovery' ? `${GOALS[mission.goal].name}: ${GOALS[mission.goal].text}` : STOP_NAMES[mission.kind]
   if (battle.phase === 'deploy') return `${title}<div class="roster">${roster(run)}</div>`
-  const rounds = battle.escape ? ` · ${battle.escaped.length} lifted off` : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
+  const rounds = battle.extract ? ` · ${battle.escaped.length} lifted off` : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
   return `${title}${rounds} · ${SIDE[battle.turn]}' turn${battle.concealed ? ' · unseen' : ''}`
 }
 
 /** Before the landing: a button per zone that flies the camera there, one back to the whole map, and the chosen zone's plan. */
-function drop(battle: Battle, zone: number | null, teams: number, greed: number): string {
-  if (battle.start) return escapes(battle, zone)
-  if (battle.goal === 'rescue') return splits(battle, teams)
+function drop(battle: Battle, zone: number | null, greed: number): string {
   if (battle.goal === 'raid') return raids(battle, greed)
-  const zones = battle.plans.map((plan, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}">${[ZONE_NAMES[i], PLANS[plan].icon, PLANS[plan].name].filter(Boolean).join(' ')}</button>`)
+  const barrage = (i: number) => (i === battle.barrage ? '💥 Barrage' : '')
+  const zones = battle.plans.map((plan, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}">${[ZONE_NAMES[i], PLANS[plan].icon, PLANS[plan].name, barrage(i)].filter(Boolean).join(' ')}</button>`)
   const overview = `<button data-zone="" class="overview ${zone === null ? 'on' : ''}" title="Whole map">🗺️</button>`
+  const strike = `<p>An artillery strike softens the pod in front: each alien -${STRIKE.damage} health. <span class="up">+${STRIKE.threat} threat</span>.</p>`
   const detail =
     zone === null
       ? '<small>Pick a landing zone to fly to it.</small>'
-      : `${PLANS[battle.plans[zone]].text ? `<p>${PLANS[battle.plans[zone]].text}.</p>` : ''}${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
+      : `${PLANS[battle.plans[zone]].text ? `<p>${PLANS[battle.plans[zone]].text}.</p>` : ''}${zone === battle.barrage ? strike : ''}${button({ type: 'land', zone }, `Land at ${ZONE_NAMES[zone]}`)}`
   const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
   return `${twist}<div class="zones">${zones.join('')}${overview}</div>${detail}`
-}
-
-/** Before any landing: an orbital strike that wounds every alien, for threat. */
-function strike(battle: Battle): string {
-  return button({ type: 'strike' }, battle.strike ? '🛰️ Strike called' : `🛰️ Orbital strike: every alien -${STRIKE.damage} health; <span class="up">+${STRIKE.threat} threat</span>`, 'strike', !battle.strike)
 }
 
 /** On a raid: a button per number of caches to go for, then what that pays and costs. */
@@ -84,41 +79,6 @@ function raids(battle: Battle, greed: number): string {
   return `<div class="zones">${buttons.join('')}</div><p>${what}</p>${button({ type: 'grab', caches: greed }, `Go for ${greed}`)}`
 }
 
-/** The ways a rescue can split a squad of `size`: together, in two teams, or each alone. */
-const splitsOf = (size: number) => [...new Set([1, 2, Math.min(TEAMS, size)])].filter((n) => n <= size)
-
-/** On a rescue: a button per way to split the squad, then the chosen split's teams and where they land. */
-function splits(battle: Battle, teams: number): string {
-  const size = battle.reserve.length
-  const name = (n: number) => (n === 1 ? 'Stay together' : n === size ? 'Split up' : `${n} teams`)
-  const buttons = splitsOf(size).map((n) => `<button data-split="${n}" class="${n === teams ? 'on' : ''}">${name(n)}</button>`)
-  const members = Array.from({ length: teams }, (_, t) => battle.reserve.filter((_, i) => i % teams === t).length)
-  const what =
-    teams === 1
-      ? 'The squad lands as one. Safest, but slow to reach civilians spread across the map.'
-      : `${members.join(' + ')}: each team lands apart and makes for the civilians nearest it. More are reached, but a small team is easy prey.`
-  return `<div class="zones">${buttons.join('')}</div><p>${what}</p>${button({ type: 'split', teams }, teams === 1 ? 'Land together' : teams === size ? 'Land split up' : `Land in ${teams} teams`)}`
-}
-
-/** On an escape: a button per escape zone, then the chosen one's aliens on the way. */
-function escapes(battle: Battle, zone: number | null): string {
-  const zones = battle.zones.map((_, i) => `<button data-zone="${i}" class="${i === zone ? 'on' : ''}">${ZONE_NAMES[i]} 🚁 ${onTheWay(battle, battle.zones[i]).length} aliens</button>`)
-  const overview = `<button data-zone="" class="overview ${zone === null ? 'on' : ''}" title="Whole map">🗺️</button>`
-  const kinds = (aliens: Unit[]) => {
-    const count = new Map<string, number>()
-    for (const u of aliens) {
-      const name = u.boss ? 'the Hunter' : ALIENS[u.kind!].name
-      count.set(name, (count.get(name) ?? 0) + 1)
-    }
-    return [...count].map(([name, n]) => `${n} ${name}`).join(', ') || 'none'
-  }
-  const detail =
-    zone === null
-      ? '<small>The squad is ambushed. Pick the way out.</small>'
-      : `<p>On the way: ${kinds(onTheWay(battle, battle.zones[zone]))}.</p>${button({ type: 'land', zone }, `Break out toward ${ZONE_NAMES[zone]}`)}`
-  return `<div class="zones">${zones.join('')}${overview}</div>${detail}`
-}
-
 /** Turns clicks into actions and hands them to `act`. */
 export function createUi(view: View, act: (action: Action) => void): Ui {
   const statusLine = document.getElementById('status')!
@@ -126,8 +86,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   const dropPanel = document.getElementById('drop')!
   /** The landing zone chosen in the deploy phase, and the battle it was chosen in. */
   let zone: number | null = null
-  /** The teams chosen to split a rescue's squad into, and the caches chosen to go for on a raid. */
-  let teams = 1
+  /** The caches chosen to go for on a raid. */
   let greed = 1
   let zoneBattle: Battle | null = null
   /** The report the player has continued past. */
@@ -219,11 +178,9 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (battle !== zoneBattle) {
       zoneBattle = battle
       zone = null
-      teams = 1
       greed = 1
-      view.showTeams(teams)
     }
-    dropPanel.innerHTML = drop(battle, zone, teams, greed) + strike(battle)
+    dropPanel.innerHTML = drop(battle, zone, greed)
   }
 
   function choose(next: number | null): void {
@@ -242,10 +199,6 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (target.dataset.action) act(JSON.parse(target.dataset.action) as Action)
     else if (target.dataset.greed) {
       greed = Number(target.dataset.greed)
-      showDrop(shown!)
-    } else if (target.dataset.split) {
-      teams = Number(target.dataset.split)
-      view.showTeams(teams)
       showDrop(shown!)
     } else choose(target.dataset.zone ? Number(target.dataset.zone) : null)
   })
