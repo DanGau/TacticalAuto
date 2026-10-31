@@ -172,8 +172,10 @@ function eventView(run: Run): string {
   return `<h2><b>${event.name}</b></h2><p>${event.text}</p><div class="choices">${options.join('')}</div>`
 }
 
-/** The map: a shop or event being met; else the run's map, with the ways on to choose from or a button to travel on. */
-/** The map, with the stop the player has picked to look at but not yet set out for, if any. */
+/**
+ * The map: a shop or event being met; else the run's map, with the ways on to choose from or a button to travel on,
+ * and the stop the player has picked to look at but not yet set out for, if any.
+ */
 function mapView(run: Run, picked: number | null): string {
   if (run.phase === 'shop') return shopView(run)
   if (run.phase === 'event') return eventView(run)

@@ -73,7 +73,6 @@ interface Rect {
 
 type Place = 'house' | 'warehouse' | 'ruin' | 'park' | 'orchard' | 'graveyard' | 'plaza' | 'market' | 'carPark' | 'depot' | 'field'
 
-/** Each kind of zone place as a plot: how many roads cross it each way, and what its lots may hold, likelier if listed more. */
 /** The overall shape a plot is laid over, which decides where the fighting funnels: see `layouts` below. */
 type Layout = 'grid' | 'river' | 'coast' | 'crater' | 'lanes'
 

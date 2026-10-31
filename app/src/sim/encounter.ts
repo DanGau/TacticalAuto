@@ -15,11 +15,6 @@ import { ENCOUNTER_BANDS, type Encounter, type Squad } from './report'
  * ENCOUNTER_BANDS. `--mission` picks missions, comma-separated.
  */
 
-/**
- * Plays one mission in isolation, from a fresh run made to stand at leg `leg` with a squad of `squad` strength:
- * as many soldiers as the leg has, a weak one at the levels a careless run reaches with no gear, a strong one levelled
- * up, in rare gear, with a relic a leg.
- */
 /** A rare piece of gear for `slot`. */
 function rare(run: Run, slot: Slot): Gear {
   for (;;) {
@@ -28,6 +23,11 @@ function rare(run: Run, slot: Slot): Gear {
   }
 }
 
+/**
+ * Plays one mission in isolation, from a fresh run made to stand at leg `leg` with a squad of `squad` strength:
+ * as many soldiers as the leg has, a weak one at the levels a careless run reaches with no gear, a strong one levelled
+ * up, in rare gear, with a relic a leg.
+ */
 function encounter(seed: number, mission: Encounter, leg: number, squad: Squad): { won: boolean; rescued: number | null; hurt: number } {
   const run = begun(seed)
   run.soldiers[0].skills.splice(1)

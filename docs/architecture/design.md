@@ -27,7 +27,7 @@ Imports point down this list only.
 
 ## Bots
 
-A bot is one function per decision point: observation in, action out, both plain data. Two ship from the start: random and heuristic.
+A bot is one function per decision point: observation in, action out, both plain data. One picks at random; the rest play by heuristics, each a different strategy.
 
 ## Simulation
 
@@ -39,7 +39,7 @@ A bot is one function per decision point: observation in, action out, both plain
 
 ## How the model sees and plays
 
-- **`window.debug`** forwards to the core and holds no logic: `snapshot()` returns the state, `apply(action)`, `step(n)` advances n beats, renders without animation, and returns the snapshot. Cheats sit in `window.debug.cheat`.
+- **`window.debug`** forwards to the core and holds no logic: `snapshot()` returns the state, `apply(action)`, `step(n)` advances n beats, renders without animation, and returns the snapshot. `edit(code)` changes the live state to set up a scene.
 - **`eye`** is one CLI. It keeps the dev server and a headless browser alive between calls, prints JSON only, and saves screenshots at a fixed viewport to a gitignored folder keyed by commit.
 - **Playbooks** are JSON lists of `eye` commands run in one call, including `step-until <expression>`.
 

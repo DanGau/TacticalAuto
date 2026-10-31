@@ -361,13 +361,13 @@ interface Spot {
   threat: number
 }
 
+/** How much the enemy's best hit chance on a tile, weighted by health, must differ for a soldier to count it safer cover. */
+const RISK_BAND = 15
+
 /**
  * How each stance ranks a tile it can shoot from, lowest first. Weighing `risk` makes a healthy unit bold
  * and a wounded one careful.
  */
-/** How much the enemy's best hit chance on a tile, weighted by health, must differ for a soldier to count it safer cover. */
-const RISK_BAND = 15
-
 const WITH_SHOT: Record<Stance, (spot: Spot) => number[]> = {
   // A soldier takes the safest cover it can shoot from, then the best shot from it; an alien, the exchange of fire
   // that most favours it. Neither strays from its side.
@@ -1153,10 +1153,6 @@ function moveSide(battle: Battle): GameEvent[] {
   return [...events, ...sighted]
 }
 
-/**
- * Deals `damage` to a unit: its armor takes it first, then its health. At zero health the unit is removed and its
- * death reported. A burster that dies explodes, and a psion that dies hurts the other aliens of its pod.
- */
 /** A soldier's tally for this battle, begun empty. */
 export function tallyOf(battle: Battle, soldier: number): Tally {
   return (battle.tally[soldier] ??= { dealt: 0, kills: 0, taken: 0, shots: 0, hits: 0, feats: [] })
@@ -1164,6 +1160,10 @@ export function tallyOf(battle: Battle, soldier: number): Tally {
 
 const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || tally.feats.push(id)
 
+/**
+ * Deals `damage` to a unit: its armor takes it first, then its health. At zero health the unit is removed and its
+ * death reported. A burster that dies explodes, and a psion that dies hurts the other aliens of its pod.
+ */
 function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[], pierce = false, crit = false): void {
   if (target.hp <= 0) return
   const damage = target.kind === 'wraith' && !crit ? Math.min(dealt, 1) : dealt

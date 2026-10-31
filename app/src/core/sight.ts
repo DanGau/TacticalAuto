@@ -23,11 +23,6 @@ export function coverAgainst(battle: Battle, at: Tile, from: Tile): Cover {
 }
 
 /**
- * Chances for a shot by a unit with `stats` standing on `shooter`: to hit, and for a hit to crit.
- * Cover lowers the hit chance and closeness raises it, so a flanked target at point-blank is a near-certain hit.
- * A piercing shot treats the target as having no cover. Shooting down from higher ground is easier, and up harder.
- */
-/**
  * What cover takes off a shot's chance to hit: COVER_DEFENSE, or FORTIFIED_DEFENSE under that rule, and nothing for a
  * soldier in exosuits; and HUNKER_DEFENSE more on a hunkered unit.
  */
@@ -38,6 +33,11 @@ function defense(battle: Battle, target: Tile, cover: Cover): number {
   return (battle.rules.includes('fortified') ? FORTIFIED_DEFENSE : COVER_DEFENSE)[cover] + hunkered
 }
 
+/**
+ * Chances for a shot by a unit with `stats` standing on `shooter`: to hit, and for a hit to crit.
+ * Cover lowers the hit chance and closeness raises it, so a flanked target at point-blank is a near-certain hit.
+ * A piercing shot treats the target as having no cover. Shooting down from higher ground is easier, and up harder.
+ */
 export function odds(battle: Battle, shooter: Tile, target: Tile, stats: Stats, piercing = false): { hit: number; crit: number } {
   const cover = piercing ? 0 : coverAgainst(battle, target, shooter)
   const hit = stats.aim - defense(battle, target, cover) + stats.close * Math.max(0, stats.range - distance(shooter, target)) + HIGH_AIM * (heightAt(battle, shooter) - heightAt(battle, target))
