@@ -725,7 +725,7 @@ export function drawBattle(run: Run, risk: Risk, when: Run = run): Stop {
   return { kind: 'battle', risk, goal, terrain, twist: drawTwist(run, when.keys), packs, ...placed(run, terrain) }
 }
 
-/** A stop with no aliens drawn ahead: an event, a key mission or the final mission. */
+/** A stop with no aliens drawn ahead: any but a battle. */
 const fixed = (kind: StopKind, terrain: TerrainKind): Stop => ({ kind, risk: 'standard', goal: 'exterminate', terrain, twist: null, packs: [] })
 
 /** How hard a stop is: a battle counts one, a quiet one none and an overrun one two. */
