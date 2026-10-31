@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util'
 import { bots } from '../bots/bots'
 import { TUNING } from '../core/tuning'
 import { winRates, type Tuning } from './pool'
-import { compare, miss } from './report'
+import { compare, offBand } from './report'
 
 /** A balance number the climber may move: where it sits in the tuning, and its step and bounds. */
 interface Knob {
@@ -70,11 +70,11 @@ process.on('exit', (code) => {
 const names = Object.keys(bots)
 const score = async (t: Tuning, start: number) => {
   const rates = await winRates(names, runs, start, t, { threads: Number(values.threads), memoryMb: values.memory ? Number(values.memory) : undefined })
-  return { rates, miss: miss(rates) }
+  return { rates, offBand: offBand(rates) }
 }
 /** Seeds the climb never sees, which judge where it ends. */
 const HELD_OUT = 1_000_000
-/** How much less a move must miss by to count, as two standard errors of a win rate near half at this many runs. */
+/** How much less a move must fall outside by to count, as two standard errors of a win rate near half at this many runs. */
 const MARGIN = 2 * Math.sqrt(0.25 / runs)
 
 /**
@@ -85,7 +85,7 @@ const CHECKPOINT = new URL('../../.tune.json', import.meta.url)
 interface Checkpoint {
   start: Tuning
   runs: number
-  best: { tuning: Tuning; rates: Record<string, number>; miss: number }
+  best: { tuning: Tuning; rates: Record<string, number>; offBand: number }
   round: number
   knob: number
   improved: boolean
@@ -94,12 +94,12 @@ const saved: Checkpoint | null = existsSync(CHECKPOINT) ? JSON.parse(readFileSyn
 const resumed = saved && saved.runs === runs && JSON.stringify(saved.start) === JSON.stringify(TUNING) ? saved : null
 const save = (c: Checkpoint) => writeFileSync(CHECKPOINT, JSON.stringify(c))
 
-// Greedy hill climb: try each knob a step either way on the same seeds, and keep a move that misses the bands by
+// Greedy hill climb: try each knob a step either way on the same seeds, and keep a move that breaks the bands by
 // clearly less than chance would.
 const start = structuredClone(TUNING) as Tuning
 let best = resumed?.best ?? { tuning: start, ...(await score(start, 0)) }
-console.log(`${resumed ? `resumed at round ${resumed.round + 1}, knob ${resumed.knob + 1}` : 'start'}  miss ${round(best.miss)}`)
-for (let round_ = resumed?.round ?? 0; round_ < Number(values.rounds) && best.miss > 0; round_++) {
+console.log(`${resumed ? `resumed at round ${resumed.round + 1}, knob ${resumed.knob + 1}` : 'start'}  off band ${round(best.offBand)}`)
+for (let round_ = resumed?.round ?? 0; round_ < Number(values.rounds) && best.offBand > 0; round_++) {
   let improved = round_ === resumed?.round && resumed.improved
   for (let k = round_ === resumed?.round ? resumed.knob : 0; k < KNOBS.length; k++) {
     save({ start, runs, best, round: round_, knob: k, improved })
@@ -108,10 +108,10 @@ for (let round_ = resumed?.round ?? 0; round_ < Number(values.rounds) && best.mi
       const tuning = moved(best.tuning, knob, by)
       if (!tuning) continue
       const tried = await score(tuning, 0)
-      if (tried.miss > best.miss - MARGIN) continue
+      if (tried.offBand > best.offBand - MARGIN) continue
       best = { tuning, ...tried }
       improved = true
-      console.log(`${knob.key}${knob.index === undefined ? '' : `[${knob.index}]`} → ${get(tuning, knob)}  miss ${round(best.miss)}`)
+      console.log(`${knob.key}${knob.index === undefined ? '' : `[${knob.index}]`} → ${get(tuning, knob)}  off band ${round(best.offBand)}`)
       break
     }
   }
@@ -120,10 +120,10 @@ for (let round_ = resumed?.round ?? 0; round_ < Number(values.rounds) && best.mi
 
 // The climb's seeds flatter it, so the held-out seeds decide whether its tuning replaces the old.
 const [before, after] = [await score(start, HELD_OUT), await score(best.tuning, HELD_OUT)]
-const kept = after.miss < before.miss
+const kept = after.offBand < before.offBand
 if (kept) write(best.tuning)
 rmSync(CHECKPOINT, { force: true })
-console.log(`held-out miss ${round(before.miss)} → ${round(after.miss)}: ${kept ? 'tuning.ts rewritten' : 'tuning.ts unchanged'}`)
+console.log(`held-out off band ${round(before.offBand)} → ${round(after.offBand)}: ${kept ? 'tuning.ts rewritten' : 'tuning.ts unchanged'}`)
 const { table, warnings } = compare((kept ? after : before).rates)
 console.log([table, ...warnings.map((w) => `WARN ${w}`)].join('\n'))
 finished = true

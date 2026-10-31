@@ -7,8 +7,8 @@ export type GameEvent =
   | { type: 'move'; id: number; path: Tile[]; with?: Effect }
   /** A pod is sighted. `units` gives each member's tile at that moment. */
   | { type: 'reveal'; units: { id: number; x: number; y: number }[] }
-  /** `damage` is 0 for a miss. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. */
-  | { type: 'shot'; id: number; target: number; hit: boolean; crit: boolean; damage: number; with: Effect[] }
+  /** `damage` is 0 if a shield or image took it. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. */
+  | { type: 'shot'; id: number; target: number; crit: boolean; damage: number; with: Effect[] }
   /** A rocket, grenade or napalm (`fire`) lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */
   | { type: 'rocket'; id: number; x: number; y: number; hits: { target: number; damage: number }[]; fire?: true }
   | { type: 'heal'; id: number; target: number; amount: number }

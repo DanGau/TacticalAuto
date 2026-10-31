@@ -20,12 +20,12 @@ export interface Trait {
 
 export const TRAITS = {
   veteran: { name: 'Veteran', pro: 'Joins at level 3', con: '+4 threat', level: 3, threat: 4 },
-  eagle: { name: 'Eagle-Eyed', pro: '+10% aim', con: '-3 health', stats: { aim: 0.1, hp: -3 } },
+  eagle: { name: 'Eagle-Eyed', pro: '+1 range', con: '-3 health', stats: { range: 1, hp: -3 } },
   bruiser: { name: 'Bruiser', pro: '+4 health and +1 damage', con: '-1 move', stats: { hp: 4, damage: 1, move: -1 } },
-  quartermaster: { name: 'Quartermaster', pro: '+6 supplies', con: '-10% aim', supplies: 6, stats: { aim: -0.1 } },
+  quartermaster: { name: 'Quartermaster', pro: '+6 supplies', con: '-2 health', supplies: 6, stats: { hp: -2 } },
   hunter: { name: 'Relic Hunter', pro: 'Brings a random relic', con: '+5 threat', relic: true, threat: 5 },
   fleet: { name: 'Fleet-Footed', pro: '+2 move', con: '-2 health', stats: { move: 2, hp: -2 } },
-  hothead: { name: 'Hothead', pro: '+25% crit chance', con: '-10% aim', stats: { crit: 0.25, aim: -0.1 } },
+  hothead: { name: 'Hothead', pro: '+25% crit chance', con: '-2 health', stats: { crit: 0.25, hp: -2 } },
 } satisfies Record<string, Trait>
 
 export type TraitId = keyof typeof TRAITS

@@ -11,7 +11,7 @@ import { has, hostage, fireproof, chillFrom, foeHas, nearest, immune, onTile } f
 
 /** A soldier's tally for this battle, begun empty. */
 export function tallyOf(battle: Battle, soldier: number): Tally {
-  return (battle.tally[soldier] ??= { dealt: 0, kills: 0, taken: 0, shots: 0, hits: 0, feats: [] })
+  return (battle.tally[soldier] ??= { dealt: 0, kills: 0, taken: 0, feats: [] })
 }
 
 export const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || tally.feats.push(id)

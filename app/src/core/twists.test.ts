@@ -4,11 +4,11 @@ import { enterAt, entranceOf, begun } from './roads'
 import { apply } from './apply'
 import { GRID, type Battle } from './battle'
 import { crumble } from './grid'
-import { coverAt } from './grid'
+import { bulkAt } from './grid'
 import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
 import { roots } from './skills'
-import { coverAgainst, detects, sees } from './sight'
+import { detects, sees } from './sight'
 import { generateTerrain } from './terrain-gen'
 import { drawTwist, FUEL_DAMAGE, TWISTS, type Twist } from './twists'
 
@@ -22,7 +22,7 @@ function duel(twist: Twist | null): Battle {
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist })
   battle.ground.fill('pavement')
-  battle.cover.fill(0)
+  battle.bulk.fill(0)
   battle.props.fill('none')
   battle.height.fill(0)
   battle.north.fill('none')
@@ -57,7 +57,7 @@ test('no twist on the first leg; each later leg opens its own twists, and only t
   }
 })
 
-test('narrow ground leaves void off the battlefield, which blocks walking but neither sight nor shelters', () => {
+test('narrow ground leaves void off the battlefield, which blocks walking but not sight', () => {
   const terrain = generateTerrain({ rng: 5 }, GRID, 'town', 'narrow')
   // Of the battlefield, the narrowing takes some but not all.
   const patch = GRID * GRID
@@ -66,30 +66,28 @@ test('narrow ground leaves void off the battlefield, which blocks walking but ne
   expect(gone).toBeLessThan(patch * 0.8)
   const battle = duel(null)
   battle.props[11 * GRID + 10] = 'void'
-  battle.cover[11 * GRID + 10] = 1
-  expect(coverAgainst(battle, { x: 10, y: 10 }, { x: 10, y: 14 })).toBe(0)
+  battle.bulk[11 * GRID + 10] = 1
   expect(sees(battle, { x: 10, y: 10 }, { x: 10, y: 14 })).toBe(true)
 })
 
-test('crumbling cover breaks a level with each hit: high cover to rubble, rubble to nothing', () => {
+test('crumbling ruins break a level with each hit: a tall object to rubble, rubble to nothing', () => {
   const battle = duel('crumbling')
   battle.props[11 * GRID + 10] = 'stack'
-  battle.cover[11 * GRID + 10] = 2
+  battle.bulk[11 * GRID + 10] = 2
   crumble(battle, { x: 10, y: 10 }, { x: 10, y: 12 })
-  expect([battle.props[11 * GRID + 10], coverAt(battle, 10, 11)]).toEqual(['rubble', 1])
+  expect([battle.props[11 * GRID + 10], bulkAt(battle, 10, 11)]).toEqual(['rubble', 1])
   crumble(battle, { x: 10, y: 10 }, { x: 10, y: 12 })
-  expect(coverAt(battle, 10, 11)).toBe(0)
+  expect(bulkAt(battle, 10, 11)).toBe(0)
 })
 
-test('a shot that misses a unit beside a fuel tank sets it off', () => {
+test('a hit on a unit beside a fuel tank sets it off', () => {
   const battle = duel('fuel')
-  const [soldier, alien] = battle.units
-  soldier.stats = { ...soldier.stats, aim: -9 }
+  const [, alien] = battle.units
   battle.props[12 * GRID + 11] = 'fuel'
-  battle.cover[12 * GRID + 11] = 1
+  battle.bulk[12 * GRID + 11] = 1
   const events = untilShot(battle)
   expect(events).toContainEqual(expect.objectContaining({ type: 'rocket', x: 11, y: 12 }))
-  expect(alien.hp).toBe(99 - FUEL_DAMAGE)
+  expect(alien.hp).toBeLessThanOrEqual(99 - FUEL_DAMAGE)
   expect(alien.burning).toBeGreaterThan(0)
   expect(battle.props[12 * GRID + 11]).toBe('none')
 })
@@ -97,7 +95,7 @@ test('a shot that misses a unit beside a fuel tank sets it off', () => {
 test('in the rain nothing burns', () => {
   const battle = duel('rain')
   const [soldier, alien] = battle.units
-  Object.assign(soldier, { effects: ['incendiary'], stats: { ...soldier.stats, aim: 9 } })
+  Object.assign(soldier, { effects: ['incendiary'], stats: { ...soldier.stats } })
   untilShot(battle)
   expect(alien.burning).toBe(0)
 })
@@ -114,7 +112,7 @@ test('fog shortens sight, and night noticing', () => {
   expect(detects(battle, soldier, alien)).toBe(false)
 })
 
-test('narrow ground leaves no open ground cut off by cover or walls', () => {
+test('narrow ground leaves no open ground cut off by objects or walls', () => {
   for (let seed = 1; seed <= 10; seed++) {
     const t = generateTerrain({ rng: seed }, GRID, 'town', 'narrow')
     const open = (i: number) => t.ground[i] !== 'void' && t.props[i] === 'none'

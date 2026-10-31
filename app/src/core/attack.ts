@@ -1,5 +1,5 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
-import { type Battle, type Unit, SUPPRESS_AIM, SPOTTER_AIM, SLAYER_DAMAGE, SEARING_DAMAGE, RECKLESS_AIM, RAGE_DAMAGE, isSoldier, INSPIRE_AIM, HURL_TILES, HURL_DAMAGE, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_CHANCE, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_AIM, BURN_TURNS, BULWARK_DEFENSE, BANE_REACH, BANE_AIM, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_AIM, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
+import { type Battle, type Unit, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RECKLESS_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_TURNS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
 import { cloakOn } from './abilities'
 import { freeTilesNear } from './grid'
 import { blocked } from './grid'
@@ -9,12 +9,12 @@ import { wreck } from './grid'
 import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
-import { PARRY_CHANCE } from './doctrines'
+import { PARRY_SOAK } from './doctrines'
 import type { GameEvent } from './combat-event'
 import { onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS, spotlit } from './fighters'
-import { tallyOf, wound, knockback } from './wound'
+import { wound, knockback } from './wound'
 import { TUNING } from './tuning'
-import { odds, coverAgainst } from './sight'
+import { bite, MIN_DAMAGE, odds } from './sight'
 import { random } from './rng'
 import { paths, bestPath, preyed, walk, leapTo, exposure } from './pathing'
 import { FUEL_DAMAGE } from './twists'
@@ -23,7 +23,7 @@ import { FUEL_DAMAGE } from './twists'
 export const closing = (unit: Unit) => unit.stance === 'rush' || unit.stats.range <= 1
 
 /**
- * What a shooter's gear makes a target worth beyond the hit chance, in hit chance: holding back an alien that closes
+ * What a shooter's gear makes a target worth beyond the share of its damage a shot lands, in that share: holding back an alien that closes
  * in, pulling one that keeps its distance, knocking one into harm, and bursts or arcs where aliens crowd.
  */
 export function worth(battle: Battle, unit: Unit, enemy: Unit): number {
@@ -41,7 +41,7 @@ export function worth(battle: Battle, unit: Unit, enemy: Unit): number {
   )
 }
 
-/** Tiles a ricochet reaches from its first target, an arc leaps, and the leaps it makes. */
+/** Tiles a ricochet reaches from its target, an arc leaps, and the leaps it makes. */
 export const RICOCHET_REACH = 3
 
 export const ARC_REACH = 3
@@ -51,20 +51,16 @@ export const ARC_LEAPS = 2
 /** Damage a volatile kill bursts for, and a thundering hit slams a target into what stops it for. */
 export const VOLATILE_DAMAGE = 2
 
-export const MIRROR_CHANCE = 0.5
-
 /**
- * A shot at the enemy the unit can shoot and is likeliest to hit, a civilian counting PREY_WORTH; the nearest, then the lowest id, wins a tie.
+ * A shot, which always lands, at the enemy the unit can shoot and hurt most, a civilian counting PREY_WORTH; the nearest, then the lowest id, wins a tie.
  * An alien that can shoot a taunting soldier, or one in the spotlight, must. With `only`, the shot is at that enemy or not at all.
  * The effects of both units' gear and skills, and of relics, apply. `granted` names the effect that gave a shot
  * beyond the unit's own; such a shot grants no further one.
  */
 export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, only?: Unit): GameEvent[] {
-  const piercing = has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic')
-  const chanceAt = (target: Unit) => odds(battle, unit, target, unit.stats, piercing)
   const inReach = (only ? [only] : battle.units).filter((other) => other.side !== unit.side && shootable(battle, unit, unit, other, seen))
   const taunting = inReach.filter((other) => has(other, 'taunt') || spotlit(battle, other))
-  const value = (other: Unit) => preyed(other, chanceAt(other).hit) + worth(battle, unit, other)
+  const value = (other: Unit) => preyed(other, bite(battle, unit, other, unit.stats)) + worth(battle, unit, other)
   let enemy: Unit | undefined
   for (const other of taunting.length > 0 ? taunting : inReach) {
     const gain = enemy ? value(other) - value(enemy) : 1
@@ -80,63 +76,43 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   }
   const events: GameEvent[] = []
   if (taunting.length > 0 && taunting.length < inReach.length) events.push({ type: 'effect', id: enemy.id, effect: 'taunt', amount: 0 })
-  const chance = chanceAt(enemy)
   const baned = battle.units.some((u) => u.side !== unit.side && has(u, 'bane') && distance(u, unit) <= BANE_REACH)
-  // An attack out of cloak strikes surer and harder, and breaks the cloak.
+  // An attack out of cloak strikes past armor and harder, and breaks the cloak.
   const unseen = !!unit.cloaked
   if (unseen) {
     unit.cloaked = 0
     events.push({ type: 'cloak', id: unit.id, on: false })
   }
-  const toHit =
-    chance.hit +
-    (unseen ? CLOAK_AIM : 0) +
-    (inAura(battle, unit, 'inspire') ? INSPIRE_AIM : 0) +
-    when(true, 'reckless', RECKLESS_AIM) +
-    (has(enemy, 'reckless') ? RECKLESS_AIM : 0) +
-    when(enemy.marked, 'spotter', SPOTTER_AIM) -
-    (unit.chilled > 0 ? CHILL_AIM : 0) -
-    (inAura(battle, enemy, 'bulwark') ? BULWARK_DEFENSE : 0) -
-    (baned ? BANE_AIM : 0) -
-    (unit.suppressed > 0 ? SUPPRESS_AIM : 0)
-  // Steady aim rolls twice and takes the better.
-  const rolls = 1 + when(!unit.moved, 'steady', 1)
-  let hit = Array.from({ length: rolls }, () => random(battle) < toHit).some(Boolean)
-  if (hit && has(enemy, 'dodge') && random(battle) < DODGE_CHANCE) {
-    hit = false
-    events.push({ type: 'effect', id: enemy.id, effect: 'dodge', amount: 0 })
-  }
-  if (hit && has(enemy, 'mirror') && enemy.spent.filter((e) => e === 'mirror').length < MIRROR_IMAGES && random(battle) < MIRROR_CHANCE) {
-    hit = false
-    enemy.spent.push('mirror')
-    events.push({ type: 'effect', id: enemy.id, effect: 'mirror', amount: 0 })
-  }
-  if (hit && has(enemy, 'parry') && distance(unit, enemy) > 1 && random(battle) < PARRY_CHANCE) {
-    hit = false
-    events.push({ type: 'effect', id: enemy.id, effect: 'parry', amount: 0 })
-  }
-  if (unit.soldier !== null) {
-    const tally = tallyOf(battle, unit.soldier)
-    tally.shots++
-    if (hit) tally.hits++
-  }
-  if (!hit) {
-    // A ricochet bounces a miss to another alien near the target, for one more roll.
-    const bounce = granted ? undefined : has(unit, 'ricochet') ? nearest(inReach.filter((u) => u !== enemy && distance(u, enemy!) <= RICOCHET_REACH), enemy) : undefined
-    return [{ type: 'shot', id: unit.id, target: enemy.id, hit, crit: false, damage: 0, with: used }, ...events, ...(battle.twist === 'fuel' ? ignite(battle, enemy) : []), ...(bounce ? shoot(battle, unit, seen, 'ricochet', bounce) : again(battle, unit, seen, granted, false))]
-  }
+  const gain = odds(battle, unit, enemy)
+  const parried = has(enemy, 'parry') && distance(unit, enemy) > 1
+  if (has(enemy, 'dodge')) events.push({ type: 'effect', id: enemy.id, effect: 'dodge', amount: 0 })
+  if (parried) events.push({ type: 'effect', id: enemy.id, effect: 'parry', amount: 0 })
+  const blunted =
+    (unit.chilled > 0 ? CHILL_DAMAGE : 0) +
+    (inAura(battle, enemy, 'bulwark') ? BULWARK_SOAK : 0) +
+    (baned ? BANE_DAMAGE : 0) +
+    (unit.suppressed > 0 ? SUPPRESS_DAMAGE : 0) +
+    (has(enemy, 'dodge') ? DODGE_SOAK : 0) +
+    (parried ? PARRY_SOAK : 0)
 
   const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) > 0
-  const crit = !enemy.resists.includes('crit') && (sure || random(battle) < chance.crit)
+  const crit = !enemy.resists.includes('crit') && (sure || random(battle) < unit.stats.crit)
   // A mirror hits as hard as the squad's hardest hitter; a feeder as hard as it has grown.
   const base = unit.kind === 'mirror' ? Math.max(unit.stats.damage, ...battle.units.filter(isSoldier).map((s) => s.stats.damage)) : unit.stats.damage
-  let damage =
+  const dealt =
     base +
+    gain -
+    blunted +
+    (inAura(battle, unit, 'inspire') ? INSPIRE_DAMAGE : 0) +
+    when(true, 'reckless', RECKLESS_DAMAGE) +
+    (has(enemy, 'reckless') ? RECKLESS_DAMAGE : 0) +
+    when(enemy.marked, 'spotter', SPOTTER_DAMAGE) +
+    when(!unit.moved, 'steady', 1) +
     (unit.kind === 'feeder' ? unit.fury : 0) +
     (unseen ? CLOAK_DAMAGE + when(true, 'shadowStrike', SHADOW_DAMAGE) : 0) +
     (crit ? CRIT_BONUS + when(true, 'headshot', HEADSHOT_DAMAGE) : 0) +
     when(enemy.hp <= enemy.stats.hp / 2, 'executioner', EXECUTE_BONUS) +
-    when(coverAgainst(battle, enemy, unit) === 0, 'backstab', BACKSTAB_DAMAGE) +
+    when(!battle.units.some((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1), 'backstab', BACKSTAB_DAMAGE) +
     when(unit.hp <= unit.stats.hp / 2, 'rage', RAGE_DAMAGE) +
     when(enemy.hp < enemy.stats.hp, 'slayer', SLAYER_DAMAGE) +
     (enemy.marked ? TUNING.markDamage : 0) +
@@ -149,10 +125,15 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(enemy.rooted > 0, 'net', 2) +
     when(enemy.boss, 'bounty', BOUNTY_DAMAGE) +
     when(unit.fury > 0, 'bloodRite', unit.fury)
+  let damage = base > 0 ? Math.max(MIN_DAMAGE, dealt) : Math.max(0, dealt)
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0
-  const pierced = unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) + when(enemy.chilled > 0, 'frostbreak', 1) > 0
+  const pierced = unseen || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) + when(enemy.chilled > 0, 'frostbreak', 1) > 0
   const left = enemy.hp + (pierced ? 0 : enemy.armor)
-  if (spend(enemy, 'shield')) {
+  if (has(enemy, 'mirror') && enemy.spent.filter((e) => e === 'mirror').length < MIRROR_IMAGES) {
+    damage = 0
+    enemy.spent.push('mirror')
+    events.push({ type: 'effect', id: enemy.id, effect: 'mirror', amount: 0 })
+  } else if (spend(enemy, 'shield')) {
     damage = 0
     events.push({ type: 'effect', id: enemy.id, effect: 'shield', amount: 0 })
     // No one shot kills a commander from full health.
@@ -162,7 +143,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   }
   // Those beside the target, for a volley or a cleave, as they stand before the hit.
   const beside = battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1)
-  events.unshift({ type: 'shot', id: unit.id, target: enemy.id, hit, crit, damage, with: used })
+  events.unshift({ type: 'shot', id: unit.id, target: enemy.id, crit, damage, with: used })
   if (battle.twist === 'crumbling' && damage > 0) crumble(battle, enemy, unit)
   // A bonded squadmate beside the target takes the hit in its place.
   const guard = battle.units.find((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && has(u, 'bond') && distance(u, enemy) <= 1)
@@ -170,6 +151,14 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     events.push({ type: 'effect', id: guard.id, effect: 'bond', amount: -damage })
     wound(battle, guard, damage, events, pierced, crit)
   } else wound(battle, enemy, damage, events, pierced, crit)
+  if (battle.twist === 'fuel' && damage > 0) events.push(...ignite(battle, enemy))
+  // A ricochet strikes another alien near the target for half.
+  const bounce = damage > 0 ? nearest(inReach.filter((u) => u !== enemy && u.hp > 0 && distance(u, enemy!) <= RICOCHET_REACH), enemy) : undefined
+  if (bounce && when(true, 'ricochet', 1)) {
+    const half = Math.max(MIN_DAMAGE, Math.floor(damage / 2))
+    events.push({ type: 'effect', id: bounce.id, effect: 'ricochet', amount: -half })
+    wound(battle, bounce, half, events)
+  }
   const spare = enemy.hp <= 0 ? when(damage > left, 'overkill', damage - left) : 0
   const next = spare > 0 ? nearest(battle.units.filter((u) => u.side === enemy.side && u.hp > 0), enemy) : undefined
   if (next) {
@@ -291,7 +280,7 @@ export function again(battle: Battle, unit: Unit, seen: Set<number>, granted: Ef
 /** Primary attacks the unit makes each turn. */
 export const attacksOf = (unit: Unit) => (isSoldier(unit) ? SOLDIER_ATTACKS : 1)
 
-/** A shot missed `target`: a fuel tank beside it goes up, hurting and setting burning everyone beside the tank. */
+/** A shot struck `target`: a fuel tank beside it goes up, hurting and setting burning everyone beside the tank. */
 export function ignite(battle: Battle, target: Unit): GameEvent[] {
   const tank = NEIGHBORS.map(([dx, dy]) => ({ x: target.x + dx, y: target.y + dy })).find((t) => onGrid(t.x, t.y) && battle.props[t.y * GRID + t.x] === 'fuel')
   if (!tank) return []

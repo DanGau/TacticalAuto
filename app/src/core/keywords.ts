@@ -9,9 +9,9 @@ export type Keyword = 'burn' | 'frost' | 'mark' | 'crit' | 'kill' | 'ward'
 
 export const KEYWORDS: Record<Keyword, { name: string; icon: string; text: string }> = {
   burn: { name: 'Burn', icon: '🔥', text: 'A burning unit takes 1 damage at the start of each of its next 2 turns' },
-  frost: { name: 'Frost', icon: '❄️', text: 'A chilled unit has -2 move and -15% aim on its next turn' },
+  frost: { name: 'Frost', icon: '❄️', text: 'A chilled unit has -2 move and does 1 less damage on its next turn' },
   mark: { name: 'Mark', icon: '🎯', text: `Every hit on a marked unit does ${TUNING.markDamage} more damage` },
-  crit: { name: 'Crit', icon: '💥', text: 'A crit does 2 more damage; only a target without cover against the shot can be crit' },
+  crit: { name: 'Crit', icon: '💥', text: 'A crit does 2 more damage' },
   kill: { name: 'Kill', icon: '💀', text: 'Pays off when the soldier kills' },
   ward: { name: 'Ward', icon: '🛡️', text: 'Armor: temporary health that takes damage first and is whole again each fight' },
 }

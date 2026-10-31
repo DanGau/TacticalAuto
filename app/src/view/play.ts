@@ -88,7 +88,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       if (!from || !to || !shooter) continue
       const after = vitals(battle, e.target)
       await drawing(s, (fx) => playShot(s, fx, from, to, e, after, attackOf(shooter, s.soldiers.find((m) => m.id === shooter.soldier)?.gear.weapon?.weapon ?? null, s.blademasters)))
-      // Crumbling cover has already broken in the battle; show it as the hit lands.
+      // Crumbling ruins have already broken in the battle; show it as the hit lands.
       if (battle.twist === 'crumbling' && e.damage > 0) drawTerrain(s, battle)
     } else if (e.type === 'rocket') {
       const from = sprites.get(e.id)
@@ -136,7 +136,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const on = sprites.get(e.id)
       if (!on) continue
       on.drawHp(...vitals(battle, e.id))
-      // A demolishing hit has already wrecked the cover in the battle; show it as the hit lands.
+      // A demolishing hit has already wrecked what stood in the battle; show it as the hit lands.
       if (e.effect === 'demolish') drawTerrain(s, battle)
       float(s, effectCallout(s, e, on))
     } else if (e.type === 'saved' || e.type === 'escaped') {

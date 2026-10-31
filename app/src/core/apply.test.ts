@@ -3,7 +3,7 @@ import { expect, test } from 'vitest'
 import { enterAt, begun } from './roads'
 import { apply } from './apply'
 import { isSoldier, ENTRANCES, type Battle } from './battle'
-import { coverAt } from './grid'
+import { bulkAt } from './grid'
 import { current } from './run'
 import { type Run } from './run-state'
 
@@ -22,7 +22,7 @@ test('entering puts the whole squad on open tiles and begins the battle', () => 
   expect(enterAt(run, 0)).toEqual({ ok: true })
   const squad = run.battle.units.filter(isSoldier)
   expect(squad.map((u) => u.soldier)).toEqual(run.soldiers.map((s) => s.id))
-  for (const unit of squad) expect(coverAt(run.battle, unit.x, unit.y)).toBe(0)
+  for (const unit of squad) expect(bulkAt(run.battle, unit.x, unit.y)).toBe(0)
   expect(new Set(squad.map((u) => `${u.x},${u.y}`)).size).toBe(run.soldiers.length)
   expect(run.battle).toMatchObject({ phase: 'battle', reserve: [] })
 })

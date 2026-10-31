@@ -54,7 +54,7 @@ export function threatBar(threat: number, landed = 0): string {
 /** The access keys, won and still to win. */
 
 /** What each stat is called. */
-export const STAT_NAMES: Record<keyof Stats, string> = { hp: 'Health', armor: 'Armor', aim: 'Aim', damage: 'Damage', range: 'Range', move: 'Move', crit: 'Crit', close: 'Aim per tile closer' }
+export const STAT_NAMES: Record<keyof Stats, string> = { hp: 'Health', armor: 'Armor', damage: 'Damage', range: 'Range', move: 'Move', crit: 'Crit' }
 
 const percent = (n: number) => `${signed(Math.round(100 * n))}%`
 
@@ -62,12 +62,10 @@ const percent = (n: number) => `${signed(Math.round(100 * n))}%`
 const STAT_TEXT: Record<keyof Stats, (n: number) => string> = {
   hp: (n) => `${signed(n)} health`,
   armor: (n) => `${signed(n)} armor`,
-  aim: (n) => `${percent(n)} aim`,
   damage: (n) => `${signed(n)} damage`,
   range: (n) => `${signed(n)} range`,
   move: (n) => `${signed(n)} move`,
   crit: (n) => `${percent(n)} crit`,
-  close: (n) => `${percent(n)} aim per tile closer`,
 }
 
 /** What a piece of gear changes, as plain text: its weapon's and its own stat changes, then what its weapon and effect do. */

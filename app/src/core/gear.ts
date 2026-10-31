@@ -37,11 +37,11 @@ const BASES: Record<Exclude<Slot, 'weapon'>, string[]> = {
 
 const MODS: Record<Slot, Mod[]> = {
   weapon: [
-    { prefix: 'Steady', stats: { aim: 0.08 } },
+    { prefix: 'Honed', stats: { damage: 1, range: -1 } },
     { prefix: 'Keen', stats: { crit: 0.2 } },
     { prefix: 'Long', stats: { range: 1 } },
-    { prefix: 'Heavy', stats: { damage: 1, aim: -0.05 } },
-    { prefix: 'Snub', stats: { close: 0.04, range: -1 } },
+    { prefix: 'Heavy', stats: { damage: 1, move: -1 } },
+    { prefix: 'Snub', stats: { crit: 0.3, range: -1 } },
   ],
   armor: [
     { prefix: 'Sturdy', stats: { armor: 2 } },
@@ -50,7 +50,7 @@ const MODS: Record<Slot, Mod[]> = {
   ],
   utility: [
     { prefix: 'Fleet', stats: { move: 1 } },
-    { prefix: 'Targeting', stats: { aim: 0.05 } },
+    { prefix: 'Vital', stats: { hp: 2 } },
     { prefix: 'Deadeye', stats: { crit: 0.15 } },
     { prefix: 'Ranging', stats: { range: 1 } },
   ],
@@ -61,7 +61,7 @@ export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: str
   incendiary: { slot: 'weapon', prefix: 'Scorching', text: 'Hits set the target burning', tags: ['burn'] },
   frostbite: { slot: 'weapon', prefix: 'Rimed', text: 'Hits chill the target', tags: ['frost'] },
   tracer: { slot: 'weapon', prefix: 'Tracer', text: 'Hits mark the target', tags: ['mark'] },
-  piercing: { slot: 'weapon', prefix: 'Piercing', text: "Ignores the target's cover" },
+  piercing: { slot: 'weapon', prefix: 'Piercing', text: "Ignores the target's armor" },
   vampiric: { slot: 'weapon', prefix: 'Leeching', text: 'Each hit heals the shooter 1' },
   executioner: { slot: 'weapon', prefix: 'Merciless', text: '+2 damage to targets at half health or less', tags: ['kill'] },
   chain: { slot: 'weapon', prefix: 'Frenzied', text: 'A kill grants one more shot', tags: ['kill'], epic: true },
@@ -72,11 +72,11 @@ export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: str
   lastStand: { slot: 'armor', prefix: 'Stubborn', text: 'Once per battle, survives a killing hit at 1 health', epic: true },
   medkit: { slot: 'utility', prefix: "Medic's", text: 'Once per battle, heals the carrier 4 at half health or less, and the carrier still shoots' },
   grenade: { slot: 'utility', prefix: "Bombardier's", text: 'Once per battle, throws a grenade at two or more aliens standing together, and the carrier still shoots' },
-  ricochet: { slot: 'weapon', prefix: 'Ricocheting', text: 'A miss bounces to another alien within 3 tiles of the target and rolls again', epic: true },
+  ricochet: { slot: 'weapon', prefix: 'Ricocheting', text: 'Each hit also strikes another alien within 3 tiles of the target for half its damage', epic: true },
   arc: { slot: 'weapon', prefix: 'Arcing', text: 'A crit leaps to the nearest alien within 3 tiles for half its damage, then leaps once more', tags: ['crit'], epic: true },
   volatile: { slot: 'weapon', prefix: 'Volatile', text: 'An alien it kills bursts, dealing 2 damage to every alien beside it', tags: ['kill'], epic: true },
   thunder: { slot: 'weapon', prefix: 'Thundering', text: 'Hits knock the target a tile back; if something stops it, it slams into that for 1 damage', epic: true },
-  mirror: { slot: 'armor', prefix: 'Mirrored', text: 'Begins each battle with 2 mirror images; each hit on the wearer has a 50% chance to pop one instead', tags: ['ward'], epic: true },
+  mirror: { slot: 'armor', prefix: 'Mirrored', text: 'Begins each battle with 2 mirror images; each of the first 2 hits on the wearer pops one instead', tags: ['ward'], epic: true },
   bond: { slot: 'armor', prefix: 'Bonded', text: 'Takes the hits meant for squadmates beside the wearer', tags: ['ward'], epic: true },
   guardians: { slot: 'armor', prefix: 'Haloed', text: 'Spirits strike each alien that ends its move within 2 tiles of the wearer for 1 damage', epic: true },
   blink: { slot: 'utility', prefix: 'Blinking', text: 'Once per battle, when hit to half health or less, the carrier blinks to the safest tile within 5', epic: true },

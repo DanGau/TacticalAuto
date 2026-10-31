@@ -67,7 +67,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist: null })
   battle.ground.fill('pavement')
   battle.props.fill('none')
-  battle.cover.fill(0)
+  battle.bulk.fill(0)
   battle.height.fill(0)
   battle.north.fill('none')
   battle.west.fill('none')
@@ -78,7 +78,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   battle.pods.forEach((pod) => Object.assign(pod, { revealed: true, engaged: true }))
   // A soldier of no class in particular: it holds its ground and has no ability or class skill.
   Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, effects: gear.effect ? [gear.effect] : [] })
-  Object.assign(alien, { kind: 'trooper', x: 10, y: 11, hp: 99, armor: 0, target: false, stats: { ...alienStats('trooper', 0, 0), hp: 99, armor: 0, aim: 2, crit: 0 } })
+  Object.assign(alien, { kind: 'trooper', x: 10, y: 11, hp: 99, armor: 0, target: false, stats: { ...alienStats('trooper', 0, 0), hp: 99, armor: 0, crit: 0 } })
   return { battle, soldier, alien, step: () => stepBattle(battle) }
 }
 
@@ -109,7 +109,7 @@ test('barbed armor wounds whoever hits its wearer', () => {
 })
 
 test('a scorching weapon burns its target at the start of the target\'s turns', () => {
-  const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Scorching Steady Carbine', stats: { aim: 2 }, effect: 'incendiary' })
+  const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Scorching Steady Carbine', stats: {}, effect: 'incendiary' })
   d.soldier.stats = { ...d.soldier.stats, damage: 1, crit: 0 }
   const events = untilAlienShoots(d)
   expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'incendiary', amount: 0 })
@@ -118,7 +118,7 @@ test('a scorching weapon burns its target at the start of the target\'s turns', 
 })
 
 test('a rimed weapon chills its target, and a shatterglass edge and thermal shock core pay off on it', () => {
-  const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Rimed Steady Carbine', stats: { aim: 2 }, effect: 'frostbite' })
+  const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Rimed Steady Carbine', stats: {}, effect: 'frostbite' })
   d.soldier.stats = { ...d.soldier.stats, damage: 2, crit: 0 }
   d.soldier.effects.push('shatter', 'thermal')
   const shots = () => {
@@ -126,15 +126,15 @@ test('a rimed weapon chills its target, and a shatterglass edge and thermal shoc
     return events.filter((e) => e.type === 'shot' && e.id === d.soldier.id)
   }
   const [first] = shots()
-  expect(first).toMatchObject({ hit: true, damage: 2 })
+  expect(first).toMatchObject({ damage: 2 })
   expect(d.alien.chilled).toBeGreaterThan(0)
   d.alien.burning = 5
   const [second] = shots()
-  expect(second).toMatchObject({ hit: true, damage: 2 + TUNING.shatterDamage + TUNING.thermalDamage })
+  expect(second).toMatchObject({ damage: 2 + TUNING.shatterDamage + TUNING.thermalDamage })
 })
 
 test('an alien that resists frost and burn is neither chilled nor set burning', () => {
-  const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Rimed Steady Carbine', stats: { aim: 2 }, effect: 'frostbite' })
+  const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Rimed Steady Carbine', stats: {}, effect: 'frostbite' })
   d.soldier.stats = { ...d.soldier.stats, damage: 1, crit: 0 }
   d.soldier.effects.push('incendiary')
   d.alien.resists = ['frost', 'burn']
@@ -144,7 +144,7 @@ test('an alien that resists frost and burn is neither chilled nor set burning', 
 })
 
 test('overkill coils carry damage beyond a kill to the nearest other alien', () => {
-  const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Steady Carbine', stats: { aim: 2 }, effect: null })
+  const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Steady Carbine', stats: {}, effect: null })
   d.soldier.stats = { ...d.soldier.stats, damage: 10, crit: 0 }
   d.soldier.effects.push('overkill')
   d.alien.hp = 4
@@ -153,7 +153,7 @@ test('overkill coils carry damage beyond a kill to the nearest other alien', () 
   d.battle.units.push(other)
   const events = []
   while (d.alien.hp > 0) events.push(...d.step())
-  const shot = events.find((e) => e.type === 'shot' && e.target === d.alien.id && e.hit)
+  const shot = events.find((e) => e.type === 'shot' && e.target === d.alien.id)
   expect(shot).toBeDefined()
   expect(events).toContainEqual({ type: 'effect', id: other.id, effect: 'overkill', amount: -(shot!.type === 'shot' ? shot!.damage - 4 : 0) })
 })
@@ -169,17 +169,17 @@ function another(d: ReturnType<typeof duel>, dx: number, dy: number): Unit {
 function armed(effects: Effect[], stats: Partial<Stats> = {}) {
   const d = duel({ slot: 'weapon', rarity: 'rare', name: 'Carbine', stats: {}, effect: null })
   d.soldier.effects.push(...effects)
-  d.soldier.stats = { ...d.soldier.stats, aim: 2, crit: 0, damage: 1, ...stats }
+  d.soldier.stats = { ...d.soldier.stats, crit: 0, damage: 1, ...stats }
   return d
 }
 
 const effectsOf = (events: GameEvent[], effect: Effect) => events.filter((e) => e.type === 'effect' && e.effect === effect)
 
-test('a ricochet bounces a miss to another alien near the target', () => {
-  const d = armed(['ricochet'], { aim: -9 })
+test('a ricochet strikes another alien near the target for half', () => {
+  const d = armed(['ricochet'], { damage: 4 })
   const other = another(d, 1, 0)
   const events = untilAlienShoots(d)
-  expect(events).toContainEqual(expect.objectContaining({ type: 'shot', id: d.soldier.id, target: other.id, with: ['ricochet'] }))
+  expect(effectsOf(events, 'ricochet')[0]).toMatchObject({ id: other.id, amount: -2 })
 })
 
 test('an arcing crit leaps to the two nearest other aliens for half its damage', () => {
@@ -260,7 +260,7 @@ test('a null field stops a spitter spitting', () => {
 })
 
 test('a pyre censer sets the ground under a burning alien ablaze', () => {
-  const d = armed(['pyre'], { damage: 0, aim: -9 })
+  const d = armed(['pyre'], { damage: 0 })
   d.alien.burning = 3
   const { x, y } = d.alien
   untilAlienShoots(d)
@@ -317,7 +317,8 @@ test('a tethered hit pulls its target a tile toward the shooter', () => {
 })
 
 test('caltrops are strewn in the path of an alien closing in', () => {
-  const d = armed(['caltrops'], { damage: 0 })
+  const d = armed(['caltrops'], { damage: 0, move: 0 })
+  d.soldier.hp = d.soldier.stats.hp = 999
   Object.assign(d.alien, { x: 10, y: 15 })
   d.alien.stats = { ...d.alien.stats, range: 1 }
   for (let beats = 0; d.battle.caltrops.length === 0 && beats < 200; beats++) d.step()
@@ -365,17 +366,17 @@ test('cryo rounds chill the target; an icebreaker hits a chilled one harder, and
   const d = armed(['icebreak', 'permafrost'])
   d.soldier.ability = 'cryo'
   const shots = () => untilAlienShoots(d).filter((e) => e.type === 'shot' && e.id === d.soldier.id)
-  expect(shots()[0]).toMatchObject({ hit: true, damage: 1 })
+  expect(shots()[0]).toMatchObject({ damage: 1 })
   expect(d.alien.chilled).toBeGreaterThan(CHILL_TURNS)
-  expect(shots()[0]).toMatchObject({ hit: true, damage: 1 + SEARING_DAMAGE })
+  expect(shots()[0]).toMatchObject({ damage: 1 + SEARING_DAMAGE })
 })
 
 test('incendiary rounds set the target burning, and searing hits a burning one harder', () => {
   const d = armed(['tinder', 'searing'])
   const shots = () => untilAlienShoots(d).filter((e) => e.type === 'shot' && e.id === d.soldier.id)
-  expect(shots()[0]).toMatchObject({ hit: true, damage: 1 })
+  expect(shots()[0]).toMatchObject({ damage: 1 })
   expect(d.alien.burning).toBeGreaterThan(0)
-  expect(shots()[0]).toMatchObject({ hit: true, damage: 1 + SEARING_DAMAGE })
+  expect(shots()[0]).toMatchObject({ damage: 1 + SEARING_DAMAGE })
 })
 
 test('napalm blasts aliens standing together, setting them burning and the ground alight', () => {

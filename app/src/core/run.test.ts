@@ -8,7 +8,8 @@ import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
 import { CLASSES } from './classes'
 import { EVENTS } from './events'
-import { coverAgainst, odds } from './sight'
+import { odds } from './sight'
+import { FORTIFIED_SOAK } from './doctrines'
 import { HUB } from './world'
 import {
   createRun,
@@ -272,9 +273,9 @@ test('getting out, a soldier picks up a squadmate down, walks at half its move c
   const battle = run.battle!
   const [carrier, fallen] = battle.units.filter(isSoldier)
   // One alien is left, rooted and harmless, and the carrier cannot kill it: the battle ends only by lifting off.
-  Object.assign(carrier, { ability: null, effects: [], stats: { ...carrier.stats, aim: 0, damage: 0 } })
+  Object.assign(carrier, { ability: null, effects: [], stats: { ...carrier.stats, damage: 0 } })
   const alien = battle.units.find((u) => u.side === 'alien')!
-  Object.assign(alien, { stats: { ...alien.stats, aim: 0, damage: 0, move: 0 } })
+  Object.assign(alien, { stats: { ...alien.stats, damage: 0, move: 0 } })
   battle.units = [carrier, alien]
   battle.waves = []
   battle.extract = edgeNear(battle, { x: GRID - carrier.x, y: GRID - carrier.y })
@@ -406,7 +407,7 @@ test('experience follows what a soldier did: kills and damage its own, feats onl
     apply(run, { type: 'advance' })
     enterAt(run, 0)
     const b = run.battle!
-    b.tally[soldier.id] = { dealt: 12, kills: 3, taken: 4, shots: 0, hits: 0, feats: ['hatTrick'] }
+    b.tally[soldier.id] = { dealt: 12, kills: 3, taken: 4, feats: ['hatTrick'] }
     b.units = b.units.filter((u) => u.side === 'human')
     Object.assign(b, { phase: 'over', winner: 'human' })
     endBattle(run)
@@ -512,7 +513,7 @@ test('stats add class, level, skills and relics to the base', () => {
   const stats = soldierStats(run, soldier({ xp: xpFor(2) }))
   expect(stats.hp).toBe(BASE_STATS.hp + 2 * LEVEL_STATS.hp!)
   expect(stats.damage).toBe(BASE_STATS.damage + 1)
-  expect(stats.aim).toBeCloseTo(BASE_STATS.aim + 2 * LEVEL_STATS.aim!)
+  expect(stats.crit).toBeCloseTo(BASE_STATS.crit + 2 * LEVEL_STATS.crit!)
   expect(soldierStats(run, soldier({ xp: xpFor(2), cls: 'heavy' })).hp).toBe(stats.hp + CLASSES.heavy.stats.hp!)
   expect(soldierStats(run, soldier({ xp: xpFor(2), skills: ['sprinter'] })).move).toBe(stats.move + SKILLS.sprinter.stats!.move!)
   run.relics = ['plasma', 'glassCannon']
@@ -694,21 +695,17 @@ test('doctrines change the run: Lone Wolf leaves one soldier and stops recruits;
   expect(wolf.soldiers).toHaveLength(1)
 })
 
-test('under exosuits cover shields aliens but not soldiers; fortification makes every cover count for more', () => {
-  const run = travelling(['battle'])
+test('under fortification every hit does 1 less damage, on either side', () => {
+  const run = begun(1)
+  apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   enterAt(run, 0)
   const battle = run.battle!
   const soldier = battle.units.find(isSoldier)!
   const alien = battle.units.find((u) => u.side === 'alien')!
-  const cover = (unit: typeof soldier) => coverAgainst(battle, unit, unit === soldier ? alien : soldier)
-  const hit = (from: typeof soldier, to: typeof soldier) => odds(battle, from, to, from.stats).hit
-  const plain = [hit(alien, soldier), hit(soldier, alien)]
+  const plain = odds(battle, alien, soldier)
   battle.rules = ['fortified']
-  if (cover(soldier) > 0) expect(hit(alien, soldier)).toBeLessThan(plain[0])
-  battle.rules = ['exosuits']
-  expect(hit(alien, soldier)).toBeGreaterThanOrEqual(plain[0])
-  expect(hit(soldier, alien)).toBe(plain[1])
+  expect(odds(battle, alien, soldier)).toBe(plain - FORTIFIED_SOAK)
 })
 
 test("a soldier lands with its class's ability and its uses, the effects of its skills and the squad's relics, and armor from its gear", () => {
@@ -753,7 +750,7 @@ test('a run begins with a choice of recruits of different classes, one plain, th
   expect(apply(run, { type: 'recruit', index: 0 })).toEqual({ ok: true })
   expect(run.soldiers).toEqual([chosen])
   expect(run.supplies).toBe(START_SUPPLIES + TRAITS.quartermaster.supplies)
-  expect(soldierStats(run, chosen).aim).toBeCloseTo(soldierStats(run, { ...chosen, trait: null }).aim + TRAITS.quartermaster.stats.aim)
+  expect(soldierStats(run, chosen).hp).toBe(soldierStats(run, { ...chosen, trait: null }).hp + TRAITS.quartermaster.stats.hp)
   expect(run.recruits).toHaveLength(0)
   expect(run.phase).not.toBe('recruit')
   expect(apply(run, { type: 'recruit', index: 0 }).ok).toBe(false)

@@ -35,8 +35,8 @@ test('phantoms cloak, no alien targets a cloaked one, and an attack out of cloak
         if (e.type !== 'shot' || !cloaked(e.id)) continue
         const shooter = before.units.find((u) => u.id === e.id)!
         // Only a shield or a last stand takes from a hit's damage.
-        const blunted = events.some((b) => b.type === 'effect' && b.id === e.target && (b.effect === 'shield' || b.effect === 'lastStand'))
-        if (e.hit && !blunted) expect(e.damage).toBeGreaterThanOrEqual(shooter.stats.damage + CLOAK_DAMAGE + SHADOW_DAMAGE)
+        const blunted = events.some((b) => b.type === 'effect' && b.id === e.target && (b.effect === 'shield' || b.effect === 'mirror' || b.effect === 'lastStand'))
+        if (!blunted) expect(e.damage).toBeGreaterThanOrEqual(shooter.stats.damage + CLOAK_DAMAGE + SHADOW_DAMAGE)
         expect(events).toContainEqual({ type: 'cloak', id: e.id, on: false })
         strikes++
       }

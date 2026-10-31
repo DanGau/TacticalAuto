@@ -265,9 +265,8 @@ function details(run: Run, soldier: Soldier): string {
     <div class="details">
       <table class="stats">
         <tr><td>Health</td><td>${health(run, soldier)}/${stats.hp}</td><td>Armor</td><td>${stats.armor}</td></tr>
-        <tr><td>Aim</td><td>${Math.round(100 * stats.aim)}%</td><td>Crit</td><td>${Math.round(100 * stats.crit)}%</td></tr>
+        <tr><td>Crit</td><td>${Math.round(100 * stats.crit)}%</td><td>Move</td><td>${stats.move}</td></tr>
         <tr><td>Damage</td><td>${stats.damage}</td><td>Range</td><td>${stats.range}</td></tr>
-        <tr><td>Move</td><td>${stats.move}</td><td></td><td></td></tr>
       </table>
       <div>${cls ? `<p>${cls.stanceText}.</p><p><b>${cls.abilityName}${uses > 0 ? ` ×${uses}` : ''}.</b> ${cls.abilityText}.</p>` : ''}${skills.join('')}${feats.length > 0 ? `<p>${feats.join(' ')}</p>` : ''}</div>
       ${gear.join('')}

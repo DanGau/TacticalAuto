@@ -114,7 +114,7 @@ export const ENCOUNTER_BANDS: Record<Encounter, Record<Squad, readonly [number, 
 }
 
 /** Each band a set of win rates breaks, with how far outside it they fall. */
-function misses(rates: Record<string, number>): { by: number; text: string }[] {
+function breaches(rates: Record<string, number>): { by: number; text: string }[] {
   const pct = (n: number) => `${Math.round(100 * n)}%`
   const [top, topRate] = Object.entries(rates).sort((a, b) => b[1] - a[1])[0]
   const outside = (name: string, rate: number, [low, high]: readonly [number, number]) =>
@@ -130,11 +130,11 @@ function misses(rates: Record<string, number>): { by: number; text: string }[] {
 }
 
 /** How far, in total, a set of win rates falls outside the bands: 0 when it breaks none. */
-export const miss = (rates: Record<string, number>) => misses(rates).reduce((sum, m) => sum + m.by, 0)
+export const offBand = (rates: Record<string, number>) => breaches(rates).reduce((sum, m) => sum + m.by, 0)
 
 /** Each bot's win rate on the same seeds, best first, and the bands they break. */
 export function compare(rates: Record<string, number>): { table: string; warnings: string[] } {
   const ranked = Object.entries(rates).sort((a, b) => b[1] - a[1])
   const table = ranked.map(([name, rate]) => `${name.padEnd(12)}${`${Math.round(100 * rate)}%`.padStart(5)}`).join('\n')
-  return { table, warnings: misses(rates).map((m) => m.text) }
+  return { table, warnings: breaches(rates).map((m) => m.text) }
 }

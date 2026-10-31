@@ -20,12 +20,10 @@ export const FEATS: Record<FeatId, Feat> = feats
 /** Damage one hit must do for Overkill. */
 export const OVERKILL = 8
 
-/** What a soldier did in a battle: damage done to aliens, kills, damage taken, shots and those that hit, and feats pulled off. */
+/** What a soldier did in a battle: damage done to aliens, kills, damage taken, and feats pulled off. */
 export interface Tally {
   dealt: number
   kills: number
   taken: number
-  shots: number
-  hits: number
   feats: FeatId[]
 }

@@ -122,7 +122,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
       const vertical = chance(0.5)
       for (let i = 0; i < size; i++) for (let d = 0; d < shore[i]; d++) clear(vertical ? d : i, vertical ? i : d, 'water')
     },
-    // A blast crater: an open bowl of scorched ground in the middle, ringed by rubble, where no one has cover.
+    // A blast crater: an open bowl of scorched ground in the middle, ringed by rubble, with nothing standing.
     crater: () => {
       const c = { x: between(scaled(12), size - scaled(13)), y: between(scaled(12), size - scaled(13)) }
       const reach = between(5, 7)
@@ -159,7 +159,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     return [t - size, t + size, t % size > 0 ? t - 1 : -1, t % size < size - 1 ? t + 1 : -1].filter((n) => n >= 0 && n < size * size && ground[n] !== 'void')
   }
 
-  /** Clears a way into every patch of open ground that cover and walls cut off, as narrow ground can. */
+  /** Clears a way into every patch of open ground that objects and walls cut off, as narrow ground can. */
   function connect(): void {
     const open = (t: number) => ground[t] !== 'void' && props[t] === 'none'
     const reached = new Uint8Array(size * size)

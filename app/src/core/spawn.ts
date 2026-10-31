@@ -44,7 +44,7 @@ export function mechUnit(battle: Battle, owner: Unit, stats: Stats, effects: Eff
 
 /** A civilian of `kind` with `hp` health, standing on `tile`. */
 export function civilianUnit(battle: Battle, tile: Tile, hp: number, kind: NonNullable<Unit['civilian']>): Unit {
-  const stats = { ...BASE_STATS, hp, aim: 0, damage: 0, range: 0, move: CIVILIAN_MOVE, crit: 0 }
+  const stats = { ...BASE_STATS, hp, damage: 0, range: 0, move: CIVILIAN_MOVE, crit: 0 }
   return { id: battle.nextId++, side: 'human', ...tile, hp, armor: 0, stats, soldier: null, pod: null, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: kind, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null }
 }
 
@@ -70,7 +70,7 @@ export function dropUnit(battle: Battle, owner: Unit, stats: Stats, spot: Tile, 
 }
 
 /** A drop turret: it never moves, and shoots far and true. */
-export const TURRET: Stats = { ...BASE_STATS, hp: 8, aim: 0.7, damage: 3, range: 7, move: 0, crit: 0.1 }
+export const TURRET: Stats = { ...BASE_STATS, hp: 8, damage: 3, range: 7, move: 0, crit: 0.1 }
 
 /** A holo-decoy: tough, unmoving, and harmless. */
-export const DECOY: Stats = { ...BASE_STATS, hp: 10, armor: 2, aim: 0, damage: 0, range: 0, move: 0, crit: 0 }
+export const DECOY: Stats = { ...BASE_STATS, hp: 10, armor: 2, damage: 0, range: 0, move: 0, crit: 0 }

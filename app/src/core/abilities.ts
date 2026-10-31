@@ -83,7 +83,7 @@ export function polymorph(battle: Battle, unit: Unit, seen: Set<number>): GameEv
   return [{ type: 'effect', id: target.id, effect: 'polymorph', amount: 0 }]
 }
 
-/** Spit: the nearest unit but a hostage the spitter can shoot is hit without a roll, and acid is left on its tile. */
+/** Spit: the nearest unit but a hostage the spitter can shoot is hit, and acid is left on its tile. */
 export function spit(battle: Battle, unit: Unit): GameEvent[] {
   const target = nearest(
     battle.units.filter((u) => u.side !== unit.side && !u.cloaked && !hostage(battle, u) && canShoot(battle, unit, u, unit.stats.range)),
@@ -96,11 +96,11 @@ export function spit(battle: Battle, unit: Unit): GameEvent[] {
   return events
 }
 
-/** Panic: when ready, the psion panics the soldier in reach and sight with the best aim not already panicked. */
+/** Panic: when ready, the psion panics the soldier in reach and sight who hits hardest, not already panicked. */
 export function panic(battle: Battle, unit: Unit): GameEvent[] {
   if (unit.cooldown > 0) return []
   const targets = battle.units.filter((u) => u.side !== unit.side && !u.cloaked && !u.panicked && !immune(battle, u, 'panic') && distance(unit, u) <= PSI_RANGE && lineOfSight(battle, unit, u))
-  const target = targets.reduce<Unit | undefined>((best, u) => (!best || u.stats.aim > best.stats.aim ? u : best), undefined)
+  const target = targets.reduce<Unit | undefined>((best, u) => (!best || u.stats.damage > best.stats.damage ? u : best), undefined)
   if (!target) return []
   target.panicked = true
   unit.cooldown = PSI_COOLDOWN
@@ -142,7 +142,7 @@ export function secondWind(unit: Unit): GameEvent[] {
   return [{ type: 'effect', id: unit.id, effect: 'secondWind', amount }]
 }
 
-/** A combat drone hits the nearest revealed alien its soldier has in sight within reach, without a roll. */
+/** A combat drone hits the nearest revealed alien its soldier has in sight within reach. */
 export function drone(battle: Battle, unit: Unit): GameEvent[] {
   if (!has(unit, 'drone')) return []
   const target = nearest(
@@ -150,17 +150,17 @@ export function drone(battle: Battle, unit: Unit): GameEvent[] {
     unit,
   )
   if (!target) return []
-  const events: GameEvent[] = [{ type: 'shot', id: unit.id, target: target.id, hit: true, crit: false, damage: DRONE_DAMAGE, with: ['drone'] }]
+  const events: GameEvent[] = [{ type: 'shot', id: unit.id, target: target.id, crit: false, damage: DRONE_DAMAGE, with: ['drone'] }]
   wound(battle, target, DRONE_DAMAGE, events)
   return events
 }
 
-/** A skirmisher steps to the tile in reach where the enemy's best shot at it is worst; it stays if no tile is better. */
+/** A skirmisher steps to the tile in reach where the enemy's best shot at it is worst, then farthest from them. */
 export function skirmish(battle: Battle, unit: Unit): GameEvent[] {
   if (!has(unit, 'skirmish')) return []
   const enemies = enemiesOf(battle, unit)
   const events: GameEvent[] = []
-  walk(unit, bestPath(paths(battle, unit, SKIRMISH_MOVE), unit, (end) => [exposure(battle, enemies, end)]), events)
+  walk(unit, bestPath(paths(battle, unit, SKIRMISH_MOVE), unit, (end) => [exposure(battle, enemies, end), -Math.min(...enemies.map((e) => distance(e, end)))]), events)
   return events.map((e) => (e.type === 'move' ? { ...e, with: 'skirmish' as const } : e))
 }
 
@@ -194,7 +194,7 @@ export function deploy(battle: Battle, unit: Unit, seen: Set<number>): GameEvent
   const stats: Stats = swarm ? { ...DRONE_STATS } : { ...MECH_STATS }
   if (has(unit, 'titan')) Object.assign(stats, { hp: stats.hp + TITAN_HEALTH, damage: stats.damage + 1 })
   if (has(unit, 'plating')) stats.armor += PLATING_ARMOR
-  if (has(unit, 'servos')) Object.assign(stats, { move: stats.move + 2, aim: stats.aim + 0.15 })
+  if (has(unit, 'servos')) Object.assign(stats, { move: stats.move + 2, damage: stats.damage + 1 })
   const granted: [SkillEffect, Effect][] = [['spotter', 'mark'], ['linked', 'inspire'], ['shock', 'snare'], ['detonate', 'detonate']]
   const effects = [...(swarm ? [] : ['taunt' as const]), ...granted.flatMap(([skill, effect]) => (has(unit, skill) ? [effect] : []))]
   const tiles = freeTilesNear(battle, unit, !swarm ? 1 : has(unit, 'hive') ? 3 : 2)

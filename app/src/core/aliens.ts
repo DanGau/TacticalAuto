@@ -57,19 +57,19 @@ interface AlienType {
 }
 
 export const ALIENS: Record<AlienKind, AlienType> = {
-  trooper: { name: 'Trooper', text: 'Shoots from cover, as a soldier does', danger: 'small', hp: 1, stats: {}, stance: 'balanced', resists: [] },
+  trooper: { name: 'Trooper', text: 'Shoots from range, picking its ground', danger: 'small', hp: 1, stats: {}, stance: 'balanced', resists: [] },
   swarmling: {
     name: 'Swarmling',
     text: 'Weak and fast; attacks only up close, and comes in numbers',
     danger: 'small',
     hp: 0.4,
-    stats: { range: 1, move: 6, damage: 2, aim: 0.85, close: 0 },
+    stats: { range: 1, move: 6, damage: 2 },
     stance: 'rush',
     resists: [],
   },
   spitter: {
     name: 'Spitter',
-    text: 'Its spit never misses and leaves acid on the tile, which burns whoever is still in it after their side moves',
+    text: 'Its spit leaves acid on the tile, which burns whoever is still in it after their side moves',
     danger: 'medium',
     hp: 0.8,
     stats: { range: 6 },
@@ -90,7 +90,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     text: 'Tough, and attacks only up close; each hit it survives sends it charging at the shooter',
     danger: 'large',
     hp: 2,
-    stats: { range: 1, move: 3, damage: 5, aim: 0.85, close: 0 },
+    stats: { range: 1, move: 3, damage: 5 },
     stance: 'rush',
     resists: ['frost'],
   },
@@ -129,7 +129,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     intro: 'Only half here. Ordinary rounds pass straight through. A clean, critical hit might not.',
     danger: 'medium',
     hp: 0.6,
-    stats: { range: 6, aim: 0.8 },
+    stats: { range: 6 },
     stance: 'standoff',
     resists: [],
   },
@@ -139,7 +139,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     intro: 'Tremors underfoot. It will come up beside whoever stands alone.',
     danger: 'medium',
     hp: 1,
-    stats: { range: 1, move: 4, damage: 5, aim: 0.85, close: 0 },
+    stats: { range: 1, move: 4, damage: 5 },
     stance: 'rush',
     resists: [],
   },
@@ -169,7 +169,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     intro: 'Fast. Very fast. It will be on us before we blink, unless something slows it.',
     danger: 'small',
     hp: 0.7,
-    stats: { range: 1, move: 9, damage: 4, aim: 0.85, close: 0 },
+    stats: { range: 1, move: 9, damage: 4 },
     stance: 'rush',
     resists: [],
   },
@@ -210,7 +210,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     intro: 'It is not killing them. It is harvesting them. Whoever it takes gets back up, on its side.',
     danger: 'medium',
     hp: 1,
-    stats: { range: 1, move: 7, damage: 4, aim: 0.85, close: 0 },
+    stats: { range: 1, move: 7, damage: 4 },
     stance: 'rush',
     resists: [],
   },
@@ -219,24 +219,22 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     text: 'A civilian a harvester killed, risen: weak, and attacks up close',
     danger: 'small',
     hp: 0.5,
-    stats: { range: 1, move: 4, damage: 2, aim: 0.8, close: 0 },
+    stats: { range: 1, move: 4, damage: 2 },
     stance: 'rush',
     resists: [],
   },
 }
 
-/** Hit chance each step of an alien's weapon adds. */
-const WEAPON_AIM = 0.05
 
 /**
  * An alien's stats: its kind's, with the equipment given. A kind's health is the same all game; what grows is its
- * armor, which shows as armor pips, and its weapon, each step of which adds a point of damage and some aim.
+ * armor, which shows as armor pips, and its weapon, each step of which adds a point of damage.
  * A burster has no weapon to improve.
  */
 export function alienStats(kind: AlienKind, armor: number, weapon: number): Stats {
   const stats = { ...BASE_STATS, ...ALIENS[kind].stats }
   const armed = kind === 'burster' ? 0 : weapon
-  return { ...stats, hp: Math.max(1, Math.round(BASE_STATS.hp * ALIENS[kind].hp * TUNING.alienHp)), armor: armor + (ALIENS[kind].stats.armor ?? 0), damage: stats.damage + armed, aim: stats.aim + WEAPON_AIM * armed }
+  return { ...stats, hp: Math.max(1, Math.round(BASE_STATS.hp * ALIENS[kind].hp * TUNING.alienHp)), armor: armor + (ALIENS[kind].stats.armor ?? 0), damage: stats.damage + armed }
 }
 
 /** A themed group of aliens that roams and fights as one pod. */

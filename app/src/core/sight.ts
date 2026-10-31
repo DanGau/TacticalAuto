@@ -1,61 +1,31 @@
-// Line of sight, cover, hit odds, and noticing.
-import { FORTIFIED_DEFENSE } from './doctrines'
-import { COVER_DEFENSE, HUNKER_DEFENSE, GRID, SIGHT, type Battle, type Cover, type Stats, type Tile, type Unit } from './battle'
-import { edgeBetween } from './grid'
-import { coverAt } from './grid'
-import { HIGH_AIM } from './grid'
+// Line of sight, what stands between a shot and its damage, and noticing.
+import { FORTIFIED_SOAK } from './doctrines'
+import { HUNKER_SOAK, GRID, SIGHT, type Battle, type Stats, type Tile, type Unit } from './battle'
+import { bulkAt } from './grid'
+import { HIGH_DAMAGE } from './grid'
 import { HIGH_SIGHT } from './grid'
 import { heightAt } from './grid'
-import { onGrid } from './grid'
 import { distance } from './grid'
-import { EDGE_COVER } from './terrain'
 import { FOG_SIGHT, NIGHT_DETECT } from './twists'
 
-const SIDES = [[0, -1], [1, 0], [0, 1], [-1, 0]]
-
-/**
- * The best cover a unit standing on `at` has against a shot from `from`. A side of the unit's tile gives cover from
- * what stands on that edge, or else from the prop on the tile beyond it, and only if the shooter is on that side;
- * otherwise the unit is flanked.
- */
-export function coverAgainst(battle: Battle, at: Tile, from: Tile): Cover {
-  let best: Cover = 0
-  for (const [dx, dy] of SIDES) {
-    const x = at.x + dx
-    const y = at.y + dy
-    if (!onGrid(x, y) || (from.x - at.x) * dx + (from.y - at.y) * dy <= 0) continue
-    const cover = Math.max(battle.props[y * GRID + x] === 'void' ? 0 : coverAt(battle, x, y), EDGE_COVER[edgeBetween(battle, at, { x, y })]) as Cover
-    if (cover > best) best = cover
-  }
-  return best
-}
-
-/**
- * What cover takes off a shot's chance to hit: COVER_DEFENSE, or FORTIFIED_DEFENSE under that rule, and nothing for a
- * soldier in exosuits; and HUNKER_DEFENSE more on a hunkered unit.
- */
-function defense(battle: Battle, target: Tile, cover: Cover): number {
+/** What the ground does to a shot from `shooter` at `target`: damage gained, negative if lost, from height, a hunkered target and the fortified rule. */
+export function odds(battle: Battle, shooter: Tile, target: Tile): number {
   const unit = battle.units.find((u) => u.x === target.x && u.y === target.y)
-  const hunkered = unit?.order === 'hunker' ? HUNKER_DEFENSE : 0
-  if (battle.rules.includes('exosuits') && unit?.side === 'human') return hunkered
-  return (battle.rules.includes('fortified') ? FORTIFIED_DEFENSE : COVER_DEFENSE)[cover] + hunkered
+  return HIGH_DAMAGE * (heightAt(battle, shooter) - heightAt(battle, target)) - (unit?.order === 'hunker' ? HUNKER_SOAK : 0) - (battle.rules.includes('fortified') ? FORTIFIED_SOAK : 0)
+}
+
+/** Every attack by a unit that deals damage lands for at least this. */
+export const MIN_DAMAGE = 1
+
+/** How much of its damage a shot lands, 1 from open level ground; every attack lands something. What a tile's shot is worth to pathing and targeting. */
+export function bite(battle: Battle, shooter: Tile, target: Tile, stats: Stats): number {
+  return stats.damage > 0 ? Math.max(MIN_DAMAGE, stats.damage + odds(battle, shooter, target)) / stats.damage : 0
 }
 
 /**
- * Chances for a shot by a unit with `stats` standing on `shooter`: to hit, and for a hit to crit.
- * Cover lowers the hit chance and closeness raises it, so a flanked target at point-blank is a near-certain hit.
- * A piercing shot treats the target as having no cover. Shooting down from higher ground is easier, and up harder.
- */
-export function odds(battle: Battle, shooter: Tile, target: Tile, stats: Stats, piercing = false): { hit: number; crit: number } {
-  const cover = piercing ? 0 : coverAgainst(battle, target, shooter)
-  const hit = stats.aim - defense(battle, target, cover) + stats.close * Math.max(0, stats.range - distance(shooter, target)) + HIGH_AIM * (heightAt(battle, shooter) - heightAt(battle, target))
-  return { hit: Math.min(Math.max(hit, 0), 1), crit: cover === 0 ? stats.crit : 0 }
-}
-
-/**
- * Whether a straight line between the centres of two tiles is clear: it cuts through no tile of high cover between
+ * Whether a straight line between the centres of two tiles is clear: it cuts through no tall object between
  * them and crosses no wall. A line that only touches a tile's corner is clear of that tile, but one that touches a
- * wall's end is blocked. Low cover and windows never block; units shoot over and through them.
+ * wall's end is blocked. Low objects and windows never block; units shoot over and through them.
  */
 export function lineOfSight(battle: Battle, a: Tile, b: Tile): boolean {
   // Tile centres and corners in half-tile units, so every coordinate is an integer.
@@ -74,7 +44,7 @@ export function lineOfSight(battle: Battle, a: Tile, b: Tile): boolean {
     for (let x = Math.min(a.x, b.x); x <= Math.max(a.x, b.x); x++) {
       if (battle.north[y * GRID + x] === 'wall' && crosses(x, y, x + 1, y)) return false
       if (battle.west[y * GRID + x] === 'wall' && crosses(x, y, x, y + 1)) return false
-      if (coverAt(battle, x, y) !== 2 || (x === a.x && y === a.y) || (x === b.x && y === b.y)) continue
+      if (bulkAt(battle, x, y) !== 2 || (x === a.x && y === a.y) || (x === b.x && y === b.y)) continue
       // The line cuts through the tile when it has corners on both sides of the line.
       const sides = [side(x, y), side(x + 1, y), side(x, y + 1), side(x + 1, y + 1)]
       if (sides.includes(1) && sides.includes(-1)) return false
@@ -93,18 +63,17 @@ export function sees(battle: Battle, from: Tile, to: Tile): boolean {
   return distance(from, to) <= SIGHT - (battle.twist === 'fog' ? FOG_SIGHT : 0) + HIGH_SIGHT * (heightAt(battle, from) - heightAt(battle, to)) && lineOfSight(battle, from, to)
 }
 
-/** Tiles within which a soldier notices an alien not yet seen, before cover and stillness hide it. */
+/** Tiles within which a soldier notices an alien not yet seen, before stillness hides it. */
 const DETECT = 20
-/** Tiles of DETECT an enemy in cover against the watcher subtracts, and one that held still since its last turn. */
-const HIDE_COVER = 2
+/** Tiles of DETECT an enemy that held still since its last turn subtracts. */
 const HIDE_STILL = 1
 
 /**
  * Whether `from` notices `to`, an enemy not yet seen: within DETECT, less at night, farther from higher ground, nearer
- * when the enemy hides in cover or holds still, with line of sight.
+ * when the enemy holds still, with line of sight.
  */
 export function detects(battle: Battle, from: Unit, to: Unit): boolean {
-  const range = DETECT - (battle.twist === 'night' ? NIGHT_DETECT : 0) + HIGH_SIGHT * (heightAt(battle, from) - heightAt(battle, to)) - (coverAgainst(battle, to, from) > 0 ? HIDE_COVER : 0) - (to.moved ? 0 : HIDE_STILL)
+  const range = DETECT - (battle.twist === 'night' ? NIGHT_DETECT : 0) + HIGH_SIGHT * (heightAt(battle, from) - heightAt(battle, to)) - (to.moved ? 0 : HIDE_STILL)
   return distance(from, to) <= range && lineOfSight(battle, from, to)
 }
 

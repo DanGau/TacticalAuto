@@ -110,15 +110,13 @@ export function choice(run: Run, armed: string | null = null): string {
 
 /** What each soldier did in the battle, a row each, the squad's best in each column but damage taken marked. */
 function battleStats(report: Report): string {
-  const columns: [string, (t: Tally) => number, string?][] = [
+  const columns: [string, (t: Tally) => number][] = [
     ['Damage dealt', (t) => t.dealt],
     ['Kills', (t) => t.kills],
     ['Damage taken', (t) => t.taken],
-    ['Hits', (t) => t.hits],
-    ['Accuracy', (t) => (t.shots > 0 ? Math.round((100 * t.hits) / t.shots) : 0), '%'],
   ]
   const best = columns.map(([name, value]) => (name === 'Damage taken' ? null : Math.max(1, ...report.soldiers.map((s) => value(s.tally)))))
-  const rows = report.soldiers.map((s) => `<tr><td><span class="portrait">${badge(s.cls)}</span>${s.name}</td>${columns.map(([, value, unit], i) => `<td class="${value(s.tally) === best[i] ? 'best' : ''}">${value(s.tally)}${unit ?? ''}</td>`).join('')}</tr>`)
+  const rows = report.soldiers.map((s) => `<tr><td><span class="portrait">${badge(s.cls)}</span>${s.name}</td>${columns.map(([, value], i) => `<td class="${value(s.tally) === best[i] ? 'best' : ''}">${value(s.tally)}</td>`).join('')}</tr>`)
   return `<table class="tally"><tr><th></th>${columns.map(([name]) => `<th>${name}</th>`).join('')}</tr>${rows.join('')}</table>`
 }
 
@@ -131,7 +129,7 @@ export function stopReport(run: Run, report: Report, still = false): string {
   const threat = after === before ? '' : `<span class="note">${signed(after - before)}</span>`
   // The hero just joined stands with the squad that fought.
   const hero = run.soldiers.find((s) => s.name === report.hired)
-  const all = [...report.soldiers, ...(hero ? [{ id: hero.id, name: hero.name, cls: hero.cls, xpBefore: hero.xp, xpAfter: hero.xp, taken: false, earned: [], feats: [], hp: health(run, hero), maxHp: soldierStats(run, hero).hp, tally: { dealt: 0, kills: 0, taken: 0, shots: 0, hits: 0, feats: [] } }] : [])]
+  const all = [...report.soldiers, ...(hero ? [{ id: hero.id, name: hero.name, cls: hero.cls, xpBefore: hero.xp, xpAfter: hero.xp, taken: false, earned: [], feats: [], hp: health(run, hero), maxHp: soldierStats(run, hero).hp, tally: { dealt: 0, kills: 0, taken: 0, feats: [] } }] : [])]
   const crates = run.finds.map((_, i) => `<button class="crate" data-crate="${i}" title="Open">🎁</button>`)
   const squad = report.soldiers.length > 0 ? `<div class="stage second">${battleStats(report)}<div class="squad">${all.map((s) => soldierCard(run, s)).join('')}</div>${crates.length > 0 ? `<div class="crates">${crates.join('')}</div>` : ''}</div>` : ''
   const owed = squad !== '' && (run.finds.length > 0 || run.soldiers.some((s) => skillOffers(s).length > 0))

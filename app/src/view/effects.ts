@@ -28,9 +28,8 @@ export function callout(s: Stage, text: string, color: number, over: Sprite, siz
   return mark
 }
 
-/** A shot's result: a miss, or a hit or crit with its damage. */
+/** A shot's result: a hit or crit with its damage. */
 export function shotCallout(s: Stage, e: Extract<GameEvent, { type: 'shot' }>, over: Sprite): Label {
-  if (!e.hit) return callout(s, 'MISS', COLOR.miss, over)
   return e.crit ? callout(s, `CRIT -${e.damage}`, COLOR.crit, over, 18) : callout(s, `HIT -${e.damage}`, COLOR.hit, over)
 }
 
@@ -109,7 +108,7 @@ function fire(s: Stage, fx: Sketch, a: Tile, ends: Tile[], gun: Attack): Promise
 }
 
 /** The attacker winds back, lunges in, rakes the target with a slash per bolt, and steps back. */
-async function strike(s: Stage, fx: Sketch, from: Sprite, to: Sprite, gun: Attack, ends: Tile[], hit: boolean): Promise<void> {
+async function strike(s: Stage, fx: Sketch, from: Sprite, to: Sprite, gun: Attack, ends: Tile[]): Promise<void> {
   const home = s.toWorld(from.tile.x, from.tile.y)
   const dx = to.at.x - home.x
   const dy = to.at.y - home.y
@@ -120,7 +119,6 @@ async function strike(s: Stage, fx: Sketch, from: Sprite, to: Sprite, gun: Attac
   await s.tween(gun.ms * 0.6, (t) => nudge(-gun.flash + (reach + gun.flash) * t * t))
   await s.tween(gun.ms * 1.5, (t) => {
     fx.clear()
-    if (!hit) return
     ends.forEach((b, i) => {
       const local = Math.min(1, Math.max(0, t * ends.length - i * 0.6))
       if (local === 0) return
@@ -148,36 +146,30 @@ function burst(s: Stage, fx: Sketch, at: Tile, dir: Tile, color: number, count: 
 
 /**
  * A shot plays as its weapon: the projectile or lunge, then on a hit a freeze on the blow with the target squashed and
- * flashing, a camera jolt, a knockback and sparks, all harder on a crit. A miss sails past and ricochets.
+ * flashing, a camera jolt, a knockback and sparks, all harder on a crit.
  */
 export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: [number, number], gun: Attack): Promise<void> {
-  const { hit, crit } = e
+  const { crit } = e
   const a = chest(from)
-  // A miss flies past above the target.
-  const aim = hit ? chest(to) : { x: to.at.x + 10, y: to.at.y - CHEST - 26 }
-  const len = Math.hypot(aim.x - a.x, aim.y - a.y) || 1
-  const dir = { x: (aim.x - a.x) / len, y: (aim.y - a.y) / len }
+  const mark = chest(to)
+  const len = Math.hypot(mark.x - a.x, mark.y - a.y) || 1
+  const dir = { x: (mark.x - a.x) / len, y: (mark.y - a.y) / len }
   const ends = Array.from({ length: gun.bolts }, (_, i) => {
     const off = gun.bolts === 1 ? 0 : (i / (gun.bolts - 1) - 0.5) * gun.spread + (Math.random() - 0.5) * gun.spread * 0.3
-    return { x: aim.x - dir.y * off, y: aim.y + dir.x * off }
+    return { x: mark.x - dir.y * off, y: mark.y + dir.x * off }
   })
-  if (gun.style === 'strike') await strike(s, fx, from, to, gun, ends, hit)
+  if (gun.style === 'strike') await strike(s, fx, from, to, gun, ends)
   else await fire(s, fx, a, ends, gun)
   fx.clear()
   float(s, shotCallout(s, e, to))
   // What of the shooter's shaped the shot, named over the shooter.
   if (e.with.length > 0) float(s, callout(s, e.with.map((effect) => effectName(effect, s.kit()).toUpperCase()).join(' · '), 0xffffff, from))
-  if (!hit) {
-    if (gun.style !== 'strike') await burst(s, fx, aim, dir, COLOR.miss, 3, 0.5)
-    fx.clear()
-    return
-  }
   to.drawHp(...after)
   const power = crit ? 2 : 1
   const home = s.toWorld(to.tile.x, to.tile.y)
   squash(to, 1.2, 0.8)
   await s.tween(gun.hitstop * power, () => {
-    fx.clear().circle(aim.x, aim.y, 10 * power).fill({ color: 0xffffff, alpha: 0.9 })
+    fx.clear().circle(mark.x, mark.y, 10 * power).fill({ color: 0xffffff, alpha: 0.9 })
   })
   void shake(s, gun.shake * power)
   const kick = gun.kick * power
@@ -186,7 +178,7 @@ export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e
     shift(s, to, { x: home.x + dir.x * push, y: home.y + dir.y * push })
     squash(to, 1.2 - 0.2 * t, 0.8 + 0.2 * t)
   })
-  await burst(s, fx, aim, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, power)
+  await burst(s, fx, mark, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, power)
   place(s, to, to.tile)
   squash(to, 1, 1)
   fx.clear()

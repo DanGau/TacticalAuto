@@ -3,7 +3,7 @@ import { type Battle, type Tile, type Reserve, POD_CLEARANCE, GRID, type Unit, t
 import { onGrid, distance, freeTilesNear, walkingDistances, spacedTile, NEIGHBORS, passable, edgeDepths, openNear, blocked, walks } from './grid'
 import { randomInt } from './rng'
 import { alienUnit, civilianUnit } from './spawn'
-import { PROP_COVER, type TerrainKind, type Locale, type Prop } from './terrain'
+import { PROP_BULK, type TerrainKind, type Locale, type Prop } from './terrain'
 import type { Rule } from './doctrines'
 import { type Goal, VIP_HP, CIVILIANS, CIVILIAN_HP } from './goals'
 import { generateTerrain } from './terrain-gen'
@@ -25,7 +25,7 @@ export function sealPockets(battle: Battle): void {
   const area = Array<number>(GRID * GRID).fill(-1)
   const sizes: number[] = []
   for (let start = 0; start < GRID * GRID; start++) {
-    if (battle.cover[start] > 0 || area[start] >= 0) continue
+    if (battle.bulk[start] > 0 || area[start] >= 0) continue
     area[start] = sizes.length
     const queue = [start]
     for (const tile of queue) {
@@ -33,7 +33,7 @@ export function sealPockets(battle: Battle): void {
         const x = (tile % GRID) + dx
         const y = Math.floor(tile / GRID) + dy
         const from = { x: tile % GRID, y: Math.floor(tile / GRID) }
-        if (!onGrid(x, y) || battle.cover[y * GRID + x] > 0 || area[y * GRID + x] >= 0 || !passable(battle, from, { x, y })) continue
+        if (!onGrid(x, y) || battle.bulk[y * GRID + x] > 0 || area[y * GRID + x] >= 0 || !passable(battle, from, { x, y })) continue
         area[y * GRID + x] = sizes.length
         queue.push(y * GRID + x)
       }
@@ -43,7 +43,7 @@ export function sealPockets(battle: Battle): void {
   const largest = sizes.indexOf(Math.max(...sizes))
   area.forEach((id, tile) => {
     if (id < 0 || id === largest) return
-    battle.cover[tile] = 2
+    battle.bulk[tile] = 2
     battle.props[tile] = 'stack'
   })
   walks.delete(battle)
@@ -56,7 +56,7 @@ export function sealPockets(battle: Battle): void {
 export function arenaSpot(battle: Battle, roofed: boolean): Tile {
   const depth = edgeDepths(battle)
   const open = (margin: number, roof: boolean) =>
-    battle.ground.flatMap((g, t) => (g !== 'void' && (!roof || g === 'floor') && depth[t] > margin && battle.cover[t] === 0 ? [{ x: t % GRID, y: Math.floor(t / GRID) }] : []))
+    battle.ground.flatMap((g, t) => (g !== 'void' && (!roof || g === 'floor') && depth[t] > margin && battle.bulk[t] === 0 ? [{ x: t % GRID, y: Math.floor(t / GRID) }] : []))
   for (let margin = ARENA_REACH; ; margin--) {
     const under = roofed ? open(margin, true) : []
     const spots = under.length > 0 ? under : open(margin, false)
@@ -91,9 +91,9 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
   return units
 }
 
-/** How far from its centre the arena reaches, and the share of its open ground that should give cover. */
+/** How far from its centre the arena reaches, and the share of its open ground that objects should stand on. */
 export const ARENA_REACH = 14
-export const ARENA_COVER = 0.1
+export const ARENA_OBJECTS = 0.1
 
 /** How far from the squad an ambush's Hunter starts. */
 export const HUNTER_START = 10
@@ -106,22 +106,22 @@ export const TERROR_REACH = 10
 /** The supply caches a raid can grab, at most. */
 export const CACHES = 3
 
-/** The cover a region scatters where its arena is bare, low and high; crates and stacks elsewhere. */
+/** The objects a region scatters where its arena is bare, low and high; crates and stacks elsewhere. */
 const SCATTER: Partial<Record<TerrainKind, [Prop, Prop]>> = { countryside: ['fence', 'tree'], hive: ['growth', 'spire'] }
 
-/** Scatters cover over the arena until ARENA_COVER of its ground gives some, never beside other cover, so it walls nothing off. */
+/** Scatters objects over the arena until ARENA_OBJECTS of its ground has one, never beside another, so it walls nothing off. */
 function furnish(battle: Battle, arena: Arena): void {
   const [low, high] = SCATTER[battle.place] ?? ['crate', 'stack']
   const tiles: number[] = []
   for (let y = arena.y - arena.reach; y <= arena.y + arena.reach; y++) for (let x = arena.x - arena.reach; x <= arena.x + arena.reach; x++) if (onGrid(x, y) && battle.ground[y * GRID + x] !== 'void') tiles.push(y * GRID + x)
-  let covered = tiles.filter((t) => battle.cover[t] > 0).length
-  for (let tries = 0; covered < ARENA_COVER * tiles.length && tries < 4 * tiles.length; tries++) {
+  let covered = tiles.filter((t) => battle.bulk[t] > 0).length
+  for (let tries = 0; covered < ARENA_OBJECTS * tiles.length && tries < 4 * tiles.length; tries++) {
     const t = tiles[randomInt(battle, tiles.length)]
     const x = t % GRID
     const y = Math.floor(t / GRID)
-    if (battle.cover[t] > 0 || NEIGHBORS.some(([dx, dy]) => onGrid(x + dx, y + dy) && battle.cover[(y + dy) * GRID + x + dx] > 0)) continue
+    if (battle.bulk[t] > 0 || NEIGHBORS.some(([dx, dy]) => onGrid(x + dx, y + dy) && battle.bulk[(y + dy) * GRID + x + dx] > 0)) continue
     battle.props[t] = randomInt(battle, 3) === 0 ? high : low
-    battle.cover[t] = PROP_COVER[battle.props[t]]
+    battle.bulk[t] = PROP_BULK[battle.props[t]]
     covered++
   }
   walks.delete(battle)
@@ -143,7 +143,7 @@ function arenaTile(battle: Battle, avoid: Tile[], clearance: number, from = 0): 
 
 /**
  * A battle awaiting the squad's entrance. The fight is staged in an arena within: its pods hang out there at their
- * posts, with cover between them, and the entrances lie by them. A VIP rescue's arena is about the VIP, a hold's the
+ * posts, with objects between them, and the entrances lie by them. A VIP rescue's arena is about the VIP, a hold's the
  * uplink; an assassination keeps its commander at the far side. A hold keeps half its packs back as waves; a rescue's
  * civilians are scattered about its last pod. An ambush has no entrance: the squad is down in the arena's middle,
  * the Hunter nearest.
@@ -171,7 +171,7 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     nextId: 1,
     place: kind,
     ...terrain,
-    cover: terrain.props.map((prop) => PROP_COVER[prop]),
+    bulk: terrain.props.map((prop) => PROP_BULK[prop]),
     pods: [],
     used: [],
     primed: [],

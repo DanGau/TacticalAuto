@@ -7,7 +7,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | File | Owns |
 |---|---|
 | `battle.ts` | Battle state types (`Battle`, `Unit`, `Pod`) and the numbers rules share |
-| `grid.ts` | The board: distance, cover, walls, walking costs and routes, free tiles |
+| `grid.ts` | The board: distance, objects, walls, walking costs and routes, free tiles |
 | `setup.ts` | `createBattle`: the arena, pods, civilians, goals |
 | `entrances.ts` | Entrances: their kinds, where each comes in, what each sets off |
 | `spawn.ts` | Making units: aliens, soldiers, civilians, mechs, drops |
@@ -21,8 +21,8 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `wound.ts` | Damage landing, what it sets off, the battle tally |
 | `upkeep.ts` | What happens as a side's turn begins: the next pod engaging, waves |
 | `fighters.ts` | Unit queries every combat module asks |
-| `sight.ts` | Line of sight, cover, hit odds, noticing |
-| `terrain.ts` | Battlefield tile types and the cover each gives |
+| `sight.ts` | Line of sight, what height and hunkering do to a shot, noticing |
+| `terrain.ts` | Battlefield tile types and how solid each is |
 | `terrain-gen.ts` | `generateTerrain`: streets, lots, layout, twist, hills, connectivity |
 | `terrain-lots.ts` | The places that fill a lot |
 | `streets.ts` | Street plans |

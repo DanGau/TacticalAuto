@@ -1,7 +1,7 @@
-// The battle board: distances, cover, walls, walking costs and routes, and finding free tiles.
-import { type Battle, BLAST_RADIUS, GRID, type Tile, type Unit, type Cover } from './battle'
+// The battle board: distances, objects, walls, walking costs and routes, and finding free tiles.
+import { type Battle, BLAST_RADIUS, GRID, type Tile, type Unit, type Bulk } from './battle'
 import { randomInt } from './rng'
-import { EDGE_COVER, PROP_COVER, type Edge } from './terrain'
+import { EDGE_BULK, PROP_BULK, type Edge } from './terrain'
 
 /** Tiles between two points, counting a diagonal as one. */
 export const distance = (a: Tile, b: Tile) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
@@ -15,8 +15,8 @@ export const heightAt = (battle: Battle, tile: Tile) => battle.height[tile.y * G
 /** Tiles of sight a unit gains for each level it stands above what it looks at, and loses for each below. */
 export const HIGH_SIGHT = 2
 
-/** Aim a shot gains for each level the shooter stands above its target, and loses for each below. */
-export const HIGH_AIM = 0.1
+/** Damage a shot gains for each level the shooter stands above its target, and loses for each below. */
+export const HIGH_DAMAGE = 1
 
 /** Move a step costs beyond its one tile for each level it climbs. */
 export const CLIMB = 2
@@ -28,8 +28,8 @@ export const CALTROP_COST = 2
 export const stepCost = (battle: Battle, from: Tile, to: Tile) =>
   1 + CLIMB * Math.max(0, heightAt(battle, to) - heightAt(battle, from)) + (battle.caltrops.some((t) => t.x === to.x && t.y === to.y) ? CALTROP_COST : 0)
 
-export function coverAt(battle: Battle, x: number, y: number): Cover {
-  return battle.cover[y * GRID + x]
+export function bulkAt(battle: Battle, x: number, y: number): Bulk {
+  return battle.bulk[y * GRID + x]
 }
 
 export function unitAt(battle: Battle, x: number, y: number): Unit | undefined {
@@ -44,7 +44,7 @@ export function wreck(battle: Battle, centre: Tile, radius = BLAST_RADIUS): void
       if (!onGrid(x, y) || battle.ground[y * GRID + x] === 'void') continue
       const tile = y * GRID + x
       battle.props[tile] = 'none'
-      battle.cover[tile] = 0
+      battle.bulk[tile] = 0
       battle.ground[tile] = 'scorched'
       battle.north[tile] = battle.west[tile] = 'none'
       if (onGrid(x, y + 1)) battle.north[tile + GRID] = 'none'
@@ -60,17 +60,17 @@ export function breach(battle: Battle, centre: Tile, radius = 1): void {
 }
 
 /**
- * Breaks down a level the cover sheltering `at` from a shot from `from`: a wall to a window, a window to nothing,
- * high cover to rubble, low cover to nothing. Water and void stay as they are.
+ * Breaks down a level what stands by `at` on the side of `from`: a wall to a window, a window to nothing,
+ * a tall object to rubble, a low one to nothing. Water and void stay as they are.
  */
 export function crumble(battle: Battle, at: Tile, from: Tile): void {
-  let best: { x: number; y: number; cover: number } | undefined
+  let best: { x: number; y: number; bulk: number } | undefined
   for (const [dx, dy] of NEIGHBORS.slice(0, 4)) {
     const x = at.x + dx
     const y = at.y + dy
     if (!onGrid(x, y) || (from.x - at.x) * dx + (from.y - at.y) * dy <= 0 || ['water', 'void'].includes(battle.props[y * GRID + x])) continue
-    const cover = Math.max(coverAt(battle, x, y), EDGE_COVER[edgeBetween(battle, at, { x, y })])
-    if (cover > (best?.cover ?? 0)) best = { x, y, cover }
+    const bulk = Math.max(bulkAt(battle, x, y), EDGE_BULK[edgeBetween(battle, at, { x, y })])
+    if (bulk > (best?.bulk ?? 0)) best = { x, y, bulk }
   }
   if (!best) return
   walks.delete(battle)
@@ -80,8 +80,8 @@ export function crumble(battle: Battle, at: Tile, from: Tile): void {
   if (edge !== 'none') edges[index] = edge === 'wall' ? 'window' : 'none'
   else {
     const tile = best.y * GRID + best.x
-    battle.props[tile] = battle.cover[tile] === 2 ? 'rubble' : 'none'
-    battle.cover[tile] = PROP_COVER[battle.props[tile]]
+    battle.props[tile] = battle.bulk[tile] === 2 ? 'rubble' : 'none'
+    battle.bulk[tile] = PROP_BULK[battle.props[tile]]
   }
 }
 
@@ -124,7 +124,7 @@ export function walkGraph(battle: Battle) {
     for (const [dx, dy] of NEIGHBORS) {
       const from = { x: tile.x + dx, y: tile.y + dy }
       const f = from.y * GRID + from.x
-      if (onGrid(from.x, from.y) && battle.cover[f] === 0 && !walls.has(f) && passable(battle, tile, from)) steps.push(f, stepCost(battle, from, tile))
+      if (onGrid(from.x, from.y) && battle.bulk[f] === 0 && !walls.has(f) && passable(battle, tile, from)) steps.push(f, stepCost(battle, from, tile))
     }
     return steps
   })
@@ -181,9 +181,9 @@ export function reachableFrom(battle: Battle, start: Tile): boolean[] {
   return reached
 }
 
-/** Whether nothing may stand on the tile: it is off the grid, cover, or occupied. */
+/** Whether nothing may stand on the tile: it is off the grid, solid, or occupied. */
 export function blocked(battle: Battle, x: number, y: number): boolean {
-  return !onGrid(x, y) || coverAt(battle, x, y) > 0 || unitAt(battle, x, y) !== undefined
+  return !onGrid(x, y) || bulkAt(battle, x, y) > 0 || unitAt(battle, x, y) !== undefined
 }
 
 /** The open tile nearest `tile` as the crow flies. */
@@ -206,7 +206,7 @@ export function freeTilesNear(battle: Battle, centre: Tile, count: number): Tile
     for (const [dx, dy] of NEIGHBORS) {
       const x = tile.x + dx
       const y = tile.y + dy
-      if (!onGrid(x, y) || coverAt(battle, x, y) > 0 || seen.has(y * GRID + x) || !passable(battle, tile, { x, y })) continue
+      if (!onGrid(x, y) || bulkAt(battle, x, y) > 0 || seen.has(y * GRID + x) || !passable(battle, tile, { x, y })) continue
       seen.add(y * GRID + x)
       queue.push({ x, y })
     }
@@ -226,7 +226,7 @@ export function spacedTile(battle: Battle, avoid: Tile[], clearance: number, wit
     const tile = randomTile(battle)
     const needed = clearance - Math.floor(tries / 200)
     const placed = tries > 2000 || inPart(depth[tile.y * GRID + tile.x], within)
-    if (placed && coverAt(battle, tile.x, tile.y) === 0 && avoid.every((other) => distance(tile, other) >= needed)) return tile
+    if (placed && bulkAt(battle, tile.x, tile.y) === 0 && avoid.every((other) => distance(tile, other) >= needed)) return tile
   }
 }
 

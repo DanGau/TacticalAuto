@@ -159,7 +159,7 @@ function terror(seed: number): Run {
   const run = before('rescue')
   run.battle!.rng = seed
   enterAt(run, 0)
-  for (const s of run.battle!.units.filter(isSoldier)) Object.assign(s, { rooted: 999, stats: { ...s.stats, aim: -10 } })
+  for (const s of run.battle!.units.filter(isSoldier)) Object.assign(s, { rooted: 999, stats: { ...s.stats } })
   return run
 }
 
@@ -180,7 +180,7 @@ test('on a rescue aliens with no soldier to fight kill civilians', () => {
   expect(killed).toBeGreaterThan(0)
 })
 
-test('a rescue mixes civilians who hide, taking cover and staying put, with civilians who run from the aliens', () => {
+test('a rescue mixes civilians who hide, huddling and staying put, with civilians who run from the aliens', () => {
   const run = terror(3)
   const battle = run.battle!
   const civilians = battle.units.filter((u) => u.civilian)
@@ -273,7 +273,7 @@ test('no one shot kills a commander from full health; brought low, it blinks awa
   battle.units = battle.units.filter((u) => u.side !== 'alien' || u === commander)
   battle.pods[commander.pod!] = { ...battle.pods[commander.pod!], revealed: true, engaged: true }
   const soldier = battle.units.find(isSoldier)!
-  Object.assign(soldier, freeTilesNear(battle, commander, 2)[1], { stats: { ...soldier.stats, damage: 99, aim: 10, crit: 1, move: 0 } })
+  Object.assign(soldier, freeTilesNear(battle, commander, 2)[1], { stats: { ...soldier.stats, damage: 99, crit: 1, move: 0 } })
   Object.assign(battle, { turn: 'human', stage: 'move' })
   const events: GameEvent[] = []
   while (!events.some((e) => e.type === 'shot' && e.target === commander.id)) events.push(...stepBattle(battle))

@@ -58,8 +58,8 @@ const ok: Result = { ok: true }
 const no = (reason: string): Result => ({ ok: false, reason })
 
 /**
- * Whether the consumable at `index` of the kit can be used now: in a battle, one aimed at the aliens only once one in
- * the fight is in sight, one aimed at the squad from the entrance screen on.
+ * Whether the consumable at `index` of the kit can be used now: in a battle, one acting on the aliens only once one in
+ * the fight is in sight, one acting on the squad from the entrance screen on.
  */
 export function canUse(run: Run, index: number): boolean {
   const id = run.kit[index]

@@ -18,12 +18,11 @@ export const COLOR = {
   fog: 0x05070b,
   /** Glow under an alien the squad hasn't found, so the player sees trouble coming. */
   lurk: 0xff3030,
-  /** Tint of a cover block or unit standing in fog. */
+  /** Tint of an object or unit standing in fog. */
   dim: 0x5a5f6b,
   line: 0x10141c,
   hit: 0xffd84d,
   crit: 0xff7a3d,
-  miss: 0x77808f,
   heal: 0x7ddc5a,
   acid: 0xa6e22e,
   fire: 0xff6a1f,

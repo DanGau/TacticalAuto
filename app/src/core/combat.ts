@@ -149,7 +149,8 @@ function useConsumable(battle: Battle, id: ConsumableId): GameEvent[] {
     for (const u of squad) u.hp = Math.max(1, u.hp - STIMS.cost)
   } else if (id === 'rage') {
     used(squad)
-    boost(RAGE)
+    boost({ damage: RAGE.damage })
+    for (const u of squad) u.hp = Math.max(1, u.hp - RAGE.cost)
   } else if (id === 'plating') {
     used(squad)
     for (const u of squad) u.armor += PLATING

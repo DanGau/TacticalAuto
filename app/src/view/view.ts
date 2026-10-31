@@ -241,7 +241,7 @@ export async function createView(): Promise<View> {
           if (!from || !to) continue
           const a = chest(from)
           const b = chest(to)
-          fx.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: e.crit ? COLOR.crit : e.hit ? COLOR.hit : COLOR.miss, width: 3 })
+          fx.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: e.crit ? COLOR.crit : COLOR.hit, width: 3 })
           shotCallout(s, e, to)
           if (e.with.length > 0) callout(s, e.with.map((effect) => effectName(effect, s.kit()).toUpperCase()).join(' · '), 0xffffff, from)
         }

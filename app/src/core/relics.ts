@@ -51,7 +51,7 @@ const relics = {
   lattice: { name: 'Frost Lattice', text: 'Crits chill the target', tags: ['crit', 'frost'], effect: 'freeze' },
   shatter: { name: 'Shatterglass Edge', text: `Hits on a chilled target do +${TUNING.shatterDamage} damage`, tags: ['frost'], effect: 'shatter' },
   thermal: { name: 'Thermal Shock Core', text: `Hits on a target both burning and chilled do +${TUNING.thermalDamage} damage`, tags: ['burn', 'frost'], effect: 'thermal' },
-  spotter: { name: 'Spotter Network', text: '+15% aim against a marked target', tags: ['mark'], effect: 'spotter' },
+  spotter: { name: 'Spotter Network', text: '+1 damage against a marked target', tags: ['mark'], effect: 'spotter' },
   hunt: { name: 'Eye of the Hunt', text: 'Crits mark the target', tags: ['crit', 'mark'], effect: 'exploit' },
   bloodforged: { name: 'Bloodforged Plate', text: 'A kill gives the soldier 1 armor', tags: ['kill', 'ward'], effect: 'momentum' },
   rite: { name: 'Blood Rite', text: 'Each kill gives the soldier +1 damage for the rest of the battle', tags: ['kill'], effect: 'bloodRite' },
@@ -72,7 +72,7 @@ const relics = {
   charges: { name: 'Breaching Charges', text: `Every entrance blasts each alien within ${CHARGE_REACH} tiles for ${TUNING.impactDamage + CHARGE_BLAST}`, effect: 'entryBlast' },
   shredder: { name: 'Shredder Charges', text: `Every entrance strips the armor from each alien within ${CHARGE_REACH} tiles and hurts it`, tags: ['ward'], effect: 'entryShred' },
   cryo: { name: 'Cryo Charges', text: `Every entrance chills each alien within ${CHARGE_REACH} tiles and hurts it`, tags: ['frost'], effect: 'entryFrost' },
-  bulwark: { name: 'Pop-up Barricades', text: 'Full cover springs up beside each soldier as it comes in, toward the nearest alien', effect: 'entryWall' },
+  bulwark: { name: 'Pop-up Barricades', text: 'A barricade springs up beside each soldier as it comes in, toward the nearest alien', effect: 'entryWall' },
   turrets: { name: 'Turret Drop', text: 'A turret comes in with the squad: it never moves, and shoots far and true', effect: 'entryTurret' },
   // The goals.
   beacon: { name: 'Evac Beacon', text: `A soldier gets a civilian out from ${BEACON_REACH} tiles away`, effect: 'beacon' },

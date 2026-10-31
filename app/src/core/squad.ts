@@ -110,7 +110,7 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
 export const weaponOf = (soldier: Soldier) => (soldier.gear.weapon?.weapon ? WEAPONS[soldier.gear.weapon.weapon] : null)
 
 /** What each level adds to a soldier's stats. */
-export const LEVEL_STATS: Partial<Stats> = { hp: 2, aim: 0.05 }
+export const LEVEL_STATS: Partial<Stats> = { hp: 2, crit: 0.03 }
 
 /**
  * Adds a recruit to the squad and returns it: a level 1 recruit set on one of its class's paths at random. Under a
@@ -197,7 +197,7 @@ export function squadKeywords(run: Run): Keyword[] {
 
 /** What a soldier earns from a battle, after the feats it ends the battle with are recorded. */
 export function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | null): { earned: Earned[]; feats: FeatId[]; tally: Tally } {
-  const tally = battle.tally[soldier.id] ?? { dealt: 0, kills: 0, taken: 0, shots: 0, hits: 0, feats: [] }
+  const tally = battle.tally[soldier.id] ?? { dealt: 0, kills: 0, taken: 0, feats: [] }
   // A soldier lifted off has left the field.
   const unit = battle.units.find((u) => u.soldier === soldier.id)
   if (won && tally.taken === 0) tally.feats.push('untouched')

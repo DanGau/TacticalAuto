@@ -12,7 +12,7 @@ test('moves in a row walk together, words among them do not hold them up, and a 
 })
 
 test('a shot waits for the walk before it, and an alien appearing out of sight takes no time', () => {
-  const shot: GameEvent = { type: 'shot', id: 1, target: 2, hit: true, crit: false, damage: 3, with: [] }
+  const shot: GameEvent = { type: 'shot', id: 1, target: 2, crit: false, damage: 3, with: [] }
   expect(beatMs([move(1, 2), shot], pace, shown)).toBe(2 * PACE.tile + PACE.attack)
   expect(beatMs([{ type: 'reveal', units: [{ id: 9, x: 0, y: 0 }] }], pace, shown)).toBe(0)
 })

@@ -7,17 +7,15 @@ import { type Goal } from './goals'
 import type { Twist } from './twists'
 import type { ConsumableId } from './consumables'
 import type { EntranceKind } from './entrances'
-import { type Cover, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
+import { type Bulk, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
 
-export type { Cover }
+export type { Bulk }
 
 export const GRID = 96
 /** A battle still running at this beat ends as a draw. */
 export const MAX_BEATS = 1000
 /** Damage a crit adds. */
 export const CRIT_BONUS = 2
-/** Hit chance a target's cover removes, indexed by Cover. */
-export const COVER_DEFENSE = [0, 0.2, 0.4]
 /** Tiles within which a soldier with line of sight reveals an alien. */
 export const SIGHT = 24
 /** How near the squad an alien must be to take an entrance's impact. */
@@ -46,8 +44,8 @@ export const BURN_DAMAGE = 1
 
 export const CHILL_TURNS = 2
 export const CHILL_MOVE = 2
-export const CHILL_AIM = 0.15
-export const SPOTTER_AIM = 0.15
+export const CHILL_DAMAGE = 1
+export const SPOTTER_DAMAGE = 1
 /** Damage the executioner effect adds against a target at half health or less. */
 export const EXECUTE_BONUS = 2
 /** Damage a burster's explosion does within BLAST_RADIUS. */
@@ -65,11 +63,11 @@ export const SPAWN_EVERY = 2
 /** What skills and relics are worth. Each name says the effect; skills.ts and relics.ts say what the effect does. */
 export const BACKSTAB_DAMAGE = 2
 export const RAGE_DAMAGE = 2
-export const DODGE_CHANCE = 0.25
-export const SUPPRESS_AIM = 0.25
+export const DODGE_SOAK = 1
+export const SUPPRESS_DAMAGE = 1
 export const AURA_REACH = 2
-export const BULWARK_DEFENSE = 0.1
-export const INSPIRE_AIM = 0.1
+export const BULWARK_SOAK = 1
+export const INSPIRE_DAMAGE = 1
 export const HEADSHOT_DAMAGE = 2
 export const REVIVE_REACH = 3
 export const REVIVE_HEALTH = 3
@@ -79,14 +77,14 @@ export const FEAST_HEAL = 2
 export const PHOENIX_HEALTH = 5
 export const SECOND_WIND_HEAL = 5
 export const SKIRMISH_MOVE = 2
-export const RECKLESS_AIM = 0.2
+export const RECKLESS_DAMAGE = 1
 export const CLEAVE_DAMAGE = 2
 export const BIG_BLAST_RADIUS = 2
 export const SLAYER_DAMAGE = 2
 export const ELUSIVE_REACH = 4
 export const HASTE_MOVE = 2
 export const BANE_REACH = 3
-export const BANE_AIM = 0.1
+export const BANE_DAMAGE = 1
 export const DRONE_DAMAGE = 2
 export const DRONE_REACH = 5
 export const LEAP_DAMAGE = 2
@@ -99,9 +97,8 @@ export const FORCE_FIELD_ARMOR = 4
 export const FORCE_FIELD_REACH = 4
 export const TITAN_HEALTH = 3
 export const PLATING_ARMOR = 3
-/** Own turns a cloak lasts unbroken, and the aim and damage an attack out of cloak adds, and Shadow Strike on top. */
+/** Own turns a cloak lasts unbroken, and the damage an attack out of cloak adds, and Shadow Strike on top. */
 export const CLOAK_TURNS = 2
-export const CLOAK_AIM = 0.3
 export const CLOAK_DAMAGE = 3
 export const SHADOW_DAMAGE = 2
 /** Entrances offered to the squad. */
@@ -121,24 +118,20 @@ export interface Stats {
   hp: number
   /** Points that take damage before health does. */
   armor: number
-  /** Chance to hit a target at full range with no cover against the shooter. */
-  aim: number
   damage: number
   /** Tiles a shot reaches, counting a diagonal as one. */
   range: number
   /** Tiles the unit may move in its side's turn. */
   move: number
-  /** Chance a hit crits when the target has no cover against the shooter. */
+  /** Chance a hit crits. */
   crit: number
-  /** Hit chance a shot gains for each tile the target is nearer than the range. */
-  close: number
 }
 
-export const BASE_STATS: Stats = { hp: 10, armor: 0, aim: 0.75, damage: 3, range: 5, move: 4, crit: 0.5, close: 0.06 }
+export const BASE_STATS: Stats = { hp: 10, armor: 0, damage: 3, range: 5, move: 4, crit: 0.2 }
 
 /** A mech's stats, a frail decoy the aliens must shoot, and a light drone's, before its engineer's skills. */
-export const MECH_STATS: Stats = { ...BASE_STATS, hp: 3, aim: 0.65, crit: 0.1, range: 4 }
-export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, aim: 0.65, crit: 0.1, range: 4, move: 6 }
+export const MECH_STATS: Stats = { ...BASE_STATS, hp: 3, crit: 0.1, range: 4 }
+export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, crit: 0.1, range: 4, move: 6 }
 
 /** Something a unit does unprompted beyond moving and shooting; each is described where combat applies it. */
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' | 'napalm' | 'cryo' | 'cloak'
@@ -290,7 +283,7 @@ export interface Unit {
   resists: Resist[]
   /**
    * A civilian to rescue, null for any other unit: on the human side, never fights, and is not a soldier. A hider takes
-   * cover and stays; a runner flees the aliens; a VIP waits for the squad, then keeps by it on the way out.
+   * beside the biggest object it can reach and stays; a runner flees the aliens; a VIP waits for the squad, then keeps by it on the way out.
    */
   civilian: 'hider' | 'runner' | 'vip' | null
   /** For a mech, the soldier id of the engineer who deployed it, credited with what it does; null for any other unit. */
@@ -299,7 +292,7 @@ export interface Unit {
   panicked: boolean
   /** Whether the unit has moved this turn. */
   moved: boolean
-  /** Own turns for which its aim is suppressed. */
+  /** Own turns for which its attacks do SUPPRESS_DAMAGE less. */
   suppressed: number
   /** Whether every hit on it does TUNING.markDamage more damage. */
   marked: boolean
@@ -312,13 +305,13 @@ export interface Unit {
 }
 
 /**
- * A soldier's standard actions in place of attacking. Hunker: harder to hit until its next turn. Prepare: overwatch,
+ * A soldier's standard actions in place of attacking. Hunker: takes HUNKER_SOAK less from each hit until its next turn. Prepare: overwatch,
  * shooting the first alien that moves where it can shoot it. Sprint: moves again.
  */
 export type Order = 'hunker' | 'prepare' | 'sprint'
 
-/** Hit chance a hunkered unit takes off shots at it. */
-export const HUNKER_DEFENSE = 0.3
+/** Damage a hunkered unit takes off each hit. */
+export const HUNKER_SOAK = 1
 
 /**
  * A group of aliens. It hangs out at its post, alert but waiting its turn, until it engages: then it comes for the
@@ -382,8 +375,8 @@ export interface Battle {
   winner: Side | null
   units: Unit[]
   nextId: number
-  /** The cover each tile's prop gives, one entry per tile, row by row; read it with coverAt. */
-  cover: Cover[]
+  /** How solid each tile's prop is, one entry per tile, row by row; read it with bulkAt. */
+  bulk: Bulk[]
   ground: Ground[]
   /** How high each tile stands; read it with heightAt. */
   height: number[]

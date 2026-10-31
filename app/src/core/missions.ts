@@ -37,7 +37,7 @@ export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goa
 }
 
 /**
- * The aliens of a mission, in pods: packs mustered at random for its force. A kind's health and aim never change;
+ * The aliens of a mission, in pods: packs mustered at random for its force. A kind's health never changes;
  * deeper along the road aliens are better equipped: a point of armor each step, a point of damage every second. A key or final mission adds a boss, a trooper built up by the keys
  * already won: each adds health, armor and an escorting trooper; from the second satellite on it hits harder and
  * spawns swarmlings, and from the third it shoots farther.

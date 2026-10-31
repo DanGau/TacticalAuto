@@ -3,7 +3,7 @@ import { type Battle, type Unit, type Tile, GRID, type Stance, revealed, engaged
 import { blocked, breach } from './grid'
 import { walkingDistances } from './grid'
 import { passable } from './grid'
-import { coverAt } from './grid'
+import { bulkAt } from './grid'
 import { stepCost } from './grid'
 import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
@@ -11,7 +11,7 @@ import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { vipOf, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, MIRROR_IMAGES, inAura, has, GUARDIAN_REACH, fireproof, enemiesOf, besideFuel, foes, spotlit } from './fighters'
 import { ESCORT_REACH } from './goals'
-import { canShoot, coverAgainst, odds, sees } from './sight'
+import { bite, canShoot, sees } from './sight'
 
 /**
  * The cheapest path to each tile the unit can reach with `move`, climbing costing more, cheapest first,
@@ -68,9 +68,9 @@ export function bestPath(candidates: Tile[][], unit: Unit, score: (end: Tile, st
 
 /** What a stance weighs about a tile a unit could end its move on. */
 export interface Spot {
-  /** The unit's best hit chance from the tile, in percent; 0 with no shot. */
+  /** The most of its damage the unit lands from the tile, in percent; 0 with no shot. */
   mine: number
-  /** The best hit chance any enemy has on the tile from where it stands, in percent. */
+  /** The most of its damage any enemy lands on the tile from where it stands, in percent. */
   theirs: number
   /** `theirs` weighted by the unit's health: halved at full health, tripled near death. */
   risk: number
@@ -88,8 +88,6 @@ export interface Spot {
   toGoal: number
   /** Tiles the squad's centre is beyond COHESION. */
   stray: number
-  /** The cover the tile gives against the goal. */
-  shelter: number
   /** 1 if the tile brings the unit no nearer the goal than where it stands. */
   stalled: number
   /** Whether the unit is a soldier. Soldiers pick their way forward; aliens press the attack. */
@@ -98,7 +96,7 @@ export interface Spot {
   threat: number
 }
 
-/** How much the enemy's best hit chance on a tile, weighted by health, must differ for a soldier to count it safer cover. */
+/** How much `theirs` on a tile, weighted by health, must differ for a soldier to count it safer. */
 export const RISK_BAND = 15
 
 /**
@@ -106,10 +104,10 @@ export const RISK_BAND = 15
  * and a wounded one careful.
  */
 export const WITH_SHOT: Record<Stance, (spot: Spot) => number[]> = {
-  // A soldier takes the safest cover it can shoot from, then the best shot from it; an alien, the exchange of fire
+  // A soldier takes the safest tile it can shoot from, then the best shot from it; an alien, the exchange of fire
   // that most favours it. Neither strays from its side.
   balanced: ({ mine, risk, stray, careful, threat }) => [careful ? Math.round(risk / RISK_BAND) : 0, risk - mine + STRAY_COST * stray + THREAT_COST * threat],
-  // The surest shot; what comes back counts only as wounds mount.
+  // The hardest shot; what comes back counts only as wounds mount.
   rush: ({ mine, risk, hurt, stray }) => [Math.round(hurt * risk) - mine + STRAY_COST * stray],
   // The same, with safety counted double.
   anchor: ({ mine, risk, stray, careful, threat }) => [careful ? Math.round(risk / RISK_BAND) : 0, 2 * risk - mine + STRAY_COST * stray + 2 * THREAT_COST * threat],
@@ -119,13 +117,13 @@ export const WITH_SHOT: Record<Stance, (spot: Spot) => number[]> = {
   escort: ({ mine, risk, apart, stray }) => [risk - mine + 10 * apart + STRAY_COST * stray],
 }
 
-/** What each enemy that could reach a tile to shoot it next turn costs it, in points of hit chance. */
+/** What each enemy that could reach a tile to shoot it next turn costs it, in points of `mine`. */
 export const THREAT_COST = 5
 
 /** Tiles a soldier may be from the squad's centre before it counts as straying. */
 export const COHESION = 4
 
-/** What each tile of straying costs a firing position, in points of hit chance. */
+/** What each tile of straying costs a firing position, in points of `mine`. */
 export const STRAY_COST = 8
 
 /**
@@ -144,15 +142,14 @@ export const WARY = 0.5
 
 /**
  * Closing on the goal with no shot to take. An alien takes the shortest walk. A soldier gives up some of the walk to
- * stay with the squad, to stay out of an enemy's sights, and to end behind cover facing the goal; a wary one walks
- * only through tiles no enemy can shoot. It moves from cover to cover: any tile nearer the goal beats standing still,
- * and among those, cover is worth a lot. A soldier's costs are in tenths of a tile: a tile of straying costs two tiles
- * of progress, a certain hit coming back five, each level of cover one and a half, and each enemy that could come
+ * stay with the squad, and to stay out of an enemy's sights; a wary one walks
+ * only through tiles no enemy can shoot. Any tile nearer the goal beats standing still. A soldier's costs are in tenths of a tile: a tile of straying costs two tiles
+ * of progress, a certain hit coming back five, and each enemy that could come
  * within range of it next turn two.
  */
-export const advance = ({ toGoal, theirs, wary, stray, shelter, careful, stalled, threat }: Spot) => {
+export const advance = ({ toGoal, theirs, wary, stray, careful, stalled, threat }: Spot) => {
   if (!careful) return [toGoal, theirs]
-  const cost = 10 * toGoal + 20 * stray + Math.round(theirs / 2) - 15 * shelter + 20 * threat
+  const cost = 10 * toGoal + 20 * stray + Math.round(theirs / 2) + 20 * threat
   return wary ? [theirs, threat, stalled, cost] : [stalled, cost]
 }
 
@@ -180,9 +177,9 @@ export function threats(battle: Battle, enemies: Unit[]): (tile: Tile) => number
   return (tile) => fields.filter(({ walk, reach }) => near(walk, tile) <= reach).length
 }
 
-/** The best hit chance any of `enemies` has on a tile from where it stands, in whole percent. */
+/** The most of its damage any of `enemies` lands on a tile from where it stands, in whole percent. */
 export function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
-  const chances = enemies.filter((enemy) => canShoot(battle, enemy, tile, enemy.stats.range)).map((enemy) => odds(battle, enemy, tile, enemy.stats).hit)
+  const chances = enemies.filter((enemy) => canShoot(battle, enemy, tile, enemy.stats.range)).map((enemy) => bite(battle, enemy, tile, enemy.stats))
   return Math.round(100 * Math.max(0, ...chances))
 }
 
@@ -234,7 +231,7 @@ export const PREY_WORTH = 0.25
 /** What a shot at a VIP is worth to an alien beside the same chance at a soldier: it takes any it can get. */
 export const VIP_WORTH = 1.5
 
-/** What a hit chance at `target` is worth to an alien. */
+/** What `hit`, a share of a shot's damage, is worth to an alien against `target`. */
 export const preyed = (target: Unit, hit: number) => (target.civilian === 'vip' ? VIP_WORTH * hit : target.civilian ? PREY_WORTH * hit : hit)
 
 /**
@@ -251,12 +248,11 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   if (unit.side === 'human' && walkingDistances(battle, goal)[unit.y * GRID + unit.x] === Infinity && walkingDistances(battle, unit).filter(Number.isFinite).length < POCKET) breach(battle, unit)
   const toGoal = walkingDistances(battle, goal)
   const seen = spotted(battle)
-  const flanker = has(unit, 'backstab')
-  /** The best hit chance from `end`, in whole percent; 0 with no shot. A backstabber counts a target out of cover half again. */
+  /** The most of its damage it lands from `end`, in whole percent; 0 with no shot. */
   const mine = (end: Tile) => {
     const chances = enemies
       .filter((enemy) => shootable(battle, unit, end, enemy, seen))
-      .map((enemy) => preyed(enemy, odds(battle, end, enemy, unit.stats, has(unit, 'piercing')).hit) * (flanker && coverAgainst(battle, enemy, end) === 0 ? 1.5 : 1))
+      .map((enemy) => preyed(enemy, bite(battle, end, enemy, unit.stats)))
     return Math.round(100 * Math.max(0, ...chances))
   }
   // A cloaked unit fears no shot.
@@ -278,7 +274,7 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   /** Whether `end` would hurt the unit to stand on: acid, or fire unless it cannot burn; for a soldier, a fuel tank beside it. Caltrops only slow and hurt the way. */
   const acid = (end: Tile) => (onTile(battle.acid, end) || (unit.side === 'human' && besideFuel(battle, end)) || (onTile(battle.fire, end) && !fireproof(battle, unit)) ? 1 : 0)
   /**
-   * What a soldier's gear makes a tile worth, in points of hit chance: a null field over aliens with abilities, spirit
+   * What a soldier's gear makes a tile worth, in points of `mine`: a null field over aliens with abilities, spirit
    * guardians where aliens will come while the wearer is healthy, a bond beside a squadmate.
    */
   const role = (end: Tile) =>
@@ -323,8 +319,6 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
         blind: enemies.some((enemy) => sees(battle, end, enemy)) ? 0 : 1,
         toGoal: toGoal[end.y * GRID + end.x] - Math.round(role(end) / 10),
         stray: stray(end),
-        // On the march, with no alien in sight, a soldier makes its full way rather than stopping short for cover.
-        shelter: marching ? 0 : coverAgainst(battle, end, goal),
         stalled: toGoal[end.y * GRID + end.x] >= toGoal[unit.y * GRID + unit.x] ? 1 : 0,
         // A rescue is no time for care: every turn costs civilians.
         careful: unit.side === 'human' && battle.round < RESTLESS_ROUND && battle.goal !== 'rescue',
@@ -401,11 +395,11 @@ export function leapTo(battle: Battle, unit: Unit): { to: Tile; caught: Unit[] }
 /** Tiles from every alien a fleeing civilian counts safe. */
 export const SAFE = 6
 
-/** The most cover a prop beside `tile` gives: what a hider hides behind. */
+/** The biggest object beside `tile`: what a hider huddles by. */
 export const hideout = (battle: Battle, tile: Tile) =>
-  Math.max(...[[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => (onGrid(tile.x + dx, tile.y + dy) ? coverAt(battle, tile.x + dx, tile.y + dy) : 0)))
+  Math.max(...[[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => (onGrid(tile.x + dx, tile.y + dy) ? bulkAt(battle, tile.x + dx, tile.y + dy) : 0)))
 
-/** A civilian's path. A hider makes for the best cover in reach and stays there; a runner goes away from the nearest alien until SAFE from all, then toward the nearest soldier. */
+/** A civilian's path. A hider makes for the biggest object in reach and stays there; a runner goes away from the nearest alien until SAFE from all, then toward the nearest soldier. */
 export function fleePath(battle: Battle, unit: Unit): Tile[] {
   if (unit.civilian === 'vip') return battle.vip === 'freed' ? escapePath(battle, unit) : []
   if (unit.civilian === 'hider') return hideout(battle, unit) > 0 ? [] : bestPath(paths(battle, unit, unit.stats.move), unit, (end, steps) => [-hideout(battle, end), steps])

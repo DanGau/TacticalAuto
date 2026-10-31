@@ -1,5 +1,5 @@
 // Soldier classes: stats, positioning, and the ability each uses unprompted.
-import { CLOAK_AIM, CLOAK_DAMAGE, CLOAK_TURNS, MECH_STATS, type Ability, type Stance, type Stats } from './battle'
+import { CLOAK_DAMAGE, CLOAK_TURNS, MECH_STATS, type Ability, type Stance, type Stats } from './battle'
 
 /** What a soldier becomes at first promotion: stat changes, a way of positioning, and one ability used unprompted. */
 export interface SoldierClass {
@@ -28,9 +28,9 @@ const classes = {
   },
   heavy: {
     name: 'Heavy',
-    stats: { move: -1, hp: 3, damage: 1, aim: -0.05 },
+    stats: { move: -1, hp: 3, damage: 1 },
     stance: 'anchor',
-    stanceText: 'Fights from the best cover it can find',
+    stanceText: 'Plants itself and holds its ground',
     ability: 'rocket',
     abilityName: 'Rocket',
     abilityText: 'Once per battle, in place of a shot, blasts two or more aliens standing together',
@@ -60,7 +60,7 @@ const classes = {
     name: 'Engineer',
     stats: { hp: -1, damage: -1 },
     stance: 'anchor',
-    stanceText: 'Fights from cover while its machines take the front',
+    stanceText: 'Hangs back while its machines take the front',
     ability: 'mech',
     abilityName: 'Deploy Mech',
     abilityText: `Once per battle, once aliens are in sight, deploys a frail combat mech beside it, ${MECH_STATS.hp} health, that every alien able to shoot it must shoot, and still shoots`,
@@ -78,7 +78,7 @@ const classes = {
   },
   cryo: {
     name: 'Cryo',
-    stats: { aim: 0.05 },
+    stats: {},
     stance: 'standoff',
     stanceText: 'Hangs back and slows whatever comes on',
     ability: 'cryo',
@@ -93,7 +93,7 @@ const classes = {
     stanceText: 'Closes in, unseen, for the strike',
     ability: 'cloak',
     abilityName: 'Cloak',
-    abilityText: `Twice per battle, in place of its attacks when aliens can shoot it, it cloaks: no alien sees or targets it for ${CLOAK_TURNS} turns. Its next attack, out of cloak, has +${CLOAK_AIM * 100}% aim and +${CLOAK_DAMAGE} damage, and reveals it`,
+    abilityText: `Twice per battle, in place of its attacks when aliens can shoot it, it cloaks: no alien sees or targets it for ${CLOAK_TURNS} turns. Its next attack, out of cloak, ignores armor, has +${CLOAK_DAMAGE} damage, and reveals it`,
     charges: 2,
   },
 } satisfies Record<string, SoldierClass>

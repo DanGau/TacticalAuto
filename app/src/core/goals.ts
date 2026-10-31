@@ -29,7 +29,7 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
   hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as packs come at it one after another, then get every soldier left to the extraction zone`, reward: 'a relic, no gear', force: -4, weight: 1, from: 1 },
   rescue: {
     name: 'Rescue',
-    text: `A terror site: aliens are killing ${CIVILIANS} civilians. Hiders, squat and amber, take cover and stay put; runners, tall and pale, flee the aliens; and harvesters raise the dead as husks. The squad bursts in among them: aliens shoot civilians when they have no good shot at a soldier, so push in. A soldier who reaches a civilian gets them out. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
+    text: `A terror site: aliens are killing ${CIVILIANS} civilians. Hiders, squat and amber, huddle and stay put; runners, tall and pale, flee the aliens; and harvesters raise the dead as husks. The squad bursts in among them: aliens shoot civilians when they have no good shot at a soldier, so push in. A soldier who reaches a civilian gets them out. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and every soldier 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
     reward: 'supplies and experience, no gear',
     force: 3,
     weight: 1,

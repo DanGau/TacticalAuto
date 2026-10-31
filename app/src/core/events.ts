@@ -131,12 +131,12 @@ const encounters = {
   exosuits: {
     name: 'Exosuit Prototype',
     text: 'A crashed military transport holds four exosuits, still in their packing foam. The manual has one page: DO NOT CROUCH. Underneath, in pen: seriously, the knees.',
-    options: [{ quip: 'Suit up. Cover is for people without a reactor on their back.', text: 'Exosuits: every soldier has +3 armor, but cover gives soldiers no defense', take: (run) => adopt(run, 'exosuits') }, gain(4, 'Sell the suits on the black market as very large toasters.')],
+    options: [{ quip: 'Suit up. Walking is for people without a reactor on their back.', text: 'Exosuits: every soldier has +3 armor and 1 less move', take: (run) => adopt(run, 'exosuits') }, gain(4, 'Sell the suits on the black market as very large toasters.')],
   },
   bunker: {
     name: 'Bunker Plans',
     text: 'A filing cabinet of bunker blueprints, stamped TOP SECRET and, below that, ALSO FILED ON THE PUBLIC WIKI. Whatever the squad learns from them, the aliens will have read too.',
-    options: [{ quip: 'Sandbag everything. Sandbag the sandbags.', text: 'Fortification Doctrine: low cover stops 30% of shots and high cover 60%, for both sides', take: (run) => adopt(run, 'fortified') }, leave('Leave the cabinet for the aliens. Let them do the reading.')],
+    options: [{ quip: 'Sandbag everything. Sandbag the sandbags.', text: 'Fortification Doctrine: every hit, on either side, does 1 less damage, down to 1', take: (run) => adopt(run, 'fortified') }, leave('Leave the cabinet for the aliens. Let them do the reading.')],
   },
   shotguns: {
     name: 'Smuggled Shotguns',
@@ -160,7 +160,7 @@ const encounters = {
   },
   creed: {
     name: "Gunslinger's Creed",
-    text: 'A drifter in a long coat leans on a burned-out car, a pistol in each hand, spinning both. "Aiming," they drawl, "is for people with one gun."',
+    text: 'A drifter in a long coat leans on a burned-out car, a pistol in each hand, spinning both. "Care," they drawl, "is for people with one gun."',
     options: [{ quip: 'Two guns. Zero plans. Infinite style.', text: `Gunslingers: ${DOCTRINES.gunslingers.text}`, take: (run) => adopt(run, 'gunslingers') }, leave('Point out that they just dropped one. Walk away while they look.')],
   },
   refugees: {
