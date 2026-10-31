@@ -6,7 +6,7 @@ import type { SecondaryId } from './secondaries'
 export type GameEvent =
   /** `path` lists each tile entered, in order. `with` names a skill that granted the move. */
   | { type: 'move'; id: number; path: Tile[]; with?: Effect }
-  /** A pod is sighted. `units` gives each member's tile at that moment. */
+  /** Aliens are sighted. `units` gives each one's tile at that moment. */
   | { type: 'reveal'; units: { id: number; x: number; y: number }[] }
   /** `damage` is 0 if a shield or image took it. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. `secondary` names the attack if not the weapon; `opens` tells of a combo's first blow. */
   | { type: 'shot'; id: number; target: number; crit: boolean; damage: number; with: Effect[]; secondary?: SecondaryId; opens?: boolean }
@@ -37,7 +37,7 @@ export type GameEvent =
   | { type: 'cloak'; id: number; on: boolean }
   /** A panicked soldier loses its action. */
   | { type: 'frozen'; id: number }
-  /** A unit is hurt by acid underfoot, or by the death of the psion of its pod. */
+  /** A unit is hurt by acid underfoot, or by the death of a psion near it. */
   | { type: 'hurt'; id: number; amount: number; cause: 'acid' | 'backlash' | 'impact' }
   /** A hold is done: the extraction zone appears at x, y. */
   | { type: 'extract'; x: number; y: number }

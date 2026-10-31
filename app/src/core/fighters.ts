@@ -1,6 +1,6 @@
 // Questions every combat module asks about units in a fight: whose enemy, nearest, has what, can shoot.
 import type { Secondary } from './secondaries'
-import { AURA_REACH, BURN_TURNS, type Battle, CHILL_TURNS, type Effect, ELUSIVE_REACH, GRID, LINGER_TURNS, type Tile, type Unit, engaged, isSoldier, revealed } from './battle'
+import { AURA_REACH, BURN_TURNS, type Battle, CHILL_TURNS, type Effect, ELUSIVE_REACH, GRID, LINGER_TURNS, type Tile, type Unit, isSoldier } from './battle'
 import { onGrid, spacedTile, walkingDistances } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
@@ -13,7 +13,7 @@ import { lineOfSight, canShoot, sees } from './sight'
  */
 export function enemiesOf(battle: Battle, unit: Unit): Unit[] {
   const others = battle.units.filter((u) => u.side !== unit.side && !u.cloaked)
-  const known = others.filter((u) => revealed(battle, u))
+  const known = others.filter((u) => u.revealed)
   return known.length > 0 ? known : others
 }
 
@@ -51,7 +51,7 @@ export function spend(unit: Unit, effect: Effect): boolean {
 /** Ids of the revealed aliens some soldier sees now. */
 export function spotted(battle: Battle): Set<number> {
   const soldiers = battle.units.filter(isSoldier)
-  return new Set(battle.units.filter((u) => u.side === 'alien' && revealed(battle, u) && soldiers.some((s) => sees(battle, s, u))).map((u) => u.id))
+  return new Set(battle.units.filter((u) => u.side === 'alien' && u.revealed && soldiers.some((s) => sees(battle, s, u))).map((u) => u.id))
 }
 
 /** Whether `unit` is a VIP not yet freed: a hostage, kept alive. */
@@ -65,14 +65,28 @@ export function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, 
   if (hostage(battle, target)) return false
   if (target.cloaked) return false
   if (has(target, 'elusive') && distance(from, target) > ELUSIVE_REACH) return false
-  // A psionic attack needs no line of sight, only an alien whose pod is revealed.
-  if (has(unit, 'psionic') && revealed(battle, target) && distance(from, target) <= unit.stats.range) return true
+  // A psionic attack needs no line of sight, only an alien revealed.
+  if (has(unit, 'psionic') && target.revealed && distance(from, target) <= unit.stats.range) return true
   if (canShoot(battle, from, target, unit.stats.range)) return true
   return unit.ability === 'squadsight' && seen.has(target.id) && lineOfSight(battle, from, target)
 }
 
 /** The aliens a soldier's powers may act on: revealed and in the fight. */
-export const foes = (battle: Battle, unit: Unit) => battle.units.filter((u) => u.side !== unit.side && !u.civilian && revealed(battle, u) && engaged(battle, u))
+/** Aliens that can walk in the fight at once, and how many join at a time, by soldiers on the field. */
+export const fightCap = (soldiers: number) => 2 * soldiers + 2
+export const joinSize = (soldiers: number) => soldiers + 1
+
+/** Those of a side's aliens in the fight that can walk: a turret or a nest never holds the next back. */
+export const walkersFighting = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.engaged && u.stats.move > 0).length
+
+/** Brings into the fight up to `count` of the aliens waiting nearest `from`. */
+export function engageNearest(battle: Battle, from: Tile[], count: number): void {
+  const near = (u: Unit) => Math.min(...from.map((t) => distance(t, u)))
+  const waiting = battle.units.filter((u) => u.side === 'alien' && !u.engaged).sort((a, b) => near(a) - near(b))
+  for (const alien of waiting.slice(0, count)) alien.engaged = true
+}
+
+export const foes = (battle: Battle, unit: Unit) => battle.units.filter((u) => u.side !== unit.side && !u.civilian && u.revealed && u.engaged)
 
 /** Whether a unit cannot burn: by its nature, a fire suit, or in the rain. */
 export const fireproof = (battle: Battle, unit: Unit) => unit.resists.includes('burn') || has(unit, 'fireSuit') || battle.twist === 'rain'
@@ -121,7 +135,7 @@ export function extractionFrom(battle: Battle, start: Tile): Tile {
 /** Aliens in sight that can walk to `vip`, and so make its column keep together. A turret, or an alien walled off, never comes. */
 export const pursuers = (battle: Battle, vip: Unit) => {
   const walk = walkingDistances(battle, vip)
-  return battle.units.filter((u) => u.side === 'alien' && revealed(battle, u) && u.stats.move > 0 && walk[u.y * GRID + u.x] < Infinity)
+  return battle.units.filter((u) => u.side === 'alien' && u.revealed && u.stats.move > 0 && walk[u.y * GRID + u.x] < Infinity)
 }
 
 /** How near the extraction zone lifts a soldier off; a Signal Flare widens it. */

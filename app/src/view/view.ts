@@ -1,6 +1,6 @@
 // The battle view the UI drives: showing a run's battle, picking and framing entrances, and panning.
 import { AdditiveBlending, BoxGeometry, CircleGeometry, Mesh, MeshBasicMaterial, Raycaster, Vector2 } from 'three'
-import { BLAST_RADIUS, ENTRY_RADIUS, revealed, type Battle, type Tile } from '../core/battle'
+import { BLAST_RADIUS, ENTRY_RADIUS, type Battle, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { effectName } from '../core/effects'
 import { distance, nearestAlien } from '../core/grid'
@@ -36,7 +36,7 @@ export interface View {
   /**
    * Shows the run's battle, which `events` produced. Animated, it follows the action with the camera, plays the
    * events, and resolves when they finish. Still, it draws the whole map at once and marks each shot with a line.
-   * Aliens in unrevealed pods are never drawn; before the entrance, every pod but burrowers shows.
+   * Aliens unrevealed are never drawn; before the entrance, every alien but burrowers shows.
    * Once landed, fog darkens every tile no soldier sees.
    */
   show(run: Run, events: GameEvent[], animate: boolean): Promise<void>
@@ -123,13 +123,13 @@ export async function createView(): Promise<View> {
   }
 
   /**
-   * The camera framing what is in play: before the entrance its entrances, pods and goals; after it, the squad and the
+   * The camera framing what is in play: before the entrance its entrances, aliens and goals; after it, the squad and the
    * aliens it has found.
    */
   function inPlay(yaw = YAW): Camera {
     const battle = s.shown!
     const goals = [battle.uplink, battle.extract, ...battle.caches].filter((t): t is Tile => t !== null)
-    const units = battle.units.filter((u) => u.side === 'human' || battle.phase === 'deploy' || revealed(battle, u))
+    const units = battle.units.filter((u) => u.side === 'human' || battle.phase === 'deploy' || u.revealed)
     return framing([...(battle.phase === 'deploy' ? battle.entrances.map((e) => e.at) : []), ...goals, ...units], yaw, WHOLE_MARGIN)
   }
 

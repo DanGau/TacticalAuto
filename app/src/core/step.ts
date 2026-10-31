@@ -1,5 +1,4 @@
 // Advances the run's battle a beat, and settles it into the run when it ends.
-import { revealed } from './battle'
 import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
 import { beatMs, overlaps, PACE, staggerOf, tick, tilePace, type Clock } from './pace'
@@ -21,7 +20,7 @@ export function timedFlow(run: Run, clock: Clock): { events: GameEvent[]; clock:
   const events = step(run)
   const units = battle?.units ?? []
   const pace = new Map(units.map((u) => [u.id, tilePace(u.side === 'human')]))
-  const shown = new Set(units.filter((u) => revealed(battle!, u)).map((u) => u.id))
+  const shown = new Set(units.filter((u) => u.revealed).map((u) => u.id))
   const passed = battle?.turn !== side ? clock.done + PACE.turn : null
   return { events, clock: tick(passed === null ? clock : { next: passed, done: passed }, beatMs(events, pace, shown), overlaps(events), staggerOf(events)) }
 }

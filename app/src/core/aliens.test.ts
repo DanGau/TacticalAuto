@@ -1,6 +1,6 @@
 import { roots } from './skills'
 import { expect, test } from 'vitest'
-import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, PACKS, REGEN_HEAL, type AlienKind } from './aliens'
+import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, REGEN_HEAL, type AlienKind } from './aliens'
 import { enterAt, entranceOf, begun } from './roads'
 import { apply } from './apply'
 import { isSoldier, ACID_DAMAGE, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, GRID, MECH_STATS, DRONE_STATS, TITAN_HEALTH, LEAP_DAMAGE, SLAM_HIT, SLAM_TILES, HURL_DAMAGE, type Battle, type Unit } from './battle'
@@ -21,7 +21,6 @@ test('a mission musters packs its depth allows, for exactly its force, and a lon
       expect(packs.filter((pack) => pack.cost === 1).length).toBeLessThanOrEqual(1)
     }
   }
-  expect(new Set(PACKS.map((pack) => pack.name)).size).toBe(PACKS.length)
 })
 
 /**
@@ -47,9 +46,8 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   reshaped(battle)
   const soldier = battle.units.find(isSoldier)!
   Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, hp: 30, stats: { ...soldier.stats, hp: 30, crit: 0, damage: 3 } })
-  const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss || (ALIENS[kind].spawns ?? false), target: false, resists: ALIENS[kind].resists }, { x, y }, 0))
+  const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss || (ALIENS[kind].spawns ?? false), target: false, resists: ALIENS[kind].resists }, { x, y }, true))
   battle.units = [soldier, ...units]
-  battle.pods = [{ name: 'Test', revealed: true, surprised: 0, engaged: true, post: { x: 0, y: 0 } }]
   const until = (done: (events: GameEvent[]) => boolean) => {
     const all: GameEvent[] = []
     for (let beats = 0; beats < 60; beats++) {
@@ -124,10 +122,10 @@ test('a brute that survives a hit charges the shooter', () => {
   expect(aliens[0].y).toBe(14 - aliens[0].stats.move)
 })
 
-test('a psion panics a soldier, who loses its next action, and hurts its pod when it dies', () => {
+test('a psion panics a soldier, who loses its next action, and hurts the aliens near it when it dies', () => {
   const { soldier, aliens, until } = arena([
     { kind: 'psion', x: 10, y: 15 },
-    { kind: 'trooper', x: 16, y: 10 },
+    { kind: 'trooper', x: 12, y: 15 },
   ])
   soldier.stats = { ...soldier.stats, move: 0, damage: 50, range: 9 }
   aliens[1].stats = { ...aliens[1].stats, move: 0 }
@@ -150,9 +148,9 @@ test('a spawner spawns a swarmling every few alien turns', () => {
   expect(battle.units.filter((u) => u.kind === 'swarmling')).toHaveLength(1)
 })
 
-test('a pod unseen, as a wave coming in, stays unseen until it opens fire', () => {
+test('an alien unseen, as a wave coming in, stays unseen until it opens fire', () => {
   const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 22 }])
-  Object.assign(battle.pods[0], { revealed: false, engaged: true })
+  Object.assign(aliens[0], { revealed: false, engaged: true })
   soldier.stats = { ...soldier.stats, move: 0, range: 0 }
   // The trooper looks down from a hill: it sees the soldier from farther than the soldier sees it.
   for (let y = 20; y < 25; y++) for (let x = 8; x < 13; x++) battle.height[y * GRID + x] = 5
@@ -390,7 +388,7 @@ test('burrowers stay unseen underground, then once engaged surface beside the so
   const mate: Unit = { ...structuredClone(soldier), id: 901, x: 11, y: 10 }
   battle.units.push(loner, mate)
   for (const unit of [soldier, loner, mate]) unit.stats = { ...unit.stats, move: 0, range: 0 }
-  Object.assign(battle.pods[0], { revealed: false, engaged: true })
+  for (const b of aliens) Object.assign(b, { revealed: false, engaged: true })
   until(has('reveal'))
   for (const b of aliens) expect(Math.max(Math.abs(b.x - loner.x), Math.abs(b.y - loner.y))).toBe(1)
 })
@@ -399,7 +397,7 @@ test('a feeder in sight grows on each trick the squad uses; a mirror hits as har
   const { battle, soldier, aliens, until } = arena([{ kind: 'feeder', x: 10, y: 13 }])
   soldier.effects = ['grenade']
   soldier.stats = { ...soldier.stats, move: 0 }
-  battle.units.push(alienUnit(battle, { kind: 'trooper', stats: alienStats('trooper', 0, 0), stance: 'balanced', boss: false, spawns: false, target: false, resists: [] }, { x: 11, y: 13 }, 0))
+  battle.units.push(alienUnit(battle, { kind: 'trooper', stats: alienStats('trooper', 0, 0), stance: 'balanced', boss: false, spawns: false, target: false, resists: [] }, { x: 11, y: 13 }, true))
   aliens[0].hp = aliens[0].stats.hp = 99
   aliens[0].stats = { ...aliens[0].stats, move: 0, range: 0 }
   expect(until(has('feed'))).toContainEqual({ type: 'feed', id: aliens[0].id, damage: 1 })
@@ -434,21 +432,20 @@ test('a regenerator heals each turn unless burning; a chilled sprinter cannot mo
   expect(nest.battle.units.filter((u) => u.kind === 'swarmling').length).toBeGreaterThanOrEqual(2)
 })
 
-test('a pod waiting its turn holds its post and its fire while another fights, and engages once a soldier comes near', () => {
+test('an alien waiting its turn holds its post and its fire while another fights, and engages once a soldier comes near', () => {
   const { battle, soldier, aliens, until } = arena([
     { kind: 'trooper', x: 30, y: 30 },
     { kind: 'turret', x: 80, y: 80 },
   ])
-  battle.pods[0].engaged = false
-  battle.pods.push({ name: 'Fighting', revealed: true, surprised: 0, engaged: true, post: { x: 80, y: 80 } })
-  aliens[1].pod = 1
+  aliens[0].engaged = false
+  Object.assign(aliens[1], { hp: 9999, stats: { ...aliens[1].stats, move: 4 } })
   battle.rallied = Infinity
   soldier.stats = { ...soldier.stats, move: 0, range: 0 }
   until(() => battle.round >= 3)
   expect(aliens[0]).toMatchObject({ x: 30, y: 30 })
   Object.assign(soldier, { x: 30, y: 27 })
   until((all) => all.some((e) => e.type === 'shot' && e.id === aliens[0].id))
-  expect(battle.pods[0].engaged).toBe(true)
+  expect(aliens[0].engaged).toBe(true)
 })
 
 test('a turret never moves, and shoots a soldier in range', () => {

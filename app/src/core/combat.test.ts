@@ -2,7 +2,7 @@ import { roots } from './skills'
 import { expect, test } from 'vitest'
 import { enterAt, begun } from './roads'
 import { apply } from './apply'
-import { HASTE_MOVE, isSoldier, revealed, SOLDIER_ATTACKS, type Battle } from './battle'
+import { HASTE_MOVE, isSoldier, SOLDIER_ATTACKS, type Battle } from './battle'
 import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
 import { detects } from './sight'
@@ -71,21 +71,21 @@ test('no unit moves farther than its move, and one on the squad its sprint', () 
   })
 })
 
-test('an alien shoots only after its pod is revealed', () => {
+test('an alien shoots only once revealed', () => {
   play(3, (events, before) => {
     for (const e of events) {
       const shooter = e.type === 'shot' ? before.units.find((u) => u.id === e.id)! : null
-      if (shooter?.side === 'alien') expect(revealed(before, shooter)).toBe(true)
+      if (shooter?.side === 'alien') expect(shooter.revealed).toBe(true)
     }
   })
 })
 
-test('a pod is revealed once a soldier notices one of its aliens', () => {
+test('an alien is revealed once a soldier notices it', () => {
   play(4, (_, __, after) => {
     const soldiers = after.units.filter(isSoldier)
     for (const alien of after.units.filter((u) => u.side === 'alien')) {
       const seen = soldiers.some((s) => detects(after, s, alien))
-      if (seen) expect(revealed(after, alien)).toBe(true)
+      if (seen) expect(alien.revealed).toBe(true)
     }
   })
 })
@@ -94,7 +94,7 @@ test('before contact, soldiers walk their full move from the first turn', () => 
   for (let seed = 1; seed <= 6; seed++) {
     let checked = false
     play(seed, (events, before) => {
-      if (checked || before.turn !== 'human' || before.stage !== 'move' || before.pods.some((p) => p.revealed)) return
+      if (checked || before.turn !== 'human' || before.stage !== 'move' || before.units.some((u) => u.side === 'alien' && u.revealed)) return
       const walks = events.flatMap((e) => (e.type === 'move' && !e.with ? [e] : []))
       if (walks.length === 0) return
       checked = true

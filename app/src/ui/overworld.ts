@@ -11,7 +11,6 @@ import { current, legOf, KEYS, ways, nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Soldier } from '../core/run-state'
 import { type Stop } from '../core/run-state'
-import { type Muster } from '../core/run-state'
 import { missionAt } from '../core/missions'
 import { huntForce } from '../core/missions'
 import { RISKS } from '../core/missions'
@@ -38,8 +37,7 @@ export type Tab = (typeof TABS)[number]
 
 
 /** The aliens of a zone, counted by kind with a recon uplink, "3 Troopers, 2 Swarmlings"; else by danger, "3 small, 2 medium". */
-function census(run: Run, packs: Muster[]): string {
-  const kinds = packs.flatMap((pack) => pack.kinds)
+function census(run: Run, kinds: AlienKind[]): string {
   if (run.relics.some((id) => (RELICS[id] as Relic).recon)) {
     const counts = new Map<AlienKind, number>()
     for (const kind of kinds) counts.set(kind, (counts.get(kind) ?? 0) + 1)
@@ -61,7 +59,7 @@ function stopIcon(run: Run, stop: Stop, state = ''): string {
   if (stop.kind !== 'battle') return `<span class="node ${stop.kind} ${state}" title="${STOP_NAMES[stop.kind]}">${STOP_ICONS[stop.kind]}</span>`
   const risk = RISKS[stop.risk]
   const goal = GOALS[stop.goal]
-  const aliens = census(run, stop.packs) + (stop.goal === 'assassinate' ? ', a Commander' : '')
+  const aliens = census(run, stop.aliens) + (stop.goal === 'assassinate' ? ', a Commander' : '')
   return `<span class="node ${stop.risk} ${state}" title="${goal.name} · ${risk.name} · ${aliens.replace(/<[^>]*>/g, '')}">${STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}</span>`
 }
 

@@ -1,6 +1,6 @@
 // Marks on the ground and over it: entrances, goals and their fences, acid and fire, fog, and glows of unfound aliens.
 import { type Group, type Mesh, type MeshBasicMaterial, type Object3D, Sprite as Billboard, type SpriteMaterial } from 'three'
-import { ENTRY_RADIUS, GRID, revealed, type Battle, type Tile } from '../core/battle'
+import { ENTRY_RADIUS, GRID, type Battle, type Tile } from '../core/battle'
 import { UPLINK_REACH } from '../core/fighters'
 import { EXTRACT_REACH } from '../core/goals'
 import { nearestAlien } from '../core/grid'
@@ -43,7 +43,7 @@ const ring = (shapes: Shapes, x: number, y: number, color: number, width: number
   for (let i = 0; i < 4; i++) shapes.band(c[i], c[(i + 1) % 4], w, color, alpha)
 }
 
-/** Before the entrance: tints and names each entrance, and names each pod in sight. */
+/** Before the entrance: tints and names each entrance, and names those the mission turns on. */
 export function drawMarks(s: Stage, battle: Battle): void {
   const { hovered, selected } = s
   const tint = new Shapes()
@@ -57,8 +57,7 @@ export function drawMarks(s: Stage, battle: Battle): void {
   for (const body of battle.downed.filter((d) => d.carrier === null)) marks.push(label(battle.captives.some((c) => c.soldier === body.soldier) ? '⛓ HELD' : '✚ DOWNED', body, COLOR.contact, 22))
   // Aliens caught off guard say so over their heads until they recover, while the squad sees them.
   for (const u of battle.units) {
-    const pod = u.pod === null ? null : battle.pods[u.pod]
-    if (pod?.surprised && s.sprites.has(u.id) && (!s.seen || s.seen[u.y * GRID + u.x])) marks.push(label('❗ SURPRISED', u, COLOR.crit, 16))
+    if (u.surprised && s.sprites.has(u.id) && (!s.seen || s.seen[u.y * GRID + u.x])) marks.push(label('❗ SURPRISED', u, COLOR.crit, 16))
   }
   if (battle.phase === 'deploy') {
     if (!s.briefing)
@@ -78,11 +77,8 @@ export function drawMarks(s: Stage, battle: Battle): void {
         }
         marks.push(label(`${ENTRANCE_KINDS[kind].icon} ${ENTRANCE_KINDS[kind].name}`, zone, 0xffffff, 26))
       })
-    // Burrowers underground stay hidden.
-    battle.pods.forEach((pod, i) => {
-      const members = battle.units.filter((u) => u.pod === i)
-      if (members.length > 0 && pod.revealed) marks.push(label(pod.name, members[0], COLOR.contact, 20))
-    })
+    // Those the mission turns on are named; every other alien speaks for itself.
+    for (const u of battle.units.filter((a) => a.side === 'alien' && (a.target || a.boss))) marks.push(label(u.target ? '🎯 COMMANDER' : battle.goal === 'ambush' ? 'THE HUNTER' : battle.place === 'hive' ? 'THE SOURCE' : 'GUARDIAN', u, COLOR.contact, 20))
   }
   lay(s.zones, tint)
   // A fence rings each zone in play: the entrances to choose from, the uplink to hold, the way out.
@@ -125,7 +121,7 @@ export function drawFog(s: Stage, battle: Battle, snap = false): void {
   })
   lay(s.fog, shapes)
   // Mid-beat, a glow stays where its slide left it; the battle already holds where the alien ends up.
-  const lurking = seen ? battle.units.filter((u) => u.hp > 0 && !u.civilian && !revealed(battle, u)) : []
+  const lurking = seen ? battle.units.filter((u) => u.hp > 0 && !u.civilian && !u.revealed) : []
   const ids = new Set(lurking.map((u) => u.id))
   for (const [id, glow] of s.glows) {
     if (ids.has(id)) continue
@@ -160,7 +156,7 @@ export function drawAcid(s: Stage, battle: Battle): void {
     const at = spot(tile.x, tile.y)
     for (const [dx, dz] of [[-0.25, 0.1], [0, -0.2], [0.25, 0.1], [-0.12, 0.25], [0.12, 0.25]]) shapes.spike(at.x + dx, at.z + dz, at.y, 0.05, { x: at.x + dx, y: at.y + tall(5), z: at.z + dz }, COLOR.spike)
   }
-  for (const unit of battle.units.filter((u) => u.hp > 0 && revealed(battle, u))) {
+  for (const unit of battle.units.filter((u) => u.hp > 0 && u.revealed)) {
     if (unit.rooted > 0) ring(shapes, unit.x, unit.y, COLOR.rooted, 3, 0.9)
     if (unit.booming > 0) ring(shapes, unit.x, unit.y, COLOR.booming, 2, 0.9)
   }

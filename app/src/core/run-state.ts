@@ -26,12 +26,6 @@ export type Risk = 'safe' | 'standard' | 'dangerous'
  */
 export type StopKind = 'battle' | 'supply' | 'cache' | 'shop' | 'unknown' | 'medic' | 'key' | 'final'
 
-/** A pack of aliens by name and kinds, mustered before it is equipped. */
-export interface Muster {
-  name: string
-  kinds: AlienKind[]
-}
-
 /**
  * A stop on the road. A battle has its own risk, goal and kind of place, and `packs` holds the aliens it will send,
  * mustered in advance so the map can show them. Other stops fight as `standard` exterminations, and have no packs.
@@ -43,7 +37,8 @@ export interface Stop {
   terrain: TerrainKind
   /** What about the ground or weather changes the battle; drawn ahead, so the map can show it. */
   twist: Twist | null
-  packs: Muster[]
+  /** Its aliens by kind, mustered before they are equipped. */
+  aliens: AlienKind[]
   /** How the town it is fought in is built, and the place it is named for; drawn by the battle when absent. */
   region?: RegionId
   city?: string

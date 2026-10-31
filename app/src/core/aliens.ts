@@ -96,7 +96,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   psion: {
     name: 'Psion',
-    text: 'Panics a soldier, who loses a turn of action; when it dies, the aliens of its pod are hurt',
+    text: 'Panics a soldier, who loses a turn of action; when it dies, the aliens near it are hurt',
     danger: 'medium',
     hp: 0.8,
     stats: { damage: 2 },
@@ -237,9 +237,8 @@ export function alienStats(kind: AlienKind, armor: number, weapon: number): Stat
   return { ...stats, hp: Math.max(1, Math.round(BASE_STATS.hp * ALIENS[kind].hp * TUNING.alienHp)), armor: armor + (ALIENS[kind].stats.armor ?? 0), damage: stats.damage + armed + TUNING.alienDamage, crit: 0 }
 }
 
-/** A themed group of aliens that roams and fights as one pod. */
+/** A themed handful of aliens a mission's force buys together. */
 export interface Pack {
-  name: string
   kinds: AlienKind[]
   /** What it costs of a mission's force. */
   cost: number
@@ -248,26 +247,26 @@ export interface Pack {
 }
 
 export const PACKS: Pack[] = [
-  { name: 'Scout', kinds: ['trooper'], cost: 1, from: 0 },
-  { name: 'Patrol', kinds: ['trooper', 'trooper'], cost: 2, from: 0 },
-  { name: 'Swarm', kinds: ['swarmling', 'swarmling', 'swarmling', 'swarmling'], cost: 2, from: 0 },
-  { name: 'Acid team', kinds: ['spitter', 'spitter', 'trooper'], cost: 3, from: 1 },
-  { name: 'Hunting pack', kinds: ['spitter', 'swarmling', 'swarmling'], cost: 2, from: 0 },
-  { name: 'Brood', kinds: ['burster', 'burster', 'swarmling', 'swarmling'], cost: 3, from: 2 },
-  { name: 'Shock troop', kinds: ['brute', 'swarmling', 'swarmling'], cost: 3, from: 2 },
-  { name: 'Siege team', kinds: ['brute', 'spitter'], cost: 3, from: 3 },
-  { name: 'Psi cell', kinds: ['psion', 'trooper', 'trooper'], cost: 4, from: 3 },
-  { name: 'Warband', kinds: ['brute', 'brute', 'burster'], cost: 5, from: 4 },
-  { name: 'Burrowers', kinds: ['burrower', 'burrower'], cost: 3, from: 1 },
-  { name: 'Sprinters', kinds: ['sprinter', 'sprinter', 'sprinter'], cost: 3, from: 1 },
-  { name: 'Juggernaut', kinds: ['juggernaut', 'trooper'], cost: 3, from: 2 },
-  { name: 'Clutch', kinds: ['incubator', 'swarmling', 'swarmling'], cost: 3, from: 2 },
-  { name: 'Regenerators', kinds: ['regenerator', 'regenerator'], cost: 3, from: 2 },
-  { name: 'Wraiths', kinds: ['wraith', 'wraith'], cost: 3, from: 3 },
-  { name: 'Feeder', kinds: ['feeder', 'trooper', 'trooper'], cost: 3, from: 3 },
-  { name: 'Nest', kinds: ['hiveNode', 'trooper'], cost: 3, from: 3 },
-  { name: 'Mirror', kinds: ['mirror', 'trooper'], cost: 3, from: 4 },
-  { name: 'Emplacement', kinds: ['turret', 'trooper'], cost: 3, from: 1 },
+  { kinds: ['trooper'], cost: 1, from: 0 },
+  { kinds: ['trooper', 'trooper'], cost: 2, from: 0 },
+  { kinds: ['swarmling', 'swarmling', 'swarmling', 'swarmling'], cost: 2, from: 0 },
+  { kinds: ['spitter', 'spitter', 'trooper'], cost: 3, from: 1 },
+  { kinds: ['spitter', 'swarmling', 'swarmling'], cost: 2, from: 0 },
+  { kinds: ['burster', 'burster', 'swarmling', 'swarmling'], cost: 3, from: 2 },
+  { kinds: ['brute', 'swarmling', 'swarmling'], cost: 3, from: 2 },
+  { kinds: ['brute', 'spitter'], cost: 3, from: 3 },
+  { kinds: ['psion', 'trooper', 'trooper'], cost: 4, from: 3 },
+  { kinds: ['brute', 'brute', 'burster'], cost: 5, from: 4 },
+  { kinds: ['burrower', 'burrower'], cost: 3, from: 1 },
+  { kinds: ['sprinter', 'sprinter', 'sprinter'], cost: 3, from: 1 },
+  { kinds: ['juggernaut', 'trooper'], cost: 3, from: 2 },
+  { kinds: ['incubator', 'swarmling', 'swarmling'], cost: 3, from: 2 },
+  { kinds: ['regenerator', 'regenerator'], cost: 3, from: 2 },
+  { kinds: ['wraith', 'wraith'], cost: 3, from: 3 },
+  { kinds: ['feeder', 'trooper', 'trooper'], cost: 3, from: 3 },
+  { kinds: ['hiveNode', 'trooper'], cost: 3, from: 3 },
+  { kinds: ['mirror', 'trooper'], cost: 3, from: 4 },
+  { kinds: ['turret', 'trooper'], cost: 3, from: 1 },
 ]
 
 /** The packs a mission of the given force sends, at the given depth: random picks that the force can pay for. */

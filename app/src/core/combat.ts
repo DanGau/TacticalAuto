@@ -37,7 +37,7 @@ import { armed, moveSide, stride } from './sides'
 function actNext(battle: Battle): GameEvent[] {
   const seen = spotted(battle)
   for (const unit of battle.units) {
-    if (unit.side !== battle.turn || unit.id < battle.shooter || unit.civilian || !armed(battle, unit)) continue
+    if (unit.side !== battle.turn || unit.id < battle.shooter || unit.civilian || !armed(unit)) continue
     if (unit.id === battle.shooter) {
       if (battle.attacks >= attacksOf(unit)) continue
       // The secondary: a walk to a shot if it has none, the shot, then what follows the last, ending with a step back.
@@ -97,11 +97,10 @@ function actNext(battle: Battle): GameEvent[] {
       continue
     }
     battle.shooter = unit.id
-    // A pod unseen gives itself away when it opens fire.
-    const pod = unit.pod === null ? null : battle.pods[unit.pod]
-    if (pod && !pod.revealed) {
-      pod.revealed = true
-      events.unshift({ type: 'reveal', units: battle.units.filter((u) => u.pod === unit.pod).map(({ id, x, y }) => ({ id, x, y })) })
+    // An alien unseen gives itself away when it opens fire.
+    if (!unit.revealed) {
+      unit.revealed = true
+      events.unshift({ type: 'reveal', units: [{ id: unit.id, x: unit.x, y: unit.y }] })
     }
     return events
   }
@@ -120,7 +119,7 @@ function act(battle: Battle): GameEvent[] {
     }
     const action = actNext(battle)
     if (action.length > 0) return action
-    if (battle.turn === 'alien') for (const pod of battle.pods) pod.surprised = Math.max(0, pod.surprised - 1)
+    if (battle.turn === 'alien') for (const u of battle.units) u.surprised = Math.max(0, u.surprised - 1)
     battle.turn = battle.turn === 'human' ? 'alien' : 'human'
     battle.stage = 'move'
   }
@@ -128,7 +127,7 @@ function act(battle: Battle): GameEvent[] {
 }
 
 /** Aliens in the fight the squad sees: revealed, and engaged. */
-export const foesInSight = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.pod !== null && battle.pods[u.pod].revealed && battle.pods[u.pod].engaged)
+export const foesInSight = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.revealed && u.engaged)
 
 /** What a consumable does as it is used. */
 function useConsumable(battle: Battle, id: ConsumableId): GameEvent[] {

@@ -1,5 +1,5 @@
 // Actions in place of a shot: alien powers, and soldier skills and gear.
-import { type Battle, type Effect, type Unit, BLAST_RADIUS, CLOAK_TURNS, isSoldier, FORCE_FIELD_REACH, FORCE_FIELD_ARMOR, SLAM_HIT, SLAM_TILES, STUN_REACH, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN, SURGEON_HEAL, MEDIC_REACH, MEDIC_HEAL, SECOND_WIND_HEAL, revealed, DRONE_REACH, DRONE_DAMAGE, SKIRMISH_MOVE, MEDKIT_HEAL, TITAN_HEALTH, PLATING_ARMOR, MECH_STATS, DRONE_STATS, type Stats, type SkillEffect, engaged } from './battle'
+import { type Battle, type Effect, type Unit, BLAST_RADIUS, CLOAK_TURNS, isSoldier, FORCE_FIELD_REACH, FORCE_FIELD_ARMOR, SLAM_HIT, SLAM_TILES, STUN_REACH, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN, SURGEON_HEAL, MEDIC_REACH, MEDIC_HEAL, SECOND_WIND_HEAL, DRONE_REACH, DRONE_DAMAGE, SKIRMISH_MOVE, MEDKIT_HEAL, TITAN_HEALTH, PLATING_ARMOR, MECH_STATS, DRONE_STATS, type Stats, type SkillEffect } from './battle'
 import { mechUnit } from './spawn'
 import { freeTilesNear } from './grid'
 import { onGrid } from './grid'
@@ -146,7 +146,7 @@ export function secondWind(unit: Unit): GameEvent[] {
 export function drone(battle: Battle, unit: Unit): GameEvent[] {
   if (!has(unit, 'drone')) return []
   const target = nearest(
-    battle.units.filter((u) => u.side !== unit.side && revealed(battle, u) && distance(unit, u) <= DRONE_REACH && lineOfSight(battle, unit, u)),
+    battle.units.filter((u) => u.side !== unit.side && u.revealed && distance(unit, u) <= DRONE_REACH && lineOfSight(battle, unit, u)),
     unit,
   )
   if (!target) return []
@@ -157,8 +157,8 @@ export function drone(battle: Battle, unit: Unit): GameEvent[] {
 
 /** A skirmisher steps to the tile in reach farthest from the enemy. */
 export function skirmish(battle: Battle, unit: Unit): GameEvent[] {
-  // Getting out, a step back would undo the walk there.
-  if (!has(unit, 'skirmish') || (unit.side === 'human' && battle.extract)) return []
+  // Getting out or holding the uplink, a step back would undo the walk there.
+  if (!has(unit, 'skirmish') || (unit.side === 'human' && (battle.extract || battle.uplink))) return []
   const enemies = enemiesOf(battle, unit)
   const events: GameEvent[] = []
   walk(unit, bestPath(paths(battle, unit, SKIRMISH_MOVE), unit, (end) => [-Math.min(...enemies.map((e) => distance(e, end)))]), events)
@@ -178,7 +178,7 @@ export function feed(battle: Battle, unit: Unit, events: GameEvent[]): GameEvent
   const tricked = events.some((e) => (e.type === 'rocket' || e.type === 'heal' || e.type === 'spawn' || (e.type === 'effect' && e.amount >= 0)) && e.id === unit.id)
   if (!tricked) return []
   return battle.units
-    .filter((u) => u.kind === 'feeder' && revealed(battle, u))
+    .filter((u) => u.kind === 'feeder' && u.revealed)
     .map((u) => {
       u.fury++
       return { type: 'feed', id: u.id, damage: u.fury }
@@ -215,7 +215,7 @@ export function deploy(battle: Battle, unit: Unit, seen: Set<number>): GameEvent
 export function strew(battle: Battle, unit: Unit, effect: 'caltrops' | 'firewall'): GameEvent[] {
   if (!has(unit, effect) || unit.spent.includes(effect)) return []
   const rusher = nearest(
-    battle.units.filter((u) => u.side !== unit.side && revealed(battle, u) && engaged(battle, u) && distance(u, unit) <= CALTROP_RANGE && distance(u, unit) > CALTROP_LATE),
+    battle.units.filter((u) => u.side !== unit.side && u.revealed && u.engaged && distance(u, unit) <= CALTROP_RANGE && distance(u, unit) > CALTROP_LATE),
     unit,
   )
   if (!rusher) return []

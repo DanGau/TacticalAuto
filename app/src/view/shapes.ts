@@ -172,7 +172,7 @@ type Style = number | { color: number; alpha?: number; width?: number }
 type Op = (ctx: CanvasRenderingContext2D) => void
 
 /**
- * Vector shapes over the scene, in the camera's plane: a projectile, a spark, a pod streaking down. Each shape is kept
+ * Vector shapes over the scene, in the camera's plane: a projectile, a spark, a shell streaking down. Each shape is kept
  * until `clear`, and drawn afresh every frame.
  */
 export class Sketch {

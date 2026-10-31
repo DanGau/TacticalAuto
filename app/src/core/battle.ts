@@ -1,4 +1,4 @@
-// A battle's state: units, pods, the board, and the numbers its rules share.
+// A battle's state: units, the board, and the numbers its rules share.
 import type { SecondaryId } from './secondaries'
 import { type AlienKind } from './aliens'
 import type { Tally } from './feats'
@@ -55,10 +55,11 @@ export const BURST_DAMAGE = 4
 export const SPIT_DAMAGE = 1
 export const ACID_TURNS = 2
 export const ACID_DAMAGE = 2
-/** Tiles a psion's panic reaches, the alien turns between its uses, and the damage its death does to its pod. */
+/** Tiles a psion's panic reaches, the alien turns between its uses, and the damage its death does to the aliens within PSI_BACKLASH_REACH. */
 export const PSI_RANGE = 7
 export const PSI_COOLDOWN = 3
 export const PSI_BACKLASH = 2
+export const PSI_BACKLASH_REACH = 3
 /** Alien turns between the swarmlings a boss spawns. */
 export const SPAWN_EVERY = 2
 /** What skills and relics are worth. Each name says the effect; skills.ts and relics.ts say what the effect does. */
@@ -106,9 +107,9 @@ export const SHADOW_DAMAGE = 2
 export const ENTRANCES = 3
 /** Tiles around an entrance that are marked as it, and that its squad comes in on. */
 export const ENTRY_RADIUS = 2
-/** Tiles a pod keeps from the others, and a wave from the squad. */
+/** Tiles a wave keeps from the squad. */
 export const POD_CLEARANCE = 7
-/** How near a soldier comes to a pod waiting its turn before it engages. */
+/** How near a soldier comes to an alien waiting its turn before it engages. */
 export const ENGAGE_REACH = 5
 
 export type Side = 'human' | 'alien'
@@ -255,8 +256,12 @@ export interface Unit {
   stats: Stats
   /** The soldier this unit is; null for aliens. */
   soldier: number | null
-  /** Index of the alien's pod; null for humans. */
-  pod: number | null
+  /** In the fight: an alien coming for the squad. One not engaged stands at its post and holds its fire. Humans always are. */
+  engaged: boolean
+  /** Seen by the squad: drawn, and shot at. Every alien is but burrowers underground and waves not yet sighted. */
+  revealed: boolean
+  /** Alien turns left caught off guard, doing nothing. */
+  surprised: number
   ability: Ability | null
   /** Uses of the ability left this battle. */
   charges: number
@@ -316,29 +321,13 @@ export interface Unit {
 export type Order = 'prepare' | 'sprint'
 
 
-/**
- * A group of aliens. It hangs out at its post, alert but waiting its turn, until it engages: then it comes for the
- * squad and fights. Pods engage one at a time; see rally.
- */
-interface Pod {
-  /** The name of its pack. */
-  name: string
-  /** Seen by the squad: drawn, and shot at. Every pod is but burrowers underground and waves not yet sighted. */
-  revealed: boolean
-  /** Alien turns left caught off guard, its members doing nothing. */
-  surprised: number
-  /** In the fight: coming for the squad. A pod not yet engaged stands at its post and holds its fire. */
-  engaged: boolean
-  post: Tile
-}
-
 /** An entrance the squad may make: how, and the tile it comes in at. */
 export interface Entrance {
   kind: EntranceKind
   at: Tile
 }
 
-/** The ground the fight is staged on: where the pods hang out, and the entrances by them. */
+/** The ground the fight is staged on: where the aliens hang out, and the entrances by them. */
 export interface Arena {
   x: number
   y: number
@@ -356,8 +345,8 @@ export interface Battle {
   place: TerrainKind
   /** Alien turns begun. */
   round: number
-  /** Packs still to arrive as waves, on a hold or a recovery. */
-  waves: { name: string; aliens: Alien[] }[]
+  /** Handfuls of aliens still to arrive as waves, on a hold or a recovery. */
+  waves: Alien[][]
   /** The unit whose action is under way, credited with the damage it does; null between actions. */
   actor: number | null
   /** What each soldier did this battle, by soldier id. */
@@ -389,7 +378,6 @@ export interface Battle {
   west: Edge[]
   region: Terrain['region']
   city: string
-  pods: Pod[]
   /** Once-per-battle effects of the whole squad already used. */
   used: Effect[]
   /** Consumables the player has used, taking effect at the next beat. */
@@ -402,8 +390,8 @@ export interface Battle {
   fire: { x: number; y: number; turns: number }[]
   /** Tiles strewn with caltrops: dear to cross, and they hurt an alien that steps on them. */
   caltrops: Tile[]
-  /** Where civilians a harvester killed lie, to rise as husks of its pod on the next alien turn. */
-  husks: { x: number; y: number; pod: number }[]
+  /** Where civilians a harvester killed lie, to rise as husks on the next alien turn. */
+  husks: Tile[]
   /** Rounds ended with a soldier inside the uplink's zone, on a hold. */
   held: number
   /** Civilians soldiers have reached and got out, on a rescue. */
@@ -418,7 +406,7 @@ export interface Battle {
   approaches: Tile[]
   /** Where reinforcements arrive. */
   gates: Tile[]
-  /** The round the last pod engaged. */
+  /** The round aliens last joined the fight. */
   rallied: number
   /** A soldier whose monologue draws every alien's attention until the round `until` ends; null if none. */
   spotlight: { id: number; until: number } | null
@@ -451,13 +439,6 @@ interface Downed {
 /** Primary attacks a soldier makes each turn; an alien makes one. */
 export const SOLDIER_ATTACKS = 2
 
-/** Whether the unit is in the fight: an alien once its pod engages. Humans always are. */
-export const engaged = (battle: Battle, unit: Unit) => unit.pod === null || battle.pods[unit.pod].engaged
-
 /** A soldier of the squad: not a civilian, nor a mech, which fights for the squad but cannot hold the field alone. */
 export const isSoldier = (unit: Unit) => unit.side === 'human' && unit.soldier !== null
 
-/** Whether the unit is in the open: an alien once its pod is revealed, any human always. */
-export function revealed(battle: Battle, unit: Unit): boolean {
-  return unit.pod === null || battle.pods[unit.pod].revealed
-}

@@ -1,5 +1,5 @@
 // Where a unit moves: candidate paths, scored by stance, goal and threat.
-import { type Battle, type Unit, type Tile, GRID, type Stance, revealed, engaged, isSoldier, STANDOFF, MEDIC_REACH, HASTE_MOVE, CHILL_MOVE, type Order, ENGAGE_REACH } from './battle'
+import { type Battle, type Unit, type Tile, GRID, type Stance, isSoldier, STANDOFF, MEDIC_REACH, HASTE_MOVE, CHILL_MOVE, type Order, ENGAGE_REACH } from './battle'
 import { blocked, breach } from './grid'
 import { walkingDistances } from './grid'
 import { passable } from './grid'
@@ -152,7 +152,7 @@ export const NO_SHOT: Record<Stance, (spot: Spot) => number[]> = {
  * there. Walls the walk goes round count; line of sight from where it ends does not.
  */
 export function threats(battle: Battle, enemies: Unit[]): (tile: Tile) => number {
-  const known = enemies.filter((e) => !e.civilian && revealed(battle, e) && engaged(battle, e) && e.stats.range > 0)
+  const known = enemies.filter((e) => !e.civilian && e.revealed && e.engaged && e.stats.range > 0)
   const fields = known.map((e) => ({ walk: walkingDistances(battle, e), reach: e.stats.move + e.stats.range }))
   // A tile no walk ends on, such as one a unit that never moves stands on, is as near as its nearest neighbour.
   const near = (walk: readonly number[], tile: Tile) =>
@@ -184,7 +184,7 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
   if (captive) return captive
   // A raider makes for the nearest cache it can walk to until it has as many as it came for; walled off from all, it fights.
   const caches = battle.goal === 'raid' && unit.side === 'human' ? battle.caches.filter((c) => walkingDistances(battle, c)[unit.y * GRID + unit.x] < Infinity) : []
-  if (caches.length > 0) return caches.reduce((a, b) => (distance(b, unit) < distance(a, unit) ? b : a))
+  if (caches.length > 0) return caches.reduce((a, b) => (walkingDistances(battle, b)[unit.y * GRID + unit.x] < walkingDistances(battle, a)[unit.y * GRID + unit.x] ? b : a))
   const star = unit.side === 'alien' && enemies.find((e) => spotlit(battle, e))
   if (star) return star
   // On a hold an alien makes for the uplink, then from its zone goes for the squad, so no stand-off lasts.
@@ -198,8 +198,8 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
     const hunters = enemies.filter((e) => prey(e) <= PREY_REACH).sort((a, b) => prey(a) - prey(b) || distance(a, squad) - distance(b, squad))
     return hunters[0] ?? nearest(civilians, squad)
   }
-  const fighting = enemies.filter((u) => engaged(battle, u))
-  return enemies.find((u) => u.target && revealed(battle, u)) ?? nearest(fighting.length > 0 ? fighting : enemies, squad)
+  const fighting = enemies.filter((u) => u.engaged)
+  return enemies.find((u) => u.target && u.revealed) ?? nearest(fighting.length > 0 ? fighting : enemies, squad)
 }
 
 /** How near a civilian an alien must be for the squad to go for it on a rescue. */
@@ -223,8 +223,8 @@ export const preyed = (target: Unit, hit: number) => (target.civilian === 'vip' 
 /**
  * The path a fighting unit takes in its move stage: to the tile its stance ranks best, preferring any tile with a
  * shot over any without; the fewest steps wins a tie. Run and Gun doubles the move when the normal move reaches no shot.
- * While some soldier has an alien in sight, a soldier first avoids any tile from which it would sight a pod unseen or
- * draw in a pod waiting its turn, so one engagement ends before the next begins. A soldier left with no shot sets its order: see orderFor.
+ * While some soldier has an alien in sight, a soldier first avoids any tile from which it would sight an alien unseen or
+ * draw in one waiting its turn, so one engagement ends before the next begins. A soldier left with no shot sets its order: see orderFor.
  */
 export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const enemies = enemiesOf(battle, unit)
@@ -250,11 +250,11 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const centre = squadmates.length > 0 ? centreOf(squadmates) : unit
   /** Tiles `end` is beyond COHESION from the middle of the unit's squadmates. Aliens fight as they find themselves. */
   const stray = (end: Tile) => (unit.side === 'human' ? Math.max(0, distance(end, centre) - COHESION) : 0)
-  const unseen = battle.units.filter((u) => u.side !== unit.side && !revealed(battle, u))
-  const waiting = battle.units.filter((u) => u.side !== unit.side && !engaged(battle, u))
+  const unseen = battle.units.filter((u) => u.side !== unit.side && !u.revealed)
+  const waiting = battle.units.filter((u) => u.side !== unit.side && !u.engaged)
   // The squad is in a fight while some soldier has an alien in sight.
   const fighting = unit.side === 'human' && seen.size > 0
-  /** Whether a soldier on `end` would sight a pod unseen, or draw in one waiting, while the squad is in a fight. */
+  /** Whether a soldier on `end` would sight an alien unseen, or draw in one waiting, while the squad is in a fight. */
   const provokes = (end: Tile) => (fighting && (unseen.some((alien) => sees(battle, end, alien)) || waiting.some((alien) => distance(alien, end) <= ENGAGE_REACH)) ? 1 : 0)
   /** Whether `end` would hurt the unit to stand on: acid, or fire unless it cannot burn; for a soldier, a fuel tank beside it, until the battle drags on, for a tank never goes away and tanks can bar the way. Caltrops only slow and hurt the way. */
   const acid = (end: Tile) => (onTile(battle.acid, end) || (unit.side === 'human' && battle.round < RESTLESS_ROUND && besideFuel(battle, end)) || (onTile(battle.fire, end) && !fireproof(battle, unit)) ? 1 : 0)
@@ -265,8 +265,8 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const role = (end: Tile) =>
     unit.side !== 'human'
       ? 0
-      : (has(unit, 'null') ? 15 * enemies.filter((e) => revealed(battle, e) && e.kind !== 'trooper' && distance(end, e) <= NULL_REACH).length : 0) +
-        (has(unit, 'guardians') && hurt < WARY ? 8 * enemies.filter((e) => revealed(battle, e) && distance(end, e) <= GUARDIAN_REACH + 2).length : 0) +
+      : (has(unit, 'null') ? 15 * enemies.filter((e) => e.revealed && e.kind !== 'trooper' && distance(end, e) <= NULL_REACH).length : 0) +
+        (has(unit, 'guardians') && hurt < WARY ? 8 * enemies.filter((e) => e.revealed && distance(end, e) <= GUARDIAN_REACH + 2).length : 0) +
         (has(unit, 'bond') && squadmates.some((u) => distance(u, end) <= 1) ? 15 : 0) +
         (canHurlFrom(battle, unit, end) ? HURL_WORTH : 0)
   const uplink = battle.uplink
@@ -316,7 +316,7 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   }
   // A unit whose perks pay for standing still holds a tile it can shoot from, unless the tile is acid or off the uplink.
   const still = has(unit, 'steady') || has(unit, 'doubleTap')
-  const shotHere = enemies.some((enemy) => revealed(battle, enemy) && shootable(battle, unit, unit, enemy, seen))
+  const shotHere = enemies.some((enemy) => enemy.revealed && shootable(battle, unit, unit, enemy, seen))
   if (still && shotHere && !battle.extract && !leash(unit) && !acid(unit)) return []
   // A booming charge pins a unit that can fight from where it stands; a rooted one cannot move at all.
   if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || (unit.kind === 'sprinter' && unit.chilled > 0)) return []
@@ -392,7 +392,7 @@ export function fleePath(battle: Battle, unit: Unit): Tile[] {
 export function escapePath(battle: Battle, unit: Unit): Tile[] {
   const toExtract = walkingDistances(battle, battle.extract!)
   const soldiers = battle.units.filter(isSoldier)
-  const aliens = battle.units.filter((u) => u.side === 'alien' && revealed(battle, u))
+  const aliens = battle.units.filter((u) => u.side === 'alien' && u.revealed)
   const hunted = pursuers(battle, unit).length > 0
   // Hunted, it keeps by a soldier. Fire shapes its way only among tiles nearer the way out, so a turret's field cannot pen it.
   return bestPath(paths(battle, unit, unit.stats.move), unit, (end) => [

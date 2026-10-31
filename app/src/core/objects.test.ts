@@ -25,7 +25,7 @@ function duel() {
   battle.north.fill('none')
   battle.west.fill('none')
   battle.height.fill(0)
-  battle.pods[alien.pod!].engaged = true
+  alien.engaged = true
   Object.assign(soldier, { x: 10, y: 10 })
   Object.assign(alien, { x: 10, y: 13, hp: 99, armor: 0 })
   return { battle, soldier, alien, walled }

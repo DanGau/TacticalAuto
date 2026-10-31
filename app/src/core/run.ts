@@ -17,7 +17,7 @@ import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId
 import { LEG_STOPS, STOP_THREAT, THREAT_MAX } from './progress'
 import { charges, draft, equipped, health, join, offerRecruits, skillOffers, soldierStats, weaponOf, xpFor } from './squad'
 import { dropGear, settle } from './rewards'
-import { drawBattle, missionAt, packsOf, placed, RISKS } from './missions'
+import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
 import { type Leg, type MapNode, type Risk, type Run, type Stage, type Stop, type StopKind } from './run-state'
 
 /** Access keys needed to find the alien source; each is won at a satellite, at the end of a leg. */
@@ -302,7 +302,7 @@ export function drawStops(run: Run): void {
 }
 
 /** A stop with no aliens drawn ahead: any but a battle. */
-const fixed = (kind: StopKind, terrain: TerrainKind): Stop => ({ kind, risk: 'standard', goal: 'exterminate', terrain, twist: null, packs: [] })
+const fixed = (kind: StopKind, terrain: TerrainKind): Stop => ({ kind, risk: 'standard', goal: 'exterminate', terrain, twist: null, aliens: [] })
 
 /** The leg under way. */
 export const legOf = (run: Run) => run.legs[run.keys]
@@ -410,7 +410,7 @@ export function advance(run: Run): void {
   }))
   const rules = doctrines.flatMap((d) => d.rule ?? [])
   const held = (r: Reserve) => run.captives.includes(r.soldier)
-  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, packsOf(run, mission, stop === 'battle' ? here.packs : undefined), reserve.filter((r) => !held(r)), mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city } : undefined)
+  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, stop === 'battle' ? here.aliens : undefined), reserve.filter((r) => !held(r)), mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city } : undefined)
   holdCaptives(run.battle, reserve.filter(held))
 }
 

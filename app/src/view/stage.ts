@@ -57,7 +57,7 @@ export class Stage {
 
   readonly renderer = new WebGLRenderer({ antialias: true })
   readonly canvas = this.renderer.domElement
-  /** Shots, sparks, pods and words, drawn over the scene in the camera's picture. */
+  /** Shots, sparks and words, drawn over the scene in the camera's picture. */
   readonly overlay = document.createElement('canvas')
   readonly ctx = this.overlay.getContext('2d')!
   readonly scene = new Scene()
@@ -82,7 +82,7 @@ export class Stage {
   /** Shot effects over the scene, and each entrance's props under way. */
   readonly fx = new Sketch()
   readonly drops = new Set<Sketch>()
-  /** Before the entrance, the entrances' and pods' names; and the callouts over units. */
+  /** Before the entrance, the entrances' names; and the callouts over units. */
   marks: Label[] = []
   readonly labels = new Set<Label>()
 

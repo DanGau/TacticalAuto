@@ -1,6 +1,6 @@
 // Plays a beat's events on screen, in order: walks, sightings, shots, and what each did.
 import type { Object3D } from 'three'
-import { revealed, type Battle, type Order, type Tile } from '../core/battle'
+import { type Battle, type Order, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { CONSUMABLES } from '../core/consumables'
 import { effectName } from '../core/effects'
@@ -81,12 +81,12 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const walks = [...paths].map(([id, path]) => (sprites.has(id) ? walk(s, sprites.get(id)!, path, ms) : glide(s, glows.get(id)!, path, ms)))
       for (const m of group) if (m.type === 'move' && m.with && sprites.has(m.id)) float(s, callout(s, effectName(m.with, s.kit()).toUpperCase(), 0xffffff, sprites.get(m.id)!))
       await Promise.all([s.follow(squad(battle), Math.max(ms, CAMERA_MS)), ...walks])
-      // The fog lifts where the squad arrived, before any pod it uncovered appears.
+      // The fog lifts where the squad arrived, before any alien it uncovered appears.
       drawFog(s, battle)
       await play(s, battle, group.filter((m) => m.type !== 'move'))
     } else if (e.type === 'reveal' || e.type === 'wave') {
       // A wave the squad cannot see yet stays off screen, and the camera stays where it is.
-      if (e.type === 'wave' && !e.units.some((at) => battle.units.some((u) => u.id === at.id && revealed(battle, u)))) continue
+      if (e.type === 'wave' && !e.units.some((at) => battle.units.some((u) => u.id === at.id && u.revealed))) continue
       const appeared = e.units.flatMap((at) => {
         const unit = battle.units.find((u) => u.id === at.id)
         return unit && !sprites.has(unit.id) ? [create(s, { ...unit, x: at.x, y: at.y }, 0, letter(unit))] : []
@@ -144,7 +144,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       float(s, e.type === 'frozen' ? callout(s, battle.units.find((u) => u.id === e.id)?.side === 'alien' ? 'STUNNED' : 'TOO SHAKEN TO ACT', COLOR.psi, on) : callout(s, `${e.cause.toUpperCase()} -${e.amount}`, e.cause === 'acid' ? COLOR.acid : e.cause === 'impact' ? COLOR.crit : COLOR.psi, on))
     } else if (e.type === 'spawn') {
       const unit = battle.units.find((u) => u.id === e.unit.id)
-      if (!unit || !revealed(battle, unit)) continue
+      if (!unit || !unit.revealed) continue
       const born = create(s, { ...unit, x: e.unit.x, y: e.unit.y }, 0, letter(unit))
       await s.tween(PACE.reveal, (t) => fade(born, t))
     } else if (e.type === 'effect') {

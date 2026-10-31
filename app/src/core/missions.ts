@@ -1,12 +1,11 @@
-// Missions: their force, alien packs, goal, and where they are fought.
+// Missions: their force, aliens, goal, and where they are fought.
 import { type Alien, type Stats, BASE_STATS } from './battle'
-import { alienStats, ALIENS, muster } from './aliens'
+import { type AlienKind, alienStats, ALIENS, muster } from './aliens'
 import { type Goal, GOALS } from './goals'
 import { depth, late, THREAT_MAX } from './progress'
 import { type Run } from './run-state'
 import { type Mission } from './run-state'
 import { type Stop } from './run-state'
-import { type Muster } from './run-state'
 import { type Risk } from './run-state'
 import { soldierStats } from './squad'
 import { TUNING } from './tuning'
@@ -37,44 +36,44 @@ export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goa
 }
 
 /**
- * The aliens of a mission, in pods: packs mustered at random for its force. A kind's health never changes;
+ * The aliens of a mission: mustered at random for its force. A kind's health never changes;
  * deeper along the road aliens are better equipped: a point of armor each step, a point of damage every second. A key or final mission adds a boss, a trooper built up by the keys
  * already won: each adds health, armor and an escorting trooper; from the second satellite on it hits harder and
  * spawns swarmlings, and from the third it shoots farther.
  */
-export function packsOf(run: Run, mission: Mission, mustered?: Muster[]): { name: string; aliens: Alien[] }[] {
+export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[]): Alien[] {
   const tier = depth(run)
   const armor = tier
   const weapon = Math.floor(tier / 2)
   const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, armor, weapon), stance: ALIENS[kind].stance, boss: false, spawns: ALIENS[kind].spawns ?? false, target: false, resists: ALIENS[kind].resists })
   const boss = mission.kind === 'key' || mission.kind === 'final'
   const escort = boss ? run.keys : 0
-  // The hunt sends more packs the higher the threat.
-  const hunting = muster(run, huntForce(run, mission), tier)
-  const packs = [...(mustered ?? muster(run, Math.max(0, mission.force - (boss ? 2 + escort : 0)), tier)), ...hunting].map((pack) => ({ name: pack.name, aliens: pack.kinds.map(alien) }))
+  // The hunt sends more the higher the threat.
+  const hunting = muster(run, huntForce(run, mission), tier).flatMap((pack) => pack.kinds)
+  const aliens = [...(mustered ?? muster(run, Math.max(0, mission.force - (boss ? 2 + escort : 0)), tier).flatMap((pack) => pack.kinds)), ...hunting].map(alien)
   // An assassination's commander: a trooper tougher than its kind, with its guards.
   if (mission.goal === 'assassinate') {
     const commander = alien('trooper')
     commander.stats = { ...commander.stats, hp: commander.stats.hp + COMMANDER.hp, armor: commander.stats.armor + COMMANDER.armor, damage: commander.stats.damage + 1 }
     const guards = Array.from({ length: COMMANDER.guards + (tier >= COMMANDER.moreFrom ? 1 : 0) }, () => alien('trooper'))
-    packs.unshift({ name: 'Commander', aliens: [{ ...commander, target: true, stance: 'anchor' }, ...guards] })
+    aliens.unshift({ ...commander, target: true, stance: 'anchor' }, ...guards)
   }
   // A terror site's harvesters, more of them deeper along the road.
-  if (mission.goal === 'rescue') packs.unshift({ name: 'Harvesters', aliens: Array.from({ length: tier >= HARVESTERS_MORE_FROM ? 2 : 1 }, () => alien('harvester')) })
+  if (mission.goal === 'rescue') aliens.unshift(...Array.from({ length: tier >= HARVESTERS_MORE_FROM ? 2 : 1 }, () => alien('harvester')))
   // An ambush's Hunter: a mini-boss about half again as strong as the squad's strongest soldier, that runs it down.
   if (mission.goal === 'ambush') {
     const best = run.soldiers.map((s) => soldierStats(run, s)).reduce((a, b) => (b.hp * b.damage > a.hp * a.damage ? b : a))
     const trooper = alien('trooper')
     const stats: Stats = { ...best, hp: Math.round(best.hp * HUNTER.hp), damage: Math.ceil(best.damage * HUNTER.damage), armor: Math.max(best.armor, trooper.stats.armor) + 1, move: best.move + 1 }
-    packs.unshift({ name: 'The Hunter', aliens: [{ ...trooper, stats, boss: true, stance: 'rush' }] })
+    aliens.unshift({ ...trooper, stats, boss: true, stance: 'rush' })
   }
   if (boss) {
     const k = run.keys
     const stats: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + 5 * k, armor: 2 + k, damage: BASE_STATS.damage + (k >= 1 ? 1 : 0), range: BASE_STATS.range + (k >= 2 ? 1 : 0) }
     const escorts = Array.from({ length: escort }, () => alien('trooper'))
-    packs.unshift({ name: mission.kind === 'final' ? 'The source' : 'Guardian', aliens: [{ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: k >= 1, target: false, resists: [run.bosses[k]] }, ...escorts] })
+    aliens.unshift({ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: k >= 1, target: false, resists: [run.bosses[k]] }, ...escorts)
   }
-  return packs
+  return aliens
 }
 
 /** The depth from which a rescue has a second harvester. */
@@ -106,9 +105,9 @@ export function drawBattle(run: Run, risk: Risk, when: Run = run): Stop {
   const goal = drawGoal(run, when)
   const force = missionAt(when, 'battle', risk, goal).force
   // Each battle's force varies a little either way, so two battles of one risk are not the same fight.
-  const packs = muster(run, Math.max(1, force + randomInt(run, 3) - 1), depth(when)).map(({ name, kinds }) => ({ name, kinds }))
+  const aliens = muster(run, Math.max(1, force + randomInt(run, 3) - 1), depth(when)).flatMap((pack) => pack.kinds)
   const terrain = ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)]
-  return { kind: 'battle', risk, goal, terrain, twist: drawTwist(run, when.keys), packs, ...placed(run, terrain) }
+  return { kind: 'battle', risk, goal, terrain, twist: drawTwist(run, when.keys), aliens, ...placed(run, terrain) }
 }
 
 /** How hard a stop is: a battle counts one, a quiet one none and an overrun one two. */

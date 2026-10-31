@@ -1,4 +1,4 @@
-// Creating a battle: its state, its encounter, the pods, civilians and goals placed by it.
+// Creating a battle: its state, its encounter, the aliens, civilians and goals placed by it.
 import { type Battle, type Tile, type Reserve, GRID, type Unit, type Alien } from './battle'
 import { onGrid, distance, freeTilesNear, walkingDistances, spacedTile, NEIGHBORS, passable, openNear, walks } from './grid'
 import { alienUnit, civilianUnit } from './spawn'
@@ -10,12 +10,12 @@ import type { Twist } from './twists'
 import { deploy, planEntrances } from './entrances'
 import { ARENA_REACH, designEncounter } from './encounter'
 
-/** Lays each soldier the aliens hold on a recovery beside a pod, in turn. */
+/** Lays each soldier the aliens hold on a recovery beside an alien, in turn. */
 export function holdCaptives(battle: Battle, captives: Reserve[]): void {
   battle.captives = captives
-  const pods = battle.pods.map((_, i) => battle.units.find((u) => u.pod === i)!).filter(Boolean)
+  const guards = battle.units.filter((u) => u.side === 'alien')
   captives.forEach((captive, i) => {
-    const [tile] = freeTilesNear(battle, pods[i % pods.length], 12).filter((t) => !battle.downed.some((d) => d.x === t.x && d.y === t.y))
+    const [tile] = freeTilesNear(battle, guards[i % guards.length], 12).filter((t) => !battle.downed.some((d) => d.x === t.x && d.y === t.y))
     battle.downed.push({ soldier: captive.soldier, ...tile, carrier: null })
   })
 }
@@ -49,32 +49,30 @@ export function sealPockets(battle: Battle): void {
   walks.delete(battle)
 }
 
-/**
- * Places a pack as a new pod around `centre`, its post. Every pod is in the open but burrowers, which keep
- * underground; `revealed` false keeps any pod unseen, as a wave coming in.
- */
-export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }, centre: Tile, revealed = true): Unit[] {
-  const units = freeTilesNear(battle, centre, pack.aliens.length).map((tile, i) => alienUnit(battle, pack.aliens[i], tile, battle.pods.length))
-  battle.units.push(...units)
-  // One that never moves stands where it walls no ground off, as seen from across the map.
-  const far = openNear(battle, { x: GRID - 1 - centre.x, y: GRID - 1 - centre.y })
-  for (const still of units.filter((u) => u.stats.move === 0)) {
-    battle.units.splice(battle.units.indexOf(still), 1)
+/** Places an alien on `tile`. One that never moves stands where it walls no ground off, as seen from across the map. */
+export function placeAlien(battle: Battle, alien: Alien, tile: Tile, engaged = false, seen = true): Unit {
+  const unit = alienUnit(battle, alien, tile, engaged, seen)
+  if (unit.stats.move === 0) {
+    const far = openNear(battle, { x: GRID - 1 - tile.x, y: GRID - 1 - tile.y })
     const open = walkingDistances(battle, far).filter(Number.isFinite).length
-    const tile = freeTilesNear(battle, centre, 30).find((t) => {
-      Object.assign(still, t)
-      battle.units.push(still)
+    const clear = freeTilesNear(battle, tile, 30).find((t) => {
+      Object.assign(unit, t)
+      battle.units.push(unit)
       const walls = walkingDistances(battle, far).filter(Number.isFinite).length < open - 1
-      battle.units.splice(battle.units.indexOf(still), 1)
+      battle.units.pop()
       return !walls
     })
-    if (tile) Object.assign(still, tile)
-    battle.units.push(still)
+    Object.assign(unit, clear ?? tile)
   }
-  const burrowers = units.every((u) => u.kind === 'burrower')
-  battle.pods.push({ name: pack.name, revealed: revealed && !burrowers, surprised: 0, engaged: false, post: centre })
-  return units
+  battle.units.push(unit)
+  return unit
 }
+
+/** Aliens a wave brings at a time. */
+export const WAVE_SIZE = 3
+
+/** `aliens` as waves. */
+const inWaves = (aliens: Alien[]) => Array.from({ length: Math.ceil(aliens.length / WAVE_SIZE) }, (_, i) => aliens.slice(i * WAVE_SIZE, (i + 1) * WAVE_SIZE))
 
 /** Tiles apart a rescue's civilians start, from each other and the aliens, and the farthest from the terror's heart. */
 export const CIVILIAN_CLEARANCE = 4
@@ -86,10 +84,10 @@ export const CACHES = 3
 
 /**
  * A battle awaiting the squad's entrance, its encounter designed as one piece: see designEncounter. A hold keeps half
- * its packs back as waves; a rescue's civilians are scattered about its last pod. An ambush has no entrance: the squad
+ * its aliens back as waves; a rescue's civilians are scattered about the terror's heart. An ambush has no entrance: the squad
  * is down in the arena's middle.
  */
-export function createBattle(seed: number, kind: TerrainKind, packs: { name: string; aliens: Alien[] }[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale): Battle {
+export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale): Battle {
   const holder = { rng: seed }
   const terrain = generateTerrain(holder, GRID, kind, twist, place)
   const battle: Battle = {
@@ -98,8 +96,8 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     rules,
     twist,
     round: 0,
-    // All of a recovery's packs come on a second time, as waves.
-    waves: goal === 'hold' ? packs.slice(Math.ceil(packs.length / 2)) : goal === 'recover' ? [...packs] : [],
+    // All of a recovery's aliens come on a second time, as waves.
+    waves: goal === 'hold' ? inWaves(aliens.slice(Math.ceil(aliens.length / 2))) : goal === 'recover' ? inWaves(aliens) : [],
     beat: 0,
     phase: 'deploy',
     turn: 'human',
@@ -113,7 +111,6 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     place: kind,
     ...terrain,
     bulk: terrain.props.map((prop) => PROP_BULK[prop]),
-    pods: [],
     used: [],
     primed: [],
     acid: [],
@@ -145,24 +142,22 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     captives: [],
   }
   sealPockets(battle)
-  const posted = packs.slice(0, goal === 'hold' ? packs.length - battle.waves.length : packs.length)
-  const { spot, posts } = designEncounter(battle, posted, goal)
+  const posted = goal === 'hold' ? aliens.slice(0, Math.ceil(aliens.length / 2)) : aliens
+  const { spot, posts, heart } = designEncounter(battle, posted, goal)
   sealPockets(battle)
   const centre = openNear(battle, spot)
   const vip = goal === 'vip' ? centre : null
   if (goal === 'hold') battle.uplink = centre
   if (vip) battle.units.push(civilianUnit(battle, vip, VIP_HP, 'vip'))
   const ambush = goal === 'ambush'
-  const centres = posts.map((post, i) => (vip && i === 0 ? vip : post))
-  posted.forEach((pack, i) => placePod(battle, pack, centres[i]))
+  posted.forEach((alien, i) => placeAlien(battle, alien, posts[i]))
   if (ambush) {
     deploy(battle, centre)
-    // The Hunter engages first, whichever pod stands nearest.
-    battle.pods.forEach((pod, i) => (pod.engaged = i === 0))
+    // The Hunter engages first, whoever stands nearest.
+    for (const u of battle.units) if (u.side === 'alien') u.engaged = u.boss
     return battle
   }
-  // A rescue's terror is about its last pod: civilians scattered about it, half hiding where they are, half running from the aliens.
-  const heart = goal === 'rescue' ? centres.at(-1)! : null
+  // A rescue's civilians are scattered about the terror's heart, half hiding where they are, half running from the aliens.
   if (heart) {
     for (let i = 0; i < CIVILIANS; i++) {
       let tile = spacedTile(battle, battle.units, CIVILIAN_CLEARANCE)
@@ -170,8 +165,11 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
       battle.units.push(civilianUnit(battle, tile, CIVILIAN_HP, i % 2 === 0 ? 'hider' : 'runner'))
     }
   }
-  // A raid's caches each stand by a pod, guarded.
-  if (goal === 'raid') battle.caches = Array.from({ length: CACHES }, (_, i) => (centres[i] ? (freeTilesNear(battle, centres[i], 4)[3] ?? centres[i]) : freeTilesNear(battle, spot, 40)[10 * i]))
+  // A raid's caches each stand by an alien, guarded.
+  if (goal === 'raid') battle.caches = Array.from({ length: CACHES }, (_, i) => {
+    const guard = i < posts.length ? posts[Math.floor((i * posts.length) / CACHES)] : null
+    return guard ? (freeTilesNear(battle, guard, 4)[3] ?? guard) : freeTilesNear(battle, spot, 40)[10 * i]
+  })
   planEntrances(battle, heart)
   return battle
 }

@@ -1,8 +1,8 @@
-// A side's simultaneous move: sighting pods, walking, sentries, overwatch, burrowers.
+// A side's simultaneous move: sighting aliens, walking, sentries, overwatch, burrowers.
 import type { Secondary } from './secondaries'
 import { aiming } from './fighters'
 import { shoot } from './attack'
-import { GRID, type Battle, engaged, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, revealed, ENGAGE_REACH, STANDOFF } from './battle'
+import { GRID, type Battle, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, ENGAGE_REACH, STANDOFF } from './battle'
 import { opening } from './entrances'
 import { soldierUnit } from './spawn'
 import { breach } from './grid'
@@ -11,15 +11,15 @@ import { walkingDistances } from './grid'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { immune, onTile, fireproof, foeHas, has, GUARDIAN_REACH, lying, extractReach, carrying, BEACON_REACH, vipOf, nearest, extractionFrom, pursuers, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
+import { engageNearest, fightCap, walkersFighting, immune, onTile, fireproof, foeHas, has, GUARDIAN_REACH, lying, extractReach, carrying, BEACON_REACH, vipOf, nearest, extractionFrom, pursuers, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
 import { fleePath, fightPath, walk, paths, costOf, bestPath, COHESION, POCKET } from './pathing'
 import { detects, sees } from './sight'
 import { upkeep } from './upkeep'
 import { moved, wound } from './wound'
 
 /**
- * The side on turn has its upkeep; each of its units walks its path, lowest id first, an alien only once its pod
- * engages; acid burns those still in it; then newly sighted pods are revealed.
+ * The side on turn has its upkeep; each of its units walks its path, lowest id first, an alien only once it
+ * engages; acid burns those still in it; then newly sighted aliens are revealed.
  */
 export function moveSide(battle: Battle): GameEvent[] {
   const events = [...(battle.opening ? opening(battle) : []), ...upkeep(battle), ...(battle.turn === 'alien' ? surface(battle) : [])]
@@ -27,7 +27,7 @@ export function moveSide(battle: Battle): GameEvent[] {
   battle.strides = {}
   for (const unit of battle.units) {
     if (unit.side !== battle.turn || unit.hp <= 0) continue
-    const path = unit.civilian ? fleePath(battle, unit) : engaged(battle, unit) ? fightPath(battle, unit) : []
+    const path = unit.civilian ? fleePath(battle, unit) : unit.engaged ? fightPath(battle, unit) : []
     if (path.length === 0 && unit.civilian === 'vip') events.push(...squeezePast(battle, unit))
     if (path.length === 0 && unit.order) events.push({ type: 'order', id: unit.id, order: unit.order })
     if (path.length === 0) continue
@@ -56,26 +56,24 @@ export function moveSide(battle: Battle): GameEvent[] {
     }
   }
   const sighted = sight(battle)
-  // Soldiers on overwatch fire once the aliens have moved and any pod sighted has taken its place.
+  // Soldiers on overwatch fire once the aliens have moved and any alien sighted has taken its place.
   if (battle.turn === 'alien') sighted.push(...overwatch(battle, [...events, ...sighted].flatMap((e) => (e.type === 'move' ? [e.id] : []))))
   return [...events, ...sighted]
 }
 
 /**
- * A pod waiting its turn engages once a soldier comes within ENGAGE_REACH of it; a pod unseen, a wave coming in,
- * shows once a soldier sights it.
+ * An alien waiting its turn engages once a soldier comes within ENGAGE_REACH of it, nearest first, up to the most that
+ * fight at once; one unseen, a wave coming in, shows once a soldier sights it.
  */
 export function sight(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
   const soldiers = battle.units.filter(isSoldier)
-  battle.pods.forEach((pod, index) => {
-    if (burrowing(battle, index)) return
-    const members = battle.units.filter((u) => u.pod === index)
-    if (!pod.engaged && members.some((m) => soldiers.some((s) => distance(s, m) <= ENGAGE_REACH))) pod.engaged = true
-    if (pod.revealed || !members.some((m) => soldiers.some((s) => detects(battle, s, m)))) return
-    pod.revealed = true
-    events.push({ type: 'reveal', units: members.map(({ id, x, y }) => ({ id, x, y })) })
-  })
+  const aliens = battle.units.filter((u) => u.side === 'alien' && !burrowing(u))
+  const drawn = aliens.filter((u) => !u.engaged && soldiers.some((s) => distance(s, u) <= ENGAGE_REACH))
+  if (drawn.length > 0) engageNearest(battle, soldiers, Math.min(drawn.length, Math.max(0, fightCap(soldiers.length) - walkersFighting(battle))))
+  const sighted = aliens.filter((u) => !u.revealed && soldiers.some((s) => detects(battle, s, u)))
+  for (const alien of sighted) alien.revealed = true
+  if (sighted.length > 0) events.push({ type: 'reveal', units: sighted.map(({ id, x, y }) => ({ id, x, y })) })
   // Getting out, a soldier with its hands free beside a squadmate down picks them up.
   for (const body of battle.extract ? lying(battle) : []) {
     const carrier = soldiers.find((s) => distance(s, body) <= 1 && !carrying(battle, s))
@@ -145,10 +143,10 @@ export function escortVip(battle: Battle, soldiers: Unit[]): GameEvent[] {
     const at = { x: vip.x + Math.sign(breacher.x - vip.x), y: vip.y + Math.sign(breacher.y - vip.y) }
     wreck(battle, at)
     const guards = battle.units.filter((u) => u.side === 'alien' && distance(u, vip) <= BREACH_REACH + 2)
-    for (const pod of new Set(guards.map((u) => u.pod!))) Object.assign(battle.pods[pod], { revealed: true, engaged: true, surprised: 1 })
+    for (const guard of guards) Object.assign(guard, { revealed: true, engaged: true, surprised: 1 })
     events.push({ type: 'rocket', id: breacher.id, x: at.x, y: at.y, hits: [] })
   }
-  const guarded = pursuers(battle, vip).some((u) => engaged(battle, u) && distance(u, vip) <= FREE_REACH)
+  const guarded = pursuers(battle, vip).some((u) => u.engaged && distance(u, vip) <= FREE_REACH)
   if (battle.vip === 'breached' && !guarded && soldiers.some((s) => distance(s, vip) <= BREACH_REACH)) {
     battle.vip = 'freed'
     // A VIP still walled in is broken out.
@@ -200,14 +198,14 @@ function squeezePast(battle: Battle, vip: Unit): GameEvent[] {
 /**
  * A soldier's walk between or after its attacks, within the move it has left: with `toShot`, to the nearest tile with a
  * shot (of `secondary`, if given), if it has none here; else a Deadeye backs out of arm's reach. Never
- * into harm, off the uplink, or into sight of a pod not yet revealed.
+ * into harm, off the uplink, or into sight of an alien not yet revealed.
  */
 export function stride(battle: Battle, unit: Unit, seen: Set<number>, toShot: boolean, secondary?: Secondary): GameEvent[] {
   const left = battle.strides[unit.id] ?? 0
   const enemies = enemiesOf(battle, unit)
   const shotFrom = (end: Tile) => enemies.some((e) => shootable(battle, aiming(unit, secondary), end, e, seen))
   if (left <= 0 || unit.hp <= 0 || (toShot ? shotFrom(unit) : unit.stance !== 'standoff')) return []
-  const unseen = battle.units.filter((u) => u.side !== unit.side && !revealed(battle, u))
+  const unseen = battle.units.filter((u) => u.side !== unit.side && !u.revealed)
   const reach = uplinkReach(battle)
   const barred = (end: Tile) =>
     onTile(battle.acid, end) || besideFuel(battle, end) || (onTile(battle.fire, end) && !fireproof(battle, unit)) || (battle.uplink !== null && distance(end, battle.uplink) > reach) || unseen.some((alien) => sees(battle, end, alien)) ? 1 : 0
@@ -229,7 +227,7 @@ export function overwatch(battle: Battle, moved: number[]): GameEvent[] {
   for (const unit of battle.units.filter((u) => u.side === 'human' && (has(u, 'overwatch') || u.order === 'prepare'))) {
     const seen = spotted(battle)
     for (const id of moved) {
-      const alien = battle.units.find((u) => u.id === id && revealed(battle, u))
+      const alien = battle.units.find((u) => u.id === id && u.revealed)
       battle.actor = unit.id
       const shot = alien && unit.hp > 0 ? shoot(battle, unit, seen, 'overwatch', alien) : []
       battle.actor = null
@@ -241,34 +239,26 @@ export function overwatch(battle: Battle, moved: number[]): GameEvent[] {
   return events
 }
 
-/** Whether the unit may act this turn: a soldier may not under an order; an alien may not until its pod engages, nor while it is surprised. */
-export function armed(battle: Battle, unit: Unit): boolean {
+/** Whether the unit may act this turn: a soldier may not under an order; an alien may not until it engages, nor while it is surprised. */
+export function armed(unit: Unit): boolean {
   if (unit.order) return false
-  return unit.pod === null || (battle.pods[unit.pod].engaged && !battle.pods[unit.pod].surprised)
+  return unit.engaged && !unit.surprised
 }
 
-/** Burrowers underground surface once their pod engages: beside the soldier with the fewest squadmates near, ready to strike this turn. */
+/** Burrowers underground surface once engaged: beside the soldier with the fewest squadmates near, ready to strike this turn. */
 export function surface(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
   const soldiers = battle.units.filter(isSoldier)
   const company = (s: Unit) => battle.units.filter((u) => u.side === s.side && u !== s && !u.civilian && distance(u, s) <= COHESION).length
-  battle.pods.forEach((pod, index) => {
-    if (!burrowing(battle, index)) return
-    const members = battle.units.filter((u) => u.pod === index)
-    if (!pod.engaged) return
-    const alone = soldiers.reduce<Unit | undefined>((best, s) => (!best || company(s) < company(best) ? s : best), undefined)
-    if (!alone) return
-    freeTilesNear(battle, alone, members.length).forEach((tile, i) => Object.assign(members[i], tile))
-    Object.assign(pod, { revealed: true, surprised: 0 })
-    events.push({ type: 'reveal', units: members.map(({ id, x, y }) => ({ id, x, y })) })
-    // Surfacing is a move, so overwatch answers it.
-    for (const m of members) events.push({ type: 'move', id: m.id, path: [{ x: m.x, y: m.y }] })
-  })
+  const rising = battle.units.filter((u) => burrowing(u) && u.engaged)
+  const alone = soldiers.reduce<Unit | undefined>((best, s) => (!best || company(s) < company(best) ? s : best), undefined)
+  if (rising.length === 0 || !alone) return events
+  freeTilesNear(battle, alone, rising.length).forEach((tile, i) => Object.assign(rising[i], tile, { revealed: true, surprised: 0 }))
+  events.push({ type: 'reveal', units: rising.map(({ id, x, y }) => ({ id, x, y })) })
+  // Surfacing is a move, so overwatch answers it.
+  for (const m of rising) events.push({ type: 'move', id: m.id, path: [{ x: m.x, y: m.y }] })
   return events
 }
 
-/** Whether a pod is burrowers still underground: unseen, and beyond the squad's sight. */
-export function burrowing(battle: Battle, index: number): boolean {
-  const members = battle.units.filter((u) => u.pod === index)
-  return !battle.pods[index].revealed && members.length > 0 && members.every((u) => u.kind === 'burrower')
-}
+/** Whether an alien is a burrower still underground. */
+const burrowing = (unit: Unit) => !unit.revealed && unit.kind === 'burrower'

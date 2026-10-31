@@ -13,20 +13,20 @@ function landing(kit: Run['kit']): Run {
   const run = begun(3)
   run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   apply(run, { type: 'go', index: 0 })
-  road(run, [{ kind: 'battle', risk: 'standard', goal: 'exterminate', terrain: 'town', twist: null, packs: [{ name: 'Patrol', kinds: ['trooper', 'trooper', 'trooper'] }] }])
+  road(run, [{ kind: 'battle', risk: 'standard', goal: 'exterminate', terrain: 'town', twist: null, aliens: ['trooper', 'trooper', 'trooper'] }])
   apply(run, { type: 'advance' })
   run.kit = kit
   return run
 }
 
-/** Brings every pod into the fight, in sight. */
-const engage = (run: Run) => run.battle!.pods.forEach((pod) => Object.assign(pod, { revealed: true, engaged: true }))
+/** Brings every alien into the fight, in sight. */
+const engage = (run: Run) => run.battle!.units.forEach((u) => Object.assign(u, { revealed: true, engaged: true }))
 
 test('a consumable is used only in a battle, and one aimed at the aliens only once one is in the fight', () => {
   const run = landing(['airstrike', 'medkit'])
   expect(apply(run, { type: 'use', index: 0 })).toEqual({ ok: false, reason: 'cannot use that now' })
   enterAt(run, 0)
-  for (const pod of run.battle!.pods) pod.engaged = false
+  for (const u of run.battle!.units) if (u.side === 'alien') u.engaged = false
   expect(apply(run, { type: 'use', index: 0 }).ok).toBe(false)
   engage(run)
   expect(apply(run, { type: 'use', index: 0 })).toEqual({ ok: true })

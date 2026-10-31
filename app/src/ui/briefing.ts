@@ -79,13 +79,18 @@ function ground(battle: Battle, at: Tile): string {
 /** What a prop makes of the ground it stands on. */
 const FEATURES: Partial<Record<Prop, string>> = { car: 'wrecked cars', truck: 'wrecked cars', tree: 'trees', crate: 'crates', stack: 'crates', fence: 'fences', rubble: 'rubble', spire: 'alien growth', growth: 'alien growth', water: 'water', fuel: 'fuel tanks', void: 'a sheer drop' }
 
-/** A pod, as the briefing names it. */
-function podLine(battle: Battle, pod: number): string {
-  const members = battle.units.filter((u) => u.pod === pod)
+/** The aliens about `at`, as the briefing names them. */
+function nearby(battle: Battle, at: Tile): string {
   const kinds = new Map<string, number>()
-  for (const u of members) kinds.set(u.boss ? 'the Hunter' : ALIENS[u.kind!].name.toLowerCase(), (kinds.get(u.boss ? 'the Hunter' : ALIENS[u.kind!].name.toLowerCase()) ?? 0) + 1)
-  return `${battle.pods[pod].name}: ${[...kinds].map(([k, n]) => (n > 1 ? `${n} ${k}s` : k)).join(', ')}`
+  for (const u of battle.units.filter((a) => a.side === 'alien' && a.revealed && Math.hypot(a.x - at.x, a.y - at.y) <= NEARBY)) {
+    const name = u.boss ? 'the Hunter' : ALIENS[u.kind!].name.toLowerCase()
+    kinds.set(name, (kinds.get(name) ?? 0) + 1)
+  }
+  return kinds.size === 0 ? '' : `Near it: ${[...kinds].map(([k, n]) => (n > 1 ? `${n} ${k}s` : k)).join(', ')}. `
 }
+
+/** Tiles about a thing the briefing counts aliens in. */
+const NEARBY = 5
 
 /** The most stops a briefing makes, the whole map among them. */
 export const STOPS = 3
@@ -97,12 +102,11 @@ export const STOPS = 3
 export function shots(battle: Battle): Shot[] {
   const goal = GOALS[battle.goal]
   const aliens = battle.units.filter((u) => u.side === 'alien')
-  const pod = (at: Tile & { pod?: number | null }) => (at.pod != null ? `${podLine(battle, at.pod)}. ` : '')
   const commander = aliens.find((u) => u.target)
-  // The objective: the uplink, the commander, the caches, or failing those the biggest pod.
-  const sizes = battle.pods.map((_, i) => aliens.filter((u) => u.pod === i).length)
-  const biggest = aliens.find((u) => u.pod === sizes.indexOf(Math.max(...sizes)))
-  const at: (Tile & { pod?: number | null })[] = battle.uplink
+  // The objective: the uplink, the commander, the caches, or failing those the alien most surrounded.
+  const company = (a: Tile) => aliens.filter((u) => Math.hypot(u.x - a.x, u.y - a.y) <= NEARBY).length
+  const biggest = aliens.filter((u) => u.revealed).reduce<Tile | undefined>((a, b) => (!a || company(b) > company(a) ? b : a), undefined)
+  const at: Tile[] = battle.uplink
       ? [battle.uplink]
       : commander
         ? [commander]
@@ -112,7 +116,7 @@ export function shots(battle: Battle): Shot[] {
             ? [biggest]
             : []
   const where = `${battle.city}, ${REGIONS[battle.region].name.toLowerCase()}. `
-  const lines = at.map((t, i) => `${i === 0 ? `${where}Objective: ${goal.text}. ` : ''}${pod(t)}${ground(battle, t)}.`)
+  const lines = at.map((t, i) => `${i === 0 ? `${where}Objective: ${goal.text}. ` : ''}${nearby(battle, t)}${ground(battle, t)}.`)
   const twist = battle.twist && TWISTS[battle.twist]
   const choice = battle.goal === 'raid' ? 'Choose how many caches to go for.' : 'Choose your entrance.'
   const last = `${twist ? `${twist.icon} ${twist.name}: ${twist.text}. ` : ''}${choice}`

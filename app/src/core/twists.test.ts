@@ -30,7 +30,7 @@ function duel(twist: Twist | null): Battle {
   const soldier = battle.units.find((u) => u.side === 'human' && !u.civilian)!
   const alien = battle.units.find((u) => u.side === 'alien')!
   battle.units = [soldier, alien]
-  battle.pods.forEach((pod) => Object.assign(pod, { revealed: true, engaged: true }))
+  for (const u of battle.units) Object.assign(u, { revealed: true, engaged: true })
   Object.assign(soldier, { x: 10, y: 10, effects: [], stats: { ...soldier.stats, move: 0, range: 8 } })
   Object.assign(alien, { kind: 'trooper', x: 10, y: 12, hp: 99, armor: 0, target: false, stats: { ...alienStats('trooper', 0, 0), hp: 99, armor: 0, move: 0 } })
   return battle

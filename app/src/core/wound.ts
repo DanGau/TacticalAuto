@@ -1,5 +1,5 @@
 // Damage landing on a unit, what it sets off, and the tally it adds to.
-import { REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_TURNS, BLAST_RADIUS, type Battle, type Unit, type Tile, type Effect } from './battle'
+import { REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_TURNS, BLAST_RADIUS, type Battle, type Unit, type Tile, type Effect } from './battle'
 import { blocked } from './grid'
 import { passable } from './grid'
 import { wreck } from './grid'
@@ -18,12 +18,12 @@ export const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || ta
 
 /**
  * Deals `damage` to a unit: its armor takes it first, then its health. At zero health the unit is removed and its
- * death reported; a hostage takes none. A burster that dies explodes, and a psion that dies hurts the other aliens of its pod. A pod hurt
+ * death reported; a hostage takes none. A burster that dies explodes, and a psion that dies hurts the aliens near it. An alien hurt
  * engages.
  */
 export function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[], pierce = false, crit = false): void {
   if (target.hp <= 0 || hostage(battle, target)) return
-  if (target.pod !== null) battle.pods[target.pod].engaged = true
+  target.engaged = true
   const damage = target.kind === 'wraith' && !crit ? Math.min(dealt, 1) : dealt
   const full = target.hp === target.stats.hp
   // A juggernaut's plate stops a hit whole, and is lost to it.
@@ -77,7 +77,7 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
     battle.downed.push({ soldier: target.soldier!, x: target.x, y: target.y, carrier: null })
   }
   events.push({ type: 'death', id: target.id })
-  if (target.civilian && killer?.kind === 'harvester') battle.husks.push({ x: target.x, y: target.y, pod: killer.pod! })
+  if (target.civilian && killer?.kind === 'harvester') battle.husks.push({ x: target.x, y: target.y })
   if (has(target, 'detonate')) {
     const caught = battle.units.filter((u) => u.side !== target.side && distance(u, target) <= 1)
     events.push({ type: 'rocket', id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: DETONATE_DAMAGE })) })
@@ -102,7 +102,7 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
     for (const unit of caught) wound(battle, unit, BURST_DAMAGE, events)
   }
   if (target.kind === 'psion') {
-    for (const unit of battle.units.filter((u) => u.pod === target.pod)) {
+    for (const unit of battle.units.filter((u) => u.side === 'alien' && distance(u, target) <= PSI_BACKLASH_REACH)) {
       events.push({ type: 'hurt', id: unit.id, amount: PSI_BACKLASH, cause: 'backlash' })
       wound(battle, unit, PSI_BACKLASH, events)
     }

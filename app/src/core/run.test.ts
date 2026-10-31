@@ -70,7 +70,7 @@ const stopOf = (kind: StopKind, risk: Risk = 'standard'): Stop => ({
   goal: 'exterminate',
   terrain: kind === 'key' ? 'compound' : 'town',
   twist: null,
-  packs: kind === 'battle' ? [{ name: 'Patrol', kinds: ['trooper', 'trooper'] }] : [],
+  aliens: kind === 'battle' ? ['trooper', 'trooper'] : [],
 })
 
 /** Goes on to a road of the given stops, each of `risk`. */
@@ -428,14 +428,14 @@ test('experience follows what a soldier did: kills and damage its own, feats onl
   expect(soldier.feats).toEqual(['hatTrick'])
 })
 
-test('an ambush has no entrance: the squad is down at once, every pod in sight, the Hunter engaged first and half again as strong as its best soldier', () => {
+test('an ambush has no entrance: the squad is down at once, every alien in sight, the Hunter engaged first and half again as strong as its best soldier', () => {
   const run = travelling(['battle', 'battle'])
   run.threat = THREAT_MAX
   apply(run, { type: 'advance' })
   const battle = run.battle!
   expect(battle).toMatchObject({ goal: 'ambush', phase: 'battle', waves: [] })
   expect(battle.units.filter(isSoldier)).toHaveLength(run.soldiers.length)
-  expect(battle.pods.map((p) => p.engaged)).toEqual(battle.pods.map((_, i) => i === 0))
+  for (const u of battle.units.filter((a) => a.side === 'alien')) expect(u.engaged).toBe(u.boss)
   const hunter = battle.units.find((u) => u.boss)!.stats
   const best = soldierStats(run, run.soldiers[0])
   expect(hunter.hp * hunter.damage).toBeGreaterThanOrEqual(1.4 * best.hp * best.damage)
@@ -501,7 +501,7 @@ test('a key mission has one boss, with an escort for each key already won', () =
     const battle = run.battle!
     const boss = battle.units.filter((u) => u.boss)
     expect(boss).toHaveLength(1)
-    expect(battle.units.filter((u) => u.pod === boss[0].pod)).toHaveLength(1 + keys)
+    expect(battle.units.filter((u) => u.side === 'alien').length).toBeGreaterThanOrEqual(1 + keys)
     expect(boss[0].spawns).toBe(keys >= 1)
   }
 })

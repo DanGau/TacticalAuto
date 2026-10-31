@@ -16,7 +16,7 @@ export function road(run: Run, stops: Stop[]): void {
 /** For tests: puts the squad at its leg's satellite, its leg's stops drawn or not. */
 export function atKey(run: Run): void {
   const leg = legOf(run)
-  leg.columns.at(-1)![0].stop ??= { kind: 'key', risk: 'standard', goal: 'exterminate', terrain: 'compound', twist: null, packs: [] }
+  leg.columns.at(-1)![0].stop ??= { kind: 'key', risk: 'standard', goal: 'exterminate', terrain: 'compound', twist: null, aliens: [] }
   run.stop = leg.columns.length - 1
   leg.path = [...Array<number>(run.stop).fill(-1), 0]
 }

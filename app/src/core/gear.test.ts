@@ -75,7 +75,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   const soldier = battle.units.find((u) => u.soldier === run.soldiers[0].id)!
   const alien = battle.units.find((u) => u.side === 'alien')!
   battle.units = [soldier, alien]
-  battle.pods.forEach((pod) => Object.assign(pod, { revealed: true, engaged: true }))
+  for (const u of battle.units) Object.assign(u, { revealed: true, engaged: true })
   // A soldier of no class in particular: it holds its ground and has no ability or class skill.
   Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, effects: gear.effect ? [gear.effect] : [] })
   Object.assign(alien, { kind: 'trooper', x: 10, y: 11, hp: 99, armor: 0, target: false, stats: { ...alienStats('trooper', 0, 0), hp: 99, armor: 0, crit: 0 } })
@@ -149,7 +149,7 @@ test('overkill coils carry damage beyond a kill to the nearest other alien', () 
   d.soldier.effects.push('overkill')
   d.alien.hp = 4
   d.alien.armor = 0
-  const other = alienUnit(d.battle, { kind: 'trooper', stats: { ...d.alien.stats, hp: 99, armor: 0 }, stance: 'anchor', boss: false, spawns: false, target: false, resists: [] }, { x: d.alien.x + 1, y: d.alien.y }, 0)
+  const other = alienUnit(d.battle, { kind: 'trooper', stats: { ...d.alien.stats, hp: 99, armor: 0 }, stance: 'anchor', boss: false, spawns: false, target: false, resists: [] }, { x: d.alien.x + 1, y: d.alien.y }, true)
   d.battle.units.push(other)
   const events = []
   while (d.alien.hp > 0) events.push(...d.step())
@@ -160,7 +160,7 @@ test('overkill coils carry damage beyond a kill to the nearest other alien', () 
 
 /** Another alien in the duel, at `dx`, `dy` from the first, too tough to die. */
 function another(d: ReturnType<typeof duel>, dx: number, dy: number): Unit {
-  const other = alienUnit(d.battle, { kind: 'trooper', stats: { ...d.alien.stats, hp: 99, armor: 0 }, stance: 'anchor', boss: false, spawns: false, target: false, resists: [] }, { x: d.alien.x + dx, y: d.alien.y + dy }, 0)
+  const other = alienUnit(d.battle, { kind: 'trooper', stats: { ...d.alien.stats, hp: 99, armor: 0 }, stance: 'anchor', boss: false, spawns: false, target: false, resists: [] }, { x: d.alien.x + dx, y: d.alien.y + dy }, true)
   d.battle.units.push(other)
   return other
 }

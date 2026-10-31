@@ -1,5 +1,6 @@
 // The squad's entrance on screen, as a film would cut to it: the door kicked in, the wall smashed, the monologue, the tap on the shoulder.
 import { type Battle, type Tile, type Unit } from '../core/battle'
+import { closeBy, LOOK_REACH, STRIKE } from '../core/entrances'
 import { nearestAlien } from '../core/grid'
 import { drawTerrain } from './board'
 import { callout, drawing, float } from './effects'
@@ -256,13 +257,13 @@ async function truck(s: Stage, fx: Sketch, at: Tile, back: Tile): Promise<void> 
   await s.tween(DEBRIS_MS, (t) => fx.clear().ellipse(at.x, at.y - 10, 30 + 80 * t, 14 + 36 * t).fill({ color: 0xb8a888, alpha: 0.7 * (1 - t) }))
 }
 
-/** Shells streak down on the pod nearest, one after another, before the squad goes in. */
+/** Shells streak down on the aliens nearest, one after another, before the squad goes in. */
 async function strike(s: Stage, battle: Battle, foe: Unit | undefined): Promise<void> {
   if (!foe) return
-  const pod = battle.units.filter((u) => u.pod === foe.pod)
-  await s.follow(pod.map((u) => ({ x: u.x, y: u.y })), 400)
+  const struck = closeBy(battle, foe, STRIKE.reach)
+  await s.follow(struck.map((u) => ({ x: u.x, y: u.y })), 400)
   await Promise.all(
-    pod.map((u, i) =>
+    struck.map((u, i) =>
       drawing(s, async (fx) => {
         const ground = s.toWorld(u.x, u.y)
         await s.tween(i * STAGGER_MS, () => {})
@@ -333,7 +334,7 @@ function burst(fx: Sketch, at: Tile, t: number): void {
   fx.clear().poly(points).fill({ color: 0xffe08a, alpha: 1 - t }).stroke({ color: 0x10141c, width: 3, alpha: 1 - t })
 }
 
-/** A hero points away from the aliens and calls out; the nearest pod falls for it, every alien turning round. */
+/** A hero points away from the aliens and calls out; those nearest fall for it, turning round. */
 async function look(s: Stage, battle: Battle, soldiers: Unit[], foe: Unit | undefined): Promise<void> {
   if (!foe) return
   const hero = s.sprites.get(lead(soldiers, foe).id)!
@@ -350,9 +351,9 @@ async function look(s: Stage, battle: Battle, soldiers: Unit[], foe: Unit | unde
     }),
   )
   s.labels.delete(line)
-  const pod = battle.units.filter((u) => u.pod === foe.pod && s.sprites.has(u.id)).map((u) => s.sprites.get(u.id)!)
-  for (const sprite of pod) float(s, callout(s, 'Huh?', 0xffffff, sprite, 18))
-  await Promise.all(pod.map((sprite) => turn(s, sprite)))
+  const fooled = closeBy(battle, foe, LOOK_REACH).filter((u) => s.sprites.has(u.id)).map((u) => s.sprites.get(u.id)!)
+  for (const sprite of fooled) float(s, callout(s, 'Huh?', 0xffffff, sprite, 18))
+  await Promise.all(fooled.map((sprite) => turn(s, sprite)))
   await s.tween(BEAT_MS, () => {})
 }
 

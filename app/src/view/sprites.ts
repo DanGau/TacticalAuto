@@ -1,7 +1,7 @@
 // Units on the board: each one's picture with its health pips, and moving, squashing, fading and removing it.
 import { CanvasTexture, CircleGeometry, Group, Mesh, MeshBasicMaterial, Sprite as Billboard, SpriteMaterial } from 'three'
 import { ALIENS } from '../core/aliens'
-import { revealed, type Battle, type Tile, type Unit } from '../core/battle'
+import { type Battle, type Tile, type Unit } from '../core/battle'
 import { CLASSES } from '../core/classes'
 import { type Run } from '../core/run-state'
 import { level } from '../core/squad'
@@ -163,7 +163,7 @@ export function remove(s: Stage, id: number): void {
 /** Makes the sprites match the battle exactly. */
 export function sync(s: Stage, run: Run, battle: Battle): void {
   drawAcid(s, battle)
-  const visible = battle.units.filter((u) => revealed(battle, u))
+  const visible = battle.units.filter((u) => u.revealed)
   const live = new Set(visible.map((u) => u.id))
   for (const id of [...s.sprites.keys()]) if (!live.has(id)) remove(s, id)
   for (const unit of visible) {

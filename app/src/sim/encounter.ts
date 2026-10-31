@@ -53,7 +53,7 @@ function encounter(seed: number, mission: Encounter, leg: number, squad: Squad):
   if (mission === 'key' || mission === 'final') {
     if (mission === 'final') run.keys = KEYS
     const leg = legOf(run)
-    if (mission === 'final') leg.columns[0][0].stop = { kind: 'final', risk: 'standard', goal: 'exterminate', terrain: 'hive', twist: null, packs: [] }
+    if (mission === 'final') leg.columns[0][0].stop = { kind: 'final', risk: 'standard', goal: 'exterminate', terrain: 'hive', twist: null, aliens: [] }
     atKey(run)
   } else {
     let stop = drawBattle(run, 'standard')

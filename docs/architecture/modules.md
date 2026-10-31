@@ -6,9 +6,9 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 | File | Owns |
 |---|---|
-| `battle.ts` | Battle state types (`Battle`, `Unit`, `Pod`) and the numbers rules share |
+| `battle.ts` | Battle state types (`Battle`, `Unit`) and the numbers rules share |
 | `grid.ts` | The board: distance, objects, walls, walking costs and routes, free tiles |
-| `setup.ts` | `createBattle`: battle state, placing pods, civilians, goals by the encounter |
+| `setup.ts` | `createBattle`: battle state, placing aliens, civilians, goals by the encounter |
 | `encounter.ts` | `designEncounter`: the set-piece: arena, overlook, hazard, objects, posts, approaches, gates |
 | `objects.ts` | What heroes do with objects: hurling them, setting off tanks |
 | `entrances.ts` | Entrances: their kinds, where each comes in, what each sets off |
@@ -21,7 +21,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `attack.ts` | A shot and what a hit or kill sets off |
 | `abilities.ts` | Actions in place of a shot: alien powers, soldier skills and gear |
 | `wound.ts` | Damage landing, what it sets off, the battle tally |
-| `upkeep.ts` | What happens as a side's turn begins: the next pod engaging, waves |
+| `upkeep.ts` | What happens as a side's turn begins: more aliens engaging, waves |
 | `fighters.ts` | Unit queries every combat module asks |
 | `sight.ts` | Line of sight, what height does to a shot, noticing |
 | `terrain.ts` | Battlefield tile types and how solid each is |
@@ -38,7 +38,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `progress.ts` | How far along the run is, and threat |
 | `squad.ts` | Soldiers: experience, levels, skills, stats, health, hiring |
 | `rewards.ts` | Gear and relic rewards, the shop, settling the reward phase |
-| `missions.ts` | Missions: their force, packs, goal and place |
+| `missions.ts` | Missions: their force, aliens, goal and place |
 | `debrief.ts` | `endBattle`: settling a battle into the run |
 | `events.ts` | Unknown stops' events |
 | `apply.ts` | `apply`: the player's actions, checked and applied |

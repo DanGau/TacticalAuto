@@ -3,7 +3,7 @@ import { BARRIER_ARMOR, CHILL_TURNS, ENTRANCES, GRID, IMPACT_REACH, isSoldier, t
 import type { GameEvent } from './combat-event'
 import { SMOKE_TURNS } from './consumables'
 import { blocked, breach, distance, edgeBetween, edgeDepths, freeTilesNear, heightAt, NEIGHBORS, onGrid, openNear, reachableFrom, walkingDistances, walks } from './grid'
-import { has, nearest } from './fighters'
+import { engageNearest, has, joinSize, nearest } from './fighters'
 import { PROP_BULK } from './terrain'
 import { randomInt } from './rng'
 import { dropUnit, soldierUnit, TURRET } from './spawn'
@@ -13,8 +13,8 @@ import { wound } from './wound'
 /** A way the squad makes its entrance. */
 export type EntranceKind = 'door' | 'wall' | 'monologue' | 'skylight' | 'rappel' | 'smoke' | 'truck' | 'strike' | 'tap' | 'look' | 'blast' | 'han' | 'mine'
 
-/** An artillery strike's threat, and the damage it does each alien of the pod it hits, never killing one. */
-export const STRIKE = { threat: 2, damage: 5 }
+/** An artillery strike's threat, and the damage it does each alien within `reach` of the nearest, never killing one. */
+export const STRIKE = { threat: 2, damage: 5, reach: 3 }
 
 /** Rounds a monologue holds every alien's attention, and the more Limelight adds. */
 export const MONOLOGUE_ROUNDS = 2
@@ -27,10 +27,11 @@ export const SMOKE_REACH = 10
 export const CHARGE_REACH = 8
 export const CHARGE_BLAST = 3
 
-/** How near an alien a shoulder tap must come in, the damage it does whom it cannot flatten, and alien turns a pod looks the wrong way. */
+/** How near an alien a shoulder tap must come in, the damage it does whom it cannot flatten, and alien turns those within LOOK_REACH of the nearest look the wrong way. */
 export const TAP_REACH = 4
 export const TAP_DAMAGE = 6
 export const LOOK_TURNS = 2
+export const LOOK_REACH = 5
 
 /** The nearest an entrance comes to an assassination's commander, and to another entrance. */
 export const COMMANDER_GAP = 12
@@ -47,15 +48,15 @@ const ENTRY_WALK = 40
  */
 export const ENTRANCE_KINDS: Record<EntranceKind, { name: string; icon: string; text: string; reach: [number, number]; site: (battle: Battle, tile: Tile) => number; fits?: (battle: Battle, tile: Tile) => boolean }> = {
   door: { name: 'Kick the door', icon: '🚪', text: 'The classic: the door flies into the nearest alien, hurting it, and it loses its first action', reach: [5, 8], site: (b, t) => walled(b, t), fits: (b, t) => threshold(b, t) },
-  wall: { name: 'Through the wall', icon: '🧱', text: 'Charge straight through a wall: the nearest pod is caught surprised and holds its fire on its first turn', reach: [5, 8], site: (b, t) => walled(b, t), fits: (b, t) => walled(b, t) > 0 },
+  wall: { name: 'Through the wall', icon: '🧱', text: 'Charge straight through a wall: the aliens nearest are caught surprised and hold their fire on its first turn', reach: [5, 8], site: (b, t) => walled(b, t), fits: (b, t) => walled(b, t) > 0 },
   monologue: { name: 'Land and monologue', icon: '🎤', text: `Drop in and taunt them: for ${MONOLOGUE_ROUNDS} rounds every alien goes for the speaker, sparing civilians and the VIP`, reach: [6, 9], site: () => 0 },
   skylight: { name: 'Skylight crash', icon: '🪟', text: `Crash down among them: falling glass hurts each alien within ${IMPACT_REACH} tiles of the squad`, reach: [3, 6], site: () => 0, fits: (b, t) => ground(b, t) === 'floor' },
   rappel: { name: 'Rappel in', icon: '🪢', text: 'Rope down onto the highest ground over the fight', reach: [6, 10], site: (b, t) => heightAt(b, t), fits: (b, t) => heightAt(b, t) > 0 },
   smoke: { name: 'Out of the smoke', icon: '💨', text: `Stride out of a smoke screen: every alien within ${SMOKE_REACH} tiles is suppressed, its attacks doing 1 less damage, for ${SMOKE_TURNS} turns`, reach: [5, 8], site: () => 0 },
   truck: { name: 'Ram raid', icon: '🚚', text: 'Crash a truck into the nearest alien, hurting it badly; the wreck stands, blocking shots', reach: [5, 8], site: (b, t) => (ground(b, t) === 'road' ? 1 : 0), fits: (b, t) => ground(b, t) === 'road' || ground(b, t) === 'pavement' },
-  strike: { name: 'Danger close', icon: '💥', text: `Walk in behind an artillery strike: each alien of the nearest pod loses ${STRIKE.damage} health, never the last`, reach: [7, 10], site: () => 0 },
-  tap: { name: 'Shoulder tap', icon: '👉', text: `Appear right behind a pod, deep among the aliens with every one in reach: the nearest turns round and is flattened (a boss or commander loses ${TAP_DAMAGE} health)`, reach: [2, 3], site: (b, t) => inView(b).filter((u) => distance(u, t) <= TAP_REACH + 1).length, fits: (b, t) => tappable(b, t) },
-  look: { name: 'Look over there!', icon: '👀', text: `Land far out and point: the nearest pod looks the wrong way for ${LOOK_TURNS} alien turns while the squad crosses the ground`, reach: [10, 13], site: () => 0 },
+  strike: { name: 'Danger close', icon: '💥', text: `Walk in behind an artillery strike: the nearest aliens each lose ${STRIKE.damage} health, never the last`, reach: [7, 10], site: () => 0 },
+  tap: { name: 'Shoulder tap', icon: '👉', text: `Appear right behind an alien, deep among them: the nearest turns round and is flattened (a boss or commander loses ${TAP_DAMAGE} health)`, reach: [2, 3], site: (b, t) => inView(b).filter((u) => distance(u, t) <= TAP_REACH + 1).length, fits: (b, t) => tappable(b, t) },
+  look: { name: 'Look over there!', icon: '👀', text: `Land far out and point: the nearest aliens look the wrong way for ${LOOK_TURNS} alien turns while the squad crosses the ground`, reach: [10, 13], site: () => 0 },
   blast: { name: 'Big explosion', icon: '🔥', text: 'Something behind the squad blows up, nobody looks back, and the fight is on. Style only', reach: [5, 8], site: () => 0 },
   han: { name: 'Shoot first', icon: '🔫', text: 'The nearest alien starts a speech and a hero shoots it mid-word, hurting it', reach: [5, 8], site: () => 0 },
   mine: { name: 'He was mine', icon: '🎯', text: 'A hero drops a straggler another had dibs on, and hears about it. Style only', reach: [5, 8], site: () => 0 },
@@ -135,20 +136,21 @@ export function planEntrances(battle: Battle, heart: Tile | null): void {
 }
 
 /**
- * The squad makes the entrance: it comes in on the free tiles nearest it, the pod nearest engages, and the battle
+ * The squad makes the entrance: it comes in on the free tiles nearest it, the aliens nearest engage, and the battle
  * begins. What the entrance sets off lands as the first beat; see opening.
  */
 export function enter(battle: Battle, entrance: Entrance): void {
   battle.entered = entrance
   deploy(battle, entrance.at)
   const squad = battle.units.filter(isSoldier)
-  const near = nearestPod(battle, entrance.at)
+  const closest = nearest(battle.units.filter((u) => u.side === 'alien'), entrance.at)
+  const dazed = closest ? closeBy(battle, closest, LOOK_REACH) : []
   const held = (effect: Effect) => squad.some((u) => has(u, effect))
   if (entrance.kind === 'wall') {
     breach(battle, entrance.at)
-    if (near !== null) battle.pods[near].surprised = 1
+    for (const alien of dazed) alien.surprised = 1
   }
-  if (entrance.kind === 'look' && near !== null) battle.pods[near].surprised = LOOK_TURNS
+  if (entrance.kind === 'look') for (const alien of dazed) alien.surprised = LOOK_TURNS
   if (entrance.kind === 'monologue') {
     const speaker = squad.reduce((a, b) => (b.hp > a.hp ? b : a))
     battle.spotlight = { id: speaker.id, until: MONOLOGUE_ROUNDS + (held('limelight') ? LIMELIGHT_ROUNDS : 0) }
@@ -167,26 +169,23 @@ export function enter(battle: Battle, entrance: Entrance): void {
   if (held('entryWall')) for (const soldier of squad) barricade(battle, soldier)
 }
 
-/** Puts the whole squad down on the free tiles nearest `at` and begins the battle, the pod nearest engaging. */
+/** Puts the whole squad down on the free tiles nearest `at` and begins the battle, the aliens nearest engaging. */
 export function deploy(battle: Battle, at: Tile): void {
   const tiles = freeTilesNear(battle, at, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => battle.units.push(soldierUnit(battle, soldier, tiles[i])))
   battle.reserve = []
   battle.phase = 'battle'
   battle.opening = true
-  const near = nearestPod(battle, at)
-  if (near !== null) battle.pods[near].engaged = true
   const squad = battle.units.filter(isSoldier)
+  engageNearest(battle, [at], joinSize(squad.length))
   // A barrier projector armors every squadmate of its carrier.
   for (const carrier of squad.filter((u) => u.effects.includes('barrier'))) {
     for (const mate of squad) if (mate !== carrier) mate.armor += BARRIER_ARMOR
   }
 }
 
-/** The pod with a member nearest `at`; null with none left. */
-function nearestPod(battle: Battle, at: Tile): number | null {
-  return nearest(battle.units.filter((u) => u.side === 'alien'), at)?.pod ?? null
-}
+/** The aliens within `reach` of `alien`, it among them. */
+export const closeBy = (battle: Battle, alien: Tile, reach: number) => battle.units.filter((u) => u.side === 'alien' && distance(u, alien) <= reach)
 
 /** Stands `prop` on `tile`, unless it would cut ground off from `soldier`. */
 function raise(battle: Battle, soldier: Unit, tile: Tile, prop: 'stack' | 'truck'): void {
@@ -232,7 +231,7 @@ export function opening(battle: Battle): GameEvent[] {
   if (kind === 'truck' && first) hurt(first, 2 * TUNING.impactDamage)
   if (kind === 'skylight') for (const alien of aliens().filter((u) => soldiers.some((s) => distance(s, u) <= IMPACT_REACH))) hurt(alien, TUNING.impactDamage)
   if (kind === 'strike' && first) {
-    for (const alien of aliens().filter((u) => u.pod === first.pod)) {
+    for (const alien of closeBy(battle, first, STRIKE.reach).filter((u) => u.kind !== 'burrower')) {
       const amount = Math.min(STRIKE.damage, alien.hp - 1)
       if (amount <= 0) continue
       events.push({ type: 'hurt', id: alien.id, amount, cause: 'impact' })
