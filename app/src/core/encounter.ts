@@ -33,10 +33,20 @@ const HEART: Mark = [2, 0]
 const COMMANDER_POST: Mark = [11, 0]
 const BOSS_POST: Mark = [9, 0]
 
+/** A shed a place with nothing left standing gets for entrances to use, its size, and where it stands. */
+const SHED = { w: 6, h: 5 }
+const SHED_MARKS: Mark[] = [[-13, -8], [-13, 8], [-10, -13], [-10, 13]]
+/** How near the arena's centre a building may stand and be kept, how far out one is worth keeping, and how many are. */
+const KEEP_FROM = 8
+const KEEP_TO = 20
+const KEPT = 2
+
 /** How many aliens stand by what a mission is about; how far each likes to keep from the others, and must. */
 const GUARDS = 2
 const SPREAD = 7
-const ELBOW_ROOM = 2
+const ELBOW_ROOM = 3
+/** Tiles a guard stands from what it guards, a VIP's but a step. */
+const GUARD_GAP = 3
 
 /** A random open tile far enough within the map's edge to hold the arena; in a building if `roofed` and one stands there. */
 function arenaSpot(battle: Battle, roofed: boolean): Tile {
@@ -86,6 +96,50 @@ function clearArena(battle: Battle, arena: Arena, kept: Set<number>): void {
   }
 }
 
+/** Buildings by the arena's edge, whole, for entrances to use: at most KEPT, nearest first, none reaching the arena's heart. */
+function edgeBuildings(battle: Battle, spot: Tile): Set<number> {
+  const seen = new Set<number>()
+  const found: { tiles: Set<number>; near: number }[] = []
+  battle.ground.forEach((g, t) => {
+    if (g !== 'floor' || seen.has(t)) return
+    const building = buildingAt(battle, { x: t % GRID, y: Math.floor(t / GRID) })
+    for (const b of building) seen.add(b)
+    const near = Math.min(...[...building].map((b) => distance({ x: b % GRID, y: Math.floor(b / GRID) }, spot)))
+    if (near >= KEEP_FROM && near <= KEEP_TO) found.push({ tiles: building, near })
+  })
+  found.sort((a, b) => a.near - b.near)
+  return new Set(found.slice(0, KEPT).flatMap((b) => [...b.tiles]))
+}
+
+/** Raises a shed whose corner is `at`, door toward `spot`, if the ground takes it. */
+function raiseShed(battle: Battle, at: Tile, spot: Tile): boolean {
+  const { w, h } = SHED
+  const x0 = at.x - (w >> 1)
+  const y0 = at.y - (h >> 1)
+  if (x0 < 1 || y0 < 1 || x0 + w >= GRID - 1 || y0 + h >= GRID - 1) return false
+  for (let y = y0 - 1; y <= y0 + h; y++) for (let x = x0 - 1; x <= x0 + w; x++) if (['void', 'water', 'floor'].includes(battle.ground[y * GRID + x])) return false
+  for (let y = y0; y < y0 + h; y++) {
+    for (let x = x0; x < x0 + w; x++) {
+      const t = y * GRID + x
+      battle.ground[t] = 'floor'
+      battle.props[t] = 'none'
+      battle.bulk[t] = 0
+      battle.height[t] = 0
+    }
+    battle.west[y * GRID + x0] = 'wall'
+    battle.west[y * GRID + x0 + w] = 'wall'
+  }
+  for (let x = x0; x < x0 + w; x++) {
+    battle.north[y0 * GRID + x] = 'wall'
+    battle.north[(y0 + h) * GRID + x] = 'wall'
+  }
+  // The door opens on the long side nearer the fight.
+  const middle = x0 + (w >> 1)
+  if (spot.y >= y0 + h / 2) battle.north[(y0 + h) * GRID + middle] = 'none'
+  else battle.north[y0 * GRID + middle] = 'none'
+  return true
+}
+
 /** Raises a mound about `at`, a level at `reach` and two at its crest, clear of what stands on it. */
 function rise(battle: Battle, at: Tile, reach: number, crest: number): void {
   for (let y = at.y - reach; y <= at.y + reach; y++) {
@@ -114,7 +168,9 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal): { 
   const spot = arenaSpot(battle, goal === 'vip')
   const arena = { x: spot.x, y: spot.y, reach: ARENA_REACH }
   battle.arena = arena
-  clearArena(battle, arena, goal === 'vip' ? buildingAt(battle, spot) : new Set())
+  const standing = edgeBuildings(battle, spot)
+  if (goal === 'vip') for (const t of buildingAt(battle, spot)) standing.add(t)
+  clearArena(battle, arena, standing)
   // The axis the fight flows along: of eight headings, the first whose both ends lie on the map, from a random start.
   const start = randomInt(battle, 8)
   const headings = Array.from({ length: 8 }, (_, i) => ((start + i) * Math.PI) / 4)
@@ -125,6 +181,8 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal): { 
     const clamp = (v: number) => Math.max(0, Math.min(GRID - 1, Math.round(v)))
     return { x: clamp(spot.x + fx * along - fy * across), y: clamp(spot.y + fy * along + fx * across) }
   }
+  // Nothing left for a hero to burst out of: a shed by the edge, but in the hive, which holds nothing human.
+  if (battle.place !== 'hive' && standing.size === 0 && battle.place !== 'compound') SHED_MARKS.some((mark) => raiseShed(battle, raw(mark), spot))
   rise(battle, raw(OVERLOOK), 3, 1)
   rise(battle, raw(LEDGE), 2, 0)
   const [low, tall] = SCATTER[battle.place] ?? ['crate', 'stack']
@@ -152,15 +210,15 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal): { 
     const room = Math.min(SPREAD, ...posts.map((p) => distance(p, t)))
     const shooter = alien.stats.range > 1 ? 6 * battle.height[t.y * GRID + t.x] + 0.4 * along(t) : 0
     const bruiser = alien.stats.range <= 1 && alien.stats.hp > 4 && !guarding ? -1.5 * Math.min(...chokes.map((c) => distance(c, t))) : 0
-    const guard = guarding ? -3 * distance(objective!, t) : 0
+    const guard = guarding ? -2 * Math.abs(distance(objective!, t) - (goal === 'vip' ? 1 : GUARD_GAP)) : 0
     const indoors = battle.ground[t.y * GRID + t.x] === 'floor' && !guarding ? -20 : 0
     const clear = goal === 'ambush' ? Math.min(0, 3 * (distance(t, spot) - 6)) : 0
     return room + shooter + bruiser + guard + indoors + clear + random(battle) * 2
   }
   for (const alien of aliens) {
     const set = alien.target ? COMMANDER_POST : alien.boss ? (goal === 'ambush' ? OVERLOOK : BOSS_POST) : null
-    const free = ground.filter((t) => posts.every((p) => distance(p, t) >= ELBOW_ROOM))
     const guarding = !set && guards > 0
+    const free = ground.filter((t) => posts.every((p) => distance(p, t) >= (guarding ? 1 : ELBOW_ROOM)) && distance(t, spot) >= (goal === 'vip' ? 1 : 0))
     if (guarding) guards--
     const pick = set ? openNear(battle, raw(set)) : (free.length > 0 ? free : ground).reduce<Tile | null>((a, b) => (!a || fit(alien, b, guarding) > fit(alien, a, guarding) ? b : a), null)
     const post = pick ?? openNear(battle, spot)

@@ -105,7 +105,7 @@ test('an assassination is won when the commander falls, though its guard lives',
   enterAt(run, 0)
   const commander = battle.units.filter((u) => u.target)
   expect(commander).toHaveLength(1)
-  expect(battle.units.filter((u) => u.side === 'alien' && !u.target && distance(u, commander[0]) <= 8).length).toBeGreaterThanOrEqual(2)
+  expect(battle.units.filter((u) => u.side === 'alien' && !u.target && distance(u, commander[0]) <= 10).length).toBeGreaterThanOrEqual(2)
   battle.units = battle.units.filter((u) => !u.target)
   stepBattle(battle)
   expect(battle.winner).toBe('human')

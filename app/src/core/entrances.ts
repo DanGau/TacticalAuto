@@ -2,8 +2,9 @@
 import { BARRIER_ARMOR, CHILL_TURNS, ENTRANCES, GRID, IMPACT_REACH, isSoldier, type Battle, type Effect, type Entrance, type RelicEffect, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { SMOKE_TURNS } from './consumables'
-import { blocked, breach, distance, edgeBetween, edgeDepths, freeTilesNear, heightAt, NEIGHBORS, onGrid, openNear, reachableFrom, walkingDistances, walks } from './grid'
+import { blocked, breach, distance, edgeDepths, freeTilesNear, NEIGHBORS, onGrid, openNear, reachableFrom, walkingDistances, walks } from './grid'
 import { engageNearest, has, joinSize, nearest } from './fighters'
+import { sitesOf, SUITS, type FeatureKind, type Site } from './features'
 import { PROP_BULK } from './terrain'
 import { randomInt } from './rng'
 import { dropUnit, soldierUnit, TURRET } from './spawn'
@@ -43,17 +44,17 @@ const ENTRY_WALK = 40
 
 /**
  * What each entrance is called and does, for the player; how far from the nearest alien it comes in; how it ranks a
- * tile to come in on; and, if it needs something standing there, which tiles have it. Those without `fits` can come in
- * anywhere, so a map with no buildings still offers three. Some are only style, and their text says so.
+ * tile to come in on; and, for a tap, which tiles allow it. A feature entrance comes in only by what stands there (see
+ * features.ts); the others come in anywhere, so a map with nothing standing still offers three. Some are only style, and their text says so.
  */
 export const ENTRANCE_KINDS: Record<EntranceKind, { name: string; icon: string; text: string; reach: [number, number]; site: (battle: Battle, tile: Tile) => number; fits?: (battle: Battle, tile: Tile) => boolean }> = {
-  door: { name: 'Kick the door', icon: '🚪', text: 'The classic: the door flies into the nearest alien, hurting it, and it loses its first action', reach: [5, 8], site: (b, t) => walled(b, t), fits: (b, t) => threshold(b, t) },
-  wall: { name: 'Through the wall', icon: '🧱', text: 'Charge straight through a wall: the aliens nearest are caught surprised and hold their fire on its first turn', reach: [5, 8], site: (b, t) => walled(b, t), fits: (b, t) => walled(b, t) > 0 },
+  door: { name: 'Kick the door', icon: '🚪', text: 'The classic: the door flies into the nearest alien, hurting it, and it loses its first action', reach: [5, 9], site: () => 0 },
+  wall: { name: 'Through the wall', icon: '🧱', text: 'Charge straight through a wall: the aliens nearest are caught surprised and hold their fire on its first turn', reach: [5, 9], site: () => 0 },
   monologue: { name: 'Land and monologue', icon: '🎤', text: `Drop in and taunt them: for ${MONOLOGUE_ROUNDS} rounds every alien goes for the speaker, sparing civilians and the VIP`, reach: [6, 9], site: () => 0 },
-  skylight: { name: 'Skylight crash', icon: '🪟', text: `Crash down among them: falling glass hurts each alien within ${IMPACT_REACH} tiles of the squad`, reach: [3, 6], site: () => 0, fits: (b, t) => ground(b, t) === 'floor' },
-  rappel: { name: 'Rappel in', icon: '🪢', text: 'Rope down onto the highest ground over the fight', reach: [6, 10], site: (b, t) => heightAt(b, t), fits: (b, t) => heightAt(b, t) > 0 },
+  skylight: { name: 'Skylight crash', icon: '🪟', text: `Crash down among them: falling glass hurts each alien within ${IMPACT_REACH} tiles of the squad`, reach: [3, 9], site: () => 0 },
+  rappel: { name: 'Rappel in', icon: '🪢', text: 'Rope down from the high point over the fight', reach: [5, 10], site: () => 0 },
   smoke: { name: 'Out of the smoke', icon: '💨', text: `Stride out of a smoke screen: every alien within ${SMOKE_REACH} tiles is suppressed, its attacks doing 1 less damage, for ${SMOKE_TURNS} turns`, reach: [5, 8], site: () => 0 },
-  truck: { name: 'Ram raid', icon: '🚚', text: 'Crash a truck into the nearest alien, hurting it badly; the wreck stands, blocking shots', reach: [5, 8], site: (b, t) => (ground(b, t) === 'road' ? 1 : 0), fits: (b, t) => ground(b, t) === 'road' || ground(b, t) === 'pavement' },
+  truck: { name: 'Ram raid', icon: '🚚', text: 'Crash a truck into the nearest alien, hurting it badly; the wreck stands, blocking shots', reach: [5, 9], site: () => 0 },
   strike: { name: 'Danger close', icon: '💥', text: `Walk in behind an artillery strike: the nearest aliens each lose ${STRIKE.damage} health, never the last`, reach: [7, 10], site: () => 0 },
   tap: { name: 'Shoulder tap', icon: '👉', text: `Appear right behind an alien, deep among them: the nearest turns round and is flattened (a boss or commander loses ${TAP_DAMAGE} health)`, reach: [2, 3], site: (b, t) => inView(b).filter((u) => distance(u, t) <= TAP_REACH + 1).length, fits: (b, t) => tappable(b, t) },
   look: { name: 'Look over there!', icon: '👀', text: `Land far out and point: the nearest aliens look the wrong way for ${LOOK_TURNS} alien turns while the squad crosses the ground`, reach: [10, 13], site: () => 0 },
@@ -63,12 +64,10 @@ export const ENTRANCE_KINDS: Record<EntranceKind, { name: string; icon: string; 
 }
 
 const KINDS = Object.keys(ENTRANCE_KINDS) as EntranceKind[]
-const ground = (battle: Battle, t: Tile) => battle.ground[t.y * GRID + t.x]
-/** Walls on a tile's sides. */
-const walled = (battle: Battle, t: Tile) => NEIGHBORS.slice(0, 4).filter(([dx, dy]) => onGrid(t.x + dx, t.y + dy) && edgeBetween(battle, t, { x: t.x + dx, y: t.y + dy }) === 'wall').length
-/** Whether a tile is a building's doorway: floor with no wall between it and the ground outside. */
-const threshold = (battle: Battle, t: Tile) =>
-  ground(battle, t) === 'floor' && NEIGHBORS.slice(0, 4).some(([dx, dy]) => onGrid(t.x + dx, t.y + dy) && ground(battle, { x: t.x + dx, y: t.y + dy }) !== 'floor' && edgeBetween(battle, t, { x: t.x + dx, y: t.y + dy }) === 'none')
+const FEATURED = ['door', 'wall', 'skylight', 'rappel', 'truck'] as const satisfies FeatureKind[]
+const featured = (kind: EntranceKind): kind is FeatureKind => (FEATURED as readonly string[]).includes(kind)
+/** The most entrances on offer made from a feature, so the rest stay free of what the map holds. */
+const MOST_FEATURED = 2
 
 /** The aliens an entrance is placed by: those the squad can see coming, not burrowers underground. */
 const inView = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.kind !== 'burrower')
@@ -77,7 +76,7 @@ const inView = (battle: Battle) => battle.units.filter((u) => u.side === 'alien'
 const tappable = (battle: Battle, t: Tile) => inView(battle).some((u) => distance(u, t) <= TAP_REACH) && battle.units.every((u) => !u.target || distance(u, t) >= COMMANDER_GAP)
 
 /**
- * Lays out the entrances on offer: ENTRANCES of different kinds the ground supports, one more with Encore, Land and Monologue always with
+ * Lays out the entrances on offer: ENTRANCES of different kinds the ground supports, those made from what stands here first, one more with Encore, Land and Monologue always with
  * Limelight; a raid has one. Each comes in at its kind's distance from the nearest alien, by the fight, as the goal
  * asks: an assassination's never near the commander, a hold's by the uplink, a VIP rescue's by the VIP, a rescue's
  * among the civilians, clear of the aliens.
@@ -86,11 +85,13 @@ export function planEntrances(battle: Battle, heart: Tile | null): void {
   const held = (effect: RelicEffect) => battle.reserve.some((r) => r.effects.includes(effect))
   const count = battle.goal === 'raid' ? 1 : ENTRANCES + (held('encore') ? 1 : 0)
   // A raid's one entrance is not chosen, so it neither costs threat nor lands the squad among the aliens.
-  const kinds = KINDS.filter((k) => battle.goal !== 'raid' || (k !== 'strike' && k !== 'tap'))
+  const suited = SUITS[battle.place] as EntranceKind[]
+  const kinds = KINDS.filter((k) => (battle.goal !== 'raid' || (k !== 'strike' && k !== 'tap')) && (!featured(k) || suited.includes(k)))
   for (let i = kinds.length - 1; i > 0; i--) {
     const j = randomInt(battle, i + 1)
     ;[kinds[i], kinds[j]] = [kinds[j], kinds[i]]
   }
+  kinds.sort((a, b) => Number(featured(b)) - Number(featured(a)))
   if (held('limelight') && battle.goal !== 'raid') kinds.unshift(...kinds.splice(kinds.indexOf('monologue'), 1))
   const centre = openNear(battle, battle.arena)
   const toCentre = walkingDistances(battle, centre)
@@ -118,11 +119,16 @@ export function planEntrances(battle: Battle, heart: Tile | null): void {
   // Should the goal's ground leave no room, any the squad can walk in by will do.
   if (open.length === 0) open.push(...walkable)
   const contact = (t: Tile) => near[t.y * GRID + t.x]
+  const inPlay = new Set(open.map((t) => t.y * GRID + t.x))
+  const fromAliens = (t: Tile) => (aliens.length > 0 ? Math.min(...aliens.map((a) => distance(a, t))) : 0)
+  let made = 0
   for (const kind of kinds) {
     if (battle.entrances.length === count) break
+    if (featured(kind) && made === MOST_FEATURED) continue
     const approach = battle.approaches[battle.entrances.length] ?? centre
     const { reach, site, fits } = ENTRANCE_KINDS[kind]
-    const supported = fits ? open.filter((t) => fits(battle, t)) : open
+    const sites: Site[] = featured(kind) ? sitesOf(battle, kind, fromAliens).filter((c) => inPlay.has(c.at.y * GRID + c.at.x)) : []
+    const supported = featured(kind) ? sites.map((c) => c.at) : fits ? open.filter((t) => fits(battle, t)) : open
     if (supported.length === 0) continue
     const spaced = supported.filter((t) => battle.entrances.every((e) => distance(e.at, t) >= ENTRY_SPACING))
     let options: Tile[] = []
@@ -131,7 +137,9 @@ export function planEntrances(battle: Battle, heart: Tile | null): void {
     // The tile its kind ranks best, nearest the way in the encounter means it to take.
     const score = (t: Tile) => 2 * site(battle, t) - distance(t, approach)
     const at = options.reduce((a, b) => (score(b) > score(a) ? b : a))
-    battle.entrances.push({ kind, at })
+    const feature = sites.find((c) => c.at === at)?.feature
+    if (feature) made++
+    battle.entrances.push(feature ? { kind, at, feature } : { kind, at })
   }
 }
 

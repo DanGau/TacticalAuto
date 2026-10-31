@@ -16,6 +16,8 @@ const DASH_FROM = 3
 /** How long a fall from above takes, and from how high, in world pixels. */
 const FALL_MS = 450
 const FALL_FROM = 320
+/** How far above where it stands a rope is tied, in world pixels. */
+const ROPE_TOP = 150
 /** How long debris flies, and the monologue holds. */
 const DEBRIS_MS = 600
 const LINE_MS = 1600
@@ -39,18 +41,20 @@ export async function makeEntrance(s: Stage, battle: Battle): Promise<void> {
   const foe = nearestAlien(battle, entrance.at)
   for (const unit of soldiers) fade(s.sprites.get(unit.id)!, 0)
   await s.follow([...soldiers.map((u) => ({ x: u.x, y: u.y })), ...(foe ? [{ x: foe.x, y: foe.y }] : [])], 600)
-  // From the side away from the aliens.
-  const back = foe ? unitAway(entrance.at, foe) : { x: 0, y: 1 }
+  const source = entrance.feature?.from
+  // From what it comes out of, or the side away from the aliens.
+  const back = source && (source.x !== entrance.at.x || source.y !== entrance.at.y) ? unitAway(entrance.at, source, -1) : foe ? unitAway(entrance.at, foe) : { x: 0, y: 1 }
   const sprites = soldiers.map((u) => s.sprites.get(u.id)!)
   const at = s.toWorld(entrance.at.x, entrance.at.y)
+  const origin = source ? s.toWorld(source.x, source.y) : at
   const toward = foe ? s.toWorld(foe.x, foe.y) : at
   switch (entrance.kind) {
     case 'door':
-      await Promise.all([drawing(s, (fx) => door(s, fx, at, toward)), dashIn(s, sprites, back, 120)])
+      await Promise.all([drawing(s, (fx) => door(s, fx, origin, toward)), dashIn(s, sprites, back, 120)])
       break
     case 'wall':
       shake(s, 6, 500)
-      await Promise.all([drawing(s, (fx) => debris(s, fx, at, 0xa0522d, 14)), dashIn(s, sprites, back, 0)])
+      await Promise.all([drawing(s, (fx) => debris(s, fx, origin, 0xa0522d, 14)), dashIn(s, sprites, back, 0)])
       drawTerrain(s, battle)
       break
     case 'monologue':
@@ -61,13 +65,13 @@ export async function makeEntrance(s: Stage, battle: Battle): Promise<void> {
       await fallIn(s, sprites, (fx, sprite, t) => glass(fx, sprite.at, t))
       break
     case 'rappel':
-      await rappel(s, sprites)
+      await rappel(s, sprites, origin)
       break
     case 'smoke':
       await Promise.all([drawing(s, (fx) => smoke(s, fx, at)), emerge(s, sprites, back)])
       break
     case 'truck':
-      await drawing(s, (fx) => truck(s, fx, at, back))
+      await drawing(s, (fx) => truck(s, fx, (entrance.feature?.path ?? [entrance.at]).map((t) => s.toWorld(t.x, t.y))))
       drawTerrain(s, battle)
       await dashIn(s, sprites, back, 0)
       break
@@ -99,10 +103,10 @@ export async function makeEntrance(s: Stage, battle: Battle): Promise<void> {
   }
 }
 
-/** A unit step from `foe` toward `at`. */
-function unitAway(at: Tile, foe: Tile): Tile {
+/** A unit step from `foe` toward `at`, or `sign` -1 back toward `foe`. */
+function unitAway(at: Tile, foe: Tile, sign = 1): Tile {
   const len = Math.hypot(at.x - foe.x, at.y - foe.y) || 1
-  return { x: (at.x - foe.x) / len, y: (at.y - foe.y) / len }
+  return { x: (sign * (at.x - foe.x)) / len, y: (sign * (at.y - foe.y)) / len }
 }
 
 /** Shakes the picture `px` pixels, dying away over `ms`. */
@@ -197,19 +201,19 @@ async function debris(s: Stage, fx: Sketch, at: Tile, color: number, count: numb
   })
 }
 
-/** Ropes drop from above and each soldier slides down one. */
-async function rappel(s: Stage, sprites: Sprite[]): Promise<void> {
+/** Ropes drop from the high point `anchor` and each soldier slides down one to where it lands. */
+async function rappel(s: Stage, sprites: Sprite[], anchor: Tile): Promise<void> {
   await Promise.all(
     sprites.map((sprite, i) =>
       drawing(s, async (fx) => {
         const ground = sprite.at
-        const top = ground.y - FALL_FROM - 100
+        const top = { x: anchor.x, y: anchor.y - ROPE_TOP }
         await s.tween(i * STAGGER_MS, () => {})
-        await s.tween(200, (t) => fx.clear().moveTo(ground.x, top).lineTo(ground.x, top + (ground.y - top) * t).stroke({ color: 0xd8dde6, width: 2 }))
+        await s.tween(200, (t) => fx.clear().moveTo(top.x, top.y).lineTo(top.x + (ground.x - top.x) * t, top.y + (ground.y - top.y) * t).stroke({ color: 0xd8dde6, width: 2 }))
         fade(sprite, 1)
-        await s.tween(2 * FALL_MS, (t) => shift(s, sprite, { x: ground.x, y: top + 40 + (ground.y - top - 40) * t }))
+        await s.tween(2 * FALL_MS, (t) => shift(s, sprite, { x: top.x + (ground.x - top.x) * t, y: top.y + (ground.y - top.y) * t }))
         place(s, sprite, sprite.tile)
-        await s.tween(250, (t) => fx.clear().moveTo(ground.x, top - (ground.y - top) * t).lineTo(ground.x, ground.y - (ground.y - top) * t).stroke({ color: 0xd8dde6, width: 2 }))
+        await s.tween(250, (t) => fx.clear().moveTo(top.x, top.y).lineTo(ground.x + (top.x - ground.x) * t, ground.y + (top.y - ground.y) * t).stroke({ color: 0xd8dde6, width: 2 }))
       }),
     ),
   )
@@ -240,15 +244,15 @@ async function emerge(s: Stage, sprites: Sprite[], back: Tile): Promise<void> {
   )
 }
 
-/** A truck roars in from behind and slews to a stop at the fight, dust flying. */
-async function truck(s: Stage, fx: Sketch, at: Tile, back: Tile): Promise<void> {
-  const far = s.toWorld(0, 0)
-  const near = s.toWorld(back.x * 10, back.y * 10)
-  const from = { x: at.x + near.x - far.x, y: at.y + near.y - far.y }
+/** A truck roars up the road `way` and slews to a stop at its end, dust flying. */
+async function truck(s: Stage, fx: Sketch, way: Tile[]): Promise<void> {
+  const at = way.at(-1)!
   await s.tween(2 * DASH_MS, (t) => {
     const e = 1 - (1 - t) * (1 - t)
-    const x = from.x + (at.x - from.x) * e
-    const y = from.y + (at.y - from.y) * e
+    const along = e * (way.length - 1)
+    const [a, b] = [way[Math.floor(along)], way[Math.ceil(along)]]
+    const x = a.x + (b.x - a.x) * (along % 1)
+    const y = a.y + (b.y - a.y) * (along % 1)
     fx.clear().ellipse(x, y, 40, 14).fill({ color: 0x000000, alpha: 0.35 })
     fx.roundRect(x - 34, y - 40, 68, 34, 6).fill(0xb03a2e).stroke({ color: 0x10141c, width: 3 })
     fx.rect(x - 30, y - 34, 20, 12).fill(0x6fb7ff)

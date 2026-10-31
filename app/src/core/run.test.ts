@@ -276,7 +276,7 @@ test('getting out, a soldier picks up a squadmate down, walks at half its move c
   // One alien is left, rooted and harmless, and the carrier cannot kill it: the battle ends only by lifting off.
   Object.assign(carrier, { ability: null, effects: [], spent: ['throw', 'throw', 'throw'], stats: { ...carrier.stats, damage: 0 } })
   const alien = battle.units.find((u) => u.side === 'alien')!
-  Object.assign(alien, { stats: { ...alien.stats, damage: 0, move: 0 } })
+  Object.assign(alien, { hp: 9999, stats: { ...alien.stats, damage: 0, move: 0 } })
   battle.units = [carrier, alien]
   battle.waves = []
   battle.extract = edgeNear(battle, { x: GRID - carrier.x, y: GRID - carrier.y })

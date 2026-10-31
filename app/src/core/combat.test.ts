@@ -1,4 +1,5 @@
 import { roots } from './skills'
+import { current } from './run'
 import { expect, test } from 'vitest'
 import { enterAt, begun } from './roads'
 import { apply } from './apply'
@@ -12,6 +13,7 @@ function battle(seed: number): Battle {
   const run = begun(seed)
   run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   apply(run, { type: 'go', index: 1 })
+  current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })
   enterAt(run, 0)
   return run.battle!
@@ -29,26 +31,21 @@ function play(seed: number, check: (events: GameEvent[], before: Battle, after: 
 
 test('a turn is one move beat, then an attack per beat in id order, two by each soldier and one by each alien, then the other side', () => {
   let turn = ''
-  let stage = 'move'
   let shooter = 0
   let attacks = 0
   let twice = 0
-  const end = play(1, (events, before, after) => {
-    const first = events.find((e) => ['move', 'shot', 'rocket', 'heal', 'spit', 'panic', 'frozen'].includes(e.type)) as Extract<GameEvent, { id: number }> | undefined
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+  const end = play(seed, (events, before, after) => {
+    const first = events.find((e) => ['move', 'shot', 'rocket', 'heal', 'spit', 'panic', 'frozen'].includes(e.type) && !(e.type === 'move' && e.with)) as Extract<GameEvent, { id: number }> | undefined
     if (!first) return
     // A turn spent standing still shows no event, so turns are told apart by the round as well as the side. A unit
     // arriving this beat is only in the after.
     const side = `${after.round}:${[...before.units, ...after.units].find((u) => u.id === first.id)!.side}`
     if (side !== turn) {
       turn = side
-      stage = 'move'
       shooter = 0
     }
-    // After the move beat, a move opens a soldier's attack: its walk to a shot.
-    if (first.type === 'move' && stage === 'move') {
-      stage = 'shoot'
-    } else {
-      stage = 'shoot'
+    if (first.type !== 'move') {
       expect(first.id).toBeGreaterThanOrEqual(shooter)
       attacks = first.id === shooter ? attacks + 1 : 1
       shooter = first.id
@@ -58,6 +55,7 @@ test('a turn is one move beat, then an attack per beat in id order, two by each 
     }
   })
   expect(end.winner).not.toBeNull()
+  }
   expect(twice).toBeGreaterThan(0)
 })
 

@@ -61,7 +61,7 @@ export function drawMarks(s: Stage, battle: Battle): void {
   }
   if (battle.phase === 'deploy') {
     if (!s.briefing)
-      battle.entrances.forEach(({ kind, at: zone }, i) => {
+      battle.entrances.forEach(({ kind, at: zone, feature }, i) => {
         for (let y = zone.y - ENTRY_RADIUS; y <= zone.y + ENTRY_RADIUS; y++) {
           for (let x = zone.x - ENTRY_RADIUS; x <= zone.x + ENTRY_RADIUS; x++) {
             if (y >= 0 && x >= 0 && y < GRID && x < GRID && battle.ground[y * GRID + x] !== 'void') diamond(tint, x, y, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone, 0.8)
@@ -75,7 +75,17 @@ export function drawMarks(s: Stage, battle: Battle): void {
           const lift = Math.max(a.y, b.y) + DECAL_LIFT * 3
           tint.band({ ...a, y: lift }, { ...b, y: lift }, 4 / ACROSS, battle.uplink ? COLOR.uplink : COLOR.contact, 0.9)
         }
-        marks.push(label(`${ENTRANCE_KINDS[kind].icon} ${ENTRANCE_KINDS[kind].name}`, zone, 0xffffff, 26))
+        // What it comes from, tied to where it lands.
+        if (feature) {
+          const way = feature.path ?? [feature.from, zone]
+          way.slice(1).forEach((t, k) => {
+            const [a, b] = [spot(way[k].x, way[k].y), spot(t.x, t.y)]
+            const lift = Math.max(a.y, b.y) + DECAL_LIFT * 3
+            tint.band({ ...a, y: lift }, { ...b, y: lift }, 6 / ACROSS, COLOR.zoneHover, 0.9)
+          })
+          diamond(tint, feature.from.x, feature.from.y, COLOR.zoneHover, 0.9)
+        }
+        marks.push(label(`${ENTRANCE_KINDS[kind].icon} ${ENTRANCE_KINDS[kind].name}${feature?.name ? ` ${feature.name}` : ''}`, zone, 0xffffff, 26))
       })
     // Those the mission turns on are named; every other alien speaks for itself.
     for (const u of battle.units.filter((a) => a.side === 'alien' && (a.target || a.boss))) marks.push(label(u.target ? '🎯 COMMANDER' : battle.goal === 'ambush' ? 'THE HUNTER' : battle.place === 'hive' ? 'THE SOURCE' : 'GUARDIAN', u, COLOR.contact, 20))

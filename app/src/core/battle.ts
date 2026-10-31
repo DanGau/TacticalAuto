@@ -8,6 +8,7 @@ import { type Goal } from './goals'
 import type { Twist } from './twists'
 import type { ConsumableId } from './consumables'
 import type { EntranceKind } from './entrances'
+import type { Feature } from './features'
 import { type Bulk, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
 
 export type { Bulk }
@@ -325,6 +326,8 @@ export type Order = 'prepare' | 'sprint'
 export interface Entrance {
   kind: EntranceKind
   at: Tile
+  /** The real thing on the map it comes from, if it needs one. */
+  feature?: Feature
 }
 
 /** The ground the fight is staged on: where the aliens hang out, and the entrances by them. */

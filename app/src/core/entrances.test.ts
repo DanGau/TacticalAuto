@@ -1,3 +1,4 @@
+import { SUITS } from './features'
 import { fightCap, joinSize } from './fighters'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
@@ -40,7 +41,11 @@ test('every battlefield offers three entrances, each where the ground supports i
       apply(run, { type: 'advance' })
       const battle = run.battle!
       expect(battle.entrances).toHaveLength(ENTRANCES)
-      for (const { kind, at } of battle.entrances) expect(ENTRANCE_KINDS[kind].fits?.(battle, at) ?? true).toBe(true)
+      for (const { kind, at, feature } of battle.entrances) {
+        expect(ENTRANCE_KINDS[kind].fits?.(battle, at) ?? true).toBe(true)
+        if ((SUITS[terrain] as string[]).includes(kind)) expect(feature).toBeDefined()
+        if (feature) expect(SUITS[terrain] as string[]).toContain(kind)
+      }
     }
   }
 })
