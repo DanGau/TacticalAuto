@@ -1,5 +1,4 @@
 // Screens after a battle or stop: rewards, loot, skill choices, the stop report, and the run's end.
-import type { Stats } from '../core/battle'
 import { CLASSES } from '../core/classes'
 import { FEATS, type Tally } from '../core/feats'
 import { CIVILIANS } from '../core/goals'
@@ -9,7 +8,6 @@ import { KEYS } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { type Soldier } from '../core/run-state'
-import { SELL } from '../core/rewards'
 import { squadKeywords } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { health } from '../core/squad'
@@ -18,7 +16,8 @@ import { level } from '../core/squad'
 import { xpFor } from '../core/squad'
 import { SKILLS } from '../core/skills'
 import { TRAITS } from '../core/traits'
-import { badge, button, describe, ROLES, gearCard, gearText, healthBar, signed, STAT_NAMES, STOP_NAMES, threatBar } from './html'
+import { gearPicks, pickCard, pickDetail, sellPick } from './cards'
+import { badge, button, describe, ROLES, gearCard, gearText, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
 /**
  * A soldier's card: class badge, name, weapon, and an experience bar filling with what the battle earned, flaring on a
@@ -65,37 +64,21 @@ export function joined(run: Run, name: string): string {
 /** A pop-up over the debrief, `html` inside it. */
 export const modal = (html: string) => `<div class="modal"><div class="sheet">${html}</div></div>`
 
-/**
- * Who takes the find at `index`: a card per soldier showing what it wears in the slot, which the find replaces and
- * sells, and how its stats would change; or sell the find.
- */
-function takers(run: Run, index: number): string {
+/** Who takes the find at `index`, or sell it: fixed cards, tapped once to compare and again to confirm. */
+function takers(run: Run, index: number, armed: string | null): string {
   const gear = run.finds[index]
-  const paid = (n: number) => (n > 0 ? `<b class="supplies">+${n}</b>` : '')
-  const card = (soldier: Soldier) => {
-    const old = soldier.gear[gear.slot]
-    const now = soldierStats(run, soldier)
-    const then = soldierStats(run, { ...soldier, gear: { ...soldier.gear, [gear.slot]: gear } })
-    const rows = (Object.keys(now) as (keyof Stats)[]).filter((key) => now[key] !== then[key]).map((key) => {
-      const show = (n: number) => (key === 'aim' || key === 'crit' || key === 'close' ? `${Math.round(100 * n)}%` : `${n}`)
-      return `<tr><td>${STAT_NAMES[key]}</td><td>${show(now[key])}</td><td>→</td><td class="${then[key] > now[key] ? 'down' : 'up'}">${show(then[key])}</td></tr>`
-    })
-    const body = `<span class="who"><span class="portrait">${badge(soldier.cls)}</span><b>${soldier.name}</b></span>
-      <small title="${old ? gearText(old) : ''}">${old ? `Replaces ${old.name}` : `Empty ${gear.slot} slot`} ${paid(old ? SELL[old.rarity] : 0)}</small>
-      ${rows.length > 0 ? `<table class="stats">${rows.join('')}</table>` : ''}`
-    return button({ type: 'equip', find: index, soldier: soldier.id }, body, 'gearpick')
-  }
-  return `<div class="choices">${run.soldiers.map(card).join('')}${button({ type: 'sell', find: index }, `<b>Sell</b> ${paid(SELL[gear.rarity])}`, 'gearpick sell')}</div>`
+  const picks = [...gearPicks(run, gear, (soldier) => ({ type: 'equip', find: index, soldier: soldier.id }), 'give it to'), sellPick(gear, index)]
+  return `<div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a soldier to compare; tap again to confirm.')}`
 }
 
 /** A crate opened, in a pop-up: it shakes, bursts in its gear's rarity, and the gear rises out of it; then the player picks who takes it. */
-export function loot(run: Run, index: number): string {
+export function loot(run: Run, index: number, armed: string | null): string {
   const gear = run.finds[index]
-  return modal(`<div class="loot ${gear.rarity}">
+  return modal(`<div class="loot ${gear.rarity}${armed ? ' still' : ''}">
     <div class="burst"></div>
     <span class="box">🎁</span>
     <div class="prize gear ${gear.rarity}">${gearCard(gear, squadKeywords(run))}</div>
-    <div class="said">${takers(run, index)}</div>
+    <div class="said">${takers(run, index, armed)}</div>
   </div>`)
 }
 
@@ -114,13 +97,13 @@ export function skillChoice(run: Run, soldier: Soldier): string {
 }
 
 /** The next choice of the reward phase, alone on its screen: a relic, then each find and who takes it, then each skill owed. */
-export function choice(run: Run): string {
+export function choice(run: Run, armed: string | null = null): string {
   const held = squadKeywords(run)
   const relic = (id: RelicId, index: number) => button({ type: 'relic', index }, `<small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic')
   if (run.relicOffers.length > 0) return `<h2>Alien artifacts lie in the wreckage. The squad can carry one, and keeps it for the run.</h2><div class="choices">${run.relicOffers.map(relic).join('')}</div>`
   if (run.finds.length > 0) {
     const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
-    return `<h2>Gear found. Who takes it?${more}</h2><div class="gear ${run.finds[0].rarity}">${gearCard(run.finds[0], held)}</div>${takers(run, 0)}`
+    return `<h2>Gear found. Who takes it?${more}</h2><div class="gear ${run.finds[0].rarity}">${gearCard(run.finds[0], held)}</div>${takers(run, 0, armed)}`
   }
   return skillChoice(run, run.soldiers.find((s) => skillOffers(s).length > 0)!)
 }
