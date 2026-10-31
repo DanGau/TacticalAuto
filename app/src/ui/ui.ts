@@ -108,6 +108,9 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   /** The debrief shown, whether a pop-up has been over it, and the crate open now, by index into run.finds. */
   let opened: { report: Report | null; still: boolean } = { report: null, still: false }
   let crate: number | null = null
+  /** The fixed card tapped once, whose second tap goes through; and the shop gear whose wearer is being picked. */
+  let armed: string | null = null
+  let ware: number | null = null
   let html = ''
 
   /** The run's phase when the panel was last drawn. */
@@ -131,14 +134,14 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
       // A pop-up opened over it leaves the debrief at rest behind: nothing in it plays again.
       if (learner || find !== null) opened.still = true
       const debrief = stopReport(run, report, opened.still)
-      return learner ? debrief + modal(skillChoice(run, learner)) : find !== null ? debrief + loot(run, find) : debrief
+      return learner ? debrief + modal(skillChoice(run, learner)) : find !== null ? debrief + loot(run, find, armed) : debrief
     }
-    if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run)}`
+    if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run, armed)}`
     if (run.phase === 'shop' || run.phase === 'event') {
       // Arriving shows the shop or event; the other tabs stay open to the player while they decide.
       if (phase !== run.phase) tab = 'Map'
       phase = run.phase
-      return overworld(run, tab, open, picked)
+      return overworld(run, tab, open, picked, armed, ware)
     }
     phase = run.phase
     return report && seen !== report ? stopReport(run, report) : overworld(run, tab, open, picked)
@@ -255,6 +258,10 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   overlay.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (!target || target.disabled || flying) return
+    if (target.dataset.arm && armed !== target.dataset.arm) {
+      armed = target.dataset.arm
+      return render(shown!)
+    }
     if (target.id === 'again') location.href = location.pathname
     else if (target.id === 'start') started = true
     else if (target.id === 'begin' || target.dataset.begin !== undefined) told = true
@@ -268,7 +275,15 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     else if (target.dataset.met) met = shown!.report
     else if (target.dataset.ability) ability = Number(target.dataset.ability)
     else if (target.dataset.crate) crate = Number(target.dataset.crate)
-    else if (target.dataset.tab) tab = target.dataset.tab as Tab
+    else if (target.dataset.ware !== undefined) {
+      ware = target.dataset.ware ? Number(target.dataset.ware) : null
+      armed = null
+    }
+    else if (target.dataset.tab) {
+      tab = target.dataset.tab as Tab
+      armed = null
+      ware = null
+    }
     else if (target.dataset.pick) {
       // A stop tapped once is picked to look at; tapped again, the squad sets out for it.
       const index = Number(target.dataset.pick)
@@ -288,6 +303,8 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     } else if (target.dataset.action) {
       picked = null
       crate = null
+      armed = null
+      ware = null
       act(JSON.parse(target.dataset.action) as Action)
       return
     }

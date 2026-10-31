@@ -123,7 +123,10 @@ export const keywordChips = (tags: Keyword[] = [], held: Keyword[] = []) =>
 export const alienName = (kind: AlienKind, label = ALIENS[kind].name) => `${tip(label, ALIENS[kind].text)}${ALIENS[kind].resists.map(resistChip).join('')}`
 
 
+/** What a piece of gear does, its keywords coloured and defined. */
+export const describeGear = (gear: Gear, held: Keyword[] = []) => describe(gearText(gear), gear.effect ? EFFECTS[gear.effect].tags : [], held)
+
 /** A piece of gear as a card's contents: rarity and slot, name, what it changes, and its keywords. */
 export function gearCard(gear: Gear, held: Keyword[] = []): string {
-  return `<small>${gear.rarity} ${gear.slot}</small><br><b>${gear.name}</b><br>${describe(gearText(gear), gear.effect ? EFFECTS[gear.effect].tags : [], held)}`
+  return `<small>${gear.rarity} ${gear.slot}</small><br><b>${gear.name}</b><br>${describeGear(gear, held)}`
 }

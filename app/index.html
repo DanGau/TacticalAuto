@@ -187,8 +187,6 @@
       .node.unknown { border-color: #c28bff; }
       .node.key, .node.final { border-color: #c77dff; }
       button.travel { min-width: 320px; text-align: left; line-height: 1.5; }
-      .buy { display: flex; flex: 1; flex-direction: column; gap: 4px; }
-      .buy button.card { flex: 1; }
 
 
       .squad { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
@@ -260,14 +258,29 @@
       .choices button br { display: none; }
       button.card { min-height: 110px; }
       button.decide { padding: 12px 20px; }
-      button.gearpick { display: flex; flex-direction: column; gap: 6px; width: 200px; padding: 12px; text-align: left; border: 2px solid #3a465c; }
-      .loot .said .choices { flex-wrap: wrap; justify-content: center; }
-      button.gearpick .who { display: flex; align-items: center; gap: 8px; }
-      button.gearpick.sell { justify-content: center; align-items: center; }
-      .buyers { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-      .buyers button { padding: 3px 8px; font-size: 12px; }
-      button.gearpick .gear small { margin-right: 6px; }
-      button.gearpick ~ button.decide, .choices + button.decide { margin-top: 10px; }
+      .picks { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+      button.pick { flex: none; display: flex; flex-direction: column; gap: 4px; width: min(136px, calc((100vw - 48px) / 3)); height: 92px; padding: 8px; overflow: hidden; text-align: left; line-height: 1.25; border: 2px solid #3a465c; }
+      button.pick > small:first-child { text-transform: capitalize; }
+      button.pick .price, button.pick .purchased { margin-top: auto; }
+      button.pick.bribe { border-color: #6fd08c; }
+      button.pick.armed { outline: 3px solid #fff; outline-offset: 1px; background: #33405a; }
+      button.pick.compare { width: min(190px, calc((100vw - 40px) / 2)); height: 190px; }
+      button.pick.compare .who { display: flex; align-items: center; gap: 6px; }
+      button.pick.compare .portrait { width: 28px; height: 28px; font-size: 16px; }
+      button.pick.compare .stats { font-size: 12px; margin-top: 2px; }
+      button.pick.compare.sell { justify-content: center; align-items: center; text-align: center; }
+      .tier { font-weight: bold; text-transform: capitalize; color: #9aa6bd; }
+      .tier.rare { color: #4da3ff; }
+      .tier.epic { color: #c77dff; }
+      .detail { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-height: 104px; max-width: 720px; margin: 10px auto; padding: 8px 12px; text-align: left; border-radius: 6px; background: #1d2433; }
+      .detail p { margin: 0; }
+      .detail small { display: block; }
+      .detail .defs { position: static; display: flex; width: auto; margin-top: 2px; font-size: 12px; }
+      .loot.still *, .loot.still { animation: none !important; }
+      .loot.still .box, .loot.still .burst { display: none; }
+      .loot.still .said, .loot.still button { opacity: 1; }
+      .loot.still .prize { margin-top: 0; }
+      .loot .said { flex-direction: column; }
       button.rare { border-color: #4da3ff; }
       button.rare small { color: #4da3ff; }
       button.epic { border-color: #c77dff; }
@@ -303,7 +316,7 @@
       .crate { font-size: 34px; padding: 4px 10px; background: none; border-color: #ffd166; animation: wiggle 1.4s ease-in-out infinite; }
       @keyframes wiggle { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(-10deg); } 85% { transform: rotate(10deg); } 95% { transform: rotate(-5deg); } }
       /* A pop-up over the debrief: the ability choice, or a crate opening. */
-      .modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: #0a0d13cc; animation: fade 0.25s; }
+      .modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: #0a0d13f2; animation: fade 0.25s; }
       .modal .sheet { max-width: min(900px, 92vw); text-align: center; }
       .loot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; --glow: #9aa6bd; }
       .loot.rare { --glow: #4da3ff; }

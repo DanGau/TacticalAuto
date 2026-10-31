@@ -28,7 +28,8 @@ import { SKILLS } from '../core/skills'
 import { TWISTS } from '../core/twists'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
-import { alienName, badge, button, describe, gearCard, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
+import { gearPicks, pickCard, pickDetail, type Pick } from './cards'
+import { alienName, badge, button, describe, describeGear, gearCard, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
 const TABS = ['Map', 'Base', 'Barracks'] as const
@@ -158,34 +159,42 @@ function where(run: Run, stop: Stop): string {
 
 const PURCHASED = '<small class="purchased">Purchased</small>'
 
-/** A shop: gear, each with a button per soldier to buy it for, relics, consumables, a bribe, and the way out. What is bought keeps its place, greyed out. */
-function shopView(run: Run): string {
+/** Everything a shop sells, as cards of one size: gear, relics, consumables, the bribe. */
+function shopPicks(run: Run): Pick[] {
   const shop = run.shop!
   const held = squadKeywords(run)
-  const wares = shop.wares.map(({ gear, sold }, index) => {
+  const poor = (price: number) => (price > run.supplies ? 'Not enough supplies' : null)
+  const card = (top: string, name: string, foot: string, sold: boolean) => `<small>${top}</small><b>${name}</b>${sold ? PURCHASED : `<small class="price">${foot}</small>`}`
+  const gear = shop.wares.map(({ gear, sold }, index): Pick => {
     const price = GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
-    const buyers = run.soldiers.map((s) => {
-      const old = s.gear[gear.slot]
-      return button({ type: 'gear', index, soldier: s.id }, `${badge(s.cls)} ${s.name}`, 'buyer', !sold && price <= run.supplies, old ? `Replaces ${old.name}` : `Empty ${gear.slot} slot`)
-    })
-    return `<div class="card gear ${gear.rarity}${sold ? ' bought' : ''}">${gearCard(gear, held)}<br>${sold ? PURCHASED : `<small>${price} supplies, for:</small>`}<div class="buyers">${buyers.join('')}</div></div>`
+    return { key: `g${index}`, attrs: `data-ware="${index}"`, look: `gear ${gear.rarity}`, body: card(`${gear.rarity} ${gear.slot}`, gear.name, `${price} supplies`, sold), detail: `<p><b>${gear.name}.</b> ${describeGear(gear, held)}</p>`, go: `Tap again to choose who wears it, for ${price} supplies`, block: poor(price), spent: sold }
   })
-  const relics = shop.relics.map(({ id, sold }, index) =>
-    `<div class="buy">${button({ type: 'buy', index }, `${sold ? PURCHASED : `<small>relic · ${RELIC_PRICE} supplies</small>`}<br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, `card relic${sold ? ' bought' : ''}`, !sold && RELIC_PRICE <= run.supplies)}</div>`,
-  )
+  const relics = shop.relics.map(({ id, sold }, index): Pick => ({ key: `r${index}`, action: { type: 'buy', index }, look: 'relic', body: card('relic', RELICS[id].name, `${RELIC_PRICE} supplies`, sold), detail: `<p><b>${RELICS[id].name}.</b> ${describe(RELICS[id].text, RELICS[id].tags, held)}</p>`, go: `Tap again to buy for ${RELIC_PRICE} supplies`, block: poor(RELIC_PRICE), spent: sold }))
   const full = run.kit.length >= KIT_SLOTS
-  const consumables = shop.consumables.map(({ id, sold }, index) => {
+  const consumables = shop.consumables.map(({ id, sold }, index): Pick => {
     const item = CONSUMABLES[id]
-    const line = sold ? PURCHASED : `<small>${full ? 'kit full' : `consumable · ${item.price} supplies`}${item.threat ? ` · <span class="up">+${item.threat} threat on use</span>` : ''}</small>`
-    return button({ type: 'consumable', index }, `${line}<br><b>${item.icon} ${item.name}</b><br>${describe(item.text, item.tags, held)}`, `card consumable${sold ? ' bought' : ''}`, !sold && !full && item.price <= run.supplies)
+    return { key: `c${index}`, action: { type: 'consumable', index }, look: 'consumable', body: card('consumable', `${item.icon} ${item.name}`, `${item.price} supplies`, sold), detail: `<p><b>${item.name}.</b> ${describe(item.text, item.tags, held)}${item.threat ? ` <span class="up">+${item.threat} threat on use</span>` : ''}</p>`, go: `Tap again to buy for ${item.price} supplies`, block: full ? 'Kit full' : poor(item.price), spent: sold }
   })
-  const bribe = button({ type: 'bribe' }, `${shop.bribed ? PURCHASED : `<small>${BRIBE.price} supplies, once</small>`}<br><b>Bribe the patrols</b><br>-${BRIBE.threat} threat`, shop.bribed ? 'bought' : '', !shop.bribed && BRIBE.price <= run.supplies && run.threat > 0)
-  const kit = run.kit.map((k) => `<span title="${CONSUMABLES[k].text}">${CONSUMABLES[k].icon} ${CONSUMABLES[k].name}</span>`).join(', ') || 'empty'
-  return `<h2>A shop. Each piece is one of a kind.</h2>
-    <div class="choices">${wares.join('')}</div>
-    <div class="choices">${relics.join('')}${bribe}</div>
-    <div class="choices">${consumables.join('')}<p class="kit">Kit ${run.kit.length}/${KIT_SLOTS}: ${kit}</p></div>
+  const bribe: Pick = { key: 'b', action: { type: 'bribe' }, look: 'bribe', body: card('bribe', 'Bribe the patrols', `${BRIBE.price} supplies`, shop.bribed), detail: `<p><b>Bribe the patrols.</b> -${BRIBE.threat} threat, once.</p>`, go: `Tap again to pay ${BRIBE.price} supplies`, block: run.threat === 0 ? 'No threat to lower' : poor(BRIBE.price), spent: shop.bribed }
+  return [...gear, ...relics, ...consumables, bribe]
+}
+
+/** A shop: its cards, what the armed one does, and the way out. What is bought keeps its place, greyed out. With `ware` chosen, who wears it, in a pop-up. */
+function shopView(run: Run, armed: string | null, ware: number | null): string {
+  const picks = shopPicks(run)
+  const kit = run.kit.map((k) => `${CONSUMABLES[k].icon} ${CONSUMABLES[k].name}`).join(', ') || 'empty'
+  const screen = `<h2>A shop. Each piece is one of a kind.</h2>
+    <div class="picks">${picks.map((p) => pickCard(p, ware === null ? armed : null)).join('')}</div>
+    ${pickDetail(picks, ware === null ? armed : null, 'Tap a card for its details; tap it again to buy.')}
+    <p class="kit">Kit ${run.kit.length}/${KIT_SLOTS}: ${kit}</p>
     <button class="travel" data-action='${JSON.stringify({ type: 'leave' })}'>Leave the shop</button>`
+  if (ware === null || run.shop!.wares[ware].sold) return screen
+  const { gear } = run.shop!.wares[ware]
+  const wearers = gearPicks(run, gear, (s) => ({ type: 'gear', index: ware, soldier: s.id }), 'buy it for')
+  return `${screen}<div class="modal"><div class="sheet"><h2>Who wears ${gear.name}? · ${GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]} supplies</h2>
+    <div class="picks">${wearers.map((p) => pickCard(p, armed)).join('')}</div>
+    ${pickDetail(wearers, armed, 'Tap a soldier to compare; tap again to buy.')}
+    <button data-ware="">Back</button></div></div>`
 }
 
 /** An event: its scene, and the ways to meet it. */
@@ -199,8 +208,8 @@ function eventView(run: Run): string {
  * The map: a shop or event being met; else the run's map, with the ways on to choose from or a button to travel on,
  * and the stop the player has picked to look at but not yet set out for, if any.
  */
-function mapView(run: Run, picked: number | null): string {
-  if (run.phase === 'shop') return shopView(run)
+function mapView(run: Run, picked: number | null, armed: string | null, ware: number | null): string {
+  if (run.phase === 'shop') return shopView(run, armed, ware)
   if (run.phase === 'event') return eventView(run)
   const node = current(run)
   const ahead = picked !== null && ways(run).includes(picked) ? legOf(run).columns[run.stop][picked].stop : null
@@ -273,10 +282,10 @@ function barracksView(run: Run, open: number | null): string {
 
 /**
  * The screen between stops: a header with the keys, threat, supplies and tabs, over the chosen tab's view.
- * `open` is the soldier opened in the Barracks.
+ * `open` is the soldier opened in the Barracks; `armed` the card tapped once, `ware` the shop gear being bought.
  */
-export function overworld(run: Run, tab: Tab, open: number | null, picked: number | null): string {
-  const views = { Map: (r: Run) => mapView(r, picked), Base: baseView, Barracks: (r: Run) => barracksView(r, open) }
+export function overworld(run: Run, tab: Tab, open: number | null, picked: number | null, armed: string | null = null, ware: number | null = null): string {
+  const views = { Map: (r: Run) => mapView(r, picked, armed, ware), Base: baseView, Barracks: (r: Run) => barracksView(r, open) }
   const tabs = TABS.map((name) => `<button class="tab ${name === tab ? 'active' : ''}" data-tab="${name}">${name}</button>`)
   return `
     <div class="header">
