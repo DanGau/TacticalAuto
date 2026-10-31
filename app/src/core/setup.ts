@@ -26,11 +26,11 @@ export function zoneInfo(battle: Battle, zone: Tile): { cover: number; contact: 
 
 /** What each plan is called, and what it does, for the player. */
 export const PLANS: Record<Plan, { name: string; icon: string; text: string }> = {
-  // The plain way in, from the edge, unseen, needs no name.
+  // The plain way in, from the edge, needs no name.
   march: { name: '', icon: '', text: '' },
-  hot: { name: 'Hot drop', icon: '☄️', text: 'Land right on a pod: the drop pods hit it and it is ambushed, but every other pod hears and converges' },
-  stealth: { name: 'Parachute drop', icon: '🪂', text: 'Drop unseen anywhere clear of every pod, deep in, and creep in to set ambushes' },
-  decap: { name: 'Decapitation', icon: '🗡️', text: 'Land on the commander: it is ambushed, but every guard converges on the squad' },
+  hot: { name: 'Hot drop', icon: '☄️', text: 'Land right on a pod: the drop pods hit it and it cannot shoot on its first turn, but every other pod hears and converges' },
+  deep: { name: 'Parachute drop', icon: '🪂', text: 'Drop anywhere clear of every pod, deep in' },
+  decap: { name: 'Decapitation', icon: '🗡️', text: 'Land on the commander: it cannot shoot on its first turn, but every guard converges on the squad' },
   overwatch: { name: 'Overwatch', icon: '🔭', text: "Land on high ground at range from the commander; its pod sees the squad coming" },
   bait: { name: 'Bait', icon: '🪤', text: 'Land far off: the guards come for the squad, leaving the commander alone' },
   uplink: { name: 'Drop on the uplink', icon: '📡', text: 'The drop pods land right beside the uplink' },
@@ -41,7 +41,7 @@ export const CACHES = 3
 
 /**
  * Lands the whole squad on the free tiles nearest the zone's centre, as the zone's plan has it, and begins the battle.
- * A hot drop or a decapitation breaches: the pod beneath is caught unaware and loses its first alien turn's shots, its
+ * A hot drop or a decapitation breaches: the pod beneath is caught off guard and loses its first alien turn's shots, its
  * members take the impact in the first beat, and every other pod hears the landing and converges on it. An overwatch
  * alerts the commander's pod; bait draws every other pod to the landing. A hold's zone is the uplink it holds. The
  * barrage's zone opens with a strike on the pod nearest it.
@@ -55,16 +55,14 @@ export function land(battle: Battle, zone: Tile): void {
   }
   if (plan === 'hot' || plan === 'decap') {
     battle.breach = true
-    battle.concealed = false
     const under = nearestAlien(battle, zone)!.pod!
     battle.pods.forEach((pod, i) => {
-      if (i === under) Object.assign(pod, { revealed: true, alert: true, ambushed: true, surprised: true })
+      if (i === under) Object.assign(pod, { revealed: true, alert: true, surprised: true })
       else pod.waypoint = zone
     })
   }
   // A rescue lands in the thick of it: every pod is in the open and fighting.
   if (battle.goal === 'rescue') {
-    battle.concealed = false
     for (const pod of battle.pods) Object.assign(pod, { revealed: true, alert: true })
   }
   const commander = battle.units.find((u) => u.target)
@@ -156,7 +154,7 @@ export function planZones(battle: Battle, centres: Tile[], heart: Tile | null): 
     // Exterminate and VIP rescue: quiet approaches from the edge; Orbital Drop Pods make one a hot drop onto a pod, Night
     // Canopies one a parachute drop anywhere within.
     if (held('dropPods') && centres.length > 0) add(centres[randomInt(battle, centres.length)], 'hot')
-    if (held('canopies')) add(distinct('anywhere'), 'stealth')
+    if (held('canopies')) add(distinct('anywhere'), 'deep')
     while (battle.zones.length < ZONES) add(distinct(), 'march')
   }
   // One quiet approach comes with an artillery strike on the pod in front of it.
@@ -265,7 +263,7 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
     if (tile) Object.assign(still, tile)
     battle.units.push(still)
   }
-  battle.pods.push({ name: pack.name, revealed, alert: revealed, stalking: false, ambushed: false, surprised: false, reeling: false, stalked: 0, guard, waypoint: randomTile(battle) })
+  battle.pods.push({ name: pack.name, revealed, alert: revealed, surprised: false, guard, waypoint: randomTile(battle) })
   return units
 }
 
@@ -312,7 +310,6 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     pods: [],
     used: [],
     primed: [],
-    concealed: true,
     acid: [],
     fire: [],
     caltrops: [],
@@ -357,7 +354,6 @@ export function createBattle(seed: number, kind: TerrainKind, packs: { name: str
     placePod(battle, pack, centre, ambush && i === 0, (vip !== null && i === 0) || (!ambush && random(battle) < GUARD_SHARE))
   })
   if (drop) {
-    battle.concealed = false
     for (const pod of battle.pods) Object.assign(pod, { alert: true, waypoint: drop })
     battle.zones = [drop]
     battle.plans = ['march']

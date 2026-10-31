@@ -7,7 +7,7 @@ import type { Stage } from './stage'
 
 /** A drop pod's fall, the burst of dust as it lands, the gap between pods, and the height it falls from in world pixels. */
 const POD_FALL_MS = 800
-/** How long a stealth insertion's parachutes take to drift down, how high they start, and how long a canopy takes to fold. */
+/** How long a parachute drop's canopies take to drift down, how high they start, and how long a canopy takes to fold. */
 const CHUTE_FALL_MS = 1500
 const CHUTE_HEIGHT = 260
 const CHUTE_FOLD_MS = 350
@@ -28,7 +28,7 @@ export async function dropPods(s: Stage, battle: Battle): Promise<void> {
   if (soldiers.length === 0) return
   for (const unit of soldiers) fade(s.sprites.get(unit.id)!, 0)
   await s.follow(soldiers.map((u) => ({ x: u.x, y: u.y })))
-  if (battle.landed === 'stealth') return parachute(s, soldiers)
+  if (battle.landed === 'deep') return parachute(s, soldiers)
   if (battle.landed === 'march') return marchIn(s, soldiers)
   await Promise.all(
     soldiers.map((unit, i) =>
@@ -83,7 +83,7 @@ async function marchIn(s: Stage, soldiers: Unit[]): Promise<void> {
   )
 }
 
-/** A stealth insertion: each soldier drifts down under a canopy, swaying, and lands without a sound. */
+/** A parachute drop: each soldier drifts down under a canopy, swaying. */
 async function parachute(s: Stage, soldiers: Unit[]): Promise<void> {
   await Promise.all(
     soldiers.map((unit, i) =>

@@ -5,13 +5,8 @@ import type { ConsumableId } from './consumables'
 export type GameEvent =
   /** `path` lists each tile entered, in order. `with` names a skill that granted the move. */
   | { type: 'move'; id: number; path: Tile[]; with?: Effect }
-  /**
-   * A pod is sighted. `units` gives each member's tile at that moment. Unless it is ambushed, or `stalked` (it
-   * stalked the squad and gave itself away by opening fire), its moves to cover follow.
-   */
-  | { type: 'reveal'; ambush: boolean; stalked: boolean; units: { id: number; x: number; y: number }[] }
-  /** The squad sees a pod that has not noticed it, and holds its fire to set an ambush. */
-  | { type: 'sighted'; units: { id: number; x: number; y: number }[] }
+  /** A pod is sighted. `units` gives each member's tile at that moment. */
+  | { type: 'reveal'; units: { id: number; x: number; y: number }[] }
   /** `damage` is 0 for a miss. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. */
   | { type: 'shot'; id: number; target: number; hit: boolean; crit: boolean; damage: number; with: Effect[] }
   /** A rocket, grenade or napalm (`fire`) lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */

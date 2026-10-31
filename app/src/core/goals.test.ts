@@ -158,14 +158,13 @@ function terror(seed: number): Run {
   return run
 }
 
-test('a rescue lands among the civilians, in contact: every pod is in sight and fighting, and the squad is never concealed', () => {
+test('a rescue lands among the civilians, in contact: every pod is in sight and fighting', () => {
   const run = before('rescue')
   const battle = run.battle!
   const civilians = battle.units.filter((u) => u.civilian)
   for (const zone of battle.zones) expect(Math.min(...civilians.map((c) => distance(c, zone)))).toBeLessThanOrEqual(14)
   deploy(run, 0)
   expect(battle.pods.every((p) => p.revealed && p.alert)).toBe(true)
-  expect(battle.concealed).toBe(false)
 })
 
 test('on a rescue aliens with no soldier to fight kill civilians', () => {
@@ -268,7 +267,7 @@ test('no one shot kills a commander from full health; brought low, it blinks awa
   battle.pods[commander.pod!] = { ...battle.pods[commander.pod!], revealed: true, alert: true }
   const soldier = battle.units.find(isSoldier)!
   Object.assign(soldier, freeTilesNear(battle, commander, 2)[1], { stats: { ...soldier.stats, damage: 99, aim: 10, crit: 1, move: 0 } })
-  Object.assign(battle, { turn: 'human', stage: 'move', concealed: false })
+  Object.assign(battle, { turn: 'human', stage: 'move' })
   const events: GameEvent[] = []
   while (!events.some((e) => e.type === 'shot' && e.target === commander.id)) events.push(...stepBattle(battle))
   expect(commander.hp).toBe(1)

@@ -431,7 +431,7 @@ test('an ambush has no landing: the squad is down at once, every pod alert and c
   run.threat = THREAT_MAX
   apply(run, { type: 'advance' })
   const battle = run.battle!
-  expect(battle).toMatchObject({ goal: 'ambush', phase: 'battle', concealed: false, waves: [] })
+  expect(battle).toMatchObject({ goal: 'ambush', phase: 'battle', waves: [] })
   expect(battle.units.filter(isSoldier)).toHaveLength(run.soldiers.length)
   expect(battle.pods.map((p) => p.alert && p.revealed)).toEqual(battle.pods.map((_, i) => i === 0))
   expect(battle.pods.every((p) => p.alert)).toBe(true)

@@ -61,7 +61,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   apply(run, { type: 'advance' })
   // War drums pay off only on a kill, so they leave a duel as it is.
   // A cold zone, so no drop pod impact lands in the fight.
-  const zone = zoneOf(run.battle!, 'stealth')
+  const zone = zoneOf(run.battle!, 'deep')
   deploy(run, zone)
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist: null })

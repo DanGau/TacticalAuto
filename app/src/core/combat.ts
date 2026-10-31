@@ -21,7 +21,7 @@ import { dropUnit } from './spawn'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { centreOf, fireproof, has, hunted, nearest, spotted, vipOf } from './fighters'
+import { centreOf, fireproof, has, nearest, spotted, vipOf } from './fighters'
 import { wound } from './wound'
 import { attacksOf, blast, leap, napalm, shoot } from './attack'
 import { alienAction, deploy, drone, feed, flashbang, forceField, heal, medkit, polymorph, pulse, secondWind, skirmish, slam, strew } from './abilities'
@@ -83,11 +83,11 @@ function actNext(battle: Battle): GameEvent[] {
       continue
     }
     battle.shooter = unit.id
-    // A stalking pod gives itself away when it opens fire.
+    // A pod unseen gives itself away when it opens fire.
     const pod = unit.pod === null ? null : battle.pods[unit.pod]
     if (pod && !pod.revealed) {
       pod.revealed = true
-      events.unshift({ type: 'reveal', ambush: false, stalked: true, units: battle.units.filter((u) => u.pod === unit.pod).map(({ id, x, y }) => ({ id, x, y })) })
+      events.unshift({ type: 'reveal', units: battle.units.filter((u) => u.pod === unit.pod).map(({ id, x, y }) => ({ id, x, y })) })
     }
     return events
   }
@@ -106,13 +106,8 @@ function act(battle: Battle): GameEvent[] {
     }
     const action = actNext(battle)
     if (action.length > 0) return action
-    // An ambush lasts until the squad's turn ends; surprise, until the aliens'.
-    if (battle.turn === 'human') for (const pod of battle.pods) pod.ambushed = false
-    else {
-      for (const pod of battle.pods) Object.assign(pod, { surprised: false, stalking: false, reeling: false })
-      // With every pod that knew of it dead, the squad slips back into stealth.
-      battle.concealed = !hunted(battle) && battle.waves.length === 0
-    }
+    // Surprise lasts until the aliens' turn ends.
+    if (battle.turn === 'alien') for (const pod of battle.pods) pod.surprised = false
     battle.turn = battle.turn === 'human' ? 'alien' : 'human'
     battle.stage = 'move'
   }

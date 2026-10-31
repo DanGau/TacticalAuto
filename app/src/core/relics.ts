@@ -4,7 +4,6 @@ import { POD_BLAST } from './setup'
 import { POD_REACH } from './setup'
 import { BEACON_REACH } from './fighters'
 import { BOUNTY_DAMAGE } from './fighters'
-import { KILLZONE } from './fighters'
 import { RELAY_REACH } from './fighters'
 import { TUNING } from './tuning'
 import type { Keyword } from './keywords'
@@ -74,11 +73,9 @@ const relics = {
   cryopods: { name: 'Cryo Pods', text: `Every landing's drop pods chill each alien within ${POD_REACH} tiles and hurt it`, tags: ['frost'], effect: 'podFrost' },
   bulwark: { name: 'Bulwark Pods', text: 'The drop pods stand as full cover beside each soldier, toward the nearest alien', effect: 'podWall' },
   turrets: { name: 'Turret Drop', text: 'A turret lands with each team: it never moves, and shoots far and true', effect: 'podTurret' },
-  // Stealth and ambushes.
-  dropPods: { name: 'Orbital Drop Pods', text: 'A landing may come down hot on a pod: the pods ambush it, but every other pod hears and converges', effect: 'dropPods' },
+  // Landings.
+  dropPods: { name: 'Orbital Drop Pods', text: 'A landing may come down hot on a pod: the pod beneath cannot shoot on its first turn, but every other pod hears and converges', effect: 'dropPods' },
   canopies: { name: 'Night Canopies', text: 'A landing may be a parachute drop anywhere clear of every pod, deep within', effect: 'canopies' },
-  ghost: { name: 'Ghost Weave', text: 'Unseen, soldiers move at full pace instead of creeping', effect: 'ghost' },
-  killzone: { name: 'Killing Ground', text: `An ambush's shots hit and crit ${Math.round(100 * KILLZONE)}% more often still`, tags: ['crit'], effect: 'killzone' },
   // The goals.
   beacon: { name: 'Evac Beacon', text: `A soldier gets a civilian out from ${BEACON_REACH} tiles away`, effect: 'beacon' },
   charity: { name: 'Refugee Network', text: 'Each civilian saved pays 1 more supply', civilianSupplies: 1 },

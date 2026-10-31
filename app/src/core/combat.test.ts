@@ -6,6 +6,7 @@ import { HASTE_MOVE, isSoldier, revealed, SOLDIER_ATTACKS, type Battle } from '.
 import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
 import { detects } from './sight'
+import { costOf, DASH_MOVE } from './pathing'
 
 function battle(seed: number): Battle {
   const run = begun(seed)
@@ -60,10 +61,12 @@ test('a turn is one move beat, then an attack per beat in id order, two by each 
   expect(twice).toBeGreaterThan(0)
 })
 
-test('no unit moves farther than its move', () => {
+test('no unit moves farther than its move, and a soldier its dash', () => {
   play(2, (events, before) => {
     for (const e of events) {
-      if (e.type === 'move') expect(e.path.length).toBeLessThanOrEqual(before.units.find((u) => u.id === e.id)!.stats.move)
+      if (e.type !== 'move') continue
+      const unit = before.units.find((u) => u.id === e.id)!
+      expect(e.path.length).toBeLessThanOrEqual(unit.stats.move + (isSoldier(unit) ? DASH_MOVE : 0))
     }
   })
 })
@@ -87,27 +90,20 @@ test('a pod is revealed once a soldier notices one of its aliens', () => {
   })
 })
 
-test('a squad that sees a pod first holds its fire and sets up, then springs the ambush all at once; unseen, it creeps', () => {
-  let sprung = 0
-  for (let seed = 1; seed <= 30 && sprung === 0; seed++) {
-    play(seed, (events, before, after) => {
-      // Unseen soldiers walk at most CREEP of their move in their move stage.
-      for (const e of events) {
-        if (e.type !== 'move' || !before.concealed || before.stage !== 'move' || e.with) continue
-        // A unit that arrived this beat, such as a wave, has no move stage behind it.
-        const unit = before.units.find((u) => u.id === e.id)
-        if (unit && isSoldier(unit)) expect(e.path.length).toBeLessThanOrEqual(Math.ceil(unit.stats.move * 0.6) + 1)
+test('before contact, soldiers walk their full move from the first turn', () => {
+  for (let seed = 1; seed <= 6; seed++) {
+    let checked = false
+    play(seed, (events, before) => {
+      if (checked || before.turn !== 'human' || before.stage !== 'move' || before.pods.some((p) => p.revealed)) return
+      const walks = events.flatMap((e) => (e.type === 'move' && !e.with ? [e] : []))
+      if (walks.length === 0) return
+      checked = true
+      for (const e of walks) {
+        const unit = before.units.find((u) => u.id === e.id)!
+        if (isSoldier(unit)) expect(costOf(before, unit, e.path)).toBeGreaterThanOrEqual(unit.stats.move - 1)
       }
-      // No soldier fires on a pod the squad has seen that has not noticed it.
-      for (const e of events.filter((e) => e.type === 'shot')) {
-        const target = before.units.find((u) => u.id === e.target)
-        const pod = target && target.pod !== null ? before.pods[target.pod] : null
-        if (isSoldier(before.units.find((u) => u.id === e.id)!) && pod?.revealed) expect(pod.alert || after.pods[target!.pod!].ambushed).toBe(true)
-      }
-      sprung += events.filter((e) => e.type === 'reveal' && e.ambush && before.pods.some((p, i) => p.revealed && !p.alert && e.units.some((u) => before.units.find((b) => b.id === u.id)?.pod === i))).length
     })
   }
-  expect(sprung).toBeGreaterThan(0)
 }, 30_000)
 
 test('a soldier may walk between and after its attacks, its walks in a turn together within its move', () => {
@@ -121,7 +117,7 @@ test('a soldier may walk between and after its attacks, its walks in a turn toge
         if (before.stage === 'shoot') strides++
         const key = `${before.round}:${unit.id}`
         walked.set(key, (walked.get(key) ?? 0) + e.path.length)
-        expect(walked.get(key)).toBeLessThanOrEqual(unit.stats.move + HASTE_MOVE)
+        expect(walked.get(key)).toBeLessThanOrEqual(unit.stats.move + HASTE_MOVE + DASH_MOVE)
       }
     })
   }

@@ -76,7 +76,7 @@ const skills = {
   // Sniper
   steady: { name: 'Steady Aim', role: 'power', text: 'If it did not move this turn, it rolls twice to hit and takes the better', effect: 'steady' },
   mark: { name: "Hunter's Mark", role: 'power', tags: ['mark'], text: `A target it hits is marked: every later hit on it does ${TUNING.markDamage} more damage`, effect: 'mark' },
-  ghost: { name: 'Ghost', role: 'guard', text: 'Aliens more than 4 tiles away cannot shoot it', effect: 'ghost' },
+  elusive: { name: 'Elusive', role: 'guard', text: 'Aliens more than 4 tiles away cannot shoot it', effect: 'elusive' },
   kneecap: { name: 'Kneecap', role: 'control', text: 'Its hits root the target: it cannot move on its next turn', effect: 'snare' },
   headshot: { name: 'Headshot', role: 'power', tags: ['crit'], text: 'Crits do 2 more damage', effect: 'headshot', after: ['steady'] },
   doubleTap: { name: 'Double Tap', role: 'power', text: 'If it did not move this turn, it attacks a third time', effect: 'doubleTap', after: ['steady'] },
@@ -84,10 +84,10 @@ const skills = {
   slayer: { name: 'Colossus Slayer', role: 'power', text: '+2 damage to a target already wounded', effect: 'slayer', after: ['mark'] },
   hollowPoint: { name: 'Piercing Rounds', role: 'power', text: "Its shots ignore the target's cover", effect: 'pierce', after: ['mark'] },
   volley: { name: 'Volley', role: 'power', text: 'A hit also does half its damage to every alien beside the target', effect: 'volley', after: ['mark', 'slayer'] },
-  decoy: { name: 'Decoy', role: 'guard', text: 'Begins each battle with 2 holograms of itself; each hit on it has a 50% chance to pop one instead', effect: 'mirror', after: ['ghost'] },
-  vanish: { name: 'Vanish', role: 'guard', text: 'Once per battle, when hit to half health or less, it blinks to the safest tile within 5', effect: 'blink', after: ['ghost'] },
-  relocate: { name: 'Relocate', role: 'guard', text: 'After it acts, it moves up to 2 tiles to where the aliens have the worst shot at it', effect: 'skirmish', after: ['ghost', 'vanish'] },
-  longshot: { name: 'Longshot', role: 'power', text: '+2 range', stats: { range: 2 }, after: ['ghost', 'steady'] },
+  decoy: { name: 'Decoy', role: 'guard', text: 'Begins each battle with 2 holograms of itself; each hit on it has a 50% chance to pop one instead', effect: 'mirror', after: ['elusive'] },
+  blink: { name: 'Blink', role: 'guard', text: 'Once per battle, when hit to half health or less, it blinks to the safest tile within 5', effect: 'blink', after: ['elusive'] },
+  relocate: { name: 'Relocate', role: 'guard', text: 'After it acts, it moves up to 2 tiles to where the aliens have the worst shot at it', effect: 'skirmish', after: ['elusive', 'blink'] },
+  longshot: { name: 'Longshot', role: 'power', text: '+2 range', stats: { range: 2 }, after: ['elusive', 'steady'] },
   tranq: { name: 'Tranquilizer Dart', role: 'control', text: 'Once per battle, the toughest alien it can shoot, a boss aside, falls asleep and loses its next action', effect: 'polymorph', after: ['kneecap'] },
   charged: { name: 'Charged Rounds', role: 'control', text: 'Its hits charge the target: if it moves on its next turn, it takes 3 damage', effect: 'booming', after: ['kneecap'] },
   // Engineer
@@ -158,7 +158,7 @@ export const SKILLS: Record<SkillId, Skill> = skills
 export const TREES: Record<ClassId, SkillId[]> = {
   assault: ['bloodlust', 'reflexes', 'leap', 'rage', 'cleave', 'surge', 'reckless', 'skirmish', 'secondWind', 'unbreakable', 'hurl', 'hamstring', 'sprinter', 'backstab'],
   heavy: ['arsenal', 'bulwark', 'suppression', 'bigBlast', 'shredder', 'concussion', 'taunt', 'steadfast', 'reactive', 'slam', 'intimidate', 'overwatch', 'charge'],
-  sniper: ['steady', 'mark', 'ghost', 'kneecap', 'headshot', 'doubleTap', 'assassinate', 'slayer', 'hollowPoint', 'volley', 'decoy', 'vanish', 'longshot', 'tranq', 'charged', 'relocate'],
+  sniper: ['steady', 'mark', 'elusive', 'kneecap', 'headshot', 'doubleTap', 'assassinate', 'slayer', 'hollowPoint', 'volley', 'decoy', 'blink', 'longshot', 'tranq', 'charged', 'relocate'],
   engineer: ['titan', 'swarm', 'launcher', 'hardlight', 'plating', 'rebuild', 'servos', 'detonate', 'spotter', 'linked', 'hive', 'shock', 'emp'],
   support: ['fieldKit', 'inspire', 'barrier', 'flashbang', 'surgeon', 'revive', 'vitality', 'haste', 'drone', 'forceField', 'ward', 'bane', 'gravBeam', 'nullifier'],
   pyro: ['tanks', 'tinder', 'fireSuit', 'firewall', 'inferno', 'backdraft', 'asbestos', 'searing', 'flashpoint', 'smolder', 'burningAura', 'phoenixHeart', 'blastWave', 'blinding', 'afterburner'],

@@ -49,7 +49,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       // Each walks the whole way it went, from where it stood.
       const paths = new Map<number, Tile[]>()
       for (const m of group) if (m.type === 'move' && (sprites.has(m.id) || glows.has(m.id))) paths.set(m.id, [...(paths.get(m.id) ?? []), ...m.path])
-      const pace = (id: number) => tilePace(!!sprites.get(id)?.ally, battle.concealed)
+      const pace = (id: number) => tilePace(!!sprites.get(id)?.ally)
       const ms = walkMs([...paths].map(([id, path]) => ({ path, pace: pace(id) })))
       const walks = [...paths].map(([id, path]) => (sprites.has(id) ? walk(s, sprites.get(id)!, path, ms) : glide(s, glows.get(id)!, path, ms)))
       for (const m of group) if (m.type === 'move' && m.with && sprites.has(m.id)) float(s, callout(s, effectName(m.with, s.kit()).toUpperCase(), 0xffffff, sprites.get(m.id)!))
@@ -57,19 +57,14 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       // The fog lifts where the squad arrived, before any pod it uncovered appears.
       drawFog(s, battle)
       await play(s, battle, group.filter((m) => m.type !== 'move'))
-    } else if (e.type === 'reveal' || e.type === 'wave' || e.type === 'sighted') {
+    } else if (e.type === 'reveal' || e.type === 'wave') {
       // A wave the squad cannot see yet stays off screen, and the camera stays where it is.
       if (e.type === 'wave' && !e.units.some((at) => battle.units.some((u) => u.id === at.id && revealed(battle, u)))) continue
-      // A pod already in sight, its ambush sprung or the squad spotted, stays as it is.
       const appeared = e.units.flatMap((at) => {
         const unit = battle.units.find((u) => u.id === at.id)
         return unit && !sprites.has(unit.id) ? [create(s, { ...unit, x: at.x, y: at.y }, 0, letter(unit))] : []
       })
       await s.tween(PACE.reveal, (t) => appeared.forEach((sprite) => fade(sprite, t)))
-      const first = sprites.get(e.units[0]?.id ?? -1)
-      if (e.type === 'sighted' && first) float(s, callout(s, 'UNAWARE · HOLD FIRE', COLOR.miss, first, 18))
-      if (e.type === 'reveal' && e.ambush && first) float(s, callout(s, 'AMBUSH! CAUGHT OFF GUARD', COLOR.hit, first, 18))
-      if (e.type === 'reveal' && e.stalked && first) float(s, callout(s, 'STALKED!', COLOR.crit, first, 18))
       if (e.type === 'wave' && appeared.length > 0) float(s, callout(s, 'REINFORCEMENTS', COLOR.crit, appeared[0], 18))
     } else if (e.type === 'shot') {
       const from = sprites.get(e.id)

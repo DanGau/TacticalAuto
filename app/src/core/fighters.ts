@@ -1,5 +1,5 @@
 // Questions every combat module asks about units in a fight: whose enemy, nearest, has what, can shoot.
-import { AURA_REACH, BURN_TURNS, type Battle, CHILL_TURNS, type Effect, GHOST_REACH, GRID, LINGER_TURNS, type Tile, type Unit, alert, isSoldier, revealed, unaware } from './battle'
+import { AURA_REACH, BURN_TURNS, type Battle, CHILL_TURNS, type Effect, ELUSIVE_REACH, GRID, LINGER_TURNS, type Tile, type Unit, alert, isSoldier, revealed } from './battle'
 import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
@@ -53,20 +53,18 @@ export function spotted(battle: Battle): Set<number> {
   return new Set(battle.units.filter((u) => u.side === 'alien' && revealed(battle, u) && soldiers.some((s) => sees(battle, s, u))).map((u) => u.id))
 }
 
-/** Whether `unit`, standing on `from`, may shoot `target`. Squadsight reaches any spotted alien in a clear line; a ghost is safe from far off. */
+/** Whether `unit`, standing on `from`, may shoot `target`. Squadsight reaches any spotted alien in a clear line; an elusive target is safe from far off. */
 export function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: Set<number>): boolean {
-  // Soldiers hold their fire on a pod they are setting an ambush on, until it is sprung.
-  if (unit.side === 'human' && unaware(battle, target)) return false
   // A VIP is a hostage, kept alive until freed.
   if (target.civilian === 'vip' && battle.vip !== 'freed') return false
-  if (has(target, 'ghost') && distance(from, target) > GHOST_REACH) return false
+  if (has(target, 'elusive') && distance(from, target) > ELUSIVE_REACH) return false
   // A psionic attack needs no line of sight, only an alien whose pod is revealed.
   if (has(unit, 'psionic') && revealed(battle, target) && distance(from, target) <= unit.stats.range) return true
   if (canShoot(battle, from, target, unit.stats.range)) return true
   return unit.ability === 'squadsight' && seen.has(target.id) && lineOfSight(battle, from, target)
 }
 
-/** The aliens a soldier's powers may act on: revealed and alert, so a pod it is stalking is left be. */
+/** The aliens a soldier's powers may act on: revealed and alert. */
 export const foes = (battle: Battle, unit: Unit) => battle.units.filter((u) => u.side !== unit.side && !u.civilian && revealed(battle, u) && alert(battle, u))
 
 /** Whether a unit cannot burn: by its nature, a fire suit, or in the rain. */
@@ -126,9 +124,7 @@ export const GUARDIAN_REACH = 2
 /** Mirror images a wearer begins a battle with, and the chance a hit pops one instead. */
 export const MIRROR_IMAGES = 2
 
-/** What Killing Ground adds to an ambush's aim and crit, Bounty Rounds to hits on a boss, and how far an Evac Beacon gets a civilian out from. */
-export const KILLZONE = 0.15
-
+/** What Bounty Rounds add to hits on a boss, and how far an Evac Beacon gets a civilian out from. */
 export const BOUNTY_DAMAGE = 3
 
 export const BEACON_REACH = 3

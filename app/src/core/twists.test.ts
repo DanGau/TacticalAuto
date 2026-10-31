@@ -18,7 +18,7 @@ function duel(twist: Twist | null): Battle {
   run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
-  deploy(run, zoneOf(run.battle!, 'stealth'))
+  deploy(run, zoneOf(run.battle!, 'deep'))
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist })
   battle.ground.fill('pavement')

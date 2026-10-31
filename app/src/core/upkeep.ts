@@ -84,9 +84,9 @@ export function upkeep(battle: Battle): GameEvent[] {
     const wave = battle.waves.shift()!
     // Once the squad extracts, they stop growing.
     if (hold) battle.waves.push(battle.extract ? wave : { ...wave, aliens: [...wave.aliens, wave.aliens[0]] })
-    // It comes in unseen but hunting, as a stalking pod does, and shows once the squad sights it.
+    // It comes in unseen but hunting, and shows once the squad sights it.
     const units = placePod(battle, wave, centre, false)
-    Object.assign(battle.pods.at(-1)!, { alert: true, stalking: true })
+    Object.assign(battle.pods.at(-1)!, { alert: true })
     events.push({ type: 'wave', units: units.map(({ id, x, y }) => ({ id, x, y })) })
   }
   battle.acid = battle.acid.map((pool) => ({ ...pool, turns: pool.turns - 1 })).filter((pool) => pool.turns > 0)

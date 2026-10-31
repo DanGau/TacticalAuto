@@ -22,7 +22,7 @@ function landing(seed = 1): Run & { battle: Battle } {
   return run as Run & { battle: Battle }
 }
 
-test('an exterminate offers hot drops onto pods and stealth insertions clear of every alien', () => {
+test('an exterminate offers hot drops onto pods and parachute drops clear of every alien', () => {
   for (let seed = 1; seed <= 10; seed++) {
     const { battle } = landing(seed)
     expect(battle.zones).toHaveLength(ZONES)
@@ -34,15 +34,14 @@ test('an exterminate offers hot drops onto pods and stealth insertions clear of 
   }
 })
 
-test('a hot drop breaches: the pod beneath is ambushed and cannot shoot, its members take the impact, and the other pods converge', () => {
+test('a hot drop breaches: the pod beneath cannot shoot, its members take the impact, and the other pods converge', () => {
   const run = landing()
   const battle = run.battle
   const hot = zoneOf(battle, 'hot')
   const zone = battle.zones[hot]
   deploy(run, hot)
   const under = battle.units.find((u) => u.side === 'alien' && distance(u, zone) <= 2)!
-  expect(battle.pods[under.pod!]).toMatchObject({ revealed: true, ambushed: true, surprised: true })
-  expect(battle.concealed).toBe(false)
+  expect(battle.pods[under.pod!]).toMatchObject({ revealed: true, surprised: true })
   battle.pods.forEach((pod, i) => i !== under.pod && expect(pod.waypoint).toEqual(zone))
   const events = stepBattle(battle)
   expect(events).toContainEqual({ type: 'hurt', id: under.id, amount: TUNING.impactDamage, cause: 'impact' })
@@ -50,7 +49,7 @@ test('a hot drop breaches: the pod beneath is ambushed and cannot shoot, its mem
 
 test('landing puts the whole squad on open tiles by the zone and begins the battle', () => {
   const run = landing()
-  const cold = zoneOf(run.battle, 'stealth')
+  const cold = zoneOf(run.battle, 'deep')
   const zone = run.battle.zones[cold]
   expect(deploy(run, cold)).toEqual({ ok: true })
   const squad = run.battle.units.filter(isSoldier)

@@ -1,4 +1,4 @@
-// A side's simultaneous move: sighting pods, walking, sentries, overwatch, ambushes, burrowers.
+// A side's simultaneous move: sighting pods, walking, sentries, overwatch, burrowers.
 import { shoot } from './attack'
 import { type Battle, PATROL_MOVE, GRID, alert, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, revealed, SIGHT, IMPACT_REACH, type Effect } from './battle'
 import { POD_BLAST } from './setup'
@@ -13,7 +13,7 @@ import type { GameEvent } from './combat-event'
 import { immune, onTile, fireproof, foeHas, has, GUARDIAN_REACH, lying, hunted, extractReach, carrying, BEACON_REACH, vipOf, nearest, EXTRACT_CLEARANCE, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
 import { fleePath, fightPath, patrolPath, walk, paths, exposure, costOf, bestPath, COHESION } from './pathing'
 import { randomInt } from './rng'
-import { canShoot, detects, sees } from './sight'
+import { detects, sees } from './sight'
 import { TUNING } from './tuning'
 import { upkeep } from './upkeep'
 import { moved, wound } from './wound'
@@ -59,7 +59,7 @@ export function moveSide(battle: Battle): GameEvent[] {
       wound(battle, unit, 1, events)
     }
   }
-  const sighted = [...sight(battle), ...(battle.turn === 'human' ? spring(battle) : [])]
+  const sighted = sight(battle)
   // Soldiers on overwatch fire once the aliens have moved and any pod sighted has taken its place.
   if (battle.turn === 'alien') sighted.push(...overwatch(battle, [...events, ...sighted].flatMap((e) => (e.type === 'move' ? [e.id] : []))))
   // A patrolling pod that could not move, hemmed in by others, tries for somewhere else next turn.
@@ -74,9 +74,8 @@ export function moveSide(battle: Battle): GameEvent[] {
 }
 
 /**
- * Soldiers and pods notice each other, both by the same rule. A pod the squad notices first is ambushed: caught where
- * it stands. A pod that notices the squad first turns alert unseen and stalks it. When both notice at once, the pod
- * scrambles to fighting positions. A pod caught on its own turn does not shoot until its next.
+ * Soldiers and pods notice each other, both by the same rule. Either way the pod is alert and fights; a pod the squad
+ * has not seen stays hidden until it is sighted or opens fire. A pod caught on its own turn does not shoot until its next.
  */
 export function sight(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
@@ -86,28 +85,12 @@ export function sight(battle: Battle): GameEvent[] {
     const members = battle.units.filter((u) => u.pod === index)
     const noticed = !pod.revealed && members.some((m) => soldiers.some((s) => detects(battle, s, m)))
     const notices = !pod.alert && members.some((m) => soldiers.some((s) => detects(battle, m, s)))
-    const wasAlert = pod.alert
-    // A pod the squad is setting an ambush on spots it first: the fight is on, with no ambush.
-    if (pod.revealed && notices) {
-      Object.assign(pod, { alert: true, surprised: battle.turn === 'alien' })
-      events.push({ type: 'reveal', ambush: false, stalked: false, units: members.map(({ id, x, y }) => ({ id, x, y })) })
-      return
-    }
-    // A pod the squad sees first, unaware of it, goes on as it was while the squad sets up its ambush.
-    if (noticed && !notices && !wasAlert) {
-      pod.revealed = true
-      events.push({ type: 'sighted', units: members.map(({ id, x, y }) => ({ id, x, y })) })
-      return
-    }
-    if (notices) {
-      pod.alert = true
-      pod.stalking = !noticed
-    }
+    if (!noticed && !notices) return
+    if (!pod.alert) pod.surprised = battle.turn === 'alien'
+    pod.alert = true
     if (!noticed) return
-    const ambush = !wasAlert && !notices
-    Object.assign(pod, { revealed: true, alert: true, ambushed: ambush, surprised: battle.turn === 'alien' && !wasAlert })
-    events.push({ type: 'reveal', ambush, stalked: false, units: members.map(({ id, x, y }) => ({ id, x, y })) })
-    if (!ambush && !wasAlert) for (const member of members) walk(member, fightPath(battle, member), events)
+    pod.revealed = true
+    events.push({ type: 'reveal', units: members.map(({ id, x, y }) => ({ id, x, y })) })
   })
   // Getting out, a soldier with its hands free beside a squadmate down picks them up.
   for (const body of battle.extract ? lying(battle) : []) {
@@ -151,7 +134,6 @@ export function sight(battle: Battle): GameEvent[] {
     battle.saved++
     events.push({ type: 'saved', id: civilian.id })
   }
-  battle.concealed = !hunted(battle)
   return events
 }
 
@@ -253,33 +235,10 @@ export function overwatch(battle: Battle, moved: number[]): GameEvent[] {
   return events
 }
 
-/**
- * After the squad moves, each ambush it is setting is sprung once every soldier who can fight has a shot at the pod,
- * or after SETUP_TURNS: the pod turns alert and is ambushed, and the squad opens fire together.
- */
-export function spring(battle: Battle): GameEvent[] {
-  const events: GameEvent[] = []
-  const soldiers = battle.units.filter((u) => isSoldier(u) && armed(battle, u))
-  battle.pods.forEach((pod, index) => {
-    if (!pod.revealed || pod.alert) return
-    const members = battle.units.filter((u) => u.pod === index)
-    pod.stalked++
-    const ready = soldiers.every((s) => members.some((m) => canShoot(battle, s, m, s.stats.range)))
-    if (!ready && pod.stalked <= SETUP_TURNS) return
-    Object.assign(pod, { alert: true, ambushed: true, reeling: true })
-    events.push({ type: 'reveal', ambush: true, stalked: false, units: members.map(({ id, x, y }) => ({ id, x, y })) })
-  })
-  battle.concealed = !hunted(battle)
-  return events
-}
-
-/** Squad turns the squad sets up an ambush before it springs it, ready or not. */
-export const SETUP_TURNS = 5
-
-/** Whether the unit may act this turn: a soldier may not under an order; an alien may not while its pod is unaware, surprised or reeling. */
+/** Whether the unit may act this turn: a soldier may not under an order; an alien may not while its pod is unaware or surprised. */
 export function armed(battle: Battle, unit: Unit): boolean {
   if (unit.order) return false
-  return unit.pod === null || (battle.pods[unit.pod].alert && !battle.pods[unit.pod].surprised && !battle.pods[unit.pod].reeling)
+  return unit.pod === null || (battle.pods[unit.pod].alert && !battle.pods[unit.pod].surprised)
 }
 
 /**
@@ -297,8 +256,8 @@ export function surface(battle: Battle): GameEvent[] {
     const alone = soldiers.reduce<Unit | undefined>((best, s) => (!best || company(s) < company(best) ? s : best), undefined)
     if (!alone) return
     freeTilesNear(battle, alone, members.length).forEach((tile, i) => Object.assign(members[i], tile))
-    Object.assign(pod, { revealed: true, alert: true, stalking: false, ambushed: false, surprised: false })
-    events.push({ type: 'reveal', ambush: false, stalked: true, units: members.map(({ id, x, y }) => ({ id, x, y })) })
+    Object.assign(pod, { revealed: true, alert: true, surprised: false })
+    events.push({ type: 'reveal', units: members.map(({ id, x, y }) => ({ id, x, y })) })
     // Surfacing is a move, so overwatch answers it.
     for (const m of members) events.push({ type: 'move', id: m.id, path: [{ x: m.x, y: m.y }] })
   })

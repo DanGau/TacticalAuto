@@ -19,9 +19,6 @@ export const CRIT_BONUS = 2
 export const COVER_DEFENSE = [0, 0.2, 0.4]
 /** Tiles within which a soldier with line of sight reveals an alien. */
 export const SIGHT = 24
-/** What a soldier's shots gain against an ambushed pod: hit chance, and chance for a hit to crit. */
-export const AMBUSH_AIM = 0.2
-export const AMBUSH_CRIT = 0.25
 /** How near a soldier landing in a breach an alien must be to take the drop pods' impact damage. */
 export const IMPACT_REACH = 2
 /** Tiles an alien moves per turn before its pod is revealed. */
@@ -87,7 +84,7 @@ export const RECKLESS_AIM = 0.2
 export const CLEAVE_DAMAGE = 2
 export const BIG_BLAST_RADIUS = 2
 export const SLAYER_DAMAGE = 2
-export const GHOST_REACH = 4
+export const ELUSIVE_REACH = 4
 export const HASTE_MOVE = 2
 export const BANE_REACH = 3
 export const BANE_AIM = 0.1
@@ -184,7 +181,7 @@ export type SkillEffect =
   | 'assassinate'
   | 'slayer'
   | 'volley'
-  | 'ghost'
+  | 'elusive'
   | 'haste'
   | 'vitality'
   | 'bane'
@@ -211,7 +208,7 @@ export type SkillEffect =
   | 'forceField'
   | 'firewall'
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'podBlast' | 'podShred' | 'podFrost' | 'podWall' | 'podTurret' | 'dropPods' | 'canopies' | 'ghost' | 'killzone' | 'beacon' | 'relay' | 'flare' | 'bounty'
+export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'podBlast' | 'podShred' | 'podFrost' | 'podWall' | 'podTurret' | 'dropPods' | 'canopies' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
 export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect
 
@@ -321,16 +318,8 @@ interface Pod {
   revealed: boolean
   /** Aware of the squad: it hunts the squad and fights. */
   alert: boolean
-  /** Noticed the squad unseen: its shots this alien turn gain the ambush bonus. */
-  stalking: boolean
-  /** Caught unaware by a concealed squad: until the squad's turn ends, shots at its members gain the ambush bonus. */
-  ambushed: boolean
   /** Revealed during the current alien turn, or crashed onto by drop pods, so its members do not shoot until the next. */
   surprised: boolean
-  /** Ambushed: on its next turn its members move at half their move and do not act. */
-  reeling: boolean
-  /** Squad turns the squad has spent setting up an ambush on it, seen but unaware. */
-  stalked: number
   /** Holds its post, unmoving, until it notices the squad or the battle drags on. */
   guard: boolean
   waypoint: Tile
@@ -385,8 +374,6 @@ export interface Battle {
   used: Effect[]
   /** Consumables the player has used, taking effect at the next beat. */
   primed: ConsumableId[]
-  /** True while no living pod is alert to the squad. */
-  concealed: boolean
   /** Set by a landing on the hot zone until the drop pods' impact lands, as the battle's first beat. */
   breach: boolean
   /** The zone, by index into zones, whose landing comes with an artillery strike on the pod nearest it; null if none. */
@@ -442,9 +429,6 @@ export const SOLDIER_ATTACKS = 2
 /** Whether the unit hunts its enemies: an alien once its pod is alert. Humans always do. */
 export const alert = (battle: Battle, unit: Unit) => unit.pod === null || battle.pods[unit.pod].alert
 
-/** Whether a unit belongs to a pod the squad has seen and that has not noticed it: one the squad is setting an ambush on. */
-export const unaware = (battle: Battle, unit: Unit) => unit.pod !== null && battle.pods[unit.pod].revealed && !battle.pods[unit.pod].alert
-
 /** A soldier of the squad: not a civilian, nor a mech, which fights for the squad but cannot hold the field alone. */
 export const isSoldier = (unit: Unit) => unit.side === 'human' && unit.soldier !== null
 
@@ -459,4 +443,4 @@ export function revealed(battle: Battle, unit: Unit): boolean {
  * Assassinate: a decapitation onto the commander, an overwatch on high ground at range, or bait far off that draws the
  * guards away. Hold: which uplink to hold. Rescue: a quiet march in from the edge.
  */
-export type Plan = 'march' | 'hot' | 'stealth' | 'decap' | 'overwatch' | 'bait' | 'uplink'
+export type Plan = 'march' | 'hot' | 'deep' | 'decap' | 'overwatch' | 'bait' | 'uplink'

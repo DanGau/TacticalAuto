@@ -3,10 +3,9 @@ import type { GameEvent } from './combat-event'
 
 /** How long the view takes to play each kind of event, in ms. The view animates by these; the sim times battles by them. */
 export const PACE = {
-  /** An alien walking one tile; a soldier dashing one, quick and decisive; the squad creeping one while unseen. */
+  /** An alien walking one tile; a soldier dashing one, quick and decisive. */
   tile: 110,
   dash: 55,
-  creep: 200,
   /** The longest a side's moves take: everyone walks together and arrives together, a long way briskly. */
   march: 700,
   /** Units appearing, and dying or leaving. */
@@ -16,7 +15,7 @@ export const PACE = {
   attack: 450,
   /** Between the starts of one attack and the next in a side's attack stage, so each attack reads on its own. */
   stagger: 380,
-  /** The pause as the turn passes to the other side, while its banner sweeps across. */
+  /** The pause as the turn passes to the other side. */
   turn: 700,
   psi: 320,
   rocket: 320,
@@ -31,7 +30,7 @@ const INSTANT = new Set<GameEvent['type']>(['order', 'feed', 'effect', 'carried'
 export const instant = (e: GameEvent) => INSTANT.has(e.type)
 
 /** A unit's ms per tile. */
-export const tilePace = (ally: boolean, concealed: boolean) => (!ally ? PACE.tile : concealed ? PACE.creep : PACE.dash)
+export const tilePace = (ally: boolean) => (ally ? PACE.dash : PACE.tile)
 
 /** Tiles walked along `path`, each step's length, the first counted as one. */
 export const walked = (path: { x: number; y: number }[]) => path.reduce((sum, p, i) => sum + (i === 0 ? 1 : Math.hypot(p.x - path[i - 1].x, p.y - path[i - 1].y)), 0)
@@ -57,7 +56,7 @@ export function beatMs(events: GameEvent[], pace: Map<number, number>, shown: Se
     if (e.type === 'shot') ms += PACE.attack
     else if (e.type === 'rocket') ms += PACE.rocket + PACE.blast
     else if (e.type === 'spit' || e.type === 'panic') ms += PACE.psi
-    else if (e.type === 'reveal' || e.type === 'wave' || e.type === 'sighted') ms += e.units.some((u) => shown.has(u.id)) ? PACE.reveal : 0
+    else if (e.type === 'reveal' || e.type === 'wave') ms += e.units.some((u) => shown.has(u.id)) ? PACE.reveal : 0
     else if (e.type === 'spawn' || e.type === 'freed') ms += shown.has(e.unit.id) ? PACE.reveal : 0
     else if (e.type === 'death' || e.type === 'saved' || e.type === 'escaped') ms += PACE.death
     else if (e.type === 'used') ms += PACE.reveal

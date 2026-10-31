@@ -13,7 +13,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `step.ts` | Advances the run's battle a beat; settles it when it ends |
 | `combat.ts` | `stepBattle`: whose turn, the next unit's action, consumables |
 | `combat-event.ts` | `GameEvent`, what a beat emits for the view |
-| `sides.ts` | A side's simultaneous move: sighting, walking, sentries, overwatch, ambushes |
+| `sides.ts` | A side's simultaneous move: sighting, walking, sentries, overwatch |
 | `pathing.ts` | Where a unit moves: candidate paths scored by stance, goal and threat |
 | `attack.ts` | A shot and what a hit or kill sets off |
 | `abilities.ts` | Actions in place of a shot: alien powers, soldier skills and gear |

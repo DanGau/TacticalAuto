@@ -1,5 +1,5 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
-import { type Battle, type Unit, SUPPRESS_AIM, SPOTTER_AIM, SLAYER_DAMAGE, SEARING_DAMAGE, RECKLESS_AIM, RAGE_DAMAGE, isSoldier, INSPIRE_AIM, HURL_TILES, HURL_DAMAGE, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_CHANCE, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_AIM, BURN_TURNS, BULWARK_DEFENSE, BANE_REACH, BANE_AIM, BACKSTAB_DAMAGE, AMBUSH_CRIT, AMBUSH_AIM, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE } from './battle'
+import { type Battle, type Unit, SUPPRESS_AIM, SPOTTER_AIM, SLAYER_DAMAGE, SEARING_DAMAGE, RECKLESS_AIM, RAGE_DAMAGE, isSoldier, INSPIRE_AIM, HURL_TILES, HURL_DAMAGE, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_CHANCE, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_AIM, BURN_TURNS, BULWARK_DEFENSE, BANE_REACH, BANE_AIM, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE } from './battle'
 import { freeTilesNear } from './grid'
 import { blocked } from './grid'
 import { walkingDistances } from './grid'
@@ -10,7 +10,7 @@ import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import { PARRY_CHANCE } from './doctrines'
 import type { GameEvent } from './combat-event'
-import { onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, KILLZONE, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
+import { onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
 import { tallyOf, wound, knockback } from './wound'
 import { TUNING } from './tuning'
 import { odds, coverAgainst } from './sight'
@@ -80,12 +80,9 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const events: GameEvent[] = []
   if (taunting.length > 0 && taunting.length < inReach.length) events.push({ type: 'effect', id: enemy.id, effect: 'taunt', amount: 0 })
   const chance = chanceAt(enemy)
-  // The ambush bonus: against a pod caught unaware, or for a stalking pod's shots.
-  const ambushed = (enemy.pod !== null && battle.pods[enemy.pod].ambushed) || (unit.pod !== null && battle.pods[unit.pod].stalking)
   const baned = battle.units.some((u) => u.side !== unit.side && has(u, 'bane') && distance(u, unit) <= BANE_REACH)
   const toHit =
     chance.hit +
-    (ambushed ? AMBUSH_AIM + when(true, 'killzone', KILLZONE) : 0) +
     (inAura(battle, unit, 'inspire') ? INSPIRE_AIM : 0) +
     when(true, 'reckless', RECKLESS_AIM) +
     (has(enemy, 'reckless') ? RECKLESS_AIM : 0) +
@@ -122,7 +119,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   }
 
   const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) > 0
-  const crit = !enemy.resists.includes('crit') && (sure || random(battle) < chance.crit + (ambushed ? AMBUSH_CRIT + (has(unit, 'killzone') ? KILLZONE : 0) : 0))
+  const crit = !enemy.resists.includes('crit') && (sure || random(battle) < chance.crit)
   // A mirror hits as hard as the squad's hardest hitter; a feeder as hard as it has grown.
   const base = unit.kind === 'mirror' ? Math.max(unit.stats.damage, ...battle.units.filter(isSoldier).map((s) => s.stats.damage)) : unit.stats.damage
   let damage =

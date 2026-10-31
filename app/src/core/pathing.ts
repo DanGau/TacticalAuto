@@ -1,5 +1,5 @@
 // Where a unit moves: candidate paths, scored by stance, goal and threat.
-import { type Battle, type Unit, type Tile, GRID, type Stance, revealed, alert, isSoldier, unaware, STANDOFF, MEDIC_REACH, HASTE_MOVE, CHILL_MOVE, type Order, PATROL_MOVE } from './battle'
+import { type Battle, type Unit, type Tile, GRID, type Stance, revealed, alert, isSoldier, STANDOFF, MEDIC_REACH, HASTE_MOVE, CHILL_MOVE, type Order, PATROL_MOVE } from './battle'
 import { blocked } from './grid'
 import { walkingDistances } from './grid'
 import { passable } from './grid'
@@ -11,7 +11,7 @@ import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { vipOf, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, MIRROR_IMAGES, inAura, has, GUARDIAN_REACH, fireproof, enemiesOf, besideFuel, foes } from './fighters'
 import { ESCORT_REACH } from './goals'
-import { canShoot, detects, coverAgainst, odds, sees } from './sight'
+import { canShoot, coverAgainst, odds, sees } from './sight'
 
 /**
  * The cheapest path to each tile the unit can reach with `move`, climbing costing more, cheapest first,
@@ -289,21 +289,18 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const marching = unit.side === 'human' && seen.size === 0
   // An escort follows the squad rather than leading it, so it leads no one.
   const leaders = unit.stance === 'standoff' ? squadmates.filter((u) => u.stance !== 'standoff' && u.stance !== 'escort') : []
-  /** The nearest to the enemy this unit may walk while marching: REAR_GAP behind the foremost leader. */
-  const slot = marching && leaders.length > 0 ? Math.min(...leaders.map((u) => toGoal[u.y * GRID + u.x])) + REAR_GAP : 0
+  /** The nearest to the enemy this unit may walk while marching on one: REAR_GAP behind the foremost leader. */
+  const slot = marching && leaders.length > 0 && enemies.some((e) => e === goal) ? Math.min(...leaders.map((u) => toGoal[u.y * GRID + u.x])) + REAR_GAP : 0
   /** Tiles `end` is ahead of the unit's place in the formation. */
   const ahead = (end: Tile) => Math.max(0, slot - toGoal[end.y * GRID + end.x])
   /** 0 if a soldier ending its move on `end` gets a civilian out, else 1: a rescuer takes that chance over a shot. */
   const rescuable = unit.side === 'human' ? battle.units.filter((u) => u.civilian && u.civilian !== 'vip') : []
   const saves = (end: Tile) => (rescuable.some((c) => distance(c, end) <= 1) ? 0 : 1)
   const ward = battle.vip === 'freed' && unit.side === 'human' && enemies.some((e) => e.side === 'alien') ? vipOf(battle) : undefined
-  /** Tiles `end` is more than a step beyond ESCORT_REACH of the VIP the squad escorts. */
-  const escort = (end: Tile) => (ward ? Math.max(0, distance(end, ward) - ESCORT_REACH - 1) : 0)
-  const quarry = enemies.filter((e) => unaware(battle, e))
-  /** Whether the squad is setting an ambush: it sees a pod unaware of it, and no alert alien. */
-  const setting = unit.side === 'human' && quarry.length > 0 && !enemies.some((e) => revealed(battle, e) && alert(battle, e))
-  const noticed = (end: Tile) => (quarry.some((e) => detects(battle, e, { ...unit, x: end.x, y: end.y, moved: true })) ? 1 : 0)
-  const lays = (end: Tile) => quarry.some((e) => canShoot(battle, end, e, unit.stats.range))
+  /** Who keeps the VIP company: the VIP, and squadmates within ESCORT_REACH of it, so a column in a narrow way can lead it on. */
+  const escorts = ward ? [ward, ...squadmates.filter((u) => distance(u, ward) <= ESCORT_REACH)] : []
+  /** Tiles `end` is more than a step beyond ESCORT_REACH of the nearest escort. */
+  const escort = (end: Tile) => (ward ? Math.max(0, Math.min(...escorts.map((u) => distance(end, u))) - ESCORT_REACH - 1) : 0)
   const choose = (move: number) => {
     const reach = paths(battle, unit, move)
     /** Whether some tile in reach has a shot; out of contact, even a wary unit keeps advancing. */
@@ -320,7 +317,8 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
         blind: enemies.some((enemy) => sees(battle, end, enemy)) ? 0 : 1,
         toGoal: toGoal[end.y * GRID + end.x] - Math.round(role(end) / 10),
         stray: stray(end),
-        shelter: coverAgainst(battle, end, goal),
+        // On the march, with no alien in sight, a soldier makes its full way rather than stopping short for cover.
+        shelter: marching ? 0 : coverAgainst(battle, end, goal),
         stalled: toGoal[end.y * GRID + end.x] >= toGoal[unit.y * GRID + unit.x] ? 1 : 0,
         // A rescue is no time for care: every turn costs civilians.
         careful: unit.side === 'human' && battle.round < RESTLESS_ROUND && battle.goal !== 'rescue',
@@ -332,8 +330,6 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
       // Getting out, a soldier makes for the way out as fast as it can.
       // Escorting, a soldier keeps by the VIP.
       const first = [escort(end), battle.extract && unit.side === 'human' ? spot.toGoal : 0, leash(end), acid(end), provokes(end), saves(end)]
-      // Setting an ambush: unnoticed first, then a shot at the pod, then the best cover against it, then nearer.
-      if (setting) return [...first, noticed(end), lays(end) ? 0 : 1, -coverAgainst(battle, end, goal), steps]
       if (wary && unit.stance !== 'standoff' && inContact) return [...first, 0, ...WITH_SHOT[unit.stance](spot), spot.toGoal]
       return spot.mine > 0 ? [...first, 0, ...WITH_SHOT[unit.stance](spot), steps] : [...first, 1, ahead(end), ...NO_SHOT[unit.stance](spot)]
     })
@@ -344,18 +340,14 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   if (still && shotHere && !battle.extract && !leash(unit) && !acid(unit) && !(wary && theirs(unit) > 0)) return []
   // A booming charge pins a unit that can fight from where it stands; a rooted one cannot move at all.
   if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || (unit.kind === 'sprinter' && unit.chilled > 0)) return []
-  // A carrier walks at half its move, as does an alien reeling from an ambush.
-  const reeling = unit.pod !== null && battle.pods[unit.pod].reeling
-  const full = Math.ceil(Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0)) / (carrying(battle, unit) || reeling ? 2 : 1))
-  // Unseen, a soldier creeps.
-  // Unless it wears Ghost Weave.
-  const move = unit.side === 'human' && battle.concealed && !has(unit, 'ghost') ? Math.ceil(full * CREEP) : full
+  // A carrier walks at half its move.
+  const move = Math.ceil(Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0)) / (carrying(battle, unit) ? 2 : 1))
   const path = choose(move)
-  if (unit.ability === 'runAndGun' && !battle.concealed && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
+  if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
   const end = path.at(-1) ?? unit
   const shot = enemies.some((e) => shootable(battle, unit, end, e, seen))
-  if (unit.side === 'human' && shot && !battle.concealed && !setting && !battle.extract && !carrying(battle, unit)) battle.strides[unit.id] = move - costOf(battle, unit, path)
-  if (unit.side !== 'human' || battle.concealed || setting || shot) return path
+  if (unit.side === 'human' && shot && !battle.extract && !carrying(battle, unit)) battle.strides[unit.id] = move - costOf(battle, unit, path)
+  if (unit.side !== 'human' || shot) return path
   // A soldier no alien can reach next turn dashes on to a shot, if one is within a dash.
   if (!battle.extract && !carrying(battle, unit) && threat(end) === 0) {
     const dash = choose(move + DASH_MOVE)
@@ -450,7 +442,5 @@ export function walk(unit: Unit, path: Tile[], events: GameEvent[]): void {
   events.push({ type: 'move', id: unit.id, path })
 }
 
-/** Share of its move a soldier walks while the squad is unseen. */
-export const CREEP = 0.6
 /** Tiles further a soldier may dash in the fight to reach a shot. */
-const DASH_MOVE = 3
+export const DASH_MOVE = 3

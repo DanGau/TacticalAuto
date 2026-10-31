@@ -3,7 +3,7 @@ import { expect, test } from 'vitest'
 import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, PACKS, REGEN_HEAL, type AlienKind } from './aliens'
 import { deploy, zoneOf, begun } from './roads'
 import { apply } from './apply'
-import { isSoldier, ACID_DAMAGE, AMBUSH_AIM, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, GRID, HUNKER_DEFENSE, MECH_STATS, DRONE_STATS, TITAN_HEALTH, LEAP_DAMAGE, SLAM_HIT, SLAM_TILES, HURL_DAMAGE, type Battle, type Unit } from './battle'
+import { isSoldier, ACID_DAMAGE, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, GRID, HUNKER_DEFENSE, MECH_STATS, DRONE_STATS, TITAN_HEALTH, LEAP_DAMAGE, SLAM_HIT, SLAM_TILES, HURL_DAMAGE, type Battle, type Unit } from './battle'
 import { mechUnit } from './spawn'
 import { alienUnit } from './spawn'
 import { reshaped } from './grid'
@@ -35,7 +35,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   // A cold zone, so no drop pod impact lands in the fight.
-  const zone = zoneOf(run.battle!, 'stealth')
+  const zone = zoneOf(run.battle!, 'deep')
   deploy(run, zone)
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [] })
@@ -50,8 +50,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, hp: 30, stats: { ...soldier.stats, hp: 30, aim: 2, crit: 0, damage: 3 } })
   const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss || (ALIENS[kind].spawns ?? false), target: false, resists: ALIENS[kind].resists }, { x, y }, 0))
   battle.units = [soldier, ...units]
-  battle.pods = [{ name: 'Test', revealed: true, alert: true, stalking: false, ambushed: false, surprised: false, reeling: false, stalked: 0, guard: false, waypoint: { x: 0, y: 0 } }]
-  battle.concealed = false
+  battle.pods = [{ name: 'Test', revealed: true, alert: true, surprised: false, guard: false, waypoint: { x: 0, y: 0 } }]
   const until = (done: (events: GameEvent[]) => boolean) => {
     const all: GameEvent[] = []
     for (let beats = 0; beats < 60; beats++) {
@@ -152,52 +151,15 @@ test('a spawner spawns a swarmling every few alien turns', () => {
   expect(battle.units.filter((u) => u.kind === 'swarmling')).toHaveLength(1)
 })
 
-test("the first pod a concealed squad sights is ambushed: it does not move to cover, and is easier to hit until the squad's turn ends", () => {
-  const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
-  battle.concealed = true
-  Object.assign(battle.pods[0], { revealed: false, alert: false })
-  // An aim that hits only with the ambush bonus, against an alien that would otherwise walk to cover.
-  soldier.stats = { ...soldier.stats, move: 0, aim: 1 - AMBUSH_AIM, close: 0, range: 7 }
-  aliens[0].hp = aliens[0].stats.hp = 99
-  battle.props[14 * GRID + 10] = 'stack'
-  battle.cover[14 * GRID + 10] = 2
-  soldier.x = 10
-  soldier.y = 4
-  // Stops 7 tiles off: inside the squad's notice, outside the patrol's.
-  soldier.stats = { ...soldier.stats, move: 2 }
-  const events = until((all) => all.some((e) => e.type === 'shot' && e.id === soldier.id))
-  const reveal = events.find((e) => e.type === 'reveal')
-  expect(reveal).toMatchObject({ ambush: true })
-  expect(events.some((e) => e.type === 'move' && e.id === aliens[0].id)).toBe(false)
-  expect(battle.concealed).toBe(false)
-  expect(battle.pods[0].ambushed).toBe(true)
-  until((all) => all.some((e) => e.type === 'shot' && e.id === aliens[0].id) || all.some((e) => e.type === 'move' && e.id === aliens[0].id))
-  expect(battle.pods[0].ambushed).toBe(false)
-})
-
-test('a pod that notices the squad first stalks it unseen, then gives itself away when it opens fire', () => {
+test('a pod that notices the squad first stays unseen until it opens fire', () => {
   const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 22 }])
   Object.assign(battle.pods[0], { revealed: false, alert: false })
-  battle.concealed = true
   soldier.stats = { ...soldier.stats, move: 0, range: 0 }
   // The trooper looks down from a hill: it notices the soldier from farther than the soldier notices it.
   for (let y = 20; y < 25; y++) for (let x = 8; x < 13; x++) battle.height[y * GRID + x] = 5
   aliens[0].stats = { ...aliens[0].stats, move: 0, range: 12 }
   const events = until((all) => all.some((e) => e.type === 'shot' && e.id === aliens[0].id))
   expect(events.findIndex((e) => e.type === 'reveal')).toBeLessThan(events.findIndex((e) => e.type === 'shot'))
-  expect(events.find((e) => e.type === 'reveal')).toMatchObject({ ambush: false, stalked: true })
-  expect(battle.concealed).toBe(false)
-})
-
-test('once every alert alien is dead, the squad slips back into stealth', () => {
-  const { battle, aliens, until } = arena([{ kind: 'swarmling', x: 10, y: 12 }, { kind: 'trooper', x: 30, y: 30 }])
-  // A second pod, far off and unaware, keeps the battle going.
-  aliens[1].pod = 1
-  battle.pods.push({ name: 'Far', revealed: false, alert: false, stalking: false, ambushed: false, surprised: false, reeling: false, stalked: 0, guard: false, waypoint: { x: 30, y: 30 } })
-  battle.concealed = false
-  until((all) => all.some((e) => e.type === 'death'))
-  until(() => battle.concealed)
-  expect(battle.pods[1].alert).toBe(false)
 })
 
 test('backstab adds damage against a target with no cover; shredder destroys armor before the damage lands', () => {
@@ -265,8 +227,8 @@ test('a soldier whose skills pay for standing still holds a tile it can shoot fr
   expect(soldier).toMatchObject(start)
 })
 
-test('an alien that can shoot a taunting soldier must, and cannot shoot a ghost from far off', () => {
-  for (const [effect, shot] of [['taunt', true], ['ghost', false]] as const) {
+test('an alien that can shoot a taunting soldier must, and cannot shoot an elusive one from far off', () => {
+  for (const [effect, shot] of [['taunt', true], ['elusive', false]] as const) {
     const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 15 }])
     // A decoy nearer the alien than the soldier with the skill.
     const decoy: Unit = { ...structuredClone(soldier), id: 900, x: 11, y: 12, hp: 500 }
@@ -426,9 +388,7 @@ test('burrowers stay unseen underground, then surface beside the soldier standin
   battle.units.push(loner, mate)
   for (const unit of [soldier, loner, mate]) unit.stats = { ...unit.stats, move: 0, range: 0 }
   Object.assign(battle.pods[0], { revealed: false, alert: false })
-  battle.concealed = true
-  const events = until(has('reveal'))
-  expect(events.find((e) => e.type === 'reveal')).toMatchObject({ stalked: true })
+  until(has('reveal'))
   for (const b of aliens) expect(Math.max(Math.abs(b.x - loner.x), Math.abs(b.y - loner.y))).toBe(1)
 })
 
@@ -488,27 +448,6 @@ test('a turret never moves, and shoots a soldier in range', () => {
   const events = until((all) => all.some((e) => e.type === 'shot' && e.id === aliens[0].id))
   expect(events.some((e) => e.type === 'move' && e.id === aliens[0].id)).toBe(false)
   expect(aliens[0]).toMatchObject({ x: 10, y: 16 })
-})
-
-test('an ambushed pod reels: on its next turn it moves at most half its move and does not act; then it fights as normal', () => {
-  const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
-  battle.concealed = true
-  Object.assign(battle.pods[0], { revealed: false, alert: false })
-  soldier.stats = { ...soldier.stats, move: 2, aim: 0, close: 0, range: 7 }
-  aliens[0].hp = aliens[0].stats.hp = 99
-  soldier.x = 10
-  soldier.y = 4
-  until((all) => all.some((e) => e.type === 'reveal' && e.ambush))
-  expect(battle.pods[0].reeling).toBe(true)
-  until(() => battle.turn === 'alien')
-  const reeling: GameEvent[] = []
-  while (battle.turn === 'alien') reeling.push(...stepBattle(battle))
-  for (const e of reeling) {
-    if (e.type === 'move' && e.id === aliens[0].id) expect(e.path.length).toBeLessThanOrEqual(Math.ceil(aliens[0].stats.move / 2))
-    expect(e.type === 'shot' && e.id === aliens[0].id).toBe(false)
-  }
-  expect(battle.pods[0].reeling).toBe(false)
-  until((all) => all.some((e) => e.type === 'shot' && e.id === aliens[0].id))
 })
 
 /** A squadmate for the arena's soldier, beside it at full health. */
