@@ -1130,7 +1130,7 @@ export async function createView(): Promise<View> {
    */
   function follow(points: Tile[] | Camera, ms = CAMERA_MS): Promise<void> {
     const from = camera
-    const to = clamped(Array.isArray(points) ? framing(points, camera.yaw) : points)
+    const to = Array.isArray(points) ? clamped(framing(points, camera.yaw), points) : clamped(points)
     const mine = ++glides
     return tween(ms, (t) => {
       if (mine !== glides) return
@@ -1496,8 +1496,9 @@ export async function createView(): Promise<View> {
       } else if (e.type === 'shot') {
         const from = sprites.get(e.id)
         const to = sprites.get(e.target)
-        if (!from || !to) continue
-        const shooter = battle.units.find((u) => u.id === e.id)!
+        // A shooter gone from the field later in the beat, as one lifted off, leaves its shot unshown.
+        const shooter = battle.units.find((u) => u.id === e.id)
+        if (!from || !to || !shooter) continue
         const after = vitals(battle, e.target)
         await drawing((fx) => shoot(fx, from, to, e, after, attackOf(shooter, soldiers.find((s) => s.id === shooter.soldier)?.gear.weapon?.weapon ?? null, blademasters)))
         // Crumbling cover has already broken in the battle; show it as the hit lands.
@@ -1641,9 +1642,10 @@ export async function createView(): Promise<View> {
 
   /**
    * The still camera `to` moved only as far in, and over, as keeps everything it shows on the map, so the
-   * screen never reaches past it. A wide lens shows the far distance by design, and is left alone.
+   * screen never reaches past it, unless that would lose any of `keep` off the screen. A wide lens shows the far
+   * distance by design, and is left alone.
    */
-  function clamped(to: Camera): Camera {
+  function clamped(to: Camera, keep: Tile[] = []): Camera {
     if (to.fov > STILL_FOV) return to
     const s = Math.min(innerWidth / WIDTH, innerHeight / HEIGHT)
     // The ground the screen shows, in tiles from its centre to its farthest corner at zoom 1, whichever way it turns.
@@ -1652,7 +1654,16 @@ export async function createView(): Promise<View> {
     const zoom = Math.max(to.zoom, corner / half)
     const reach = corner / zoom
     const within = (v: number) => Math.min(GRID - 1 - reach, Math.max(reach, v))
-    return { ...to, x: within(to.x), z: within(to.z), zoom }
+    const kept = keep.map((p) => picture(spot(p.x, p.y), to.yaw))
+    const shows = (c: Camera) => {
+      const at = picture(c, c.yaw)
+      return kept.every((p) => Math.abs(p.x - at.x) * zoom <= (WIDTH - MARGIN) / 2 && Math.abs(p.y - at.y) * zoom <= (HEIGHT - MARGIN) / 2)
+    }
+    // Slid back toward `to` until all of `keep` shows.
+    for (let t = 1; ; t -= 0.1) {
+      const c = { ...to, x: to.x + (within(to.x) - to.x) * t, z: to.z + (within(to.z) - to.z) * t, zoom }
+      if (t <= 0 || shows(c)) return c
+    }
   }
 
   /**
@@ -1725,7 +1736,7 @@ export async function createView(): Promise<View> {
         void follow(above(null), FLY_MS)
       }
       // An ambush opens already in the fight, on the squad.
-      if (fresh && battle.phase !== 'deploy') look(clamped(inPlay()))
+      if (fresh && battle.phase !== 'deploy') look(clamped(inPlay(), squad(battle)))
       if (animate && overlaps(events) && !events.some((e) => e.type === 'end')) {
         // An attack lets the next start a stagger later, so a side's attacks land in quick succession; the beat after them settles the picture.
         const playing = play(battle, events)
@@ -1744,7 +1755,7 @@ export async function createView(): Promise<View> {
       deploying = battle.phase === 'deploy'
       if (landed && animate) await dropPods(battle)
       if (!animate) {
-        if (battle.phase !== 'deploy') look(clamped(inPlay()))
+        if (battle.phase !== 'deploy') look(clamped(inPlay(), squad(battle)))
         labels.clear()
         for (const e of events) {
           if (e.type === 'effect' && sprites.has(e.id)) effectCallout(e, sprites.get(e.id)!)
