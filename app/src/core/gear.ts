@@ -79,7 +79,7 @@ export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: str
   mirror: { slot: 'armor', prefix: 'Mirrored', text: 'Begins each battle with 2 mirror images; each of the first 2 hits on the wearer pops one instead', tags: ['ward'], epic: true },
   bond: { slot: 'armor', prefix: 'Bonded', text: 'Takes the hits meant for squadmates beside the wearer', tags: ['ward'], epic: true },
   guardians: { slot: 'armor', prefix: 'Haloed', text: 'Spirits strike each alien that ends its move within 2 tiles of the wearer for 1 damage', epic: true },
-  blink: { slot: 'utility', prefix: 'Blinking', text: 'Once per battle, when hit to half health or less, the carrier blinks to the safest tile within 5', epic: true },
+  blink: { slot: 'utility', prefix: 'Blinking', text: 'Once per battle, when hit to half health or less, the carrier blinks to the tile farthest from the aliens within 5', epic: true },
   polymorph: { slot: 'utility', prefix: 'Chicken', text: 'Once per battle, turns the toughest alien the carrier can shoot, a boss aside, into a chicken that loses its next action', epic: true },
   snare: { slot: 'weapon', prefix: 'Snaring', text: 'Hits root the target: it cannot move on its next turn' },
   booming: { slot: 'weapon', prefix: 'Booming', text: 'Hits charge the target: if it moves on its next turn, it takes 3 damage', epic: true },

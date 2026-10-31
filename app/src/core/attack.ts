@@ -16,7 +16,7 @@ import { wound, knockback } from './wound'
 import { TUNING } from './tuning'
 import { bite, MIN_DAMAGE, odds } from './sight'
 import { random } from './rng'
-import { paths, bestPath, preyed, walk, leapTo, exposure } from './pathing'
+import { paths, bestPath, preyed, walk, leapTo } from './pathing'
 import { FUEL_DAMAGE } from './twists'
 
 /** Whether an alien closes to fight up close, so rooting or charging it pays most. */
@@ -368,11 +368,12 @@ export function leap(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[]
   return events
 }
 
-/** Blink: the unit vanishes to the free tile within reach where the enemy's best shot at it is worst. */
+/** Blink: the unit vanishes to the free tile within reach farthest from the enemy. */
 export function blink(battle: Battle, unit: Unit, events: GameEvent[]): void {
   const enemies = enemiesOf(battle, unit)
+  const away = (t: Tile) => Math.min(...enemies.map((e) => distance(e, t)))
   const tiles = freeTilesNear(battle, unit, 4 * BLINK_REACH * BLINK_REACH).filter((t) => distance(t, unit) <= BLINK_REACH)
-  const to = tiles.reduce<Tile | undefined>((best, t) => (!best || exposure(battle, enemies, t) < exposure(battle, enemies, best) ? t : best), undefined)
+  const to = tiles.reduce<Tile | undefined>((best, t) => (!best || away(t) > away(best) ? t : best), undefined)
   if (!to) return
   unit.x = to.x
   unit.y = to.y

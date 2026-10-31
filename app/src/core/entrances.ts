@@ -2,7 +2,7 @@
 import { BARRIER_ARMOR, CHILL_TURNS, ENTRANCES, GRID, IMPACT_REACH, isSoldier, type Battle, type Effect, type Entrance, type RelicEffect, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { SMOKE_TURNS } from './consumables'
-import { blocked, breach, bulkAt, distance, edgeBetween, edgeDepths, freeTilesNear, heightAt, NEIGHBORS, onGrid, openNear, reachableFrom, walkingDistances, walks } from './grid'
+import { blocked, breach, distance, edgeBetween, edgeDepths, freeTilesNear, heightAt, NEIGHBORS, onGrid, openNear, reachableFrom, walkingDistances, walks } from './grid'
 import { has, nearest } from './fighters'
 import { PROP_BULK } from './terrain'
 import { randomInt } from './rng'
@@ -48,10 +48,10 @@ const ENTRY_WALK = 40
 export const ENTRANCE_KINDS: Record<EntranceKind, { name: string; icon: string; text: string; reach: [number, number]; site: (battle: Battle, tile: Tile) => number; fits?: (battle: Battle, tile: Tile) => boolean }> = {
   door: { name: 'Kick the door', icon: '🚪', text: 'The classic: the door flies into the nearest alien, hurting it, and it loses its first action', reach: [5, 8], site: (b, t) => walled(b, t), fits: (b, t) => threshold(b, t) },
   wall: { name: 'Through the wall', icon: '🧱', text: 'Charge straight through a wall: the nearest pod is caught surprised and holds its fire on its first turn', reach: [5, 8], site: (b, t) => walled(b, t), fits: (b, t) => walled(b, t) > 0 },
-  monologue: { name: 'Land and monologue', icon: '🎤', text: `Drop in and taunt them: for ${MONOLOGUE_ROUNDS} rounds every alien goes for the speaker, sparing civilians and the VIP`, reach: [6, 9], site: (b, t) => (shelter(b, t) === 0 ? 2 : 0) },
+  monologue: { name: 'Land and monologue', icon: '🎤', text: `Drop in and taunt them: for ${MONOLOGUE_ROUNDS} rounds every alien goes for the speaker, sparing civilians and the VIP`, reach: [6, 9], site: () => 0 },
   skylight: { name: 'Skylight crash', icon: '🪟', text: `Crash down among them: falling glass hurts each alien within ${IMPACT_REACH} tiles of the squad`, reach: [3, 6], site: () => 0, fits: (b, t) => ground(b, t) === 'floor' },
   rappel: { name: 'Rappel in', icon: '🪢', text: 'Rope down onto the highest ground over the fight', reach: [6, 10], site: (b, t) => heightAt(b, t), fits: (b, t) => heightAt(b, t) > 0 },
-  smoke: { name: 'Out of the smoke', icon: '💨', text: `Stride out of a smoke screen: every alien within ${SMOKE_REACH} tiles is suppressed, its attacks doing 1 less damage, for ${SMOKE_TURNS} turns`, reach: [5, 8], site: (b, t) => shelter(b, t) },
+  smoke: { name: 'Out of the smoke', icon: '💨', text: `Stride out of a smoke screen: every alien within ${SMOKE_REACH} tiles is suppressed, its attacks doing 1 less damage, for ${SMOKE_TURNS} turns`, reach: [5, 8], site: () => 0 },
   truck: { name: 'Ram raid', icon: '🚚', text: 'Crash a truck into the nearest alien, hurting it badly; the wreck stands, blocking shots', reach: [5, 8], site: (b, t) => (ground(b, t) === 'road' ? 1 : 0), fits: (b, t) => ground(b, t) === 'road' || ground(b, t) === 'pavement' },
   strike: { name: 'Danger close', icon: '💥', text: `Walk in behind an artillery strike: each alien of the nearest pod loses ${STRIKE.damage} health, never the last`, reach: [7, 10], site: () => 0 },
   tap: { name: 'Shoulder tap', icon: '👉', text: `Appear right behind a pod, deep among the aliens with every one in reach: the nearest turns round and is flattened (a boss or commander loses ${TAP_DAMAGE} health)`, reach: [2, 3], site: (b, t) => inView(b).filter((u) => distance(u, t) <= TAP_REACH + 1).length, fits: (b, t) => tappable(b, t) },
@@ -68,8 +68,6 @@ const walled = (battle: Battle, t: Tile) => NEIGHBORS.slice(0, 4).filter(([dx, d
 /** Whether a tile is a building's doorway: floor with no wall between it and the ground outside. */
 const threshold = (battle: Battle, t: Tile) =>
   ground(battle, t) === 'floor' && NEIGHBORS.slice(0, 4).some(([dx, dy]) => onGrid(t.x + dx, t.y + dy) && ground(battle, { x: t.x + dx, y: t.y + dy }) !== 'floor' && edgeBetween(battle, t, { x: t.x + dx, y: t.y + dy }) === 'none')
-/** Objects on the tiles around one. */
-const shelter = (battle: Battle, t: Tile) => NEIGHBORS.filter(([dx, dy]) => onGrid(t.x + dx, t.y + dy) && bulkAt(battle, t.x + dx, t.y + dy) > 0).length
 
 /** The aliens an entrance is placed by: those the squad can see coming, not burrowers underground. */
 const inView = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.kind !== 'burrower')

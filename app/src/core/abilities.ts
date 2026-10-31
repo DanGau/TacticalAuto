@@ -7,7 +7,7 @@ import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { has, hostage, foes, shootable, nearest, immune, silenced, spend, enemiesOf, onTile, FIRE_TURNS } from './fighters'
-import { walk, bestPath, paths, exposure } from './pathing'
+import { walk, bestPath, paths } from './pathing'
 import { canShoot, lineOfSight } from './sight'
 import { wound, knockback, SLAM_DAMAGE } from './wound'
 
@@ -155,13 +155,13 @@ export function drone(battle: Battle, unit: Unit): GameEvent[] {
   return events
 }
 
-/** A skirmisher steps to the tile in reach where the enemy's best shot at it is worst, then farthest from them. */
+/** A skirmisher steps to the tile in reach farthest from the enemy. */
 export function skirmish(battle: Battle, unit: Unit): GameEvent[] {
   // Getting out, a step back would undo the walk there.
   if (!has(unit, 'skirmish') || (unit.side === 'human' && battle.extract)) return []
   const enemies = enemiesOf(battle, unit)
   const events: GameEvent[] = []
-  walk(unit, bestPath(paths(battle, unit, SKIRMISH_MOVE), unit, (end) => [exposure(battle, enemies, end), -Math.min(...enemies.map((e) => distance(e, end)))]), events)
+  walk(unit, bestPath(paths(battle, unit, SKIRMISH_MOVE), unit, (end) => [-Math.min(...enemies.map((e) => distance(e, end)))]), events)
   return events.map((e) => (e.type === 'move' ? { ...e, with: 'skirmish' as const } : e))
 }
 

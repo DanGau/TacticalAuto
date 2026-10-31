@@ -20,7 +20,7 @@ const classes = {
     name: 'Vanguard',
     stats: { damage: 1, hp: 1, move: 1 },
     stance: 'rush',
-    stanceText: 'Closes in for the surest shot, whatever the exposure',
+    stanceText: 'Closes in for the hardest hit',
     ability: 'runAndGun',
     abilityName: 'Run and Gun',
     abilityText: 'Moves twice as far when that is the only way to reach a shot',

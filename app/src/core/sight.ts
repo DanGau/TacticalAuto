@@ -1,6 +1,6 @@
 // Line of sight, what stands between a shot and its damage, and noticing.
 import { FORTIFIED_SOAK } from './doctrines'
-import { HUNKER_SOAK, GRID, SIGHT, type Battle, type Stats, type Tile, type Unit } from './battle'
+import { GRID, SIGHT, type Battle, type Stats, type Tile, type Unit } from './battle'
 import { bulkAt } from './grid'
 import { HIGH_DAMAGE } from './grid'
 import { HIGH_SIGHT } from './grid'
@@ -8,10 +8,9 @@ import { heightAt } from './grid'
 import { distance } from './grid'
 import { FOG_SIGHT, NIGHT_DETECT } from './twists'
 
-/** What the ground does to a shot from `shooter` at `target`: damage gained, negative if lost, from height, a hunkered target and the fortified rule. */
+/** What the ground does to a shot from `shooter` at `target`: damage gained, negative if lost, from height and the fortified rule. */
 export function odds(battle: Battle, shooter: Tile, target: Tile): number {
-  const unit = battle.units.find((u) => u.x === target.x && u.y === target.y)
-  return HIGH_DAMAGE * (heightAt(battle, shooter) - heightAt(battle, target)) - (unit?.order === 'hunker' ? HUNKER_SOAK : 0) - (battle.rules.includes('fortified') ? FORTIFIED_SOAK : 0)
+  return HIGH_DAMAGE * (heightAt(battle, shooter) - heightAt(battle, target)) - (battle.rules.includes('fortified') ? FORTIFIED_SOAK : 0)
 }
 
 /** Every attack by a unit that deals damage lands for at least this. */

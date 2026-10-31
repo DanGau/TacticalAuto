@@ -15,7 +15,7 @@ import { cloakLook, create, fade, letter, place, remove, squash, vitals } from '
 import { CAMERA_MS, type Sprite, type Stage } from './stage'
 
 /** What a soldier's order says over it. */
-const ORDERS: Record<Order, string> = { hunker: '🛡 HUNKER DOWN', prepare: '👁 OVERWATCH', sprint: '» SPRINT' }
+const ORDERS: Record<Order, string> = { prepare: '👁 OVERWATCH', sprint: '» SPRINT' }
 
 /** Where the squad stands: the camera keeps to it, and never leaves it for action elsewhere. */
 export const squad = (battle: Battle): Tile[] => battle.units.filter((u) => u.side === 'human' && !u.civilian)

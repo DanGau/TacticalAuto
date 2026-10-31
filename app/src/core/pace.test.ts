@@ -7,7 +7,7 @@ const pace = new Map([1, 2, 3].map((id) => [id, PACE.tile]))
 const shown = new Set([1, 2, 3])
 
 test('moves in a row walk together, words among them do not hold them up, and a long walk takes no longer than a march', () => {
-  expect(beatMs([move(1, 2), { type: 'order', id: 1, order: 'hunker' }, move(2, 3)], pace, shown)).toBe(3 * PACE.tile)
+  expect(beatMs([move(1, 2), { type: 'order', id: 1, order: 'prepare' }, move(2, 3)], pace, shown)).toBe(3 * PACE.tile)
   expect(beatMs([move(1, 40)], pace, shown)).toBe(PACE.march)
 })
 

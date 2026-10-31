@@ -3,14 +3,13 @@ import { expect, test } from 'vitest'
 import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, PACKS, REGEN_HEAL, type AlienKind } from './aliens'
 import { enterAt, entranceOf, begun } from './roads'
 import { apply } from './apply'
-import { isSoldier, ACID_DAMAGE, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, GRID, HUNKER_SOAK, MECH_STATS, DRONE_STATS, TITAN_HEALTH, LEAP_DAMAGE, SLAM_HIT, SLAM_TILES, HURL_DAMAGE, type Battle, type Unit } from './battle'
+import { isSoldier, ACID_DAMAGE, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, GRID, MECH_STATS, DRONE_STATS, TITAN_HEALTH, LEAP_DAMAGE, SLAM_HIT, SLAM_TILES, HURL_DAMAGE, type Battle, type Unit } from './battle'
 import { mechUnit } from './spawn'
 import { alienUnit } from './spawn'
 import { reshaped } from './grid'
 import { distance } from './grid'
 import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
-import { odds } from './sight'
 
 test('a mission musters packs its depth allows, for exactly its force, and a lone scout only to use up the last of it', () => {
   const rng = { rng: 5 }
@@ -459,27 +458,6 @@ test('a turret never moves, and shoots a soldier in range', () => {
   expect(aliens[0]).toMatchObject({ x: 10, y: 16 })
 })
 
-/** A squadmate for the arena's soldier, beside it at full health. */
-function squadmate(battle: Battle, soldier: Unit): Unit {
-  const mate = { ...structuredClone(soldier), id: battle.nextId++, x: soldier.x + 2, y: soldier.y, soldier: soldier.soldier! + 1 }
-  battle.units.push(mate)
-  return mate
-}
-
-test('a soldier with no shot hunkers when wounded and exposed, harder to hit until its next turn', () => {
-  const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 14 }])
-  Object.assign(battle, { turn: 'human', stage: 'move' })
-  Object.assign(soldier, { hp: 5, stats: { ...soldier.stats, move: 0, range: 0 } })
-  const mate = squadmate(battle, soldier)
-  mate.hp = 30
-  mate.stats = { ...mate.stats, move: 0, range: 0 }
-  aliens[0].stats = { ...aliens[0].stats, move: 0 }
-  const open = odds(battle, aliens[0], soldier)
-  const events = until((all) => all.some((e) => e.type === 'order'))
-  expect(events).toContainEqual({ type: 'order', id: soldier.id, order: 'hunker' })
-  expect(odds(battle, aliens[0], soldier)).toBe(open - HUNKER_SOAK)
-})
-
 test('a soldier with no shot and an enemy that could reach it prepares, and shoots the first alien to come in range', () => {
   const { battle, soldier, aliens, until } = arena([{ kind: 'swarmling', x: 10, y: 16 }])
   Object.assign(battle, { turn: 'human', stage: 'move' })
@@ -502,14 +480,13 @@ test('a soldier with nothing in reach sprints, moving again in place of attackin
   expect(stepBattle(battle).some((e) => e.type === 'shot' && e.id === soldier.id)).toBe(false)
 })
 
-test('a soldier closing in stops short of where a known enemy could walk into range of it next turn', () => {
+test('a soldier closing in walks into a known enemy\'s reach rather than stopping short of it', () => {
   const { battle, soldier, aliens } = arena([{ kind: 'trooper', x: 10, y: 22 }])
   soldier.stats = { ...soldier.stats, move: 4, range: 0 }
   aliens[0].stats = { ...aliens[0].stats, move: 4 }
   const reach = aliens[0].stats.move + aliens[0].stats.range
   while (battle.turn === 'alien' || !battle.units.some((u) => u === soldier && u.moved)) stepBattle(battle)
-  expect(Math.abs(soldier.y - aliens[0].y)).toBeGreaterThan(reach)
-  expect(soldier.y).toBeGreaterThan(10)
+  expect(Math.abs(soldier.y - aliens[0].y)).toBeLessThanOrEqual(reach)
 })
 
 test('Heroic Leap lands a soldier in a knot of aliens, hurting and rooting each beside it', () => {

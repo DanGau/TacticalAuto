@@ -23,7 +23,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `wound.ts` | Damage landing, what it sets off, the battle tally |
 | `upkeep.ts` | What happens as a side's turn begins: the next pod engaging, waves |
 | `fighters.ts` | Unit queries every combat module asks |
-| `sight.ts` | Line of sight, what height and hunkering do to a shot, noticing |
+| `sight.ts` | Line of sight, what height does to a shot, noticing |
 | `terrain.ts` | Battlefield tile types and how solid each is |
 | `terrain-gen.ts` | `generateTerrain`: streets, lots, layout, twist, hills, connectivity |
 | `terrain-lots.ts` | The places that fill a lot |

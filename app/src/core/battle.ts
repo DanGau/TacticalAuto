@@ -306,13 +306,11 @@ export interface Unit {
 }
 
 /**
- * A soldier's standard actions in place of attacking. Hunker: takes HUNKER_SOAK less from each hit until its next turn. Prepare: overwatch,
+ * A soldier's standard actions in place of attacking. Prepare: overwatch,
  * shooting the first alien that moves where it can shoot it. Sprint: moves again.
  */
-export type Order = 'hunker' | 'prepare' | 'sprint'
+export type Order = 'prepare' | 'sprint'
 
-/** Damage a hunkered unit takes off each hit. */
-export const HUNKER_SOAK = 1
 
 /**
  * A group of aliens. It hangs out at its post, alert but waiting its turn, until it engages: then it comes for the

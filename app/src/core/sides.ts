@@ -1,6 +1,6 @@
 // A side's simultaneous move: sighting pods, walking, sentries, overwatch, burrowers.
 import { shoot } from './attack'
-import { type Battle, engaged, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, revealed, ENGAGE_REACH } from './battle'
+import { type Battle, engaged, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, revealed, ENGAGE_REACH, STANDOFF } from './battle'
 import { opening } from './entrances'
 import { soldierUnit } from './spawn'
 import { breach } from './grid'
@@ -10,7 +10,7 @@ import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { immune, onTile, fireproof, foeHas, has, GUARDIAN_REACH, lying, extractReach, carrying, BEACON_REACH, vipOf, nearest, extractionFrom, pursuers, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
-import { fleePath, fightPath, walk, paths, exposure, costOf, bestPath, COHESION, POCKET } from './pathing'
+import { fleePath, fightPath, walk, paths, costOf, bestPath, COHESION, POCKET } from './pathing'
 import { detects, sees } from './sight'
 import { upkeep } from './upkeep'
 import { moved, wound } from './wound'
@@ -183,20 +183,20 @@ export function sentries(battle: Battle, unit: Unit, watched: Set<number>): Game
 
 /**
  * A soldier's walk between or after its attacks, within the move it has left: with `toShot`, to the nearest tile with a
- * shot, if it has none here; else back to where the aliens' best shot at it is worst. Never
+ * shot, if it has none here; else a Deadeye backs out of arm's reach. Never
  * into harm, off the uplink, or into sight of a pod not yet revealed.
  */
 export function stride(battle: Battle, unit: Unit, seen: Set<number>, toShot: boolean): GameEvent[] {
   const left = battle.strides[unit.id] ?? 0
   const enemies = enemiesOf(battle, unit)
   const shotFrom = (end: Tile) => enemies.some((e) => shootable(battle, unit, end, e, seen))
-  if (left <= 0 || unit.hp <= 0 || (toShot && shotFrom(unit))) return []
+  if (left <= 0 || unit.hp <= 0 || (toShot ? shotFrom(unit) : unit.stance !== 'standoff')) return []
   const unseen = battle.units.filter((u) => u.side !== unit.side && !revealed(battle, u))
   const reach = uplinkReach(battle)
   const barred = (end: Tile) =>
     onTile(battle.acid, end) || besideFuel(battle, end) || (onTile(battle.fire, end) && !fireproof(battle, unit)) || (battle.uplink !== null && distance(end, battle.uplink) > reach) || unseen.some((alien) => sees(battle, end, alien)) ? 1 : 0
   const path = bestPath(paths(battle, unit, left), unit, (end, steps) =>
-    toShot ? [barred(end), shotFrom(end) ? 0 : 1, exposure(battle, enemies, end), steps] : [barred(end), exposure(battle, enemies, end), steps],
+    toShot ? [barred(end), shotFrom(end) ? 0 : 1, steps] : [barred(end), Math.max(0, STANDOFF - Math.min(...enemies.map((e) => distance(e, end)))), steps],
   )
   const end = path.at(-1)
   if (!end || barred(end) || (toShot && !shotFrom(end))) return []
