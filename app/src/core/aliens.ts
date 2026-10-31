@@ -57,7 +57,7 @@ interface AlienType {
 }
 
 export const ALIENS: Record<AlienKind, AlienType> = {
-  trooper: { name: 'Trooper', text: 'Shoots from range, picking its ground', danger: 'small', hp: 1, stats: {}, stance: 'balanced', resists: [] },
+  trooper: { name: 'Grunt', text: 'Shoots from range, picking its ground', danger: 'small', hp: 1, stats: {}, stance: 'balanced', resists: [] },
   swarmling: {
     name: 'Swarmling',
     text: 'Weak and fast; attacks only up close, and comes in numbers',

@@ -51,12 +51,12 @@ const leave = (quip: string): Option => ({ quip, text: 'Move on', take: () => {}
 /** Relics the squad may be offered. */
 const unheld = (run: Run) => offerable(run.relics)
 const pick = <T>(run: Run, options: T[]): T => options[randomInt(run, options.length)]
-/** Moves a soldier `levels` up or down, never below level 1. */
+/** Moves a hero `levels` up or down, never below level 1. */
 const train = (soldier: Run['soldiers'][number], levels: number) => (soldier.xp = xpFor(Math.max(1, level(soldier) + levels)))
 /** Whether `n` more stops lie between this one and the satellite. */
 const ahead = (run: Run, n = 1) => run.stop + n < LEG_STOPS
 
-/** Wounds every soldier `amount`, never below 1 health. */
+/** Wounds every hero `amount`, never below 1 health. */
 const hurt = (run: Run, amount: number) => run.soldiers.forEach((s) => (s.wounds += amount))
 
 const encounters = {
@@ -64,7 +64,7 @@ const encounters = {
     name: 'Field Hospital',
     text: 'A field hospital still runs in a school gym, cots in rows under the basketball hoops. The surgeon has not slept in a week and has opinions about your posture.',
     options: [
-      { quip: 'Beds. Real beds.', text: 'Rest: every soldier heals fully', can: (run) => wounded(run), take: (run) => mend(run, Infinity) },
+      { quip: 'Beds. Real beds.', text: 'Rest: every hero heals fully', can: (run) => wounded(run), take: (run) => mend(run, Infinity) },
       { quip: 'Nobody here is bleeding. Raid the quartermaster.', text: 'At full health, requisition: a piece of rare or better gear', can: (run) => !wounded(run), take: (run) => dropGear(run, true) },
       {
         quip: 'Nobody here is bleeding. Sit in on the trauma lectures.',
@@ -81,7 +81,7 @@ const encounters = {
     options: [
       {
         quip: 'Crank it to eleven. What could a few skipped organs hurt?',
-        text: 'Mass Cloning: two new clones join, and every soldier has 2 less health for the run',
+        text: 'Mass Cloning: two new clones join, and every hero has 2 less health for the run',
         take: (run) => {
           hire(run)
           hire(run)
@@ -113,7 +113,7 @@ const encounters = {
     options: [
       {
         quip: 'Drop and give me twenty, each in a different discipline.',
-        text: 'Specialist Doctrine: every soldier retrains into a different class and gains a level, and no two soldiers share a class while one is left unused; +2 threat',
+        text: 'Specialist Doctrine: every hero retrains into a different class and gains a level, and no two soldiers share a class while one is left unused; +2 threat',
         take: (run) => {
           const classes = Object.keys(CLASSES) as ClassId[]
           const offset = randomInt(run, classes.length)
@@ -131,7 +131,7 @@ const encounters = {
   exosuits: {
     name: 'Exosuit Prototype',
     text: 'A crashed military transport holds four exosuits, still in their packing foam. The manual has one page: DO NOT CROUCH. Underneath, in pen: seriously, the knees.',
-    options: [{ quip: 'Suit up. Walking is for people without a reactor on their back.', text: 'Exosuits: every soldier has +3 armor and 1 less move', take: (run) => adopt(run, 'exosuits') }, gain(4, 'Sell the suits on the black market as very large toasters.')],
+    options: [{ quip: 'Suit up. Walking is for people without a reactor on their back.', text: 'Exosuits: every hero has +3 armor and 1 less move', take: (run) => adopt(run, 'exosuits') }, gain(4, 'Sell the suits on the black market as very large toasters.')],
   },
   bunker: {
     name: 'Bunker Plans',
@@ -141,7 +141,7 @@ const encounters = {
   shotguns: {
     name: 'Smuggled Shotguns',
     text: 'A crate rattles in the back of an abandoned pickup. The label says MEDICAL SUPPLIES. Inside: shotguns, sawn short enough to fit in a lunchbox. One has "AIM? NO." carved into the stock.',
-    options: [{ quip: 'Range is a state of mind.', text: 'Scatterguns: every soldier has +2 damage and 2 less range', take: (run) => adopt(run, 'scatterguns') }, gain(4, 'Return them to the medical supply chain, for a fee.')],
+    options: [{ quip: 'Range is a state of mind.', text: 'Scatterguns: every hero has +2 damage and 2 less range', take: (run) => adopt(run, 'scatterguns') }, gain(4, 'Return them to the medical supply chain, for a fee.')],
   },
   armory: {
     name: 'Ancient Armory',
@@ -195,7 +195,7 @@ const encounters = {
     options: [
       {
         quip: 'Everybody chip in for a new paint job. Somebody has to be the chip.',
-        text: 'Sell a soldier: your lowest-level soldier leaves; +10 supplies',
+        text: 'Sell a hero: your lowest-level soldier leaves; +10 supplies',
         can: (run) => run.soldiers.length > 1,
         take: (run) => {
           const worst = run.soldiers.reduce((low, s) => (level(s) < level(low) ? s : low))
@@ -329,7 +329,7 @@ const encounters = {
     name: 'Blood Bank',
     text: 'A clinic pays in canned goods for blood, no questions asked, though the nurse does ask whether anyone is part alien. Nobody is sure.',
     options: [
-      { quip: 'Roll up your sleeves. Both of them.', text: 'Donate: every soldier loses 4 health; +6 supplies', take: (run) => (hurt(run, 4), (run.supplies += 6)) },
+      { quip: 'Roll up your sleeves. Both of them.', text: 'Donate: every hero loses 4 health; +6 supplies', take: (run) => (hurt(run, 4), (run.supplies += 6)) },
       leave('Keep your blood on the inside, where it works best.'),
     ],
   },
@@ -337,8 +337,8 @@ const encounters = {
     name: 'Stim Lab',
     text: 'A pharmacist in a hazmat suit sells combat stims from a vending machine he has hot-wired. "Side effects include feeling great. Also, they glow. The aliens love the glow."',
     options: [
-      { quip: 'One each. Two for the sniper.', text: 'Buy: -3 supplies; every soldier heals 6', can: (run) => run.supplies >= 3, take: (run) => ((run.supplies -= 3), mend(run, 6)) },
-      { quip: 'Take the whole machine.', text: 'Steal: every soldier heals fully; +3 threat', take: (run) => (mend(run, Infinity), raise(run, 3)) },
+      { quip: 'One each. Two for the sniper.', text: 'Buy: -3 supplies; every hero heals 6', can: (run) => run.supplies >= 3, take: (run) => ((run.supplies -= 3), mend(run, 6)) },
+      { quip: 'Take the whole machine.', text: 'Steal: every hero heals fully; +3 threat', take: (run) => (mend(run, Infinity), raise(run, 3)) },
       leave('Nothing that glows goes in anyone.'),
     ],
   },

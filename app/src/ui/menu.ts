@@ -18,7 +18,7 @@ export function title(): string {
 /** The story so far, line by line, before the run's first choice. */
 const STORY = [
   'Three years ago they came down at the South Pole. Their hub lies under the Antarctic ice, and every month it reaches farther.',
-  'No army has got near it. A squad might: the best soldiers left alive, scattered across the world.',
+  'No army has got near it. A team might: the last heroes alive, scattered across the world.',
   'Cross the globe to find them, one continent at a time. Each you reach joins you. Lose one, and it is over.',
   'The aliens will notice. Every stop you make, they hunt you harder.',
 ]

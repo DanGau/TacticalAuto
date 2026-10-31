@@ -1,10 +1,10 @@
 // Soldier classes: stats, positioning, and the ability each uses unprompted.
 import { CLOAK_DAMAGE, CLOAK_TURNS, MECH_STATS, type Ability, type Stance, type Stats } from './battle'
 
-/** What a soldier becomes at first promotion: stat changes, a way of positioning, and one ability used unprompted. */
+/** What a hero becomes at first promotion: stat changes, a way of positioning, and one ability used unprompted. */
 export interface SoldierClass {
   name: string
-  /** Added to the soldier's stats. */
+  /** Added to the hero's stats. */
   stats: Partial<Stats>
   stance: Stance
   stanceText: string
@@ -17,7 +17,7 @@ export interface SoldierClass {
 
 const classes = {
   assault: {
-    name: 'Assault',
+    name: 'Vanguard',
     stats: { damage: 1, hp: 1, move: 1 },
     stance: 'rush',
     stanceText: 'Closes in for the surest shot, whatever the exposure',
@@ -27,7 +27,7 @@ const classes = {
     charges: 0,
   },
   heavy: {
-    name: 'Heavy',
+    name: 'Powerhouse',
     stats: { move: -1, hp: 3, damage: 1 },
     stance: 'anchor',
     stanceText: 'Plants itself and holds its ground',
@@ -37,7 +37,7 @@ const classes = {
     charges: 1,
   },
   sniper: {
-    name: 'Sniper',
+    name: 'Deadeye',
     stats: { move: -1, damage: 1, crit: 0.25, hp: -1 },
     stance: 'standoff',
     stanceText: 'Hangs back out of reach and shoots from a distance',
@@ -47,7 +47,7 @@ const classes = {
     charges: 0,
   },
   support: {
-    name: 'Support',
+    name: 'Beacon',
     stats: { move: 1 },
     stance: 'escort',
     stanceText: 'Stays within reach of a squadmate',
@@ -57,7 +57,7 @@ const classes = {
     charges: 2,
   },
   engineer: {
-    name: 'Engineer',
+    name: 'Gadgeteer',
     stats: { hp: -1, damage: -1 },
     stance: 'anchor',
     stanceText: 'Hangs back while its machines take the front',

@@ -28,8 +28,8 @@ import type { Keyword } from './keywords'
 export type Role = 'guard' | 'control' | 'power'
 
 /**
- * Something a soldier learns on gaining a level, from its class's tree. It changes stats, adds uses of the class
- * ability, or gives an effect that combat applies; `text` says which. A skill with `after` opens once the soldier knows
+ * Something a hero learns on gaining a level, from its class's tree. It changes stats, adds uses of the class
+ * ability, or gives an effect that combat applies; `text` says which. A skill with `after` opens once the hero knows
  * any of those; one without is a root, which a recruit may arrive knowing.
  */
 export interface Skill {
@@ -115,7 +115,7 @@ const skills = {
   vitality: { name: 'Aura of Vitality', role: 'guard', text: 'At the start of its turn, each wounded squadmate within 2 tiles heals 1', effect: 'vitality', after: ['fieldKit', 'surgeon'] },
   haste: { name: 'Haste', role: 'power', text: 'Squadmates within 2 tiles have +2 move', effect: 'haste', after: ['inspire'] },
   drone: { name: 'Combat Drone', role: 'power', text: 'After it acts, its drone does 2 damage to the nearest alien in sight within 5 tiles', effect: 'drone', after: ['inspire'] },
-  forceField: { name: 'Force Field', role: 'guard', tags: ['ward'], text: `Once per battle, a soldier within ${FORCE_FIELD_REACH} tiles at half health or less gains ${FORCE_FIELD_ARMOR} armor`, effect: 'forceField', after: ['barrier', 'inspire'] },
+  forceField: { name: 'Force Field', role: 'guard', tags: ['ward'], text: `Once per battle, a hero within ${FORCE_FIELD_REACH} tiles at half health or less gains ${FORCE_FIELD_ARMOR} armor`, effect: 'forceField', after: ['barrier', 'inspire'] },
   ward: { name: 'Ward', role: 'guard', text: 'It and squadmates within 2 tiles cannot be panicked, and acid does them no harm', effect: 'ward', after: ['barrier'] },
   bane: { name: 'Bane', role: 'guard', text: 'Aliens within 3 tiles of it do 1 less damage', effect: 'bane', after: ['barrier'] },
   gravBeam: { name: 'Grav Beam', role: 'control', text: 'Its hits pull the target a tile toward it', effect: 'tether', after: ['flashbang'] },

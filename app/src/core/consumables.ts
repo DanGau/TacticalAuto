@@ -30,10 +30,10 @@ export interface Consumable {
 
 export const CONSUMABLES: Record<ConsumableId, Consumable> = {
   airstrike: { name: 'Airstrike', icon: '✈️', text: `Bombs the alien in the fight nearest the squad: ${AIRSTRIKE.damage} damage to every alien within ${AIRSTRIKE.radius} tiles, wrecking what stands there`, price: 2, on: 'aliens', threat: 2 },
-  medkit: { name: 'Nano-Medkit', icon: '➕', text: `Every soldier heals ${HEAL}`, price: 3, on: 'squad' },
-  stims: { name: 'Combat Stims', icon: '💉', text: `Every soldier +${STIMS.stats.move} move and +${pct(STIMS.stats.crit)} crit for the battle, but loses ${STIMS.cost} health`, price: 2, on: 'squad' },
-  plating: { name: 'Ablative Plating', icon: '🛡️', text: `Every soldier +${PLATING} armor`, price: 3, on: 'squad' },
-  rage: { name: 'Rage Serum', icon: '😤', text: `Every soldier +${RAGE.damage} damage for the battle, but loses ${RAGE.cost} health`, price: 2, on: 'squad' },
+  medkit: { name: 'Nano-Medkit', icon: '➕', text: `Every hero heals ${HEAL}`, price: 3, on: 'squad' },
+  stims: { name: 'Combat Stims', icon: '💉', text: `Every hero +${STIMS.stats.move} move and +${pct(STIMS.stats.crit)} crit for the battle, but loses ${STIMS.cost} health`, price: 2, on: 'squad' },
+  plating: { name: 'Ablative Plating', icon: '🛡️', text: `Every hero +${PLATING} armor`, price: 3, on: 'squad' },
+  rage: { name: 'Rage Serum', icon: '😤', text: `Every hero +${RAGE.damage} damage for the battle, but loses ${RAGE.cost} health`, price: 2, on: 'squad' },
   flashbang: { name: 'Flashbang', icon: '✴️', text: 'Every alien in the fight loses its next action; bosses shrug it off', price: 3, on: 'aliens' },
   smoke: { name: 'Smoke Screen', icon: '💨', text: `Every alien in the fight is suppressed, its attacks doing 1 less damage, for ${SMOKE_TURNS} turns`, price: 2, on: 'aliens' },
   cryo: { name: 'Cryo Bomb', icon: '🧊', text: 'Chills every alien in the fight', price: 2, on: 'aliens', tags: ['frost'] },

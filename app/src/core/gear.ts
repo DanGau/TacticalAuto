@@ -19,7 +19,7 @@ export interface Gear {
   name: string
   /** The weapon it is, on the weapon slot. */
   weapon?: WeaponId
-  /** Added to the stats of the soldier it is equipped to. */
+  /** Added to the stats of the hero it is equipped to. */
   stats: Partial<Stats>
   effect: GearEffect | null
 }
@@ -88,10 +88,10 @@ export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: str
   null: { slot: 'utility', prefix: 'Null', text: 'Aliens within 3 tiles of the carrier cannot spit, panic, spawn or burst' },
 }
 
-/** The plain assault rifle every soldier starts with. */
+/** The plain assault rifle every hero starts with. */
 export const starterRifle = (id: number): Gear => ({ id, slot: 'weapon', rarity: 'common', name: WEAPONS.rifle.name, weapon: 'rifle', stats: {}, effect: null })
 
-/** A new piece of gear of the given rarity, in a random slot; on the weapon slot, any weapon but the rifle every soldier starts with. */
+/** A new piece of gear of the given rarity, in a random slot; on the weapon slot, any weapon but the rifle every hero starts with. */
 export function generateGear(rng: { rng: number }, id: number, rarity: Rarity): Gear {
   const pick = <T>(options: T[]): T => options[randomInt(rng, options.length)]
   const slot = pick([...SLOTS])
