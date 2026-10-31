@@ -1,7 +1,8 @@
 import { apply, type Action, type Result } from './core/apply'
 import type { GameEvent } from './core/combat'
 import { createRun, type Run } from './core/run'
-import { flow, step } from './core/step'
+import { step } from './core/step'
+import { PACE } from './core/pace'
 import { brief } from './ui/briefing'
 import { introduce, newcomers } from './ui/intro'
 import { createUi } from './ui/ui'
@@ -106,8 +107,11 @@ if (!params.has('manual')) {
   for (;;) {
     await showing
     if (state.phase === 'battle' && state.battle?.phase === 'battle') {
-      const events = flow(state)
+      const side = state.battle.turn
+      const events = step(state)
       await show(events, true)
+      // The turn passes with a breath, so each side's turn reads as its own.
+      if (state.battle?.turn !== side) await new Promise((done) => setTimeout(done, PACE.turn))
       // The battle waits while the player meets each new kind of alien.
       for (const kind of newcomers(state.battle, events)) await introduce(kind)
     } else await new Promise(requestAnimationFrame)

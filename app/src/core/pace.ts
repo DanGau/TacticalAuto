@@ -12,8 +12,10 @@ export const PACE = {
   death: 260,
   /** A typical attack, muzzle to sparks. */
   attack: 450,
-  /** Between the starts of one attack and the next in a side's attack stage, so they land in quick succession. */
-  stagger: 200,
+  /** Between the starts of one attack and the next in a side's attack stage, so each attack reads on its own. */
+  stagger: 380,
+  /** The pause as the turn passes to the other side. */
+  turn: 600,
   psi: 320,
   rocket: 320,
   blast: 380,

@@ -1738,7 +1738,7 @@ export async function createView(): Promise<View> {
       // An ambush opens already in the fight, on the squad.
       if (fresh && battle.phase !== 'deploy') look(clamped(inPlay(), squad(battle)))
       if (animate && overlaps(events) && !events.some((e) => e.type === 'end')) {
-        // An attack lets the next start a stagger later, so a side's attacks land in quick succession; the beat after them settles the picture.
+        // An attack lets the next start a stagger later, so a side's attacks land one after another; the beat after them settles the picture.
         const playing = play(battle, events)
         attacks = Promise.all([attacks, playing]).then(() => {})
         await Promise.race([playing, tween(PACE.stagger, () => {})])
