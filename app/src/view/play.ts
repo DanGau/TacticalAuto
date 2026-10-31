@@ -4,7 +4,7 @@ import { revealed, type Battle, type Order, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { CONSUMABLES } from '../core/consumables'
 import { effectName } from '../core/effects'
-import { instant, PACE, tilePace, walkMs } from '../core/pace'
+import { instant, PACE, strolls, tilePace, walkMs } from '../core/pace'
 import { attackOf } from './attacks'
 import { drawTerrain } from './board'
 import { along, lerp, spot } from './camera'
@@ -28,8 +28,21 @@ const LEAN = 0.07
 const SETTLE = 0.1
 const SETTLE_MS = 160
 
+/** How much a unit rocks with each step of its cool walk. */
+const SWAGGER = 0.05
+
 async function walk(s: Stage, sprite: Sprite, path: Tile[], ms: number): Promise<void> {
   const points = [sprite.tile, ...path]
+  // A hero going a short way does not hurry: even steps, rocking side to side, no run and no landing.
+  if (sprite.ally && strolls(path, PACE.dash)) {
+    await s.tween(ms, (t) => {
+      place(s, sprite, along(points, t))
+      const rock = SWAGGER * Math.sin(t * path.length * 2 * Math.PI)
+      squash(sprite, 1 + rock, 1 - Math.abs(rock) / 2)
+    })
+    squash(sprite, 1, 1)
+    return
+  }
   await s.tween(ms, (t) => {
     place(s, sprite, along(points, momentum(t)))
     const lean = LEAN * Math.sin(Math.PI * t)

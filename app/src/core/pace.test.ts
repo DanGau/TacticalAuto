@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import type { GameEvent } from './combat-event'
-import { beatMs, PACE, tick } from './pace'
+import { beatMs, PACE, tick, walkMs } from './pace'
 
 const move = (id: number, tiles: number): GameEvent => ({ type: 'move', id, path: Array.from({ length: tiles }, (_, i) => ({ x: i, y: 0 })) })
 const pace = new Map([1, 2, 3].map((id) => [id, PACE.tile]))
@@ -9,6 +9,11 @@ const shown = new Set([1, 2, 3])
 test('moves in a row walk together, words among them do not hold them up, and a long walk takes no longer than a march', () => {
   expect(beatMs([move(1, 2), { type: 'order', id: 1, order: 'hunker' }, move(2, 3)], pace, shown)).toBe(3 * PACE.tile)
   expect(beatMs([move(1, 40)], pace, shown)).toBe(PACE.march)
+})
+
+test('a soldier going a short way takes the cool walk; a long way, it runs', () => {
+  expect(walkMs([{ path: move(1, 2).type === 'move' ? [{ x: 0, y: 0 }, { x: 1, y: 0 }] : [], pace: PACE.dash }])).toBe(2 * PACE.stroll)
+  expect(walkMs([{ path: Array.from({ length: 5 }, (_, i) => ({ x: i, y: 0 })), pace: PACE.dash }])).toBe(5 * PACE.dash)
 })
 
 test('a shot waits for the walk before it, and an alien appearing out of sight takes no time', () => {

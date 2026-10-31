@@ -6,6 +6,9 @@ export const PACE = {
   /** An alien walking one tile; a soldier running one, with weight. */
   tile: 110,
   dash: 130,
+  /** A soldier's cool walk over a short way: unhurried, in control. */
+  stroll: 300,
+  strollTiles: 3,
   /** The longest a side's moves take: everyone walks together and arrives together. */
   march: 1300,
   /** Units appearing, and dying or leaving. */
@@ -35,8 +38,11 @@ export const tilePace = (ally: boolean) => (ally ? PACE.dash : PACE.tile)
 /** Tiles walked along `path`, each step's length, the first counted as one. */
 export const walked = (path: { x: number; y: number }[]) => path.reduce((sum, p, i) => sum + (i === 0 ? 1 : Math.hypot(p.x - path[i - 1].x, p.y - path[i - 1].y)), 0)
 
+/** Whether a walker at `pace` over `path` takes the cool walk: a soldier going a short way. */
+export const strolls = (path: { x: number; y: number }[], pace: number) => pace === PACE.dash && walked(path) <= PACE.strollTiles
+
 /** How long moves in a row take together: the slowest walk, but no longer than a march. `pace` is each walker's ms per tile. */
-export const walkMs = (moves: { path: { x: number; y: number }[]; pace: number }[]) => Math.min(PACE.march, Math.max(0, ...moves.map((m) => m.pace * walked(m.path))))
+export const walkMs = (moves: { path: { x: number; y: number }[]; pace: number }[]) => Math.min(PACE.march, Math.max(0, ...moves.map((m) => (strolls(m.path, m.pace) ? PACE.stroll : m.pace) * walked(m.path))))
 
 /**
  * How long the view plays one beat's events, one after another; moves in a row, among instant events, walk together.
