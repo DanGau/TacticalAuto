@@ -72,7 +72,7 @@ export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }
     battle.units.push(still)
   }
   const burrowers = units.every((u) => u.kind === 'burrower')
-  battle.pods.push({ name: pack.name, revealed: revealed && !burrowers, surprised: false, engaged: false, post: centre })
+  battle.pods.push({ name: pack.name, revealed: revealed && !burrowers, surprised: 0, engaged: false, post: centre })
   return units
 }
 

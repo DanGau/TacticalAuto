@@ -135,7 +135,7 @@ export function escortVip(battle: Battle, soldiers: Unit[]): GameEvent[] {
     const at = { x: vip.x + Math.sign(breacher.x - vip.x), y: vip.y + Math.sign(breacher.y - vip.y) }
     wreck(battle, at)
     const guards = battle.units.filter((u) => u.side === 'alien' && distance(u, vip) <= BREACH_REACH + 2)
-    for (const pod of new Set(guards.map((u) => u.pod!))) Object.assign(battle.pods[pod], { revealed: true, engaged: true, surprised: true })
+    for (const pod of new Set(guards.map((u) => u.pod!))) Object.assign(battle.pods[pod], { revealed: true, engaged: true, surprised: 1 })
     events.push({ type: 'rocket', id: breacher.id, x: at.x, y: at.y, hits: [] })
   }
   const guarded = battle.units.some((u) => u.side === 'alien' && u.stats.move > 0 && engaged(battle, u) && distance(u, vip) <= FREE_REACH)
@@ -241,7 +241,7 @@ export function surface(battle: Battle): GameEvent[] {
     const alone = soldiers.reduce<Unit | undefined>((best, s) => (!best || company(s) < company(best) ? s : best), undefined)
     if (!alone) return
     freeTilesNear(battle, alone, members.length).forEach((tile, i) => Object.assign(members[i], tile))
-    Object.assign(pod, { revealed: true, surprised: false })
+    Object.assign(pod, { revealed: true, surprised: 0 })
     events.push({ type: 'reveal', units: members.map(({ id, x, y }) => ({ id, x, y })) })
     // Surfacing is a move, so overwatch answers it.
     for (const m of members) events.push({ type: 'move', id: m.id, path: [{ x: m.x, y: m.y }] })

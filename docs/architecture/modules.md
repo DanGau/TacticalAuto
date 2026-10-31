@@ -56,7 +56,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `camera.ts` | World and picture points, cameras that frame tiles |
 | `play.ts` | Plays a beat's events in order |
 | `effects.ts` | Shots, lunges, rockets, sparks, shake, callouts |
-| `entrance.ts` | The entrance playing: door, wall, monologue, skylight, rope, smoke, truck, strike |
+| `entrance.ts` | The entrance playing: door, wall, monologue, skylight, rope, smoke, truck, strike, tap, look, blast, shot, stolen kill |
 | `sprites.ts` | Unit pictures and moving them |
 | `marks.ts` | Ground marks: entrances, goals, fences, acid, fog, glows |
 | `board.ts` | Building the battlefield's ground, props, walls, roofs |

@@ -114,8 +114,7 @@ function act(battle: Battle): GameEvent[] {
     }
     const action = actNext(battle)
     if (action.length > 0) return action
-    // Surprise lasts until the aliens' turn ends.
-    if (battle.turn === 'alien') for (const pod of battle.pods) pod.surprised = false
+    if (battle.turn === 'alien') for (const pod of battle.pods) pod.surprised = Math.max(0, pod.surprised - 1)
     battle.turn = battle.turn === 'human' ? 'alien' : 'human'
     battle.stage = 'move'
   }

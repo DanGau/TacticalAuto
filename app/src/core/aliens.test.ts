@@ -50,7 +50,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, hp: 30, stats: { ...soldier.stats, hp: 30, crit: 0, damage: 3 } })
   const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss || (ALIENS[kind].spawns ?? false), target: false, resists: ALIENS[kind].resists }, { x, y }, 0))
   battle.units = [soldier, ...units]
-  battle.pods = [{ name: 'Test', revealed: true, surprised: false, engaged: true, post: { x: 0, y: 0 } }]
+  battle.pods = [{ name: 'Test', revealed: true, surprised: 0, engaged: true, post: { x: 0, y: 0 } }]
   const until = (done: (events: GameEvent[]) => boolean) => {
     const all: GameEvent[] = []
     for (let beats = 0; beats < 60; beats++) {
@@ -440,7 +440,7 @@ test('a pod waiting its turn holds its post and its fire while another fights, a
     { kind: 'turret', x: 80, y: 80 },
   ])
   battle.pods[0].engaged = false
-  battle.pods.push({ name: 'Fighting', revealed: true, surprised: false, engaged: true, post: { x: 80, y: 80 } })
+  battle.pods.push({ name: 'Fighting', revealed: true, surprised: 0, engaged: true, post: { x: 80, y: 80 } })
   aliens[1].pod = 1
   battle.rallied = Infinity
   soldier.stats = { ...soldier.stats, move: 0, range: 0 }

@@ -156,7 +156,7 @@ test('a rescue is won, and pays, only with more than RESCUE_QUORUM civilians sav
 function terror(seed: number): Run {
   const run = before('rescue')
   run.battle!.rng = seed
-  enterAt(run, 0)
+  enterAt(run, run.battle!.entrances.findIndex((e) => e.kind !== 'tap'))
   for (const s of run.battle!.units.filter(isSoldier)) Object.assign(s, { rooted: 999, ability: null, effects: [], hp: 500, spent: ['throw', 'throw', 'throw'], stats: { ...s.stats, damage: 0, hp: 500 } })
   return run
 }

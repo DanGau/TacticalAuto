@@ -88,11 +88,11 @@ function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
  */
 function sense(battle: Battle, kind: EntranceKind): number {
   const spare = battle.units.some((u) => u.civilian)
-  return { monologue: spare ? 10 : 2, wall: 6, door: 5, skylight: 4, truck: 4, smoke: 4, rappel: 3, strike: 0 }[kind]
+  return { monologue: spare ? 10 : 2, wall: 6, door: 5, skylight: 4, truck: 4, smoke: 4, rappel: 3, strike: 0, tap: 3, look: 5, blast: 1, han: 3, mine: 1 }[kind]
 }
 
 /** What each entrance that hurts the aliens is worth to a hard-hitting squad. */
-const HURTS: Partial<Record<EntranceKind, number>> = { truck: 3, skylight: 3, door: 2 }
+const HURTS: Partial<Record<EntranceKind, number>> = { tap: 4, truck: 3, skylight: 3, door: 2 }
 
 /** Chooses an entrance. */
 type Enter = (run: Run, battle: Battle, rng: { rng: number }) => number

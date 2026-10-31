@@ -1,11 +1,11 @@
-// The squad's entrance on screen, as a film would cut to it: the door kicked in, the wall smashed, the monologue.
+// The squad's entrance on screen, as a film would cut to it: the door kicked in, the wall smashed, the monologue, the tap on the shoulder.
 import { type Battle, type Tile, type Unit } from '../core/battle'
 import { nearestAlien } from '../core/grid'
 import { drawTerrain } from './board'
 import { callout, drawing, float } from './effects'
 import { COLOR } from './palette'
 import type { Sketch } from './shapes'
-import { fade, place, shift } from './sprites'
+import { fade, place, shift, squash } from './sprites'
 import type { Sprite, Stage } from './stage'
 
 /** The gap between soldiers coming in, how long a dash in takes, and from how many tiles back. */
@@ -18,6 +18,11 @@ const FALL_FROM = 320
 /** How long debris flies, and the monologue holds. */
 const DEBRIS_MS = 600
 const LINE_MS = 1600
+/** How long a tap, an alien's turning round, and a comic pause take. */
+const TAP_MS = 220
+const TURN_MS = 260
+const BEAT_MS = 600
+const SHOT_MS = 160
 
 /** What a hero says landing among the aliens. */
 const TAUNTS = ['You picked the wrong city.', 'Hey, ugly! Over here!', 'Leave the humans alone.', 'This planet is protected.', 'Nobody invades on my watch.']
@@ -68,6 +73,24 @@ export async function makeEntrance(s: Stage, battle: Battle): Promise<void> {
     case 'strike':
       await strike(s, battle, foe)
       await dashIn(s, sprites, back, 0)
+      break
+    case 'tap':
+      await tap(s, soldiers, foe)
+      break
+    case 'look':
+      await dashIn(s, sprites, back, 0)
+      await look(s, battle, soldiers, foe)
+      break
+    case 'blast':
+      await bigExplosion(s, soldiers, sprites, at, back)
+      break
+    case 'han':
+      await dashIn(s, sprites, back, 0)
+      await shootFirst(s, soldiers, foe)
+      break
+    case 'mine':
+      await dashIn(s, sprites, back, 0)
+      await stolenKill(s, soldiers, foe)
   }
   for (const sprite of sprites) {
     place(s, sprite, sprite.tile)
@@ -261,4 +284,143 @@ async function monologue(s: Stage, battle: Battle, soldiers: Unit[]): Promise<vo
   await s.tween(LINE_MS, () => {})
   s.labels.delete(line)
   for (const alien of battle.units.filter((u) => u.side === 'alien' && s.sprites.has(u.id))) float(s, callout(s, '!', COLOR.crit, s.sprites.get(alien.id)!, 20))
+}
+
+/** The hero of `soldiers` nearest `foe`. */
+const lead = (soldiers: Unit[], foe: Tile) => soldiers.reduce((a, b) => (Math.hypot(b.x - foe.x, b.y - foe.y) < Math.hypot(a.x - foe.x, a.y - foe.y) ? b : a))
+
+/** Turns an alien round with a quick flip. */
+async function turn(s: Stage, sprite: Sprite): Promise<void> {
+  await s.tween(TURN_MS, (t) => squash(sprite, Math.cos(t * Math.PI), 1))
+  squash(sprite, 1, 1)
+}
+
+/** The squad is there, unnoticed; one tap, two taps, the alien turns round, and it gets a fist. */
+async function tap(s: Stage, soldiers: Unit[], foe: Unit | undefined): Promise<void> {
+  await s.tween(DASH_MS, (t) => {
+    for (const unit of soldiers) fade(s.sprites.get(unit.id)!, t)
+  })
+  const victim = foe && s.sprites.get(foe.id)
+  if (!foe || !victim) return
+  const hero = s.sprites.get(lead(soldiers, foe).id)!
+  const home = hero.at
+  const reach = { x: home.x + (victim.at.x - home.x) * 0.35, y: home.y + (victim.at.y - home.y) * 0.35 }
+  const lunge = () => s.tween(TAP_MS, (t) => shift(s, hero, { x: home.x + (reach.x - home.x) * Math.sin(t * Math.PI), y: home.y + (reach.y - home.y) * Math.sin(t * Math.PI) }))
+  const line = callout(s, 'tap tap', 0xffffff, hero, 15)
+  await lunge()
+  await lunge()
+  s.labels.delete(line)
+  await s.tween(TAP_MS, () => {})
+  float(s, callout(s, '?', 0xffffff, victim, 26))
+  await turn(s, victim)
+  const hello = callout(s, '“Hi.”', 0xffffff, hero, 16)
+  await s.tween(BEAT_MS, () => {})
+  s.labels.delete(hello)
+  await lunge()
+  place(s, hero, hero.tile)
+  shake(s, 7, 350)
+  float(s, callout(s, 'POW!', COLOR.crit, victim, 30))
+  await drawing(s, (fx) => s.tween(DEBRIS_MS / 2, (t) => burst(fx, victim.at, t)))
+}
+
+/** A comic-book star bursting where a punch lands. */
+function burst(fx: Sketch, at: Tile, t: number): void {
+  const points = Array.from({ length: 16 }, (_, k) => {
+    const r = (k % 2 ? 18 : 42) * (0.5 + t)
+    const a = (k / 16) * Math.PI * 2
+    return [at.x + Math.cos(a) * r, at.y - 24 + Math.sin(a) * r * 0.7]
+  }).flat()
+  fx.clear().poly(points).fill({ color: 0xffe08a, alpha: 1 - t }).stroke({ color: 0x10141c, width: 3, alpha: 1 - t })
+}
+
+/** A hero points away from the aliens and calls out; the nearest pod falls for it, every alien turning round. */
+async function look(s: Stage, battle: Battle, soldiers: Unit[], foe: Unit | undefined): Promise<void> {
+  if (!foe) return
+  const hero = s.sprites.get(lead(soldiers, foe).id)!
+  const away = unitAway(hero.tile, foe)
+  const from = hero.at
+  const to = s.toWorld(hero.tile.x + away.x * 3, hero.tile.y + away.y * 3)
+  const line = callout(s, '“Look over there!”', 0xffffff, hero, 18)
+  await drawing(s, (fx) =>
+    s.tween(LINE_MS, (t) => {
+      const e = Math.min(1, t * 4)
+      const tip = { x: from.x + (to.x - from.x) * e, y: from.y - 24 + (to.y - from.y) * e }
+      fx.clear().moveTo(from.x, from.y - 24).lineTo(tip.x, tip.y).stroke({ color: 0xffe08a, width: 5 })
+      fx.circle(tip.x, tip.y, 7).fill(0xffe08a).stroke({ color: 0x10141c, width: 2 })
+    }),
+  )
+  s.labels.delete(line)
+  const pod = battle.units.filter((u) => u.pod === foe.pod && s.sprites.has(u.id)).map((u) => s.sprites.get(u.id)!)
+  for (const sprite of pod) float(s, callout(s, 'Huh?', 0xffffff, sprite, 18))
+  await Promise.all(pod.map((sprite) => turn(s, sprite)))
+  await s.tween(BEAT_MS, () => {})
+}
+
+/** Says `line` over `sprite` for `ms`. */
+async function say(s: Stage, line: string, sprite: Sprite, ms = LINE_MS): Promise<void> {
+  const mark = callout(s, line, 0xffffff, sprite, 18)
+  await s.tween(ms, () => {})
+  s.labels.delete(mark)
+}
+
+/** A bullet's streak from one point to another. */
+const tracer = (s: Stage, from: Tile, to: Tile) =>
+  drawing(s, (fx) =>
+    s.tween(SHOT_MS, (t) => {
+      const x = from.x + (to.x - from.x) * t
+      const y = from.y - 24 + (to.y - from.y) * t
+      fx.clear().moveTo(from.x + (x - from.x) * 0.6, from.y - 24 + (y - from.y + 24) * 0.6).lineTo(x, y).stroke({ color: 0xffe08a, width: 4 })
+    }),
+  )
+
+/** The sky goes up behind the squad, and it strides out, not looking back. */
+async function bigExplosion(s: Stage, soldiers: Unit[], sprites: Sprite[], at: Tile, back: Tile): Promise<void> {
+  const behind = { x: at.x + (back.x - back.y) * 60, y: at.y + (back.x + back.y) * 30 }
+  shake(s, 12, 900)
+  await Promise.all([
+    drawing(s, (fx) =>
+      s.tween(3 * DEBRIS_MS, (t) => {
+        const fade = Math.min(1, 3 * (1 - t))
+        fx.clear().circle(behind.x, behind.y - 60, 60 + 150 * t).fill({ color: COLOR.crit, alpha: 0.75 * fade })
+        fx.circle(behind.x, behind.y - 60, 30 + 110 * t).fill({ color: 0xffe08a, alpha: 0.9 * fade })
+      }),
+    ),
+    emerge(s, sprites, back),
+  ])
+  await say(s, '“I meant to do that.”', s.sprites.get(soldiers[0].id)!)
+}
+
+/** The nearest alien starts its demands, and a hero does not let it finish. */
+async function shootFirst(s: Stage, soldiers: Unit[], foe: Unit | undefined): Promise<void> {
+  const victim = foe && s.sprites.get(foe.id)
+  if (!foe || !victim) return
+  const hero = s.sprites.get(lead(soldiers, foe).id)!
+  const speech = callout(s, '“Earthling, surrender or we sh—”', 0xffffff, victim, 16)
+  await s.tween(LINE_MS, () => {})
+  await tracer(s, hero.at, victim.at)
+  s.labels.delete(speech)
+  shake(s, 4, 200)
+  float(s, callout(s, 'BANG', COLOR.crit, victim, 26))
+  await say(s, '“You were saying?”', hero)
+}
+
+/** A straggler no rule knows of steps up to a hero; another hero's shot drops it first, and the first complains. */
+async function stolenKill(s: Stage, soldiers: Unit[], foe: Unit | undefined): Promise<void> {
+  const shooter = s.sprites.get(soldiers[0].id)!
+  const robbed = s.sprites.get((soldiers[1] ?? soldiers[0]).id)!
+  const toward = foe ? unitAway(foe, robbed.tile) : { x: 0, y: -1 }
+  const at = s.toWorld(robbed.tile.x + toward.x * 2, robbed.tile.y + toward.y * 2)
+  await drawing(s, async (fx) => {
+    const body = (fall: number, alpha: number) => {
+      fx.clear().roundRect(at.x - 9, at.y - 30 + 24 * fall, 18, 30 - 24 * fall, 8).fill({ color: 0x7ee07e, alpha }).stroke({ color: 0x10141c, width: 2, alpha })
+    }
+    body(0, 1)
+    await say(s, '“Mine.”', robbed, BEAT_MS)
+    await tracer(s, shooter.at, at)
+    shake(s, 3, 150)
+    await s.tween(TURN_MS, (t) => body(t, 1))
+    await say(s, '“He was mine.”', robbed)
+    await say(s, '“Was.”', shooter, BEAT_MS)
+    await s.tween(TURN_MS, (t) => body(1, 1 - t))
+  })
 }

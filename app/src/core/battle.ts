@@ -323,8 +323,8 @@ interface Pod {
   name: string
   /** Seen by the squad: drawn, and shot at. Every pod is but burrowers underground and waves not yet sighted. */
   revealed: boolean
-  /** Caught off guard, so its members do not shoot until the aliens' turn ends. */
-  surprised: boolean
+  /** Alien turns left caught off guard, its members doing nothing. */
+  surprised: number
   /** In the fight: coming for the squad. A pod not yet engaged stands at its post and holds its fire. */
   engaged: boolean
   post: Tile
