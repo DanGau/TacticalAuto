@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { chromium, type Page } from 'playwright'
 import type { Debug } from '../src/main'
 import { MAX_BEATS } from '../src/core/battle'
-import { HEIGHT, WIDTH } from '../src/view/view'
+import { HEIGHT, WIDTH } from '../src/view/camera'
 import viteConfig from '../vite.config'
 
 declare const debug: Debug

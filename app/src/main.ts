@@ -6,7 +6,8 @@ import { PACE } from './core/pace'
 import { brief } from './ui/briefing'
 import { introduce, newcomers } from './ui/intro'
 import { createUi } from './ui/ui'
-import { createView, HEIGHT, WIDTH } from './view/view'
+import { createView } from './view/view'
+import { HEIGHT, WIDTH } from './view/camera'
 
 // A failure shows on screen, where a player on a phone, with no console, can report it.
 const report = (message: string) => document.getElementById('panel')!.insertAdjacentHTML('afterbegin', `<p class="up">${message}</p>`)

@@ -6,7 +6,8 @@ import { GOALS } from '../core/goals'
 import { REGIONS } from '../core/regions'
 import { TWISTS } from '../core/twists'
 import { YAW } from '../view/space'
-import type { Shot as CameraShot, View } from '../view/view'
+import type { Shot as CameraShot } from '../view/camera'
+import type { View } from '../view/view'
 
 /** How long the briefing holds on each thing it shows. */
 const DWELL_MS = 1800
