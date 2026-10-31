@@ -487,20 +487,23 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
   /** Clears a way into every patch of open ground that cover and walls cut off, as narrow ground can. */
   function connect(): void {
     const open = (t: number) => ground[t] !== 'void' && props[t] === 'none'
-    for (;;) {
-      const reached = new Set<number>()
-      const start = props.findIndex((_, t) => open(t))
-      const queue = [start]
-      reached.add(start)
+    const reached = new Uint8Array(size * size)
+    /** Grows `reached` over open ground from the tiles queued. */
+    const flood = (queue: number[]) => {
+      for (const t of queue) reached[t] = 1
       for (let i = 0; i < queue.length; i++)
         for (const n of beside(queue[i])) {
           const [edges, at] = edgeOf(queue[i], n)
-          if (reached.has(n) || !open(n) || edges[at] !== 'none') continue
-          reached.add(n)
+          if (reached[n] || !open(n) || edges[at] !== 'none') continue
+          reached[n] = 1
           queue.push(n)
         }
-      const lost = props.findIndex((_, t) => open(t) && !reached.has(t))
-      if (lost === -1) return
+    }
+    flood([props.findIndex((_, t) => open(t))])
+    // A way cleared opens only tiles on it, which join `reached`: no tile before the last patch found is cut off.
+    for (let lost = 0; ; ) {
+      while (lost < size * size && !(open(lost) && !reached[lost])) lost++
+      if (lost === size * size) return
       // The shortest way over any ground from the patch cut off to the rest, cleared of props and walls.
       const from = new Map<number, number>([[lost, lost]])
       const search = [lost]
@@ -509,9 +512,10 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
         for (const n of beside(search[i]))
           if (!from.has(n)) {
             from.set(n, search[i])
-            if (reached.has(n)) end = n
+            if (reached[n]) end = n
             search.push(n)
           }
+      const way: number[] = []
       for (let t = end; t !== lost; t = from.get(t)!) {
         const [edges, at] = edgeOf(t, from.get(t)!)
         edges[at] = 'none'
@@ -519,8 +523,10 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
         for (const at of [t, from.get(t)!]) {
           if (ground[at] === 'water') ground[at] = 'road'
           props[at] = 'none'
+          way.push(at)
         }
       }
+      flood(way)
     }
   }
 

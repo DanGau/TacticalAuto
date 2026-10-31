@@ -525,12 +525,12 @@ const open = (battle: Battle, ax: number, ay: number, bx: number, by: number) =>
  * A battle's walking graph and the distance fields found on it. Both follow from terrain and the units that never move,
  * such as a hive node, which stand as walls: wreck forgets them, and so does such a unit's death.
  */
-const walks = new WeakMap<Battle, { fixed: string; into: [from: number, cost: number][][]; fields: Map<number, number[]> }>()
+const walks = new WeakMap<Battle, { fixed: string; into: number[][]; fields: Map<number, number[]> }>()
 
 /** Drops what was worked out from the battle's terrain, once something has changed it. */
 export const reshaped = (battle: Battle) => walks.delete(battle)
 
-/** For each tile, the open tiles a unit can step onto it from, with each step's cost. */
+/** For each tile, the open tiles a unit can step onto it from, each followed by that step's cost. */
 function walkGraph(battle: Battle) {
   // A civilian waits to be reached, not to wall a way off: it leaves once a soldier is beside it.
   const still = battle.units.filter((u) => u.stats.move === 0 && u.hp > 0 && !u.civilian)
@@ -540,11 +540,11 @@ function walkGraph(battle: Battle) {
   const walls = new Set(still.map((u) => u.y * GRID + u.x))
   const into = Array.from({ length: GRID * GRID }, (_, t) => {
     const tile = { x: t % GRID, y: Math.floor(t / GRID) }
-    const steps: [number, number][] = []
+    const steps: number[] = []
     for (const [dx, dy] of NEIGHBORS) {
       const from = { x: tile.x + dx, y: tile.y + dy }
       const f = from.y * GRID + from.x
-      if (onGrid(from.x, from.y) && battle.cover[f] === 0 && !walls.has(f) && passable(battle, tile, from)) steps.push([f, stepCost(battle, from, tile)])
+      if (onGrid(from.x, from.y) && battle.cover[f] === 0 && !walls.has(f) && passable(battle, tile, from)) steps.push(f, stepCost(battle, from, tile))
     }
     return steps
   })
@@ -561,15 +561,20 @@ export function walkingDistances(battle: Battle, goal: Tile): readonly number[] 
   if (known) return known
   const field = Array<number>(GRID * GRID).fill(Infinity)
   field[start] = 0
-  // Tiles by distance found, nearest first: a step costs 1 to 1 + 2 * CLIMB, so each bucket is settled before the next.
+  // Tiles by distance found, nearest first: steps cost whole tiles, so each bucket is settled before the next.
   const buckets: number[][] = [[start]]
   for (let d = 0; d < buckets.length; d++) {
-    for (const tile of buckets[d] ?? []) {
+    const bucket = buckets[d]
+    if (!bucket) continue
+    for (const tile of bucket) {
       if (field[tile] !== d) continue
-      for (const [from, step] of into[tile]) {
-        if (d + step >= field[from]) continue
-        field[from] = d + step
-        ;(buckets[d + step] ??= []).push(from)
+      const steps = into[tile]
+      for (let i = 0; i < steps.length; i += 2) {
+        const from = steps[i]
+        const reach = d + steps[i + 1]
+        if (reach >= field[from]) continue
+        field[from] = reach
+        ;(buckets[reach] ??= []).push(from)
       }
     }
   }
@@ -581,7 +586,9 @@ export function walkingDistances(battle: Battle, goal: Tile): readonly number[] 
 function reachableFrom(battle: Battle, start: Tile): boolean[] {
   const { into } = walkGraph(battle)
   const out: number[][] = into.map(() => [])
-  into.forEach((froms, t) => froms.forEach(([f]) => out[f].push(t)))
+  into.forEach((steps, t) => {
+    for (let i = 0; i < steps.length; i += 2) out[steps[i]].push(t)
+  })
   const reached = Array<boolean>(GRID * GRID).fill(false)
   const queue = [start.y * GRID + start.x]
   reached[queue[0]] = true
