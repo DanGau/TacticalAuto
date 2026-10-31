@@ -1,5 +1,9 @@
 import { roots } from './skills'
-import { expect, test } from 'vitest'
+import { TUNING } from './tuning'
+
+// These duels stage exact hits and survivals, whatever the balance numbers are.
+beforeAll(() => void Object.assign(TUNING, { alienHp: 0.5, alienDamage: 1 }))
+import { beforeAll, expect, test } from 'vitest'
 import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, REGEN_HEAL, type AlienKind } from './aliens'
 import { enterAt, entranceOf, begun } from './roads'
 import { apply } from './apply'

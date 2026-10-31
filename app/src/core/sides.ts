@@ -103,11 +103,12 @@ export function sight(battle: Battle): GameEvent[] {
     battle.downed = battle.downed.filter((d) => d.carrier !== soldier.id)
     events.push({ type: 'escaped', id: soldier.id })
   }
-  // A soldier beside a raid's cache grabs it.
-  for (const cache of battle.caches.filter((c) => soldiers.some((s) => distance(s, c) <= 1))) {
+  // A soldier or its mech beside a raid's cache grabs it, so a crowd of mechs cannot bar the way.
+  const grabbers = battle.units.filter((u) => u.side === 'human' && !u.civilian)
+  for (const cache of battle.caches.filter((c) => grabbers.some((s) => distance(s, c) <= 1))) {
     battle.caches.splice(battle.caches.indexOf(cache), 1)
     battle.grabbed++
-    events.push({ type: 'grabbed', id: soldiers.find((s) => distance(s, cache) <= 1)!.id, x: cache.x, y: cache.y })
+    events.push({ type: 'grabbed', id: grabbers.find((s) => distance(s, cache) <= 1)!.id, x: cache.x, y: cache.y })
   }
   // A soldier, or a mech it called down, beside a civilian gets them out.
   const squad = battle.units.filter((u) => u.side === 'human' && !u.civilian)
