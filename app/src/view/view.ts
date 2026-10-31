@@ -1642,7 +1642,7 @@ export async function createView(): Promise<View> {
 
   /**
    * The still camera `to` moved only as far in, and over, as keeps everything it shows on the map, so the
-   * screen never reaches past it, unless that would lose any of `keep` off the screen. A wide lens shows the far
+   * screen never reaches past it, unless that would push any of `keep` out of frame. A wide lens shows the far
    * distance by design, and is left alone.
    */
   function clamped(to: Camera, keep: Tile[] = []): Camera {
@@ -1657,9 +1657,9 @@ export async function createView(): Promise<View> {
     const kept = keep.map((p) => picture(spot(p.x, p.y), to.yaw))
     const shows = (c: Camera) => {
       const at = picture(c, c.yaw)
-      return kept.every((p) => Math.abs(p.x - at.x) * zoom <= (WIDTH - MARGIN) / 2 && Math.abs(p.y - at.y) * zoom <= (HEIGHT - MARGIN) / 2)
+      return kept.every((p) => Math.abs(p.x - at.x) * zoom <= WIDTH / 4 && Math.abs(p.y - at.y) * zoom <= HEIGHT / 4)
     }
-    // Slid back toward `to` until all of `keep` shows.
+    // Slid back toward `to` until all of `keep` is in the screen's middle half.
     for (let t = 1; ; t -= 0.1) {
       const c = { ...to, x: to.x + (within(to.x) - to.x) * t, z: to.z + (within(to.z) - to.z) * t, zoom }
       if (t <= 0 || shows(c)) return c
