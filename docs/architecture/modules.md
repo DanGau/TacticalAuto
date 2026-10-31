@@ -8,7 +8,8 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 |---|---|
 | `battle.ts` | Battle state types (`Battle`, `Unit`, `Pod`) and the numbers rules share |
 | `grid.ts` | The board: distance, cover, walls, walking costs and routes, free tiles |
-| `setup.ts` | `createBattle`: pods, civilians, goals, landing zones, the landing |
+| `setup.ts` | `createBattle`: the arena, pods, civilians, goals |
+| `entrances.ts` | Entrances: their kinds, where each comes in, what each sets off |
 | `spawn.ts` | Making units: aliens, soldiers, civilians, mechs, drops |
 | `step.ts` | Advances the run's battle a beat; settles it when it ends |
 | `combat.ts` | `stepBattle`: whose turn, the next unit's action, consumables |
@@ -18,7 +19,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `attack.ts` | A shot and what a hit or kill sets off |
 | `abilities.ts` | Actions in place of a shot: alien powers, soldier skills and gear |
 | `wound.ts` | Damage landing, what it sets off, the battle tally |
-| `upkeep.ts` | What happens as a side's turn begins |
+| `upkeep.ts` | What happens as a side's turn begins: the next pod engaging, waves |
 | `fighters.ts` | Unit queries every combat module asks |
 | `sight.ts` | Line of sight, cover, hit odds, noticing |
 | `terrain.ts` | Battlefield tile types and the cover each gives |
@@ -48,14 +49,14 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 | File | Owns |
 |---|---|
-| `view.ts` | `createView`, the `View` the UI drives: show, zones, framing, panning |
+| `view.ts` | `createView`, the `View` the UI drives: show, entrances, framing, panning |
 | `stage.ts` | `Stage`: scene layers, camera and glides, frame loop, what is on screen |
 | `camera.ts` | World and picture points, cameras that frame tiles |
 | `play.ts` | Plays a beat's events in order |
 | `effects.ts` | Shots, lunges, rockets, sparks, shake, callouts |
-| `landing.ts` | Drop pods, parachutes, marching in |
+| `entrance.ts` | The entrance playing: door, wall, monologue, skylight, rope, smoke, truck, strike |
 | `sprites.ts` | Unit pictures and moving them |
-| `marks.ts` | Ground marks: zones, goals, fences, acid, fog, glows |
+| `marks.ts` | Ground marks: entrances, goals, fences, acid, fog, glows |
 | `board.ts` | Building the battlefield's ground, props, walls, roofs |
 | `props.ts` | Boxes props and walls are drawn from; trees |
 | `palette.ts` | Colours |
@@ -63,6 +64,6 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 ## Elsewhere
 
-- `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `briefing.ts` the pre-landing tour; `menu.ts` the title.
+- `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `briefing.ts` the tour before the entrance; `menu.ts` the title.
 - `bots/bots.ts`: bot strategies. `sim/`: the sim and tune CLIs.
 - `main.ts`: browser entry and `window.debug`.
