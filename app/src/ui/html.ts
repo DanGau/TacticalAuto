@@ -1,5 +1,6 @@
 import type { Action } from '../core/apply'
 import { EFFECTS, type Gear } from '../core/gear'
+import { WEAPONS } from '../core/weapons'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import type { Stats } from '../core/battle'
 import { KEYWORDS, RESISTS, type Keyword, type Resist } from '../core/keywords'
@@ -8,8 +9,8 @@ import type { ClassId } from '../core/classes'
 import { THREAT_MAX, type Mission, type StopKind } from '../core/run'
 
 /** A button that performs `action` when clicked. */
-export const button = (action: Action, label: string, cls = '', enabled = true) =>
-  `<button class="${cls}" data-action='${JSON.stringify(action)}' ${enabled ? '' : 'disabled'}>${label}</button>`
+export const button = (action: Action, label: string, cls = '', enabled = true, title = '') =>
+  `<button class="${cls}" data-action='${JSON.stringify(action)}' ${title ? `title="${title}"` : ''} ${enabled ? '' : 'disabled'}>${label}</button>`
 
 export const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`
 
@@ -27,8 +28,9 @@ export const STOP_NAMES: Record<StopKind | Mission['kind'], string> = {
   recovery: 'Recovery',
 }
 
-/** A soldier's health as a red bar and a count. */
-export const healthBar = (hp: number, max: number) => `<div class="health" title="Health ${hp} of ${max}">♥ ${hp}/${max}<div class="bar"><div style="width: ${(100 * hp) / max}%"></div></div></div>`
+/** A soldier's health as a red bar and a count, and the armor it starts each fight with as a yellow bar after it. */
+export const healthBar = (hp: number, max: number, armor = 0) =>
+  `<div class="health" title="Health ${hp} of ${max}${armor > 0 ? `, and ${armor} armor, which takes damage first and is whole again each fight` : ''}">♥ ${hp}/${max}${armor > 0 ? ` <span class="armor">⛨ ${armor}</span>` : ''}<div class="bar"><div style="width: ${(100 * hp) / (max + armor)}%"></div><div class="armor" style="left: ${(100 * max) / (max + armor)}%; width: ${(100 * armor) / (max + armor)}%"></div></div></div>`
 
 const BADGES: Record<ClassId, string> = { assault: '🔫', heavy: '🚀', sniper: '🎯', support: '⛑️', engineer: '🔧', pyro: '🔥', cryo: '❄️' }
 
@@ -61,10 +63,12 @@ const STAT_TEXT: Record<keyof Stats, (n: number) => string> = {
   close: (n) => `${percent(n)} aim per tile closer`,
 }
 
-/** What a piece of gear changes, as plain text: its stat changes, then its effect. */
+/** What a piece of gear changes, as plain text: its weapon's and its own stat changes, then what its weapon and effect do. */
 export function gearText(gear: Gear): string {
-  const stats = (Object.keys(gear.stats) as (keyof Stats)[]).map((key) => STAT_TEXT[key](gear.stats[key]!))
-  return `${stats.join(', ')}${gear.effect ? `. ${EFFECTS[gear.effect].text}.` : ''}`
+  const weapon = gear.weapon && WEAPONS[gear.weapon]
+  const changes = (stats: Partial<Stats>) => (Object.keys(stats) as (keyof Stats)[]).map((key) => STAT_TEXT[key](stats[key]!))
+  const stats = [...(weapon ? changes(weapon.stats) : []), ...changes(gear.stats)]
+  return [stats.join(', '), weapon ? weapon.text : '', gear.effect ? EFFECTS[gear.effect].text : ''].filter(Boolean).join('. ') + '.'
 }
 
 /** Words that explain themselves on hover. */

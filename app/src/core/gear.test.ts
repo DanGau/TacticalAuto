@@ -6,56 +6,53 @@ import { alienUnit, reshaped, CHILL_TURNS, CRIT_BONUS, SEARING_DAMAGE, SOLDIER_A
 import { stepBattle, type GameEvent } from './combat'
 import { alienStats } from './aliens'
 import { EFFECTS, generateGear, type Gear } from './gear'
-import { SELL, soldierStats, type Run } from './run'
+import { soldierStats, type Run } from './run'
+import { MELEE_RANGE, WEAPONS } from './weapons'
 import { TUNING } from './tuning'
 
-test('gear does one thing: commons a stat mod, rares a simple effect, epics an elaborate one, each for its slot', () => {
+test('gear does one thing: commons a stat mod, rares a simple effect, epics an elaborate one, each for its slot; a weapon is any weapon but the starting rifle', () => {
   const rng = { rng: 7 }
+  const kinds = new Set<string>()
   for (let id = 0; id < 200; id++) {
     const rarity = (['common', 'rare', 'epic'] as const)[id % 3]
     const gear = generateGear(rng, id, rarity)
-    expect(gear.name.split(' ').length).toBe(2)
     expect(gear.effect === null).toBe(rarity === 'common')
     expect(Object.keys(gear.stats).length > 0).toBe(rarity === 'common')
     if (gear.effect) expect([EFFECTS[gear.effect].slot, !!EFFECTS[gear.effect].epic]).toEqual([gear.slot, rarity === 'epic'])
+    expect(gear.weapon !== undefined).toBe(gear.slot === 'weapon')
+    if (gear.weapon) {
+      kinds.add(gear.weapon)
+      expect(gear.name.endsWith(WEAPONS[gear.weapon].name)).toBe(true)
+    }
   }
+  expect([...kinds].sort()).toEqual(Object.keys(WEAPONS).filter((w) => w !== 'rifle').sort())
+})
+
+test('any soldier wields any weapon: a melee one reaches the next tile and charges in, whatever the class', () => {
+  const run = begun(1)
+  const [soldier] = run.soldiers
+  const rifle = soldierStats(run, soldier)
+  soldier.gear.weapon = { id: 9, slot: 'weapon', rarity: 'common', name: 'Hammer', weapon: 'hammer', stats: {}, effect: null }
+  const hammer = soldierStats(run, soldier)
+  expect(hammer).toMatchObject({ range: MELEE_RANGE, damage: rifle.damage + WEAPONS.hammer.stats.damage! })
+  apply(run, { type: 'go', index: 1 })
+  apply(run, { type: 'advance' })
+  expect(run.battle!.reserve[0]).toMatchObject({ stance: 'rush', effects: expect.arrayContaining([WEAPONS.hammer.effect]) })
 })
 
 /** A run whose soldier has learned its first skill and found `gear`. */
 function withFind(gear: Omit<Gear, 'id'>): Run {
   const run = begun(1)
   run.soldiers[0].skills = [PATHS[run.soldiers[0].cls!][0].core]
-  run.finds.push({ soldier: run.soldiers[0].id, gear: { id: 1, ...gear } })
+  run.finds.push({ id: 1, ...gear })
   run.phase = 'reward'
   return run
 }
 
-test('found gear is equipped on its finder, selling what it replaces, or sold; then the reward phase ends', () => {
-  const vest = { slot: 'armor', rarity: 'common', name: 'Sturdy Vest', stats: { armor: 2 }, effect: null } as const
-  const run = withFind(vest)
-  const [soldier] = run.soldiers
-  expect(soldierStats(run, soldier).armor).toBe(0)
-  expect(apply(run, { type: 'keep' })).toEqual({ ok: true })
-  expect(soldierStats(run, soldier).armor).toBe(2)
-  expect(run).toMatchObject({ finds: [], phase: 'overworld' })
-  const supplies = run.supplies
-  run.finds.push({ soldier: soldier.id, gear: { id: 2, ...vest, rarity: 'rare', stats: { armor: 4 } } })
-  run.phase = 'reward'
-  apply(run, { type: 'keep' })
-  expect(run.supplies).toBe(supplies + SELL.common)
-  expect(soldier.gear.armor).toMatchObject({ id: 2 })
-  run.finds.push({ soldier: soldier.id, gear: { id: 3, ...vest, rarity: 'epic' } })
-  run.phase = 'reward'
-  apply(run, { type: 'sell' })
-  expect(run.supplies).toBe(supplies + SELL.common + SELL.epic)
-  expect(soldier.gear.armor).toMatchObject({ id: 2 })
-  expect(apply(run, { type: 'sell' }).ok).toBe(false)
-})
-
 /** A duel on open ground: one soldier wearing `gear`, one alien beside it, and the soldier too weak to win quickly. */
 function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: Unit; step: () => ReturnType<typeof stepBattle> } {
   const run = withFind(gear)
-  apply(run, { type: 'keep' })
+  apply(run, { type: 'equip', find: 0, soldier: run.soldiers[0].id })
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   // War drums pay off only on a kill, so they leave a duel as it is.

@@ -7,7 +7,8 @@ import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type Doctrine, type DoctrineId } from './doctrines'
 import type { EventId } from './events'
 import { FEATS, type FeatId, type Tally } from './feats'
-import { EFFECTS, generateGear, SLOTS, type Gear, type Slot } from './gear'
+import { EFFECTS, generateGear, SLOTS, starterRifle, type Gear, type Slot } from './gear'
+import { MELEE_RANGE, WEAPONS } from './weapons'
 import { RESISTS, type Keyword, type Resist } from './keywords'
 import { offerable, RELIC_OFFERS, RELICS, type Relic, type RelicId } from './relics'
 import { PATHS, SKILLS, type SkillId } from './skills'
@@ -146,20 +147,6 @@ export interface Soldier {
   wounds: number
 }
 
-/** Gear a soldier found, waiting to be equipped on that soldier or sold. */
-export interface Find {
-  soldier: number
-  gear: Gear
-}
-
-/** A find its finder decided alone: worn or sold, and what the finder said. */
-export interface Decision {
-  soldier: string
-  gear: Gear
-  kept: boolean
-  line: string
-}
-
 /** What the last stop changed, for the player to review. */
 export interface Report {
   /** The stop: a mission fought, or an event met on the road. */
@@ -189,15 +176,9 @@ export interface Earned {
   xp: number
 }
 
-/** A piece of gear for sale, and the soldier it is fitted to when bought. */
-export interface Ware {
-  gear: Gear
-  soldier: number
-}
-
 /** A shop's stock, each item gone once bought, and whether its bribe is spent. */
 export interface Shop {
-  wares: Ware[]
+  wares: Gear[]
   relics: RelicId[]
   bribed: boolean
 }
@@ -234,10 +215,8 @@ export interface Run {
   soldiers: Soldier[]
   nextSoldier: number
   supplies: number
-  /** Gear found and not yet equipped or sold, decided in order. */
-  finds: Find[]
-  /** Finds their finders decided alone at the last stop. */
-  decisions: Decision[]
+  /** Gear found and not yet put on a soldier the player picks, or sold. */
+  finds: Gear[]
   nextGear: number
   relics: RelicId[]
   /** Relics to choose from in the reward phase. */
@@ -298,13 +277,16 @@ export function equipped(soldier: Soldier): Gear[] {
   return SLOTS.flatMap((slot) => soldier.gear[slot] ?? [])
 }
 
-/** Equips the first find on the soldier who found it, selling what that soldier had in the slot. */
-export function keepFind(run: Run): void {
-  const { soldier: id, gear } = run.finds.shift()!
-  const soldier = run.soldiers.find((s) => s.id === id)!
+/** Puts `gear` on `soldier`, selling what it had in the slot: gear is never taken off, only replaced. */
+function wear(run: Run, soldier: Soldier, gear: Gear): void {
   const old = soldier.gear[gear.slot]
   if (old) run.supplies += SELL[old.rarity]
   soldier.gear[gear.slot] = gear
+}
+
+/** Equips the find at `index` on `soldier`. */
+export function equipFind(run: Run, index: number, soldier: Soldier): void {
+  wear(run, soldier, run.finds.splice(index, 1)[0])
   settle(run)
 }
 
@@ -316,20 +298,14 @@ export const SHOP_RELICS = 4
 /** Chance a piece of shop gear is epic rather than rare. */
 const SHOP_EPIC = 0.3
 
-/**
- * Stocks a shop: gear, each piece with an effect no other piece there has and fitted to the soldier it suits best, an
- * empty slot first, then the commonest; relics the squad lacks; and a bribe.
- */
+/** Stocks a shop: gear, each piece with an effect no other piece there has; relics the squad lacks; and a bribe. */
 export function stockShop(run: Run): Shop {
-  const wares: Ware[] = []
+  const wares: Gear[] = []
   for (let tries = 0; wares.length < SHOP_WARES && tries < 50; tries++) {
     const gear = generateGear(run, run.nextGear, random(run) < SHOP_EPIC ? 'epic' : 'rare')
-    if (wares.some((w) => w.gear.effect === gear.effect)) continue
+    if (wares.some((w) => w.effect === gear.effect)) continue
     run.nextGear++
-    // The soldier worst equipped in its slot, spread across the squad: each ware already fitted to one counts as a rank.
-    const rank = (s: Soldier) => (s.gear[gear.slot] ? RARITY_RANK[s.gear[gear.slot]!.rarity] + 1 : 0) + wares.filter((w) => w.soldier === s.id).length
-    const fits = run.soldiers.filter((s) => rank(s) === Math.min(...run.soldiers.map(rank)))
-    wares.push({ gear, soldier: fits[randomInt(run, fits.length)].id })
+    wares.push(gear)
   }
   const relics = offerable(run.relics)
   const stocked: RelicId[] = []
@@ -337,19 +313,16 @@ export function stockShop(run: Run): Shop {
   return { wares, relics: stocked, bribed: false }
 }
 
-/** Buys the ware at `index`: its soldier wears it, selling what it replaces. The caller checks it is affordable. */
-export function buyWare(run: Run, index: number): void {
-  const [{ gear, soldier: id }] = run.shop!.wares.splice(index, 1)
-  const soldier = run.soldiers.find((s) => s.id === id)!
+/** Buys the ware at `index` for `soldier` to wear. The caller checks it is affordable. */
+export function buyWare(run: Run, index: number, soldier: Soldier): void {
+  const [gear] = run.shop!.wares.splice(index, 1)
   run.supplies -= GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
-  const old = soldier.gear[gear.slot]
-  if (old) run.supplies += SELL[old.rarity]
-  soldier.gear[gear.slot] = gear
+  wear(run, soldier, gear)
 }
 
-/** Sells the first find. */
-export function sellFind(run: Run): void {
-  run.supplies += SELL[run.finds.shift()!.gear.rarity]
+/** Sells the find at `index`. */
+export function sellFind(run: Run, index: number): void {
+  run.supplies += SELL[run.finds.splice(index, 1)[0].rarity]
   settle(run)
 }
 
@@ -380,19 +353,24 @@ export function mend(run: Run, amount: number): void {
 /** Whether any soldier is below full health. */
 export const wounded = (run: Run) => run.soldiers.some((s) => health(run, s) < soldierStats(run, s).hp)
 
-/** A soldier's stats in battle: base, plus class, level, skills and gear, plus relics. */
+/** A soldier's stats in battle: base, plus class, level, skills, gear and its weapon, plus relics. A melee weapon reaches the next tile. */
 export function soldierStats(run: Run, soldier: Soldier): Stats {
   const stats = { ...BASE_STATS }
+  const weapon = weaponOf(soldier)
   for (const key of Object.keys(stats) as (keyof Stats)[]) {
     const fromClass = soldier.cls ? (CLASSES[soldier.cls].stats[key] ?? 0) : 0
-    const fromGear = equipped(soldier).reduce((sum, gear) => sum + (gear.stats[key] ?? 0), 0)
+    const fromGear = equipped(soldier).reduce((sum, gear) => sum + (gear.stats[key] ?? 0), 0) + (weapon?.stats[key] ?? 0)
     const fromSkills = soldier.skills.reduce((sum, id) => sum + (SKILLS[id].stats?.[key] ?? 0), 0)
     const fromTrait = soldier.trait ? ((TRAITS[soldier.trait] as Trait).stats?.[key] ?? 0) : 0
     stats[key] += fromClass + fromGear + fromSkills + fromTrait + level(soldier) * (LEVEL_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
   }
+  if (weapon?.melee) stats.range = MELEE_RANGE
   for (const id of run.doctrines) Object.assign(stats, (DOCTRINES[id] as Doctrine).set)
   return stats
 }
+
+/** The weapon a soldier wields, if any. */
+export const weaponOf = (soldier: Soldier) => (soldier.gear.weapon?.weapon ? WEAPONS[soldier.gear.weapon.weapon] : null)
 
 /**
  * Adds a recruit to the squad and returns it: a level 1 recruit set on one of its class's paths at random. Under a
@@ -432,7 +410,7 @@ function draft(run: Run, taken: ClassId[]): Soldier {
     cls,
     skills: [PATHS[cls][randomInt(run, 2)].core],
     feats: [],
-    gear: { weapon: null, armor: null, utility: null },
+    gear: { weapon: starterRifle(run.nextGear++), armor: null, utility: null },
     trait: null,
     home: null,
     wounds: 0,
@@ -772,7 +750,6 @@ export function createRun(seed: number): Run {
     nextSoldier: 1,
     supplies: START_SUPPLIES,
     finds: [],
-    decisions: [],
     nextGear: 1,
     relics: [],
     relicOffers: [],
@@ -810,38 +787,9 @@ function rollRarity(run: Run, lucky: boolean): Rarity {
   return roll < RARITY_CHANCE.common ? 'common' : roll < RARITY_CHANCE.common + RARITY_CHANCE.rare ? 'rare' : 'epic'
 }
 
-const RARITY_RANK: Record<Rarity, number> = { common: 0, rare: 1, epic: 2 }
-
-/** What a finder says on deciding a find alone, by whether the slot was empty, the find better, the same as what it wears, or worse. */
-const BLURBS = {
-  empty: ['"Finders keepers."', '"Was this anyone\'s? It\'s mine now."', '"Oh, that\'s going on immediately."', '"Naked no more!"'],
-  better: ['"Upgrade! The old one can go live on a farm."', '"Yes. Yes, you\'ll do."', '"Out with the old, in with the shiny."', '"I deserve this. Don\'t look it up."'],
-  same: ['"Already got one."', '"Twins. One of you goes."', '"Same again? Sell it."', '"I can only hold one of these."'],
-  worse: ['"I have standards."', '"Downgrade? In this economy?"', '"Sell it. Sentiment is for the dead."', '"Mine\'s better. Obviously."'],
-}
-
-/**
- * A piece of gear found by a soldier drawn at random. The finder decides alone, with a word on why: an empty slot or a
- * rarer find is worn, selling what it replaces; a commoner one, or one the same as what it wears, is sold. Another find
- * as rare as what the finder wears waits for the player in run.finds.
- */
+/** A piece of gear found, for the player to put on a soldier or sell. */
 export function dropGear(run: Run, lucky: boolean): void {
-  const gear = generateGear(run, run.nextGear++, rollRarity(run, lucky))
-  const soldier = run.soldiers[randomInt(run, run.soldiers.length)]
-  const old = soldier.gear[gear.slot]
-  const same = !!old && old.effect === gear.effect && JSON.stringify(old.stats) === JSON.stringify(gear.stats)
-  if (old && !same && old.rarity === gear.rarity) {
-    run.finds.push({ soldier: soldier.id, gear })
-    return
-  }
-  const kept = !old || RARITY_RANK[gear.rarity] > RARITY_RANK[old.rarity]
-  const lines = BLURBS[!old ? 'empty' : kept ? 'better' : same ? 'same' : 'worse']
-  const line = lines[randomInt(run, lines.length)]
-  if (kept) {
-    if (old) run.supplies += SELL[old.rarity]
-    soldier.gear[gear.slot] = gear
-  } else run.supplies += SELL[gear.rarity]
-  run.decisions.push({ soldier: soldier.name, gear, kept, line })
+  run.finds.push(generateGear(run, run.nextGear++, rollRarity(run, lucky)))
 }
 
 /** Moves past the stop the squad is at, and takes the way on if there is only one. */
@@ -855,7 +803,6 @@ export function advance(run: Run): void {
   const here = current(run)!.stop!
   const stop = nextStop(run)!
   if (stop === 'shop' || stop === 'unknown' || stop === 'medic') throw new Error('a shop, medic or unknown stop is arrived at, not advanced to')
-  run.decisions = []
   if (stop === 'supply' || stop === 'cache') {
     const before = run.threat
     run.threat = Math.min(run.threat + STOP_THREAT, THREAT_MAX)
@@ -878,8 +825,8 @@ export function advance(run: Run): void {
     hp: health(run, s),
     ability: s.cls && CLASSES[s.cls].ability,
     charges: charges(run, s),
-    stance: doctrines.find((d) => d.stance)?.stance ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
-    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
+    stance: doctrines.find((d) => d.stance)?.stance ?? weaponOf(s)?.stance ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
+    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)].flatMap((w) => w?.effect ?? []),...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))
   const rules = doctrines.flatMap((d) => d.rule ?? [])
   const held = (r: Reserve) => run.captives.includes(r.soldier)

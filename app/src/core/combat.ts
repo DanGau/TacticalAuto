@@ -6,7 +6,6 @@ import { FUEL_DAMAGE } from './twists'
 import {
   crumble,
   onGrid,
-  BASE_STATS,
   SIGHT,
   mechUnit,
   type SkillEffect,
@@ -47,7 +46,10 @@ import {
   SLAYER_DAMAGE,
   SUPPRESS_AIM,
   SURGEON_HEAL,
-  THICK_ARMOR,
+  TITAN_HEALTH,
+  PLATING_ARMOR,
+  MECH_STATS,
+  DRONE_STATS,
   blocked,
   BLAST_RADIUS,
   BURST_DAMAGE,
@@ -796,25 +798,22 @@ function moved(battle: Battle, unit: Unit, path: Tile[], events: GameEvent[]): v
   }
 }
 
-/** A mech's stats, and a light drone's, before its engineer's skills. */
-const MECH_STATS: Stats = { ...BASE_STATS, hp: 8, armor: 1, aim: 0.65, crit: 0.1, range: 4 }
-const DRONE_STATS: Stats = { ...BASE_STATS, hp: 4, damage: 2, aim: 0.65, crit: 0.1, range: 4, move: 6 }
 /** Damage a self-destructing mech does to each alien beside it. */
 const DETONATE_DAMAGE = 4
 
 /**
- * Deploy Mech: once aliens are in sight, an engineer with a deploy left builds a mech beside it, or drones for a swarm,
- * shaped by its skills. It costs no shot.
+ * Deploy Mech: once aliens are in sight, an engineer with a deploy left builds a mech beside it, a frail decoy every
+ * alien that can shoot must shoot, or drones for a swarm, shaped by its skills. It costs no shot.
  */
 function deploy(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
   if (unit.ability !== 'mech' || unit.charges <= 0 || seen.size === 0) return []
   const swarm = has(unit, 'swarm')
   const stats: Stats = swarm ? { ...DRONE_STATS } : { ...MECH_STATS }
-  if (has(unit, 'titan')) Object.assign(stats, { hp: stats.hp + 6, damage: stats.damage + 1 })
-  if (has(unit, 'plating')) stats.armor += 2
+  if (has(unit, 'titan')) Object.assign(stats, { hp: stats.hp + TITAN_HEALTH, damage: stats.damage + 1 })
+  if (has(unit, 'plating')) stats.armor += PLATING_ARMOR
   if (has(unit, 'servos')) Object.assign(stats, { move: stats.move + 2, aim: stats.aim + 0.15 })
-  const granted: [SkillEffect, Effect][] = [['plating', 'taunt'], ['spotter', 'mark'], ['linked', 'inspire'], ['shock', 'snare'], ['detonate', 'detonate']]
-  const effects = granted.flatMap(([skill, effect]) => (has(unit, skill) ? [effect] : []))
+  const granted: [SkillEffect, Effect][] = [['spotter', 'mark'], ['linked', 'inspire'], ['shock', 'snare'], ['detonate', 'detonate']]
+  const effects = [...(swarm ? [] : ['taunt' as const]), ...granted.flatMap(([skill, effect]) => (has(unit, skill) ? [effect] : []))]
   const tiles = freeTilesNear(battle, unit, !swarm ? 1 : has(unit, 'hive') ? 3 : 2)
   if (tiles.length === 0) return []
   unit.charges--
@@ -1446,8 +1445,7 @@ function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, 
     when(unit.armor > 0, 'armored', 1) +
     when(enemy.rooted > 0, 'net', 2) +
     when(enemy.boss, 'bounty', BOUNTY_DAMAGE) +
-    when(unit.fury > 0, 'bloodRite', unit.fury) -
-    (has(enemy, 'thick') ? THICK_ARMOR : 0)
+    when(unit.fury > 0, 'bloodRite', unit.fury)
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0
   const pierced = unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) + when(enemy.chilled > 0, 'frostbreak', 1) > 0
   const left = enemy.hp + (pierced ? 0 : enemy.armor)

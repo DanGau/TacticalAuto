@@ -4,19 +4,41 @@ import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { SKILLS } from '../core/skills'
+import { CLASSES } from '../core/classes'
+import { EFFECTS, type Gear } from '../core/gear'
+import { WEAPONS } from '../core/weapons'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
-import { current, danger, GEAR_PRICE, health, legOf, level, skillOffers, soldierStats, squadKeywords, THREAT_MAX, ways, type Risk, type Run } from '../core/run'
+import { current, danger, GEAR_PRICE, health, legOf, level, skillOffers, soldierStats, squadKeywords, THREAT_MAX, ways, type Risk, type Run, type Soldier } from '../core/run'
 
 /** Chooses the next action whenever the run waits for the player. `rng` is the bot's own, separate from the run's. */
 export type Bot = (run: Run, rng: { rng: number }) => Action
 
 const RARITY_ORDER = ['common', 'rare', 'epic']
 
-/** Keeps a find at least as rare as what its finder has in the slot; sells it otherwise. */
-function decideFind(run: Run): Action {
-  const { soldier, gear } = run.finds[0]
-  const old = run.soldiers.find((s) => s.id === soldier)!.gear[gear.slot]
-  return RARITY_ORDER.indexOf(gear.rarity) >= RARITY_ORDER.indexOf(old?.rarity ?? '') ? { type: 'keep' } : { type: 'sell' }
+/** What a piece of gear is worth on its own: rarer is better, a plain one, such as the starting rifle, least; an empty slot nothing. */
+const value = (gear: Gear | null) => (gear ? 2 * RARITY_ORDER.indexOf(gear.rarity) + (gear.effect || Object.keys(gear.stats).length > 0 ? 1 : 0) : -1)
+
+/**
+ * The soldier a piece of gear does the most for, or null if it does nothing for anyone: the most it raises the slot's
+ * worth, less where a weapon would make its wielder fight against its class's way; a `keen` bot also counts the
+ * keywords it shares with the soldier's skills.
+ */
+function fitFor(run: Run, gear: Gear, keen: boolean): number | null {
+  const gain = (s: Soldier) => {
+    const stance = gear.weapon && WEAPONS[gear.weapon].stance
+    const clash = stance && s.cls && stance !== CLASSES[s.cls].stance ? 1.5 : 0
+    const own = s.skills.flatMap((id) => SKILLS[id].tags ?? [])
+    const shared = keen && gear.effect ? (EFFECTS[gear.effect].tags ?? []).filter((tag) => own.includes(tag)).length : 0
+    return value(gear) - value(s.gear[gear.slot]) - clash + shared
+  }
+  const best = run.soldiers.reduce((a, b) => (gain(b) > gain(a) ? b : a))
+  return gain(best) > 0 ? best.id : null
+}
+
+/** Puts the first find on the soldier it does the most for, or sells it; a `keen` bot weighs keywords too. */
+function decideFind(run: Run, keen: boolean): Action {
+  const soldier = fitFor(run, run.finds[0], keen)
+  return soldier === null ? { type: 'sell', find: 0 } : { type: 'equip', find: 0, soldier }
 }
 
 /** Chooses among `count` offers, given each offer's keywords. */
@@ -33,10 +55,14 @@ const PICKS = {
   },
 } satisfies Record<string, Pick>
 
-/** The reward phase's next choice: a relic, then finds, then skills. */
+/** The reward phase's next choice: a relic, then finds, then skills. A random bot puts a find on anyone, or sells it. */
 function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
   if (run.relicOffers.length > 0) return { type: 'relic', index: pick(run, rng, run.relicOffers.map((id) => RELICS[id].tags ?? [])) }
-  if (run.finds.length > 0) return decideFind(run)
+  if (run.finds.length > 0 && pick === PICKS.random) {
+    const who = randomInt(rng, run.soldiers.length + 1)
+    return who === run.soldiers.length ? { type: 'sell', find: 0 } : { type: 'equip', find: 0, soldier: run.soldiers[who].id }
+  }
+  if (run.finds.length > 0) return decideFind(run, pick === PICKS.synergy)
   const learner = run.soldiers.find((s) => skillOffers(s).length > 0)!
   return { type: 'skill', soldier: learner.id, index: pick(run, rng, skillOffers(learner).map((id) => SKILLS[id].tags ?? [])) }
 }
@@ -69,9 +95,12 @@ const LANDS = {
   fit: (_run, battle) => best(battle, (i) => battle.reserve.filter((r) => suits(r.stance, zoneInfo(battle, battle.zones[i]))).length * 100 + cover(battle, i)),
 } satisfies Record<string, Land>
 
-/** Purchases the run can pay for now: gear, then relics. */
+/** Purchases the run can pay for now: gear, each for the soldier it does the most for, then relics. */
 const affordable = (run: Run): Action[] => [
-  ...run.shop!.wares.flatMap((ware, index): Action[] => (GEAR_PRICE[ware.gear.rarity as keyof typeof GEAR_PRICE] <= run.supplies ? [{ type: 'gear', index }] : [])),
+  ...run.shop!.wares.flatMap((ware, index): Action[] => {
+    const soldier = fitFor(run, ware, false)
+    return GEAR_PRICE[ware.rarity as keyof typeof GEAR_PRICE] <= run.supplies && soldier !== null ? [{ type: 'gear', index, soldier }] : []
+  }),
   ...run.shop!.relics.flatMap((_, index): Action[] => (RELIC_PRICE <= run.supplies ? [{ type: 'buy', index }] : [])),
 ]
 

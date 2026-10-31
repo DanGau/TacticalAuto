@@ -89,7 +89,7 @@ test('an assassination is won when the commander falls, though its guard lives',
   stepBattle(battle)
   expect(battle.winner).toBe('human')
   endBattle(run)
-  expect(run.finds.length + run.decisions.length).toBeGreaterThan(0)
+  expect(run.finds.length).toBeGreaterThan(0)
 })
 
 test('a rescue pays supplies and experience for each civilian saved or alive; a raid pays by the cache grabbed, and costs a threat for each sought beyond the first', () => {

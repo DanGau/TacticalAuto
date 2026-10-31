@@ -1,4 +1,4 @@
-import { LINGER_TURNS, SEARING_DAMAGE, type SkillEffect, type Stats } from './battle'
+import { DRONE_STATS, LINGER_TURNS, PLATING_ARMOR, SEARING_DAMAGE, TITAN_HEALTH, type SkillEffect, type Stats } from './battle'
 import { TUNING } from './tuning'
 import type { ClassId } from './classes'
 import type { Keyword } from './keywords'
@@ -36,7 +36,7 @@ const skills = {
   bulwark: { name: 'Bulwark', tags: ['ward'], text: 'Squadmates within 2 tiles are 10% harder to hit', effect: 'bulwark' },
   overwatch: { name: 'Overwatch', text: 'Shoots at an alien that moves in its sights on the alien turn', effect: 'overwatch' },
   taunt: { name: 'Taunt', text: 'An alien that can shoot it must shoot it', effect: 'taunt' },
-  thick: { name: 'Heavy Armor Master', tags: ['ward'], text: 'Every hit on it does 1 less damage', effect: 'thick' },
+  reactive: { name: 'Reactive Armor', tags: ['ward'], text: '+4 armor', stats: { armor: 4 } },
   steadfast: { name: 'Steadfast', text: 'It cannot be panicked, and acid and explosions do it no harm', effect: 'steadfast' },
   bigBlast: { name: 'Cluster Rocket', text: 'Its rockets blast 2 tiles around where they land', effect: 'bigBlast' },
   concussion: { name: 'Concussive Rounds', tags: ['crit'], text: 'A crit stuns the target, which loses its next action', effect: 'concussion' },
@@ -52,12 +52,12 @@ const skills = {
   volley: { name: 'Volley', text: 'A hit also does half its damage to every alien beside the target', effect: 'volley' },
   ghost: { name: 'Ghost', text: 'Aliens more than 4 tiles away cannot shoot it', effect: 'ghost' },
   // Engineer
-  titan: { name: 'Titan Frame', text: 'Its mech has +6 health and +1 damage', effect: 'titan' },
-  plating: { name: 'Reactive Plating', text: 'Its mech has +2 armor, and an alien that can shoot the mech must', effect: 'plating' },
+  titan: { name: 'Titan Frame', text: `Its mech has +${TITAN_HEALTH} health and +1 damage`, effect: 'titan' },
+  plating: { name: 'Reactive Plating', tags: ['ward'], text: `Its mech has +${PLATING_ARMOR} armor`, effect: 'plating' },
   servos: { name: 'Overclocked Servos', text: 'Its mech has +2 move and +15% aim', effect: 'servos' },
   detonate: { name: 'Self-Destruct', text: 'A destroyed mech of its explodes for 4 damage on every alien beside it', effect: 'detonate' },
   rebuild: { name: 'Field Rebuild', text: 'One more deploy each battle', charges: 1 },
-  swarm: { name: 'Drone Swarm', text: 'Deploys two light drones in place of a mech: 4 health and 2 damage each, but +2 move', effect: 'swarm' },
+  swarm: { name: 'Drone Swarm', text: `Deploys two light drones in place of a mech: ${DRONE_STATS.hp} health and ${DRONE_STATS.damage} damage each, +2 move, and the aliens are free to ignore them`, effect: 'swarm' },
   spotter: { name: 'Spotter Drones', tags: ['mark'], text: 'A target its drones hit is marked', effect: 'spotter' },
   linked: { name: 'Linked Targeting', text: 'Squadmates within 2 tiles of one of its drones have +10% aim', effect: 'linked' },
   hive: { name: 'Hive Mind', text: 'Deploys a third drone', effect: 'hive' },
@@ -115,7 +115,7 @@ export const PATHS: Record<ClassId, [Path, Path]> = {
   ],
   heavy: [
     { name: 'Demolisher', core: 'arsenal', tiers: [['bigBlast', 'shredder'], ['concussion', 'suppression']] },
-    { name: 'Guardian', core: 'bulwark', tiers: [['taunt', 'thick'], ['steadfast', 'overwatch']] },
+    { name: 'Guardian', core: 'bulwark', tiers: [['taunt', 'reactive'], ['steadfast', 'overwatch']] },
   ],
   sniper: [
     { name: 'Marksman', core: 'steady', tiers: [['headshot', 'longshot'], ['doubleTap', 'assassinate']] },

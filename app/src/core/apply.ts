@@ -1,12 +1,12 @@
 import { land, STRIKE } from './battle'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
-import { advance, buyWare, current, GEAR_PRICE, go, keepFind, mend, nextStop, recruit, sellFind, skillOffers, takeRelic, takeSkill, THREAT_MAX, TRAVEL_HEAL, ways, type Run } from './run'
+import { advance, buyWare, current, equipFind, GEAR_PRICE, go, mend, nextStop, recruit, sellFind, skillOffers, takeRelic, takeSkill, THREAT_MAX, TRAVEL_HEAL, ways, type Run } from './run'
 
 export type Action =
   /** At the run's start: take the recruit at `index` of run.recruits as the first soldier. */
   | { type: 'recruit'; index: number }
-  /** Shop: buy the gear at `index` of shop.wares, for the soldier it is fitted to. */
-  | { type: 'gear'; index: number }
+  /** Shop: buy the gear at `index` of shop.wares for the soldier with id `soldier` to wear, selling what it replaces. */
+  | { type: 'gear'; index: number; soldier: number }
   /** Shop: buy the relic at `index` of shop.relics. */
   | { type: 'buy'; index: number }
   /** Shop: pay to lower the threat, once. */
@@ -25,10 +25,10 @@ export type Action =
   | { type: 'grab'; caches: number }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
-  /** Reward phase: equip the first of run.finds on the soldier who found it, selling what it replaces. */
-  | { type: 'keep' }
-  /** Reward phase: sell the first of run.finds. */
-  | { type: 'sell' }
+  /** Reward phase: put the find at `find` of run.finds on the soldier with id `soldier`, selling what it replaces. */
+  | { type: 'equip'; find: number; soldier: number }
+  /** Reward phase: sell the find at `find` of run.finds. */
+  | { type: 'sell'; find: number }
   /** Reward phase: the soldier with id `soldier` learns the skill at `index` of its offers. */
   | { type: 'skill'; soldier: number; index: number }
 
@@ -64,7 +64,7 @@ export function apply(run: Run, action: Action): Result {
     land(battle, zone)
     return ok
   }
-  if (action.type === 'relic' || action.type === 'keep' || action.type === 'sell' || action.type === 'skill') {
+  if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill') {
     if (run.phase !== 'reward') return no('nothing to choose')
     if (action.type === 'relic') {
       const id = run.relicOffers[action.index]
@@ -75,9 +75,13 @@ export function apply(run: Run, action: Action): Result {
       if (!soldier || !skillOffers(soldier)[action.index]) return no('no such skill on offer')
       takeSkill(run, soldier, action.index)
     } else {
-      if (run.finds.length === 0) return no('no gear found')
-      if (action.type === 'keep') keepFind(run)
-      else sellFind(run)
+      if (!run.finds[action.find]) return no('no such find')
+      if (action.type === 'sell') sellFind(run, action.find)
+      else {
+        const soldier = run.soldiers.find((s) => s.id === action.soldier)
+        if (!soldier) return no('no such soldier')
+        equipFind(run, action.find, soldier)
+      }
     }
     return ok
   }
@@ -87,8 +91,10 @@ export function apply(run: Run, action: Action): Result {
     if (action.type === 'gear') {
       const ware = shop.wares[action.index]
       if (!ware) return no('no such gear for sale')
-      if (GEAR_PRICE[ware.gear.rarity as keyof typeof GEAR_PRICE] > run.supplies) return no('not enough supplies')
-      buyWare(run, action.index)
+      const soldier = run.soldiers.find((s) => s.id === action.soldier)
+      if (!soldier) return no('no such soldier')
+      if (GEAR_PRICE[ware.rarity as keyof typeof GEAR_PRICE] > run.supplies) return no('not enough supplies')
+      buyWare(run, action.index, soldier)
     } else if (action.type === 'buy') {
       const relic = shop.relics[action.index]
       if (!relic) return no('no such relic for sale')

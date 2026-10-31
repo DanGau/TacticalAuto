@@ -206,7 +206,10 @@
       .bar .fill { animation: fill 0.9s 1.7s both; }
       .health { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #ff8a8a; }
       .health .bar { flex: 1; height: 6px; margin: 0; }
+      .health .bar { position: relative; }
       .health .bar div { background: #e04848; }
+      .health .bar div.armor { position: absolute; top: 0; height: 100%; background: #ffd166; }
+      .health span.armor { color: #ffd166; }
       @keyframes fill { from { width: var(--from); } to { width: var(--to); } }
       .soldier .who { display: flex; gap: 10px; align-items: center; line-height: 1.2; }
       .soldier .who small { color: #9aa6bd; }
@@ -215,14 +218,7 @@
       .soldier.levelled { animation: levelled 0.8s 2.6s both; }
       .soldier.levelled .portrait { animation: pulse 0.8s 2.6s 2; }
       @keyframes levelled { 40% { border-color: #ffd84d; box-shadow: 0 0 18px #ffd84daa; } }
-      .soldier div.gear.won { margin-top: 6px; padding: 2px 8px; font-size: 12px; animation: deliver 0.7s 3.2s both; }
-      @keyframes deliver { from { opacity: 0; transform: translateY(-90px) scale(1.4) rotate(-6deg); } 70% { opacity: 1; transform: translateY(4px) scale(0.95); } }
-      .sales { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 8px; }
-      .sold { margin: 0; animation: rise 0.4s 3.4s both; }
-      @property --paid-now { syntax: '<integer>'; inherits: false; initial-value: 0; }
-      .chaching { display: inline-block; counter-reset: paid var(--paid-now); animation: chaching 0.6s 3.6s both; }
-      .chaching::after { content: '+' counter(paid) ' supplies'; }
-      @keyframes chaching { from { --paid-now: 0; } 70% { transform: scale(1.4); } to { --paid-now: var(--paid); } }
+      .soldier small.gear { display: block; margin-top: 4px; padding: 1px 6px; font-size: 12px; }
       .stats { width: 100%; margin: 4px 0; font-size: 13px; }
 
       .stats td:nth-child(odd) { color: #9aa6bd; }
@@ -273,9 +269,12 @@
       .choices button br { display: none; }
       button.card { min-height: 110px; }
       button.decide { padding: 12px 20px; }
-      button.gearpick { display: flex; flex-direction: column; gap: 6px; width: 280px; padding: 12px; text-align: left; border: 2px solid #3a465c; }
-      button.gearpick.on { border-color: #ffd166; box-shadow: 0 0 12px #ffd16688; }
-      button.gearpick .gain { margin-top: auto; font-size: 16px; }
+      button.gearpick { display: flex; flex-direction: column; gap: 6px; width: 200px; padding: 12px; text-align: left; border: 2px solid #3a465c; }
+      .loot .said .choices { flex-wrap: wrap; justify-content: center; }
+      button.gearpick .who { display: flex; align-items: center; gap: 8px; }
+      button.gearpick.sell { justify-content: center; align-items: center; }
+      .buyers { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+      .buyers button { padding: 3px 8px; font-size: 12px; }
       button.gearpick .gear small { margin-right: 6px; }
       button.gearpick ~ button.decide, .choices + button.decide { margin-top: 10px; }
       button.rare { border-color: #4da3ff; }

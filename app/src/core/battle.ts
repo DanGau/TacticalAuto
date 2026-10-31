@@ -84,7 +84,6 @@ export const SECOND_WIND_HEAL = 5
 export const SKIRMISH_MOVE = 2
 export const RECKLESS_AIM = 0.2
 export const CLEAVE_DAMAGE = 2
-export const THICK_ARMOR = 1
 export const BIG_BLAST_RADIUS = 2
 export const SLAYER_DAMAGE = 2
 export const GHOST_REACH = 4
@@ -93,6 +92,16 @@ export const BANE_REACH = 3
 export const BANE_AIM = 0.1
 export const DRONE_DAMAGE = 2
 export const DRONE_REACH = 5
+export const LEAP_DAMAGE = 2
+export const HURL_TILES = 3
+export const HURL_DAMAGE = 2
+export const SLAM_HIT = 3
+export const SLAM_TILES = 2
+export const STUN_REACH = 3
+export const FORCE_FIELD_ARMOR = 4
+export const FORCE_FIELD_REACH = 4
+export const TITAN_HEALTH = 3
+export const PLATING_ARMOR = 3
 /** The letters landing zones go by, in battle.zones order. */
 export const ZONE_NAMES = 'ABC'
 /** Landing zones offered to the squad. */
@@ -124,6 +133,10 @@ export interface Stats {
 }
 
 export const BASE_STATS: Stats = { hp: 10, armor: 0, aim: 0.75, damage: 3, range: 5, move: 4, crit: 0.5, close: 0.06 }
+
+/** A mech's stats, a frail decoy the aliens must shoot, and a light drone's, before its engineer's skills. */
+export const MECH_STATS: Stats = { ...BASE_STATS, hp: 3, aim: 0.65, crit: 0.1, range: 4 }
+export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, aim: 0.65, crit: 0.1, range: 4, move: 6 }
 
 /** Something a unit does unprompted beyond moving and shooting; each is described where combat applies it. */
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' | 'napalm' | 'cryo'
@@ -164,7 +177,6 @@ export type SkillEffect =
   | 'reckless'
   | 'cleave'
   | 'taunt'
-  | 'thick'
   | 'steadfast'
   | 'bigBlast'
   | 'concussion'
@@ -189,6 +201,14 @@ export type SkillEffect =
   | 'avalanche'
   | 'permafrost'
   | 'rimeLock'
+  | 'leap'
+  | 'hurl'
+  | 'slam'
+  | 'warcry'
+  | 'emp'
+  | 'flashbang'
+  | 'forceField'
+  | 'firewall'
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'podBlast' | 'podShred' | 'podFrost' | 'podWall' | 'podTurret' | 'dropPods' | 'canopies' | 'ghost' | 'killzone' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */

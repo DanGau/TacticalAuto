@@ -12,7 +12,7 @@ export const KEYWORDS: Record<Keyword, { name: string; icon: string; text: strin
   mark: { name: 'Mark', icon: '🎯', text: `Every hit on a marked unit does ${TUNING.markDamage} more damage` },
   crit: { name: 'Crit', icon: '💥', text: 'A crit does 2 more damage; only a target without cover against the shot can be crit' },
   kill: { name: 'Kill', icon: '💀', text: 'Pays off when the soldier kills' },
-  ward: { name: 'Ward', icon: '🛡️', text: 'Armor, which takes damage before health' },
+  ward: { name: 'Ward', icon: '🛡️', text: 'Armor: temporary health that takes damage first and is whole again each fight' },
 }
 
 /** A keyword an alien shrugs off, so a squad built on it must answer that alien some other way. */

@@ -1,4 +1,4 @@
-import type { Ability, Stance, Stats } from './battle'
+import { MECH_STATS, type Ability, type Stance, type Stats } from './battle'
 
 /** What a soldier becomes at first promotion: stat changes, a way of positioning, and one ability used unprompted. */
 export interface SoldierClass {
@@ -17,7 +17,7 @@ export interface SoldierClass {
 const classes = {
   assault: {
     name: 'Assault',
-    stats: { range: -2, damage: 1, close: 0.06, hp: 1 },
+    stats: { damage: 1, hp: 1, move: 1 },
     stance: 'rush',
     stanceText: 'Closes in for the surest shot, whatever the exposure',
     ability: 'runAndGun',
@@ -37,7 +37,7 @@ const classes = {
   },
   sniper: {
     name: 'Sniper',
-    stats: { range: 2, move: -1, damage: 1, crit: 0.25, close: -0.06, hp: -1 },
+    stats: { move: -1, damage: 1, crit: 0.25, hp: -1 },
     stance: 'standoff',
     stanceText: 'Hangs back out of reach and shoots from a distance',
     ability: 'squadsight',
@@ -62,7 +62,7 @@ const classes = {
     stanceText: 'Fights from cover while its machines take the front',
     ability: 'mech',
     abilityName: 'Deploy Mech',
-    abilityText: 'Once per battle, once aliens are in sight, deploys a combat mech beside it that fights for the squad until destroyed, and still shoots',
+    abilityText: `Once per battle, once aliens are in sight, deploys a frail combat mech beside it, ${MECH_STATS.hp} health, that every alien able to shoot it must shoot, and still shoots`,
     charges: 1,
   },
   pyro: {
@@ -77,7 +77,7 @@ const classes = {
   },
   cryo: {
     name: 'Cryo',
-    stats: { range: 1 },
+    stats: { aim: 0.05 },
     stance: 'standoff',
     stanceText: 'Hangs back and slows whatever comes on',
     ability: 'cryo',

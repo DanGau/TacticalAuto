@@ -67,8 +67,6 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   let open: number | null = null
   /** The stop ahead the player clicked to look at, before setting out for it. */
   let picked: number | null = null
-  /** How the player picked to settle the find on screen, before confirming. */
-  let gear: 'keep' | 'sell' | null = null
   let shown: Run | null = null
   /** Whether the player has left the title screen, and the recruit picked before confirming. */
   let started = false
@@ -78,8 +76,8 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
   /** The report whose joining hero has been met, and the soldier whose skill choice is open. */
   let met: Report | null = null
   let ability: number | null = null
-  /** The crates opened on the debrief shown, whether a pop-up has been over it, and the crate open now. */
-  let opened: { report: Report | null; crates: Set<number>; still: boolean } = { report: null, crates: new Set(), still: false }
+  /** The debrief shown, whether a pop-up has been over it, and the crate open now, by index into run.finds. */
+  let opened: { report: Report | null; still: boolean } = { report: null, still: false }
   let crate: number | null = null
   let html = ''
 
@@ -98,14 +96,15 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     // After a fight: a hero joining, then the debrief, where each soldier owed a skill chooses it, then the rewards.
     if (report && seen !== report && report.soldiers.length > 0) {
       if (report.hired && met !== report) return joined(run, report.hired)
-      if (opened.report !== report) opened = { report, crates: new Set(), still: false }
+      if (opened.report !== report) opened = { report, still: false }
       const learner = run.soldiers.find((s) => s.id === ability && skillOffers(s).length > 0)
+      const find = crate !== null && run.finds[crate] ? crate : null
       // A pop-up opened over it leaves the debrief at rest behind: nothing in it plays again.
-      if (learner || crate !== null) opened.still = true
-      const debrief = stopReport(run, report, opened.crates, opened.still)
-      return learner ? debrief + modal(skillChoice(run, learner)) : crate !== null ? debrief + loot(run, crate) : debrief
+      if (learner || find !== null) opened.still = true
+      const debrief = stopReport(run, report, opened.still)
+      return learner ? debrief + modal(skillChoice(run, learner)) : find !== null ? debrief + loot(run, find) : debrief
     }
-    if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run, gear)}`
+    if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run)}`
     if (run.phase === 'shop' || run.phase === 'event') {
       // Arriving shows the shop or event; the other tabs stay open to the player while they decide.
       if (phase !== run.phase) tab = 'Map'
@@ -243,10 +242,6 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     else if (target.dataset.met) met = shown!.report
     else if (target.dataset.ability) ability = Number(target.dataset.ability)
     else if (target.dataset.crate) crate = Number(target.dataset.crate)
-    else if (target.dataset.shut) {
-      opened.crates.add(Number(target.dataset.shut))
-      crate = null
-    }
     else if (target.dataset.tab) tab = target.dataset.tab as Tab
     else if (target.dataset.pick) {
       // A stop tapped once is picked to look at; tapped again, the squad sets out for it.
@@ -260,14 +255,13 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
       })
     }
     else if (target.dataset.in !== undefined) return setIn()
-    else if (target.dataset.gear) gear = target.dataset.gear as 'keep' | 'sell'
     else if (target.dataset.open) {
       // Clicking the soldier open closes it.
       const id = Number(target.dataset.open)
       open = open === id ? null : id
     } else if (target.dataset.action) {
       picked = null
-      gear = null
+      crate = null
       act(JSON.parse(target.dataset.action) as Action)
       return
     }

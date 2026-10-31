@@ -15,7 +15,7 @@ import { addRoof } from './roofs'
 import { buildChasm } from './chasm'
 import { blob, css, ditherable, shade, Shapes, Sketch, type Point3 } from './shapes'
 import { ACROSS, LEVEL, PITCH, TILE_H, TILE_W, tall, YAW } from './space'
-import { weaponOf, type Weapon } from './weapons'
+import { attackOf, type Attack } from './attacks'
 
 export const WIDTH = 1280
 export const HEIGHT = 720
@@ -1183,7 +1183,7 @@ export async function createView(): Promise<View> {
   }
 
   /** Projectiles fly from the muzzle at `a` to each of `ends`. */
-  function fire(fx: Sketch, a: Tile, ends: Tile[], gun: Weapon): Promise<void> {
+  function fire(fx: Sketch, a: Tile, ends: Tile[], gun: Attack): Promise<void> {
     const total = gun.ms + gun.stagger * (ends.length - 1)
     return tween(total, (t) => {
       fx.clear()
@@ -1220,7 +1220,7 @@ export async function createView(): Promise<View> {
   }
 
   /** The attacker winds back, lunges in, rakes the target with a slash per bolt, and steps back. */
-  async function strike(fx: Sketch, from: Sprite, to: Sprite, gun: Weapon, ends: Tile[], hit: boolean): Promise<void> {
+  async function strike(fx: Sketch, from: Sprite, to: Sprite, gun: Attack, ends: Tile[], hit: boolean): Promise<void> {
     const home = toWorld(from.tile.x, from.tile.y)
     const dx = to.at.x - home.x
     const dy = to.at.y - home.y
@@ -1261,7 +1261,7 @@ export async function createView(): Promise<View> {
    * A shot plays as its weapon: the projectile or lunge, then on a hit a freeze on the blow with the target squashed and
    * flashing, a camera jolt, a knockback and sparks, all harder on a crit. A miss sails past and ricochets.
    */
-  async function shoot(fx: Sketch, from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: [number, number], gun: Weapon): Promise<void> {
+  async function shoot(fx: Sketch, from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: [number, number], gun: Attack): Promise<void> {
     const { hit, crit } = e
     const a = chest(from)
     // A miss flies past above the target.
@@ -1484,7 +1484,7 @@ export async function createView(): Promise<View> {
         if (!from || !to) continue
         const shooter = battle.units.find((u) => u.id === e.id)!
         const after = vitals(battle, e.target)
-        await drawing((fx) => shoot(fx, from, to, e, after, weaponOf(shooter, soldiers.find((s) => s.id === shooter.soldier)?.cls ?? null, blademasters)))
+        await drawing((fx) => shoot(fx, from, to, e, after, attackOf(shooter, soldiers.find((s) => s.id === shooter.soldier)?.gear.weapon?.weapon ?? null, blademasters)))
         // Crumbling cover has already broken in the battle; show it as the hit lands.
         if (battle.twist === 'crumbling' && e.damage > 0) drawTerrain(battle)
       } else if (e.type === 'rocket') {

@@ -2,16 +2,22 @@ import type { GearEffect, Stats } from './battle'
 import type { Rarity } from './base'
 import type { Keyword } from './keywords'
 import { randomInt } from './rng'
+import { WEAPONS, type WeaponId } from './weapons'
 
 export const SLOTS = ['weapon', 'armor', 'utility'] as const
 export type Slot = (typeof SLOTS)[number]
 
-/** A piece of gear: a base that names it, and one thing it does. A common has a stat mod; a rare, a simple effect; an epic, an elaborate one. */
+/**
+ * A piece of gear: a base that names it, and one thing it does. A common has a stat mod; a rare, a simple effect; an
+ * epic, an elaborate one. On the weapon slot the base is a weapon, which does what weapons.ts says on top.
+ */
 export interface Gear {
   id: number
   slot: Slot
   rarity: Rarity
   name: string
+  /** The weapon it is, on the weapon slot. */
+  weapon?: WeaponId
   /** Added to the stats of the soldier it is equipped to. */
   stats: Partial<Stats>
   effect: GearEffect | null
@@ -23,8 +29,7 @@ interface Mod {
   stats: Partial<Stats>
 }
 
-const BASES: Record<Slot, string[]> = {
-  weapon: ['Carbine', 'Repeater', 'Lancer', 'Blaster', 'Longarm'],
+const BASES: Record<Exclude<Slot, 'weapon'>, string[]> = {
   armor: ['Vest', 'Plate', 'Weave', 'Harness'],
   utility: ['Rig', 'Module', 'Kit', 'Charm'],
 }
@@ -82,15 +87,21 @@ export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: str
   null: { slot: 'utility', prefix: 'Null', text: 'Aliens within 3 tiles of the carrier cannot spit, panic, spawn or burst' },
 }
 
-/** A new piece of gear of the given rarity, in a random slot. */
+/** The plain assault rifle every soldier starts with. */
+export const starterRifle = (id: number): Gear => ({ id, slot: 'weapon', rarity: 'common', name: WEAPONS.rifle.name, weapon: 'rifle', stats: {}, effect: null })
+
+/** A new piece of gear of the given rarity, in a random slot; on the weapon slot, any weapon but the rifle every soldier starts with. */
 export function generateGear(rng: { rng: number }, id: number, rarity: Rarity): Gear {
   const pick = <T>(options: T[]): T => options[randomInt(rng, options.length)]
   const slot = pick([...SLOTS])
-  const base = pick(BASES[slot])
+  const weapon = slot === 'weapon' ? pick((Object.keys(WEAPONS) as WeaponId[]).filter((w) => w !== 'rifle')) : undefined
+  const base = weapon ? WEAPONS[weapon].name : pick(BASES[slot as Exclude<Slot, 'weapon'>])
+  const kind = weapon ? { weapon } : {}
   if (rarity === 'common') {
-    const mod = pick(MODS[slot])
-    return { id, slot, rarity, name: `${mod.prefix} ${base}`, stats: { ...mod.stats }, effect: null }
+    // Range is no mod for a melee weapon, which reaches the next tile whatever.
+    const mod = pick(MODS[slot].filter((m) => !(weapon && WEAPONS[weapon].melee && 'range' in m.stats)))
+    return { id, slot, rarity, name: `${mod.prefix} ${base}`, ...kind, stats: { ...mod.stats }, effect: null }
   }
   const effect = pick((Object.keys(EFFECTS) as GearEffect[]).filter((e) => EFFECTS[e].slot === slot && !!EFFECTS[e].epic === (rarity === 'epic')))
-  return { id, slot, rarity, name: `${EFFECTS[effect].prefix} ${base}`, stats: {}, effect }
+  return { id, slot, rarity, name: `${EFFECTS[effect].prefix} ${base}`, ...kind, stats: {}, effect }
 }

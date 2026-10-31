@@ -11,7 +11,6 @@ import { PATHS, SKILLS } from '../core/skills'
 import { TWISTS } from '../core/twists'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
-import { decisions } from './aftermath'
 import { alienName, badge, button, describe, gearCard, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
@@ -133,15 +132,17 @@ function where(run: Run, stop: Stop): string {
   return `${GOALS[stop.goal].name} · ${RISKS[stop.risk].name}${stop.twist ? ` · ${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}` : ''}`
 }
 
-/** A shop: gear fitted to a soldier, relics, a bribe, and the way out. */
+/** A shop: gear, each with a button per soldier to buy it for, relics, a bribe, and the way out. */
 function shopView(run: Run): string {
   const shop = run.shop!
   const held = squadKeywords(run)
-  const wares = shop.wares.map(({ gear, soldier: id }, index) => {
-    const soldier = run.soldiers.find((s) => s.id === id)!
-    const old = soldier.gear[gear.slot]
+  const wares = shop.wares.map((gear, index) => {
     const price = GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
-    return button({ type: 'gear', index }, `${gearCard(gear, held)}<br><small>for ${soldier.name}${old ? `, replacing ${old.name}` : ''} · ${price} supplies</small>`, `card gear ${gear.rarity}`, price <= run.supplies)
+    const buyers = run.soldiers.map((s) => {
+      const old = s.gear[gear.slot]
+      return button({ type: 'gear', index, soldier: s.id }, `${badge(s.cls)} ${s.name}`, 'buyer', price <= run.supplies, old ? `Replaces ${old.name}` : `Empty ${gear.slot} slot`)
+    })
+    return `<div class="card gear ${gear.rarity}">${gearCard(gear, held)}<br><small>${price} supplies, for:</small><div class="buyers">${buyers.join('')}</div></div>`
   })
   const relics = shop.relics.map((id, index) =>
     `<div class="buy">${button({ type: 'buy', index }, `<small>relic · ${RELIC_PRICE} supplies</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic', RELIC_PRICE <= run.supplies)}</div>`,
@@ -168,13 +169,12 @@ function mapView(run: Run, picked: number | null): string {
   const node = current(run)
   const ahead = picked !== null && ways(run).includes(picked) ? legOf(run).columns[run.stop][picked].stop : null
   // Flight: the map fills the screen; what a stop holds shows over it once picked or reached.
-  const choices = run.report ? '' : decisions(run)
-  if (!node && !ahead) return `${choices}${runMap(run, null)}`
+  if (!node && !ahead) return runMap(run, null)
   const brief = (text: string) => (text ? `<div class="stopcard">${text}</div>` : '')
-  if (!node) return `${choices}${brief(where(run, ahead!))}${runMap(run, picked)}`
+  if (!node) return `${brief(where(run, ahead!))}${runMap(run, picked)}`
   const next = nextStop(run)!
   const here = node.stop!
-  return `${choices}${brief(next === 'recovery' ? '<b class="up">Recover your soldiers</b>' : next === 'ambush' ? '<b class="up">Ambushed: survive</b>' : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
+  return `${brief(next === 'recovery' ? '<b class="up">Recover your soldiers</b>' : next === 'ambush' ? '<b class="up">Ambushed: survive</b>' : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
     ${runMap(run, null)}`
 }
 
@@ -200,7 +200,7 @@ function soldierCard(run: Run, soldier: Soldier, open: number | null): string {
   return `<button class="soldier who ${open === soldier.id ? 'chosen' : ''}" data-open="${soldier.id}">
     <small>Level ${r}${cls ? ` · ${cls.name}` : ''}</small><br><b>${soldier.name}</b>
     <div class="bar"><div style="width: ${filled}%"></div></div>
-    ${healthBar(health(run, soldier), soldierStats(run, soldier).hp)}
+    ${healthBar(health(run, soldier), soldierStats(run, soldier).hp, soldierStats(run, soldier).armor)}
     ${slots.join('')}
   </button>`
 }
@@ -231,7 +231,7 @@ function details(run: Run, soldier: Soldier): string {
 /** The squad as short cards, and below them the details of the soldier opened. */
 function barracksView(run: Run, open: number | null): string {
   const soldier = run.soldiers.find((s) => s.id === open)
-  return `<div class="squad">${run.soldiers.map((s) => soldierCard(run, s, open)).join('')}</div>${soldier ? details(run, soldier) : '<h2>Click a soldier for details. Gear is equipped when found.</h2>'}`
+  return `<div class="squad">${run.soldiers.map((s) => soldierCard(run, s, open)).join('')}</div>${soldier ? details(run, soldier) : '<h2>Click a soldier for details.</h2>'}`
 }
 
 /**

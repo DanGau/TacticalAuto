@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util'
 import { bots } from '../bots/bots'
 import { apply } from '../core/apply'
 import { CIVILIANS, type Goal } from '../core/goals'
-import { generateGear, SLOTS } from '../core/gear'
+import { generateGear, SLOTS, type Gear, type Slot } from '../core/gear'
 import { offerable } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { atKey, begun, road } from '../core/roads'
@@ -20,6 +20,14 @@ import { ENCOUNTER_BANDS, type Encounter, type Squad } from './report'
  * as many soldiers as the leg has, a weak one at the levels a careless run reaches with no gear, a strong one levelled
  * up, in rare gear, with a relic a leg.
  */
+/** A rare piece of gear for `slot`. */
+function rare(run: Run, slot: Slot): Gear {
+  for (;;) {
+    const gear = generateGear(run, run.nextGear++, 'rare')
+    if (gear.slot === slot) return gear
+  }
+}
+
 function encounter(seed: number, mission: Encounter, leg: number, squad: Squad): { won: boolean; rescued: number | null; hurt: number } {
   const run = begun(seed)
   run.soldiers[0].skills.splice(1)
@@ -30,7 +38,7 @@ function encounter(seed: number, mission: Encounter, leg: number, squad: Squad):
     soldier.xp = xpFor(levels)
     // Skills owed are learned at random.
     while (skillOffers(soldier).length > 0) soldier.skills.push(skillOffers(soldier)[randomInt(run, 2)])
-    if (squad === 'strong') for (const slot of SLOTS) soldier.gear[slot] = { ...generateGear(run, run.nextGear++, 'rare'), slot }
+    if (squad === 'strong') for (const slot of SLOTS) soldier.gear[slot] = rare(run, slot)
   }
   if (squad === 'strong') for (let i = 0; i <= leg; i++) run.relics.push(offerable(run.relics)[randomInt(run, offerable(run.relics).length)])
   run.phase = 'overworld'
