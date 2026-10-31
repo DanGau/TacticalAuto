@@ -29,7 +29,7 @@ export interface Look {
   roof: RoofStyle[]
 }
 
-export type TreeStyle = 'round' | 'pine' | 'palm' | 'cypress' | 'blossom' | 'acacia'
+type TreeStyle = 'round' | 'pine' | 'palm' | 'cypress' | 'blossom' | 'acacia'
 export type FenceStyle = 'picket' | 'hedge' | 'stone' | 'rail' | 'bamboo' | 'iron'
 
 export const LOOKS: Record<RegionId, Look> = {

@@ -76,10 +76,10 @@ export function gearText(gear: Gear): string {
 }
 
 /** Words that explain themselves on hover. */
-export const tip = (label: string, text: string) => `<span class="tip" title="${text}">${label}</span>`
+const tip = (label: string, text: string) => `<span class="tip" title="${text}">${label}</span>`
 
 /** A keyword's chip: its icon and name, lit if the squad has it, explained on hover. */
-export const keywordChip = (tag: Keyword, held = false) => `<span class="kw ${tag} ${held ? 'held' : ''}" title="${KEYWORDS[tag].name}: ${KEYWORDS[tag].text}">${KEYWORDS[tag].icon} ${KEYWORDS[tag].name}</span>`
+const keywordChip = (tag: Keyword, held = false) => `<span class="kw ${tag} ${held ? 'held' : ''}" title="${KEYWORDS[tag].name}: ${KEYWORDS[tag].text}">${KEYWORDS[tag].icon} ${KEYWORDS[tag].name}</span>`
 
 /** A keyword something shrugs off: its icon struck through, explained on hover. */
 export const resistChip = (tag: Resist) => `<span class="kw ${tag} resist" title="Resists ${KEYWORDS[tag].name}: ${RESISTS[tag]}">${KEYWORDS[tag].icon}</span>`

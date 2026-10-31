@@ -9,7 +9,7 @@ export const YAW = Math.PI / 4
 export const PITCH = Math.asin(TILE_H / TILE_W)
 /** Screen pixels per world unit at zoom 1: across the screen, and for a height straight up. */
 export const ACROSS = TILE_W / Math.SQRT2
-export const UPRIGHT = ACROSS * Math.cos(PITCH)
+const UPRIGHT = ACROSS * Math.cos(PITCH)
 /** World units a height of `px` screen pixels stands, seen from the still camera. */
 export const tall = (px: number) => px / UPRIGHT
 /** World units a tile rises for each level of height. */

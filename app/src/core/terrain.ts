@@ -45,7 +45,7 @@ export const ZONE_TERRAINS = ['town', 'city', 'countryside', 'industrial', 'ruin
 export type TerrainKind = (typeof ZONE_TERRAINS)[number] | 'compound' | 'hive'
 
 /** What the player is told about each kind of place. */
-export const TERRAIN_TEXT: Record<TerrainKind, { name: string; text: string }> = {
+const TERRAIN_TEXT: Record<TerrainKind, { name: string; text: string }> = {
   town: { name: 'Town', text: 'houses, parks, a market or a square' },
   city: { name: 'City', text: 'buildings close together; cover everywhere' },
   countryside: { name: 'Countryside', text: 'open fields and orchards; cover is scarce' },
@@ -64,7 +64,7 @@ export interface Locale {
 }
 
 /** A rectangle of tiles, edges included. */
-export interface Rect {
+interface Rect {
   x1: number
   y1: number
   x2: number
@@ -75,7 +75,7 @@ type Place = 'house' | 'warehouse' | 'ruin' | 'park' | 'orchard' | 'graveyard' |
 
 /** Each kind of zone place as a plot: how many roads cross it each way, and what its lots may hold, likelier if listed more. */
 /** The overall shape a plot is laid over, which decides where the fighting funnels: see `layouts` below. */
-export type Layout = 'grid' | 'river' | 'coast' | 'crater' | 'lanes'
+type Layout = 'grid' | 'river' | 'coast' | 'crater' | 'lanes'
 
 /** Each kind of zone place as a plot: how many roads cross it each way, what its lots may hold, and the shapes it may take, likelier if listed more. */
 const PLOTS: Record<(typeof ZONE_TERRAINS)[number], { roads: [number, number]; places: Place[]; layouts: Layout[] }> = {

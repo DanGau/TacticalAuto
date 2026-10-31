@@ -77,7 +77,7 @@ export const INSPIRE_AIM = 0.1
 export const HEADSHOT_DAMAGE = 2
 export const REVIVE_REACH = 3
 export const REVIVE_HEALTH = 3
-export const BARRIER_ARMOR = 2
+const BARRIER_ARMOR = 2
 export const SURGEON_HEAL = 3
 export const FEAST_HEAL = 2
 export const PHOENIX_HEALTH = 5
@@ -314,7 +314,7 @@ export type Order = 'hunker' | 'prepare' | 'sprint'
 export const HUNKER_DEFENSE = 0.3
 
 /** A group of aliens. It patrols toward its waypoint, unseen, until a soldier sights a member; then it fights. */
-export interface Pod {
+interface Pod {
   /** The name of its pack. */
   name: string
   /** Seen by the squad: drawn, and shot at. */
@@ -429,7 +429,7 @@ export interface Battle {
   captives: Reserve[]
 }
 
-export interface Downed {
+interface Downed {
   soldier: number
   x: number
   y: number
@@ -453,10 +453,10 @@ export const HIGH_SIGHT = 2
 /** Aim a shot gains for each level the shooter stands above its target, and loses for each below. */
 export const HIGH_AIM = 0.1
 /** Move a step costs beyond its one tile for each level it climbs. */
-export const CLIMB = 2
+const CLIMB = 2
 
 /** Move a step onto caltrops costs beyond its one tile. */
-export const CALTROP_COST = 2
+const CALTROP_COST = 2
 
 /** What a step between neighbouring tiles costs of a unit's move: one tile, CLIMB more for each level up, and more onto caltrops. */
 export const stepCost = (battle: Battle, from: Tile, to: Tile) =>
@@ -679,7 +679,7 @@ export function spacedTile(battle: Battle, avoid: Tile[], clearance: number, wit
  */
 export const INNER = 7
 const EDGE_GAP = 2
-export type Within = 'anywhere' | 'inner' | 'edge'
+type Within = 'anywhere' | 'inner' | 'edge'
 
 const inPart = (depth: number, within: Within) => within === 'anywhere' || (within === 'inner' ? depth > INNER : depth >= EDGE_GAP && depth <= INNER)
 
@@ -767,7 +767,7 @@ export const PLANS: Record<Plan, { name: string; icon: string; text: string }> =
 export type Plan = 'march' | 'hot' | 'stealth' | 'decap' | 'overwatch' | 'bait' | 'uplink'
 
 /** The supply caches a raid can grab, at most. */
-export const CACHES = 3
+const CACHES = 3
 
 /**
  * Lands the whole squad on the free tiles nearest the zone's centre, as the zone's plan has it, and begins the battle.

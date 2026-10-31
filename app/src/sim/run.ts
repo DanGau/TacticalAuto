@@ -21,7 +21,7 @@ export interface RunResult {
 }
 
 /** More player actions than any run takes: a run past it is stuck, and fails instead of hanging. */
-export const MAX_ACTIONS = 10000
+const MAX_ACTIONS = 10000
 
 /**
  * Plays a run to its end, taking each action from `next` when the run waits for the player, and in a battle once each

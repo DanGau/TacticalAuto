@@ -11,7 +11,7 @@ export interface City {
 }
 
 /** A continent the squad can cross: the ways its towns are built, and the cities a hero may wait in. */
-export interface Continent {
+interface Continent {
   name: string
   regions: RegionId[]
   cities: City[]

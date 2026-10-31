@@ -26,7 +26,7 @@ export interface Attack {
 
 const base = { core: 0xffffff, width: 3, ms: 160, bolts: 1, spread: 0, stagger: 0, flash: 7, hitstop: 40, shake: 0, kick: 3, sparks: 5 }
 
-export const ATTACKS = {
+const ATTACKS = {
   rifle: { ...base, style: 'bolt', color: 0xffd84d },
   shotgun: { ...base, style: 'bolt', color: 0xffb347, width: 2, ms: 110, bolts: 6, spread: 26, flash: 14, hitstop: 60, shake: 4, kick: 8, sparks: 10 },
   smg: { ...base, style: 'bolt', color: 0xfff0a0, width: 2, ms: 100, bolts: 3, spread: 6, stagger: 45, flash: 7, kick: 3, sparks: 5 },

@@ -15,7 +15,7 @@ import { globe, type Pin } from './globe'
 import { alienName, badge, button, describe, gearCard, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
-export const TABS = ['Map', 'Base', 'Barracks'] as const
+const TABS = ['Map', 'Base', 'Barracks'] as const
 export type Tab = (typeof TABS)[number]
 
 

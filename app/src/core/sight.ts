@@ -89,11 +89,11 @@ export function sees(battle: Battle, from: Tile, to: Tile): boolean {
  * Tiles within which a unit notices an enemy not yet seen, before cover and stillness hide the enemy: a soldier
  * scouting, or an alien on patrol, idler.
  */
-export const DETECT = 20
-export const PATROL_DETECT = 5
+const DETECT = 20
+const PATROL_DETECT = 5
 /** Tiles of DETECT an enemy in cover against the watcher subtracts, and one that held still since its last turn. */
-export const HIDE_COVER = 2
-export const HIDE_STILL = 1
+const HIDE_COVER = 2
+const HIDE_STILL = 1
 
 /**
  * Whether `from` notices `to`, an enemy not yet seen: within DETECT or PATROL_DETECT, less at night, farther from higher ground, nearer when the

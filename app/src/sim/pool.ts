@@ -31,7 +31,7 @@ const CALM_MS = 10_000
 const MB = 1024 * 1024
 const log = (line: string) => console.error(`sim pool: ${line}`)
 
-export interface PoolOptions {
+interface PoolOptions {
   threads?: number
   doctrines?: DoctrineId[]
   /** Memory, in MB, the sim processes together may hold before the pool shrinks. */

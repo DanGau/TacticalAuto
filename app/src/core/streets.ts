@@ -18,7 +18,7 @@ export type Way = 'land' | 'street' | 'canal' | 'square' | 'median'
  * - `hutongs`: long lanes running east to west between arterials, as Beijing's.
  * - `plots`: a tight grid of small, even plots, as a township's.
  */
-export type StreetPlan = 'grid' | 'freeway' | 'cul-de-sacs' | 'winding' | 'alleys' | 'star' | 'rings' | 'chamfered' | 'superblocks' | 'lanes' | 'hutongs' | 'plots'
+type StreetPlan = 'grid' | 'freeway' | 'cul-de-sacs' | 'winding' | 'alleys' | 'star' | 'rings' | 'chamfered' | 'superblocks' | 'lanes' | 'hutongs' | 'plots'
 
 /** How a street plan is drawn: its streets' width and their spacing, and how much longer blocks run down y than across x. */
 export interface Streets {

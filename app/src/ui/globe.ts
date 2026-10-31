@@ -16,7 +16,7 @@ const MIN_REACH = 3
 const RAD = Math.PI / 180
 
 /** The window the globe is seen through, in pixels, and how much of its top and bottom the page covers. */
-export interface Size {
+interface Size {
   w: number
   h: number
   top?: number

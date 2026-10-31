@@ -14,7 +14,7 @@ import { shade, type Point3, type Shapes } from './shapes'
 export type RoofStyle = 'flat' | 'clutter' | 'gable' | 'hip' | 'eaves' | 'mansard' | 'dome' | 'tin'
 
 /** A building's rectangle of tiles, edges included, and the height its roof starts at. */
-export interface Footing {
+interface Footing {
   x1: number
   y1: number
   x2: number

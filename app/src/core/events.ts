@@ -24,7 +24,7 @@ export const RELIC_PRICE = 8
 /** What a shop's bribe costs, and the threat it takes away. */
 export const BRIBE = { price: 3, threat: 6 }
 /** How likely an unknown stop is to be a battle, and a shop; otherwise it is an event. */
-export const UNKNOWN_CHANCE = { battle: 0.3, shop: 0.3 }
+const UNKNOWN_CHANCE = { battle: 0.3, shop: 0.3 }
 
 const raise = (run: Run, threat: number) => (run.threat = Math.max(0, Math.min(run.threat + threat, THREAT_MAX)))
 /** Adopts a doctrine; a weapon doctrine sets aside the one the squad fought with. */

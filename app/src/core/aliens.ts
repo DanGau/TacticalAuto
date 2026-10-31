@@ -37,9 +37,9 @@ export type AlienKind =
 
 /** How much of a threat an alien is, as the map tells it before the fight. */
 export const DANGERS = ['small', 'medium', 'large'] as const
-export type Danger = (typeof DANGERS)[number]
+type Danger = (typeof DANGERS)[number]
 
-export interface AlienType {
+interface AlienType {
   name: string
   text: string
   danger: Danger
@@ -225,7 +225,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
 }
 
 /** Hit chance each step of an alien's weapon adds. */
-export const WEAPON_AIM = 0.05
+const WEAPON_AIM = 0.05
 
 /**
  * An alien's stats: its kind's, with the equipment given. A kind's health is the same all game; what grows is its
