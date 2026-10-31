@@ -94,12 +94,6 @@ function title(report: Report): string {
   return `<h1 class="${report.won ? 'down' : 'up'}">${name} ${report.won ? 'won' : 'lost'}</h1>`
 }
 
-/** The first find on a screen of its own, and who takes it. */
-function findChoice(run: Run): string {
-  const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
-  return `<h2>Gear found. Who takes it?${more}</h2><div class="gear ${run.finds[0].rarity}">${gearCard(run.finds[0], squadKeywords(run))}</div>${takers(run, 0)}`
-}
-
 /** A skill for a soldier to learn: one of each role its tree has opened, each told by what it does now and nothing after. */
 export function skillChoice(run: Run, soldier: Soldier): string {
   const held = squadKeywords(run)
@@ -108,17 +102,20 @@ export function skillChoice(run: Run, soldier: Soldier): string {
     <div class="choices">${skillOffers(soldier).map(card).join('')}</div>`
 }
 
-/** The next choice of the reward phase, alone on its screen: a relic, then each find, then each skill owed. */
+/** The next choice of the reward phase, alone on its screen: a relic, then each find and who takes it, then each skill owed. */
 export function choice(run: Run): string {
   const held = squadKeywords(run)
   const relic = (id: RelicId, index: number) => button({ type: 'relic', index }, `<small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic')
   if (run.relicOffers.length > 0) return `<h2>Alien artifacts lie in the wreckage. The squad can carry one, and keeps it for the run.</h2><div class="choices">${run.relicOffers.map(relic).join('')}</div>`
-  if (run.finds.length > 0) return findChoice(run)
+  if (run.finds.length > 0) {
+    const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
+    return `<h2>Gear found. Who takes it?${more}</h2><div class="gear ${run.finds[0].rarity}">${gearCard(run.finds[0], held)}</div>${takers(run, 0)}`
+  }
   return skillChoice(run, run.soldiers.find((s) => skillOffers(s).length > 0)!)
 }
 
 /** What each soldier did in the battle, a row each, the squad's best in each column but damage taken marked. */
-export function battleStats(report: Report): string {
+function battleStats(report: Report): string {
   const columns: [string, (t: Tally) => number, string?][] = [
     ['Damage dealt', (t) => t.dealt],
     ['Kills', (t) => t.kills],

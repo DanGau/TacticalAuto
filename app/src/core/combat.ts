@@ -4,7 +4,7 @@ import { TUNING } from './tuning'
 import { PARRY_CHANCE } from './doctrines'
 import { FUEL_DAMAGE } from './twists'
 import { AIRSTRIKE, HEAL, PLATING, RAGE, SMOKE_TURNS, STIMS, type ConsumableId } from './consumables'
-import { ESCORT_REACH } from './goals'
+import { ESCORT_REACH, EXTRACT_REACH, HOLD_ROUNDS, HOLD_WAVE_EVERY, RESCUE_QUORUM } from './goals'
 import {
   crumble,
   onGrid,
@@ -19,7 +19,6 @@ import {
   stepCost,
   AMBUSH_AIM,
   AMBUSH_CRIT,
-
   IMPACT_REACH,
   POD_BLAST,
   POD_REACH,
@@ -37,7 +36,6 @@ import {
   HASTE_MOVE,
   HEADSHOT_DAMAGE,
   INSPIRE_AIM,
-
   PHOENIX_HEALTH,
   RAGE_DAMAGE,
   RECKLESS_AIM,
@@ -68,15 +66,12 @@ import {
   CHILL_AIM,
   CHILL_MOVE,
   CHILL_TURNS,
-
   SPOTTER_AIM,
-
   BURN_DAMAGE,
   BURN_TURNS,
   LINGER_TURNS,
   NAPALM_DAMAGE,
   SEARING_DAMAGE,
-
   CRIT_BONUS,
   distance,
   EXECUTE_BONUS,
@@ -92,7 +87,6 @@ import {
   MEDIC_REACH,
   MEDKIT_HEAL,
   NEIGHBORS,
-
   passable,
   PATROL_MOVE,
   PSI_BACKLASH,
@@ -121,7 +115,6 @@ import {
   unaware,
   coverAt,
 } from './battle'
-import { EXTRACT_REACH, HOLD_ROUNDS, RESCUE_QUORUM, HOLD_WAVE_EVERY } from './goals'
 import { random, randomInt } from './rng'
 import { canShoot, coverAgainst, lineOfSight, odds, sees, detects } from './sight'
 

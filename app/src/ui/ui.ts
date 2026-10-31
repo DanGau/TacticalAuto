@@ -138,10 +138,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
       return overworld(run, tab, open, picked)
     }
     phase = run.phase
-    if (report && seen !== report) {
-      return stopReport(run, report)
-    }
-    return overworld(run, tab, open, picked)
+    return report && seen !== report ? stopReport(run, report) : overworld(run, tab, open, picked)
   }
 
   function render(run: Run): void {
