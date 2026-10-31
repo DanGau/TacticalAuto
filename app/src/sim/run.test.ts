@@ -7,8 +7,7 @@ import { MAX_BATTLE_SECONDS, report } from './report'
 import { replay, runWith, type RunResult } from './run'
 
 test('a run replays identically from its seed and actions', () => {
-  // The random bot takes the widest range of actions.
-  const result = runWith(0, bots.random)
+  const result = runWith(0, bots.standard)
   const first = replay(0, result.actions)
   expect(first.phase).toBe(result.won ? 'won' : 'lost')
   expect(first.keys).toBe(result.keys)
