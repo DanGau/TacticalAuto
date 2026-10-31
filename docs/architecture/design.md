@@ -40,7 +40,7 @@ A bot is one function per decision point: observation in, action out, both plain
 ## How the model sees and plays
 
 - **`window.debug`** forwards to the core and holds no logic: `snapshot()` returns the state, `apply(action)`, `step(n)` advances n beats, renders without animation, and returns the snapshot. `edit(code)` changes the live state to set up a scene.
-- **`eye`** is one CLI. It keeps the dev server and a headless browser alive between calls, prints JSON only, and saves screenshots at a fixed viewport to a gitignored folder keyed by commit.
+- **`eye`** is one CLI. It keeps one dev server and one headless browser alive between calls, for all worktrees, replacing either when idle 30 minutes or serving another checkout, prints JSON only, and saves screenshots at a fixed viewport to a gitignored folder keyed by commit.
 - **Playbooks** are JSON lists of `eye` commands run in one call, including `step-until <expression>`.
 
 ## Enforcement

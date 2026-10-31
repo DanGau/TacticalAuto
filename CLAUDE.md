@@ -24,5 +24,5 @@ Run in `app/`.
 - `npm run -s sim -- --runs=100 --bot=all` — every bot strategy on the same seeds, ranked, with warnings for win rates outside the balance bands in `app/src/sim/report.ts`.
 - `npm run -s tune -- --rounds=10 --threads=8` — hill-climbs the numbers in `app/src/core/tuning.ts` toward those bands, and rewrites the file if held-out seeds confirm the gain.
 - `npm run test -- <files>`, `npm run tsx -- <script>` — run tests or a script under a deadline that kills it if it hangs. A hook blocks running `vitest` or `tsx` directly.
-- `npm run -s eye -- <command>` — play and screenshot the game in a headless browser. Commands: `app/eye/eye.ts`.
+- `npm run -s eye -- <command>` — play and screenshot the game in a headless browser. Commands: `app/eye/eye.ts`. One server and browser serve all worktrees; `eye -- stop` ends them.
 - `npm run dev` — serve the game for a human. Each push to `main` also deploys it to https://dangau.github.io/TacticalAuto/.

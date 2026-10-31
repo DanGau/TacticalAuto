@@ -1,8 +1,9 @@
 // The model's eyes and hands: drives the game in a headless browser that stays alive between calls.
 // Usage: npm run -s eye -- <command> [args]. Prints one JSON object.
-import { execSync, spawn } from 'node:child_process'
+import { execFileSync, execSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { connect } from 'node:net'
+import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, type Page } from 'playwright'
@@ -15,7 +16,9 @@ declare const debug: Debug
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DIR = resolve(APP, '.eye')
-const PIDS = resolve(DIR, 'pids.json')
+// One registry for every worktree, so they share one server and one browser.
+const PIDS = resolve(tmpdir(), 'tactical-auto-eye.json')
+const IDLE_MS = 30 * 60 * 1000
 const VITE_PORT = viteConfig.server!.port!
 const CDP_PORT = 9333
 // Without these a window behind others stops drawing frames, and the battle the model is watching stalls.
@@ -29,12 +32,48 @@ const portOpen = (port: number) =>
     socket.once('error', () => done(false))
   })
 
-/** Starts `command` detached unless `port` already answers, then waits for the port. */
+/** A process eye started, the checkout it serves, and when eye last used it. */
+type Owned = { pid: number; app: string; used: number }
+
+const readPids = (): Record<string, Owned> => (existsSync(PIDS) ? JSON.parse(readFileSync(PIDS, 'utf8')) : {})
+
+/** Kills `owned` and its children, unless its pid has since gone to a process that is not from its checkout. */
+function kill({ pid, app }: Owned): void {
+  try {
+    const line = execFileSync('powershell', ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`], { encoding: 'utf8' })
+    if (line.includes(app)) execFileSync('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore' })
+  } catch {
+    // Already gone.
+  }
+}
+
+async function portClosed(port: number): Promise<void> {
+  while (await portOpen(port)) await new Promise((r) => setTimeout(r, 100))
+}
+
+/**
+ * Keeps one `name` on the machine, for every checkout: one left idle IDLE_MS or serving another checkout is killed
+ * first, unless a human's window is open on that other checkout. Starts `command` detached unless `port` answers.
+ */
 async function ensure(name: string, port: number, command: string, args: string[]): Promise<void> {
-  if (await portOpen(port)) return
+  const pids = readPids()
+  const held = pids[name]
+  // A window its human closed no longer answers.
+  if (pids.window && !(await portOpen(CDP_PORT))) delete pids.window
+  if (pids.window && pids.window.app !== APP) throw new Error(`a human is playing from ${pids.window.app}; wait for them, or run eye there`)
+  if (held && (held.app !== APP || (!pids.window && Date.now() - held.used > IDLE_MS))) {
+    kill(held)
+    delete pids[name]
+    await portClosed(port)
+  }
+  if (await portOpen(port)) {
+    if (pids[name]) pids[name].used = Date.now()
+    writeFileSync(PIDS, JSON.stringify(pids))
+    return
+  }
   const child = spawn(command, args, { cwd: APP, detached: true, stdio: 'ignore' })
   child.unref()
-  writeFileSync(PIDS, JSON.stringify({ ...readPids(), [name]: child.pid }))
+  writeFileSync(PIDS, JSON.stringify({ ...pids, [name]: { pid: child.pid!, app: APP, used: Date.now() } }))
   for (let i = 0; i < 100; i++) {
     if (await portOpen(port)) return
     await new Promise((r) => setTimeout(r, 100))
@@ -42,18 +81,12 @@ async function ensure(name: string, port: number, command: string, args: string[
   throw new Error(`${name} did not open port ${port}`)
 }
 
-const readPids = (): Record<string, number> => (existsSync(PIDS) ? JSON.parse(readFileSync(PIDS, 'utf8')) : {})
-
 /** Kills the named processes eye started and returns the names it knew. */
 function stop(names: string[]): string[] {
   const pids = readPids()
   const known = names.filter((name) => name in pids)
   for (const name of known) {
-    try {
-      process.kill(pids[name])
-    } catch {
-      // Already gone.
-    }
+    kill(pids[name])
     delete pids[name]
   }
   writeFileSync(PIDS, JSON.stringify(pids))
@@ -135,7 +168,7 @@ async function main(name: string, args: string[]): Promise<unknown> {
   if (name === 'launch') {
     // launch [seed]: opens a window for a human to play in real time; later commands attach to it.
     stop(['browser', 'window'])
-    while (await portOpen(CDP_PORT)) await new Promise((r) => setTimeout(r, 100))
+    await portClosed(CDP_PORT)
     await ensureBrowser('window', [`--app=${URL}${args[0] ? `?seed=${args[0]}` : ''}`, `--window-size=${WIDTH},${HEIGHT + 80}`, ...KEEP_ANIMATING])
     return 'window open'
   }
