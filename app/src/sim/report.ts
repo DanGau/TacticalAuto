@@ -22,7 +22,7 @@ export interface Report {
 }
 
 /** Seconds a battle may take to play in the view before the report warns. */
-export const MAX_BATTLE_SECONDS = 60
+const MAX_BATTLE_SECONDS = 60
 
 export function report(results: RunResult[]): Report {
   const mean = (value: (r: RunResult) => number) => Math.round((10 * results.reduce((sum, r) => sum + value(r), 0)) / results.length) / 10

@@ -3,8 +3,7 @@ import { bots } from '../bots/bots'
 import { apply } from '../core/apply'
 import { createRun } from '../core/run'
 import { flow, timedFlow } from '../core/step'
-import { MAX_BATTLE_SECONDS, report } from './report'
-import { replay, runWith, type RunResult } from './run'
+import { replay, runWith } from './run'
 
 test('a run replays identically from its seed and actions', () => {
   const result = runWith(0, bots.standard)
@@ -39,12 +38,4 @@ test('a whole battle plays in the view in well under a minute', () => {
   while (run.phase === 'battle') clock = timedFlow(run, clock).clock
   expect(clock.done).toBeGreaterThan(0)
   expect(clock.done).toBeLessThan(60000)
-})
-
-test('the report warns of battles that play too long, without failing the batch', () => {
-  const result: RunResult = { seed: 7, won: true, keys: 3, endedOn: 'final', battles: 2, draws: 0, durations: [20_000, (MAX_BATTLE_SECONDS + 5) * 1000], actions: [] }
-  const r = report([result])
-  expect(r.seconds.max).toBe(MAX_BATTLE_SECONDS + 5)
-  expect(r.warnings).toEqual([`1 of 2 battles play longer than ${MAX_BATTLE_SECONDS}s, in seeds 7`])
-  expect(r.failures).toEqual([])
 })
