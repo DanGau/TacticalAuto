@@ -1,16 +1,16 @@
 // A side's simultaneous move: sighting pods, walking, sentries, overwatch, burrowers.
 import { shoot } from './attack'
-import { type Battle, GRID, engaged, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, revealed, ENGAGE_REACH } from './battle'
+import { type Battle, engaged, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, revealed, ENGAGE_REACH } from './battle'
 import { opening } from './entrances'
 import { soldierUnit } from './spawn'
-import { spacedTile } from './grid'
+import { breach } from './grid'
 import { freeTilesNear } from './grid'
 import { walkingDistances } from './grid'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { immune, onTile, fireproof, foeHas, has, GUARDIAN_REACH, lying, extractReach, carrying, BEACON_REACH, vipOf, nearest, EXTRACT_CLEARANCE, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
-import { fleePath, fightPath, walk, paths, exposure, costOf, bestPath, COHESION } from './pathing'
+import { immune, onTile, fireproof, foeHas, has, GUARDIAN_REACH, lying, extractReach, carrying, BEACON_REACH, vipOf, nearest, extractionFrom, pursuers, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
+import { fleePath, fightPath, walk, paths, exposure, costOf, bestPath, COHESION, POCKET } from './pathing'
 import { detects, sees } from './sight'
 import { upkeep } from './upkeep'
 import { moved, wound } from './wound'
@@ -94,9 +94,8 @@ export function sight(battle: Battle): GameEvent[] {
     events.push({ type: 'freed', id: rescuer.id, unit: { id: unit.id, x: unit.x, y: unit.y } })
   }
   events.push(...escortVip(battle, soldiers))
-  // A soldier at the extraction zone, or beside one there, lifts off, with whoever it carries, once any VIP has.
-  const out = (t: Tile) => distance(t, battle.extract!) <= extractReach(battle)
-  for (const soldier of battle.extract && battle.vip !== 'freed' ? soldiers.filter((s) => out(s) || soldiers.some((o) => out(o) && distance(o, s) <= 1)) : []) {
+  // A soldier at the extraction zone, or in the crowd at it, lifts off, with whoever it carries, once any VIP has.
+  for (const soldier of battle.extract && battle.vip !== 'freed' ? soldiers.filter((s) => atExtraction(battle, s)) : []) {
     battle.units.splice(battle.units.indexOf(soldier), 1)
     battle.escaped.push(soldier.soldier!, ...battle.downed.filter((d) => d.carrier === soldier.id).map((d) => d.soldier))
     battle.lifted[soldier.soldier!] = soldier.hp
@@ -119,6 +118,14 @@ export function sight(battle: Battle): GameEvent[] {
   return events
 }
 
+/** Whether `unit` is in the extraction zone or joined to it, side by side, through the squad: the squad's own bodies cannot wall anyone off from it. */
+function atExtraction(battle: Battle, unit: Unit): boolean {
+  const squad = battle.units.filter((u) => u.side === 'human' && !u.civilian)
+  const crowd = [unit]
+  for (const u of crowd) crowd.push(...squad.filter((o) => !crowd.includes(o) && distance(o, u) <= 1))
+  return crowd.some((u) => distance(u, battle.extract!) <= extractReach(battle))
+}
+
 /**
  * A VIP rescue's steps. The first soldier within BREACH_REACH of the VIP blows in the wall between them, catching the
  * guards: they engage, but do not shoot on their next turn. A soldier beside the VIP, once no alien in the fight stands
@@ -138,18 +145,15 @@ export function escortVip(battle: Battle, soldiers: Unit[]): GameEvent[] {
     for (const pod of new Set(guards.map((u) => u.pod!))) Object.assign(battle.pods[pod], { revealed: true, engaged: true, surprised: 1 })
     events.push({ type: 'rocket', id: breacher.id, x: at.x, y: at.y, hits: [] })
   }
-  const guarded = battle.units.some((u) => u.side === 'alien' && u.stats.move > 0 && engaged(battle, u) && distance(u, vip) <= FREE_REACH)
+  const guarded = pursuers(battle, vip).some((u) => engaged(battle, u) && distance(u, vip) <= FREE_REACH)
   if (battle.vip === 'breached' && !guarded && soldiers.some((s) => distance(s, vip) <= BREACH_REACH)) {
     battle.vip = 'freed'
-    // Of edge tiles drawn, the one whose walk from the soldier who freed the VIP is nearest VIP_WALK.
-    const walk = walkingDistances(battle, nearest(soldiers, vip)!)
-    const off = (t: Tile) => Math.abs(walk[t.y * GRID + t.x] - VIP_WALK)
-    battle.extract = Array.from({ length: 40 }, () => spacedTile(battle, [vip], EXTRACT_CLEARANCE, 'edge')).reduce((a, b) => (off(b) < off(a) ? b : a))
+    // A VIP still walled in is broken out.
+    if (walkingDistances(battle, vip).filter(Number.isFinite).length < POCKET) breach(battle, vip)
+    battle.extract = extractionFrom(battle, vip)
     events.push({ type: 'extract', ...battle.extract })
   }
-  // Soldiers crowding the way out hand the VIP on.
-  const out = (t: Tile) => distance(t, battle.extract!) <= extractReach(battle)
-  if (battle.vip === 'freed' && (out(vip) || soldiers.some((s) => out(s) && distance(s, vip) <= 1))) {
+  if (battle.vip === 'freed' && atExtraction(battle, vip)) {
     battle.vip = 'out'
     battle.units.splice(battle.units.indexOf(vip), 1)
     events.push({ type: 'escaped', id: vip.id })
@@ -158,12 +162,10 @@ export function escortVip(battle: Battle, soldiers: Unit[]): GameEvent[] {
 }
 
 
-/** How near the VIP a soldier must come to breach its building, how near no alien in the fight may stand to free them, and about how far a walk the extraction zone is from it. */
+/** How near the VIP a soldier must come to breach its building, and how near no alien in the fight may stand to free them. */
 export const BREACH_REACH = 3
 
 export const FREE_REACH = 10
-
-export const VIP_WALK = 24
 
 /** Each soldier with the sentinel protocol beside an alien about to walk shoots it, once a turn each. */
 export function sentries(battle: Battle, unit: Unit, watched: Set<number>): GameEvent[] {

@@ -3,11 +3,11 @@ import { REGEN_HEAL, alienStats, ALIENS, NODE_EVERY } from './aliens'
 import { type Battle, AURA_REACH, BURN_DAMAGE, isSoldier, SPAWN_EVERY, type Unit } from './battle'
 import { placePod } from './setup'
 import { alienUnit } from './spawn'
-import { openNear, spacedTile } from './grid'
+import { openNear } from './grid'
 import { freeTilesNear } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { has, foeHas, onTile, FIRE_TURNS, uplinkReach, EXTRACT_CLEARANCE, silenced, centreOf, nearest } from './fighters'
+import { has, foeHas, onTile, FIRE_TURNS, uplinkReach, extractionFrom, silenced, centreOf, nearest } from './fighters'
 import { HOLD_ROUNDS, HOLD_WAVE_EVERY } from './goals'
 import { wound } from './wound'
 
@@ -58,7 +58,7 @@ export function upkeep(battle: Battle): GameEvent[] {
   // A hold counts only the rounds the squad ends standing on it. Once held, the uplink is done and the squad extracts.
   if (battle.uplink && battle.units.some((u) => isSoldier(u) && distance(u, battle.uplink!) <= uplinkReach(battle))) battle.held++
   if (battle.uplink && battle.held >= HOLD_ROUNDS) {
-    battle.extract = spacedTile(battle, [battle.uplink], EXTRACT_CLEARANCE, 'edge')
+    battle.extract = extractionFrom(battle, battle.uplink)
     battle.uplink = null
     events.push({ type: 'extract', ...battle.extract })
   }

@@ -1,6 +1,6 @@
 // Questions every combat module asks about units in a fight: whose enemy, nearest, has what, can shoot.
 import { AURA_REACH, BURN_TURNS, type Battle, CHILL_TURNS, type Effect, ELUSIVE_REACH, GRID, LINGER_TURNS, type Tile, type Unit, engaged, isSoldier, revealed } from './battle'
-import { onGrid } from './grid'
+import { onGrid, spacedTile, walkingDistances } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import { EXTRACT_REACH } from './goals'
@@ -103,6 +103,22 @@ export const uplinkReach = (battle: Battle) => UPLINK_REACH + (battle.units.some
 
 /** How far from the uplink a hold's extraction zone appears. */
 export const EXTRACT_CLEARANCE = 12
+
+/** About how far a walk from where the squad stands the extraction zone lies. */
+const EXTRACT_WALK = 24
+
+/** An extraction zone at the edge: of tiles drawn clear of `start`, the one whose walk from it is nearest EXTRACT_WALK. */
+export function extractionFrom(battle: Battle, start: Tile): Tile {
+  const walk = walkingDistances(battle, start)
+  const off = (t: Tile) => Math.abs(walk[t.y * GRID + t.x] - EXTRACT_WALK)
+  return Array.from({ length: 40 }, () => spacedTile(battle, [start], EXTRACT_CLEARANCE, 'edge')).reduce((a, b) => (off(b) < off(a) ? b : a))
+}
+
+/** Aliens in sight that can walk to `vip`, and so make its column keep together. A turret, or an alien walled off, never comes. */
+export const pursuers = (battle: Battle, vip: Unit) => {
+  const walk = walkingDistances(battle, vip)
+  return battle.units.filter((u) => u.side === 'alien' && revealed(battle, u) && u.stats.move > 0 && walk[u.y * GRID + u.x] < Infinity)
+}
 
 /** How near the extraction zone lifts a soldier off; a Signal Flare widens it. */
 export const FLARE_REACH = 3

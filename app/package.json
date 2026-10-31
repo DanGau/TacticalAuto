@@ -12,7 +12,7 @@
     "tune": "node scripts/deadline.mjs 86400 tsx src/sim/tune.ts",
     "eye": "tsx eye/eye.ts",
     "tsx": "node scripts/deadline.mjs 600 tsx",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run sim -- --runs=50",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run -s sim -- --runs=200 && npm run -s sim -- --runs=100 --seed-start=200 --bot=random",
     "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {

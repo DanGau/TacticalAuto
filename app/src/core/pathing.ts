@@ -9,7 +9,7 @@ import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { vipOf, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, MIRROR_IMAGES, inAura, has, GUARDIAN_REACH, fireproof, enemiesOf, besideFuel, foes, spotlit } from './fighters'
+import { vipOf, pursuers, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, MIRROR_IMAGES, inAura, has, GUARDIAN_REACH, fireproof, enemiesOf, besideFuel, foes, spotlit } from './fighters'
 import { ESCORT_REACH } from './goals'
 import { canHurlFrom } from './objects'
 import { bite, canShoot, sees } from './sight'
@@ -87,6 +87,8 @@ export interface Spot {
   blind: number
   /** The walk to the unit's goal: for a soldier the squad's, for an alien the nearest soldier. */
   toGoal: number
+  /** Tiles of walk a careful soldier gives up to stand on the tile, for what its gear or an object beside it is worth. */
+  lure: number
   /** Tiles the squad's centre is beyond COHESION. */
   stray: number
   /** 1 if the tile brings the unit no nearer the goal than where it stands. */
@@ -148,9 +150,9 @@ export const WARY = 0.5
  * of progress, a certain hit coming back five, and each enemy that could come
  * within range of it next turn two.
  */
-export const advance = ({ toGoal, theirs, wary, stray, careful, stalled, threat }: Spot) => {
+export const advance = ({ toGoal, lure, theirs, wary, stray, careful, stalled, threat }: Spot) => {
   if (!careful) return [toGoal, theirs]
-  const cost = 10 * toGoal + 20 * stray + Math.round(theirs / 2) + 20 * threat
+  const cost = 10 * (toGoal - lure) + 20 * stray + Math.round(theirs / 2) + 20 * threat
   return wary ? [theirs, threat, stalled, cost] : [stalled, cost]
 }
 
@@ -161,7 +163,7 @@ export const NO_SHOT: Record<Stance, (spot: Spot) => number[]> = {
   anchor: advance,
   // A soldier holds at a distance, out of reach, and from there looks for a clear line before walking nearer.
   // An alien closes like any other, so that two sides hanging back cannot stall a battle.
-  standoff: (spot) => (spot.careful ? [spot.theirs, spot.crowded, spot.blind, spot.toGoal + 2 * spot.stray] : advance(spot)),
+  standoff: (spot) => (spot.careful ? [spot.theirs, spot.crowded, spot.blind, spot.toGoal - spot.lure + 2 * spot.stray] : advance(spot)),
   escort: (spot) => advance({ ...spot, toGoal: spot.toGoal + spot.apart }),
 }
 
@@ -248,8 +250,8 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const enemies = enemiesOf(battle, unit)
   const goal = goalOf(battle, unit, enemies)
   if (!goal) return []
-  // A soldier walled off from where it is going punches through the walls about it.
-  if (unit.side === 'human' && walkingDistances(battle, goal)[unit.y * GRID + unit.x] === Infinity && walkingDistances(battle, unit).filter(Number.isFinite).length < POCKET) breach(battle, unit)
+  // A soldier walled off from where it is going punches through the walls about whichever of it and the goal is boxed in.
+  if (unit.side === 'human' && walkingDistances(battle, goal)[unit.y * GRID + unit.x] === Infinity) breach(battle, walkingDistances(battle, unit).filter(Number.isFinite).length < POCKET ? unit : goal)
   const toGoal = walkingDistances(battle, goal)
   const seen = spotted(battle)
   /** The most of its damage it lands from `end`, in whole percent; 0 with no shot. */
@@ -275,8 +277,8 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const fighting = unit.side === 'human' && seen.size > 0
   /** Whether a soldier on `end` would sight a pod unseen, or draw in one waiting, while the squad is in a fight. */
   const provokes = (end: Tile) => (fighting && (unseen.some((alien) => sees(battle, end, alien)) || waiting.some((alien) => distance(alien, end) <= ENGAGE_REACH)) ? 1 : 0)
-  /** Whether `end` would hurt the unit to stand on: acid, or fire unless it cannot burn; for a soldier, a fuel tank beside it. Caltrops only slow and hurt the way. */
-  const acid = (end: Tile) => (onTile(battle.acid, end) || (unit.side === 'human' && besideFuel(battle, end)) || (onTile(battle.fire, end) && !fireproof(battle, unit)) ? 1 : 0)
+  /** Whether `end` would hurt the unit to stand on: acid, or fire unless it cannot burn; for a soldier, a fuel tank beside it, until the battle drags on, for a tank never goes away and tanks can bar the way. Caltrops only slow and hurt the way. */
+  const acid = (end: Tile) => (onTile(battle.acid, end) || (unit.side === 'human' && battle.round < RESTLESS_ROUND && besideFuel(battle, end)) || (onTile(battle.fire, end) && !fireproof(battle, unit)) ? 1 : 0)
   /**
    * What a soldier's gear makes a tile worth, in points of `mine`: a null field over aliens with abilities, spirit
    * guardians where aliens will come while the wearer is healthy, a bond beside a squadmate, something to hurl.
@@ -303,7 +305,8 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   /** 0 if a soldier ending its move on `end` gets a civilian out, else 1: a rescuer takes that chance over a shot. */
   const rescuable = unit.side === 'human' ? battle.units.filter((u) => u.civilian && u.civilian !== 'vip') : []
   const saves = (end: Tile) => (rescuable.some((c) => distance(c, end) <= 1) ? 0 : 1)
-  const ward = battle.vip === 'freed' && unit.side === 'human' && enemies.some((e) => e.side === 'alien') ? vipOf(battle) : undefined
+  const freed = battle.vip === 'freed' && unit.side === 'human' ? vipOf(battle) : undefined
+  const ward = freed && pursuers(battle, freed).length > 0 ? freed : undefined
   /** Who keeps the VIP company: the VIP, and squadmates within ESCORT_REACH of it, so a column in a narrow way can lead it on. */
   const escorts = ward ? [ward, ...squadmates.filter((u) => distance(u, ward) <= ESCORT_REACH)] : []
   /** Tiles `end` is more than a step beyond ESCORT_REACH of the nearest escort. */
@@ -322,7 +325,8 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
         apart: apart(end),
         crowded: Math.max(0, STANDOFF - Math.min(...enemies.map((enemy) => distance(end, enemy)))),
         blind: enemies.some((enemy) => sees(battle, end, enemy)) ? 0 : 1,
-        toGoal: toGoal[end.y * GRID + end.x] - Math.round(role(end) / 10),
+        toGoal: toGoal[end.y * GRID + end.x],
+        lure: Math.round(role(end) / 10),
         stray: stray(end),
         stalled: toGoal[end.y * GRID + end.x] >= toGoal[unit.y * GRID + unit.x] ? 1 : 0,
         // A rescue is no time for care: every turn costs civilians.
@@ -414,14 +418,16 @@ export function fleePath(battle: Battle, unit: Unit): Tile[] {
   return bestPath(paths(battle, unit, unit.stats.move), unit, (end) => [SAFE - Math.min(SAFE, ...aliens.map((a) => distance(a, end))), toSquad ? toSquad[end.y * GRID + end.x] : 0])
 }
 
-/** A freed VIP's path: toward the extraction zone, away from the aliens' shots and, while any is in sight, never beyond ESCORT_REACH of a soldier. */
+/** A freed VIP's path: toward the extraction zone, away from the aliens' shots and, while hunted, never beyond ESCORT_REACH of a soldier. */
 export function escapePath(battle: Battle, unit: Unit): Tile[] {
   const toExtract = walkingDistances(battle, battle.extract!)
   const soldiers = battle.units.filter(isSoldier)
   const aliens = battle.units.filter((u) => u.side === 'alien' && revealed(battle, u))
-  // With no alien left in sight it makes straight for the way out.
+  const hunted = pursuers(battle, unit).length > 0
+  // Hunted, it keeps by a soldier. Fire shapes its way only among tiles nearer the way out, so a turret's field cannot pen it.
   return bestPath(paths(battle, unit, unit.stats.move), unit, (end) => [
-    aliens.length > 0 ? Math.max(0, Math.min(...soldiers.map((s) => distance(s, end))) - ESCORT_REACH) : 0,
+    hunted ? Math.max(0, Math.min(...soldiers.map((s) => distance(s, end))) - ESCORT_REACH) : 0,
+    toExtract[end.y * GRID + end.x] < toExtract[unit.y * GRID + unit.x] ? 0 : 1,
     toExtract[end.y * GRID + end.x] + Math.round(exposure(battle, aliens, end) / 10),
   ])
 }

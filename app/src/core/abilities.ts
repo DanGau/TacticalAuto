@@ -157,7 +157,8 @@ export function drone(battle: Battle, unit: Unit): GameEvent[] {
 
 /** A skirmisher steps to the tile in reach where the enemy's best shot at it is worst, then farthest from them. */
 export function skirmish(battle: Battle, unit: Unit): GameEvent[] {
-  if (!has(unit, 'skirmish')) return []
+  // Getting out, a step back would undo the walk there.
+  if (!has(unit, 'skirmish') || (unit.side === 'human' && battle.extract)) return []
   const enemies = enemiesOf(battle, unit)
   const events: GameEvent[] = []
   walk(unit, bestPath(paths(battle, unit, SKIRMISH_MOVE), unit, (end) => [exposure(battle, enemies, end), -Math.min(...enemies.map((e) => distance(e, end)))]), events)

@@ -2,17 +2,21 @@ import { roots } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { stepBattle } from './combat'
-import { goalOf } from './pathing'
-import { UPLINK_REACH } from './fighters'
+import { escapePath, fightPath, goalOf } from './pathing'
+import { pursuers, UPLINK_REACH } from './fighters'
 import { vipOf } from './fighters'
 import { escortVip, FREE_REACH } from './sides'
 import { wound } from './wound'
+import { skirmish } from './abilities'
+import { alienStats } from './aliens'
+import { alienUnit, soldierUnit } from './spawn'
+import { upkeep } from './upkeep'
 import type { GameEvent } from './combat-event'
 import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, RESCUE_QUORUM, type Goal } from './goals'
 import { GRID, isSoldier } from './battle'
 import { edgeDepths } from './grid'
 import { INNER } from './grid'
-import { freeTilesNear } from './grid'
+import { freeTilesNear, walkingDistances } from './grid'
 import { distance } from './grid'
 import { road, enterAt, begun } from './roads'
 import { START_SUPPLIES } from './run'
@@ -351,4 +355,66 @@ test('a VIP rescue is lost with the VIP, and won once the VIP lifts off, for a r
   expect(battle.winner).toBe('human')
   endBattle(run)
   expect(run.relicOffers).toHaveLength(3)
+})
+
+/** A battle of `goal` with its aliens gone but for what the test adds, and the extraction zone a long walk from its soldier. */
+function gettingOut(goal: Goal) {
+  const run = before(goal)
+  const battle = run.battle!
+  enterAt(run, 0)
+  const soldier = battle.units.find(isSoldier)!
+  battle.units = battle.units.filter((u) => u.side !== 'alien')
+  battle.waves = []
+  battle.uplink = null
+  battle.extract = freeTilesNear(battle, soldier, 2000).find((t) => distance(t, soldier) === 20)!
+  return { battle, soldier }
+}
+
+test('getting out, a slow hero leaves what it would stand beside, and takes no step back', () => {
+  const { battle, soldier } = gettingOut('hold')
+  const toExtract = walkingDistances(battle, battle.extract!)
+  const walk = (t: { x: number; y: number }) => toExtract[t.y * GRID + t.x]
+  soldier.stats = { ...soldier.stats, move: 1 }
+  soldier.effects = ['bond', 'skirmish']
+  const mate = soldierUnit(battle, { soldier: 99, stats: soldier.stats, hp: 9, ability: null, charges: 0, stance: 'balanced', effects: [] }, freeTilesNear(battle, soldier, 8).reduce((a, b) => (walk(b) > walk(a) ? b : a)))
+  battle.units.push(mate)
+  const from = walk(soldier)
+  expect(walk(fightPath(battle, soldier).at(-1)!)).toBeLessThan(from)
+  expect(skirmish(battle, soldier)).toEqual([])
+})
+
+test('a turret holds no column together: a freed VIP walks on, far from any soldier', () => {
+  const { battle, soldier } = gettingOut('vip')
+  const vip = vipOf(battle)!
+  battle.vip = 'freed'
+  battle.units.push(alienUnit(battle, { kind: 'turret', stats: alienStats('turret', 0, 0), stance: 'anchor', boss: false, spawns: false, target: false, resists: [] }, freeTilesNear(battle, vip, 8)[0], 0))
+  battle.pods[0].revealed = true
+  expect(pursuers(battle, vip)).toEqual([])
+  Object.assign(soldier, freeTilesNear(battle, vip, 2000).find((t) => distance(t, vip) === 15))
+  const toExtract = walkingDistances(battle, battle.extract!)
+  const end = escapePath(battle, vip).at(-1)!
+  expect(toExtract[end.y * GRID + end.x]).toBeLessThan(toExtract[vip.y * GRID + vip.x])
+})
+
+test('a VIP joined to the zone through a crowd of the squad lifts off', () => {
+  const { battle, soldier } = gettingOut('vip')
+  const vip = vipOf(battle)!
+  battle.vip = 'freed'
+  const along = (tiles: number) => ({ x: vip.x + (vip.x < GRID / 2 ? tiles : -tiles), y: vip.y })
+  battle.extract = along(5)
+  Object.assign(soldier, along(2))
+  battle.units.push({ ...soldier, id: battle.nextId++, soldier: null, ...along(1) })
+  escortVip(battle, [soldier])
+  expect(battle.vip).toBe('out')
+})
+
+test('a hold puts its extraction zone a fair walk from the uplink', () => {
+  const run = before('hold')
+  const battle = run.battle!
+  enterAt(run, 0)
+  const uplink = battle.uplink!
+  battle.held = HOLD_ROUNDS
+  battle.turn = 'alien'
+  upkeep(battle)
+  expect(walkingDistances(battle, uplink)[battle.extract!.y * GRID + battle.extract!.x]).toBeLessThan(40)
 })

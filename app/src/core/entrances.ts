@@ -36,8 +36,9 @@ export const LOOK_TURNS = 2
 export const COMMANDER_GAP = 12
 export const ENTRY_SPACING = 6
 
-/** How far within the map's edge every entrance lies. */
+/** How far within the map's edge every entrance lies, and the longest walk from one to the arena's centre, where the ground allows. */
 export const ENTRY_MARGIN = 4
+const ENTRY_WALK = 40
 
 /**
  * What each entrance is called and does, for the player; how far from the nearest alien it comes in; how it ranks a
@@ -107,6 +108,8 @@ export function planEntrances(battle: Battle, heart: Tile | null): void {
     if (blocked(battle, tile.x, tile.y) || depth[t] <= ENTRY_MARGIN || toCentre[t] === Infinity || !fromCentre[t] || distance(tile, centre) > battle.arena.reach + 8) continue
     near[t] = Math.min(...aliens.map((a) => distance(a, tile)))
     walkable.push(tile)
+    // Across a river, a tile near as the crow flies can be a long way round.
+    if (toCentre[t] > ENTRY_WALK) continue
     if (commander && distance(tile, commander) < COMMANDER_GAP) continue
     if (heart && distance(tile, heart) > 10) continue
     if (battle.uplink && distance(tile, battle.uplink) > 9) continue

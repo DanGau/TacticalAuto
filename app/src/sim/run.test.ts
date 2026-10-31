@@ -3,6 +3,7 @@ import { bots } from '../bots/bots'
 import { apply } from '../core/apply'
 import { createRun } from '../core/run'
 import { timedFlow } from '../core/step'
+import { report } from './report'
 import { replay, runWith } from './run'
 
 test('a run replays identically from its seed and actions', () => {
@@ -27,4 +28,8 @@ test('a whole battle plays in the view in well under a minute', () => {
   while (run.phase === 'battle') clock = timedFlow(run, clock).clock
   expect(clock.done).toBeGreaterThan(0)
   expect(clock.done).toBeLessThan(60000)
+})
+
+test('a battle at the beat limit fails the batch', () => {
+  expect(report([{ ...runWith(0, bots.standard), draws: 1 }]).failures).toHaveLength(1)
 })
