@@ -1046,6 +1046,21 @@ function indoors(battle: Battle): Tile {
 export function placePod(battle: Battle, pack: { name: string; aliens: Alien[] }, centre: Tile, revealed: boolean, guard = false): Unit[] {
   const units = freeTilesNear(battle, centre, pack.aliens.length).map((tile, i) => alienUnit(battle, pack.aliens[i], tile, battle.pods.length))
   battle.units.push(...units)
+  // One that never moves stands where it walls no ground off, as seen from across the map.
+  const far = openNear(battle, { x: GRID - 1 - centre.x, y: GRID - 1 - centre.y })
+  for (const still of units.filter((u) => u.stats.move === 0)) {
+    battle.units.splice(battle.units.indexOf(still), 1)
+    const open = walkingDistances(battle, far).filter(Number.isFinite).length
+    const tile = freeTilesNear(battle, centre, 30).find((t) => {
+      Object.assign(still, t)
+      battle.units.push(still)
+      const walls = walkingDistances(battle, far).filter(Number.isFinite).length < open - 1
+      battle.units.splice(battle.units.indexOf(still), 1)
+      return !walls
+    })
+    if (tile) Object.assign(still, tile)
+    battle.units.push(still)
+  }
   battle.pods.push({ name: pack.name, revealed, alert: revealed, stalking: false, ambushed: false, surprised: false, reeling: false, stalked: 0, guard, waypoint: randomTile(battle) })
   return units
 }
