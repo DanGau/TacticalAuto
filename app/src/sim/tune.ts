@@ -32,6 +32,7 @@ const MEANING: Record<keyof Tuning, string> = {
   alienHp: "Every alien's health, as a multiple of its kind's",
   legForce: 'The alien force a battle has in each leg, before its risk and kind are counted',
   markDamage: 'Damage each hit on a marked unit adds',
+  alienDamage: "Damage every alien's attack adds",
   accelerantDamage: 'Damage Accelerant Gel adds to hits on a burning target',
   shatterDamage: 'Damage Shatterglass Edge adds to hits on a chilled target',
   thermalDamage: 'Damage Thermal Shock Core adds to hits on a target both burning and chilled',

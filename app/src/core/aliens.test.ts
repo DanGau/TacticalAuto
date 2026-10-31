@@ -193,6 +193,7 @@ test('revive gets a fallen squadmate back up, once', () => {
   for (const unit of [soldier, medic]) unit.stats = { ...unit.stats, move: 0, range: 0 }
   soldier.hp = 1
   medic.hp = 500
+  medic.stats = { ...medic.stats, hp: 99999 }
   aliens[0].stats = { ...aliens[0].stats, move: 0, crit: 0 }
   const events = until((all) => all.some((e) => e.type === 'effect' && e.effect === 'revive'))
   expect(events).toContainEqual({ type: 'effect', id: soldier.id, effect: 'revive', amount: REVIVE_HEALTH })

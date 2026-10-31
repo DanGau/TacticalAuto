@@ -41,6 +41,9 @@ export function worth(battle: Battle, unit: Unit, enemy: Unit): number {
   )
 }
 
+/** What a soldier's full health adds to its worth as an alien's target. */
+export const SPREAD = 0.5
+
 /** Tiles a ricochet reaches from its target, an arc leaps, and the leaps it makes. */
 export const RICOCHET_REACH = 3
 
@@ -60,7 +63,9 @@ export const VOLATILE_DAMAGE = 2
 export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, only?: Unit): GameEvent[] {
   const inReach = (only ? [only] : battle.units).filter((other) => other.side !== unit.side && shootable(battle, unit, unit, other, seen))
   const taunting = inReach.filter((other) => has(other, 'taunt') || spotlit(battle, other))
-  const value = (other: Unit) => preyed(other, bite(battle, unit, other, unit.stats)) + worth(battle, unit, other)
+  // Aliens spread their fire: a healthier soldier is the likelier target, so wounds fall across the squad.
+  const spread = (other: Unit) => (unit.side === 'alien' && !other.civilian ? SPREAD * (other.hp / other.stats.hp) : 0)
+  const value = (other: Unit) => spread(other) + preyed(other, bite(battle, unit, other, unit.stats)) + worth(battle, unit, other)
   let enemy: Unit | undefined
   for (const other of taunting.length > 0 ? taunting : inReach) {
     const gain = enemy ? value(other) - value(enemy) : 1

@@ -234,7 +234,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
 export function alienStats(kind: AlienKind, armor: number, weapon: number): Stats {
   const stats = { ...BASE_STATS, ...ALIENS[kind].stats }
   const armed = kind === 'burster' ? 0 : weapon
-  return { ...stats, hp: Math.max(1, Math.round(BASE_STATS.hp * ALIENS[kind].hp * TUNING.alienHp)), armor: armor + (ALIENS[kind].stats.armor ?? 0), damage: stats.damage + armed }
+  return { ...stats, hp: Math.max(1, Math.round(BASE_STATS.hp * ALIENS[kind].hp * TUNING.alienHp)), armor: armor + (ALIENS[kind].stats.armor ?? 0), damage: stats.damage + armed + TUNING.alienDamage }
 }
 
 /** A themed group of aliens that roams and fights as one pod. */

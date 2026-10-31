@@ -77,7 +77,7 @@ export function charges(run: Run, soldier: Soldier): number {
 }
 
 /** Health every soldier heals for each stop travelled to. */
-export const TRAVEL_HEAL = 2
+export const TRAVEL_HEAL = 1
 
 /** A soldier's health now: its most less its wounds, never below 1. */
 export const health = (run: Run, soldier: Soldier) => Math.max(1, soldierStats(run, soldier).hp - soldier.wounds)
