@@ -1,3 +1,4 @@
+// Feats soldiers earn experience for, and the battle tally that records them.
 /** A feat a soldier pays experience for the first time it pulls it off. Combat and the battle's end record them. */
 export interface Feat {
   name: string

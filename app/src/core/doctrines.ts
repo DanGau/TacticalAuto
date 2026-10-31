@@ -1,3 +1,4 @@
+// Doctrines: run-long changes to how battles work.
 import type { Lasting } from './base'
 import type { Stance, Stats } from './battle'
 

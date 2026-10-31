@@ -17,6 +17,12 @@ export default tseslint.config(
   layer('sim', '\./|\.\./(core|bots)/|node:|esbuild$', 'sim/ imports only sim/, bots/, core/, node builtins and esbuild.'),
   layer('{view,ui}', '\./|\.\./(core|view|ui)/|three$|d3-geo$|topojson-(client|specification)$|world-atlas/', 'view/ and ui/ import only view/, ui/, core/, three, and d3-geo with its map data.'),
   {
+    // A file over this does more than one thing; split it by responsibility. See docs/architecture/modules.md.
+    files: ['src/**/*.ts', 'eye/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: { 'max-lines': ['error', { max: 500 }] },
+  },
+  {
     files: ['src/core/**/*.ts'],
     ignores: ['**/*.test.ts'],
     rules: {

@@ -1,3 +1,4 @@
+// Plays batches of runs across worker processes.
 import { type ChildProcess, fork } from 'node:child_process'
 import { buildSync } from 'esbuild'
 import { mkdtempSync } from 'node:fs'

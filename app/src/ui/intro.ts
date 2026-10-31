@@ -1,3 +1,4 @@
+// Introductions to kinds a player meets for the first time.
 import { ALIENS, type AlienKind } from '../core/aliens'
 import type { Battle } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'

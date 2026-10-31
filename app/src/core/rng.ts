@@ -1,3 +1,4 @@
+// The seeded random numbers every rule draws from.
 /** mulberry32. Advances `holder.rng` and returns a number in [0, 1). */
 export function random(holder: { rng: number }): number {
   holder.rng = (holder.rng + 0x6d2b79f5) | 0

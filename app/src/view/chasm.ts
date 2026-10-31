@@ -1,3 +1,4 @@
+// The cliffs where narrow ground falls away.
 import { Group } from 'three'
 import { GRID, type Battle } from '../core/battle'
 import type { TerrainKind } from '../core/terrain'

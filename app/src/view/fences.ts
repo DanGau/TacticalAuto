@@ -1,3 +1,4 @@
+// The holographic fences round zones in play.
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, DoubleSide, Mesh, ShaderMaterial } from 'three'
 import type { Tile } from '../core/battle'
 import { tall } from './space'

@@ -1,3 +1,4 @@
+// Roof shapes in each style.
 import { shade, type Point3, type Shapes } from './shapes'
 
 /**

@@ -1,3 +1,4 @@
+// Recruit traits: what each brings to the squad.
 import type { Stats } from './battle'
 
 /**

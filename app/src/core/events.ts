@@ -1,8 +1,22 @@
+// Unknown stops' events: their choices and what each does.
 import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type DoctrineId } from './doctrines'
 import { offerable } from './relics'
 import { random, randomInt } from './rng'
-import { advance, current, drawBattle, LEG_STOPS, legOf, dropGear, hire, level, mend, nextStop, passStop, settle, stockShop, STOP_THREAT, THREAT_MAX, wounded, xpFor, type Run } from './run'
+import { advance, current, legOf, nextStop, passStop } from './run'
+import { type Run } from './run-state'
+import { drawBattle } from './missions'
+import { dropGear } from './rewards'
+import { settle } from './rewards'
+import { stockShop } from './rewards'
+import { hire } from './squad'
+import { wounded } from './squad'
+import { mend } from './squad'
+import { level } from './squad'
+import { xpFor } from './squad'
+import { STOP_THREAT } from './progress'
+import { THREAT_MAX } from './progress'
+import { LEG_STOPS } from './progress'
 
 /** One way to meet an event: the squad's quip, what it does, whether the squad can, and doing it. */
 interface Option {

@@ -1,7 +1,8 @@
 import { expect, test } from 'vitest'
 import { tangles } from '../core/plane'
 import { apply } from '../core/apply'
-import { createRun, KEYS, legOf, ways, type Run } from '../core/run'
+import { createRun, KEYS, legOf, ways } from '../core/run'
+import { type Run } from '../core/run-state'
 import { layout } from './globe'
 import { flight, flightSize } from './overworld'
 

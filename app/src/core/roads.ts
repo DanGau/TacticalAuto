@@ -1,8 +1,11 @@
+// Test helpers that lay a leg's stops and land the squad.
 import { apply, type Result } from './apply'
 import { ZONE_CLEARANCE, type Battle } from './battle'
 import { type Plan } from './battle'
 import { spacedTile } from './grid'
-import { createRun, legOf, type Run, type Stop } from './run'
+import { createRun, legOf } from './run'
+import { type Run } from './run-state'
+import { type Stop } from './run-state'
 
 /** For tests: lays the rest of the leg as a road of `stops` one after another, the first entered, then the satellite. */
 export function road(run: Run, stops: Stop[]): void {

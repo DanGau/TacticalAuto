@@ -1,3 +1,4 @@
+// Alien kinds: their stats, stances and powers, and the packs they muster in.
 import { BASE_STATS, type Stance, type Stats } from './battle'
 import { TUNING } from './tuning'
 import type { Resist } from './keywords'

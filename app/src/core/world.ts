@@ -1,3 +1,4 @@
+// The globe: continents, their cities, and arcs between places.
 import type { RegionId } from './regions'
 
 /** A place on the globe: longitude east, then latitude north, in degrees. */

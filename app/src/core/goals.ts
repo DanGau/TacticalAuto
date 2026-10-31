@@ -1,3 +1,4 @@
+// Mission goals: what each asks of the squad, pays, and the numbers its rules use.
 /** What a battle asks of the squad. Each pays differently, so where the squad goes shapes what it builds. */
 export type Goal = 'exterminate' | 'assassinate' | 'hold' | 'rescue' | 'vip' | 'raid' | 'ambush' | 'recover'
 

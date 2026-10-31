@@ -1,3 +1,4 @@
+// Building blocks for meshes and 2D sketches: boxes, blobs, lines, tints.
 import { type Object3D, BufferGeometry, CanvasTexture, type Material, DoubleSide, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, Sprite, SpriteMaterial } from 'three'
 
 /** A point in the world: x and z on the ground, along a tile's x and y; y up. */

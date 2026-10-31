@@ -1,3 +1,4 @@
+// Gear: slots, effects, the starter rifle, and generating finds.
 import type { GearEffect, Stats } from './battle'
 import type { Rarity } from './base'
 import type { Keyword } from './keywords'

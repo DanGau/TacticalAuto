@@ -1,3 +1,4 @@
+// Towns on each continent where stops fall.
 import type { ContinentId, LonLat } from './world'
 
 /** Towns and cities across each continent, where the squad's stops fall: a name and where it lies. */

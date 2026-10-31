@@ -1,6 +1,8 @@
+// The browser entry: wires the run, view and UI, the battle loop, and window.debug.
 import { apply, type Action, type Result } from './core/apply'
 import type { GameEvent } from './core/combat-event'
-import { createRun, type Run } from './core/run'
+import { createRun } from './core/run'
+import { type Run } from './core/run-state'
 import { step } from './core/step'
 import { PACE } from './core/pace'
 import { brief } from './ui/briefing'

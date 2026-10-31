@@ -1,3 +1,4 @@
+// The sim command: plays runs with bots and prints a report.
 import { parseArgs } from 'node:util'
 import { bots } from '../bots/bots'
 import { DOCTRINES, type DoctrineId } from '../core/doctrines'

@@ -1,3 +1,4 @@
+// How each weapon's attack looks on screen.
 import type { Unit } from '../core/battle'
 import type { WeaponId } from '../core/weapons'
 

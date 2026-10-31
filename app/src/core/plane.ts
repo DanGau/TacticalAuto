@@ -1,3 +1,4 @@
+// Geometry on a flat map: points, distances, and whether lines cross.
 import type { LonLat } from './world'
 
 export interface Point {

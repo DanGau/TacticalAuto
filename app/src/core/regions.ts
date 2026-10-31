@@ -1,3 +1,4 @@
+// Regions of the world: how each builds its towns, and its cities.
 import type { Streets } from './streets'
 import type { TerrainKind } from './terrain'
 

@@ -1,3 +1,4 @@
+// Consumables: what each does, what the squad carries, and where it finds them.
 import type { Keyword } from './keywords'
 
 /**

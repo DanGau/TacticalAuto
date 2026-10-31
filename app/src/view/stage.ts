@@ -2,7 +2,7 @@
 import { ColorManagement, Fog, Group, LinearSRGBColorSpace, type Mesh, PerspectiveCamera, Scene, type Sprite as Billboard, type Object3D, Vector3, WebGLRenderer } from 'three'
 import { distance } from '../core/grid'
 import { GRID, ZONE_RADIUS, type Battle, type Tile } from '../core/battle'
-import type { Run } from '../core/run'
+import type { Run } from '../core/run-state'
 import { aim, axes, clamped, FIT, framing, HAZE_REACH, HEIGHT, picture, spot, WIDTH, type Camera } from './camera'
 import { RISE_MS, type fence } from './fences'
 import { COLOR, NIGHT } from './palette'

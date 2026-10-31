@@ -1,3 +1,4 @@
+// A sim worker process: plays the seeds it is sent.
 import { TUNING } from '../core/tuning'
 
 /** A sim child process: given a tuning and doctrines, plays each batch of seeds it is sent and reports the runs, without their actions. */

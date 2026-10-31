@@ -1,3 +1,4 @@
+// Relics: what each does, and which may be offered.
 import { type RelicEffect, type Stats } from './battle'
 import { POD_BLAST } from './setup'
 import { POD_REACH } from './setup'

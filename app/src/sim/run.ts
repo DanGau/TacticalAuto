@@ -1,6 +1,9 @@
+// Plays one run with a bot, and replays a recorded one.
 import type { Bot } from '../bots/bots'
 import { apply, type Action } from '../core/apply'
-import { createRun, type Mission, type Run } from '../core/run'
+import { createRun } from '../core/run'
+import { type Run } from '../core/run-state'
+import { type Mission } from '../core/run-state'
 import { timedFlow } from '../core/step'
 import type { DoctrineId } from '../core/doctrines'
 

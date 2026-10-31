@@ -1,9 +1,21 @@
+// The player's actions, checked and applied to the run: the only way a player changes state.
 import { STRIKE } from './setup'
 import { land } from './setup'
 import { foesInSight } from './combat'
 import { CONSUMABLES, KIT_SLOTS } from './consumables'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
-import { advance, buyWare, current, equipFind, GEAR_PRICE, go, mend, nextStop, recruit, sellFind, skillOffers, takeRelic, takeSkill, THREAT_MAX, TRAVEL_HEAL, ways, type Run } from './run'
+import { advance, current, go, nextStop, recruit, ways } from './run'
+import { type Run } from './run-state'
+import { takeRelic } from './rewards'
+import { sellFind } from './rewards'
+import { buyWare } from './rewards'
+import { GEAR_PRICE } from './rewards'
+import { equipFind } from './rewards'
+import { takeSkill } from './rewards'
+import { mend } from './squad'
+import { TRAVEL_HEAL } from './squad'
+import { skillOffers } from './squad'
+import { THREAT_MAX } from './progress'
 
 export type Action =
   /** At the run's start: take the recruit at `index` of run.recruits as the first soldier. */

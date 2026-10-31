@@ -1,3 +1,4 @@
+// How long the view takes to play each event, which also times battles in the sim.
 import type { GameEvent } from './combat-event'
 
 /** How long the view takes to play each kind of event, in ms. The view animates by these; the sim times battles by them. */

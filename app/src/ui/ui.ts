@@ -1,6 +1,10 @@
+// The UI shell: renders the panel for the run's phase and turns clicks into actions.
 import { recruits, story, title } from './menu'
 import type { Action } from '../core/apply'
-import { nextStop, skillOffers, type Report, type Run } from '../core/run'
+import { nextStop } from '../core/run'
+import { type Run } from '../core/run-state'
+import { type Report } from '../core/run-state'
+import { skillOffers } from '../core/squad'
 import type { View } from '../view/view'
 import { choice, joined, loot, modal, runEnd, skillChoice, stopReport } from './aftermath'
 import { TWISTS } from '../core/twists'

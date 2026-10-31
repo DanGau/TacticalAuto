@@ -1,3 +1,4 @@
+// Battle twists: fog, night, fuel and the rest, and drawing one.
 import { random, randomInt } from './rng'
 
 /** Tiles of sight fog takes, and of noticing night takes. */

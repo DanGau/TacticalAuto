@@ -1,3 +1,4 @@
+// What relics and doctrines share: lasting effects, and gear rarity.
 import type { Stats } from './battle'
 
 /** Effects that last for the run, applied once per copy held. */

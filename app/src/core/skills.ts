@@ -1,3 +1,4 @@
+// Skills: each class's tree, and what each skill does.
 import {
   DRONE_STATS,
   FORCE_FIELD_ARMOR,

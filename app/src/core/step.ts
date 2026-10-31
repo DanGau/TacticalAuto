@@ -1,8 +1,10 @@
+// Advances the run's battle a beat, and settles it into the run when it ends.
 import { revealed } from './battle'
 import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
 import { beatMs, overlaps, PACE, tick, tilePace, type Clock } from './pace'
-import { endBattle, type Run } from './run'
+import type { Run } from './run-state'
+import { endBattle } from './debrief'
 
 /** Advances the battle being fought one beat and, when it ends, settles it into the run. Does nothing otherwise. */
 export function step(run: Run): GameEvent[] {

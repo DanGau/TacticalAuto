@@ -13,7 +13,14 @@ import { INNER } from './grid'
 import { freeTilesNear } from './grid'
 import { distance } from './grid'
 import { road, deploy, begun } from './roads'
-import { endBattle, LOSS_THREAT, RISKS, START_SUPPLIES, STOP_THREAT, THREAT_MAX, XP, type Run } from './run'
+import { START_SUPPLIES } from './run'
+import { type Run } from './run-state'
+import { endBattle } from './debrief'
+import { RISKS } from './missions'
+import { XP } from './squad'
+import { LOSS_THREAT } from './progress'
+import { STOP_THREAT } from './progress'
+import { THREAT_MAX } from './progress'
 
 /** A run about to fight a battle of `goal`, with three packs to muster. */
 function before(goal: Goal): Run {

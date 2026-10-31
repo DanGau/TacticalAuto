@@ -1,6 +1,6 @@
 import { plane } from '../core/plane'
 import { along, arc, type LonLat } from '../core/world'
-import type { Run } from '../core/run'
+import type { Run } from '../core/run-state'
 import { geoCentroid, geoContains, geoDistance, geoOrthographic, geoPath, type GeoPermissibleObjects } from 'd3-geo'
 import { feature } from 'topojson-client'
 import type { Topology } from 'topojson-specification'

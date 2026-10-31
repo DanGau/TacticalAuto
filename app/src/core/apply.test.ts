@@ -9,7 +9,8 @@ import { nearestAlien } from './grid'
 import { coverAt } from './grid'
 import { distance } from './grid'
 import { stepBattle } from './combat'
-import { current, type Run } from './run'
+import { current } from './run'
+import { type Run } from './run-state'
 
 /** A run choosing where to land for its first battle. */
 function landing(seed = 1): Run & { battle: Battle } {

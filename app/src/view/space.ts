@@ -1,3 +1,4 @@
+// The view's units: tile size on screen, camera angle, and height per level.
 /**
  * The world's units. A tile is a unit square, x and z on the ground, y up; the camera looks down on it at the classic
  * 2:1 isometric angle, where at zoom 1 a tile spans TILE_W screen pixels across and TILE_H down.

@@ -1,3 +1,4 @@
+// The briefing: the camera's tour of a mission before the landing.
 import { ALIENS } from '../core/aliens'
 import { GRID, type Battle, type Tile } from '../core/battle'
 import { heightAt } from '../core/grid'

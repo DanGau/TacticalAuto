@@ -1,3 +1,4 @@
+// The tune command: hill-climbs tuning.ts toward the balance bands.
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { bots } from '../bots/bots'

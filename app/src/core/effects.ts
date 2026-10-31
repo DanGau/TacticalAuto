@@ -1,3 +1,4 @@
+// The names effects show under in the view, from the squad's skills and weapons.
 import type { Ability, Effect } from './battle'
 import { CLASSES } from './classes'
 import { DOCTRINES } from './doctrines'

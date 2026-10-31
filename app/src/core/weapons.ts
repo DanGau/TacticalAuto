@@ -1,3 +1,4 @@
+// Weapons: their stats and how each fights.
 import type { Effect, Stance, Stats } from './battle'
 
 /**

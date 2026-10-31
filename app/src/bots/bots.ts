@@ -1,3 +1,4 @@
+// Bots: each chooses the next action whenever the run waits for the player.
 import { canUse, type Action } from '../core/apply'
 import { foesInSight } from '../core/combat'
 import { CONSUMABLES, KIT_SLOTS } from '../core/consumables'
@@ -12,7 +13,18 @@ import { CLASSES } from '../core/classes'
 import { EFFECTS, type Gear } from '../core/gear'
 import { WEAPONS } from '../core/weapons'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
-import { current, danger, GEAR_PRICE, health, legOf, level, skillOffers, soldierStats, squadKeywords, THREAT_MAX, ways, type Risk, type Run, type Soldier } from '../core/run'
+import { current, legOf, ways } from '../core/run'
+import { type Run } from '../core/run-state'
+import { type Soldier } from '../core/run-state'
+import { type Risk } from '../core/run-state'
+import { danger } from '../core/missions'
+import { GEAR_PRICE } from '../core/rewards'
+import { squadKeywords } from '../core/squad'
+import { soldierStats } from '../core/squad'
+import { health } from '../core/squad'
+import { skillOffers } from '../core/squad'
+import { level } from '../core/squad'
+import { THREAT_MAX } from '../core/progress'
 
 /** Chooses the next action whenever the run waits for the player. `rng` is the bot's own, separate from the run's. */
 export type Bot = (run: Run, rng: { rng: number }) => Action

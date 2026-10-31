@@ -1,3 +1,4 @@
+// Shared HTML pieces: buttons, bars, chips, gear cards and descriptions.
 import type { Action } from '../core/apply'
 import { EFFECTS, type Gear } from '../core/gear'
 import { WEAPONS } from '../core/weapons'
@@ -7,7 +8,9 @@ import type { Stats } from '../core/battle'
 import { KEYWORDS, RESISTS, type Keyword, type Resist } from '../core/keywords'
 import { TUNING } from '../core/tuning'
 import type { ClassId } from '../core/classes'
-import { THREAT_MAX, type Mission, type StopKind } from '../core/run'
+import { type Mission } from '../core/run-state'
+import { type StopKind } from '../core/run-state'
+import { THREAT_MAX } from '../core/progress'
 
 /** A button that performs `action` when clicked. */
 export const button = (action: Action, label: string, cls = '', enabled = true, title = '') =>

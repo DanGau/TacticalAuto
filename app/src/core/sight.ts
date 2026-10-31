@@ -1,3 +1,4 @@
+// Line of sight, cover, hit odds, and noticing.
 import { FORTIFIED_DEFENSE } from './doctrines'
 import { COVER_DEFENSE, HUNKER_DEFENSE, GRID, SIGHT, type Battle, type Cover, type Stats, type Tile, type Unit } from './battle'
 import { edgeBetween } from './grid'

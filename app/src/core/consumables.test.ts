@@ -6,7 +6,7 @@ import { AIRSTRIKE, CONSUMABLES, HEAL } from './consumables'
 import { begun, deploy, road } from './roads'
 import { roots } from './skills'
 import { step } from './step'
-import type { Run } from './run'
+import type { Run } from './run-state'
 
 /** A run at a battle's landing, carrying `kit`. */
 function landing(kit: Run['kit']): Run {

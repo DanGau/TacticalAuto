@@ -1,3 +1,4 @@
+// Soldier classes: stats, positioning, and the ability each uses unprompted.
 import { MECH_STATS, type Ability, type Stance, type Stats } from './battle'
 
 /** What a soldier becomes at first promotion: stat changes, a way of positioning, and one ability used unprompted. */

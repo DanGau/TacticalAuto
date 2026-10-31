@@ -1,3 +1,4 @@
+// Each region's look: colours, trees, roofs and fences.
 import type { RegionId } from '../core/regions'
 import type { Ground } from '../core/terrain'
 import type { RoofStyle } from './roofs'

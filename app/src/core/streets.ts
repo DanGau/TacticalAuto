@@ -1,3 +1,4 @@
+// Street plans: where a battlefield's streets, canals, squares and highways run.
 import { random, randomInt } from './rng'
 
 /** What a tile of a street plan is: land to build on, a street, a canal, an open square, or a highway's median. */

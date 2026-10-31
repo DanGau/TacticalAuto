@@ -1,6 +1,6 @@
 # Architecture
 
-TacticalAuto is a web application. Layers, simulation, and model harness: [design.md](design.md).
+TacticalAuto is a web application. Layers, simulation, and model harness: [design.md](design.md). Which file owns what: [modules.md](modules.md).
 
 ## Rules
 

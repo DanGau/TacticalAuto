@@ -1,3 +1,4 @@
+// Turns run results into a report, with its balance bands and warnings.
 import type { Goal } from '../core/goals'
 import { KEYS } from '../core/run'
 import type { RunResult } from './run'

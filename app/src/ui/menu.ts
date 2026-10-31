@@ -1,5 +1,7 @@
+// The title screen, story and recruit choice.
 import { CLASSES } from '../core/classes'
-import type { Run, Soldier } from '../core/run'
+import type { Run } from '../core/run-state'
+import type { Soldier } from '../core/run-state'
 import { SKILLS } from '../core/skills'
 import { TRAITS, type Trait } from '../core/traits'
 import { places } from './globe'
