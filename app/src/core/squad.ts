@@ -115,12 +115,15 @@ const MIN_MOVE = 2
 export const LEVEL_STATS: Partial<Stats> = { hp: 2, crit: 0.03 }
 
 /**
- * Adds a recruit to the squad and returns it: a level 1 recruit set on one of its class's paths at random. Under a
+ * Adds a recruit to the squad, while it has room: a level 1 recruit set on one of its class's paths at random. Under a
  * doctrine of unique classes it takes a class no squadmate has, while one is left.
  */
-export function hire(run: Run): Soldier {
-  return join(run, draft(run, []))
+export function hire(run: Run): void {
+  if (run.soldiers.length < MAX_SQUAD) join(run, draft(run, []))
 }
+
+/** The most heroes a party has. */
+export const MAX_SQUAD = 3
 
 /** Adds `soldier` to the squad and returns it. */
 export function join(run: Run, soldier: Soldier): Soldier {

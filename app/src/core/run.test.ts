@@ -37,7 +37,7 @@ import { SHOP_WARES } from './rewards'
 import { GEAR_PRICE } from './rewards'
 import { squadKeywords } from './squad'
 import { RECRUITS } from './squad'
-import { hire } from './squad'
+import { hire, MAX_SQUAD } from './squad'
 import { LEVEL_STATS } from './squad'
 import { soldierStats } from './squad'
 import { health } from './squad'
@@ -206,7 +206,8 @@ test('a wipe loses the run even when the last alien falls with the last soldier'
 /** A run of two soldiers whose battle ended lost with the second left downed on the field, the first standing. */
 function leftBehind(): Run {
   const run = travelling(['battle', 'battle'])
-  hire(run).skills.splice(1)
+  hire(run)
+  run.soldiers.at(-1)!.skills.splice(1)
   run.phase = 'overworld'
   apply(run, { type: 'advance' })
   enterAt(run)
@@ -267,7 +268,8 @@ test('on a recovery, a soldier who reaches a held squadmate gets them up at half
 
 test('getting out, a soldier picks up a squadmate down, walks at half its move carrying them, and lifts off with them', () => {
   const run = travelling(['battle', 'battle'])
-  hire(run).skills.splice(1)
+  hire(run)
+  run.soldiers.at(-1)!.skills.splice(1)
   run.phase = 'overworld'
   apply(run, { type: 'advance' })
   enterAt(run)
@@ -319,7 +321,8 @@ test('every stop on the way across a continent is at a real town, none twice', (
 
 test('soldiers keep their health between battles, heal TRAVEL_HEAL for each stop travelled to, and come back from downed at 1', () => {
   const run = travelling(['battle', 'battle', 'battle'])
-  hire(run).skills.splice(1)
+  hire(run)
+  run.soldiers.at(-1)!.skills.splice(1)
   run.phase = 'overworld'
   const [hurt, fallen] = run.soldiers
   const most = soldierStats(run, hurt).hp
@@ -453,7 +456,7 @@ test.each(['human', 'alien'] as const)('full threat puts an ambush before the ne
   expect(nextStop(run)).toBe('battle')
 })
 
-test.each(['human', 'alien'] as const)('with every key won the squad is four, only the final mission remains, and it decides the run; %s win', (winner) => {
+test.each(['human', 'alien'] as const)('with every key won the squad is three, only the final mission remains, and it decides the run; %s win', (winner) => {
   const run = started()
   for (let key = 0; key < KEYS; key++) {
     atKey(run)
@@ -464,7 +467,7 @@ test.each(['human', 'alien'] as const)('with every key won the squad is four, on
     for (const s of run.soldiers) while (skillOffers(s).length > 0) apply(run, { type: 'skill', soldier: s.id, index: 0 })
     expect(run.phase).toBe('overworld')
   }
-  expect(run.soldiers).toHaveLength(KEYS + 1)
+  expect(run.soldiers).toHaveLength(MAX_SQUAD)
   expect(run.relics).toHaveLength(KEYS)
   onward(run)
   expect(current(run)!.stop).toMatchObject({ kind: 'final', terrain: 'hive' })
@@ -677,15 +680,21 @@ test('the Smugglers\' Tunnel skips the next two stops and comes out anywhere in 
   for (const i of next) expect(legOf(raided).columns[1][i].stop).toMatchObject({ kind: 'battle', risk: 'dangerous' })
 })
 
+test('the party never passes three', () => {
+  const run = started()
+  for (let i = 0; i < 5; i++) hire(run)
+  expect(run.soldiers).toHaveLength(MAX_SQUAD)
+})
+
 test('doctrines change the run: Lone Wolf leaves one soldier and stops recruits; Specialists give every soldier its own class', () => {
   const run = started()
-  for (let i = 0; i < 3; i++) hire(run)
+  for (let i = 0; i < 2; i++) hire(run)
   run.event = 'instructor'
   run.phase = 'event'
   enter(run)
   const levels = run.soldiers.map(level)
   apply(run, { type: 'choose', index: 0 })
-  expect(new Set(run.soldiers.map((s) => s.cls)).size).toBe(4)
+  expect(new Set(run.soldiers.map((s) => s.cls)).size).toBe(MAX_SQUAD)
   expect(run.soldiers.map(level)).toEqual(levels.map((l) => l + 1))
   expect(run.doctrines).toEqual(['specialists'])
 

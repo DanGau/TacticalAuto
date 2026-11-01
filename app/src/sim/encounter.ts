@@ -10,7 +10,7 @@ import { atKey, begun, road } from '../core/roads'
 import { KEYS, legOf } from '../core/run'
 import { type Run } from '../core/run-state'
 import { drawBattle } from '../core/missions'
-import { hire } from '../core/squad'
+import { hire, MAX_SQUAD } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { skillOffers } from '../core/squad'
 import { xpFor } from '../core/squad'
@@ -31,7 +31,7 @@ import { ENCOUNTER_BANDS, type Encounter, type Squad } from './report'
 function encounter(seed: number, mission: Encounter, leg: number, squad: Squad): { won: boolean; rescued: number | null; hurt: number } {
   const run = begun(seed)
   run.soldiers[0].skills.splice(1)
-  while (run.soldiers.length < Math.min(leg, KEYS) + 1) hire(run)
+  while (run.soldiers.length < Math.min(leg + 1, MAX_SQUAD)) hire(run)
   run.keys = Math.min(leg, KEYS)
   const levels = squad === 'strong' ? 2 + 2 * leg : 1 + leg
   for (const soldier of run.soldiers) {

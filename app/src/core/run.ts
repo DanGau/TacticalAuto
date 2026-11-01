@@ -14,7 +14,7 @@ import { TOWNS } from './towns'
 import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
 import { LEG_STOPS, STOP_THREAT, THREAT_MAX } from './progress'
-import { charges, draft, health, join, offerRecruits, skillOffers, soldierStats, weaponOf, xpFor } from './squad'
+import { charges, draft, health, join, MAX_SQUAD, offerRecruits, skillOffers, soldierStats, weaponOf, xpFor } from './squad'
 import { dropGear, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
 import { type Leg, type MapNode, type Risk, type Run, type Stage, type Stop, type StopKind } from './run-state'
@@ -54,7 +54,7 @@ const HERO_LEVEL = 2
 
 /**
  * The journey from `home`: across its own continent to a hero in another of its cities, then on to the nearest
- * continent not yet crossed, a leg each, and at last to the alien hub. A hero waits at each leg's end.
+ * continent not yet crossed, a leg each, and at last to the alien hub. A hero waits at the end of each leg while the party has room for one.
  */
 function plotRoute(run: Run, home: City): Stage[] {
   const route: Stage[] = []
@@ -68,10 +68,12 @@ function plotRoute(run: Run, home: City): Stage[] {
     const most = Math.max(...others.map((c) => townsBetween(continent, from.at, c.at)))
     const cities = others.filter((c) => townsBetween(continent, from.at, c.at) >= FAR_CITY * most)
     const to = cities[randomInt(run, cities.length)]
-    const hero = draft(run, [])
-    hero.home = to
-    hero.xp = xpFor(HERO_LEVEL)
-    for (let offers = skillOffers(hero); offers.length > 0; offers = skillOffers(hero)) hero.skills.push(offers[randomInt(run, offers.length)])
+    const hero = leg < MAX_SQUAD - 1 ? draft(run, []) : null
+    if (hero) {
+      hero.home = to
+      hero.xp = xpFor(HERO_LEVEL)
+      for (let offers = skillOffers(hero); offers.length > 0; offers = skillOffers(hero)) hero.skills.push(offers[randomInt(run, offers.length)])
+    }
     route.push({ continent, from: from.at, to, hero })
     from = to
   }

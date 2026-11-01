@@ -8,7 +8,7 @@ import { dropGear, findUtility, settle } from './rewards'
 import { random, randomInt } from './rng'
 import { drawStops, passStop } from './run'
 import { type Run } from './run-state'
-import { earn, soldierStats, join, squadKeywords } from './squad'
+import { earn, soldierStats, join, MAX_SQUAD, squadKeywords } from './squad'
 
 /**
  * Settles a finished battle: experience, threat, rewards, and where the squad stands on the road. Every soldier earns
@@ -53,9 +53,9 @@ export function endBattle(run: Run): void {
   // A key mission and an ambush always turn up a utility; a battle by its risk.
   const found = won && mission.kind !== 'final' && random(run) < (mission.kind === 'battle' ? risk.utility : 1) ? findUtility(run) : null
   const key = won && mission.kind === 'key'
-  // Each hero extracted joins the squad.
+  // A hero extracted joins the squad, if it has room.
   const hero = run.route[run.keys]?.hero
-  const hired = key && hero && !run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).noRecruits) ? join(run, hero).name : null
+  const hired = key && hero && run.soldiers.length < MAX_SQUAD && !run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).noRecruits) ? join(run, hero).name : null
   run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, soldiers, hired, rescued, found }
 
   // Losing the hero's extraction, an ambush, a recovery or the hub loses the run, as does a wipe.

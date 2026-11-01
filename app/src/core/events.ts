@@ -9,7 +9,7 @@ import { drawBattle } from './missions'
 import { dropGear } from './rewards'
 import { settle } from './rewards'
 import { stockShop } from './rewards'
-import { hire } from './squad'
+import { hire, MAX_SQUAD } from './squad'
 import { wounded } from './squad'
 import { mend } from './squad'
 import { level } from './squad'
@@ -81,7 +81,8 @@ const encounters = {
     options: [
       {
         quip: 'Crank it to eleven. What could a few skipped organs hurt?',
-        text: 'Mass Cloning: two new clones join, and every hero has 2 less health for the run',
+        text: 'Mass Cloning: clones join until the party is full, and every hero has 2 less health for the run',
+        can: (run) => run.soldiers.length < MAX_SQUAD,
         take: (run) => {
           hire(run)
           hire(run)
@@ -109,7 +110,7 @@ const encounters = {
   },
   instructor: {
     name: 'Rogue Instructor',
-    text: 'A drill instructor in mirrored shades blocks the road with a whiteboard. It reads SYNERGY, underlined four times. "Four soldiers, four jobs. If two of you do the same thing, one of you is furniture."',
+    text: 'A drill instructor in mirrored shades blocks the road with a whiteboard. It reads SYNERGY, underlined four times. "Three soldiers, three jobs. If two of you do the same thing, one of you is furniture."',
     options: [
       {
         quip: 'Drop and give me twenty, each in a different discipline.',
@@ -168,7 +169,7 @@ const encounters = {
     text: 'A column of survivors blocks the road: grandparents, a goat, a teenager livestreaming. The aliens are not far behind, and the goat is very loud.',
     options: [
       { quip: 'Feed the goat. The goat has earned this.', text: 'Shelter them: -4 supplies, -2 threat', can: (run) => run.supplies >= 4, take: (run) => ((run.supplies -= 4), raise(run, -2)) },
-      { quip: '"Anyone who can lift a rifle, step forward." The goat steps forward.', text: 'Recruit the fit: a new soldier joins; +2 threat', take: (run) => (hire(run), raise(run, 2)) },
+      { quip: '"Anyone who can lift a rifle, step forward." The goat steps forward.', text: 'Recruit the fit: a new soldier joins; +2 threat', can: (run) => run.soldiers.length < MAX_SQUAD, take: (run) => (hire(run), raise(run, 2)) },
       leave('Wave, smile, and take the other road very quickly.'),
     ],
   },

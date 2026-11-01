@@ -149,7 +149,7 @@ function travelLabel(run: Run, stop: Stop, next: 'battle' | 'key' | 'final'): st
 function where(run: Run, stop: Stop): string {
   const stage = run.route[run.keys]
   if (stop.kind === 'final') return 'The alien hub'
-  if (stop.kind === 'key') return `Extract ${stage.hero!.name}`
+  if (stop.kind === 'key') return stage.hero ? `Extract ${stage.hero.name}` : 'Storm the stronghold'
   // A stop's icon tells what it is; only a fight says more.
   if (stop.kind !== 'battle') return ''
   return `${GOALS[stop.goal].name} · ${RISKS[stop.risk].name}${stop.twist ? ` · ${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}` : ''}`

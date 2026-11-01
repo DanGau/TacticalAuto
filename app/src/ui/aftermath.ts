@@ -4,7 +4,6 @@ import { FEATS, type Tally } from '../core/feats'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { UTILITIES } from '../core/utilities'
-import { KEYS } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { type Soldier } from '../core/run-state'
@@ -12,7 +11,7 @@ import { squadKeywords } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { health } from '../core/squad'
 import { skillOffers } from '../core/squad'
-import { level, weaponOf } from '../core/squad'
+import { level, MAX_SQUAD, weaponOf } from '../core/squad'
 import { weaponText } from '../core/weapons'
 import { xpFor } from '../core/squad'
 import { SKILLS } from '../core/skills'
@@ -155,5 +154,5 @@ export function stopReport(run: Run, report: Report, still = false): string {
 
 export function runEnd(run: Run): string {
   if (run.phase === 'won') return `<h1 class="down">The source is destroyed. Earth is saved.</h1><button id="again">New run</button>`
-  return `<h1 class="up">Earth has fallen</h1><h2>Lost: ${STOP_NAMES[run.mission!.kind]}, with ${run.soldiers.length} of ${KEYS + 1} heroes</h2><button id="again">New run</button>`
+  return `<h1 class="up">Earth has fallen</h1><h2>Lost: ${STOP_NAMES[run.mission!.kind]}, with ${run.soldiers.length} of ${MAX_SQUAD} heroes</h2><button id="again">New run</button>`
 }

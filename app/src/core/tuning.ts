@@ -6,7 +6,7 @@ export const TUNING = {
   /** Damage every alien's attack adds. */
   alienDamage: -1,
   /** The alien force a battle has in each leg, before its risk and kind are counted. */
-  legForce: [3, 10, 18, 22],
+  legForce: [3, 10, 18, 20],
   /** Damage each hit on a marked unit adds. */
   markDamage: 1,
   /** Damage Accelerant Gel adds to hits on a burning target. */
