@@ -45,8 +45,8 @@ const weapons = {
   smg: { name: 'SMG', stats: { range: -1, move: 1 }, attack: { shots: 4, power: 0.4, ms: 90 } },
   lmg: { name: 'Machine Gun', stats: { range: 1, move: -1 }, attack: { shots: 5, power: 0.35, ms: 110 }, effect: 'suppress', note: 'A target it hits does 1 less damage on its next turn' },
   pistols: { name: 'Twin Pistols', stats: { move: 1 }, attack: { shots: 2, power: 0.7, ms: 220 }, note: 'Left, then right' },
-  hammer: { name: 'Hammer', stats: { move: 1 }, attack: { shots: 1, power: 3, wide: 0.6 }, thrown: { shots: 1, power: 1.3, ms: 700, range: 4 }, melee: true, stance: 'rush', effect: 'thunder', note: 'Hits knock the target a tile back; if something stops it, it slams into that for 1 damage' },
-  sword: { name: 'Sword', stats: { crit: 0.1, move: 2 }, attack: { shots: 1, power: 2.4 }, dash: 4, melee: true, stance: 'rush', effect: 'cleave', note: 'A kill does 2 damage to every alien beside the one killed' },
+  hammer: { name: 'Hammer', stats: { move: 2 }, attack: { shots: 1, power: 3, wide: 0.6 }, thrown: { shots: 1, power: 1.3, ms: 700, range: 5 }, melee: true, stance: 'rush', effect: 'thunder', note: 'Hits knock the target a tile back; if something stops it, it slams into that for 1 damage' },
+  sword: { name: 'Sword', stats: { crit: 0.1, move: 2 }, attack: { shots: 1, power: 2.7 }, dash: 4, melee: true, stance: 'rush', effect: 'cleave', note: 'A kill does 2 damage to every alien beside the one killed' },
   shield: { name: 'Shield', stats: { armor: 2, move: 1 }, attack: { shots: 1, power: 1.7 }, thrown: { shots: 1, power: 0.8, ms: 700, range: 4 }, melee: true, stance: 'rush', effect: 'block', note: `A shot from beyond arm's reach does ${BLOCK_SOAK} less damage` },
   fists: { name: 'Power Fists', stats: { move: 2 }, attack: { shots: 2, power: 1, ms: 300 }, rocket: { shots: 2, power: 0.6, ms: 480, range: 5 }, dash: 3, melee: true, stance: 'rush' },
 } satisfies Record<string, Weapon>
