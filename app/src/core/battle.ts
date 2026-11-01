@@ -282,6 +282,8 @@ export interface Battle {
   actor: number | null
   /** What each soldier did this battle, by soldier id. */
   tally: Record<number, Tally>
+  /** The alien the squad marches on while no alien is in the fight. */
+  marching: number | null
   /** Calls to stepBattle so far. */
   beat: number
   phase: 'deploy' | 'battle' | 'over'

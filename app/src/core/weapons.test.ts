@@ -162,3 +162,13 @@ test('a weapon card says its type and special, never how the weapon fights', () 
     if (w.special) expect(gearText(gear)).toContain(w.special)
   }
 })
+
+test('a hammer charges the alien in reach, though a cluster still waiting stands near it', () => {
+  const { b, hero, aliens } = field('hammer', [[14, 10], [18, 10]])
+  Object.assign(aliens[0], { engaged: true, revealed: true })
+  Object.assign(aliens[1], { engaged: false, revealed: true })
+  Object.assign(hero, { engaged: true, stats: { ...hero.stats, move: 6 } })
+  Object.assign(b, { turn: 'human', stage: 'move', shooter: 0, attacks: 0, strides: {}, round: 0 })
+  stepBattle(b)
+  expect(Math.max(Math.abs(hero.x - aliens[0].x), Math.abs(hero.y - aliens[0].y))).toBeLessThanOrEqual(1)
+})

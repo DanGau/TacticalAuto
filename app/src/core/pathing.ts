@@ -13,6 +13,7 @@ import { hasAttack, vipOf, pursuers, carrying, nearest, lying, UPLINK_REACH, cen
 import { ESCORT_REACH } from './goals'
 import { canHurlFrom } from './objects'
 import { bite, canShoot, sees } from './sight'
+import { WEAPONS } from './weapons'
 
 /**
  * The cheapest path to each tile the unit can reach with `move`, climbing costing more, cheapest first,
@@ -200,7 +201,14 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
   // Nearest by the walk, not the crow: as the walk there shortens no other can overtake it, so the squad never paces between two far aliens.
   const walk = (e: Unit) => walkingDistances(battle, e)[Math.round(squad.y) * GRID + Math.round(squad.x)]
   const byWalk = () => enemies.reduce((a, b) => (walk(b) < walk(a) || (walk(b) === walk(a) && distance(b, squad) < distance(a, squad)) ? b : a))
-  return enemies.find((u) => u.target && u.revealed) ?? (fighting.length > 0 ? nearest(fighting, squad) : byWalk())
+  const named = enemies.find((u) => u.target && u.revealed) ?? (fighting.length > 0 ? nearest(fighting, squad) : undefined)
+  if (named) return named
+  // With nobody in the fight the squad holds to one alien till it falls or the fight comes, or a centre shifting between walls paces it back and forth for good.
+  const held = enemies.find((u) => u.id === battle.marching)
+  if (held) return held
+  const next = byWalk()
+  battle.marching = next.id
+  return next
 }
 
 /** How near a civilian an alien must be for the squad to go for it on a rescue. */
@@ -229,7 +237,11 @@ export const preyed = (target: Unit, hit: number) => (target.civilian === 'vip' 
  */
 export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const enemies = enemiesOf(battle, unit)
-  const goal = goalOf(battle, unit, enemies)
+  // A melee hero fights only by reaching someone: it goes for the alien in the fight nearest it, and neither the squad nor what its charge might stir holds it back.
+  const melee = isSoldier(unit) && !!unit.weapon && !!WEAPONS[unit.weapon].melee
+  const shared = goalOf(battle, unit, enemies)
+  const quarry = melee && battle.round < RESTLESS_ROUND && shared && enemies.some((e) => e === shared) ? nearest(enemies.filter((e) => e.engaged && e.revealed && walkingDistances(battle, e)[unit.y * GRID + unit.x] < Infinity), unit) : undefined
+  const goal = quarry ?? shared
   if (!goal) return []
   // A soldier walled off from where it is going punches through the walls about whichever of it and the goal is boxed in.
   if (unit.side === 'human' && walkingDistances(battle, goal)[unit.y * GRID + unit.x] === Infinity) breach(battle, walkingDistances(battle, unit).filter(Number.isFinite).length < POCKET ? unit : goal)
@@ -250,13 +262,13 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const apart = (end: Tile) => Math.max(0, Math.min(MEDIC_REACH, ...squadmates.map((u) => distance(end, u) - MEDIC_REACH)))
   const centre = squadmates.length > 0 ? centreOf(squadmates) : unit
   /** Tiles `end` is beyond COHESION from the middle of the unit's squadmates. Aliens fight as they find themselves. */
-  const stray = (end: Tile) => (unit.side === 'human' ? Math.max(0, distance(end, centre) - COHESION) : 0)
+  const stray = (end: Tile) => (unit.side === 'human' && !melee ? Math.max(0, distance(end, centre) - COHESION) : 0)
   const unseen = battle.units.filter((u) => u.side !== unit.side && !u.revealed)
   const waiting = battle.units.filter((u) => u.side !== unit.side && !u.engaged)
   // The squad is in a fight while some soldier has an alien in sight.
   const fighting = unit.side === 'human' && seen.size > 0
   /** Whether a soldier on `end` would sight an alien unseen, or draw in one waiting, while the squad is in a fight, until the battle drags on and only moving can end it. */
-  const provokes = (end: Tile) => (fighting && battle.round < RESTLESS_ROUND && (unseen.some((alien) => sees(battle, end, alien)) || waiting.some((alien) => distance(alien, end) <= ENGAGE_REACH)) ? 1 : 0)
+  const provokes = (end: Tile) => (fighting && !melee && battle.round < RESTLESS_ROUND && (unseen.some((alien) => sees(battle, end, alien)) || waiting.some((alien) => distance(alien, end) <= ENGAGE_REACH)) ? 1 : 0)
   /** Whether `end` would hurt the unit to stand on: acid, or fire unless it cannot burn; for a soldier, a fuel tank beside it, until the battle drags on, for a tank never goes away and tanks can bar the way. Caltrops only slow and hurt the way. */
   const acid = (end: Tile) => (onTile(battle.acid, end) || (unit.side === 'human' && battle.round < RESTLESS_ROUND && besideFuel(battle, end)) || (onTile(battle.fire, end) && !fireproof(battle, unit)) ? 1 : 0)
   /**
@@ -303,7 +315,7 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
         stray: stray(end),
         stalled: toGoal[end.y * GRID + end.x] >= toGoal[unit.y * GRID + unit.x] ? 1 : 0,
         // A rescue is no time for care: every turn costs civilians.
-        careful: unit.side === 'human' && battle.round < RESTLESS_ROUND && battle.goal !== 'rescue',
+        careful: unit.side === 'human' && !melee && battle.round < RESTLESS_ROUND && battle.goal !== 'rescue',
       }
       // No unit ends its move in acid if it can help it.
       // On a hold, a soldier stands its ground at the uplink before anything else.

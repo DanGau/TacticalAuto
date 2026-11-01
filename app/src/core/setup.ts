@@ -152,6 +152,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     held: 0,
     actor: null,
     tally: {},
+    marching: null,
     entry: null,
     arena: { x: 0, y: 0, reach: ARENA_REACH },
     approach: { x: 0, y: 0 },
