@@ -1,6 +1,6 @@
 # Game design principles
 
-Test every new mechanic against these. Each cites where it comes from.
+Theme: superheroes on D&D-style rules; see [premise](premise.md). Test every new mechanic against these. Each cites where it comes from.
 
 1. **Two layers, each holding one end of the game.** In XCOM, a source we borrow from, the strategy layer holds the only way to lose and the tactical layer the only way to win, so neither can be ignored. Here the map creates the danger and a battle settles it. [1]
 2. **One choice, two stakes.** XCOM's abduction choice mixes a reward that advances the win with panic that advances the loss; that is why it is tense and still easy to read. Every choice of way here pairs its rewards with the danger of its battles. [1]
@@ -10,8 +10,8 @@ Test every new mechanic against these. Each cites where it comes from.
 6. **Breadth early, depth later.** Start with few simple options. Unlock more between runs as "you are ready for this", not as a prize: many new options quickly at first, niche ones later. Not built. [4]
 7. **Show the change.** Players feel feedback, not numbers. After a battle, show the gain first and the aliens' answer second, each as a visible change to the board. [5]
 8. **Squeeze and release.** Tension must be followed by relief the player earned, and the alien advance after a win is the next squeeze. [5]
-9. **Rewards that point a build.** A reward that is strong everywhere makes runs alike; one that pays only if the player builds around it makes them differ. Offer a few at a time and make the choice permanent, so each pick matters for the whole run. Relics here are chosen one of three and kept; each skill a soldier learns is kept and opens the next ones in its class's tree. [6]
-10. **Heroes, not hiders.** The squad never sneaks: every turn is a full turn, and soldiers march on the fight from the first. Heroes dash where the fight needs them rather than crawl: a soldier with no shot dashes on to one. The turn dial shows whose turn it is. [7] [8]
+9. **Rewards that point a build.** A reward that is strong everywhere makes runs alike; one that pays only if the player builds around it makes them differ. Offer a few at a time and make the choice permanent, so each pick matters for the whole run. Relics here are chosen one of three and kept; each skill a hero learns is kept and opens the next ones in its class's tree. [6]
+10. **Heroes, not hiders.** The party never sneaks: every turn is a full turn, and heroes march on the fight from the first. Heroes dash where the fight needs them rather than crawl: a hero with no shot dashes on to one. The turn dial shows whose turn it is. [7] [8]
 11. **Cut to the fight.** No walk to find the aliens: the game cuts to the heroes landing at the fight, and the fight is plainly one of two flows by mission and map: a push, heroes knocking down clusters one at a time, or a flood, heroes holding their ground as clumps pour in. The way in shows with every alien but burrowers in sight. [3] [8]
 
 ## Events
@@ -20,8 +20,8 @@ A draft event ships only if it passes every gate:
 
 1. **A real trade.** Every option but walking away costs something (2).
 2. **Stated odds.** The option says what it does, and how often if by chance (3).
-3. **No spiral.** No option cripples the squad for good (4).
-4. **Our levers.** It moves supplies, threat, soldiers, levels, gear, relics or stops; nothing the game lacks.
+3. **No spiral.** No option cripples the party for good (4).
+4. **Our levers.** It moves supplies, threat, heroes, levels, gear, relics or stops; nothing the game lacks.
 5. **Its own trade.** No other event offers the same deal.
 
 A test checks what it can: every event has a choice, ends in one always open, and repeats no option.

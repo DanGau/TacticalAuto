@@ -46,7 +46,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 ## core/: content and helpers
 
-`aliens`, `challenges`, `classes`, `doctrines`, `feats`, `gear`, `goals`, `keywords`, `relics`, `secondaries`, `skills`, `twists`, `utilities`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`: test helpers.
+`aliens`, `challenges`, `classes`, `doctrines`, `feats`, `gear`, `goals`, `keywords`, `powers`, `relics`, `secondaries`, `skills`, `twists`, `utilities`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`: test helpers.
 
 ## view/: battle rendering
 
@@ -66,6 +66,6 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 ## Elsewhere
 
-- `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `cards.ts` fixed-size cards tapped to arm and again to confirm, and gear comparisons; `briefing.ts` the tour before the landing; `menu.ts` the title.
+- `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `cards.ts` fixed-size cards tapped to arm and again to confirm, and gear comparisons; `sheet.ts` character sheets and alien stat blocks; `briefing.ts` the tour before the landing; `menu.ts` the title.
 - `bots/bots.ts`: bot strategies. `sim/`: the sim CLI, `sim/encounter.ts`, the challenge lab, and `sim/forks.ts`, the clean comparison of answers.
 - `main.ts`: browser entry and `window.debug`.
