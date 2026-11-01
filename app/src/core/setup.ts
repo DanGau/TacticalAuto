@@ -10,6 +10,7 @@ import { generateTerrain } from './terrain-gen'
 import type { Twist } from './twists'
 import { deploy, planEntrance } from './entrances'
 import { ARENA_REACH, designEncounter } from './encounter'
+import { deadlineFor, sentries, type ChallengeId } from './challenges'
 
 /** Lays each soldier the aliens hold on a recovery beside an alien, in turn. */
 export function holdCaptives(battle: Battle, captives: Reserve[]): void {
@@ -77,7 +78,7 @@ const WAVE_MORE = 4
 function clumps(battle: Battle, aliens: Alien[]): Alien[][] {
   const left = [...aliens]
   const waves: Alien[][] = []
-  while (left.length > 0) waves.push(left.splice(0, WAVE_LEAST + randomInt(battle, WAVE_MORE)))
+  while (left.length > 0) waves.push(left.splice(0, (battle.challenge === 'swarm' ? 2 : 1) * (WAVE_LEAST + randomInt(battle, WAVE_MORE))))
   return waves
 }
 
@@ -97,7 +98,7 @@ export const CACHES = 3
  * of its aliens back as waves; a rescue's civilians are scattered about the terror's heart. An ambush has no entrance: the squad
  * is down in the arena's middle.
  */
-export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale): Battle {
+export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale, challenge: ChallengeId | null = null): Battle {
   const holder = { rng: seed }
   const terrain = generateTerrain(holder, GRID, kind, twist, place)
   const battle: Battle = {
@@ -106,7 +107,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     rules,
     twist,
     round: 0,
-    flow: flowOf(goal, kind),
+    flow: flowOf(goal, kind, challenge),
     waves: [],
     beat: 0,
     phase: 'deploy',
@@ -122,6 +123,8 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     ...terrain,
     bulk: terrain.props.map((prop) => PROP_BULK[prop]),
     used: [],
+    challenge,
+    deadline: challenge === 'scattered' ? deadlineFor(sentries(aliens.length)) : null,
     utility: null,
     rigged: null,
     smoked: {},
@@ -153,9 +156,9 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
   }
   sealPockets(battle)
   const flood = battle.flow === 'flood'
-  const posted = flood ? aliens.slice(0, Math.ceil(aliens.length * FLOOD_POSTED)) : aliens
-  const { spot, posts, clusters, heart } = designEncounter(battle, posted, goal)
-  if (flood) battle.waves = clumps(battle, goal === 'hold' && posted.length === aliens.length ? aliens : aliens.slice(posted.length))
+  const posted = flood ? aliens.slice(0, Math.ceil(aliens.length * FLOOD_POSTED)) : battle.deadline !== null ? aliens.slice(0, sentries(aliens.length)) : aliens
+  const { spot, posts, clusters, heart } = designEncounter(battle, posted, goal, challenge)
+  if (flood || battle.deadline !== null) battle.waves = clumps(battle, goal === 'hold' && posted.length === aliens.length ? aliens : aliens.slice(posted.length))
   sealPockets(battle)
   const centre = openNear(battle, spot)
   const vip = goal === 'vip' ? centre : null

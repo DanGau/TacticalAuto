@@ -5,6 +5,7 @@ import { blocked, distance, edgeDepths, NEIGHBORS, onGrid, openNear, walkingDist
 import { gather } from './formations'
 import { randomInt } from './rng'
 import { PROP_BULK, type Prop, type TerrainKind } from './terrain'
+import type { ChallengeId } from './challenges'
 
 /** How far from its centre the arena reaches, and how far out the camera shows it clear of props. */
 export const ARENA_REACH = 14
@@ -39,6 +40,11 @@ const SHED_MARKS: Mark[] = [[-13, -8], [-13, 8], [-10, -13], [-10, 13]]
 const KEEP_FROM = 8
 const KEEP_TO = 20
 const KEPT = 2
+
+/** A Slog's band of mire, in tiles along the axis; a Firing line's ridge, how far along it runs and how far to each side. */
+const MIRE = [-6, 6]
+const RIDGE_ALONG = 9
+const RIDGE_REACH = 12
 
 /** A random open tile far enough within the map's edge to hold the arena; in a building if `roofed` and one stands there. */
 function arenaSpot(battle: Battle, roofed: boolean): Tile {
@@ -143,6 +149,15 @@ function rise(battle: Battle, at: Tile, reach: number, crest: number): void {
   }
 }
 
+/** Lays a band of mire across the axis, from one flank of the arena to the other. */
+function layMire(battle: Battle, spot: Tile, fx: number, fy: number): void {
+  for (let t = 0; t < GRID * GRID; t++) {
+    const [x, y] = [(t % GRID) - spot.x, Math.floor(t / GRID) - spot.y]
+    const along = x * fx + y * fy
+    if (along >= MIRE[0] && along <= MIRE[1] && Math.hypot(x, y) <= SIGHT_CLEAR && !['void', 'water', 'floor'].includes(battle.ground[t])) battle.ground[t] = 'mire'
+  }
+}
+
 /** Stands `prop` on an open tile near `at`, none touching another, so it walls nothing off. */
 function stand(battle: Battle, at: Tile, prop: Prop): boolean {
   if (!onGrid(at.x, at.y) || blocked(battle, at.x, at.y) || battle.ground[at.y * GRID + at.x] === 'void') return false
@@ -156,7 +171,7 @@ function stand(battle: Battle, at: Tile, prop: Prop): boolean {
  * Sets the arena and lays out the encounter for `goal`. Returns the arena's centre, a post and cluster for each alien, and on a
  * rescue the terror's heart. A VIP's building and a satellite's compound stay standing; all else in the arena comes down, and the props around it.
  */
-export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal): { spot: Tile; posts: Tile[]; clusters: number[]; heart: Tile | null } {
+export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal, challenge: ChallengeId | null = null): { spot: Tile; posts: Tile[]; clusters: number[]; heart: Tile | null } {
   const spot = arenaSpot(battle, goal === 'vip')
   const arena = { x: spot.x, y: spot.y, reach: ARENA_REACH }
   battle.arena = arena
@@ -176,6 +191,8 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal): { 
   // Nothing left for a hero to burst out of: a shed by the edge, but in the hive, which holds nothing human.
   if (battle.place !== 'hive' && standing.size === 0 && battle.place !== 'compound') SHED_MARKS.some((mark) => raiseShed(battle, raw(mark), spot))
   rise(battle, raw(OVERLOOK), 3, 1)
+  if (challenge === 'firingLine') for (let across = -RIDGE_REACH; across <= RIDGE_REACH; across += 2) rise(battle, raw([RIDGE_ALONG, across]), 2, 1)
+  if (challenge === 'slog') layMire(battle, spot, fx, fy)
   rise(battle, raw(LEDGE), 2, 0)
   const [low, tall] = SCATTER[battle.place] ?? ['crate', 'stack']
   // The hive holds nothing human: its hazard is its own growth.
@@ -193,6 +210,6 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal): { 
     }
   }
   const objective = goal === 'vip' || goal === 'hold' ? spot : heart
-  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: openNear(battle, raw(COMMANDER_POST)), boss: openNear(battle, raw(goal === 'ambush' ? OVERLOOK : BOSS_POST)), objective })
+  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: openNear(battle, raw(COMMANDER_POST)), boss: openNear(battle, raw(goal === 'ambush' ? OVERLOOK : BOSS_POST)), objective, challenge })
   return { spot, posts, clusters, heart }
 }

@@ -41,7 +41,7 @@ export function fuelTanks(battle: Battle): Tile[] {
   return tanks.sort((a, b) => distance(a, battle.approach) - distance(b, battle.approach))
 }
 
-/** The rigged tank blows once aliens crowd it or one stands beside it, catching everyone near. */
+/** The rigged tank blows once aliens crowd it, catching them and any hero close by. */
 export function blowRigged(battle: Battle): GameEvent[] {
   const tank = battle.rigged
   if (!tank) return []
@@ -50,11 +50,12 @@ export function blowRigged(battle: Battle): GameEvent[] {
     return []
   }
   const aliens = battle.units.filter((u) => u.side === 'alien' && u.revealed)
-  if (!aliens.some((a) => distance(a, tank) <= 1) && aliens.filter((a) => distance(a, tank) <= RIG.near).length < RIG.crowd) return []
+  if (aliens.filter((a) => distance(a, tank) <= RIG.near).length < RIG.crowd) return []
   battle.rigged = null
-  const caught = battle.units.filter((u) => distance(u, tank) <= RIG.radius)
+  const caught = battle.units.filter((u) => distance(u, tank) <= (u.side === 'alien' ? RIG.radius : RIG.close))
   const events: GameEvent[] = [{ type: 'rocket', id: aliens[0].id, x: tank.x, y: tank.y, hits: caught.map((u) => ({ target: u.id, damage: RIG.damage })), label: 'RIGGED' }]
   wreck(battle, tank, 1)
+  for (let y = tank.y - RIG.fireReach; y <= tank.y + RIG.fireReach; y++) for (let x = tank.x - RIG.fireReach; x <= tank.x + RIG.fireReach; x++) if (onGrid(x, y) && !['void', 'water'].includes(battle.ground[y * GRID + x])) battle.fire.push({ x, y, turns: RIG.fireTurns })
   for (const unit of caught) wound(battle, unit, RIG.damage, events)
   return events
 }

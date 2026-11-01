@@ -8,6 +8,7 @@ import type { Resist } from './keywords'
 import { type Flow, Goal } from './goals'
 import type { Twist } from './twists'
 import type { UtilityId } from './utilities'
+import type { ChallengeId } from './challenges'
 import type { EntranceKind } from './entrances'
 import type { Feature } from './features'
 import { type Bulk, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
@@ -396,6 +397,10 @@ export interface Battle {
   city: string
   /** Once-per-battle effects of the whole squad already used. */
   used: Effect[]
+  /** What this battle tests; an ambush or a recovery has none. */
+  challenge: ChallengeId | null
+  /** The round reinforcements start coming, one clump a round, if the aliens posted are not all down; null when they come on a flood's beat. */
+  deadline: number | null
   /** The utility the player picked for this fight. */
   utility: UtilityId | null
   /** A fuel tank rigged to blow; null once it has. */

@@ -16,7 +16,7 @@ import { RALLY_EVERY, rally } from './upkeep'
 function entering(seed = 1, goal: Goal = 'exterminate'): Run & { battle: Battle } {
   const run = begun(seed)
   apply(run, { type: 'go', index: 1 })
-  current(run)!.stop!.goal = goal
+  Object.assign(current(run)!.stop!, { goal, challenge: null })
   apply(run, { type: 'advance' })
   return run as Run & { battle: Battle }
 }
@@ -34,7 +34,7 @@ test("every battlefield's entrance stands where the ground supports it and suits
     for (let seed = 1; seed <= 12; seed++) {
       const run = begun(seed)
       apply(run, { type: 'go', index: 1 })
-      Object.assign(current(run)!.stop!, { goal: 'exterminate', terrain })
+      Object.assign(current(run)!.stop!, { challenge: null, goal: 'exterminate', terrain })
       apply(run, { type: 'advance' })
       const battle = run.battle!
       const { kind, at, feature } = battle.entrance!
@@ -193,7 +193,7 @@ test('a big explosion and a stolen kill are style only, and shooting first hurts
 test('with nobody left fighting, the next cluster comes whole after RALLY_EVERY rounds', () => {
   const run = begun(1)
   apply(run, { type: 'go', index: 1 })
-  road(run, [{ kind: 'battle', risk: 'standard', goal: 'exterminate', terrain: 'town', twist: null, aliens: Array.from({ length: 12 }, () => 'trooper' as const) }])
+  road(run, [{ kind: 'battle', risk: 'standard', goal: 'exterminate', terrain: 'town', challenge: null, twist: null, aliens: Array.from({ length: 12 }, () => 'trooper' as const) }])
   apply(run, { type: 'advance' })
   enterAt(run)
   const battle = run.battle!
@@ -214,7 +214,7 @@ test('Encore catches the aliens nearest surprised whatever the entrance', () => 
   const run = begun(1)
   run.relics = ['encore']
   apply(run, { type: 'go', index: 1 })
-  current(run)!.stop!.goal = 'exterminate'
+  Object.assign(current(run)!.stop!, { goal: 'exterminate', challenge: null })
   apply(run, { type: 'advance' })
   const battle = run.battle!
   stagedAs(battle, 'blast')

@@ -9,7 +9,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `battle.ts` | Battle state types (`Battle`, `Unit`) and the numbers rules share |
 | `grid.ts` | The board: distance, objects, walls, walking costs and routes, free tiles |
 | `setup.ts` | `createBattle`: battle state, placing aliens, civilians, goals by the encounter |
-| `encounter.ts` | `designEncounter`: the set-piece: arena, overlook, hazard, objects, posts, approaches, gates |
+| `encounter.ts` | `designEncounter`: the set-piece: arena, overlook, hazard, mire and ridge, objects, posts, approaches, gates |
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
 | `objects.ts` | What heroes do with objects: hurling them, setting off tanks, a rigged tank |
 | `entrances.ts` | Entrances: the one each encounter stages, where it comes in, what it and the picked utility set off |
@@ -47,7 +47,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 ## core/: content and helpers
 
-`aliens`, `classes`, `doctrines`, `feats`, `gear`, `goals`, `keywords`, `relics`, `secondaries`, `skills`, `twists`, `utilities`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`: test helpers.
+`aliens`, `challenges`, `classes`, `doctrines`, `feats`, `gear`, `goals`, `keywords`, `relics`, `secondaries`, `skills`, `twists`, `utilities`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`: test helpers.
 
 ## view/: battle rendering
 
@@ -69,5 +69,5 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 ## Elsewhere
 
 - `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `cards.ts` fixed-size cards tapped to arm and again to confirm, and gear comparisons; `briefing.ts` the tour before the entrance; `menu.ts` the title.
-- `bots/bots.ts`: bot strategies. `sim/`: the sim and tune CLIs.
+- `bots/bots.ts`: bot strategies. `sim/`: the sim CLI, and `sim/encounter.ts`, the challenge lab.
 - `main.ts`: browser entry and `window.debug`.

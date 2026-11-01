@@ -84,7 +84,7 @@ test('a shield halves hits of its own kind, down to nothing, and leaves the othe
   }
 })
 
-test('a rigged tank is picked, stands until aliens crowd it, then blows on everyone near', () => {
+test('a rigged tank is picked, stands until aliens crowd it, then blows on them', () => {
   let run = landing(['tank'])
   for (let seed = 2; fuelTanks(run.battle!).length < 2; seed++) run = landing(['tank'], seed)
   expect(apply(run, { type: 'enter', utility: 0, tank: 99 }).ok).toBe(false)
@@ -93,15 +93,17 @@ test('a rigged tank is picked, stands until aliens crowd it, then blows on every
   const tank = battle.rigged!
   expect(tank).toEqual(fuelTanks(battle)[1])
   const [foe] = aliens(run)
+  const crowd = Array.from({ length: RIG.crowd }, (_, i) => ({ ...foe, id: 900 + i, y: tank.y + i - 1 }))
   battle.units = [...squad(run), foe]
-  // Not beside it, nor a crowd: it stands.
-  Object.assign(foe, { x: tank.x + RIG.near, y: tank.y, hp: 99, armor: 0, engaged: true, surprised: 2, stats: { ...foe.stats, hp: 99, move: 0 } })
+  // Not a crowd: it stands.
+  Object.assign(foe, { x: tank.x + 1, y: tank.y, hp: 99, armor: 0, engaged: true, surprised: 2, stats: { ...foe.stats, hp: 99, move: 0 } })
   for (const hero of squad(run)) Object.assign(hero, { x: tank.x - 20, y: tank.y })
   battle.turn = 'alien'
   battle.stage = 'move'
   stepBattle(battle)
   expect(battle.rigged).toEqual(tank)
-  Object.assign(foe, { x: tank.x + 1, y: tank.y })
+  for (const c of crowd) Object.assign(c, { x: tank.x + 2, hp: 99, armor: 0, revealed: true, engaged: true, surprised: 2, stats: { ...foe.stats, hp: 99, move: 0 } })
+  battle.units.push(...crowd)
   battle.turn = 'alien'
   battle.stage = 'move'
   const events = stepBattle(battle)

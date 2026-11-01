@@ -2,6 +2,7 @@
 import { GRID, type Alien, type Battle, type Tile } from './battle'
 import { distance, onGrid } from './grid'
 import { random, randomInt } from './rng'
+import type { ChallengeId } from './challenges'
 
 /** What the encounter tells the gathering: the open ground, the fight's heading, and where the set pieces stand. */
 export interface Plot {
@@ -12,6 +13,16 @@ export interface Plot {
   boss: Tile
   /** What the mission is about. */
   objective: Tile | null
+  challenge: ChallengeId | null
+}
+
+/** How a challenge stands its clusters: their sizes, how far along the axis and off it, how far apart, and in what shape. */
+const STAGING: Partial<Record<ChallengeId, { sizes: number[]; band: [number, number]; wander: number; apart: number; shape?: Shape }>> = {
+  slog: { sizes: [2, 3], band: [7, 11], wander: 10, apart: 6, shape: 'line' },
+  firingLine: { sizes: [2, 3], band: [8, 10], wander: 11, apart: 6, shape: 'line' },
+  ironWall: { sizes: [4, 5, 6], band: [0, 8], wander: 5, apart: 8, shape: 'line' },
+  scattered: { sizes: [1], band: [-5, 12], wander: 12, apart: 8 },
+  killBox: { sizes: [99], band: [-6, -6], wander: 0, apart: 2, shape: 'crowd' },
 }
 
 /** A cluster's size is drawn from these: mostly pairs and trios, some crowds, the odd sentry. */
@@ -101,7 +112,8 @@ function groupsOf(battle: Battle, aliens: Alien[], plot: Plot): { members: numbe
     const j = randomInt(battle, i + 1)
     ;[left[i], left[j]] = [left[j], left[i]]
   }
-  while (left.length > 0) groups.push({ members: left.splice(0, SIZES[randomInt(battle, SIZES.length)]), at: null, shape: null })
+  const sizes = (plot.challenge && STAGING[plot.challenge]?.sizes) || SIZES
+  while (left.length > 0) groups.push({ members: left.splice(0, sizes[randomInt(battle, sizes.length)]), at: null, shape: null })
   return groups
 }
 
@@ -114,6 +126,7 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
   const outdoors = plot.ground.filter((t) => battle.ground[t.y * GRID + t.x] !== 'floor' && distance(t, spot) >= clear)
   const open = outdoors.length > 0 ? outdoors : plot.ground
   const groups = groupsOf(battle, aliens, plot)
+  const staged = plot.challenge ? STAGING[plot.challenge] : undefined
   const free = groups.filter((g) => !g.at)
   const centres: Tile[] = groups.flatMap((g) => g.at ?? [])
   const taken = new Set<number>([spot.y * GRID + spot.x])
@@ -126,14 +139,16 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
     if (!at) {
       const i = order++
       const span = PUSH_BAND[1] - PUSH_BAND[0]
-      const wanted = battle.flow === 'push'
+      const wanted = staged
+        ? { along: staged.band[0] + ((staged.band[1] - staged.band[0]) * (i + 0.5)) / free.length, across: (r() * 2 - 1) * staged.wander }
+        : battle.flow === 'push'
         ? { along: PUSH_BAND[0] + (span * (i + 0.5)) / free.length + (r() - 0.5) * 3, across: (r() * 2 - 1) * WANDER }
         : { along: (r() * 2 - 1) * 11, across: (r() * 2 - 1) * 11 }
       const aim = { x: spot.x + fx * wanted.along - fy * wanted.across, y: spot.y + fy * wanted.along + fx * wanted.across }
       const want = FEATURES[randomInt(battle, FEATURES.length)]
-      for (let sep = SEPARATION[battle.flow]; !at && sep >= 2; sep--) {
+      for (let sep = staged?.apart ?? SEPARATION[battle.flow]; !at && sep >= 2; sep--) {
         const room = open.filter((t) => centres.every((c) => distance(c, t) >= sep))
-        const score = (t: Tile) => -Math.hypot(t.x - aim.x, t.y - aim.y) + (featureAt(battle, t) === want ? SETTLE : 0) + r()
+        const score = (t: Tile) => -Math.hypot(t.x - aim.x, t.y - aim.y) + (!staged && featureAt(battle, t) === want ? SETTLE : 0) + r()
         at = room.reduce<Tile | null>((a, b) => (!a || score(b) > score(a) ? b : a), null)
       }
       at ??= spot
@@ -141,7 +156,7 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
     }
     const feature = featureAt(battle, at)
     const options = n === 1 ? (['retinue'] as Shape[]) : shapesFor(feature, n)
-    const shape = group.shape ?? options[randomInt(battle, options.length)]
+    const shape = group.shape ?? staged?.shape ?? options[randomInt(battle, options.length)]
     // A line lies across the way, a stream along it: a road's if it stands on one, else the fight's.
     const [rx, ry] = feature === 'road' ? roadRun(battle, at) : [fx, fy]
     const points = SHAPES[shape](n, r)

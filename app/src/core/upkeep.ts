@@ -75,7 +75,7 @@ export function upkeep(battle: Battle): GameEvent[] {
   if (battle.round === SMOKE.rounds) clearSmoke(battle)
   // Waves come in a pack at a time, at one of the encounter's two gates nearest the squad yet clear of it; a hold's without end.
   const soldiers = battle.units.filter(isSoldier)
-  if (battle.waves.length > 0 && soldiers.length > 0 && battle.round % WAVE_EVERY === 0) {
+  if (battle.waves.length > 0 && soldiers.length > 0 && (battle.deadline === null ? battle.challenge === 'swarm' || battle.round % WAVE_EVERY === 0 : battle.round >= battle.deadline)) {
     const from = centreOf(soldiers)
     const clear = battle.gates.filter((g) => distance(g, from) >= WAVE_CLEAR)
     const near = [...clear].sort((a, b) => distance(a, from) - distance(b, from)).slice(0, 2)
@@ -124,7 +124,8 @@ export const RALLY_PATIENCE = 6
 /** Nobody left to fight, or a fight dragging on, brings in the cluster nearest the squad, so a battle never stands still. */
 export function rally(battle: Battle): void {
   const soldiers = battle.units.filter(isSoldier)
-  if (soldiers.length === 0) return
+  // Sentries hold their posts: the squad must go to them.
+  if (soldiers.length === 0 || battle.deadline !== null) return
   if (battle.round - battle.rallied >= (walkersFighting(battle) > 0 ? RALLY_PATIENCE : RALLY_EVERY)) engageNearest(battle, soldiers)
 }
 

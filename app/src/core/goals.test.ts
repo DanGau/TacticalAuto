@@ -33,14 +33,14 @@ function before(goal: Goal): Run {
   const run = begun(1)
   run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
   apply(run, { type: 'go', index: 1 })
-  road(run, [{ kind: 'battle', risk: 'standard', goal, terrain: 'town', twist: null, aliens: Array.from({ length: 6 }, () => 'trooper' as const) }])
+  road(run, [{ kind: 'battle', risk: 'standard', goal, terrain: 'town', challenge: null, twist: null, aliens: Array.from({ length: 6 }, () => 'trooper' as const) }])
   apply(run, { type: 'advance' })
   return run
 }
 
-test('every battle on the leg under way has its aliens mustered in advance; no other stop has any', () => {
+test('every battle on the leg under way has its aliens mustered in advance; no stop but an extraction has any', () => {
   const run = begun(1)
-  for (const node of run.legs[0].columns.flat()) expect(node.stop!.aliens.length > 0).toBe(node.stop!.kind === 'battle')
+  for (const node of run.legs[0].columns.flat()) expect(node.stop!.aliens.length > 0).toBe(node.stop!.kind === 'battle' || node.stop!.kind === 'key')
 })
 
 test('a hold sets its uplink within, its entrance by it; once held, it is won only when the squad left reaches the extraction zone in the edge', () => {

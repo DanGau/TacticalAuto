@@ -50,8 +50,8 @@ export function endBattle(run: Run): void {
   const byGoal = { exterminate: risk.gear, assassinate: 1, hold: 0, rescue: 0, vip: 0, raid: 0, ambush: 0, recover: 0 }[mission.goal]
   const chance = mission.kind === 'key' ? 1 : mission.kind === 'battle' ? byGoal : 0
   if (won && chance > 0 && random(run) < chance) dropGear(run, risk.rareGear || mission.kind === 'key' || held.some((relic) => relic.rareGear))
-  // A key mission and an ambush always turn up a utility; a battle by its risk.
-  const found = won && mission.kind !== 'final' && random(run) < (mission.kind === 'battle' ? risk.utility : 1) ? findUtility(run) : null
+  // A key mission, an ambush and a win with none held always turn up a utility; a battle by its risk.
+  const found = won && mission.kind !== 'final' && random(run) < (mission.kind === 'battle' && run.utilities.length > 0 ? risk.utility : 1) ? findUtility(run) : null
   const key = won && mission.kind === 'key'
   // A hero extracted joins the squad, if it has room.
   const hero = run.route[run.keys]?.hero

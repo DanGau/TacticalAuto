@@ -1,15 +1,17 @@
 // Mission goals: what each asks of the squad, pays, and the numbers its rules use.
 /** What a battle asks of the squad. Each pays differently, so where the squad goes shapes what it builds. */
 import type { TerrainKind } from './terrain'
+import type { ChallengeId } from './challenges'
 
 export type Goal = 'exterminate' | 'assassinate' | 'hold' | 'rescue' | 'vip' | 'raid' | 'ambush' | 'recover'
 
 /** How a battle plays: heroes push through clusters one at a time, or hold their ground as aliens flood in. */
 export type Flow = 'push' | 'flood'
 
-/** The flow of a battle: a hive's clearing and open or ruined raids flood too, for nothing there stands in the aliens' way. */
-export function flowOf(goal: Goal, place: TerrainKind): Flow {
-  if (goal === 'hold' || goal === 'ambush' || goal === 'rescue') return 'flood'
+/** The flow of a battle: a swarm floods, and with no challenge to stage it, a hive's clearing and open or ruined raids too, for nothing there stands in the aliens' way. */
+export function flowOf(goal: Goal, place: TerrainKind, challenge: ChallengeId | null = null): Flow {
+  if (goal === 'hold' || goal === 'ambush' || goal === 'rescue' || challenge === 'swarm') return 'flood'
+  if (challenge) return 'push'
   if (goal === 'exterminate' && place === 'hive') return 'flood'
   if (goal === 'raid' && (place === 'ruins' || place === 'countryside')) return 'flood'
   return 'push'

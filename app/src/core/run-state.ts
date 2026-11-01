@@ -10,6 +10,7 @@ import type { FeatId, Tally } from './feats'
 import type { Gear } from './gear'
 import type { SkillId } from './skills'
 import type { UtilityId } from './utilities'
+import type { ChallengeId } from './challenges'
 import type { RelicId } from './relics'
 import type { Battle } from './battle'
 import type { DoctrineId } from './doctrines'
@@ -34,6 +35,8 @@ export interface Stop {
   risk: Risk
   goal: Goal
   terrain: TerrainKind
+  /** What the battle tests, drawn ahead, so the map can show it; none but on a fight. */
+  challenge: ChallengeId | null
   /** What about the ground or weather changes the battle; drawn ahead, so the map can show it. */
   twist: Twist | null
   /** Its aliens by kind, mustered before they are equipped. */

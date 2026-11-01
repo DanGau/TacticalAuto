@@ -1,88 +1,65 @@
-// Plays each mission alone at each leg, for a weak and a strong squad, and prints win rates.
+// The challenge lab: plays each challenge alone, for each party size and rung, with each utility, and prints what it costs.
 import { parseArgs } from 'node:util'
-import { bots } from '../bots/bots'
 import { apply } from '../core/apply'
-import { CIVILIANS, type Goal } from '../core/goals'
+import { CHALLENGES, forceOf, type ChallengeId } from '../core/challenges'
 import { generateGear } from '../core/gear'
+import { GOALS, type Goal } from '../core/goals'
+import { fuelTanks } from '../core/objects'
 import { offerable } from '../core/relics'
 import { randomInt } from '../core/rng'
-import { atKey, begun, road } from '../core/roads'
-import { KEYS, legOf } from '../core/run'
+import { road } from '../core/roads'
+import { createRun, legOf } from '../core/run'
 import { type Run } from '../core/run-state'
-import { drawBattle } from '../core/missions'
-import { hire, MAX_SQUAD } from '../core/squad'
-import { soldierStats } from '../core/squad'
-import { skillOffers } from '../core/squad'
-import { xpFor } from '../core/squad'
-import { THREAT_MAX } from '../core/progress'
-import { step } from '../core/step'
-import { ENCOUNTER_BANDS, type Encounter, type Squad } from './report'
+import { hire, skillOffers, soldierStats, xpFor } from '../core/squad'
+import { timedFlow } from '../core/step'
+import { UTILITY_IDS, type UtilityId } from '../core/utilities'
 
-/*
- * Plays each mission in isolation at each leg, for a weak and a strong squad, and prints how often it is won against
- * ENCOUNTER_BANDS. `--mission` picks missions, comma-separated.
- */
+/** The level a party of each size has reached by the time it meets a rung, about what a careful run has. */
+const levelAt = (party: number, rung: number) => party * 2 - 1 + rung
 
-/**
- * Plays one mission in isolation, from a fresh run made to stand at leg `leg` with a squad of `squad` strength:
- * as many soldiers as the leg has, a weak one at the levels a careless run reaches with no gear, a strong one levelled
- * up, in rare gear, with a relic a leg.
- */
-function encounter(seed: number, mission: Encounter, leg: number, squad: Squad): { won: boolean; rescued: number | null; hurt: number } {
-  const run = begun(seed)
-  run.soldiers[0].skills.splice(1)
-  while (run.soldiers.length < Math.min(leg + 1, MAX_SQUAD)) hire(run)
-  run.keys = Math.min(leg, KEYS)
-  const levels = squad === 'strong' ? 2 + 2 * leg : 1 + leg
+/** One battle alone: a fresh party of `party`, levelled for where it stands, with a relic a leg, at full health. */
+function battle(seed: number, party: number, rung: number, challenge: ChallengeId, utility: UtilityId | null, goal: Goal): { won: boolean; hurt: number; seconds: number } {
+  const run = createRun(seed)
+  apply(run, { type: 'recruit', index: seed % run.recruits.length })
+  while (run.soldiers.length < party) hire(run)
+  run.keys = party - 1
+  run.stop = rung * 3
   for (const soldier of run.soldiers) {
-    soldier.xp = xpFor(levels)
-    // Skills owed are learned at random.
+    soldier.xp = xpFor(levelAt(party, rung))
     while (skillOffers(soldier).length > 0) soldier.skills.push(skillOffers(soldier)[randomInt(run, skillOffers(soldier).length)])
-    if (squad === 'strong') soldier.gear = generateGear(run, run.nextGear++, 'rare')
+    soldier.gear = generateGear(run, run.nextGear++, party === 1 ? 'common' : 'rare')
   }
-  if (squad === 'strong') for (let i = 0; i <= leg; i++) run.relics.push(offerable(run.relics)[randomInt(run, offerable(run.relics).length)])
+  for (let i = 0; i < party - 1; i++) run.relics.push(offerable(run.relics)[randomInt(run, offerable(run.relics).length)])
   run.phase = 'overworld'
-  if (mission === 'key' || mission === 'final') {
-    if (mission === 'final') run.keys = KEYS
-    const leg = legOf(run)
-    if (mission === 'final') leg.columns[0][0].stop = { kind: 'final', risk: 'standard', goal: 'exterminate', terrain: 'hive', twist: null, aliens: [] }
-    atKey(run)
-  } else {
-    let stop = drawBattle(run, 'standard')
-    const goal: Goal = mission === 'ambush' || mission === 'recover' ? 'exterminate' : mission
-    for (let tries = 0; stop.goal !== goal && tries < 500; tries++) stop = drawBattle(run, 'standard')
-    road(run, [stop])
-    if (mission === 'ambush') run.threat = THREAT_MAX
-    if (mission === 'recover') run.captives = [run.soldiers.at(-1)!.id]
-  }
+  const stop = { kind: 'battle' as const, risk: 'standard' as const, goal, terrain: 'town' as const, challenge, twist: null, aliens: forceOf(challenge, party, rung, GOALS[goal].force) }
+  legOf(run).path = Array<number>(run.stop).fill(-1)
+  road(run, [stop])
   apply(run, { type: 'advance' })
-  const bot = bots.standard
-  const rng = { rng: seed }
-  while ((run.phase as Run['phase']) === 'battle') {
-    if (run.battle!.phase === 'deploy') apply(run, bot(run, rng))
-    else step(run)
-  }
+  const held = utility ? [utility] : []
+  run.utilities = held
+  const usable = utility !== 'tank' || fuelTanks(run.battle!).length > 0
+  apply(run, held.length > 0 && usable ? { type: 'enter', utility: 0, tank: Math.max(0, fuelTanks(run.battle!).length - 1) } : { type: 'enter' })
+  let clock = { next: 0, done: 0 }
+  while ((run.phase as Run['phase']) === 'battle') clock = timedFlow(run, clock).clock
   const hp = run.report!.soldiers.reduce((sum, s) => sum + s.hp, 0)
   const most = run.soldiers.reduce((sum, s) => sum + soldierStats(run, s).hp, 0)
-  return { won: run.report!.won, rescued: run.report!.rescued, hurt: 1 - hp / most }
+  return { won: run.report!.won, hurt: 1 - hp / most, seconds: clock.done / 1000 }
 }
 
-{
-  const { values } = parseArgs({ options: { runs: { type: 'string', default: '40' }, mission: { type: 'string', default: '' } } })
-  const runs = Number(values.runs)
-  const missions = (values.mission ? values.mission.split(',') : Object.keys(ENCOUNTER_BANDS)) as Encounter[]
-  console.log('mission      leg  squad   won   band      health lost  saved')
-  for (const mission of missions) {
-    for (let leg = mission === 'final' ? KEYS : 0; leg <= (mission === 'final' ? KEYS : KEYS - 1); leg++) {
-      if (mission === 'recover' && leg === 0) continue
-      for (const squad of ['weak', 'strong'] as const) {
-        const results = Array.from({ length: runs }, (_, seed) => encounter(seed, mission, leg, squad))
-        const won = results.filter((r) => r.won).length / runs
-        const [low, high] = ENCOUNTER_BANDS[mission][squad]
-        const saved = mission === 'rescue' ? (results.reduce((sum, r) => sum + (r.rescued ?? 0), 0) / runs).toFixed(1) + ` of ${CIVILIANS}` : ''
-        const pct = (n: number) => `${Math.round(100 * n)}%`
-        const flag = won < low || won > high ? ' !' : ''
-        console.log(`${mission.padEnd(12)} ${String(leg).padEnd(4)} ${squad.padEnd(7)} ${pct(won).padStart(4)}${flag.padEnd(2)} ${`${pct(low)}-${pct(high)}`.padEnd(9)} ${pct(results.reduce((sum, r) => sum + r.hurt, 0) / runs).padStart(11)}  ${saved}`)
+const { values } = parseArgs({ options: { runs: { type: 'string', default: '30' }, challenge: { type: 'string', default: '' }, party: { type: 'string', default: '1,2,3' }, rung: { type: 'string', default: '0,1,2' }, goal: { type: 'string', default: 'exterminate' }, none: { type: 'boolean', default: false } } })
+const runs = Number(values.runs)
+const challenges = (values.challenge ? values.challenge.split(',') : Object.keys(CHALLENGES)) as ChallengeId[]
+const pct = (n: number) => `${Math.round(100 * n)}%`.padStart(5)
+console.log('challenge    party rung utility       won  health lost  seconds')
+for (const challenge of challenges) {
+  for (const party of values.party.split(',').map(Number)) {
+    for (const rung of values.rung.split(',').map(Number)) {
+      const answers = CHALLENGES[challenge].answers
+      const others = UTILITY_IDS.filter((id) => !answers.includes(id))
+      for (const utility of (values.none ? [null] : [null, ...answers, 'other']) as (UtilityId | 'other' | null)[]) {
+        const results = Array.from({ length: runs }, (_, i) => battle(1000 + i, party, rung, challenge, utility === 'other' ? others[i % others.length] : utility, values.goal as Goal))
+        const mean = (value: (r: (typeof results)[number]) => number) => results.reduce((sum, r) => sum + value(r), 0) / runs
+        console.log(`${challenge.padEnd(12)} ${party}     ${rung}    ${(utility ?? 'none').padEnd(13)}${pct(mean((r) => (r.won ? 1 : 0)))}${pct(mean((r) => r.hurt)).padStart(10)}${mean((r) => r.seconds).toFixed(0).padStart(9)}`)
       }
     }
   }

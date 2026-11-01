@@ -44,7 +44,7 @@ export const COLOR = {
 }
 
 /** Each ground's colour, where its region's look gives none. */
-export const GROUND_COLOR: Record<Ground, number> = { pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x34302c, hive: 0x2a1838, water: 0x1d5f5c, void: 0x000000 }
+export const GROUND_COLOR: Record<Ground, number> = { mire: 0x4e5a22, pavement: 0x2b3240, road: 0x1c2029, grass: 0x25402c, floor: 0x4b4136, scorched: 0x34302c, hive: 0x2a1838, water: 0x1d5f5c, void: 0x000000 }
 
 /** How each kind of alien is drawn: its colour, and its size against a soldier's. */
 export const ALIEN_LOOK: Record<AlienKind, { color: number; scale: number }> = {

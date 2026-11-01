@@ -2,6 +2,7 @@
 import { BARRIER_ARMOR, CHILL_TURNS, GRID, IMPACT_REACH, isSoldier, type Battle, type Effect, type RelicEffect, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { fuelTanks } from './objects'
+import { CHALLENGES, type ChallengeId } from './challenges'
 import { OVERCHARGE, SMOKE, STUN_TURNS, THRUST, type UtilityId } from './utilities'
 import { blocked, breach, distance, edgeDepths, freeTilesNear, NEIGHBORS, onGrid, openNear, reachableFrom, walkingDistances, walks } from './grid'
 import { engageNearest, has, nearest } from './fighters'
@@ -60,6 +61,9 @@ export const ENTRANCE_KINDS: Record<EntranceKind, { name: string; icon: string; 
   han: { name: 'Shoot first', icon: '🔫', text: 'The nearest alien starts a speech and a hero shoots it mid-word, hurting it', reach: [5, 8], site: () => 0 },
   mine: { name: 'He was mine', icon: '🎯', text: 'A hero drops a straggler another had dibs on, and hears about it. Style only', reach: [5, 8], site: () => 0 },
 }
+
+/** Challenges whose test is the ground between the way in and the aliens. */
+const FROM_AFAR: ChallengeId[] = ['slog', 'firingLine', 'scattered']
 
 /** The kinds that fit each flow: a push comes in at the head of the axis, ahead of the first cluster; a flood lands by what it holds, among the fight. */
 const FITS: Record<Flow, EntranceKind[]> = {
@@ -126,7 +130,8 @@ export function planEntrance(battle: Battle, heart: Tile | null): void {
     if (supported.length === 0) continue
     let options: Tile[] = []
     for (let widen = 0; options.length === 0 && widen < 8; widen++) options = supported.filter((t) => contact(t) >= Math.max(Math.min(3, reach[0]), reach[0] - widen) && contact(t) <= reach[1] + 2 * widen)
-    if (options.length === 0) options = supported
+    // Across what the challenge stages, the squad comes in at the head of the axis, however far that lies.
+    if (options.length === 0 || (battle.challenge && FROM_AFAR.includes(battle.challenge))) options = supported
     // The tile its kind ranks best, nearest the way in the encounter means it to take.
     const score = (t: Tile) => 2 * site(battle, t) - distance(t, approach)
     const at = options.reduce((a, b) => (score(b) > score(a) ? b : a))
@@ -143,7 +148,7 @@ export function planEntrance(battle: Battle, heart: Tile | null): void {
 export function enter(battle: Battle, utility: UtilityId | null = null, tank = 0): void {
   const entrance = battle.entrance!
   deploy(battle, entrance.at)
-  takeUtility(battle, utility, tank)
+  if (battle.challenge && CHALLENGES[battle.challenge].volley) for (const u of battle.units) if (u.side === 'alien') u.engaged = true
   const squad = battle.units.filter(isSoldier)
   const closest = nearest(battle.units.filter((u) => u.side === 'alien'), entrance.at)
   const dazed = closest ? closeBy(battle, closest, LOOK_REACH) : []
@@ -170,6 +175,7 @@ export function enter(battle: Battle, utility: UtilityId | null = null, tank = 0
   }
   if (held('entryTurret')) dropUnit(battle, squad[0], TURRET, entrance.at)
   if (held('entryWall')) for (const soldier of squad) barricade(battle, soldier)
+  takeUtility(battle, utility, tank)
 }
 
 /** The utility the player picked takes hold as the squad comes in. */

@@ -1,8 +1,8 @@
 // What a battlefield is made of: ground, props, walls, how solid each is, and the kinds of place.
 import type { RegionId } from './regions'
 
-/** What the ground of a tile is. It changes only how the tile looks, but void: no ground at all, off the battlefield. */
-export type Ground = 'pavement' | 'road' | 'grass' | 'floor' | 'scorched' | 'hive' | 'water' | 'void'
+/** What the ground of a tile is. It changes only how the tile looks, but mire, dear to cross, and void: no ground at all, off the battlefield. */
+export type Ground = 'pavement' | 'road' | 'grass' | 'floor' | 'scorched' | 'hive' | 'water' | 'mire' | 'void'
 
 /**
  * The object standing on a tile. A spire and a growth are what the aliens build; a fuel tank explodes. Void stands

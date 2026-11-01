@@ -7,6 +7,7 @@ import { type Report } from '../core/run-state'
 import { skillOffers } from '../core/squad'
 import { choice, joined, loot, modal, runEnd, skillChoice, spareChoice, stopReport } from './aftermath'
 import { TWISTS } from '../core/twists'
+import { CHALLENGES } from '../core/challenges'
 import { type Battle } from '../core/battle'
 import { ENTRANCE_KINDS } from '../core/entrances'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
@@ -32,8 +33,9 @@ function status(run: Run): string {
   const title = mission.kind === 'battle' || mission.kind === 'ambush' || mission.kind === 'recovery' ? `${GOALS[mission.goal].name}: ${GOALS[mission.goal].text}` : STOP_NAMES[mission.kind]
   if (battle.phase === 'deploy') return title
   const rounds = battle.extract ? ` · ${battle.escaped.length} lifted off` : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
+  const clock = battle.deadline !== null && battle.round < battle.deadline ? ` · reinforcements in ${battle.deadline - battle.round} rounds` : ''
   const vip = battle.vip ? ` · the VIP ${{ held: 'held', breached: 'held', freed: 'with the squad', out: 'lifted off' }[battle.vip]}` : ''
-  return `${title}${vip}${rounds}`
+  return `${title}${vip}${rounds}${clock}`
 }
 
 /**
@@ -44,6 +46,7 @@ function drop(run: Run, battle: Battle, armed: string | null, rigging: number | 
   const { icon, name, text } = ENTRANCE_KINDS[battle.entrance!.kind]
   const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
   const tanks = fuelTanks(battle)
+  const challenge = battle.challenge && CHALLENGES[battle.challenge]
   const go = (detail: string, picks: Pick[], idle: string) => `<p>${detail}</p><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, idle)}`
   const chosen =
     rigging !== null
@@ -53,11 +56,12 @@ function drop(run: Run, battle: Battle, armed: string | null, rigging: number | 
         : go(
             'Pick a utility for this fight.',
             run.utilities.map((id, i): Pick =>
-              utilityPick(`u${i}`, id === 'tank' ? undefined : { type: 'enter', utility: i }, id, 'utility', id === 'tank' ? 'Tap again to choose a tank' : `Tap again to go in with ${UTILITIES[id].name}`, id === 'tank' ? { attrs: `data-rig="${i}"`, block: tanks.length === 0 ? 'No fuel tanks on this ground' : null } : {}),
+              utilityPick(`u${i}`, id === 'tank' ? undefined : { type: 'enter', utility: i }, id, challenge?.answers.includes(id) ? 'answers this' : 'utility', id === 'tank' ? 'Tap again to choose a tank' : `Tap again to go in with ${UTILITIES[id].name}`, id === 'tank' ? { attrs: `data-rig="${i}"`, block: tanks.length === 0 ? 'No fuel tanks on this ground' : null } : {}),
             ),
             'Tap a utility for its details; tap it again to go in with it.',
           )
-  return `${twist}<p>${icon} <b>${name}.</b> ${text}.</p>${chosen}`
+  const test = challenge ? `<h2 class="challenge">${challenge.icon} ${challenge.name}</h2><p>${challenge.test}.</p>` : ''
+  return `${test}${twist}<p>${icon} <b>${name}.</b> ${text}.</p>${chosen}`
 }
 
 /** Turns clicks into actions and hands them to `act`. */

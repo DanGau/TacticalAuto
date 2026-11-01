@@ -17,6 +17,7 @@ import { LEG_STOPS, STOP_THREAT, THREAT_MAX } from './progress'
 import { charges, draft, health, join, MAX_SQUAD, offerRecruits, skillOffers, soldierStats, weaponOf, xpFor } from './squad'
 import { dropGear, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
+import { forceOf, type ChallengeId } from './challenges'
 import { type Leg, type MapNode, type Risk, type Run, type Stage, type Stop, type StopKind } from './run-state'
 
 /** Access keys needed to find the alien source; each is won at a satellite, at the end of a leg. */
@@ -284,15 +285,19 @@ function drawShape(run: Run): MapNode[][] {
 export function drawStops(run: Run): void {
   const leg = run.legs[run.keys]
   if (run.keys === KEYS) {
-    leg.columns[0][0].stop = fixed('final', 'hive')
+    leg.columns[0][0].stop = { ...fixed('final', 'hive'), challenge: 'bigOne', aliens: forceOf('bigOne', run.soldiers.length, 2, 2) }
     return
   }
   const risks = Object.keys(RISKS) as Risk[]
+  const party = Math.max(1, run.soldiers.length)
   leg.columns.forEach((column, c) => {
+    // The challenges on offer in a column differ where they can, so the way taken is a choice.
+    const taken: ChallengeId[] = []
     for (const node of column) {
       let roll = random(run)
       const kind = c === 0 ? undefined : (Object.keys(STOP_CHANCE) as (keyof typeof STOP_CHANCE)[]).find((k) => (roll -= STOP_CHANCE[k]) < 0)
-      node.stop = c === LEG_STOPS ? { ...fixed('key', 'compound'), ...placed(run, 'compound'), city: run.route[run.keys].to.name } : kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], { ...run, stop: c })
+      node.stop = c === LEG_STOPS ? { ...fixed('key', 'compound'), ...placed(run, 'compound'), challenge: 'bigOne', aliens: forceOf('bigOne', party, 2, 0), city: run.route[run.keys].to.name } : kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], { ...run, stop: c }, taken)
+      if (node.stop.challenge) taken.push(node.stop.challenge)
       // A stop is named for the town it is at.
       if (node.town) node.stop.city = node.town
     }
@@ -300,7 +305,7 @@ export function drawStops(run: Run): void {
 }
 
 /** A stop with no aliens drawn ahead: any but a battle. */
-const fixed = (kind: StopKind, terrain: TerrainKind): Stop => ({ kind, risk: 'standard', goal: 'exterminate', terrain, twist: null, aliens: [] })
+const fixed = (kind: StopKind, terrain: TerrainKind): Stop => ({ kind, risk: 'standard', goal: 'exterminate', terrain, challenge: null, twist: null, aliens: [] })
 
 /** The leg under way. */
 export const legOf = (run: Run) => run.legs[run.keys]
@@ -410,7 +415,8 @@ export function advance(run: Run): void {
   }))
   const rules = doctrines.flatMap((d) => d.rule ?? [])
   const held = (r: Reserve) => run.captives.includes(r.soldier)
-  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, stop === 'battle' ? here.aliens : undefined), reserve.filter((r) => !held(r)), mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city } : undefined)
+  const challenge = stop === 'battle' || stop === 'key' || stop === 'final' ? here.challenge : null
+  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), reserve.filter((r) => !held(r)), mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city } : undefined, challenge)
   holdCaptives(run.battle, reserve.filter(held))
 }
 

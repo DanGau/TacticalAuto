@@ -1,5 +1,5 @@
 // Missions: their force, aliens, goal, and where they are fought.
-import { type Alien, type Stats, BASE_STATS } from './battle'
+import { type Alien, BASE_STATS } from './battle'
 import { type AlienKind, alienStats, ALIENS, muster } from './aliens'
 import { type Goal, GOALS } from './goals'
 import { depth, late, THREAT_MAX } from './progress'
@@ -14,6 +14,7 @@ import { type RegionId, REGION_IDS, REGIONS } from './regions'
 import { ZONE_TERRAINS, type TerrainKind } from './terrain'
 import { CONTINENTS } from './world'
 import { drawTwist } from './twists'
+import { bigOneStats, drawChallenge, forceOf, rungOf, sentries, STIFFEN, type ChallengeId } from './challenges'
 
 /** What each risk means for a battle: how many aliens it has, what it pays, and the chance it drops gear on the goals that do, and of a utility. */
 export const RISKS: Record<Risk, { name: string; aliens: number; supplies: number; gear: number; rareGear: boolean; utility: number; text: string }> = {
@@ -41,13 +42,14 @@ export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goa
  * already won: each adds health, armor and an escorting trooper; from the second satellite on it hits harder and
  * spawns swarmlings, and from the third it shoots farther.
  */
-export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[]): Alien[] {
+export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], challenge: ChallengeId | null = null): Alien[] {
   const tier = depth(run)
   const armor = tier
   const weapon = Math.floor(tier / 2)
   const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, armor, weapon), stance: ALIENS[kind].stance, boss: false, spawns: ALIENS[kind].spawns ?? false, target: false, resists: ALIENS[kind].resists })
-  const boss = mission.kind === 'key' || mission.kind === 'final'
-  const escort = boss ? run.keys : 0
+  const extraction = mission.kind === 'key' || mission.kind === 'final'
+  const boss = extraction || challenge === 'bigOne'
+  const escort = extraction ? run.keys : 0
   // The hunt sends more the higher the threat.
   const hunting = muster(run, huntForce(run, mission), tier).flatMap((pack) => pack.kinds)
   const aliens = [...(mustered ?? muster(run, Math.max(0, mission.force - (boss ? 2 + escort : 0)), tier).flatMap((pack) => pack.kinds)), ...hunting].map(alien)
@@ -64,14 +66,22 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[]): Al
   if (mission.goal === 'ambush') {
     const best = run.soldiers.map((s) => soldierStats(run, s)).reduce((a, b) => (b.hp * b.damage > a.hp * a.damage ? b : a))
     const trooper = alien('trooper')
-    const stats: Stats = { ...best, hp: Math.round(best.hp * HUNTER.hp), damage: Math.ceil(best.damage * HUNTER.damage), armor: Math.max(best.armor, trooper.stats.armor) + 1, move: best.move + 1 }
+    const stats = { ...best, hp: Math.round(best.hp * HUNTER.hp), damage: Math.ceil(best.damage * HUNTER.damage), armor: Math.max(best.armor, trooper.stats.armor) + 1, move: best.move + 1 }
     aliens.unshift({ ...trooper, stats, boss: true, stance: 'rush' })
   }
+  const stiff = challenge && STIFFEN[challenge]
+  if (stiff) {
+    const party = Math.min(run.soldiers.length, 3) - 1
+    for (const a of aliens) a.stats = { ...a.stats, range: a.stats.range > 1 ? a.stats.range + (stiff.range ?? 0) : a.stats.range, armor: a.stats.armor + (stiff.armor?.[party] ?? 0) }
+    if (stiff.range) for (const a of aliens) a.stance = 'anchor'
+  }
+  if (challenge === 'scattered') for (const a of aliens.slice(0, sentries(mustered?.length ?? 0))) a.stance = 'anchor'
   if (boss) {
     const k = run.keys
-    const stats: Stats = { ...BASE_STATS, hp: BASE_STATS.hp + 5 * k, armor: 2 + k, damage: BASE_STATS.damage + (k >= 1 ? 1 : 0), range: BASE_STATS.range + (k >= 2 ? 1 : 0) }
+    const rung = extraction ? 2 : rungOf(run.stop)
+    const stats = { ...bigOneStats(run.soldiers.length, rung, BASE_STATS), range: BASE_STATS.range + (k >= 2 ? 1 : 0) }
     const escorts = Array.from({ length: escort }, () => alien('trooper'))
-    aliens.unshift({ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: k >= 1, target: false, resists: [run.bosses[k]] }, ...escorts)
+    aliens.unshift({ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: extraction && k >= 1, target: false, resists: [run.bosses[k]] }, ...escorts)
   }
   return aliens
 }
@@ -101,13 +111,15 @@ export function placed(run: Run, kind: TerrainKind): { region: RegionId; city: s
 }
 
 /** A battle of `risk` with a goal and place drawn at random, its aliens mustered for the squad as it will be at `when`. */
-export function drawBattle(run: Run, risk: Risk, when: Run = run): Stop {
+export function drawBattle(run: Run, risk: Risk, when: Run = run, taken: ChallengeId[] = []): Stop {
   const goal = drawGoal(run, when)
-  const force = missionAt(when, 'battle', risk, goal).force
+  const party = Math.max(1, run.soldiers.length)
+  const rung = rungOf(when.stop)
+  const challenge = drawChallenge(run, party, rung, goal, taken)
   // Each battle's force varies a little either way, so two battles of one risk are not the same fight.
-  const aliens = muster(run, Math.max(1, force + randomInt(run, 3) - 1), depth(when)).flatMap((pack) => pack.kinds)
+  const aliens = forceOf(challenge, party, rung, RISKS[risk].aliens + GOALS[goal].force + randomInt(run, 3) - 1)
   const terrain = ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)]
-  return { kind: 'battle', risk, goal, terrain, twist: drawTwist(run, when.keys), aliens, ...placed(run, terrain) }
+  return { kind: 'battle', risk, goal, terrain, challenge, twist: drawTwist(run, when.keys), aliens, ...placed(run, terrain) }
 }
 
 /** How hard a stop is: a battle counts one, a quiet one none and an overrun one two. */

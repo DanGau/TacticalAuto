@@ -25,6 +25,7 @@ import { LEG_STOPS } from '../core/progress'
 import { FEATS } from '../core/feats'
 import { SKILLS } from '../core/skills'
 import { TWISTS } from '../core/twists'
+import { CHALLENGES } from '../core/challenges'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
 import { gearPicks, pickCard, pickDetail, utilityPick, type Pick } from './cards'
@@ -59,7 +60,9 @@ function stopIcon(run: Run, stop: Stop, state = ''): string {
   const risk = RISKS[stop.risk]
   const goal = GOALS[stop.goal]
   const aliens = census(run, stop.aliens) + (stop.goal === 'assassinate' ? ', a Commander' : '')
-  return `<span class="node ${stop.risk} ${state}" title="${goal.name} · ${risk.name} · ${aliens.replace(/<[^>]*>/g, '')}">${STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}</span>`
+  const challenge = stop.challenge && CHALLENGES[stop.challenge]
+  const answered = challenge && challenge.answers.some((id) => run.utilities.includes(id)) ? ' answered' : ''
+  return `<span class="node ${stop.risk} ${state}${answered}" title="${challenge?.name} · ${goal.name} · ${risk.name} · ${aliens.replace(/<[^>]*>/g, '')}">${challenge?.icon ?? STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}</span>`
 }
 
 /** A stop not yet seen. */
@@ -140,19 +143,25 @@ function squadStrip(run: Run): string {
 
 /** The alien force at the squad's stop. */
 function travelLabel(run: Run, stop: Stop, next: 'battle' | 'key' | 'final'): string {
-  const mission = missionAt(run, next, stop.risk, next === 'battle' ? stop.goal : 'exterminate')
-  const hunt = huntForce(run, mission)
-  return `force ${mission.force}${hunt > 0 ? ` + ${hunt} hunting` : ''}${next === 'key' || next === 'final' ? ' + boss' : ''}`
+  const hunt = huntForce(run, missionAt(run, next, stop.risk, next === 'battle' ? stop.goal : 'exterminate'))
+  return `${stop.aliens.length} aliens${hunt > 0 ? ` + ${hunt} hunting` : ''}${stop.challenge === 'bigOne' ? ' + boss' : ''}`
+}
+
+/** What a stop tests, and which utility held answers it, or that none does. */
+function readChallenge(run: Run, stop: Stop): string {
+  const challenge = CHALLENGES[stop.challenge!]
+  const held = challenge.answers.filter((id) => run.utilities.includes(id))
+  return `${challenge.icon} <b>${challenge.name}.</b> ${challenge.test}. <small class="${held.length > 0 ? 'down' : 'up'}">${held.length > 0 ? `Held: ${held.map((id) => UTILITIES[id].name).join(', ')}` : 'No answer held'}</small>`
 }
 
 /** What the squad faces at a stop, as the map's heading. */
 function where(run: Run, stop: Stop): string {
   const stage = run.route[run.keys]
-  if (stop.kind === 'final') return 'The alien hub'
-  if (stop.kind === 'key') return stage.hero ? `Extract ${stage.hero.name}` : 'Storm the stronghold'
+  if (stop.kind === 'final') return `The alien hub<br>${readChallenge(run, stop)}`
+  if (stop.kind === 'key') return `${stage.hero ? `Extract ${stage.hero.name}` : 'Storm the stronghold'}<br>${readChallenge(run, stop)}`
   // A stop's icon tells what it is; only a fight says more.
   if (stop.kind !== 'battle') return ''
-  return `${GOALS[stop.goal].name} · ${RISKS[stop.risk].name}${stop.twist ? ` · ${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}` : ''}`
+  return `${GOALS[stop.goal].name} · ${RISKS[stop.risk].name}${stop.twist ? ` · ${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}` : ''}<br>${readChallenge(run, stop)}`
 }
 
 const PURCHASED = '<small class="purchased">Purchased</small>'

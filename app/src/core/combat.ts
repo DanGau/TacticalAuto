@@ -117,6 +117,8 @@ export function stepBattle(battle: Battle): GameEvent[] {
   battle.beat++
   const events = act(battle)
   const humans = battle.units.some(isSoldier)
+  // Every sentry down before the clock runs out: no reinforcements come.
+  if (battle.deadline !== null && battle.round < battle.deadline && !battle.units.some((u) => u.side === 'alien')) battle.waves = []
   // Aliens left to beat: none once the commander falls, for the rest flee.
   const fled = battle.goal === 'assassinate' && !battle.units.some((u) => u.target)
   // A VIP rescue is done once the VIP is out, and not before.
