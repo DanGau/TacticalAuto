@@ -160,6 +160,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     events.push({ type: 'effect', id: enemy.id, effect: distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield', amount: 0 })
   }
   if (has(enemy, 'fortress') || hallowed(battle, enemy)) damage = Math.ceil(damage / 2)
+  if (enemy.invulnerable) damage = 0
   if (has(enemy, 'intangible') && random(battle) < INTANGIBLE_CHANCE) {
     damage = 0
     events.push({ type: 'effect', id: enemy.id, effect: 'intangible', amount: 0 })

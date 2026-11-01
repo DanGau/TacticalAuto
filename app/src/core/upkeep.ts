@@ -3,6 +3,7 @@ import { REGEN_HEAL, alienStats, ALIENS, NODE_EVERY } from './aliens'
 import { replenish } from './abilities'
 import { type Battle, AURA_REACH, BURN_DAMAGE, BURN_TURNS, isSoldier, SPAWN_EVERY, type Unit } from './battle'
 import { CONFLAGRATION_DAMAGE, HELLFIRE_REACH } from './keystones'
+import { stormBlows } from './ultimates'
 import { placeAlien } from './setup'
 import { alienUnit } from './spawn'
 import { openNear } from './grid'
@@ -31,6 +32,11 @@ export function upkeep(battle: Battle): GameEvent[] {
     if (unit.rooted > 0) unit.rooted--
     if (unit.booming > 0) unit.booming--
     if (unit.cloaked && --unit.cloaked === 0) events.push({ type: 'cloak', id: unit.id, on: false })
+    if (unit.invulnerable) unit.invulnerable--
+    if (unit.storm) {
+      unit.storm--
+      stormBlows(battle, unit, events)
+    }
     if (has(unit, 'vitality')) {
       for (const mate of battle.units.filter((u) => u.side === unit.side && u !== unit && u.hp < u.stats.hp && distance(u, unit) <= AURA_REACH)) {
         mate.hp++

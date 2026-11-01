@@ -62,7 +62,7 @@ export function heroSheet(run: Run, hero: Soldier): string {
 /** A class's tree as a grid, a column per branch and a row per tier, with `cell` drawing each skill. */
 export const treeGrid = (hero: Soldier, cell: (id: SkillId) => string) => {
   const branches = TREES[hero.cls!]
-  return `<div class="tree" style="--branches:${branches.length}">${branches.map(({ name, tiers }) => `<div class="branch"><b>${name}</b>${tiers.map((skills, tier) => `<small>Tier ${tier + 1}</small>${skills.map(cell).join('')}`).join('')}</div>`).join('')}</div>`
+  return `<div class="tree" style="--branches:${branches.length}">${branches.map(({ name, tiers }) => `<div class="branch"><b>${name}</b>${tiers.map((skills, tier) => `<small class="t${tier + 1}">Tier ${tier + 1}</small>${skills.map(cell).join('')}`).join('')}</div>`).join('')}</div>`
 }
 
 /** Whether a hero knows a skill, can learn it now, or has it locked. */

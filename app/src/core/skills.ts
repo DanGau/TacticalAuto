@@ -17,6 +17,8 @@ import {
   type Effect,
   type Stats,
 } from './battle'
+import { ABLAZE, BLIZZARD, BULLET_TIME, COLOSSUS, DRONE_STORM, EXTINCTION, HAIL, INDESTRUCTIBLE, LEGION, LEVEL_BLOCK, MIRRORS, ORBITAL, QUAKE, SENTENCE, SHIELD_TURNS, SPREE, SUPERNOVA, TIME_STOP, TITAN_FORM, ZERO } from './ultimates'
+import { PHOENIX_RISING } from './wound'
 import { AFTERSHOCK_DAMAGE, BLOODBATH_HEAL, CONFLAGRATION_DAMAGE, EARTHSHAKER_DAMAGE, FAN_TARGETS, FONT_REACH, HELLFIRE_REACH, IMPACT_DAMAGE, SACRED_REACH, SHARD_DAMAGE, SWARM_LIMIT, TESLA, WAR_MACHINE } from './keystones'
 import { TUNING } from './tuning'
 import { classPower, CLASSES, type ClassId } from './classes'
@@ -184,6 +186,31 @@ const skills = {
   livingShadow: { name: 'Living Shadow', use: 'Passive', text: 'Attacking does not break its Cloak: every attack in it strikes from the dark', effect: 'livingShadow' },
   intangible: { name: 'Intangible', use: 'Passive', text: 'Half of the hits on it pass through', effect: 'intangible' },
   bladeDance: { name: 'Blade Dance', use: 'At will', text: `Its bonus attack also strikes ${FAN_TARGETS} more aliens in reach`, effect: 'bladeDance' },
+  // Tier 4s, each once a battle
+  killingSpree: { name: 'Killing Spree', use: '1/battle', range: `${SPREE.reach}`, target: `Up to ${SPREE.strikes} aliens in turn`, text: `Flashes to each and strikes for its damage +${SPREE.damage}`, effect: 'killingSpree' },
+  indestructible: { name: 'Indestructible', use: '1/battle', target: 'Self at half HP', text: `Nothing can hurt it for ${INDESTRUCTIBLE.turns} turns; +${INDESTRUCTIBLE.damage} damage for the battle`, effect: 'indestructible' },
+  levelBlock: { name: 'Level the Block', use: '1/battle', range: `${LEVEL_BLOCK.radius}`, target: '2+ aliens', text: `Everything standing in reach comes down; ${LEVEL_BLOCK.damage} damage to each alien`, effect: 'levelBlock' },
+  extinction: { name: 'Extinction Event', use: '1/battle', target: `${EXTINCTION.meteors} meteors, thickest knots`, text: `Each does ${EXTINCTION.damage} to aliens within ${EXTINCTION.radius} and flattens the ground; allies are spared`, effect: 'extinction' },
+  titanForm: { name: 'Titan Form', use: '1/battle', target: 'Self at half HP', text: `Grows to a titan: +${TITAN_FORM.hp} HP, full health, +${TITAN_FORM.armor} armor, +${TITAN_FORM.damage} damage, and Taunt, for the battle`, effect: 'titanForm' },
+  earthquake: { name: 'Earthquake', use: '1/battle', range: `${QUAKE.radius}`, target: '2+ aliens', text: `${QUAKE.damage} damage to each; each loses its next turn, a boss too`, effect: 'earthquake' },
+  bulletTime: { name: 'Bullet Time', use: '1/battle', target: `Up to ${BULLET_TIME.targets} aliens in sight`, text: `A crit on each, +${BULLET_TIME.damage} damage`, effect: 'bulletTime' },
+  deathSentence: { name: 'Death Sentence', use: '1/battle', target: 'Toughest alien, boss or not', text: `Half its HP +${SENTENCE} damage, ignoring armor`, effect: 'deathSentence' },
+  hallOfMirrors: { name: 'Hall of Mirrors', use: '1/battle', target: 'Self', text: `${MIRRORS.images} images of ${MIRRORS.hp} HP step out, attack and draw every alien's fire`, effect: 'hallOfMirrors' },
+  colossus: { name: 'Colossus', use: '1/battle', target: 'Beside it', text: `Deploys a colossus: ${COLOSSUS.hp} HP, ${COLOSSUS.armor} armor, ${COLOSSUS.damage} damage; every alien able must shoot it`, effect: 'colossus' },
+  droneStorm: { name: 'Drone Storm', use: '1/battle', target: 'Aliens in the fight', text: `${DRONE_STORM.strikes} strikes of ${DRONE_STORM.damage} damage rain among them`, effect: 'droneStorm' },
+  orbital: { name: 'Orbital Lance', use: '1/battle', range: `Line of ${ORBITAL.length}`, target: 'The line through the most aliens', text: `${ORBITAL.damage} damage, ignoring armor; flattens all along it`, effect: 'orbital' },
+  resurrection: { name: 'Resurrection', use: '1/battle', target: 'Every ally, fallen or not', text: 'The fallen rise beside it; all stand at full HP', effect: 'resurrection' },
+  divineShield: { name: 'Divine Shield', use: '1/battle', target: 'Every ally, once one is at half HP', text: `Nothing can hurt them for ${SHIELD_TURNS} turns`, effect: 'divineShield' },
+  timeStop: { name: 'Time Stop', use: '1/battle', target: 'Every alien, boss too', text: `Frozen in time for ${TIME_STOP} rounds`, effect: 'timeStop' },
+  supernova: { name: 'Supernova', use: '1/battle', range: `${SUPERNOVA.radius}`, target: '2+ aliens', tags: ['burn'], text: `${SUPERNOVA.damage} damage to each, and burning; costs it half its HP`, effect: 'supernova' },
+  worldAblaze: { name: 'World Ablaze', use: '1/battle', target: 'Every alien in the fight', tags: ['burn'], text: `Armor burns away; ${ABLAZE.damage} damage, burning for ${ABLAZE.burn} turns on burning ground`, effect: 'worldAblaze' },
+  phoenixRising: { name: 'Phoenix Rising', use: '1/battle', range: `${PHOENIX_RISING.radius}`, target: 'Self, as it falls', tags: ['burn'], text: `Rises at full HP; ${PHOENIX_RISING.damage} damage to each alien in reach, and burning`, effect: 'phoenixRising' },
+  absoluteZero: { name: 'Absolute Zero', use: '1/battle', target: 'Every alien in the fight', tags: ['frost'], text: `A wave of ice: ${ZERO.damage} damage past armor; frozen ${ZERO.frozen} rounds, a boss 1`, effect: 'absoluteZero' },
+  blizzard: { name: 'Blizzard', use: '1/battle', range: `${BLIZZARD.radius}`, target: 'Aliens around it', tags: ['frost'], text: `For ${BLIZZARD.turns} turns, ${BLIZZARD.damage} damage to each and chilled, as it walks`, effect: 'blizzard' },
+  hailOfIcicles: { name: 'Hail of Icicles', use: '1/battle', target: 'Aliens in the fight', tags: ['frost'], text: `${HAIL.shards} shards of ${HAIL.damage} damage rain among them, each chilling`, effect: 'hailOfIcicles' },
+  eclipse: { name: 'Eclipse', use: '1/battle', target: 'Every hero', text: 'Darkness: each hero Cloaks, unseen until its attack strikes from the dark', effect: 'eclipse' },
+  reap: { name: 'Reap', use: '1/battle', target: 'Every alien in the fight', text: 'Those at half HP or less die, a boss aside; the rest lose half their HP', effect: 'reap' },
+  phantomLegion: { name: 'Phantom Legion', use: '1/battle', target: `${LEGION.blades} strikes in the fight`, text: `Shadows strike for its damage +${LEGION.damage}, ignoring armor`, effect: 'phantomLegion' },
 } satisfies Record<string, Skill>
 
 export type SkillId = keyof typeof skills
@@ -192,52 +219,52 @@ export const SKILLS: Record<SkillId, Skill> = skills
 /** Each class's tree: its branches, each with its name and its skills by tier, lowest first. The first branch holds the class's ability. */
 export const TREES: Record<ClassId, Branch[]> = {
   assault: [
-    { name: 'Rampage', tiers: [['mightyBound', 'bloodlust'], ['rage', 'cleave', 'surge'], ['bloodbath']] },
-    { name: 'Ironhide', tiers: [['reflexes'], ['secondWind', 'skirmish', 'unbreakable'], ['riposte']] },
-    { name: 'Juggernaut', tiers: [['leap'], ['hamstring', 'hurl', 'sprinter'], ['earthshaker']] },
+    { name: 'Rampage', tiers: [['mightyBound', 'bloodlust'], ['rage', 'cleave', 'surge'], ['bloodbath'], ['killingSpree']] },
+    { name: 'Ironhide', tiers: [['reflexes'], ['secondWind', 'skirmish', 'unbreakable'], ['riposte'], ['indestructible']] },
+    { name: 'Juggernaut', tiers: [['leap'], ['hamstring', 'hurl', 'sprinter'], ['earthshaker'], ['levelBlock']] },
   ],
   heavy: [
-    { name: 'Cataclysm', tiers: [['meteorStrike'], ['arsenal', 'shredder', 'bigBlast'], ['impact']] },
-    { name: 'Bastion', tiers: [['bulwark'], ['taunt', 'steadfast', 'reactive'], ['fortress']] },
-    { name: 'Shockwave', tiers: [['suppression'], ['slam', 'concussion', 'intimidate'], ['aftershock']] },
+    { name: 'Cataclysm', tiers: [['meteorStrike'], ['arsenal', 'shredder', 'bigBlast'], ['impact'], ['extinction']] },
+    { name: 'Bastion', tiers: [['bulwark'], ['taunt', 'steadfast', 'reactive'], ['fortress'], ['titanForm']] },
+    { name: 'Shockwave', tiers: [['suppression'], ['slam', 'concussion', 'intimidate'], ['aftershock'], ['earthquake']] },
   ],
   sniper: [
-    { name: 'Marksman', tiers: [['farSight', 'steady'], ['headshot', 'doubleTap', 'assassinate'], ['sureShot']] },
-    { name: 'Hunter', tiers: [['mark', 'kneecap'], ['slayer', 'hollowPoint', 'volley'], ['apex']] },
-    { name: 'Ghost', tiers: [['elusive'], ['decoy', 'blink', 'relocate'], ['ghostShot']] },
+    { name: 'Marksman', tiers: [['farSight', 'steady'], ['headshot', 'doubleTap', 'assassinate'], ['sureShot'], ['bulletTime']] },
+    { name: 'Hunter', tiers: [['mark', 'kneecap'], ['slayer', 'hollowPoint', 'volley'], ['apex'], ['deathSentence']] },
+    { name: 'Ghost', tiers: [['elusive'], ['decoy', 'blink', 'relocate'], ['ghostShot'], ['hallOfMirrors']] },
   ],
   engineer: [
-    { name: 'Mech Bay', tiers: [['deployMech'], ['titan', 'plating', 'rebuild', 'detonate'], ['warMachine']] },
-    { name: 'Drone Hive', tiers: [['swarm'], ['spotter', 'linked', 'servos', 'hive'], ['endlessSwarm']] },
-    { name: 'Tinker', tiers: [['launcher'], ['hardlight', 'emp'], ['tesla']] },
+    { name: 'Mech Bay', tiers: [['deployMech'], ['titan', 'plating', 'rebuild', 'detonate'], ['warMachine'], ['colossus']] },
+    { name: 'Drone Hive', tiers: [['swarm'], ['spotter', 'linked', 'servos', 'hive'], ['endlessSwarm'], ['droneStorm']] },
+    { name: 'Tinker', tiers: [['launcher'], ['hardlight', 'emp'], ['tesla'], ['orbital']] },
   ],
   support: [
-    { name: 'Mending', tiers: [['healingLight'], ['fieldKit', 'surgeon', 'vitality', 'revive'], ['fontOfLife']] },
-    { name: 'Aegis', tiers: [['barrier'], ['ward', 'bane', 'forceField'], ['sacredGround']] },
-    { name: 'Zeal', tiers: [['inspire', 'flashbang'], ['haste', 'drone', 'gravBeam', 'nullifier'], ['command']] },
+    { name: 'Mending', tiers: [['healingLight'], ['fieldKit', 'surgeon', 'vitality', 'revive'], ['fontOfLife'], ['resurrection']] },
+    { name: 'Aegis', tiers: [['barrier'], ['ward', 'bane', 'forceField'], ['sacredGround'], ['divineShield']] },
+    { name: 'Zeal', tiers: [['inspire', 'flashbang'], ['haste', 'drone', 'gravBeam', 'nullifier'], ['command'], ['timeStop']] },
   ],
   pyro: [
-    { name: 'Inferno', tiers: [['fireball'], ['tanks', 'searing', 'inferno'], ['firestorm']] },
-    { name: 'Immolation', tiers: [['tinder'], ['flashpoint', 'smolder', 'backdraft'], ['conflagration']] },
-    { name: 'Ember Hide', tiers: [['fireSuit'], ['burningAura', 'asbestos', 'phoenixHeart'], ['hellfire']] },
+    { name: 'Inferno', tiers: [['fireball'], ['tanks', 'searing', 'inferno'], ['firestorm'], ['supernova']] },
+    { name: 'Immolation', tiers: [['tinder'], ['flashpoint', 'smolder', 'backdraft'], ['conflagration'], ['worldAblaze']] },
+    { name: 'Ember Hide', tiers: [['fireSuit'], ['burningAura', 'asbestos', 'phoenixHeart'], ['hellfire'], ['phoenixRising']] },
   ],
   cryo: [
-    { name: 'Hoarfrost', tiers: [['chillTouch'], ['icebreak', 'permafrost', 'rimeLock', 'deepFreeze'], ['frozenHeart']] },
-    { name: 'Glacier', tiers: [['iceArmor'], ['frostAura', 'glide', 'cryostasis'], ['glacialArmor']] },
-    { name: 'Icicle', tiers: [['coldSteel'], ['coldEye', 'longRange'], ['shardstorm']] },
+    { name: 'Hoarfrost', tiers: [['chillTouch'], ['icebreak', 'permafrost', 'rimeLock', 'deepFreeze'], ['frozenHeart'], ['absoluteZero']] },
+    { name: 'Glacier', tiers: [['iceArmor'], ['frostAura', 'glide', 'cryostasis'], ['glacialArmor'], ['blizzard']] },
+    { name: 'Icicle', tiers: [['coldSteel'], ['coldEye', 'longRange'], ['shardstorm'], ['hailOfIcicles']] },
   ],
   phantom: [
-    { name: 'Shade', tiers: [['cloak'], ['shadowStrike', 'daze', 'deepCloak', 'afterimage'], ['livingShadow']] },
-    { name: 'Wraith', tiers: [['vanish'], ['phaseShift', 'fadeOut', 'shadowStep'], ['intangible']] },
-    { name: 'Knives', tiers: [['knifeWork'], ['garrote', 'smokeBomb'], ['bladeDance']] },
+    { name: 'Shade', tiers: [['cloak'], ['shadowStrike', 'daze', 'deepCloak', 'afterimage'], ['livingShadow'], ['eclipse']] },
+    { name: 'Wraith', tiers: [['vanish'], ['phaseShift', 'fadeOut', 'shadowStep'], ['intangible'], ['reap']] },
+    { name: 'Knives', tiers: [['knifeWork'], ['garrote', 'smokeBomb'], ['bladeDance'], ['phantomLegion']] },
   ],
 }
 
-/** Picks a hero must have made before a tier 3 skill opens. */
+/** Picks a hero must have made before a tier 3 skill opens; a tier 4 needs its tier 3. */
 export const CAPSTONE_PICKS = 3
 
-/** A skill of `tiers` is open at tier 1; above, once the hero knows one of the tier below in its branch, and at the last tier, has made CAPSTONE_PICKS. */
-const opens = (tiers: SkillId[][], tier: number, known: SkillId[]) => tier === 0 || (tiers[tier - 1].some((id) => known.includes(id)) && (tier < tiers.length - 1 || known.length >= CAPSTONE_PICKS))
+/** A skill of `tiers` is open at tier 1; above, once the hero knows one of the tier below in its branch, and from tier 3, has made CAPSTONE_PICKS. */
+const opens = (tiers: SkillId[][], tier: number, known: SkillId[]) => tier === 0 || (tiers[tier - 1].some((id) => known.includes(id)) && (tier < 2 || known.length >= CAPSTONE_PICKS))
 
 /** The skills of `cls` a hero knowing `known` can learn now, in tree order. */
 export const unlocked = (cls: ClassId, known: SkillId[]): SkillId[] => TREES[cls].flatMap(({ tiers }) => tiers.flatMap((skills, tier) => (opens(tiers, tier, known) ? skills.filter((id) => !known.includes(id)) : [])))

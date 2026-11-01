@@ -178,7 +178,7 @@ export function skirmish(battle: Battle, unit: Unit): GameEvent[] {
 
 /** Each feeder in sight grows on a trick the squad's unit used in `events`: its ability or a once-per-battle effect. */
 export function feed(battle: Battle, unit: Unit, events: GameEvent[]): GameEvent[] {
-  const tricked = events.some((e) => (e.type === 'rocket' || e.type === 'heal' || e.type === 'spawn' || (e.type === 'effect' && e.amount >= 0)) && e.id === unit.id)
+  const tricked = events.some((e) => (e.type === 'rocket' || e.type === 'ultimate' || e.type === 'heal' || e.type === 'spawn' || (e.type === 'effect' && e.amount >= 0)) && e.id === unit.id)
   if (!tricked) return []
   return battle.units
     .filter((u) => u.kind === 'feeder' && u.revealed)

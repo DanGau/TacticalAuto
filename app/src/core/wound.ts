@@ -22,7 +22,7 @@ export const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || ta
  * engages.
  */
 export function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[], pierce = false, crit = false): void {
-  if (target.hp <= 0 || hostage(battle, target)) return
+  if (target.hp <= 0 || hostage(battle, target) || target.invulnerable) return
   if (!target.engaged) engage(battle, target)
   const damage = target.kind === 'wraith' && !crit ? Math.min(dealt, 1) : dealt
   const full = target.hp === target.stats.hp
@@ -70,11 +70,22 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
     events.push({ type: 'effect', id: target.id, effect: rises, amount: target.hp })
     return
   }
+  if (has(target, 'phoenixRising') && !target.spent.includes('phoenixRising')) {
+    target.spent.push('phoenixRising')
+    target.hp = target.stats.hp
+    events.push({ type: 'ultimate', id: target.id, effect: 'phoenixRising', x: target.x, y: target.y, radius: PHOENIX_RISING.radius })
+    for (const foe of battle.units.filter((u) => u.side !== target.side && !u.civilian && distance(u, target) <= PHOENIX_RISING.radius)) {
+      if (!fireproof(battle, foe)) foe.burning = BURN_TURNS
+      events.push({ type: 'effect', id: foe.id, effect: 'phoenixRising', amount: -PHOENIX_RISING.damage })
+      wound(battle, foe, PHOENIX_RISING.damage, events)
+    }
+    return
+  }
   battle.units = battle.units.filter((u) => u !== target)
   // A soldier falls where it stands, dropping whoever it carried.
   if (isSoldier(target)) {
     for (const body of battle.downed.filter((d) => d.carrier === target.id)) Object.assign(body, { x: target.x, y: target.y, carrier: null })
-    battle.downed.push({ soldier: target.soldier!, x: target.x, y: target.y, carrier: null })
+    battle.downed.push({ soldier: target.soldier!, x: target.x, y: target.y, carrier: null, unit: target })
   }
   events.push({ type: 'death', id: target.id })
   if (target.civilian && killer?.kind === 'harvester') battle.husks.push({ x: target.x, y: target.y })
@@ -108,6 +119,9 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
     }
   }
 }
+
+/** What Phoenix Rising does to the aliens around the hero as it rises. */
+export const PHOENIX_RISING = { radius: 3, damage: 8 }
 
 /** Damage a self-destructing mech does to each alien beside it. */
 export const DETONATE_DAMAGE = 4

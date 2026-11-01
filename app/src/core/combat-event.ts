@@ -15,6 +15,8 @@ export type GameEvent =
   | { type: 'heal'; id: number; target: number; amount: number }
   /** An effect of gear, a skill, a relic or a class ability acts on the unit `id`. `amount` is the health it gained, or lost if negative; 0 when neither. */
   | { type: 'effect'; id: number; effect: Effect | Ability; amount: number }
+  /** A hero's tier 4 goes off where it stood; `radius` is how far it reaches in tiles, 0 if it takes no ground, and a beam ends at `to`. */
+  | { type: 'ultimate'; id: number; effect: Effect; x: number; y: number; radius: number; to?: Tile }
   /** A spitter's spit lands on its target, which takes `damage`, and leaves acid on the tile. */
   | { type: 'spit'; id: number; target: number; damage: number }
   /** A feeder grows on a trick the squad used: its hits do `damage` more than its weapon's. */

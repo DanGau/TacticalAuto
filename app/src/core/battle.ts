@@ -1,5 +1,6 @@
 // A battle's state: units, the board, and the numbers its rules share.
 import type { SecondaryId } from './secondaries'
+import type { SKILL_EFFECTS } from './skill-effects'
 import type { WeaponId } from './weapons'
 import { type AlienKind } from './aliens'
 import type { Tally } from './feats'
@@ -134,110 +135,7 @@ export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' |
 /** Something a piece of gear does; gear.ts says what each does. */
 export type GearEffect = 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'snare' | 'booming' | 'tether'
 /** Something a skill does; skills.ts says what each does. */
-export type SkillEffect =
-  | 'thorns'
-  | 'shield'
-  | 'rime'
-  | 'regen'
-  | 'lastStand'
-  | 'mirror'
-  | 'blink'
-  | 'polymorph'
-  | 'null'
-  | 'caltrops'
-  | 'titan'
-  | 'plating'
-  | 'servos'
-  | 'detonate'
-  | 'swarm'
-  | 'spotter'
-  | 'linked'
-  | 'hive'
-  | 'shock'
-  | 'frenzy'
-  | 'backstab'
-  | 'rage'
-  | 'dodge'
-  | 'longshot'
-  | 'shred'
-  | 'suppress'
-  | 'bulwark'
-  | 'overwatch'
-  | 'steady'
-  | 'headshot'
-  | 'mark'
-  | 'doubleTap'
-  | 'pierce'
-  | 'revive'
-  | 'inspire'
-  | 'barrier'
-  | 'surgeon'
-  | 'surge'
-  | 'throw'
-  | 'secondWind'
-  | 'skirmish'
-  | 'reckless'
-  | 'cleave'
-  | 'taunt'
-  | 'steadfast'
-  | 'bigBlast'
-  | 'concussion'
-  | 'assassinate'
-  | 'slayer'
-  | 'volley'
-  | 'elusive'
-  | 'haste'
-  | 'vitality'
-  | 'bane'
-  | 'ward'
-  | 'drone'
-  | 'inferno'
-  | 'fireSuit'
-  | 'tinder'
-  | 'searing'
-  | 'backdraft'
-  | 'smolder'
-  | 'icebreak'
-  | 'frostbreak'
-  | 'deepFreeze'
-  | 'avalanche'
-  | 'permafrost'
-  | 'rimeLock'
-  | 'leap'
-  | 'hurl'
-  | 'slam'
-  | 'warcry'
-  | 'emp'
-  | 'flashbang'
-  | 'forceField'
-  | 'firewall'
-  | 'shadowStrike'
-  | 'vanish'
-  | 'daze'
-  | 'afterimage'
-  | 'bloodbath'
-  | 'riposte'
-  | 'earthshaker'
-  | 'impact'
-  | 'fortress'
-  | 'aftershock'
-  | 'sureShot'
-  | 'apex'
-  | 'warMachine'
-  | 'endlessSwarm'
-  | 'tesla'
-  | 'fontOfLife'
-  | 'sacredGround'
-  | 'command'
-  | 'firestorm'
-  | 'conflagration'
-  | 'hellfire'
-  | 'frozenHeart'
-  | 'glacialArmor'
-  | 'shardstorm'
-  | 'livingShadow'
-  | 'intangible'
-  | 'bladeDance'
+export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
@@ -344,6 +242,12 @@ export interface Unit {
   order: Order | null
   /** Own turns its cloak has left: no enemy sees or targets it. Unset or 0 when not cloaked. */
   cloaked?: number
+  /** Own turns for which nothing can hurt it. */
+  invulnerable?: number
+  /** Own turns its blizzard has left. */
+  storm?: number
+  /** Grown to giant size, by a tier 4. */
+  giant?: boolean
 }
 
 /**
@@ -466,6 +370,8 @@ interface Downed {
   x: number
   y: number
   carrier: number | null
+  /** The hero as it fell, for a power to raise; none for a captive. */
+  unit?: Unit
 }
 
 /** Primary attacks a soldier makes each turn; an alien makes one. */

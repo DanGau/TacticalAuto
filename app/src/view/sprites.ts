@@ -23,6 +23,16 @@ const BODY_RES = 2
 /** The letter over a unit that is no soldier: its kind's initial, C for a commander, nothing for a boss or civilian. */
 export const letter = (unit: Unit) => (unit.target ? 'C' : unit.summoner !== null ? 'M' : unit.boss || !unit.kind ? '' : ALIENS[unit.kind].name[0])
 
+/** How much bigger a giant stands. */
+const GIANT = 2.2
+
+/** Makes a sprite a giant's size. */
+export function grow(sprite: Sprite): void {
+  sprite.scale = GIANT
+  sprite.shadow.scale.setScalar(GIANT)
+  squash(sprite, 1, 1)
+}
+
 /** Stands a sprite on a tile. */
 export function place(s: Stage, sprite: Sprite, tile: Tile): void {
   sprite.tile = tile
@@ -100,7 +110,7 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
     shadow,
     tile: unit,
     at: { x: 0, y: 0 },
-    scale: unit.boss ? 1.6 : unit.target ? 1.3 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1,
+    scale: unit.giant ? GIANT : unit.boss ? 1.6 : unit.target ? 1.3 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1,
     ally,
     cloaked: false,
     drawHp(hp, armor) {
@@ -170,6 +180,7 @@ export function sync(s: Stage, run: Run, battle: Battle): void {
     const soldier = run.soldiers.find((member) => member.id === unit.soldier)
     const sprite = s.sprites.get(unit.id) ?? create(s, unit, soldier ? level(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : letter(unit))
     place(s, sprite, { x: unit.x, y: unit.y })
+    if (unit.giant) grow(sprite)
     cloakLook(sprite, !!unit.cloaked)
     fade(sprite, 1)
     sprite.drawHp(unit.hp, unit.armor)

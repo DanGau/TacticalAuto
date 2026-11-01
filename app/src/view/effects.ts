@@ -65,7 +65,7 @@ export async function drawing(s: Stage, play: (sketch: Sketch) => Promise<void>)
 }
 
 /** Jolts the camera, fading out over `ms`. */
-function shake(s: Stage, power: number, ms = 240): Promise<void> {
+export function shake(s: Stage, power: number, ms = 240): Promise<void> {
   if (power === 0) return Promise.resolve()
   return s.tween(ms, (t) => {
     s.jolt.x = (Math.random() * 2 - 1) * power * (1 - t)

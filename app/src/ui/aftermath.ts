@@ -92,7 +92,7 @@ export function skillChoice(run: Run, soldier: Soldier, armed: string | null = n
   const pick = (id: SkillId): Pick => {
     const skill = SKILLS[id]
     const state = skillState(soldier, id)
-    return { key: id, action: state === 'open' ? { type: 'skill', soldier: soldier.id, index: offers.indexOf(id) } : undefined, look: `skillnode ${state}`, body: `<b>${skill.name}</b>`, detail: `<p><b>${skill.name}</b> <small class="use">${usage(skill)}</small></p><div>${describe(skill.text, skill.tags, held)}</div>`, go: `Tap again to learn ${skill.name}`, block: state === 'taken' ? 'Learned' : state === 'locked' ? 'Locked: take a power of the tier below' + (soldier.skills.length < CAPSTONE_PICKS ? `; tier 3 needs ${CAPSTONE_PICKS} powers` : '') : null }
+    return { key: id, action: state === 'open' ? { type: 'skill', soldier: soldier.id, index: offers.indexOf(id) } : undefined, look: `skillnode ${state}`, body: `<b>${skill.name}</b>`, detail: `<p><b>${skill.name}</b> <small class="use">${usage(skill)}</small></p><div>${describe(skill.text, skill.tags, held)}</div>`, go: `Tap again to learn ${skill.name}`, block: state === 'taken' ? 'Learned' : state === 'locked' ? 'Locked: take a power of the tier below' + (soldier.skills.length < CAPSTONE_PICKS ? `; tier 3 needs ${CAPSTONE_PICKS} powers learned, tier 4 its tier 3` : '') : null }
   }
   const picks = TREES[soldier.cls!].flatMap((branch) => branch.tiers.flat()).map(pick)
   return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name} level ${level(soldier)}. Choose a power; a branch taken is a branch given up.</h2>

@@ -23,6 +23,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `abilities.ts` | Actions in place of a shot: alien powers, soldier skills and gear |
 | `keystones.ts` | Tier 3 powers: what a hit sets off, their numbers |
 | `follow-ups.ts` | Command's ally attack, Blade Dance's extra strikes |
+| `ultimates.ts` | Tier 4 powers: when each fires and what it does |
 | `wound.ts` | Damage landing, what it sets off, the battle tally |
 | `upkeep.ts` | What happens as a side's turn begins: more aliens engaging, waves |
 | `fighters.ts` | Unit queries every combat module asks |
@@ -48,7 +49,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 ## core/: content and helpers
 
-`aliens`, `challenges`, `classes`, `doctrines`, `feats`, `gear`, `goals`, `keywords`, `powers`, `relics`, `secondaries`, `skills`, `twists`, `utilities`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`, `arena`: test helpers.
+`aliens`, `challenges`, `classes`, `doctrines`, `feats`, `gear`, `goals`, `keywords`, `powers`, `relics`, `secondaries`, `skill-effects`, `skills`, `twists`, `utilities`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`, `arena`: test helpers.
 
 ## view/: battle rendering
 
@@ -59,6 +60,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `camera.ts` | World and picture points, cameras that frame tiles |
 | `play.ts` | Plays a beat's events in order |
 | `effects.ts` | Shots, lunges, rockets, sparks, shake, callouts |
+| `ultimates.ts` | A tier 4 on screen: its name, colour and shape |
 | `sprites.ts` | Unit pictures and moving them |
 | `marks.ts` | Ground marks: the way in, goals, fences, acid, fog, glows |
 | `board.ts` | Building the battlefield's ground, props, walls, roofs |
