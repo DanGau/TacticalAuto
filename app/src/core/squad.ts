@@ -6,11 +6,11 @@ import { CLASSES, type ClassId } from './classes'
 import { type Doctrine, DOCTRINES } from './doctrines'
 import { EFFECTS, plainGear } from './gear'
 import { type Relic, RELICS } from './relics'
-import { random, randomInt } from './rng'
+import { randomInt } from './rng'
 import { type Run } from './run-state'
 import { type Earned } from './run-state'
 import { type Soldier } from './run-state'
-import { TREES, SKILLS, type Role, type SkillId } from './skills'
+import { SKILLS, type SkillId, unlocked } from './skills'
 import { MELEE_RANGE, WEAPONS } from './weapons'
 import { CONTINENT_IDS, type City, CONTINENTS } from './world'
 import type { Keyword } from './keywords'
@@ -44,24 +44,9 @@ export function total(run: Run, effect: (source: Lasting) => number | undefined)
 /** Skills a soldier knows at most: none at level 1, then one more at each level until it has this many. */
 export const MAX_SKILLS = 5
 
-/** Skills a level offers to choose from: one of each role while the tree has one open. */
-export const OFFERS = 3
-
-export const ROLES: Role[] = ['guard', 'control', 'power']
-
-/**
- * The skills a soldier chooses the next from, or none if no choice is owed: from those its class's tree has opened to
- * it, one of each role when one is open, filled from the rest, drawn by its own seed so the offer stays put until
- * chosen. A skill passed over may be offered again; its class's ability always is.
- */
+/** The skills a soldier chooses the next from, or none if no choice is owed: all its class's tree has unlocked. */
 export function skillOffers(soldier: Soldier): SkillId[] {
-  if (!soldier.cls || soldier.skills.length >= Math.min(level(soldier) - 1, MAX_SKILLS)) return []
-  const known = (id: string) => soldier.skills.includes(id as SkillId)
-  const open = TREES[soldier.cls].filter((id) => !known(id) && (SKILLS[id].after?.some(known) ?? true))
-  const rng = { rng: soldier.seed + soldier.skills.length }
-  const drawn = open.map((id) => ({ id, at: SKILLS[id].teaches ? -1 : random(rng) })).sort((a, b) => a.at - b.at).map((d) => d.id)
-  const offers = ROLES.flatMap((role) => drawn.find((id) => SKILLS[id].role === role) ?? [])
-  return [...offers, ...drawn.filter((id) => !offers.includes(id))].slice(0, OFFERS)
+  return !soldier.cls || soldier.skills.length >= Math.min(level(soldier) - 1, MAX_SKILLS) ? [] : unlocked(soldier.cls, soldier.skills)
 }
 
 /** The class ability a soldier has learned, if any. */

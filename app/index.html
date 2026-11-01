@@ -255,6 +255,17 @@
       button.pick.bribe { border-color: #6fd08c; }
       button.pick.utility { border-color: #6fc3d0; }
       button.pick.blocked .price { color: #ff6b6b; }
+      .tree { display: grid; grid-template-columns: repeat(var(--branches), minmax(0, 1fr)); gap: 8px; max-width: 720px; margin: 8px auto; text-align: left; }
+      .branch { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+      .branch small { color: #9aa6bd; }
+      button.pick.skillnode { width: 100%; height: auto; min-height: 40px; padding: 6px; font-size: 13px; }
+      button.pick.skillnode.taken { border-color: #ffd166; background: #4a3f1e; }
+      button.pick.skillnode.open { border-color: #6fd08c; }
+      button.pick.skillnode.locked { border-color: #333b4d; opacity: 0.55; }
+      .node-name { font-size: 12px; }
+      .node-name.taken { color: #ffd166; font-weight: bold; }
+      .node-name.open { color: #6fd08c; }
+      .node-name.locked { color: #6b7488; }
       .shelf { margin-bottom: 6px; text-align: center; }
       .shelf > small { display: block; color: #9aa6bd; }
       .shopfoot { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 8px 0; }

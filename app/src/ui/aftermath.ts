@@ -13,11 +13,11 @@ import { health } from '../core/squad'
 import { skillOffers } from '../core/squad'
 import { level, MAX_SQUAD } from '../core/squad'
 import { xpFor } from '../core/squad'
-import { SKILLS } from '../core/skills'
+import { CAPSTONE_PICKS, SKILLS, TREES, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
-import { gearPicks, pickCard, pickDetail, sellPick, utilityPick } from './cards'
-import { heroSheet } from './sheet'
-import { badge, button, describe, ROLES, gearCard, gearText, healthBar, signed, STOP_NAMES, threatBar } from './html'
+import { gearPicks, pickCard, pickDetail, sellPick, utilityPick, type Pick } from './cards'
+import { heroSheet, skillState, treeGrid } from './sheet'
+import { badge, button, describe, gearCard, gearText, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
 /**
  * A soldier's card: class badge, name, weapon, and an experience bar filling with what the battle earned, flaring on a
@@ -85,12 +85,19 @@ function title(report: Report): string {
   return `<h1 class="${report.won ? 'down' : 'up'}">${name} ${report.won ? 'won' : 'lost'}</h1>`
 }
 
-/** A skill for a soldier to learn: one of each role its tree has opened, each told by what it does now and nothing after. */
-export function skillChoice(run: Run, soldier: Soldier): string {
+/** The class's tree, for a soldier owed a power: taken, open and locked at a glance; an open one tapped tells what it does, and tapped again is learned. */
+export function skillChoice(run: Run, soldier: Soldier, armed: string | null = null): string {
   const held = squadKeywords(run)
-  const card = (id: (typeof soldier.skills)[number], index: number) => button({ type: 'skill', soldier: soldier.id, index }, `<small>${ROLES[SKILLS[id].role]}</small><br><b>${SKILLS[id].name}</b><br><small class="use">${usage(SKILLS[id])}</small><br>${describe(SKILLS[id].text, SKILLS[id].tags, held)}`, 'card skill')
-  return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name}, level ${level(soldier)}. Choose a power; each opens more.</h2>
-    <div class="choices">${skillOffers(soldier).map(card).join('')}</div>`
+  const offers = skillOffers(soldier)
+  const pick = (id: SkillId): Pick => {
+    const skill = SKILLS[id]
+    const state = skillState(soldier, id)
+    return { key: id, action: state === 'open' ? { type: 'skill', soldier: soldier.id, index: offers.indexOf(id) } : undefined, look: `skillnode ${state}`, body: `<b>${skill.name}</b>`, detail: `<p><b>${skill.name}</b> <small class="use">${usage(skill)}</small></p><div>${describe(skill.text, skill.tags, held)}</div>`, go: `Tap again to learn ${skill.name}`, block: state === 'taken' ? 'Learned' : state === 'locked' ? 'Locked: take a power of the tier below' + (soldier.skills.length < CAPSTONE_PICKS ? `; tier 3 needs ${CAPSTONE_PICKS} powers` : '') : null }
+  }
+  const picks = TREES[soldier.cls!].flatMap((branch) => branch.tiers.flat()).map(pick)
+  return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name} level ${level(soldier)}. Choose a power; a branch taken is a branch given up.</h2>
+    ${treeGrid(soldier, (id) => pickCard(pick(id), armed))}
+    ${pickDetail(picks, armed, 'Tap a power for its details; tap it again to learn it.')}`
 }
 
 /** With a utility found and no room: fixed cards, each held one to drop for it, or the new one left behind. */
@@ -110,7 +117,7 @@ export function choice(run: Run, armed: string | null = null): string {
     return `<h2>Gear found. Who takes it?${more}</h2><div class="gear ${run.finds[0].rarity}">${gearCard(run.finds[0], held)}</div>${takers(run, 0, armed)}`
   }
   const learner = run.soldiers.find((s) => skillOffers(s).length > 0)
-  return learner ? skillChoice(run, learner) : ''
+  return learner ? skillChoice(run, learner, armed) : ''
 }
 
 /** What each soldier did in the battle, a row each, the squad's best in each column but damage taken marked. */

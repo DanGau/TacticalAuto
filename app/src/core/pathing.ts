@@ -174,9 +174,9 @@ export function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
  * else on a hold the uplink, then the squad; otherwise the soldier nearest, shooting civilians on the way.
  */
 export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
-  // The squad goes for the VIP until it reaches them.
+  // The squad goes for the VIP until it reaches them; with its guard out of reach and the battle dragging on, it goes for the guard.
   const vip = vipOf(battle)
-  if (vip && unit.side === 'human' && battle.vip !== 'freed') return vip
+  if (vip && unit.side === 'human' && battle.vip !== 'freed' && !(battle.vip === 'breached' && battle.round >= RESTLESS_ROUND && enemies.length > 0)) return vip
   if (enemies.length === 0 && !(battle.extract && unit.side === 'human')) return undefined
   // Getting out, a soldier with its hands free goes for the nearest squadmate down first.
   if (battle.extract && unit.side === 'human') return (!carrying(battle, unit) && nearest(lying(battle), unit)) || battle.extract

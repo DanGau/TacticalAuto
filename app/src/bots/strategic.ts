@@ -10,7 +10,7 @@ import { THREAT_MAX } from '../core/progress'
 import { GEAR_PRICE } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
-import { SKILLS } from '../core/skills'
+import { SKILLS, TREES } from '../core/skills'
 import { health, MAX_SQUAD, skillOffers, soldierStats } from '../core/squad'
 import { RIG, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from '../core/utilities'
 import { WEAPONS, type WeaponId } from '../core/weapons'
@@ -151,7 +151,21 @@ function shop(run: Run): Action {
   return { type: 'leave' }
 }
 
-/** Takes the first relic offered, on the same seeds better than choosing by shared keywords, and its class's ability, then the first skill. */
+/** The branch each class climbs first: for each, the one that wins most on the same seeds. */
+const PLANS: Record<ClassId, string> = { assault: 'Ironhide', heavy: 'Bastion', sniper: 'Ghost', engineer: 'Drone Hive', support: 'Mending', pyro: 'Ember Hide', cryo: 'Glacier', phantom: 'Wraith' }
+
+/** The skill a hero plans on: up its class's planned branch, highest tier open first; that branch done, up the next. */
+function plannedSkill(soldier: Soldier): number {
+  const offers = skillOffers(soldier)
+  const branches = TREES[soldier.cls!]
+  for (const { tiers } of [...branches.filter((b) => b.name === PLANS[soldier.cls!]), ...branches]) {
+    const open = tiers.flat().filter((id) => offers.includes(id))
+    if (open.length > 0) return offers.indexOf(open.at(-1)!)
+  }
+  return 0
+}
+
+/** Takes the first relic offered, on the same seeds better than choosing by shared keywords, and the skill its hero plans on. */
 function reward(run: Run): Action {
   if (run.relicOffers.length > 0) return { type: 'relic', index: 0 }
   if (run.finds.length > 0) {
@@ -159,7 +173,7 @@ function reward(run: Run): Action {
     return holder === null ? { type: 'sell', find: 0 } : { type: 'equip', find: 0, soldier: holder }
   }
   const learner = run.soldiers.find((s) => skillOffers(s).length > 0)!
-  return { type: 'skill', soldier: learner.id, index: Math.max(0, skillOffers(learner).findIndex((id) => SKILLS[id].teaches)) }
+  return { type: 'skill', soldier: learner.id, index: plannedSkill(learner) }
 }
 
 /** Classes by how many runs a lone hero of each wins, on the same seeds. */

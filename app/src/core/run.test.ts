@@ -51,7 +51,7 @@ import { LOSS_THREAT } from './progress'
 import { STOP_THREAT } from './progress'
 import { THREAT_MAX } from './progress'
 import { LEG_STOPS } from './progress'
-import { roots, SKILLS, TREES } from './skills'
+import { roots, SKILLS, unlocked } from './skills'
 import { atKey, road, enterAt, begun } from './roads'
 import { RELICS } from './relics'
 import { SHOP_UTILITIES, UTILITY_SLOTS } from './utilities'
@@ -534,42 +534,17 @@ test('levels never stop: each takes more experience than the last', () => {
   }
 })
 
-test('each level offers one guard, one control and one power skill its tree has opened, the same until chosen; past the last, levels add stats only', () => {
+test('each pick owed offers what the tree has unlocked; past the last, levels add stats only', () => {
   const run = begun(1)
   const [soldier] = run.soldiers
   expect(skillOffers(soldier)).toEqual([])
   soldier.xp = xpFor(MAX_SKILLS + 5)
   run.phase = 'reward'
-  const seen = new Set<string>()
-  for (let n = 1; n < MAX_SKILLS; n++) {
-    const offers = skillOffers(soldier)
-    expect(skillOffers(soldier)).toEqual(offers)
-    expect(offers.map((id) => SKILLS[id].role)).toEqual(['guard', 'control', 'power'])
-    for (const id of offers) {
-      expect(TREES[soldier.cls!]).toContain(id)
-      expect(soldier.skills).not.toContain(id)
-      expect(!SKILLS[id].after || SKILLS[id].after.some((a) => soldier.skills.includes(a as never))).toBe(true)
-      seen.add(id)
-    }
-    apply(run, { type: 'skill', soldier: soldier.id, index: n % 3 })
+  while (soldier.skills.length < MAX_SKILLS) {
+    expect(skillOffers(soldier)).toEqual(unlocked(soldier.cls!, soldier.skills))
+    apply(run, { type: 'skill', soldier: soldier.id, index: 0 })
   }
-  expect(soldier.skills).toHaveLength(MAX_SKILLS)
   expect(skillOffers(soldier)).toEqual([])
-  // Two soldiers of a class are offered different things.
-  const offered = (seed: number) => skillOffers({ ...soldier, skills: soldier.skills.slice(0, 1), seed })
-  expect(Array.from({ length: 8 }, (_, seed) => offered(seed).join()).some((o) => o !== offered(0).join())).toBe(true)
-})
-
-test("every class's tree holds roots of each role, at least three skills of each, and opens each skill from skills in that tree", () => {
-  for (const cls of Object.keys(TREES) as (keyof typeof TREES)[]) {
-    const tree = TREES[cls]
-    for (const role of ['guard', 'control', 'power'] as const) {
-      expect(roots(cls).some((id) => SKILLS[id].role === role)).toBe(true)
-      expect(tree.filter((id) => SKILLS[id].role === role).length).toBeGreaterThanOrEqual(3)
-    }
-    for (const id of tree) for (const a of SKILLS[id].after ?? []) expect(tree).toContain(a)
-  }
-  expect(new Set(Object.values(TREES).flat()).size).toBe(Object.keys(SKILLS).length)
 })
 
 test('a satellite won offers three relics; a relic held changes the run', () => {

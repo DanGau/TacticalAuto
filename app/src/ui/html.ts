@@ -2,7 +2,6 @@
 import type { Action } from '../core/apply'
 import { EFFECTS, type Gear } from '../core/gear'
 import { weaponText, WEAPONS } from '../core/weapons'
-import type { Role } from '../core/skills'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import type { Stats } from '../core/battle'
 import { KEYWORDS, RESISTS, type Keyword, type Resist } from '../core/keywords'
@@ -17,7 +16,6 @@ export const button = (action: Action, label: string, cls = '', enabled = true, 
   `<button class="${cls}" data-action='${JSON.stringify(action)}' ${title ? `title="${title}"` : ''} ${enabled ? '' : 'disabled'}>${label}</button>`
 
 /** What each skill role is called on a card. */
-export const ROLES: Record<Role, string> = { guard: '🛡️ Guard', control: '🌀 Control', power: '⚔️ Might' }
 
 export const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`
 

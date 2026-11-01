@@ -7,7 +7,7 @@ import { usage, type Power } from '../core/powers'
 import type { Run, Soldier } from '../core/run-state'
 import { secondaryOf, charges, health, level, soldierStats, weaponOf } from '../core/squad'
 import { secondaryPower, SECONDARIES } from '../core/secondaries'
-import { SKILLS } from '../core/skills'
+import { SKILLS, TREES, unlocked, type SkillId } from '../core/skills'
 import { weaponText } from '../core/weapons'
 import { describe, resistChip } from './html'
 
@@ -35,7 +35,7 @@ const kit = (run: Run, hero: Soldier) => {
 /** A hero's powers: its bonus attack, then those it learned, its class's ability with its uses worked out. */
 const powers = (run: Run, hero: Soldier): (Power & { tags?: Keyword[] })[] => [
   secondaryPower(SECONDARIES[secondaryOf(hero)]),
-  ...hero.skills.map((id) => (SKILLS[id].teaches ? classPower(CLASSES[hero.cls!], charges(run, hero)) : SKILLS[id])),
+  ...hero.skills.map((id) => (SKILLS[id].name === CLASSES[hero.cls!].abilityName ? classPower(CLASSES[hero.cls!], charges(run, hero)) : SKILLS[id])),
 ]
 
 /** Class and level, as a sheet heads them. */
@@ -56,8 +56,20 @@ export function heroSheet(run: Run, hero: Soldier): string {
   const stance = hero.cls && !weaponOf(hero)?.stance ? `<small>${CLASSES[hero.cls].stanceText}.</small>` : ''
   return `<div class="charsheet"><small>${heading(hero)}</small>${heroStats(run, hero)}
     <div class="weapon"><b>${hero.gear?.name ?? 'Empty hands'}</b><small>${kit(run, hero)}.</small></div>${stance}
-    ${powerList(run, hero)}</div>`
+    ${powerList(run, hero)}${heroTree(hero)}</div>`
 }
+
+/** A class's tree as a grid, a column per branch and a row per tier, with `cell` drawing each skill. */
+export const treeGrid = (hero: Soldier, cell: (id: SkillId) => string) => {
+  const branches = TREES[hero.cls!]
+  return `<div class="tree" style="--branches:${branches.length}">${branches.map(({ name, tiers }) => `<div class="branch"><b>${name}</b>${tiers.map((skills, tier) => `<small>Tier ${tier + 1}</small>${skills.map(cell).join('')}`).join('')}</div>`).join('')}</div>`
+}
+
+/** Whether a hero knows a skill, can learn it now, or has it locked. */
+export const skillState = (hero: Soldier, id: SkillId) => (hero.skills.includes(id) ? 'taken' : unlocked(hero.cls!, hero.skills).includes(id) ? 'open' : 'locked')
+
+/** A hero's tree in brief, each skill's name marked by its state. */
+export const heroTree = (hero: Soldier) => (hero.cls ? treeGrid(hero, (id) => `<span class="node-name ${skillState(hero, id)}" title="${SKILLS[id].text}">${SKILLS[id].name}</span>`) : '')
 
 /** An alien's stat block: name, numbers, what it does, what it resists. */
 export const alienBlock = (kind: AlienKind, stats: Stats, hp = stats.hp) => `<div class="charsheet alien"><b class="name">${ALIENS[kind].name}</b> ${ALIENS[kind].resists.map(resistChip).join('')}

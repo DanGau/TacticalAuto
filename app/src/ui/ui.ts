@@ -134,7 +134,7 @@ export function createUi(act: (action: Action) => void): Ui {
       // A pop-up opened over it leaves the debrief at rest behind: nothing in it plays again.
       if (learner || find !== null) opened.still = true
       const debrief = stopReport(run, report, opened.still)
-      return learner ? debrief + modal(skillChoice(run, learner)) : find !== null ? debrief + loot(run, find, armed) : debrief
+      return learner ? debrief + modal(skillChoice(run, learner, armed)) : find !== null ? debrief + loot(run, find, armed) : debrief
     }
     if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run, armed)}`
     if (run.phase === 'shop' || run.phase === 'event') {
