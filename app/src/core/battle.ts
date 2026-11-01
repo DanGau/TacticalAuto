@@ -75,7 +75,6 @@ export const FEAST_HEAL = 2
 export const PHOENIX_HEALTH = 5
 export const SECOND_WIND_HEAL = 5
 export const SKIRMISH_MOVE = 2
-export const RECKLESS_DAMAGE = 1
 export const CLEAVE_DAMAGE = 2
 export const BIG_BLAST_RADIUS = 2
 export const SLAYER_DAMAGE = 2
@@ -139,7 +138,7 @@ export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
-export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect | 'block' | 'hover' | 'rangedShield' | 'meleeShield'
+export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect | 'block' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw'
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'

@@ -199,13 +199,6 @@ test('blinking gear carries a soldier hit to half health to safety, once', () =>
   expect(d.soldier.spent).toContain('blink')
 })
 
-test('a chicken claw turns an alien into a chicken that loses its next action', () => {
-  const d = armed(['polymorph'], { damage: 0 })
-  const events = untilAlienShoots(d)
-  expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'polymorph', amount: 0 })
-  expect(events).toContainEqual({ type: 'frozen', id: d.alien.id })
-})
-
 test('a null field stops a spitter spitting', () => {
   const d = armed(['null'], { damage: 0 })
   d.alien.kind = 'spitter'
@@ -352,12 +345,11 @@ test('a fire suit keeps its wearer from burning in fire', () => {
   expect(d.soldier.burning).toBe(0)
 })
 
-test('a kill on an alien burning and chilled spreads both to those beside it, with backdraft and avalanche', () => {
-  const d = armed(['backdraft', 'avalanche'], { damage: 5 })
-  Object.assign(d.alien, { hp: 1, burning: 9, chilled: 9 })
+test('a kill on a burning alien spreads the fire to those beside it, with backdraft', () => {
+  const d = armed(['backdraft'], { damage: 5 })
+  Object.assign(d.alien, { hp: 1, burning: 9 })
   const other = another(d, 1, 0)
   const events = []
   while (d.alien.hp > 0) events.push(...d.step())
   expect(effectsOf(events, 'backdraft')).toContainEqual({ type: 'effect', id: other.id, effect: 'backdraft', amount: 0 })
-  expect(effectsOf(events, 'avalanche')).toContainEqual({ type: 'effect', id: other.id, effect: 'avalanche', amount: 0 })
 })

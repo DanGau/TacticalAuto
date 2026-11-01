@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import { CLASSES, type ClassId } from './classes'
 import { begun } from './roads'
 import { MAX_SKILLS, skillOffers, xpFor } from './squad'
+import { SKILL_EFFECTS } from './skill-effects'
 import { CAPSTONE_PICKS, roots, SKILLS, TREES, unlocked, type SkillId } from './skills'
 
 const classes = Object.keys(CLASSES) as ClassId[]
@@ -18,6 +19,12 @@ test('every skill stands in one tree, every class has 2 or 3 branches of tiers 1
     expect(unlocked(cls, [])).toEqual(roots(cls))
     expect(SKILLS[roots(cls)[0]].name).toBe(CLASSES[cls].abilityName)
   }
+})
+
+test('no power no tree offers: every skill effect belongs to a skill, and every skill to a tree', () => {
+  const offered = classes.flatMap((cls) => TREES[cls].flatMap((b) => b.tiers.flat()))
+  const effects = new Set(offered.map((id) => SKILLS[id].effect))
+  expect(SKILL_EFFECTS.filter((effect) => !effects.has(effect))).toEqual([])
 })
 
 test('tier locks hold: tier 2 needs a tier 1 of its branch, tier 3 a tier 2 and enough picks, tier 4 its tier 3', () => {

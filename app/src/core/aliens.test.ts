@@ -176,7 +176,7 @@ test('backstab adds damage against a target with no alien beside it; shredder de
 
 test('a soldier on overwatch shoots an alien that moves in its sights on the alien turn', () => {
   const { soldier, aliens, until } = arena([{ kind: 'swarmling', x: 10, y: 22 }])
-  soldier.effects = ['overwatch']
+  soldier.order = 'prepare'
   soldier.secondary = undefined
   soldier.stats = { ...soldier.stats, move: 0, range: 4 }
   aliens[0].hp = aliens[0].stats.hp = 99
@@ -332,11 +332,11 @@ test('an engineer deploys a frail mech once aliens are in sight, which the alien
 
 test('a dronemaster deploys drones that carry its skills, and a self-destructing mech blasts the aliens beside it', () => {
   const { battle, soldier, until } = arena([{ kind: 'trooper', x: 10, y: 14 }])
-  Object.assign(soldier, { ability: 'mech', charges: 1, effects: ['swarm', 'hive', 'shock'] })
+  Object.assign(soldier, { ability: 'mech', charges: 1, effects: ['swarm', 'hive', 'spotter'] })
   until((events) => events.filter((e) => e.type === 'spawn').length === 3)
   const drones = battle.units.filter((u) => u.summoner === soldier.soldier)
   expect(drones).toHaveLength(3)
-  expect(drones.every((d) => d.stats.hp === DRONE_STATS.hp && d.effects.includes('snare') && !d.effects.includes('taunt'))).toBe(true)
+  expect(drones.every((d) => d.stats.hp === DRONE_STATS.hp && d.effects.includes('mark') && !d.effects.includes('taunt'))).toBe(true)
 
   const blast = arena([{ kind: 'trooper', x: 12, y: 10 }])
   const mech = mechUnit(blast.battle, blast.soldier, { ...blast.soldier.stats, hp: 1 }, ['detonate'], { x: 11, y: 10 })

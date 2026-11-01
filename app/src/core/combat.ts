@@ -13,7 +13,7 @@ import { has, spotted, vipOf } from './fighters'
 import { SECONDARIES } from './secondaries'
 import { attacksOf, blast, leap, napalm, shoot, weaponAttack } from './attack'
 import { leverage } from './objects'
-import { alienAction, cloak, deploy, drone, feed, flashbang, forceField, heal, polymorph, pulse, secondWind, skirmish, slam, strew } from './abilities'
+import { alienAction, cloak, deploy, drone, feed, flashbang, forceField, heal, pulse, secondWind, skirmish, slam, strew } from './abilities'
 import { armed, dash, moveSide, stride } from './sides'
 import { IMPACT_DAMAGE, tesla } from './keystones'
 import { bladeDance, command } from './follow-ups'
@@ -76,7 +76,7 @@ function actNext(battle: Battle): GameEvent[] {
     const fallback = primary.length === 0 && unit.secondary && unit.stats.range > 0 && unit.stats.damage > 0 ? shoot(battle, unit, seen, undefined, undefined, SECONDARIES[unit.secondary]) : []
     if (fallback.length > 0) battle.attacks = attacksOf(unit)
     const struck = [...primary, ...fallback]
-    const acted = [...secondWind(unit), ...polymorph(battle, unit, seen), ...strew(battle, unit, 'caltrops'), ...strew(battle, unit, 'firewall'), ...deploy(battle, unit, seen), ...powers, ...healed, ...struck]
+    const acted = [...secondWind(unit), ...strew(battle, unit), ...deploy(battle, unit, seen), ...powers, ...healed, ...struck]
     // What follows an action: a drone's shot, then a skirmisher's step back.
     const events = acted.length > 0 && unit.hp > 0 && attacksOf(unit) === 1 ? [...acted, ...drone(battle, unit), ...tesla(battle, unit, seen), ...skirmish(battle, unit)] : acted
     battle.actor = null

@@ -1,5 +1,5 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
-import { type Battle, type Unit, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RECKLESS_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_TURNS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
+import { type Battle, type Unit, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_TURNS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
 import { cloakOn } from './abilities'
 import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './keystones'
 import { freeTilesNear } from './grid'
@@ -129,8 +129,6 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     gain -
     blunted +
     (inAura(battle, unit, 'inspire') ? INSPIRE_DAMAGE : 0) +
-    when(true, 'reckless', RECKLESS_DAMAGE) +
-    (has(enemy, 'reckless') ? RECKLESS_DAMAGE : 0) +
     when(enemy.marked, 'spotter', SPOTTER_DAMAGE) +
     when(!unit.moved, 'steady', 1) +
     (unit.kind === 'feeder' ? unit.fury : 0) +
@@ -166,7 +164,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     events.push({ type: 'effect', id: enemy.id, effect: 'intangible', amount: 0 })
   }
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0
-  const pierced = unseen || secondary?.effect === 'pierce' || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) + when(enemy.chilled > 0, 'frostbreak', 1) > 0
+  const pierced = unseen || secondary?.effect === 'pierce' || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) > 0
   const left = enemy.hp + (pierced ? 0 : enemy.armor)
   if (has(enemy, 'mirror') && enemy.spent.filter((e) => e === 'mirror').length < MIRROR_IMAGES) {
     damage = 0

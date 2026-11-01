@@ -6,7 +6,7 @@ import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { has, hostage, foes, powering, shootable, nearest, immune, silenced, spend, enemiesOf, onTile, FIRE_TURNS } from './fighters'
+import { has, hostage, foes, powering, shootable, nearest, immune, silenced, spend, enemiesOf, onTile } from './fighters'
 import { walk, bestPath, paths } from './pathing'
 import { canShoot, lineOfSight } from './sight'
 import { FONT_REACH, SWARM_LIMIT, WAR_MACHINE } from './keystones'
@@ -70,18 +70,6 @@ export function forceField(battle: Battle, unit: Unit): GameEvent[] {
   unit.spent.push('forceField')
   mate.armor += FORCE_FIELD_ARMOR
   return [{ type: 'effect', id: mate.id, effect: 'forceField', amount: 0 }]
-}
-
-/** Polymorph: once per battle, the toughest alien the unit can shoot, a boss aside, becomes a chicken and loses its next action. */
-export function polymorph(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
-  if (!has(unit, 'polymorph') || unit.spent.includes('polymorph')) return []
-  const target = battle.units
-    .filter((u) => u.side !== unit.side && !u.boss && !u.panicked && shootable(battle, powering(unit), unit, u, seen))
-    .reduce<Unit | undefined>((best, u) => (!best || u.hp > best.hp ? u : best), undefined)
-  if (!target) return []
-  unit.spent.push('polymorph')
-  target.panicked = true
-  return [{ type: 'effect', id: target.id, effect: 'polymorph', amount: 0 }]
 }
 
 /** Spit: the nearest unit but a hostage the spitter can shoot is hit, and acid is left on its tile. */
@@ -213,7 +201,7 @@ function build(battle: Battle, unit: Unit, count: number): GameEvent[] {
   if (has(unit, 'plating')) stats.armor += PLATING_ARMOR
   if (has(unit, 'servos')) Object.assign(stats, { move: stats.move + 2, damage: stats.damage + 1 })
   if (!swarm && has(unit, 'warMachine')) Object.assign(stats, { hp: stats.hp + WAR_MACHINE.hp, damage: stats.damage + WAR_MACHINE.damage, range: stats.range + WAR_MACHINE.range })
-  const granted: [SkillEffect, Effect][] = [['spotter', 'mark'], ['linked', 'inspire'], ['shock', 'snare'], ['detonate', 'detonate']]
+  const granted: [SkillEffect, Effect][] = [['spotter', 'mark'], ['linked', 'inspire'], ['detonate', 'detonate']]
   const effects = [...(swarm ? [] : ['taunt' as const]), ...granted.flatMap(([skill, effect]) => (has(unit, skill) ? [effect] : []))]
   return freeTilesNear(battle, unit, count).map((tile) => {
     const mech = mechUnit(battle, unit, { ...stats }, effects, tile)
@@ -222,26 +210,22 @@ function build(battle: Battle, unit: Unit, count: number): GameEvent[] {
   })
 }
 
-/**
- * Caltrops and Firewall: once per battle, an alien closing in finds the tiles between it and the soldier strewn with
- * caltrops, or set alight.
- */
-export function strew(battle: Battle, unit: Unit, effect: 'caltrops' | 'firewall'): GameEvent[] {
-  if (!has(unit, effect) || unit.spent.includes(effect)) return []
+/** Caltrops: once per battle, an alien closing in finds the tiles between it and the soldier strewn with them. */
+export function strew(battle: Battle, unit: Unit): GameEvent[] {
+  if (!has(unit, 'caltrops') || unit.spent.includes('caltrops')) return []
   const rusher = nearest(
     battle.units.filter((u) => u.side !== unit.side && u.revealed && u.engaged && distance(u, unit) <= CALTROP_RANGE && distance(u, unit) > CALTROP_LATE),
     unit,
   )
   if (!rusher) return []
-  unit.spent.push(effect)
+  unit.spent.push('caltrops')
   const centre = { x: unit.x + 2 * Math.sign(rusher.x - unit.x), y: unit.y + 2 * Math.sign(rusher.y - unit.y) }
   for (const [dx, dy] of [[0, 0], ...NEIGHBORS]) {
     const tile = { x: centre.x + dx, y: centre.y + dy }
     if (!onGrid(tile.x, tile.y)) continue
-    if (effect === 'caltrops' && !onTile(battle.caltrops, tile)) battle.caltrops.push(tile)
-    if (effect === 'firewall' && !onTile(battle.fire, tile)) battle.fire.push({ ...tile, turns: FIRE_TURNS })
+    if (!onTile(battle.caltrops, tile)) battle.caltrops.push(tile)
   }
-  return [{ type: 'effect', id: unit.id, effect, amount: 0 }]
+  return [{ type: 'effect', id: unit.id, effect: 'caltrops', amount: 0 }]
 }
 
 /** How near an alien closing in must come before caltrops are strewn in its path, and how near is too late. */

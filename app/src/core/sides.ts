@@ -1,7 +1,7 @@
 // A side's simultaneous move: sighting aliens, walking, sentries, overwatch, burrowers.
-import { SECONDARIES, type Secondary } from './secondaries'
+import type { Secondary } from './secondaries'
 import { aiming } from './fighters'
-import { shoot, weaponAttack } from './attack'
+import { weaponAttack } from './attack'
 import { WEAPONS } from './weapons'
 import { GRID, type Battle, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, ENGAGE_REACH, STANDOFF } from './battle'
 import { opening } from './landing'
@@ -238,16 +238,15 @@ export function dash(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[]
   return [...events.map((e) => (e.type === 'move' ? { ...e, with: 'dash' as const } : e)), ...sight(battle)]
 }
 
-/** Overwatch: each soldier with it, or prepared, shoots at the first alien that moved this turn and that it can now shoot. */
+/** Overwatch: each prepared soldier shoots at the first alien that moved this turn and that it can now shoot. */
 export function overwatch(battle: Battle, moved: number[]): GameEvent[] {
   const events: GameEvent[] = []
-  for (const unit of battle.units.filter((u) => u.side === 'human' && (has(u, 'overwatch') || u.order === 'prepare'))) {
+  for (const unit of battle.units.filter((u) => u.side === 'human' && u.order === 'prepare')) {
     const seen = spotted(battle)
     for (const id of moved) {
       const alien = battle.units.find((u) => u.id === id && u.revealed)
       battle.actor = unit.id
-      const held = alien && unit.hp > 0 ? weaponAttack(battle, unit, seen, 'overwatch', alien) : []
-      const shot = held.length === 0 && alien && unit.hp > 0 && has(unit, 'overwatch') && unit.secondary ? shoot(battle, unit, seen, 'overwatch', alien, SECONDARIES[unit.secondary]) : held
+      const shot = alien && unit.hp > 0 ? weaponAttack(battle, unit, seen, 'overwatch', alien) : []
       battle.actor = null
       if (shot.length === 0) continue
       events.push(...shot)

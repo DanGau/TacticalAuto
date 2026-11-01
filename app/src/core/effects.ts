@@ -14,6 +14,7 @@ import { WEAPONS, type WeaponId } from './weapons'
  * effect adds to a name, or any skill's.
  */
 export function effectName(effect: Effect | Ability, squad: { skills: SkillId[]; weapons: WeaponId[] } = { skills: [], weapons: [] }): string {
+  if (effect === 'overwatch') return 'Overwatch'
   const ability = Object.values(CLASSES).find((cls) => cls.ability === effect)
   if (ability) return ability.abilityName
   const own = [...squad.skills.map((id) => SKILLS[id]), ...squad.weapons.map((id) => WEAPONS[id]), ...Object.values(RELICS), ...Object.values(DOCTRINES)].find((source) => source.effect === effect)
