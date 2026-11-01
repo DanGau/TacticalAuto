@@ -32,6 +32,8 @@ const log = (line: string) => console.error(`sim pool: ${line}`)
 interface PoolOptions {
   threads?: number
   doctrines?: DoctrineId[]
+  /** Play each deploy screen on with every utility: see forks.ts. */
+  forks?: boolean
   /** Memory, in MB, the sim processes together may hold before the pool shrinks. */
   memoryMb?: number
 }
@@ -43,7 +45,7 @@ interface PoolOptions {
  * its batch retried on a fresh one.
  */
 export async function playAll(bots: string[], runs: number, start: number, options: PoolOptions = {}): Promise<Record<string, RunResult[]>> {
-  const { threads = availableParallelism() - 1, doctrines = [], memoryMb = (totalmem() / MB) * 0.6 } = options
+  const { threads = availableParallelism() - 1, doctrines = [], forks = false, memoryMb = (totalmem() / MB) * 0.6 } = options
   const jobs = bots.flatMap((bot) => Array.from({ length: runs }, (_, i) => ({ bot, seed: start + i })))
   // Fewer seeds a batch when there are too few to keep every process busy.
   const size = Math.max(1, Math.min(BATCH, Math.ceil(jobs.length / Math.max(1, threads))))
@@ -80,7 +82,7 @@ export async function playAll(bots: string[], runs: number, start: number, optio
       // Maglev can crash a CPU-starved process (nodejs/node#64841); without it the sim runs as fast.
       const proc = fork(BUNDLE, { execArgv: [`--max-old-space-size=${HEAP_MB}`, '--no-maglev'], stdio: ['ignore', 'inherit', 'inherit', 'ipc'] })
       procs.set(proc, { rss: 0 })
-      proc.send({ doctrines })
+      proc.send({ doctrines, forks })
       proc.on('message', (m: { ready: true } | { id: number; played: typeof played; rss: number }) => {
         if (failed) return
         if ('ready' in m) return give(proc)

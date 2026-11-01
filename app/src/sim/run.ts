@@ -10,6 +10,7 @@ import type { DoctrineId } from '../core/doctrines'
 import { CHALLENGES, type ChallengeId } from '../core/challenges'
 import type { Goal } from '../core/goals'
 import type { UtilityId } from '../core/utilities'
+import { forksOf, type Fork } from './forks'
 
 /** Whether a party met a challenge with an answer it picked, with one it held and left behind, or with none. */
 export type Answer = 'picked' | 'held' | 'none'
@@ -42,6 +43,8 @@ export interface RunResult {
   durations: number[]
   /** Each battle's toll on the squad's health. */
   tolls: Toll[]
+  /** With `forks` asked for: each deploy screen played on with every utility. */
+  forks: Fork[]
   /** With the seed, enough to replay the run. */
   actions: Action[]
 }
@@ -59,10 +62,10 @@ const MAX_ACTIONS = 10000
 /**
  * Plays a run to its end, taking each action from `next` when the run waits for the player.
  */
-function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = []): { run: Run; result: RunResult } {
+function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = [], forks = false): { run: Run; result: RunResult } {
   const run = createRun(seed)
   run.doctrines.push(...doctrines)
-  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], tolls: [], actions: [] }
+  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], tolls: [], forks: [], actions: [] }
   let clock = { next: 0, done: 0 }
   /** The battle under way, its leg, the squad's health as it began, and the utilities it held. */
   let begun: [Run['battle'], number, number, UtilityId[]] = [null, 0, 0, []]
@@ -84,6 +87,7 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
       continue
     }
     if (result.actions.length >= MAX_ACTIONS) throw new Error(`seed ${seed}: no end after ${MAX_ACTIONS} actions, in phase ${run.phase}`)
+    if (forks && run.phase === 'battle' && run.battle!.phase === 'deploy') result.forks.push(...forksOf(run))
     const action = next(run)
     const applied = apply(run, action)
     if (!applied.ok) throw new Error(`action rejected: ${applied.reason}`)
@@ -99,7 +103,7 @@ export function replay(seed: number, actions: Action[]): Run {
 }
 
 /** Plays a run with `bot`, the squad holding `doctrines` from the start. */
-export function runWith(seed: number, bot: Bot, doctrines: DoctrineId[] = []): RunResult {
+export function runWith(seed: number, bot: Bot, doctrines: DoctrineId[] = [], forks = false): RunResult {
   const rng = { rng: seed }
-  return play(seed, (run) => bot(run, rng), doctrines).result
+  return play(seed, (run) => bot(run, rng), doctrines, forks).result
 }

@@ -67,5 +67,5 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 ## Elsewhere
 
 - `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `cards.ts` fixed-size cards tapped to arm and again to confirm, and gear comparisons; `briefing.ts` the tour before the landing; `menu.ts` the title.
-- `bots/bots.ts`: bot strategies. `sim/`: the sim CLI, and `sim/encounter.ts`, the challenge lab.
+- `bots/bots.ts`: bot strategies. `sim/`: the sim CLI, `sim/encounter.ts`, the challenge lab, and `sim/forks.ts`, the clean comparison of answers.
 - `main.ts`: browser entry and `window.debug`.
