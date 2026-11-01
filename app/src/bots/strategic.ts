@@ -1,21 +1,19 @@
 // The strategic bot: reads each stop's challenge, and chooses utilities, route, recruits and weapons to answer them.
 import type { Action } from '../core/apply'
 import { CHALLENGES, rungOf, TIERS, type ChallengeId } from '../core/challenges'
-import { CLASSES } from '../core/classes'
+import { CLASSES, type ClassId } from '../core/classes'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { EFFECTS, type Gear } from '../core/gear'
-import { type Keyword } from '../core/keywords'
 import { distance } from '../core/grid'
 import { fuelTanks } from '../core/objects'
 import { THREAT_MAX } from '../core/progress'
-import { RELICS } from '../core/relics'
 import { GEAR_PRICE } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
 import { SKILLS } from '../core/skills'
-import { health, MAX_SQUAD, skillOffers, soldierStats, squadKeywords } from '../core/squad'
+import { health, MAX_SQUAD, skillOffers, soldierStats } from '../core/squad'
 import { RIG, UTILITY_PRICE, type UtilityId } from '../core/utilities'
-import type { WeaponId } from '../core/weapons'
+import { WEAPONS, type WeaponId } from '../core/weapons'
 import type { Bot } from './bots'
 
 /** What to take into a fight no utility held answers, best first. */
@@ -29,12 +27,12 @@ export function answerFor(run: Run, challenge: ChallengeId | null): number {
   return best ? run.utilities.indexOf(best) : -1
 }
 
-/** The tank farthest from the way in that keeps the squad clear of its blast. */
-function tankFor(run: Run): number {
+/** Against a swarm, which comes to the squad, the tank nearest the way in clear of its blast; else the farthest. */
+export function tankFor(run: Run): number {
   const battle = run.battle!
   const tanks = fuelTanks(battle)
   const at = battle.entry!
-  const rank = (t: { x: number; y: number }) => (distance(t, at) <= RIG.close + 2 ? -1 : -distance(t, battle.arena))
+  const rank = (t: { x: number; y: number }) => (distance(t, at) <= RIG.close + 2 ? -Infinity : battle.challenge === 'swarm' ? -distance(t, at) : distance(t, at))
   return tanks.reduce((best, t, i) => (rank(t) > rank(tanks[best]) ? i : best), 0)
 }
 
@@ -125,7 +123,9 @@ function gearWorth(run: Run, gear: Gear | null, soldier: Soldier): number {
   if (!gear) return -1
   const own = soldier.skills.flatMap((id) => SKILLS[id].tags ?? [])
   const shared = gear.effect ? (EFFECTS[gear.effect].tags ?? []).filter((tag) => own.includes(tag)).length : 0
-  return RARITY[gear.rarity] + shared + unanswered(run).filter((id) => COVERS[id].includes(gear.weapon)).length
+  // A weapon against its class's way fights badly.
+  const clash = WEAPONS[gear.weapon]?.stance && soldier.cls && WEAPONS[gear.weapon].stance !== CLASSES[soldier.cls].stance ? 1.5 : 0
+  return -clash + RARITY[gear.rarity] + shared + unanswered(run).filter((id) => COVERS[id].includes(gear.weapon)).length
 }
 
 /** The soldier `gear` does the most for, if it improves on what that soldier holds by more than a sale is worth. */
@@ -135,14 +135,14 @@ function holderFor(run: Run, gear: Gear): number | null {
   return gain(best) > 0 ? best.id : null
 }
 
-/** A shop: an answer it lacks first, then a relic, then gear, then a bribe once threat builds. */
+/** A shop: a relic, then an answer it lacks, then gear, then a bribe once threat builds. */
 function shop(run: Run): Action {
   const { utilities, relics, wares, bribed } = run.shop!
+  const relic = relics.findIndex((r) => !r.sold && RELIC_PRICE <= run.supplies)
+  if (relic >= 0) return { type: 'buy', index: relic }
   const gaps = unanswered(run)
   const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && gaps.some((c) => CHALLENGES[c].answers.includes(id)))
   if (answer >= 0) return { type: 'utility', index: answer }
-  const relic = relics.findIndex((r) => !r.sold && RELIC_PRICE <= run.supplies)
-  if (relic >= 0) return { type: 'buy', index: relic }
   for (const [index, { gear, sold }] of wares.entries()) {
     const holder = sold || GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] > run.supplies ? null : holderFor(run, gear)
     if (holder !== null) return { type: 'gear', index, soldier: holder }
@@ -151,27 +151,23 @@ function shop(run: Run): Action {
   return { type: 'leave' }
 }
 
-/** The offer sharing the most keywords with what the squad has. */
-const synergy = (run: Run, tags: Keyword[][]) => {
-  const held = squadKeywords(run)
-  const score = (i: number) => 10 * tags[i].filter((tag) => held.includes(tag)).length + tags[i].length
-  return tags.reduce((best, _, i) => (score(i) > score(best) ? i : best), 0)
-}
-
+/** Takes the first relic and skill offered: on the same seeds that beat choosing by shared keywords. */
 function reward(run: Run): Action {
-  if (run.relicOffers.length > 0) return { type: 'relic', index: synergy(run, run.relicOffers.map((id) => RELICS[id].tags ?? [])) }
+  if (run.relicOffers.length > 0) return { type: 'relic', index: 0 }
   if (run.finds.length > 0) {
     const holder = holderFor(run, run.finds[0])
     return holder === null ? { type: 'sell', find: 0 } : { type: 'equip', find: 0, soldier: holder }
   }
   const learner = run.soldiers.find((s) => skillOffers(s).length > 0)!
-  return { type: 'skill', soldier: learner.id, index: synergy(run, skillOffers(learner).map((id) => SKILLS[id].tags ?? [])) }
+  return { type: 'skill', soldier: learner.id, index: 0 }
 }
 
-/** The recruit toughest for a lone hero to start with: health counts over all, and a weapon that reaches. */
+/** Classes by how many runs a lone hero of each wins, on the same seeds. */
+const RECRUIT_ORDER: ClassId[] = ['assault', 'sniper', 'support', 'engineer', 'phantom', 'heavy', 'cryo', 'pyro']
+
 function recruit(run: Run): Action {
-  const value = (s: Soldier) => (CLASSES[s.cls!].stats.hp ?? 0) * 2 + (CLASSES[s.cls!].stats.damage ?? 0) + (s.gear?.weapon === 'rifle' || s.gear?.weapon === 'lmg' || s.gear?.weapon === 'shotgun' ? 2 : 0)
-  return { type: 'recruit', index: run.recruits.reduce((best, s, i) => (value(s) > value(run.recruits[best]) ? i : best), 0) }
+  const rank = (s: Soldier) => RECRUIT_ORDER.indexOf(s.cls!)
+  return { type: 'recruit', index: run.recruits.reduce((best, s, i) => (rank(s) < rank(run.recruits[best]) ? i : best), 0) }
 }
 
 export const strategic: Bot = (run) => {

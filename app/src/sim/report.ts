@@ -152,4 +152,4 @@ export function formatDiagnosis(bot: string, of: Row[]): string {
 }
 
 /** Wins the strategic bot must reach for `npm run check` to pass: that good choices can win runs, not a target for balance. */
-export const STRATEGIC_FLOOR = 0.05
+export const STRATEGIC_FLOOR = 0.15
