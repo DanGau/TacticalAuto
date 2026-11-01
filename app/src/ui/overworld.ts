@@ -120,8 +120,8 @@ export function flight(run: Run, picked: number | null): { pins: Pin[]; focus: L
   return { pins, focus, path }
 }
 
-/** The window the flight map is seen through: the whole screen, its stops clear of the header above and the stop's card below. */
-export const flightSize = (w: number, h: number) => ({ w, h, top: 70, bottom: 70 })
+/** The window the flight map is seen through: the whole screen, its stops clear of the header and squad strip above and the stop's card below. */
+export const flightSize = (w: number, h: number) => ({ w, h, top: 100, bottom: 70 })
 
 /** The run as a globe, the flight map pinned on it. */
 function runMap(run: Run, picked: number | null): string {

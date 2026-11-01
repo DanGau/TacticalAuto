@@ -368,8 +368,10 @@ export function places(size: Size, all: { at: LonLat; html: string; chosen: bool
  * choice and on from them. The choices pulse.
  */
 export function globe(size: Size, run: Run, pins: Pin[], focus: LonLat, path: string[], picking: boolean): string {
-  const { target, pushed } = layout(size, run, pins, focus)
-  return keep(size, target, (view) => drawRun(size, run, pins, focus, path, picking, view, target, pushed))
+  const { target, placed, pushed } = layout(size, run, pins, focus)
+  const kept = pins.filter((pin) => placed.get(pin.id)!.front)
+  const walked = path.filter((id) => placed.get(id)!.front)
+  return keep(size, target, (view) => drawRun(size, run, kept, focus, walked, picking, view, target, pushed))
 }
 
 /**
@@ -379,7 +381,7 @@ export function globe(size: Size, run: Run, pins: Pin[], focus: LonLat, path: st
  */
 export function layout(size: Size, run: Run, pins: Pin[], focus: LonLat): { target: View; placed: Map<string, { x: number; y: number; front: boolean }>; pushed: Map<string, { x: number; y: number }> } {
   // Framed on where the squad stands and the stops ahead; the stops passed may fall off the edge.
-  const ahead = pins.filter((p) => !p.past).map((p) => p.at)
+  const ahead = pins.filter((p) => !p.past && !p.squad).map((p) => p.at)
   const choices = pins.filter((p) => p.choice).map((p) => p.at)
   // The leg leads up the page where the view looks: along the great circle it follows, at the point nearest the view's middle.
   const { from, to } = run.route[run.keys]
@@ -392,20 +394,31 @@ export function layout(size: Size, run: Run, pins: Pin[], focus: LonLat): { targ
   const lines = shown.flatMap((pin) => pin.next.flatMap((id): [number, number][] => (index.has(id) ? [[index.get(pin.id)!, index.get(id)!]] : [])))
   // Laid out, the stops ahead may spill out of the window; then the view draws back until they fit.
   const { middle: mid, half } = open(size)
-  // The globe always covers the window, so every stop on screen stands on its face.
+  // The globe covers the window if it can, so every stop on screen stands on its face; only the stops the player can tap, far apart, draw it back further.
   const floor = Math.hypot(size.w / 2, Math.max(mid, size.h - mid))
   target.r = Math.max(target.r, floor)
+  const must = shown.filter((pin) => pin.choice || pin.squad)
+  const spillOf = (stops: { x: number; y: number }[]) => Math.max(...stops.map((p) => Math.max(Math.abs(p.x - size.w / 2) / (size.w / 2 - MARGIN / 2), Math.abs(p.y - mid) / (half - MARGIN / 2))))
   for (let tries = 0; ; tries++) {
     const project = projection(target, size)
     const at = new Map(pins.map((pin) => [pin.id, project(pin.at)]))
     const placed = new Map([...at].map(([id, p]) => [id, { ...p }]))
     untangle(shown.map((pin) => ({ p: placed.get(pin.id)!, layer: pin.layer, order: pin.order, fixed: pin.squad })), lines)
-    const seen = shown.filter((pin) => !pin.past).map((pin) => placed.get(pin.id)!)
-    const spill = Math.max(...seen.map((p) => Math.max(Math.abs(p.x - size.w / 2) / (size.w / 2 - MARGIN / 2), Math.abs(p.y - mid) / (half - MARGIN / 2))))
-    if (spill <= 1 || tries === 3 || target.r <= floor) return { target, placed, pushed: new Map([...at].map(([id, p]) => [id, { x: placed.get(id)!.x - p.x, y: placed.get(id)!.y - p.y }])) }
-    target.r = Math.max(floor, target.r / spill / 1.2)
+    // A view drawn far back leaves the globe's edge on screen: a stop passed that is pushed past it drops out of the picture.
+    for (const pin of shown.filter((pin) => pin.past)) {
+      const p = placed.get(pin.id)!
+      if (Math.hypot(p.x - size.w / 2, p.y - mid) > target.r) p.front = false
+    }
+    const tappable = spillOf(must.map((pin) => placed.get(pin.id)!))
+    const onward = spillOf(shown.filter((pin) => !pin.past).map((pin) => placed.get(pin.id)!))
+    const spill = tappable > 1 ? tappable : target.r > floor ? onward : 1
+    if (spill <= 1 || tries === FIT_TRIES) return { target, placed, pushed: new Map([...at].map(([id, p]) => [id, { x: placed.get(id)!.x - p.x, y: placed.get(id)!.y - p.y }])) }
+    target.r = Math.max(tappable > 1 ? 1 : floor, target.r / spill / 1.2)
   }
 }
+
+/** How many times the view draws back to fit. */
+const FIT_TRIES = 8
 
 /** The run's globe seen from `view`. */
 function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: string[], picking: boolean, view: View, target: View, pushed: Map<string, { x: number; y: number }>): string {

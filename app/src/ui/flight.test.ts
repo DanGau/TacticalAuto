@@ -27,9 +27,26 @@ function tangled(run: Run, w: number, h: number): string[] {
   return [...off, ...tangles(shown.map((pin) => placed.get(pin.id)!), lines, CLEAR, ROOM)]
 }
 
+/** Every stop the player can tap, as the screen shows it, away from the page's edges, the header and squad strip above, and the stop's card below. */
+function outOfReach(run: Run, w: number, h: number): string[] {
+  const { pins, focus } = flight(run, null)
+  const { placed } = layout(flightSize(w, h), run, pins, focus)
+  return pins
+    .filter((pin) => pin.choice)
+    .filter((pin) => {
+      const p = placed.get(pin.id)!
+      return !p.front || p.x < TAP || p.x > w - TAP || p.y < CHROME_TOP + TAP || p.y > h - TAP
+    })
+    .map((pin) => `stop ${pin.id} out of reach at ${Math.round(placed.get(pin.id)!.x)},${Math.round(placed.get(pin.id)!.y)}`)
+}
+
+/** A stop's button reaches this far from its middle, and the header and squad strip this far down the page. */
+const TAP = 24
+const CHROME_TOP = 90
 const CLEAR = 22
 const ROOM = 50
 const SEEDS = 30
+const SCREENS = [[1280, 800], [1920, 1080], [768, 1024], [600, 1298], [600, 1067], [844, 390]]
 
 test('on the flight map, at every stop of every leg, trails never cross nor run through a stop, and stops stand apart', () => {
   const found: string[] = []
@@ -51,6 +68,29 @@ test('on the flight map, at every stop of every leg, trails never cross nor run 
       run.stop = 0
     }
   }
+  expect(found).toEqual([])
+})
+
+test('every stop the player can take next is on screen and clear to tap, at every stop of every leg, the source too', () => {
+  const found: string[] = []
+  let source = 0
+  for (let seed = 0; seed < 60; seed++) {
+    const run = createRun(seed)
+    apply(run, { type: 'recruit', index: seed % run.recruits.length })
+    for (let key = 0; key <= KEYS; key++) {
+      run.keys = key
+      run.stop = 0
+      for (let stop = 0; stop < legOf(run).columns.length; stop++) {
+        for (const here of ['choosing', 'there']) {
+          source += key === KEYS && here === 'choosing' ? 1 : 0
+          for (const [w, h] of SCREENS) found.push(...outOfReach(run, w, h).map((t) => `seed ${seed} leg ${key} stop ${stop} ${here} ${w}px: ${t}`))
+          if (here === 'choosing') legOf(run).path.push(ways(run)[seed % ways(run).length])
+        }
+        run.stop++
+      }
+    }
+  }
+  expect(source).toBe(60)
   expect(found).toEqual([])
 })
 
