@@ -54,7 +54,7 @@ import { LEG_STOPS } from './progress'
 import { roots, SKILLS, TREES } from './skills'
 import { atKey, road, enterAt, begun } from './roads'
 import { RELICS } from './relics'
-import { KIT_SLOTS, SHOP_CONSUMABLES } from './consumables'
+import { SHOP_UTILITIES, UTILITY_SLOTS } from './utilities'
 
 /** A run whose first soldier has learned its first skill, so the overworld waits. */
 function started(): Run {
@@ -586,7 +586,7 @@ test('a satellite won offers three relics; a relic held changes the run', () => 
   expect(paid(['contact']).finds.every((find) => find.rarity !== 'common')).toBe(true)
 })
 
-test('a shop stocks one-of-a-kind gear for the soldier the player picks, relics the squad lacks, consumables, and a bribe, each sold once and kept in its place; and is left for the road', () => {
+test('a shop stocks one-of-a-kind gear for the soldier the player picks, relics the squad lacks, utilities, and a bribe, each sold once and kept in its place; and is left for the road', () => {
   const run = travelling(['shop', 'battle'])
   const buyer = run.soldiers[0].id
   expect(apply(run, { type: 'gear', index: 0, soldier: buyer })).toEqual({ ok: false, reason: 'not in a shop' })
@@ -612,11 +612,17 @@ test('a shop stocks one-of-a-kind gear for the soldier the player picks, relics 
   expect(run.relics).toContain(relic)
   expect(shop.relics[last]).toEqual({ id: relic, sold: true })
   expect(apply(run, { type: 'buy', index: last }).ok).toBe(false)
-  expect(new Set(shop.consumables.map((c) => c.id)).size).toBe(SHOP_CONSUMABLES)
-  run.kit = Array(KIT_SLOTS - 1).fill('medkit')
-  expect(apply(run, { type: 'consumable', index: 0 })).toEqual({ ok: true })
-  expect(run.kit.at(-1)).toBe(shop.consumables[0].id)
-  expect(apply(run, { type: 'consumable', index: 1 })).toEqual({ ok: false, reason: 'the kit is full' })
+  expect(new Set(shop.utilities.map((c) => c.id)).size).toBe(SHOP_UTILITIES)
+  run.utilities = Array(UTILITY_SLOTS - 1).fill('hover')
+  expect(apply(run, { type: 'utility', index: 0 })).toEqual({ ok: true })
+  expect(run.utilities.at(-1)).toBe(shop.utilities[0].id)
+  expect(run.spare).toBeNull()
+  expect(apply(run, { type: 'utility', index: 1 })).toEqual({ ok: true })
+  expect(run.spare).toBe(shop.utilities[1].id)
+  expect(apply(run, { type: 'bribe' }).ok).toBe(false)
+  const held = [...run.utilities]
+  expect(apply(run, { type: 'keep', drop: 0 })).toEqual({ ok: true })
+  expect(run.utilities).toEqual([shop.utilities[1].id, ...held.slice(1)])
   expect(apply(run, { type: 'bribe' })).toEqual({ ok: true })
   expect(run.threat).toBe(0)
   expect(apply(run, { type: 'bribe' }).ok).toBe(false)

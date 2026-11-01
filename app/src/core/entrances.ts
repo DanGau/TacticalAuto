@@ -1,7 +1,8 @@
 // Entrances: the one the encounter stages for its flow, where it comes in, and what it sets off.
 import { BARRIER_ARMOR, CHILL_TURNS, GRID, IMPACT_REACH, isSoldier, type Battle, type Effect, type RelicEffect, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
-import { SMOKE_TURNS } from './consumables'
+import { fuelTanks } from './objects'
+import { OVERCHARGE, SMOKE, STUN_TURNS, THRUST, type UtilityId } from './utilities'
 import { blocked, breach, distance, edgeDepths, freeTilesNear, NEIGHBORS, onGrid, openNear, reachableFrom, walkingDistances, walks } from './grid'
 import { engageNearest, has, nearest } from './fighters'
 import { sitesOf, SUITS, type FeatureKind, type Site } from './features'
@@ -19,8 +20,9 @@ export type EntranceKind = 'door' | 'wall' | 'monologue' | 'skylight' | 'rappel'
 export const MONOLOGUE_ROUNDS = 2
 export const LIMELIGHT_ROUNDS = 2
 
-/** Tiles within which the smoke reaches the aliens. */
+/** Tiles within which the smoke reaches the aliens, and the turns it suppresses them. */
 export const SMOKE_REACH = 10
+export const SMOKE_TURNS = 2
 
 /** How near where the squad comes in its charges reach aliens, and the damage Breaching Charges add to the impact. */
 export const CHARGE_REACH = 8
@@ -138,9 +140,10 @@ export function planEntrance(battle: Battle, heart: Tile | null): void {
  * The squad makes the entrance: it comes in on the free tiles nearest it, the cluster nearest engages, and the battle
  * begins. What the entrance sets off lands as the first beat; see opening.
  */
-export function enter(battle: Battle): void {
+export function enter(battle: Battle, utility: UtilityId | null = null, tank = 0): void {
   const entrance = battle.entrance!
   deploy(battle, entrance.at)
+  takeUtility(battle, utility, tank)
   const squad = battle.units.filter(isSoldier)
   const closest = nearest(battle.units.filter((u) => u.side === 'alien'), entrance.at)
   const dazed = closest ? closeBy(battle, closest, LOOK_REACH) : []
@@ -167,6 +170,29 @@ export function enter(battle: Battle): void {
   }
   if (held('entryTurret')) dropUnit(battle, squad[0], TURRET, entrance.at)
   if (held('entryWall')) for (const soldier of squad) barricade(battle, soldier)
+}
+
+/** The utility the player picked takes hold as the squad comes in. */
+function takeUtility(battle: Battle, utility: UtilityId | null, tank: number): void {
+  battle.utility = utility
+  const squad = battle.units.filter(isSoldier)
+  const effect = utility === 'crack' ? 'piercing' : utility === 'hover' || utility === 'rangedShield' || utility === 'meleeShield' ? utility : null
+  for (const u of squad) {
+    if (effect) u.effects = [...u.effects, effect]
+    if (utility === 'thrusters') u.stats = { ...u.stats, move: u.stats.move + THRUST }
+    if (utility === 'overcharge') u.stats = { ...u.stats, damage: u.stats.damage + OVERCHARGE }
+  }
+  if (utility === 'tank') battle.rigged = fuelTanks(battle)[tank] ?? null
+  if (utility === 'smoke') {
+    for (const u of battle.units.filter((a) => a.side === 'alien')) {
+      battle.smoked[u.id] = u.stats.range
+      u.stats = { ...u.stats, range: Math.min(u.stats.range, SMOKE.reach) }
+    }
+  }
+  if (utility === 'flashbang') {
+    const first = nearest(battle.units.filter((u) => u.side === 'alien' && u.engaged), battle.entrance!.at)
+    for (const u of battle.units.filter((a) => a.side === 'alien' && first && a.cluster === first.cluster)) u.surprised = u.boss ? STUN_TURNS - 1 : STUN_TURNS
+  }
 }
 
 /** Puts the whole squad down on the free tiles nearest `at` and begins the battle, the cluster nearest engaging. */
@@ -233,9 +259,10 @@ export function opening(battle: Battle): GameEvent[] {
   if (kind === 'smoke' && at) {
     const smoked = aliens().filter((u) => distance(u, at) <= SMOKE_REACH)
     for (const alien of smoked) alien.suppressed = SMOKE_TURNS
-    events.push({ type: 'used', consumable: 'smoke', on: smoked.map((u) => u.id) })
+    events.push({ type: 'used', utility: 'smoke', on: smoked.map((u) => u.id) })
   }
   if (kind === 'monologue' && battle.spotlight) events.push({ type: 'effect', id: battle.spotlight.id, effect: 'taunt', amount: 0 })
+  if (battle.utility) events.push({ type: 'used', utility: battle.utility, on: battle.utility === 'flashbang' ? battle.units.filter((u) => u.surprised > 0).map((u) => u.id) : soldiers.map((u) => u.id) })
   const held = (effect: Effect) => soldiers.some((s) => has(s, effect))
   if (at && (held('entryBlast') || held('entryShred') || held('entryFrost'))) {
     for (const alien of aliens().filter((u) => distance(u, at) <= CHARGE_REACH)) hurt(alien, TUNING.impactDamage + (held('entryBlast') ? CHARGE_BLAST : 0))

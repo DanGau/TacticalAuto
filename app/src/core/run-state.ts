@@ -9,7 +9,7 @@ import type { ClassId } from './classes'
 import type { FeatId, Tally } from './feats'
 import type { Gear } from './gear'
 import type { SkillId } from './skills'
-import type { ConsumableId } from './consumables'
+import type { UtilityId } from './utilities'
 import type { RelicId } from './relics'
 import type { Battle } from './battle'
 import type { DoctrineId } from './doctrines'
@@ -127,8 +127,8 @@ export interface Report {
   hired: string | null
   /** Civilians kept alive on a rescue; null on any other stop. */
   rescued: number | null
-  /** A consumable the stop turned up, now in the kit. */
-  found: ConsumableId | null
+  /** A utility the stop turned up. */
+  found: UtilityId | null
 }
 
 /** Experience from one source. */
@@ -141,7 +141,7 @@ export interface Earned {
 export interface Shop {
   wares: { gear: Gear; sold: boolean }[]
   relics: { id: RelicId; sold: boolean }[]
-  consumables: { id: ConsumableId; sold: boolean }[]
+  utilities: { id: UtilityId; sold: boolean }[]
   bribed: boolean
 }
 
@@ -181,8 +181,10 @@ export interface Run {
   finds: Gear[]
   nextGear: number
   relics: RelicId[]
-  /** Consumables carried, at most KIT_SLOTS, each used once in a battle. */
-  kit: ConsumableId[]
+  /** Utilities the party holds, at most UTILITY_SLOTS. One is picked for each fight, and it is never used up. */
+  utilities: UtilityId[]
+  /** A utility gained with no room for it: the player drops it or one held. */
+  spare: UtilityId | null
   /** Relics to choose from in the reward phase. */
   relicOffers: RelicId[]
   /** At the run's start, the recruits to choose the first soldier from. */

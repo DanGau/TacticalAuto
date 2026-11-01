@@ -11,12 +11,12 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `setup.ts` | `createBattle`: battle state, placing aliens, civilians, goals by the encounter |
 | `encounter.ts` | `designEncounter`: the set-piece: arena, overlook, hazard, objects, posts, approaches, gates |
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
-| `objects.ts` | What heroes do with objects: hurling them, setting off tanks |
-| `entrances.ts` | Entrances: the one each encounter stages, where it comes in, what it sets off |
+| `objects.ts` | What heroes do with objects: hurling them, setting off tanks, a rigged tank |
+| `entrances.ts` | Entrances: the one each encounter stages, where it comes in, what it and the picked utility set off |
 | `features.ts` | The real doors, walls, roofs, high points and roads an entrance comes from, and which suit each place |
 | `spawn.ts` | Making units: aliens, soldiers, civilians, mechs, drops |
 | `step.ts` | Advances the run's battle a beat; settles it when it ends |
-| `combat.ts` | `stepBattle`: whose turn, the next unit's action, consumables |
+| `combat.ts` | `stepBattle`: whose turn, the next unit's action |
 | `combat-event.ts` | `GameEvent`, what a beat emits for the view |
 | `sides.ts` | A side's simultaneous move: sighting, walking, sentries, overwatch |
 | `pathing.ts` | Where a unit moves: candidate paths scored by stance, goal and threat |
@@ -47,7 +47,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 ## core/: content and helpers
 
-`aliens`, `classes`, `consumables`, `doctrines`, `feats`, `gear`, `goals`, `keywords`, `relics`, `secondaries`, `skills`, `twists`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`: test helpers.
+`aliens`, `classes`, `doctrines`, `feats`, `gear`, `goals`, `keywords`, `relics`, `secondaries`, `skills`, `twists`, `utilities`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`: test helpers.
 
 ## view/: battle rendering
 

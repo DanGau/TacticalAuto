@@ -6,6 +6,7 @@ import { distance, NEIGHBORS, onGrid, wreck } from './grid'
 import { canShoot } from './sight'
 import type { Prop } from './terrain'
 import { FUEL_DAMAGE } from './twists'
+import { RIG } from './utilities'
 import { wound } from './wound'
 
 /** What a hero can pick up and hurl. */
@@ -30,6 +31,34 @@ function strike(battle: Battle, unit: Unit, at: Tile, caught: Unit[], damage: nu
   for (const alien of caught) wound(battle, alien, damage, events)
 }
 
+/** The fuel tanks standing in the arena, nearest the way in first: what a rigged tank is picked from. */
+export function fuelTanks(battle: Battle): Tile[] {
+  const tanks: Tile[] = []
+  for (let t = 0; t < GRID * GRID; t++) {
+    const tile = { x: t % GRID, y: Math.floor(t / GRID) }
+    if (battle.props[t] === 'fuel' && distance(tile, battle.arena) <= battle.arena.reach) tanks.push(tile)
+  }
+  return tanks.sort((a, b) => distance(a, battle.approach) - distance(b, battle.approach))
+}
+
+/** The rigged tank blows once aliens crowd it or one stands beside it, catching everyone near. */
+export function blowRigged(battle: Battle): GameEvent[] {
+  const tank = battle.rigged
+  if (!tank) return []
+  if (battle.props[tank.y * GRID + tank.x] !== 'fuel') {
+    battle.rigged = null
+    return []
+  }
+  const aliens = battle.units.filter((u) => u.side === 'alien' && u.revealed)
+  if (!aliens.some((a) => distance(a, tank) <= 1) && aliens.filter((a) => distance(a, tank) <= RIG.near).length < RIG.crowd) return []
+  battle.rigged = null
+  const caught = battle.units.filter((u) => distance(u, tank) <= RIG.radius)
+  const events: GameEvent[] = [{ type: 'rocket', id: aliens[0].id, x: tank.x, y: tank.y, hits: caught.map((u) => ({ target: u.id, damage: RIG.damage })), label: 'RIGGED' }]
+  wreck(battle, tank, 1)
+  for (const unit of caught) wound(battle, unit, RIG.damage, events)
+  return events
+}
+
 /** In place of a soldier's attack: sets off a fuel tank it can shoot with aliens beside it and no human; else hurls what stands beside it at the alien with the most others about it. */
 export function leverage(battle: Battle, unit: Unit): GameEvent[] {
   if (!isSoldier(unit) || !usesLeft(unit)) return []
@@ -39,6 +68,7 @@ export function leverage(battle: Battle, unit: Unit): GameEvent[] {
   for (let t = 0; t < GRID * GRID; t++) {
     if (battle.props[t] !== 'fuel') continue
     const tank = { x: t % GRID, y: Math.floor(t / GRID) }
+    if (battle.rigged?.x === tank.x && battle.rigged.y === tank.y) continue
     if (distance(tank, unit) > unit.stats.range || !canShoot(battle, unit, tank, unit.stats.range) || beside(tank, 1).length === 0) continue
     if (battle.units.some((u) => u.side === 'human' && distance(u, tank) <= 1)) continue
     strike(battle, unit, tank, beside(tank, 1), FUEL_DAMAGE, 'TANK', events)

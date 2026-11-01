@@ -1,20 +1,20 @@
 // The player's actions, checked and applied to the run: the only way a player changes state.
 import { enter } from './entrances'
-import { foesInSight } from './combat'
-import { CONSUMABLES, KIT_SLOTS } from './consumables'
+import { fuelTanks } from './objects'
+import { UTILITY_PRICE } from './utilities'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
 import { advance, current, go, nextStop, recruit, ways } from './run'
 import { type Run } from './run-state'
 import { takeRelic } from './rewards'
 import { sellFind } from './rewards'
 import { buyWare } from './rewards'
+import { buyUtility, keepUtility } from './rewards'
 import { GEAR_PRICE } from './rewards'
 import { equipFind } from './rewards'
 import { takeSkill } from './rewards'
 import { mend } from './squad'
 import { TRAVEL_HEAL } from './squad'
 import { skillOffers } from './squad'
-import { THREAT_MAX } from './progress'
 
 export type Action =
   /** At the run's start: take the recruit at `index` of run.recruits as the first soldier. */
@@ -23,8 +23,10 @@ export type Action =
   | { type: 'gear'; index: number; soldier: number }
   /** Shop: buy the relic at `index` of shop.relics. */
   | { type: 'buy'; index: number }
-  /** Shop: buy the consumable at `index` of shop.consumables, into the kit. */
-  | { type: 'consumable'; index: number }
+  /** Shop: buy the utility at `index` of shop.utilities. */
+  | { type: 'utility'; index: number }
+  /** Shop or reward phase, with a utility to spare: drop the one held at `drop`, or with -1, the new one. */
+  | { type: 'keep'; drop: number }
   /** Shop: pay to lower the threat, once. */
   | { type: 'bribe' }
   /** Shop: leave for the road. */
@@ -35,14 +37,8 @@ export type Action =
   | { type: 'go'; index: number }
   /** Overworld: travel to the next stop. */
   | { type: 'advance' }
-  /** Deploy phase: make the battle's entrance and begin it. */
-  | { type: 'enter' }
-  /** Battle, entering or fighting: use the consumable at `index` of run.kit; it takes effect at the next beat. */
-  | { type: 'use'; index: number }
-  /** Battle: fight on without using a consumable, when asked to choose. */
-  | { type: 'wait' }
-  /** On a raid, in place of `enter`: how many supply caches the squad goes for before it lifts off. */
-  | { type: 'grab'; caches: number }
+  /** Deploy phase: make the battle's entrance with the utility held at `utility`, rigging the tank at `tank` of fuelTanks if it is one, and begin. */
+  | { type: 'enter'; utility?: number; tank?: number }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
   /** Reward phase: put the find at `find` of run.finds on the soldier with id `soldier`, selling what it replaces. */
@@ -57,17 +53,6 @@ export type Result = { ok: true } | { ok: false; reason: string }
 const ok: Result = { ok: true }
 const no = (reason: string): Result => ({ ok: false, reason })
 
-/**
- * Whether the consumable at `index` of the kit can be used now: in a battle, one acting on the aliens only once one in
- * the fight is in sight, one acting on the squad from the entrance screen on.
- */
-export function canUse(run: Run, index: number): boolean {
-  const id = run.kit[index]
-  const battle = run.battle
-  if (!id || run.phase !== 'battle' || !battle || battle.phase === 'over' || battle.primed.includes(id)) return false
-  return CONSUMABLES[id].on === 'squad' || (battle.phase === 'battle' && foesInSight(battle).length > 0)
-}
-
 /** The only way a player changes state. A rejected action leaves state untouched. */
 export function apply(run: Run, action: Action): Result {
   if (action.type === 'recruit') {
@@ -77,29 +62,20 @@ export function apply(run: Run, action: Action): Result {
     return ok
   }
   if (run.phase === 'recruit') return no('choose a recruit first')
-  if (action.type === 'use' || action.type === 'wait') {
-    if (run.phase !== 'battle' || run.battle?.phase === 'over') return no('not in a battle')
-    if (action.type === 'use') {
-      if (!canUse(run, action.index)) return no('cannot use that now')
-      const id = run.kit.splice(action.index, 1)[0]
-      run.threat = Math.min(run.threat + (CONSUMABLES[id].threat ?? 0), THREAT_MAX)
-      run.battle!.primed.push(id)
-    }
-    return ok
-  }
-  if (action.type === 'grab') {
-    const battle = run.battle
-    if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy' || battle.goal !== 'raid') return no('not raiding')
-    if (!Number.isInteger(action.caches) || action.caches < 1 || action.caches > battle.caches.length) return no('no such raid')
-    battle.greed = action.caches
-    enter(battle)
-    return ok
-  }
+  if (run.spare !== null && action.type !== 'keep') return no('choose what to drop first')
   if (action.type === 'enter') {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not entering')
-    if (battle.goal === 'raid') return no('a raid picks how many caches to grab instead')
-    enter(battle)
+    const utility = action.utility === undefined ? null : run.utilities[action.utility]
+    if (utility === undefined) return no('no such utility')
+    if (utility === 'tank' && !fuelTanks(battle)[action.tank ?? 0]) return no('no such tank')
+    enter(battle, utility, action.tank)
+    return ok
+  }
+  if (action.type === 'keep') {
+    if (run.spare === null) return no('no utility to spare')
+    if (action.drop !== -1 && !run.utilities[action.drop]) return no('no such utility')
+    keepUtility(run, action.drop)
     return ok
   }
   if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill') {
@@ -123,7 +99,7 @@ export function apply(run: Run, action: Action): Result {
     }
     return ok
   }
-  if (action.type === 'gear' || action.type === 'buy' || action.type === 'consumable' || action.type === 'bribe' || action.type === 'leave') {
+  if (action.type === 'gear' || action.type === 'buy' || action.type === 'utility' || action.type === 'bribe' || action.type === 'leave') {
     const shop = run.shop
     if (run.phase !== 'shop' || !shop) return no('not in a shop')
     if (action.type === 'gear') {
@@ -140,14 +116,11 @@ export function apply(run: Run, action: Action): Result {
       run.supplies -= RELIC_PRICE
       run.relics.push(relic.id)
       relic.sold = true
-    } else if (action.type === 'consumable') {
-      const item = shop.consumables[action.index]
-      if (!item || item.sold) return no('no such consumable for sale')
-      if (CONSUMABLES[item.id].price > run.supplies) return no('not enough supplies')
-      if (run.kit.length >= KIT_SLOTS) return no('the kit is full')
-      run.supplies -= CONSUMABLES[item.id].price
-      run.kit.push(item.id)
-      item.sold = true
+    } else if (action.type === 'utility') {
+      const item = shop.utilities[action.index]
+      if (!item || item.sold) return no('no such utility for sale')
+      if (UTILITY_PRICE > run.supplies) return no('not enough supplies')
+      buyUtility(run, action.index)
     } else if (action.type === 'bribe') {
       if (shop.bribed) return no('already bribed')
       if (BRIBE.price > run.supplies) return no('not enough supplies')

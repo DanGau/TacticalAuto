@@ -119,7 +119,7 @@ export function shots(battle: Battle): Shot[] {
   const where = `${battle.city}, ${REGIONS[battle.region].name.toLowerCase()}. `
   const lines = at.map((t, i) => `${i === 0 ? `${where}Objective: ${goal.text}. ` : ''}${nearby(battle, t)}${ground(battle, t)}.`)
   const twist = battle.twist && TWISTS[battle.twist]
-  const choice = battle.goal === 'raid' ? 'Choose how many caches to go for.' : `Coming in: ${battle.entrance ? ENTRANCE_KINDS[battle.entrance.kind].name : 'now'}.`
+  const choice = `Coming in: ${battle.entrance ? ENTRANCE_KINDS[battle.entrance.kind].name : 'now'}.`
   const last = `${twist ? `${twist.icon} ${twist.name}: ${twist.text}. ` : ''}${choice}`
   return [...at.map((t, i): Shot => ({ tiles: around(t), line: lines[i] })), { tiles: null, line: at.length === 0 ? `${where}Objective: ${goal.text}. ${last}` : last, entrances: true }]
 }

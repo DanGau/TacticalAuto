@@ -1,28 +1,16 @@
-// A battle's beat: whose turn it is, the next unit's action, and the consumables the player uses.
-import { AIRSTRIKE, HEAL, PLATING, RAGE, SMOKE_TURNS, STIMS, type ConsumableId } from './consumables'
+// A battle's beat: whose turn it is, and the next unit's action.
 import { RESCUE_QUORUM } from './goals'
 import {
-  type Stats,
   BIG_BLAST_RADIUS,
   BLAST_RADIUS,
-  CHILL_TURNS,
-  BURN_TURNS,
-  GRID,
   isSoldier,
   MAX_BEATS,
   ROCKET_DAMAGE,
   type Battle,
-  type Unit,
 } from './battle'
-import { DECOY } from './spawn'
-import { TURRET } from './spawn'
-import { dropUnit } from './spawn'
-import { wreck } from './grid'
-import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { centreOf, fireproof, has, nearest, spotted, vipOf } from './fighters'
+import { has, spotted, vipOf } from './fighters'
 import { SECONDARIES } from './secondaries'
-import { wound } from './wound'
 import { attacksOf, blast, leap, napalm, shoot, weaponAttack } from './attack'
 import { leverage } from './objects'
 import { alienAction, cloak, deploy, drone, feed, flashbang, forceField, heal, polymorph, pulse, secondWind, skirmish, slam, strew } from './abilities'
@@ -123,84 +111,19 @@ function act(battle: Battle): GameEvent[] {
   return []
 }
 
-/** Aliens in the fight the squad sees: revealed, and engaged. */
-export const foesInSight = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.revealed && u.engaged)
-
-/** What a consumable does as it is used. */
-function useConsumable(battle: Battle, id: ConsumableId): GameEvent[] {
-  const squad = battle.units.filter(isSoldier)
-  const foes = foesInSight(battle)
-  const events: GameEvent[] = []
-  const used = (on: Unit[]) => events.unshift({ type: 'used', consumable: id, on: on.map((u) => u.id) })
-  const boost = (stats: Partial<Stats>) => {
-    for (const u of squad) u.stats = { ...u.stats, ...Object.fromEntries(Object.entries(stats).map(([k, v]) => [k, u.stats[k as keyof Stats] + v])) }
-  }
-  if (id === 'airstrike') {
-    const centre = nearest(foes, centreOf(squad))
-    if (!centre) return []
-    const caught = battle.units.filter((u) => u.side === 'alien' && distance(u, centre) <= AIRSTRIKE.radius)
-    used([centre])
-    events.push({ type: 'rocket', id: centre.id, x: centre.x, y: centre.y, hits: caught.map((u) => ({ target: u.id, damage: AIRSTRIKE.damage })) })
-    wreck(battle, centre, AIRSTRIKE.radius)
-    for (const u of caught) wound(battle, u, AIRSTRIKE.damage, events)
-  } else if (id === 'medkit') {
-    used(squad)
-    for (const u of squad) u.hp = Math.min(u.stats.hp, u.hp + HEAL)
-  } else if (id === 'stims') {
-    used(squad)
-    boost(STIMS.stats)
-    for (const u of squad) u.hp = Math.max(1, u.hp - STIMS.cost)
-  } else if (id === 'rage') {
-    used(squad)
-    boost({ damage: RAGE.damage })
-    for (const u of squad) u.hp = Math.max(1, u.hp - RAGE.cost)
-  } else if (id === 'plating') {
-    used(squad)
-    for (const u of squad) u.armor += PLATING
-  } else if (id === 'sentry' || id === 'decoy') {
-    const owner = squad[0]
-    if (!owner) return []
-    const toward = nearest(battle.units.filter((u) => u.side === 'alien'), owner)
-    // The decoy stands a few tiles toward the aliens; the turret beside the squad.
-    const spot = id === 'decoy' && toward ? { x: owner.x + Math.sign(toward.x - owner.x) * 3, y: owner.y + Math.sign(toward.y - owner.y) * 3 } : owner
-    const unit = dropUnit(battle, owner, id === 'sentry' ? TURRET : DECOY, { x: Math.max(0, Math.min(GRID - 1, spot.x)), y: Math.max(0, Math.min(GRID - 1, spot.y)) }, id === 'decoy' ? ['taunt'] : [])
-    if (!unit) return []
-    used([unit])
-    events.push({ type: 'spawn', id: owner.id, unit: { id: unit.id, x: unit.x, y: unit.y } })
-  } else {
-    const struck = foes.filter((u) =>
-      id === 'flashbang' ? !u.boss : id === 'cryo' ? !u.resists.includes('frost') : id === 'firebomb' ? !fireproof(battle, u) : id === 'painter' ? !u.resists.includes('mark') : true,
-    )
-    used(struck)
-    for (const u of struck) {
-      if (id === 'flashbang') u.panicked = true
-      else if (id === 'smoke') u.suppressed = SMOKE_TURNS
-      else if (id === 'cryo') u.chilled = CHILL_TURNS
-      else if (id === 'firebomb') u.burning = BURN_TURNS
-      else u.marked = true
-    }
-  }
-  return events
-}
-
-/** What the player's consumables do, used since the last beat. */
-function unleash(battle: Battle): GameEvent[] {
-  return battle.primed.splice(0).flatMap((id) => useConsumable(battle, id))
-}
-
 /** Advances a battle one beat: a side's simultaneous move, or one unit's action. Does nothing outside the battle phase. */
 export function stepBattle(battle: Battle): GameEvent[] {
   if (battle.phase !== 'battle') return []
   battle.beat++
-  const events = battle.primed.length > 0 ? unleash(battle) : act(battle)
+  const events = act(battle)
   const humans = battle.units.some(isSoldier)
   // Aliens left to beat: none once the commander falls, for the rest flee.
   const fled = battle.goal === 'assassinate' && !battle.units.some((u) => u.target)
   // A VIP rescue is done once the VIP is out, and not before.
   const aliens = !fled && battle.vip !== 'out' && (battle.units.some((u) => u.side === 'alien') || battle.waves.length > 0 || battle.vip !== null)
-  // A rescue is over once no civilian is left to save: won if any were. A raid is won once it has the caches it came for.
+  // A rescue is over once no civilian is left to save: won if any were. A raid is won once it has every cache.
   const emptied = battle.goal === 'rescue' && !battle.units.some((u) => u.civilian)
-  const loaded = battle.goal === 'raid' && battle.grabbed >= battle.greed
+  const loaded = battle.goal === 'raid' && battle.caches.length === 0
   // A VIP rescue is lost with the VIP.
   const lost = battle.vip !== null && battle.vip !== 'out' && !vipOf(battle)
   if (!humans || !aliens || emptied || loaded || lost || battle.beat >= MAX_BEATS) {

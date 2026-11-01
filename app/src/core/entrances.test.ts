@@ -227,8 +227,7 @@ test('every flow ends with nothing to choose: bots play each goal to a winner, u
   for (const goal of ['exterminate', 'hold', 'rescue', 'raid', 'vip', 'assassinate'] as Goal[]) {
     for (let seed = 1; seed <= 3; seed++) {
       const run = entering(seed, goal)
-      if (goal === 'raid') apply(run, { type: 'grab', caches: 1 })
-      else apply(run, { type: 'enter' })
+      apply(run, { type: 'enter' })
       // Heroes that never move: rally and waves must still settle it.
       for (const u of run.battle.units.filter(isSoldier)) u.stats = { ...u.stats, move: 0, range: 0 }
       while (run.battle.phase === 'battle') stepBattle(run.battle)

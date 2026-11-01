@@ -89,6 +89,8 @@ export class Stage {
   readonly sprites = new Map<number, Sprite>()
   /** The squad of the run shown, for each soldier's class, and whether it fights with blades. */
   soldiers: Run['soldiers'] = []
+  /** Whether the party holds a rigged tank, so the deploy screen numbers the tanks. */
+  rigging = false
   /** A red glow under each alien the squad hasn't found, by unit id. */
   readonly glows = new Map<number, { node: Object3D; tile: Tile }>()
   /** Each prop, wall and window on the board, with the tiles that light it: it is lit when a soldier sees any of them. */

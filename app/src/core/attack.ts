@@ -152,6 +152,11 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   // A fraction is a chance of one point more, so small shots add up to their share.
   const scaled = blow && blow.kit.power !== 1 ? Math.floor(dealt * blow.kit.power + random(battle)) : dealt
   let damage = base > 0 ? Math.max(MIN_DAMAGE, scaled) : Math.max(0, scaled)
+  const warded = has(enemy, distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield')
+  if (warded) {
+    damage = Math.floor(damage / 2)
+    events.push({ type: 'effect', id: enemy.id, effect: distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield', amount: 0 })
+  }
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0
   const pierced = unseen || secondary?.effect === 'pierce' || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) + when(enemy.chilled > 0, 'frostbreak', 1) > 0
   const left = enemy.hp + (pierced ? 0 : enemy.armor)

@@ -7,7 +7,7 @@ import type { DoctrineEffect, Rule } from './doctrines'
 import type { Resist } from './keywords'
 import { type Flow, Goal } from './goals'
 import type { Twist } from './twists'
-import type { ConsumableId } from './consumables'
+import type { UtilityId } from './utilities'
 import type { EntranceKind } from './entrances'
 import type { Feature } from './features'
 import { type Bulk, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
@@ -221,7 +221,7 @@ export type SkillEffect =
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'limelight' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
-export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect | 'block'
+export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect | 'block' | 'hover' | 'rangedShield' | 'meleeShield'
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
@@ -396,8 +396,12 @@ export interface Battle {
   city: string
   /** Once-per-battle effects of the whole squad already used. */
   used: Effect[]
-  /** Consumables the player has used, taking effect at the next beat. */
-  primed: ConsumableId[]
+  /** The utility the player picked for this fight. */
+  utility: UtilityId | null
+  /** A fuel tank rigged to blow; null once it has. */
+  rigged: Tile | null
+  /** The range each alien had before a smoke bomb, by unit id, until the smoke clears. */
+  smoked: Record<number, number>
   /** Set by the entrance until what it sets off lands, as the battle's first beat. */
   opening: boolean
   /** Tiles of acid, each with the alien turns it has left. */
@@ -432,9 +436,8 @@ export interface Battle {
   /** Soldiers lifted off from the extraction zone, by soldier id, and the health each left with; 0 if carried. */
   escaped: number[]
   lifted: Record<number, number>
-  /** On a raid, the supply caches still on the map, and how many the squad set out to grab and has grabbed. */
+  /** On a raid, the supply caches still on the map, and how many the squad has grabbed. */
   caches: Tile[]
-  greed: number
   grabbed: number
   /** Soldiers not yet landed. */
   reserve: Reserve[]

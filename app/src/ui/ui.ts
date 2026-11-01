@@ -5,14 +5,15 @@ import { nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { skillOffers } from '../core/squad'
-import { choice, joined, loot, modal, runEnd, skillChoice, stopReport } from './aftermath'
+import { choice, joined, loot, modal, runEnd, skillChoice, spareChoice, stopReport } from './aftermath'
 import { TWISTS } from '../core/twists'
 import { type Battle } from '../core/battle'
 import { ENTRANCE_KINDS } from '../core/entrances'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { button, STOP_NAMES } from './html'
-import { canUse } from '../core/apply'
-import { CONSUMABLES, KIT_SLOTS } from '../core/consumables'
+import { fuelTanks } from '../core/objects'
+import { UTILITIES } from '../core/utilities'
+import { pickCard, pickDetail, utilityPick, type Pick } from './cards'
 import { overworld, type Tab } from './overworld'
 import { glide, viewNow } from './globe'
 
@@ -35,37 +36,28 @@ function status(run: Run): string {
   return `${title}${vip}${rounds}`
 }
 
-/** Before the entrance: the twist, what the entrance is, and the tap that starts the battle. A raid's choice of caches comes in the middle. */
-function drop(battle: Battle, greed: number): string {
-  const { kind } = battle.entrance!
-  const { icon, name, text } = ENTRANCE_KINDS[kind]
-  const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
-  const go = battle.goal === 'raid' ? raids(battle, greed) : button({ type: 'enter' }, `${icon} ${name}!`)
-  return `${twist}<p>${icon} <b>${name}.</b> ${text}.</p>${go}`
-}
-
-/** On a raid: a button per number of caches to go for, then what that pays and costs. */
-function raids(battle: Battle, greed: number): string {
-  const buttons = battle.caches.map((_, i) => `<button data-greed="${i + 1}" class="${i + 1 === greed ? 'on' : ''}">📦 ${i + 1}</button>`)
-  const what = greed === 1 ? 'Grab the nearest cache and lift off.' : `Grab ${greed} caches before lifting off: ${greed} times the supplies, and ${greed - 1} more threat.`
-  return `<div class="entrances">${buttons.join('')}</div><p>${what}</p>${button({ type: 'grab', caches: greed }, `Go for ${greed}`)}`
-}
-
 /**
- * The consumables carried into a battle, a slot each: one usable now uses it at a click; one readied on the entrance
- * screen waits, lit, for the entrance.
+ * Before the entrance: the twist, what the entrance is, and how the squad goes in: with no utility held, a tap; else a
+ * card per utility, tapped to arm and again to go in with it. A rigged tank then asks which tank, `rigging` holding its index.
  */
-function kit(run: Run): string {
-  const battle = run.battle!
-  const readied = battle.primed.map((id) => `<button class="primed" disabled title="${CONSUMABLES[id].text}">${CONSUMABLES[id].icon} ${CONSUMABLES[id].name}<small>${battle.phase === 'deploy' ? 'on entering' : 'now'}</small></button>`)
-  const held = run.kit.map((id, index) => {
-    const item = CONSUMABLES[id]
-    const usable = canUse(run, index)
-    const when = !usable ? 'once aliens are in the fight' : battle.phase === 'deploy' ? 'ready for the entrance' : 'use now'
-    return button({ type: 'use', index }, `${item.icon} ${item.name}<small>${when}${item.threat ? ` · +${item.threat} threat` : ''}</small>`, '', usable).replace('<button', `<button title="${item.text}"`)
-  })
-  const empty = Array.from({ length: Math.max(0, KIT_SLOTS - readied.length - held.length) }, () => '<button class="empty" disabled>Empty slot</button>')
-  return [...readied, ...held, ...empty].join('')
+function drop(run: Run, battle: Battle, armed: string | null, rigging: number | null): string {
+  const { icon, name, text } = ENTRANCE_KINDS[battle.entrance!.kind]
+  const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
+  const tanks = fuelTanks(battle)
+  const go = (detail: string, picks: Pick[], idle: string) => `<p>${detail}</p><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, idle)}`
+  const chosen =
+    rigging !== null
+      ? go('Rig which tank?', tanks.map((_, tank): Pick => utilityPick(`t${tank}`, { type: 'enter', utility: rigging, tank }, 'tank', 'rig', `Tap again to rig tank ${tank + 1} and go in`, { body: `<small>rig</small><b>🛢️ Tank ${tank + 1}</b>` })), 'Tap a tank, then tap it again to go in.')
+      : run.utilities.length === 0
+        ? button({ type: 'enter' }, `${icon} ${name}!`)
+        : go(
+            'Pick a utility for this fight.',
+            run.utilities.map((id, i): Pick =>
+              utilityPick(`u${i}`, id === 'tank' ? undefined : { type: 'enter', utility: i }, id, 'utility', id === 'tank' ? 'Tap again to choose a tank' : `Tap again to go in with ${UTILITIES[id].name}`, id === 'tank' ? { attrs: `data-rig="${i}"`, block: tanks.length === 0 ? 'No fuel tanks on this ground' : null } : {}),
+            ),
+            'Tap a utility for its details; tap it again to go in with it.',
+          )
+  return `${twist}<p>${icon} <b>${name}.</b> ${text}.</p>${chosen}`
 }
 
 /** Turns clicks into actions and hands them to `act`. */
@@ -73,15 +65,9 @@ export function createUi(act: (action: Action) => void): Ui {
   const statusLine = document.getElementById('status')!
   const overlay = document.getElementById('panel')!
   const dropPanel = document.getElementById('drop')!
-  const kitPanel = document.getElementById('kit')!
-  let kitHtml = ''
-  kitPanel.addEventListener('click', (e) => {
-    const target = (e.target as HTMLElement).closest('button')
-    if (target?.dataset.action && !target.disabled) act(JSON.parse(target.dataset.action) as Action)
-  })
-  /** The caches chosen to go for on a raid. */
-  let greed = 1
   let choosing: Battle | null = null
+  /** On the deploy screen, the rigged tank held at this index awaiting its tank. */
+  let rigging: number | null = null
   /** The report the player has continued past. */
   let seen: Report | null = null
   let tab: Tab = 'Map'
@@ -114,6 +100,11 @@ export function createUi(act: (action: Action) => void): Ui {
    * Continue. Then the overworld.
    */
   function panel(run: Run): string {
+    const screen = phaseScreen(run)
+    return run.spare ? screen + spareChoice(run, armed) : screen
+  }
+
+  function phaseScreen(run: Run): string {
     const report = run.report
     if (run.phase === 'recruit') return !started ? title() : !told ? story() : recruits(run, recruit)
     if (run.phase === 'battle') return ''
@@ -169,18 +160,26 @@ export function createUi(act: (action: Action) => void): Ui {
     if (!battle) return
     if (battle !== choosing) {
       choosing = battle
-      greed = 1
+      rigging = null
+      armed = null
     }
-    dropPanel.innerHTML = drop(battle, greed)
+    dropPanel.innerHTML = drop(run, battle, armed, rigging)
   }
 
   dropPanel.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (!target) return
-    if (target.dataset.action) act(JSON.parse(target.dataset.action) as Action)
-    else if (target.dataset.greed) {
-      greed = Number(target.dataset.greed)
+    if (target.dataset.arm && armed !== target.dataset.arm) {
+      armed = target.dataset.arm
+      return showDrop(shown!)
+    }
+    if (target.dataset.rig) {
+      rigging = Number(target.dataset.rig)
+      armed = null
       showDrop(shown!)
+    } else if (target.dataset.action) {
+      armed = null
+      act(JSON.parse(target.dataset.action) as Action)
     }
   })
   addEventListener('resize', () => requestAnimationFrame(shrink))
@@ -303,17 +302,9 @@ export function createUi(act: (action: Action) => void): Ui {
     if (battle && (halves % 2 === 1) !== (battle.turn === 'alien')) dial.style.setProperty('--turn', `${++halves * 180}deg`)
   }
 
-  function showKit(run: Run): void {
-    const shown = run.phase === 'battle' && !!run.battle && run.battle.phase !== 'over' && run.kit.length + run.battle.primed.length > 0
-    kitPanel.hidden = !shown
-    const next = shown ? kit(run) : ''
-    if (next !== kitHtml) kitPanel.innerHTML = kitHtml = next
-  }
-
   return {
     update(run) {
       statusLine.innerHTML = status(run)
-      showKit(run)
       turnDial(run)
       render(run)
       showDrop(run)

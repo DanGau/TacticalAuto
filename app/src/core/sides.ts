@@ -9,6 +9,7 @@ import { soldierUnit } from './spawn'
 import { breach } from './grid'
 import { freeTilesNear } from './grid'
 import { walkingDistances } from './grid'
+import { blowRigged } from './objects'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
@@ -39,6 +40,7 @@ export function moveSide(battle: Battle): GameEvent[] {
     moved(battle, unit, path, events)
     if (unit.order) events.push({ type: 'order', id: unit.id, order: unit.order })
   }
+  if (battle.turn === 'alien') events.push(...blowRigged(battle))
   // Acid burns each unit of the side still standing in it once the side has moved, so a unit free to move can step out.
   for (const unit of battle.units.filter((u) => u.side === battle.turn)) {
     if (!battle.acid.some((pool) => pool.x === unit.x && pool.y === unit.y) || immune(battle, unit, 'acid')) continue

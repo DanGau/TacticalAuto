@@ -2,7 +2,7 @@
 import type { Object3D } from 'three'
 import { type Battle, type Order, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
-import { CONSUMABLES } from '../core/consumables'
+import { UTILITIES } from '../core/utilities'
 import { effectName } from '../core/effects'
 import { instant, PACE, strolls, tilePace, walkMs } from '../core/pace'
 import { attackOf, finisher, opener, secondaryAttack } from './attacks'
@@ -183,7 +183,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const on = sprites.get(e.id)
       if (on) float(s, callout(s, `FED +${e.damage}`, COLOR.crit, on))
     } else if (e.type === 'used') {
-      const word = CONSUMABLES[e.consumable].name.toUpperCase()
+      const word = UTILITIES[e.utility].name.toUpperCase()
       for (const id of e.on) {
         const on = sprites.get(id)
         if (!on) continue

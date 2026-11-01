@@ -75,5 +75,3 @@ export function dropUnit(battle: Battle, owner: Unit, stats: Stats, spot: Tile, 
 /** A drop turret: it never moves, and shoots far and true. */
 export const TURRET: Stats = { ...BASE_STATS, hp: 8, damage: 3, range: 7, move: 0, crit: 0.1 }
 
-/** A holo-decoy: tough, unmoving, and harmless. */
-export const DECOY: Stats = { ...BASE_STATS, hp: 10, armor: 2, damage: 0, range: 0, move: 0, crit: 0 }

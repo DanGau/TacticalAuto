@@ -37,7 +37,7 @@ export function paths(battle: Battle, unit: Unit, move: number): Tile[][] {
         const x = from.x + dx
         const y = from.y + dy
         if (blocked(battle, x, y) || !passable(battle, from, { x, y })) continue
-        const next = cost + stepCost(battle, from, { x, y })
+        const next = cost + stepCost(battle, from, { x, y }, has(unit, 'hover'))
         const bent = bends + (back && (from.x - back.x !== dx || from.y - back.y !== dy) ? 1 : 0)
         const known = best.get(y * GRID + x) ?? Infinity
         // A first step is always within reach of a unit that can move, so a climb dearer than its move cannot wall it in.
@@ -403,7 +403,7 @@ export function escapePath(battle: Battle, unit: Unit): Tile[] {
 
 /** The move a path costs, climbing costing more. */
 export function costOf(battle: Battle, unit: Unit, path: Tile[]): number {
-  return path.reduce((sum, tile, i) => sum + stepCost(battle, path[i - 1] ?? unit, tile), 0)
+  return path.reduce((sum, tile, i) => sum + stepCost(battle, path[i - 1] ?? unit, tile, has(unit, 'hover')), 0)
 }
 
 export function walk(unit: Unit, path: Tile[], events: GameEvent[]): void {

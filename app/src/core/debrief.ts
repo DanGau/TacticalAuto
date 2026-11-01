@@ -1,11 +1,10 @@
 // Settling a finished battle into the run: experience, losses, loot and threat.
-import { KIT_SLOTS, CONSUMABLE_DROP, CONSUMABLE_IDS } from './consumables'
 import { DOCTRINES, type Doctrine } from './doctrines'
 import { CIVILIANS, CIVILIANS_PER_THREAT, CIVILIAN_SUPPLIES } from './goals'
 import { RISKS } from './missions'
 import { STOP_THREAT, LOSS_THREAT, THREAT_MAX } from './progress'
 import { type Relic, RELICS, offerable, RELIC_OFFERS } from './relics'
-import { dropGear, settle } from './rewards'
+import { dropGear, findUtility, settle } from './rewards'
 import { random, randomInt } from './rng'
 import { drawStops, passStop } from './run'
 import { type Run } from './run-state'
@@ -43,7 +42,7 @@ export function endBattle(run: Run): void {
   const risk = RISKS[mission.risk]
   // An ambush won empties the threat; any other battle is a stop, and adds to it.
   if (mission.kind === 'ambush') run.threat = won ? 0 : run.threat
-  else if (mission.kind !== 'recovery') run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT) + (mission.goal === 'raid' ? Math.max(0, battle.greed - 1) : 0) + (rescued === null ? 0 : Math.floor((CIVILIANS - (won ? rescued : 0)) / CIVILIANS_PER_THREAT)), THREAT_MAX)
+  else if (mission.kind !== 'recovery') run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT) + (rescued === null ? 0 : Math.floor((CIVILIANS - (won ? rescued : 0)) / CIVILIANS_PER_THREAT)), THREAT_MAX)
   const held = run.relics.map((id): Relic => RELICS[id])
   const supplies = won ? risk.supplies * (mission.goal === 'raid' ? battle.grabbed : 1) + (rescued ?? 0) * (CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.civilianSupplies ?? 0), 0)) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
   run.supplies += supplies
@@ -51,8 +50,8 @@ export function endBattle(run: Run): void {
   const byGoal = { exterminate: risk.gear, assassinate: 1, hold: 0, rescue: 0, vip: 0, raid: 0, ambush: 0, recover: 0 }[mission.goal]
   const chance = mission.kind === 'key' ? 1 : mission.kind === 'battle' ? byGoal : 0
   if (won && chance > 0 && random(run) < chance) dropGear(run, risk.rareGear || mission.kind === 'key' || held.some((relic) => relic.rareGear))
-  const found = won && mission.kind !== 'final' && run.kit.length < KIT_SLOTS && random(run) < CONSUMABLE_DROP ? CONSUMABLE_IDS[randomInt(run, CONSUMABLE_IDS.length)] : null
-  if (found) run.kit.push(found)
+  // A key mission and an ambush always turn up a utility; a battle by its risk.
+  const found = won && mission.kind !== 'final' && random(run) < (mission.kind === 'battle' ? risk.utility : 1) ? findUtility(run) : null
   const key = won && mission.kind === 'key'
   // Each hero extracted joins the squad.
   const hero = run.route[run.keys]?.hero

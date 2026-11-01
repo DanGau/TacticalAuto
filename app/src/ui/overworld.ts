@@ -5,7 +5,7 @@ import { GOALS } from '../core/goals'
 import { DOCTRINES } from '../core/doctrines'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
-import { CONSUMABLES, KIT_SLOTS } from '../core/consumables'
+import { UTILITIES, UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
 import { current, legOf, KEYS, ways, nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Soldier } from '../core/run-state'
@@ -27,7 +27,7 @@ import { SKILLS } from '../core/skills'
 import { TWISTS } from '../core/twists'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
-import { gearPicks, pickCard, pickDetail, type Pick } from './cards'
+import { gearPicks, pickCard, pickDetail, utilityPick, type Pick } from './cards'
 import { alienName, badge, button, describe, describeGear, gearCard, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
@@ -157,7 +157,7 @@ function where(run: Run, stop: Stop): string {
 
 const PURCHASED = '<small class="purchased">Purchased</small>'
 
-/** Everything a shop sells, as cards of one size: gear, relics, consumables, the bribe. */
+/** Everything a shop sells, as cards of one size: gear, relics, utilities, the bribe. */
 function shopPicks(run: Run): Pick[] {
   const shop = run.shop!
   const held = squadKeywords(run)
@@ -168,23 +168,25 @@ function shopPicks(run: Run): Pick[] {
     return { key: `g${index}`, attrs: `data-ware="${index}"`, look: `gear ${gear.rarity}`, body: card(gear.rarity, gear.name, `${price} supplies`, sold), detail: `<p><b>${gear.name}.</b> ${describeGear(gear, held)}</p>`, go: `Tap again to choose who takes it, for ${price} supplies`, block: poor(price), spent: sold }
   })
   const relics = shop.relics.map(({ id, sold }, index): Pick => ({ key: `r${index}`, action: { type: 'buy', index }, look: 'relic', body: card('relic', RELICS[id].name, `${RELIC_PRICE} supplies`, sold), detail: `<p><b>${RELICS[id].name}.</b> ${describe(RELICS[id].text, RELICS[id].tags, held)}</p>`, go: `Tap again to buy for ${RELIC_PRICE} supplies`, block: poor(RELIC_PRICE), spent: sold }))
-  const full = run.kit.length >= KIT_SLOTS
-  const consumables = shop.consumables.map(({ id, sold }, index): Pick => {
-    const item = CONSUMABLES[id]
-    return { key: `c${index}`, action: { type: 'consumable', index }, look: 'consumable', body: card('consumable', `${item.icon} ${item.name}`, `${item.price} supplies`, sold), detail: `<p><b>${item.name}.</b> ${describe(item.text, item.tags, held)}${item.threat ? ` <span class="up">+${item.threat} threat on use</span>` : ''}</p>`, go: `Tap again to buy for ${item.price} supplies`, block: full ? 'Kit full' : poor(item.price), spent: sold }
-  })
+  const utilities = shop.utilities.map(({ id, sold }, index): Pick =>
+    utilityPick(`u${index}`, { type: 'utility', index }, id, 'utility', `Tap again to buy for ${UTILITY_PRICE} supplies${run.utilities.length >= UTILITY_SLOTS ? ', dropping one' : ''}`, {
+      body: card('utility', `${UTILITIES[id].icon} ${UTILITIES[id].name}`, `${UTILITY_PRICE} supplies`, sold),
+      block: run.utilities.includes(id) ? 'Held' : poor(UTILITY_PRICE),
+      spent: sold,
+    }),
+  )
   const bribe: Pick = { key: 'b', action: { type: 'bribe' }, look: 'bribe', body: card('bribe', 'Bribe the patrols', `${BRIBE.price} supplies`, shop.bribed), detail: `<p><b>Bribe the patrols.</b> -${BRIBE.threat} threat, once.</p>`, go: `Tap again to pay ${BRIBE.price} supplies`, block: run.threat === 0 ? 'No threat to lower' : poor(BRIBE.price), spent: shop.bribed }
-  return [...gear, ...relics, ...consumables, bribe]
+  return [...gear, ...relics, ...utilities, bribe]
 }
 
 /** A shop: its cards, what the armed one does, and the way out. What is bought keeps its place, greyed out. With `ware` chosen, who takes it, in a pop-up. */
 function shopView(run: Run, armed: string | null, ware: number | null): string {
   const picks = shopPicks(run)
-  const kit = run.kit.map((k) => `${CONSUMABLES[k].icon} ${CONSUMABLES[k].name}`).join(', ') || 'empty'
+  const held = run.utilities.map((k) => `${UTILITIES[k].icon} ${UTILITIES[k].name}`).join(', ') || 'none'
   const screen = `<h2>A shop. Each piece is one of a kind.</h2>
     <div class="picks">${picks.map((p) => pickCard(p, ware === null ? armed : null)).join('')}</div>
     ${pickDetail(picks, ware === null ? armed : null, 'Tap a card for its details; tap it again to buy.')}
-    <p class="kit">Kit ${run.kit.length}/${KIT_SLOTS}: ${kit}</p>
+    <p class="kit">Utilities ${run.utilities.length}/${UTILITY_SLOTS}: ${held}</p>
     <button class="travel" data-action='${JSON.stringify({ type: 'leave' })}'>Leave the shop</button>`
   if (ware === null || run.shop!.wares[ware].sold) return screen
   const { gear } = run.shop!.wares[ware]
@@ -224,10 +226,10 @@ function mapView(run: Run, picked: number | null, armed: string | null, ware: nu
 function baseView(run: Run): string {
   const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags)}</div>`)
   const doctrines = run.doctrines.map((id) => `<div class="gear doctrine"><small>doctrine</small><br><b>${DOCTRINES[id].name}</b><br>${DOCTRINES[id].text}</div>`)
-  const kit = run.kit.map((id) => `<div class="gear"><small>consumable · on the ${CONSUMABLES[id].on}</small><br><b>${CONSUMABLES[id].icon} ${CONSUMABLES[id].name}</b><br>${describe(CONSUMABLES[id].text, CONSUMABLES[id].tags)}</div>`)
+  const utilities = run.utilities.map((id) => `<div class="gear"><small>utility</small><br><b>${UTILITIES[id].icon} ${UTILITIES[id].name}</b><br>${UTILITIES[id].text}</div>`)
   const held = squadKeywords(run)
-  return `${relics.length + doctrines.length + held.length + kit.length === 0 ? '<h2>Relics, doctrines and consumables the squad gains show here.</h2>' : ''}
-    ${kit.length > 0 ? `<h2>Consumables ${kit.length}/${KIT_SLOTS}</h2><div class="stash">${kit.join('')}</div>` : ''}
+  return `${relics.length + doctrines.length + held.length + utilities.length === 0 ? '<h2>Relics, doctrines and utilities the squad gains show here.</h2>' : ''}
+    ${utilities.length > 0 ? `<h2>Utilities ${utilities.length}/${UTILITY_SLOTS}</h2><div class="stash">${utilities.join('')}</div>` : ''}
     ${held.length > 0 ? `<h2>Keywords</h2>${keywordChips(held, held)}` : ''}
     ${doctrines.length > 0 ? `<h2>Doctrines</h2><div class="stash">${doctrines.join('')}</div>` : ''}
     ${relics.length > 0 ? `<h2>Relics</h2><div class="stash">${relics.join('')}</div>` : ''}`

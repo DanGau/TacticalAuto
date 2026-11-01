@@ -5,6 +5,7 @@ import type { Gear } from '../core/gear'
 import { SELL } from '../core/rewards'
 import { type Run, type Soldier } from '../core/run-state'
 import { soldierStats } from '../core/squad'
+import { UTILITIES, type UtilityId } from '../core/utilities'
 import { badge, describeGear, gearText, STAT_NAMES } from './html'
 
 export interface Pick {
@@ -68,6 +69,12 @@ export function gearPicks(run: Run, gear: Gear, action: (soldier: Soldier) => Ac
       block,
     }
   })
+}
+
+/** A utility as a card: `top` says what tapping it means, `go` what the second tap does. */
+export function utilityPick(key: string, action: Action | undefined, id: UtilityId, top: string, go: string, extra: Partial<Pick> = {}): Pick {
+  const { icon, name, text } = UTILITIES[id]
+  return { key, action, look: 'utility', body: `<small>${top}</small><b>${icon} ${name}</b>`, detail: `<p><b>${name}.</b> ${text}.</p>`, go, ...extra }
 }
 
 /** Selling a find, as a card among those who could take it. */

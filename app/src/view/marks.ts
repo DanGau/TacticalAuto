@@ -5,6 +5,7 @@ import { UPLINK_REACH } from '../core/fighters'
 import { EXTRACT_REACH } from '../core/goals'
 import { nearestAlien } from '../core/grid'
 import { ENTRANCE_KINDS } from '../core/entrances'
+import { fuelTanks } from '../core/objects'
 import { visibleTiles } from '../core/sight'
 import { DECAL_LIFT, spot } from './camera'
 import { fence } from './fences'
@@ -50,6 +51,8 @@ export function drawMarks(s: Stage, battle: Battle): void {
   if (battle.uplink) marks.push(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
   if (battle.extract) marks.push(label('🚁 EXTRACT', battle.extract, COLOR.uplink, 28))
   for (const cache of battle.caches) marks.push(label('📦', cache, COLOR.uplink, 24))
+  if (battle.rigged) marks.push(label('💣 RIGGED', battle.rigged, COLOR.crit, 22))
+  if (battle.phase === 'deploy' && s.rigging && !s.briefing) fuelTanks(battle).forEach((tank, i) => marks.push(label(`🛢️ ${i + 1}`, tank, COLOR.crit, 24)))
   const vip = battle.vip === 'held' && battle.units.find((u) => u.civilian === 'vip')
   if (vip) marks.push(label('⭐ VIP', vip, COLOR.vip, 28))
   // Soldiers down where they fell; a recovery's captives are held.

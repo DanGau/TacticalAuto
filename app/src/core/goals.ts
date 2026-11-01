@@ -56,7 +56,7 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
     weight: 1,
     from: 1,
   },
-  raid: { name: 'Smash and grab', text: 'Guarded supply caches. Choose how many to go for; each pays supplies, and each beyond the first adds a threat', reward: 'supplies by the cache, no gear', force: -1, weight: 1, from: 0 },
+  raid: { name: 'Smash and grab', text: 'Guarded supply caches. Grab them all; each pays supplies', reward: 'supplies by the cache, no gear', force: -1, weight: 1, from: 0 },
   // Never drawn: a full threat turns the next stop into an ambush.
   // Never drawn: soldiers left behind turn the next stop into a recovery.
   recover: { name: 'Bring them back', text: 'The aliens hold your downed heroes among them. Reach each to get them up, and kill every alien. Lose and the run is over', reward: 'your heroes back', force: 0, weight: 0, from: 0 },

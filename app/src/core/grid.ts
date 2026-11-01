@@ -24,9 +24,9 @@ export const CLIMB = 2
 /** Move a step onto caltrops costs beyond its one tile. */
 export const CALTROP_COST = 2
 
-/** What a step between neighbouring tiles costs of a unit's move: one tile, CLIMB more for each level up, and more onto caltrops. */
-export const stepCost = (battle: Battle, from: Tile, to: Tile) =>
-  1 + CLIMB * Math.max(0, heightAt(battle, to) - heightAt(battle, from)) + (battle.caltrops.some((t) => t.x === to.x && t.y === to.y) ? CALTROP_COST : 0)
+/** What a step between neighbouring tiles costs of a unit's move: one tile, CLIMB more for each level up, and more onto caltrops; one tile whatever for a unit that `hovers`. */
+export const stepCost = (battle: Battle, from: Tile, to: Tile, hovers = false) =>
+  hovers ? 1 : 1 + CLIMB * Math.max(0, heightAt(battle, to) - heightAt(battle, from)) + (battle.caltrops.some((t) => t.x === to.x && t.y === to.y) ? CALTROP_COST : 0)
 
 export function bulkAt(battle: Battle, x: number, y: number): Bulk {
   return battle.bulk[y * GRID + x]

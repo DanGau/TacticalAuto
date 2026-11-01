@@ -1,6 +1,6 @@
 // Gear and relic rewards, the shop, and settling the reward phase.
 import { RARITY_CHANCE, type Rarity } from './base'
-import { CONSUMABLE_IDS, SHOP_CONSUMABLES } from './consumables'
+import { SHOP_UTILITIES, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
 import { generateGear, type Gear } from './gear'
 import { random, randomInt } from './rng'
 import { offerable, type RelicId } from './relics'
@@ -50,9 +50,9 @@ export function stockShop(run: Run): Shop {
   const relics = offerable(run.relics)
   const stocked: RelicId[] = []
   while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(relics.splice(randomInt(run, relics.length), 1)[0])
-  const kinds = [...CONSUMABLE_IDS]
-  const consumables = Array.from({ length: SHOP_CONSUMABLES }, () => ({ id: kinds.splice(randomInt(run, kinds.length), 1)[0], sold: false }))
-  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), consumables, bribed: false }
+  const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
+  const utilities = Array.from({ length: Math.min(SHOP_UTILITIES, kinds.length) }, () => ({ id: kinds.splice(randomInt(run, kinds.length), 1)[0], sold: false }))
+  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, bribed: false }
 }
 
 /** Buys the ware at `index` for `soldier` to wear. The caller checks it is affordable. */
@@ -64,15 +64,45 @@ export function buyWare(run: Run, index: number, soldier: Soldier): void {
   wear(run, soldier, gear)
 }
 
+/** The party gains a utility; with no room, the player must choose what to drop. */
+export function gainUtility(run: Run, id: UtilityId): void {
+  if (run.utilities.length < UTILITY_SLOTS) run.utilities.push(id)
+  else run.spare = id
+}
+
+/** A utility the party lacks, found at a stop; none if it holds them all. */
+export function findUtility(run: Run): UtilityId | null {
+  const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
+  if (kinds.length === 0) return null
+  const id = kinds[randomInt(run, kinds.length)]
+  gainUtility(run, id)
+  return id
+}
+
+/** Buys the shop's utility at `index`. The caller checks it is affordable and not held. */
+export function buyUtility(run: Run, index: number): void {
+  const item = run.shop!.utilities[index]
+  item.sold = true
+  run.supplies -= UTILITY_PRICE
+  gainUtility(run, item.id)
+}
+
+/** Settles a utility with no room: drops the one held at `drop`, or with -1, the new one. */
+export function keepUtility(run: Run, drop: number): void {
+  if (drop >= 0) run.utilities[drop] = run.spare!
+  run.spare = null
+  if (run.phase === 'reward') settle(run)
+}
+
 /** Sells the find at `index`. */
 export function sellFind(run: Run, index: number): void {
   run.supplies += SELL[run.finds.splice(index, 1)[0].rarity]
   settle(run)
 }
 
-/** Ends the reward phase once no choice is left: no relic, find or skill. */
+/** Ends the reward phase once no choice is left: no relic, find, spare utility or skill. */
 export function settle(run: Run): void {
-  const owed = run.relicOffers.length > 0 || run.finds.length > 0 || run.soldiers.some((s) => skillOffers(s).length > 0)
+  const owed = run.relicOffers.length > 0 || run.finds.length > 0 || run.spare !== null || run.soldiers.some((s) => skillOffers(s).length > 0)
   run.phase = owed ? 'reward' : 'overworld'
 }
 

@@ -1,6 +1,6 @@
 // The events a beat emits for the view to play.
 import type { Tile, Effect, Ability, Order, Side } from './battle'
-import type { ConsumableId } from './consumables'
+import type { UtilityId } from './utilities'
 import type { SecondaryId } from './secondaries'
 
 export type GameEvent =
@@ -46,6 +46,6 @@ export type GameEvent =
   /** A boss spawns a swarmling, or an engineer deploys a mech. */
   | { type: 'spawn'; id: number; unit: { id: number; x: number; y: number } }
   | { type: 'death'; id: number }
-  /** The player uses a consumable, acting on the units `on`. */
-  | { type: 'used'; consumable: ConsumableId; on: number[] }
+  /** A utility takes hold, acting on the units `on`. */
+  | { type: 'used'; utility: UtilityId; on: number[] }
   | { type: 'end'; winner: Side | null } 

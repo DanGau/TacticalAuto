@@ -97,9 +97,9 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
   }
   if (target.kind === 'burster') {
     const caught = battle.units.filter((u) => distance(target, u) <= BLAST_RADIUS && !immune(battle, u, 'blast'))
-    events.push({ type: 'rocket', id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: BURST_DAMAGE })) })
+    events.push({ type: 'rocket', id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: burstOn(u) })) })
     wreck(battle, target)
-    for (const unit of caught) wound(battle, unit, BURST_DAMAGE, events)
+    for (const unit of caught) wound(battle, unit, burstOn(unit), events)
   }
   if (target.kind === 'psion') {
     for (const unit of battle.units.filter((u) => u.side === 'alien' && distance(u, target) <= PSI_BACKLASH_REACH)) {
@@ -111,6 +111,9 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
 
 /** Damage a self-destructing mech does to each alien beside it. */
 export const DETONATE_DAMAGE = 4
+
+/** What a burster's explosion does to `unit`. */
+const burstOn = (unit: Unit) => (has(unit, 'meleeShield') ? Math.floor(BURST_DAMAGE / 2) : BURST_DAMAGE)
 
 /** What befalls a unit that has walked `path`: caltrops it stepped on hurt an alien, and a booming charge goes off. */
 export function moved(battle: Battle, unit: Unit, path: Tile[], events: GameEvent[]): void {

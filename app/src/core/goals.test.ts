@@ -112,7 +112,7 @@ test('an assassination is won when the commander falls, though its guard lives',
   expect(run.finds.length).toBeGreaterThan(0)
 })
 
-test('a rescue pays supplies and experience for each civilian saved or alive; a raid pays by the cache grabbed, and costs a threat for each sought beyond the first', () => {
+test('a rescue pays supplies and experience for each civilian saved or alive; a raid pays by the cache grabbed', () => {
   const rescue = before('rescue')
   enterAt(rescue)
   expect(rescue.battle!.units.filter((u) => u.civilian)).toHaveLength(CIVILIANS)
@@ -128,14 +128,13 @@ test('a rescue pays supplies and experience for each civilian saved or alive; a 
   expect(rescue.supplies).toBe(supplies + RISKS.standard.supplies + alive * CIVILIAN_SUPPLIES)
 
   const raid = before('raid')
-  expect(apply(raid, { type: 'enter' }).ok).toBe(false)
-  apply(raid, { type: 'grab', caches: 2 })
+  apply(raid, { type: 'enter' })
   const threat = raid.threat
   raid.battle!.grabbed = 2
   raid.battle!.winner = 'human'
   endBattle(raid)
   expect(raid.supplies).toBe(START_SUPPLIES + 2 * RISKS.standard.supplies)
-  expect(raid.threat).toBe(threat + STOP_THREAT + 1)
+  expect(raid.threat).toBe(threat + STOP_THREAT)
   expect(raid.finds).toEqual([])
 })
 

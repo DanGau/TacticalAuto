@@ -19,7 +19,7 @@ const SCATTER: Partial<Record<TerrainKind, [Prop, Prop]>> = { countryside: ['cra
 /** The overlook, a rise the aliens hold; the ledge, a low rise by a flank way in; the fuel tanks out in the open. */
 const OVERLOOK: Mark = [9, 0]
 const LEDGE: Mark = [-8, -9]
-const HAZARD: Mark[] = [[3, -2], [4, 0], [3, 2]]
+const HAZARD: Mark[] = [[1, -7], [5, 0], [1, 7]]
 /** Heaps of things to hurl, beside each flank and down the middle. */
 const HEAPS: Mark[] = [[-6, -6], [-6, 6], [-2, -8], [-2, 8], [6, -5], [6, 5]]
 /** The way in, head on. */

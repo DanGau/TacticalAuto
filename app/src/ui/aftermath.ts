@@ -3,7 +3,7 @@ import { CLASSES } from '../core/classes'
 import { FEATS, type Tally } from '../core/feats'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
-import { CONSUMABLES } from '../core/consumables'
+import { UTILITIES } from '../core/utilities'
 import { KEYS } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
@@ -16,7 +16,7 @@ import { level, weaponOf } from '../core/squad'
 import { weaponText } from '../core/weapons'
 import { xpFor } from '../core/squad'
 import { SKILLS } from '../core/skills'
-import { gearPicks, pickCard, pickDetail, sellPick } from './cards'
+import { gearPicks, pickCard, pickDetail, sellPick, utilityPick } from './cards'
 import { badge, button, describe, ROLES, gearCard, gearText, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
 /**
@@ -95,6 +95,13 @@ export function skillChoice(run: Run, soldier: Soldier): string {
     <div class="choices">${skillOffers(soldier).map(card).join('')}</div>`
 }
 
+/** With a utility found and no room: fixed cards, each held one to drop for it, or the new one left behind. */
+export function spareChoice(run: Run, armed: string | null): string {
+  const spare = UTILITIES[run.spare!]
+  const picks = [...run.utilities.map((id, i) => utilityPick(`d${i}`, { type: 'keep', drop: i }, id, 'drop', `Tap again to drop ${UTILITIES[id].name} for ${spare.name}`)), utilityPick('d', { type: 'keep', drop: -1 }, run.spare!, 'leave', `Tap again to leave ${spare.name} behind`)]
+  return modal(`<h2>${spare.icon} ${spare.name} found. ${spare.text}. The party holds three: drop which?</h2><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a card for its details; tap it again to drop it.')}`)
+}
+
 /** The next choice of the reward phase, alone on its screen: a relic, then each find and who takes it, then each skill owed. */
 export function choice(run: Run, armed: string | null = null): string {
   const held = squadKeywords(run)
@@ -104,7 +111,8 @@ export function choice(run: Run, armed: string | null = null): string {
     const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
     return `<h2>Gear found. Who takes it?${more}</h2><div class="gear ${run.finds[0].rarity}">${gearCard(run.finds[0], held)}</div>${takers(run, 0, armed)}`
   }
-  return skillChoice(run, run.soldiers.find((s) => skillOffers(s).length > 0)!)
+  const learner = run.soldiers.find((s) => skillOffers(s).length > 0)
+  return learner ? skillChoice(run, learner) : ''
 }
 
 /** What each soldier did in the battle, a row each, the squad's best in each column but damage taken marked. */
@@ -131,14 +139,14 @@ export function stopReport(run: Run, report: Report, still = false): string {
   const all = [...report.soldiers, ...(hero ? [{ id: hero.id, name: hero.name, cls: hero.cls, xpBefore: hero.xp, xpAfter: hero.xp, taken: false, earned: [], feats: [], hp: health(run, hero), maxHp: soldierStats(run, hero).hp, tally: { dealt: 0, kills: 0, taken: 0, feats: [] } }] : [])]
   const crates = run.finds.map((_, i) => `<button class="crate" data-crate="${i}" title="Open">🎁</button>`)
   const squad = report.soldiers.length > 0 ? `<div class="stage second">${battleStats(report)}<div class="squad">${all.map((s) => soldierCard(run, s)).join('')}</div>${crates.length > 0 ? `<div class="crates">${crates.join('')}</div>` : ''}</div>` : ''
-  const owed = squad !== '' && (run.finds.length > 0 || run.soldiers.some((s) => skillOffers(s).length > 0))
+  const owed = squad !== '' && (run.finds.length > 0 || run.spare !== null || run.soldiers.some((s) => skillOffers(s).length > 0))
   return `<div class="debrief${still ? ' still' : ''}">
     ${title(report)}
     <div class="stage">
       <p>Threat ${threatBar(after, Math.max(0, after - before))}${threat}</p>
       ${report.rescued !== null ? `<p class="down">${report.rescued} of ${CIVILIANS} civilians rescued</p>` : ''}
       ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : ''}
-      ${report.found ? `<p class="supplies">Found ${CONSUMABLES[report.found].icon} ${CONSUMABLES[report.found].name}: ${CONSUMABLES[report.found].text}</p>` : ''}
+      ${report.found ? `<p class="supplies">Found ${UTILITIES[report.found].icon} ${UTILITIES[report.found].name}: ${UTILITIES[report.found].text}</p>` : ''}
     </div>
     ${squad}
     <div class="stage ${squad ? 'third' : 'second'}"><button data-seen="report"${owed ? ' disabled' : ''}>Continue</button></div>

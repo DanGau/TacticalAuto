@@ -23,7 +23,7 @@ const DRAG_PX = 6
 const FOCUS_MS = 700
 const FLY_MS = 1600
 /** Screen pixels the entrance panel takes from the bottom of the canvas. */
-const PANEL = 110
+const PANEL = 230
 /** Screen pixels kept clear around what is in play, which sits in the middle of the screen above the panel. */
 const WHOLE_MARGIN = PANEL - 20
 
@@ -153,6 +153,7 @@ export async function createView(): Promise<View> {
     async show(run, events, animate) {
       const { fx, sprites } = s
       s.soldiers = run.soldiers
+      s.rigging = run.utilities.includes('tank')
       fx.clear()
       const battle = run.battle
       if (!battle) return

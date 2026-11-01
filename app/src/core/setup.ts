@@ -89,7 +89,7 @@ export const CIVILIAN_CLEARANCE = 4
 
 export const TERROR_REACH = 10
 
-/** The supply caches a raid can grab, at most. */
+/** The supply caches a raid goes for. */
 export const CACHES = 3
 
 /**
@@ -122,7 +122,9 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     ...terrain,
     bulk: terrain.props.map((prop) => PROP_BULK[prop]),
     used: [],
-    primed: [],
+    utility: null,
+    rigged: null,
+    smoked: {},
     acid: [],
     fire: [],
     caltrops: [],
@@ -143,7 +145,6 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     escaped: [],
     lifted: {},
     caches: [],
-    greed: 0,
     grabbed: 0,
     opening: false,
     reserve,
