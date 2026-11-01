@@ -5,7 +5,7 @@ import { nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { skillOffers } from '../core/squad'
-import { choice, joined, loot, modal, runEnd, skillChoice, spareChoice, stopReport } from './aftermath'
+import { acquired, choice, joined, loot, modal, runEnd, skillChoice, spareChoice, stopReport } from './aftermath'
 import { ALIENS } from '../core/aliens'
 import { TWISTS } from '../core/twists'
 import { CHALLENGES } from '../core/challenges'
@@ -117,6 +117,9 @@ export function createUi(act: (action: Action) => void): Ui {
    */
   function panel(run: Run): string {
     const screen = phaseScreen(run)
+    // Told after the debrief, once the player has seen how the fight went.
+    const debriefing = run.report && seen !== run.report && run.report.soldiers.length > 0
+    if (run.gains.length > 0 && !debriefing && run.phase !== 'battle' && run.phase !== 'won' && run.phase !== 'lost') return screen + acquired(run, run.gains[0])
     return run.spare ? screen + spareChoice(run, armed) : screen
   }
 

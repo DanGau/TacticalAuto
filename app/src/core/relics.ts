@@ -88,7 +88,7 @@ export const RELICS: Record<RelicId, Relic> = relics
 export const REQUIRES: Partial<Record<RelicId, RelicId>> = { shredder: 'charges', cryo: 'charges' }
 
 /** Relics that may be offered to a squad holding `held`: those it lacks whose requirement it holds. */
-export function offerable(held: RelicId[]): RelicId[] {
+export function offerable(held: readonly RelicId[]): RelicId[] {
   return (Object.keys(RELICS) as RelicId[]).filter((id) => !held.includes(id) && (!REQUIRES[id] || held.includes(REQUIRES[id])))
 }
 

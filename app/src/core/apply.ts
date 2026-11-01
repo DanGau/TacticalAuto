@@ -5,7 +5,7 @@ import { UTILITY_PRICE } from './utilities'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
 import { advance, current, go, nextStop, recruit, ways } from './run'
 import { type Run } from './run-state'
-import { takeRelic } from './rewards'
+import { gainRelic, takeRelic } from './rewards'
 import { sellFind } from './rewards'
 import { buyWare } from './rewards'
 import { buyUtility, keepUtility } from './rewards'
@@ -45,6 +45,8 @@ export type Action =
   | { type: 'equip'; find: number; soldier: number }
   /** Reward phase: sell the find at `find` of run.finds. */
   | { type: 'sell'; find: number }
+  /** Any time: the player has read the first of run.gains. */
+  | { type: 'ack' }
   /** Reward phase: the soldier with id `soldier` learns the skill at `index` of its offers. */
   | { type: 'skill'; soldier: number; index: number }
 
@@ -55,6 +57,11 @@ const no = (reason: string): Result => ({ ok: false, reason })
 
 /** The only way a player changes state. A rejected action leaves state untouched. */
 export function apply(run: Run, action: Action): Result {
+  if (action.type === 'ack') {
+    if (run.gains.length === 0) return no('nothing to acknowledge')
+    run.gains.shift()
+    return ok
+  }
   if (action.type === 'recruit') {
     if (run.phase !== 'recruit') return no('not recruiting')
     if (!run.recruits[action.index]) return no('no such recruit')
@@ -114,7 +121,7 @@ export function apply(run: Run, action: Action): Result {
       if (!relic || relic.sold) return no('no such relic for sale')
       if (RELIC_PRICE > run.supplies) return no('not enough supplies')
       run.supplies -= RELIC_PRICE
-      run.relics.push(relic.id)
+      gainRelic(run, relic.id, true)
       relic.sold = true
     } else if (action.type === 'utility') {
       const item = shop.utilities[action.index]

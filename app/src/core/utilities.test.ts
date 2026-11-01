@@ -122,7 +122,6 @@ test('a utility found with three held forces a choice of which to drop', () => {
   endBattle(run)
   const found = run.spare!
   expect(['hover', 'smoke', 'crack']).not.toContain(found)
-  expect(run.report!.found).toBe(found)
   expect(run.phase).toBe('reward')
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
   apply(run, { type: 'keep', drop: 1 })

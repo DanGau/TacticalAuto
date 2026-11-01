@@ -109,11 +109,11 @@ const MIN_MOVE = 2
 export const LEVEL_STATS: Partial<Stats> = { hp: 2, crit: 0.03 }
 
 /**
- * Adds a recruit to the squad, while it has room. Under a
+ * Adds a recruit the player has not seen to the squad, while it has room, and tells the player. Under a
  * doctrine of unique classes it takes a class no squadmate has, while one is left.
  */
 export function hire(run: Run): void {
-  if (run.soldiers.length < MAX_SQUAD) join(run, draft(run, []))
+  if (run.soldiers.length < MAX_SQUAD) run.gains.push({ kind: 'hero', soldier: join(run, draft(run, [])).id })
 }
 
 /** The most heroes a party has. */

@@ -51,12 +51,12 @@ export function endBattle(run: Run): void {
   const chance = mission.kind === 'key' ? 1 : mission.kind === 'battle' ? byGoal : 0
   if (won && chance > 0 && random(run) < chance) dropGear(run, risk.rareGear || mission.kind === 'key' || held.some((relic) => relic.rareGear))
   // A key mission, an ambush and a win with none held always turn up a utility; a battle by its risk.
-  const found = won && mission.kind !== 'final' && random(run) < (mission.kind === 'battle' && run.utilities.length > 0 ? risk.utility : 1) ? findUtility(run) : null
+  if (won && mission.kind !== 'final' && random(run) < (mission.kind === 'battle' && run.utilities.length > 0 ? risk.utility : 1)) findUtility(run)
   const key = won && mission.kind === 'key'
   // A hero extracted joins the squad, if it has room.
   const hero = run.route[run.keys]?.hero
   const hired = key && hero && run.soldiers.length < MAX_SQUAD && !run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).noRecruits) ? join(run, hero).name : null
-  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, soldiers, hired, rescued, found }
+  run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, soldiers, hired, rescued }
 
   // Losing the hero's extraction, an ambush, a recovery or the hub loses the run, as does a wipe.
   if (mission.kind === 'final' || (mission.kind !== 'battle' && !won) || wiped) {

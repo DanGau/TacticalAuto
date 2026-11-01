@@ -70,12 +70,27 @@ export function gainUtility(run: Run, id: UtilityId): void {
   else run.spare = id
 }
 
-/** A utility the party lacks, found at a stop; none if it holds them all. */
+/** The squad gains a relic: `seen` if the player chose it from a card, else the player is told. */
+export function gainRelic(run: Run, id: RelicId, seen = false): void {
+  run.relics = [...run.relics, id]
+  if (!seen) run.gains.push({ kind: 'relic', id })
+}
+
+/** The squad loses the relic at `index`, and the player is told which. */
+export function loseRelic(run: Run, index: number): RelicId {
+  const id = run.relics[index]
+  run.relics = run.relics.filter((_, i) => i !== index)
+  run.gains.push({ kind: 'relicLost', id })
+  return id
+}
+
+/** A utility the party lacks, found at a stop; none if it holds them all. With no room the choice of what to drop tells of it; else the player is told. */
 export function findUtility(run: Run): UtilityId | null {
   const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
   if (kinds.length === 0) return null
   const id = kinds[randomInt(run, kinds.length)]
   gainUtility(run, id)
+  if (run.spare !== id) run.gains.push({ kind: 'boon', id })
   return id
 }
 
@@ -128,7 +143,7 @@ export function dropGear(run: Run, lucky: boolean): void {
 
 /** Takes an offered relic. */
 export function takeRelic(run: Run, id: RelicId): void {
-  run.relics.push(id)
+  gainRelic(run, id, true)
   run.relicOffers = []
   settle(run)
 }

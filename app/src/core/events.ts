@@ -6,7 +6,7 @@ import { random, randomInt } from './rng'
 import { advance, current, legOf, nextStop, passStop } from './run'
 import { type Run } from './run-state'
 import { drawBattle } from './missions'
-import { dropGear } from './rewards'
+import { dropGear, gainRelic, loseRelic } from './rewards'
 import { settle } from './rewards'
 import { stockShop } from './rewards'
 import { hire, MAX_SQUAD } from './squad'
@@ -183,7 +183,7 @@ const encounters = {
         can: (run) => unheld(run).length > 0,
         take: (run) => {
           const relics = unheld(run)
-          run.relics.push(relics[randomInt(run, relics.length)])
+          gainRelic(run, relics[randomInt(run, relics.length)])
           raise(run, 2)
         },
       },
@@ -250,11 +250,11 @@ const encounters = {
         can: (run) => run.relics.length > 0 && unheld(run).length > 0,
         take: (run) => {
           // What is given up is gone before the new one is drawn, so the new one needs no relic given up.
-          const [old] = run.relics.splice(randomInt(run, run.relics.length), 1)
-          run.relics.push(pick(run, unheld(run).filter((id) => id !== old)) ?? old)
+          const old = loseRelic(run, randomInt(run, run.relics.length))
+          gainRelic(run, pick(run, unheld(run).filter((id) => id !== old)) ?? old)
         },
       },
-      { quip: 'Cash, darling.', text: 'Sell: a random relic you hold; +8 supplies', can: (run) => run.relics.length > 0, take: (run) => (run.relics.splice(randomInt(run, run.relics.length), 1), (run.supplies += 8)) },
+      { quip: 'Cash, darling.', text: 'Sell: a random relic you hold; +8 supplies', can: (run) => run.relics.length > 0, take: (run) => (loseRelic(run, randomInt(run, run.relics.length)), (run.supplies += 8)) },
       leave('Tell him the monocle is fake. Watch his heart break.'),
     ],
   },

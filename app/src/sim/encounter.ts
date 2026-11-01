@@ -1,4 +1,5 @@
 // The challenge lab: plays each challenge alone, for each party size and rung, with each utility, and prints what it costs.
+import { gainRelic } from '../core/rewards'
 import { parseArgs } from 'node:util'
 import { apply } from '../core/apply'
 import { CHALLENGES, forceOf, type ChallengeId } from '../core/challenges'
@@ -37,7 +38,7 @@ function battle(seed: number, party: number, rung: number, challenge: ChallengeI
     while (skillOffers(soldier).length > 0) soldier.skills.push(skillOffers(soldier)[randomInt(run, skillOffers(soldier).length)])
     soldier.gear = generateGear(run, run.nextGear++, party === 1 ? 'common' : 'rare')
   }
-  for (let i = 0; i < party - 1; i++) run.relics.push(offerable(run.relics)[randomInt(run, offerable(run.relics).length)])
+  for (let i = 0; i < party - 1; i++) gainRelic(run, offerable(run.relics)[randomInt(run, offerable(run.relics).length)], true)
   run.phase = 'overworld'
   const stop = { kind: 'battle' as const, risk: 'standard' as const, goal, terrain: 'town' as const, challenge, twist: null, aliens: forceOf(challenge, party, rung, GOALS[goal].force) }
   legOf(run).path = Array<number>(run.stop).fill(-1)

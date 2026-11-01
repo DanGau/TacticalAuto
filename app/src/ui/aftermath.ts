@@ -1,10 +1,11 @@
 // Screens after a battle or stop: rewards, loot, skill choices, the stop report, and the run's end.
 import { CLASSES } from '../core/classes'
 import { FEATS, type Tally } from '../core/feats'
+import type { Keyword } from '../core/keywords'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { UTILITIES } from '../core/utilities'
-import { type Run } from '../core/run-state'
+import { type Gain, type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { type Soldier } from '../core/run-state'
 import { squadKeywords } from '../core/squad'
@@ -56,6 +57,18 @@ export function joined(run: Run, name: string): string {
     ${heroSheet(run, hero)}
     <button class="decide" data-met="report">Continue</button>
   </div>`
+}
+
+/** What the squad gained or lost unchosen, alone in a pop-up: what it is, what it does, and a button to go on. */
+export function acquired(run: Run, gain: Gain): string {
+  const shown = (top: string, look: string, name: string, text: string) => `<small class="up-top">${top}</small><div class="prize gear ${look}"><b>${name}</b><br>${text}</div>`
+  const relicBody = (top: string, look: string, id: RelicId, held: Keyword[] = []) => shown(top, look, RELICS[id].name, describe(RELICS[id].text, RELICS[id].tags, held))
+  const heroBody = (id: number) => {
+    const hero = run.soldiers.find((s) => s.id === id)!
+    return shown('Hero joined', hero.gear?.rarity ?? '', `${badge(hero.cls)} ${hero.name}`, heroSheet(run, hero))
+  }
+  const body = gain.kind === 'relic' ? relicBody('Relic gained', 'relic', gain.id, squadKeywords(run)) : gain.kind === 'relicLost' ? relicBody('Relic lost', 'relic lost', gain.id) : gain.kind === 'boon' ? shown('Boon gained', '', `${UTILITIES[gain.id].icon} ${UTILITIES[gain.id].name}`, UTILITIES[gain.id].text) : heroBody(gain.soldier)
+  return modal(`<div class="acquired">${body}<button class="decide" data-action='${JSON.stringify({ type: 'ack' })}'>Got it</button></div>`)
 }
 
 /** A pop-up over the debrief, `html` inside it. */
@@ -151,7 +164,6 @@ export function stopReport(run: Run, report: Report, still = false): string {
       <p>Threat ${threatBar(after, Math.max(0, after - before))}${threat}</p>
       ${report.rescued !== null ? `<p class="down">${report.rescued} of ${CIVILIANS} civilians rescued</p>` : ''}
       ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : ''}
-      ${report.found ? `<p class="supplies">Found ${UTILITIES[report.found].icon} ${UTILITIES[report.found].name}: ${UTILITIES[report.found].text}</p>` : ''}
     </div>
     ${squad}
     <div class="stage ${squad ? 'third' : 'second'}"><button data-seen="report"${owed ? ' disabled' : ''}>Continue</button></div>

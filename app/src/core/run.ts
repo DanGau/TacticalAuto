@@ -346,6 +346,7 @@ export function createRun(seed: number): Run {
     finds: [],
     nextGear: 1,
     relics: [],
+    gains: [],
     utilities: [],
     spare: null,
     relicOffers: [],
@@ -392,7 +393,7 @@ export function advance(run: Run): void {
     const supplies = stop === 'supply' ? DROP_SUPPLIES : 0
     run.supplies += supplies
     if (stop === 'cache') dropGear(run, run.relics.some((id) => (RELICS[id] as Relic).rareGear))
-    run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, key: false, soldiers: [], hired: null, rescued: null, found: null }
+    run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, key: false, soldiers: [], hired: null, rescued: null }
     passStop(run)
     settle(run)
     return

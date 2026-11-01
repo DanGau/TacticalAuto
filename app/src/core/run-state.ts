@@ -130,9 +130,10 @@ export interface Report {
   hired: string | null
   /** Civilians kept alive on a rescue; null on any other stop. */
   rescued: number | null
-  /** A utility the stop turned up. */
-  found: UtilityId | null
 }
+
+/** What the squad gained or lost without choosing it from a card the player could read; the player is told, one screen each. */
+export type Gain = { kind: 'relic'; id: RelicId } | { kind: 'relicLost'; id: RelicId } | { kind: 'boon'; id: UtilityId } | { kind: 'hero'; soldier: number }
 
 /** Experience from one source. */
 export interface Earned {
@@ -183,7 +184,10 @@ export interface Run {
   /** Gear found and not yet put on a soldier the player picks, or sold. */
   finds: Gear[]
   nextGear: number
-  relics: RelicId[]
+  /** Changed only through gainRelic and loseRelic, so the player hears of it. */
+  relics: readonly RelicId[]
+  /** What the player has yet to be told of. */
+  gains: Gain[]
   /** Utilities the party holds, at most UTILITY_SLOTS. One is picked for each fight, and it is never used up. */
   utilities: UtilityId[]
   /** A utility gained with no room for it: the player drops it or one held. */
