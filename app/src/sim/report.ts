@@ -135,6 +135,15 @@ export function verdicts(of: Row[]): string[] {
   return found
 }
 
+/** Battle wins by goal, as `name won% of n`. */
+export function byGoal(results: RunResult[]): string {
+  const tolls = results.flatMap((r) => r.tolls)
+  return [...new Set(tolls.map((t) => t.goal))].map((goal) => {
+    const of = tolls.filter((t) => t.goal === goal)
+    return `${goal} ${Math.round((100 * of.filter((t) => t.won).length) / of.length)}% of ${of.length}`
+  }).join(', ')
+}
+
 export function formatDiagnosis(bot: string, of: Row[]): string {
   const head = `${bot}: challenge, party, answer, battles, won, health lost`
   const lines = of.map((r) => `${CHALLENGES[r.challenge].name.padEnd(14)}${r.party}  ${r.answer.padEnd(9)}${String(r.battles).padStart(7)}${`${r.won}%`.padStart(6)}${`${r.lost}%`.padStart(13)}`)

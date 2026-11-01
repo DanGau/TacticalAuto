@@ -2,7 +2,9 @@
 import { parseArgs } from 'node:util'
 import { apply } from '../core/apply'
 import { CHALLENGES, forceOf, type ChallengeId } from '../core/challenges'
+import type { ClassId } from '../core/classes'
 import { generateGear } from '../core/gear'
+import { roots } from '../core/skills'
 import { GOALS, type Goal } from '../core/goals'
 import { fuelTanks } from '../core/objects'
 import { offerable } from '../core/relics'
@@ -14,6 +16,8 @@ import { hire, skillOffers, soldierStats, xpFor } from '../core/squad'
 import { timedFlow } from '../core/step'
 import { UTILITY_IDS, type UtilityId } from '../core/utilities'
 
+const { values } = parseArgs({ options: { runs: { type: 'string', default: '30' }, challenge: { type: 'string', default: '' }, party: { type: 'string', default: '1,2,3' }, rung: { type: 'string', default: '0,1,2' }, goal: { type: 'string', default: 'exterminate' }, cls: { type: 'string', default: '' }, none: { type: 'boolean', default: false } } })
+
 /** The level a party of each size has reached by the time it meets a rung, about what a careful run has. */
 const levelAt = (party: number, rung: number) => party * 2 - 1 + rung
 
@@ -21,6 +25,10 @@ const levelAt = (party: number, rung: number) => party * 2 - 1 + rung
 function battle(seed: number, party: number, rung: number, challenge: ChallengeId, utility: UtilityId | null, goal: Goal): { won: boolean; hurt: number; seconds: number } {
   const run = createRun(seed)
   apply(run, { type: 'recruit', index: seed % run.recruits.length })
+  if (values.cls) {
+    run.soldiers[0].cls = values.cls as ClassId
+    run.soldiers[0].skills = [roots(values.cls as ClassId)[0]]
+  }
   while (run.soldiers.length < party) hire(run)
   run.keys = party - 1
   run.stop = rung * 3
@@ -46,7 +54,6 @@ function battle(seed: number, party: number, rung: number, challenge: ChallengeI
   return { won: run.report!.won, hurt: 1 - hp / most, seconds: clock.done / 1000 }
 }
 
-const { values } = parseArgs({ options: { runs: { type: 'string', default: '30' }, challenge: { type: 'string', default: '' }, party: { type: 'string', default: '1,2,3' }, rung: { type: 'string', default: '0,1,2' }, goal: { type: 'string', default: 'exterminate' }, none: { type: 'boolean', default: false } } })
 const runs = Number(values.runs)
 const challenges = (values.challenge ? values.challenge.split(',') : Object.keys(CHALLENGES)) as ChallengeId[]
 const pct = (n: number) => `${Math.round(100 * n)}%`.padStart(5)

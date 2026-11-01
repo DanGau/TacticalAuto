@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { alienStats, ALIENS, type AlienKind } from './aliens'
-import type { Alien, Unit } from './battle'
+import { ENGAGE_REACH, type Alien, type Unit } from './battle'
 import { flowOf, type Goal } from './goals'
 import { distance } from './grid'
 import { createBattle } from './setup'
@@ -61,4 +61,10 @@ test('flow follows mission and map', () => {
   expect(flowOf('raid', 'town')).toBe('push')
   expect(flowOf('raid', 'ruins')).toBe('flood')
   expect(flowOf('exterminate', 'hive')).toBe('flood')
+})
+
+test('a push stands its clusters beyond the wake range of each other, so nearing one wakes only it', () => {
+  for (const aliens of layouts('exterminate', 14)) {
+    for (const a of aliens) for (const b of aliens) if (a.cluster !== b.cluster) expect(distance(a, b)).toBeGreaterThan(ENGAGE_REACH)
+  }
 })

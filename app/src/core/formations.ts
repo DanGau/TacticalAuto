@@ -1,8 +1,8 @@
 // Gathers a battle's aliens into clusters: how they are grouped, the shapes they stand in, and how the ground shapes those.
-import { GRID, type Alien, type Battle, type Tile } from './battle'
+import { ENGAGE_REACH, GRID, type Alien, type Battle, type Tile } from './battle'
 import { distance, onGrid } from './grid'
 import { random, randomInt } from './rng'
-import type { ChallengeId } from './challenges'
+import { CHALLENGES, type ChallengeId } from './challenges'
 
 /** What the encounter tells the gathering: the open ground, the fight's heading, and where the set pieces stand. */
 export interface Plot {
@@ -117,6 +117,9 @@ function groupsOf(battle: Battle, aliens: Alien[], plot: Plot): { members: numbe
   return groups
 }
 
+/** The nearest two clusters of a push stand, so that a soldier nearing one wakes only it. */
+const WAKE_CLEAR = ENGAGE_REACH + 1
+
 /** A post and a cluster number, from 1, for each of `aliens`. */
 export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Tile[]; clusters: number[] } {
   const r = () => random(battle)
@@ -133,9 +136,13 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
   const posts: Tile[] = []
   const clusters: number[] = []
   let order = 0
+  // Volleying clusters are all in the fight from the start, so only those that wake need to stand apart.
+  const keepApart = battle.flow === 'push' && !(plot.challenge && CHALLENGES[plot.challenge].volley)
+  const clearOfOthers = (t: Tile, by: number) => !keepApart || posts.every((p) => !p || distance(p, t) >= WAKE_CLEAR + by)
   groups.forEach((group, g) => {
     const n = group.members.length
     let at = group.at
+    let joinTo: number | null = null
     if (!at) {
       const i = order++
       const span = PUSH_BAND[1] - PUSH_BAND[0]
@@ -146,10 +153,16 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
         : { along: (r() * 2 - 1) * 11, across: (r() * 2 - 1) * 11 }
       const aim = { x: spot.x + fx * wanted.along - fy * wanted.across, y: spot.y + fy * wanted.along + fx * wanted.across }
       const want = FEATURES[randomInt(battle, FEATURES.length)]
-      for (let sep = staged?.apart ?? SEPARATION[battle.flow]; !at && sep >= 2; sep--) {
-        const room = open.filter((t) => centres.every((c) => distance(c, t) >= sep))
+      for (let sep = staged?.apart ?? SEPARATION[battle.flow]; !at && sep >= (keepApart ? WAKE_CLEAR : 2); sep--) {
+        const room = open.filter((t) => centres.every((c) => distance(c, t) >= sep) && clearOfOthers(t, Math.ceil(Math.sqrt(n))))
         const score = (t: Tile) => -Math.hypot(t.x - aim.x, t.y - aim.y) + (!staged && featureAt(battle, t) === want ? SETTLE : 0) + r()
         at = room.reduce<Tile | null>((a, b) => (!a || score(b) > score(a) ? b : a), null)
+      }
+      // No room stands clear: it joins the nearest cluster, which engages as one.
+      if (!at && keepApart && posts.length > 0) {
+        const joined = group.members.length && posts.reduce<Tile | null>((p, q) => (q && (!p || distance(q, spot) < distance(p, spot)) ? q : p), null)
+        at = joined || spot
+        joinTo = clusters[posts.indexOf(at)]
       }
       at ??= spot
       centres.push(at)
@@ -160,7 +173,8 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
     // A line lies across the way, a stream along it: a road's if it stands on one, else the fight's.
     const [rx, ry] = feature === 'road' ? roadRun(battle, at) : [fx, fy]
     const points = SHAPES[shape](n, r)
-    const pool = group.at ? plot.ground : open
+    const mine = (t: Tile) => group.at || !keepApart || posts.every((p, m) => !p || clusters[m] === joinTo || distance(p, t) >= WAKE_CLEAR)
+    const pool = (group.at ? plot.ground : open).filter(mine)
     const tiles = points.map(([u, v]) => {
       const ideal = { x: at.x + rx * u - ry * v + (r() - 0.5), y: at.y + ry * u + rx * v + (r() - 0.5) }
       const tile = pool.reduce<Tile | null>((a, b) => {
@@ -175,7 +189,7 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
     const places = shape === 'retinue' ? tiles : [...tiles].sort((a, b) => along(b) - along(a))
     members.forEach((m, i) => {
       posts[m] = places[i]
-      clusters[m] = g + 1
+      clusters[m] = joinTo ?? g + 1
     })
   })
   return { posts, clusters }

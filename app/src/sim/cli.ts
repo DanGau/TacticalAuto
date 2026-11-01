@@ -3,7 +3,7 @@ import { parseArgs } from 'node:util'
 import { bots } from '../bots/bots'
 import { DOCTRINES, type DoctrineId } from '../core/doctrines'
 import { playAll } from './pool'
-import { formatDiagnosis, formatReport, ranked, report, rows, STRATEGIC_FLOOR } from './report'
+import { byGoal, formatDiagnosis, formatReport, ranked, report, rows, STRATEGIC_FLOOR } from './report'
 
 const { values } = parseArgs({
   options: {
@@ -37,6 +37,6 @@ if (values.bot === 'all') {
   const summary = report(results)
   if (values.floor && summary.wins / summary.runs < STRATEGIC_FLOOR) summary.failures.push(`the strategic bot won ${summary.wins} of ${summary.runs}, under its floor of ${Math.round(100 * STRATEGIC_FLOOR)}%: the game has become unwinnable, or the bot has broken`)
   console.log(values.json ? JSON.stringify(summary) : formatReport(summary))
-  if (values.diagnose) console.log(`\n${formatDiagnosis(values.bot, rows(results))}`)
+  if (values.diagnose) console.log(`\nby goal: ${byGoal(results)}\n${formatDiagnosis(values.bot, rows(results))}`)
   if (summary.failures.length > 0) process.exitCode = 1
 }

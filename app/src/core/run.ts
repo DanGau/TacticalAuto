@@ -410,7 +410,7 @@ export function advance(run: Run): void {
     charges: charges(run, s),
     secondary: secondaryOf(s),
     weapon: doctrines.find((d) => d.fights)?.fights ?? s.gear?.weapon,
-    stance: doctrines.find((d) => d.stance)?.stance ?? (s.cls === 'support' ? CLASSES.support.stance : weaponOf(s)?.stance) ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
+    stance: doctrines.find((d) => d.stance)?.stance ?? (s.cls === 'support' && run.soldiers.length > 1 ? CLASSES.support.stance : weaponOf(s)?.stance) ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
     effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))
   const rules = doctrines.flatMap((d) => d.rule ?? [])

@@ -277,7 +277,7 @@ function details(run: Run, soldier: Soldier): string {
         <tr><td>Crit</td><td>${Math.round(100 * stats.crit)}%</td><td>Move</td><td>${stats.move}</td></tr>
         <tr><td>Damage</td><td>${stats.damage}</td><td>Range</td><td>${stats.range}</td></tr>
       </table>
-      <div>${attacks}${cls ? `${weaponOf(soldier)?.stance && soldier.cls !== 'support' ? '' : `<p>${cls.stanceText}.</p>`}<p><b>${cls.abilityName}${uses > 0 ? ` ×${uses}` : ''}.</b> ${cls.abilityText}.</p>` : ''}${skills.join('')}${feats.length > 0 ? `<p>${feats.join(' ')}</p>` : ''}</div>
+      <div>${attacks}${cls ? `${weaponOf(soldier)?.stance && (soldier.cls !== 'support' || run.soldiers.length === 1) ? '' : `<p>${cls.stanceText}.</p>`}<p><b>${cls.abilityName}${uses > 0 ? ` ×${uses}` : ''}.</b> ${cls.abilityText}.</p>` : ''}${skills.join('')}${feats.length > 0 ? `<p>${feats.join(' ')}</p>` : ''}</div>
       ${gear}
     </div>`
 }

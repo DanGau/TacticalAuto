@@ -123,10 +123,10 @@ export function alienAction(battle: Battle, unit: Unit): GameEvent[] | null {
   return events
 }
 
-/** Medic: heals the most wounded other soldier at half health or less within reach. It does not cost the medic's shot. */
+/** Medic: heals the most wounded soldier at half health or less within reach, itself among them. It does not cost the medic's shot. */
 export function heal(battle: Battle, unit: Unit): GameEvent[] {
   const wounded = battle.units
-    .filter((u) => u.side === unit.side && u !== unit && u.hp <= u.stats.hp / 2 && distance(unit, u) <= MEDIC_REACH)
+    .filter((u) => u.side === unit.side && u.hp > 0 && u.hp <= u.stats.hp / 2 && distance(unit, u) <= MEDIC_REACH)
     .reduce<Unit | undefined>((worst, u) => (!worst || u.hp < worst.hp ? u : worst), undefined)
   if (!wounded) return []
   const amount = Math.min(MEDIC_HEAL + (has(unit, 'surgeon') ? SURGEON_HEAL : 0), wounded.stats.hp - wounded.hp)
