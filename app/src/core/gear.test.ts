@@ -14,10 +14,10 @@ import { soldierStats } from './squad'
 import { MELEE_RANGE, WEAPONS } from './weapons'
 import { TUNING } from './tuning'
 
-test('gear does one thing: commons a stat mod, rares a simple effect, epics an elaborate one, each for its slot; a weapon is any weapon but the starting rifle', () => {
+test('gear does one thing: commons a stat mod, rares a simple effect, epics an elaborate one, each for its slot; a weapon is any weapon', () => {
   const rng = { rng: 7 }
   const kinds = new Set<string>()
-  for (let id = 0; id < 200; id++) {
+  for (let id = 0; id < 900; id++) {
     const rarity = (['common', 'rare', 'epic'] as const)[id % 3]
     const gear = generateGear(rng, id, rarity)
     expect(gear.effect === null).toBe(rarity === 'common')
@@ -29,7 +29,7 @@ test('gear does one thing: commons a stat mod, rares a simple effect, epics an e
       expect(gear.name.endsWith(WEAPONS[gear.weapon].name)).toBe(true)
     }
   }
-  expect([...kinds].sort()).toEqual(Object.keys(WEAPONS).filter((w) => w !== 'rifle').sort())
+  expect([...kinds].sort()).toEqual(Object.keys(WEAPONS).sort())
 })
 
 test('any soldier wields any weapon: a melee one reaches the next tile and charges in, whatever the class', () => {

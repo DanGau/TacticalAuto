@@ -1,5 +1,5 @@
 // A side's simultaneous move: sighting aliens, walking, sentries, overwatch, burrowers.
-import type { Secondary } from './secondaries'
+import { SECONDARIES, type Secondary } from './secondaries'
 import { aiming } from './fighters'
 import { shoot } from './attack'
 import { GRID, type Battle, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, ENGAGE_REACH, STANDOFF } from './battle'
@@ -230,7 +230,8 @@ export function overwatch(battle: Battle, moved: number[]): GameEvent[] {
     for (const id of moved) {
       const alien = battle.units.find((u) => u.id === id && u.revealed)
       battle.actor = unit.id
-      const shot = alien && unit.hp > 0 ? shoot(battle, unit, seen, 'overwatch', alien) : []
+      const held = alien && unit.hp > 0 ? shoot(battle, unit, seen, 'overwatch', alien) : []
+      const shot = held.length === 0 && alien && unit.hp > 0 && has(unit, 'overwatch') && unit.secondary ? shoot(battle, unit, seen, 'overwatch', alien, SECONDARIES[unit.secondary]) : held
       battle.actor = null
       if (shot.length === 0) continue
       events.push(...shot)

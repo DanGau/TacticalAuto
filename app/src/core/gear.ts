@@ -1,4 +1,4 @@
-// Gear: slots, effects, the starter rifle, and generating finds.
+// Gear: slots, effects, and generating it.
 import type { GearEffect, Stats } from './battle'
 import type { Rarity } from './base'
 import type { Keyword } from './keywords'
@@ -88,14 +88,11 @@ export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: str
   null: { slot: 'utility', prefix: 'Null', text: 'Aliens within 3 tiles of the carrier cannot spit, panic, spawn or burst' },
 }
 
-/** The plain assault rifle every hero starts with. */
-export const starterRifle = (id: number): Gear => ({ id, slot: 'weapon', rarity: 'common', name: WEAPONS.rifle.name, weapon: 'rifle', stats: {}, effect: null })
-
-/** A new piece of gear of the given rarity, in a random slot; on the weapon slot, any weapon but the rifle every hero starts with. */
-export function generateGear(rng: { rng: number }, id: number, rarity: Rarity): Gear {
+/** A new piece of gear of the given rarity, in `chosen` slot or a random one; on the weapon slot, any weapon. */
+export function generateGear(rng: { rng: number }, id: number, rarity: Rarity, chosen?: Slot): Gear {
   const pick = <T>(options: T[]): T => options[randomInt(rng, options.length)]
-  const slot = pick([...SLOTS])
-  const weapon = slot === 'weapon' ? pick((Object.keys(WEAPONS) as WeaponId[]).filter((w) => w !== 'rifle')) : undefined
+  const slot = chosen ?? pick([...SLOTS])
+  const weapon = slot === 'weapon' ? pick(Object.keys(WEAPONS) as WeaponId[]) : undefined
   const base = weapon ? WEAPONS[weapon].name : pick(BASES[slot as Exclude<Slot, 'weapon'>])
   const kind = weapon ? { weapon } : {}
   if (rarity === 'common') {

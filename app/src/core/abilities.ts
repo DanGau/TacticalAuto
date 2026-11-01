@@ -6,7 +6,7 @@ import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { has, hostage, foes, shootable, nearest, immune, silenced, spend, enemiesOf, onTile, FIRE_TURNS } from './fighters'
+import { has, hostage, foes, powering, shootable, nearest, immune, silenced, spend, enemiesOf, onTile, FIRE_TURNS } from './fighters'
 import { walk, bestPath, paths } from './pathing'
 import { canShoot, lineOfSight } from './sight'
 import { wound, knockback, SLAM_DAMAGE } from './wound'
@@ -52,7 +52,7 @@ export function pulse(battle: Battle, unit: Unit, effect: 'warcry' | 'emp'): Gam
 export function flashbang(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
   if (!has(unit, 'flashbang') || unit.spent.includes('flashbang')) return []
   const all = foes(battle, unit).filter((u) => !u.boss)
-  const knots = all.filter((u) => shootable(battle, unit, unit, u, seen)).map((centre) => all.filter((u) => distance(u, centre) <= BLAST_RADIUS))
+  const knots = all.filter((u) => shootable(battle, powering(unit), unit, u, seen)).map((centre) => all.filter((u) => distance(u, centre) <= BLAST_RADIUS))
   const caught = knots.reduce<Unit[]>((best, knot) => (knot.length > best.length ? knot : best), [])
   if (caught.length < 2) return []
   unit.spent.push('flashbang')
@@ -75,7 +75,7 @@ export function forceField(battle: Battle, unit: Unit): GameEvent[] {
 export function polymorph(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
   if (!has(unit, 'polymorph') || unit.spent.includes('polymorph')) return []
   const target = battle.units
-    .filter((u) => u.side !== unit.side && !u.boss && !u.panicked && shootable(battle, unit, unit, u, seen))
+    .filter((u) => u.side !== unit.side && !u.boss && !u.panicked && shootable(battle, powering(unit), unit, u, seen))
     .reduce<Unit | undefined>((best, u) => (!best || u.hp > best.hp ? u : best), undefined)
   if (!target) return []
   unit.spent.push('polymorph')

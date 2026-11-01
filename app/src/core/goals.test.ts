@@ -228,6 +228,9 @@ test('a civilian a harvester kills rises on the next alien turn as a husk', () =
   // Beside the hider farthest from the squad, which stays put.
   const soldier = battle.units.find(isSoldier)!
   const prey = battle.units.filter((u) => u.civilian === 'hider').sort((a, b) => distance(b, soldier) - distance(a, soldier))[0]
+  // Neither falls before the harvest.
+  harvester.hp = harvester.stats.hp = 999
+  soldier.hp = soldier.stats.hp = 999
   Object.assign(harvester, freeTilesNear(battle, prey, 30).find((t) => distance(t, prey) === 2))
   let died = false
   while (battle.phase === 'battle' && !battle.units.some((u) => u.kind === 'husk')) {

@@ -46,7 +46,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 ## core/: content and helpers
 
-`aliens`, `classes`, `consumables`, `doctrines`, `feats`, `gear`, `goals`, `keywords`, `relics`, `secondaries`, `skills`, `traits`, `twists`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`: test helpers.
+`aliens`, `classes`, `consumables`, `doctrines`, `feats`, `gear`, `goals`, `keywords`, `relics`, `secondaries`, `skills`, `twists`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`: test helpers.
 
 ## view/: battle rendering
 

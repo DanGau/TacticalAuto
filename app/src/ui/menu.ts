@@ -4,7 +4,7 @@ import { CLASSES } from '../core/classes'
 import type { Run } from '../core/run-state'
 import type { Soldier } from '../core/run-state'
 import { SKILLS } from '../core/skills'
-import { TRAITS, type Trait } from '../core/traits'
+import { weaponOf } from '../core/squad'
 import { places } from './globe'
 
 /** The title screen, before a run begins. */
@@ -32,11 +32,9 @@ export function story(): string {
   </div>`
 }
 
-/** A recruit as a card to pick: class, first skill, home and trait at a glance; hovering an ability or skill tells what it does. */
+/** A recruit as a card to pick: class, weapon, first skill and home at a glance; hovering an ability or skill tells what it does. */
 function card(recruit: Soldier, index: number, chosen: number | null): string {
   const cls = CLASSES[recruit.cls!]
-  const trait: Trait | null = recruit.trait ? TRAITS[recruit.trait] : null
-  const quirk = trait ? `<b>${trait.name}</b><span class="down">${trait.pro}</span><span class="up">${trait.con}</span>` : '<b>Steady</b><small>No quirks</small>'
   const secondary = SECONDARIES[cls.secondary]
   const named = [{ name: cls.abilityName, text: cls.abilityText }, { name: secondary.name, text: `Secondary attack. ${secondaryText(secondary)}` }, ...recruit.skills.map((id) => SKILLS[id])]
   return `<button data-recruit="${index}" class="card recruit${index === chosen ? ' chosen' : ''}">
@@ -44,7 +42,7 @@ function card(recruit: Soldier, index: number, chosen: number | null): string {
     <b class="name">${recruit.name}</b>
     <small class="home">🌍 ${recruit.home!.name}, ${recruit.home!.country}</small>
     <span class="feats">${named.map((n, i) => `<span class="chip ${i === 0 ? 'feat' : ''}" title="${n.text}">${n.name}</span>`).join('')}</span>
-    <div class="trait">${quirk}</div>
+    <div class="weapon"><b>${recruit.gear.weapon!.name}</b><small>${weaponOf(recruit)!.text}</small></div>
   </button>`
 }
 

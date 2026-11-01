@@ -10,7 +10,6 @@ import { RELICS, type Relic } from './relics'
 import { SKILLS } from './skills'
 import { type TerrainKind } from './terrain'
 import { random, randomInt } from './rng'
-import { TRAITS, type Trait, type TraitId } from './traits'
 import { TOWNS } from './towns'
 import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
@@ -29,7 +28,7 @@ export const START_SUPPLIES = 3
 /** Supplies a supply drop gives. */
 export const DROP_SUPPLIES = 4
 
-/** Takes the recruit at `index` as the run's first soldier, with what its trait brings, and sets out from its home. */
+/** Takes the recruit at `index` as the run's first soldier, and sets out from its home. */
 export function recruit(run: Run, index: number): void {
   const soldier = run.recruits[index]
   run.recruits = []
@@ -72,9 +71,6 @@ function plotRoute(run: Run, home: City): Stage[] {
     const hero = draft(run, [])
     hero.home = to
     hero.xp = xpFor(HERO_LEVEL)
-    // A hero has a quirk of its own, as a recruit does, though never one that sets its level.
-    const quirks = (Object.keys(TRAITS) as TraitId[]).filter((id) => !(TRAITS[id] as Trait).level)
-    hero.trait = quirks[randomInt(run, quirks.length)]
     for (let offers = skillOffers(hero); offers.length > 0; offers = skillOffers(hero)) hero.skills.push(offers[randomInt(run, offers.length)])
     route.push({ continent, from: from.at, to, hero })
     from = to
@@ -405,7 +401,7 @@ export function advance(run: Run): void {
     ability: s.cls && CLASSES[s.cls].ability,
     charges: charges(run, s),
     secondary: secondaryOf(s),
-    stance: doctrines.find((d) => d.stance)?.stance ?? weaponOf(s)?.stance ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
+    stance: doctrines.find((d) => d.stance)?.stance ?? (s.cls === 'support' ? CLASSES.support.stance : weaponOf(s)?.stance) ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
     effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)].flatMap((w) => w?.effect ?? []),...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))
   const rules = doctrines.flatMap((d) => d.rule ?? [])

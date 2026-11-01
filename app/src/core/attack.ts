@@ -12,7 +12,7 @@ import { distance } from './grid'
 import { PARRY_SOAK } from './doctrines'
 import { FRAG_SPLASH, type Secondary } from './secondaries'
 import type { GameEvent } from './combat-event'
-import { aiming, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS, spotlit } from './fighters'
+import { aiming, powering, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS, spotlit } from './fighters'
 import { wound, knockback } from './wound'
 import { TUNING } from './tuning'
 import { bite, MIN_DAMAGE, odds } from './sight'
@@ -216,7 +216,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     enemy.panicked = true
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'stasis') ? 'stasis' : 'deepFreeze', amount: 0 })
   }
-  if (enemy.hp > 0 && damage > 0 && distance(unit, enemy) <= 1 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
+  if (enemy.hp > 0 && damage > 0 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
   else if (enemy.hp > 0 && damage > 0 && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
   if (enemy.hp > 0 && damage > 0 && when(true, 'tether', 1)) knockback(battle, unit, enemy, events, -1)
   if (enemy.hp > 0 && when(true, 'snare', 1)) {
@@ -322,7 +322,7 @@ export function ignite(battle: Battle, target: Unit): GameEvent[] {
 }
 
 /**
- * A blast on the shootable enemy with the most enemies around it, if at least two are caught and no ally is.
+ * A blast on the enemy in a power's reach with the most enemies around it, if at least two are caught and no ally is.
  * It wrecks the props and walls it catches. A rocket replaces the shot; a grenade does not.
  */
 export function blast(battle: Battle, unit: Unit, seen: Set<number>, damage: number, radius = BLAST_RADIUS): GameEvent[] {
@@ -330,7 +330,7 @@ export function blast(battle: Battle, unit: Unit, seen: Set<number>, damage: num
   let best: Unit[] = []
   let centre: Unit | undefined
   for (const enemy of battle.units) {
-    if (enemy.side === unit.side || !shootable(battle, unit, unit, enemy, seen)) continue
+    if (enemy.side === unit.side || !shootable(battle, powering(unit), unit, enemy, seen)) continue
     const caught = inBlast(enemy)
     if (caught.every((u) => u.side !== unit.side) && caught.length > Math.max(1, best.length)) {
       best = caught

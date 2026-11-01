@@ -57,9 +57,22 @@ export function spotted(battle: Battle): Set<number> {
 /** Whether `unit` is a VIP not yet freed: a hostage, kept alive. */
 export const hostage = (battle: Battle, unit: Unit) => unit.civilian === 'vip' && battle.vip !== 'freed'
 
-/** Whether `unit`, standing on `from`, may shoot `target`. Squadsight reaches any spotted alien in a clear line; an elusive target is safe from far off, and a cloaked one from all. */
-/** The unit as it aims a secondary: only that reach counts, no squadsight. */
-export const aiming = (unit: Unit, secondary?: Secondary): Unit => (secondary ? { ...unit, ability: null, stats: { ...unit.stats, range: secondary.range } } : unit)
+/** Whether `unit`, standing on `from`, may shoot `target`. An elusive target is safe from far off, and a cloaked one from all. */
+/** A secondary's reach under Squadsight: any spotted alien in a clear line. */
+const SPOTTED_REACH = Infinity
+
+/** Tiles Longshot adds to a secondary's reach. */
+const LONGSHOT_REACH = 2
+
+/** The unit as it aims a secondary: that reach counts, not its weapon's. */
+export const aiming = (unit: Unit, secondary?: Secondary): Unit =>
+  secondary ? { ...unit, stats: { ...unit.stats, range: unit.ability === 'squadsight' ? SPOTTED_REACH : secondary.range + (has(unit, 'longshot') ? LONGSHOT_REACH : 0) } } : unit
+
+/** Tiles a hero's powers reach, whatever its weapon. */
+const POWER_REACH = 5
+
+/** The unit as it aims a power, a rocket or a flashbang: the power's reach counts, not its weapon's. */
+export const powering = (unit: Unit): Unit => ({ ...unit, stats: { ...unit.stats, range: POWER_REACH } })
 
 export function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: Set<number>): boolean {
   if (hostage(battle, target)) return false
@@ -67,8 +80,8 @@ export function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, 
   if (has(target, 'elusive') && distance(from, target) > ELUSIVE_REACH) return false
   // A psionic attack needs no line of sight, only an alien revealed.
   if (has(unit, 'psionic') && target.revealed && distance(from, target) <= unit.stats.range) return true
-  if (canShoot(battle, from, target, unit.stats.range)) return true
-  return unit.ability === 'squadsight' && seen.has(target.id) && lineOfSight(battle, from, target)
+  if (unit.stats.range === SPOTTED_REACH) return seen.has(target.id) && lineOfSight(battle, from, target)
+  return canShoot(battle, from, target, unit.stats.range)
 }
 
 /** The aliens a soldier's powers may act on: revealed and in the fight. */

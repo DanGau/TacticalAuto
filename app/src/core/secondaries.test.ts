@@ -1,3 +1,4 @@
+import { powering } from './fighters'
 import { expect, test } from 'vitest'
 import { begun, enterAt } from './roads'
 import { apply } from './apply'
@@ -71,6 +72,7 @@ test('a secondary does its own damage, and reaches only as far as it does', () =
   expect(frag.damage).toBe(weapon.damage + SECONDARIES.frag.damage)
   expect(frag.secondary).toBe('frag')
   const far = duel(SECONDARIES.flameBurst.range + 1)
+  far.hero.ability = null
   far.hero.stats.range = 20
   expect(shoot(far.b, far.hero, spotted(far.b), undefined, undefined, SECONDARIES.flameBurst)).toEqual([])
   expect(shots(shoot(far.b, far.hero, spotted(far.b)))).toHaveLength(1)
@@ -114,4 +116,23 @@ test("a combo's blows are closer together than two heroes' attacks", () => {
   const lone: GameEvent = { type: 'shot', id: 1, target: 2, crit: false, damage: 3, with: [] }
   expect(staggerOf([opens])).toBeLessThan(staggerOf([lone]))
   expect(tick({ next: 0, done: 0 }, PACE.attack, true, staggerOf([opens])).next).toBe(PACE.combo)
+})
+
+test('Squadsight carries the secondary to any spotted alien, never the weapon', () => {
+  const { b, hero } = duel(20)
+  Object.assign(hero, { ability: 'squadsight', stats: { ...hero.stats, range: 1 } })
+  expect(shoot(b, hero, spotted(b))).toEqual([])
+  const seen = new Set(b.units.filter((u) => u.side === 'alien').map((u) => u.id))
+  expect(shots(shoot(b, hero, seen, undefined, undefined, SECONDARIES.pistol))).toHaveLength(1)
+})
+
+test('Longshot adds to a secondary, and a power reaches the same with any weapon', () => {
+  const { b, hero } = duel(SECONDARIES.flameBurst.range + 1)
+  hero.ability = null
+  const seen = spotted(b)
+  expect(shoot(b, hero, seen, undefined, undefined, SECONDARIES.flameBurst)).toEqual([])
+  hero.effects = ['longshot']
+  expect(shots(shoot(b, hero, seen, undefined, undefined, SECONDARIES.flameBurst))).toHaveLength(1)
+  hero.stats.range = 1
+  expect(powering(hero).stats.range).toBeGreaterThan(1)
 })

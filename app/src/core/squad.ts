@@ -4,16 +4,14 @@ import type { Lasting } from './base'
 import { type Battle, type Stats, BASE_STATS } from './battle'
 import { CLASSES, type ClassId } from './classes'
 import { type Doctrine, DOCTRINES } from './doctrines'
-import { EFFECTS, type Gear, SLOTS, starterRifle } from './gear'
-import { offerable, type Relic, RELICS } from './relics'
+import { EFFECTS, type Gear, SLOTS, generateGear } from './gear'
+import { type Relic, RELICS } from './relics'
 import { random, randomInt } from './rng'
 import { type Run } from './run-state'
 import { type Earned } from './run-state'
 import { type Soldier } from './run-state'
 import { TREES, SKILLS, type Role, type SkillId, roots } from './skills'
 import { MELEE_RANGE, WEAPONS } from './weapons'
-import { TRAITS, type Trait, type TraitId } from './traits'
-import { THREAT_MAX } from './progress'
 import { CONTINENT_IDS, type City, CONTINENTS } from './world'
 import type { Keyword } from './keywords'
 import { type FeatId, type Tally, FEATS } from './feats'
@@ -99,10 +97,11 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
     const fromClass = soldier.cls ? (CLASSES[soldier.cls].stats[key] ?? 0) : 0
     const fromGear = equipped(soldier).reduce((sum, gear) => sum + (gear.stats[key] ?? 0), 0) + (weapon?.stats[key] ?? 0)
     const fromSkills = soldier.skills.reduce((sum, id) => sum + (SKILLS[id].stats?.[key] ?? 0), 0)
-    const fromTrait = soldier.trait ? ((TRAITS[soldier.trait] as Trait).stats?.[key] ?? 0) : 0
-    stats[key] += fromClass + fromGear + fromSkills + fromTrait + level(soldier) * (LEVEL_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
+    stats[key] += fromClass + fromGear + fromSkills + level(soldier) * (LEVEL_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
   }
   if (weapon?.melee) stats.range = MELEE_RANGE
+  // Class, weapon and mod can sum below walking, and a hero that cannot walk stalls a battle.
+  stats.move = Math.max(MIN_MOVE, stats.move)
   for (const id of run.doctrines) Object.assign(stats, (DOCTRINES[id] as Doctrine).set)
   return stats
 }
@@ -112,6 +111,9 @@ export const secondaryOf = (soldier: Soldier): SecondaryId => (soldier.cls ? CLA
 
 /** The weapon a soldier wields, if any. */
 export const weaponOf = (soldier: Soldier) => (soldier.gear.weapon?.weapon ? WEAPONS[soldier.gear.weapon.weapon] : null)
+
+/** The least move a soldier has. */
+const MIN_MOVE = 2
 
 /** What each level adds to a soldier's stats. */
 export const LEVEL_STATS: Partial<Stats> = { hp: 2, crit: 0.03 }
@@ -124,17 +126,10 @@ export function hire(run: Run): Soldier {
   return join(run, draft(run, []))
 }
 
-/** Adds `soldier` to the squad, with what its trait brings, and returns it. */
+/** Adds `soldier` to the squad and returns it. */
 export function join(run: Run, soldier: Soldier): Soldier {
   soldier.id = run.nextSoldier++
   run.soldiers.push(soldier)
-  const trait: Trait | null = soldier.trait ? TRAITS[soldier.trait] : null
-  run.supplies += trait?.supplies ?? 0
-  run.threat = Math.min(run.threat + (trait?.threat ?? 0), THREAT_MAX)
-  if (trait?.relic) {
-    const unheld = offerable(run.relics)
-    if (unheld.length > 0) run.relics.push(unheld[randomInt(run, unheld.length)])
-  }
   return soldier
 }
 
@@ -144,6 +139,7 @@ export function draft(run: Run, taken: ClassId[]): Soldier {
   const unique = run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).uniqueClasses) && unused.length > 0
   const all = (unique ? unused : (Object.keys(CLASSES) as ClassId[])).filter((id) => !taken.includes(id))
   const classes = all.length > 0 ? all : (Object.keys(CLASSES) as ClassId[])
+  const weapon = generateGear(run, run.nextGear++, 'common', 'weapon')
   const free = NAMES.filter((name) => ![...run.soldiers, ...run.recruits].some((s) => s.name === name))
   const name = free[randomInt(run, free.length)]
   const cls = classes[randomInt(run, classes.length)]
@@ -156,8 +152,7 @@ export function draft(run: Run, taken: ClassId[]): Soldier {
     // Read, not drawn: the seed costs the run no draw.
     seed: run.rng,
     feats: [],
-    gear: { weapon: starterRifle(run.nextGear++), armor: null, utility: null },
-    trait: null,
+    gear: { weapon, armor: null, utility: null },
     home: null,
     wounds: 0,
   }
@@ -169,23 +164,13 @@ export const NAMES = ['Vega', 'Okafor', 'Lindqvist', 'Tanaka', 'Reyes', 'Novak',
 /** Recruits offered at a run's start. */
 export const RECRUITS = 3
 
-/**
- * Offers the run's first soldier: recruits of different classes from different continents, one plain and the rest
- * each with a different trait.
- */
+/** Offers the run's first soldier: recruits of different classes from different continents. */
 export function offerRecruits(run: Run): void {
-  const traits = Object.keys(TRAITS) as TraitId[]
   const continents = [...CONTINENT_IDS]
-  const plain = randomInt(run, RECRUITS)
   for (let i = 0; i < RECRUITS; i++) {
     const recruit = draft(run, run.recruits.map((r) => r.cls!))
     const cities: City[] = CONTINENTS[continents.splice(randomInt(run, continents.length), 1)[0]].cities
     recruit.home = cities[randomInt(run, cities.length)]
-    if (i !== plain) recruit.trait = traits.splice(randomInt(run, traits.length), 1)[0]
-    // A recruit joining above level 1 has already learned a skill for each level.
-    const joins = recruit.trait ? (TRAITS[recruit.trait] as Trait).level : undefined
-    if (joins) recruit.xp = xpFor(joins)
-    for (let offers = skillOffers(recruit); offers.length > 0; offers = skillOffers(recruit)) recruit.skills.push(offers[randomInt(run, offers.length)])
     run.recruits.push(recruit)
   }
 }

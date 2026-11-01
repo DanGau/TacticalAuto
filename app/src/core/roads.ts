@@ -5,6 +5,7 @@ import { type EntranceKind } from './entrances'
 import { createRun, legOf } from './run'
 import { type Run } from './run-state'
 import { type Stop } from './run-state'
+import { roots } from './skills'
 
 /** For tests: lays the rest of the leg as a road of `stops` one after another, the first entered, then the satellite. */
 export function road(run: Run, stops: Stop[]): void {
@@ -34,9 +35,12 @@ export function entranceOf(battle: Battle, kind: EntranceKind): number {
   return 0
 }
 
-/** For tests: a run of `seed` under way, its first soldier the plain recruit, with no trait. */
+/** For tests: a run of `seed` under way, its first soldier the first recruit, a Deadeye with a plain rifle. */
 export function begun(seed: number): Run {
   const run = createRun(seed)
-  apply(run, { type: 'recruit', index: run.recruits.findIndex((r) => r.trait === null) })
+  run.recruits[0].cls = 'sniper'
+  run.recruits[0].skills = [roots('sniper')[0]]
+  run.recruits[0].gear.weapon = { id: 0, slot: 'weapon', rarity: 'common', name: 'Assault Rifle', weapon: 'rifle', stats: {}, effect: null }
+  apply(run, { type: 'recruit', index: 0 })
   return run
 }

@@ -1,3 +1,4 @@
+import { WEAPONS } from './weapons'
 import { expect, test } from 'vitest'
 import { TUNING } from './tuning'
 import { apply } from './apply'
@@ -52,7 +53,6 @@ import { THREAT_MAX } from './progress'
 import { LEG_STOPS } from './progress'
 import { roots, SKILLS, TREES } from './skills'
 import { atKey, road, enterAt, begun } from './roads'
-import { TRAITS } from './traits'
 import { RELICS } from './relics'
 import { KIT_SLOTS, SHOP_CONSUMABLES } from './consumables'
 
@@ -167,7 +167,7 @@ test('a find goes to the soldier the player picks, replacing and selling what it
   const run = started()
   hire(run)
   const [first, second] = run.soldiers
-  expect(first.gear.weapon).toMatchObject({ weapon: 'rifle', rarity: 'common' })
+  expect(first.gear.weapon).toMatchObject({ slot: 'weapon', rarity: 'common' })
   dropGear(run, false)
   dropGear(run, false)
   const [gear] = run.finds
@@ -506,7 +506,7 @@ test('a key mission has one boss, with an escort for each key already won', () =
   }
 })
 
-const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: { weapon: null, armor: null, utility: null }, trait: null, home: null, wounds: 0, seed: 0, ...extra })
+const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: { weapon: null, armor: null, utility: null }, home: null, wounds: 0, seed: 0, ...extra })
 
 test('stats add class, level, skills and relics to the base', () => {
   const run = begun(1)
@@ -733,26 +733,34 @@ test("the first relic offered shares a keyword with the squad's skills, gear or 
   }
 })
 
-test('a run begins with a choice of recruits of different classes, one plain, the rest each with its own trait, applied on joining', () => {
+test('a run begins with a choice of recruits of different classes, each with a common weapon', () => {
   for (let seed = 1; seed <= 20; seed++) {
     const run = createRun(seed)
     expect(run.phase).toBe('recruit')
     expect(run.soldiers).toHaveLength(0)
     expect(new Set(run.recruits.map((r) => r.cls)).size).toBe(RECRUITS)
-    expect(run.recruits.filter((r) => r.trait === null)).toHaveLength(1)
-    expect(new Set(run.recruits.map((r) => r.trait)).size).toBe(RECRUITS)
-    // A veteran joins with its skills learned.
-    for (const r of run.recruits) expect(r.skills).toHaveLength(r.trait === 'veteran' ? 3 : 1)
+    for (const r of run.recruits) {
+      expect(r.skills).toHaveLength(1)
+      expect(r.gear.weapon).toMatchObject({ slot: 'weapon', rarity: 'common' })
+    }
   }
   const run = createRun(1)
-  run.recruits[0].trait = 'quartermaster'
-  run.recruits[1].trait = 'veteran'
   const chosen = run.recruits[0]
   expect(apply(run, { type: 'recruit', index: 0 })).toEqual({ ok: true })
   expect(run.soldiers).toEqual([chosen])
-  expect(run.supplies).toBe(START_SUPPLIES + TRAITS.quartermaster.supplies)
-  expect(soldierStats(run, chosen).hp).toBe(soldierStats(run, { ...chosen, trait: null }).hp + TRAITS.quartermaster.stats.hp)
+  expect(run.supplies).toBe(START_SUPPLIES)
   expect(run.recruits).toHaveLength(0)
   expect(run.phase).not.toBe('recruit')
   expect(apply(run, { type: 'recruit', index: 0 }).ok).toBe(false)
+})
+
+test('heroes start with every weapon between them, melee among them, those on the route too', () => {
+  const kinds = new Set<string>()
+  for (let seed = 1; seed <= 40; seed++) {
+    const run = createRun(seed)
+    kinds.add(run.recruits[0].gear.weapon!.weapon!)
+    apply(run, { type: 'recruit', index: 1 })
+    for (const stage of run.route) if (stage.hero) kinds.add(stage.hero.gear.weapon!.weapon!)
+  }
+  expect([...kinds].sort()).toEqual(Object.keys(WEAPONS).sort())
 })

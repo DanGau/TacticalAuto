@@ -182,8 +182,7 @@ const play =
   (run, rng) => {
     if (run.phase === 'battle' && run.battle!.phase === 'battle') return useKit(run)
     if (run.phase === 'reward') return reward(run, rng, PICKS[pick])
-    // A bold bot takes a recruit with a trait, any other the plain one.
-    if (run.phase === 'recruit') return { type: 'recruit', index: run.recruits.findIndex((r) => (events === 'bold') === (r.trait !== null)) }
+    if (run.phase === 'recruit') return { type: 'recruit', index: 0 }
     // Danger Close on the hard fights, a key, the final mission or an Overrun battle, while the threat leaves room for it.
     const hard = run.mission && (run.mission.kind === 'key' || run.mission.kind === 'final' || run.mission.risk === 'dangerous')
     const strike = run.battle?.entrances.findIndex((e) => e.kind === 'strike') ?? -1

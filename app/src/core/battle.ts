@@ -156,6 +156,7 @@ export type SkillEffect =
   | 'backstab'
   | 'rage'
   | 'dodge'
+  | 'longshot'
   | 'shred'
   | 'suppress'
   | 'bulwark'

@@ -12,10 +12,9 @@ import { squadKeywords } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { health } from '../core/squad'
 import { skillOffers } from '../core/squad'
-import { level } from '../core/squad'
+import { level, weaponOf } from '../core/squad'
 import { xpFor } from '../core/squad'
 import { SKILLS } from '../core/skills'
-import { TRAITS } from '../core/traits'
 import { gearPicks, pickCard, pickDetail, sellPick } from './cards'
 import { badge, button, describe, ROLES, gearCard, gearText, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
@@ -49,14 +48,13 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
 /** A hero joining the squad, alone on its screen: who they are, where from, and what they bring. */
 export function joined(run: Run, name: string): string {
   const hero = run.soldiers.find((s) => s.name === name)!
-  const trait = hero.trait ? TRAITS[hero.trait] : null
   const named = hero.skills.map((id) => `<span class="chip" title="${SKILLS[id].text}">${SKILLS[id].name}</span>`)
   return `<div class="debrief joined">
     <span class="portrait">${badge(hero.cls)}</span>
     <h1 class="down">${hero.name} joins</h1>
     <p>${CLASSES[hero.cls!].name} · level ${level(hero)} · 🌍 ${hero.home?.name ?? ''}</p>
     <p class="feats">${named.join('')}</p>
-    ${trait ? `<p><b>${trait.name}</b> <span class="down">${trait.pro}</span> <span class="up">${trait.con}</span></p>` : ''}
+    <p><b>${hero.gear.weapon!.name}.</b> ${weaponOf(hero)!.text}</p>
     <button class="decide" data-met="report">Continue</button>
   </div>`
 }

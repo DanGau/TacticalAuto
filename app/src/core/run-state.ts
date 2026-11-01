@@ -9,7 +9,6 @@ import type { ClassId } from './classes'
 import type { FeatId, Tally } from './feats'
 import type { Slot, Gear } from './gear'
 import type { SkillId } from './skills'
-import type { TraitId } from './traits'
 import type { ConsumableId } from './consumables'
 import type { RelicId } from './relics'
 import type { Battle } from './battle'
@@ -98,8 +97,6 @@ export interface Soldier {
   /** Feats it has pulled off, each paying experience only the first time. */
   feats: FeatId[]
   gear: Record<Slot, Gear | null>
-  /** The quirk it was recruited with, if any. */
-  trait: TraitId | null
   /** Where it comes from: a recruit's home, a hero's city; none for one who joined on the road. */
   home: City | null
   /** Health lost and not yet healed; it carries from battle to battle. */
