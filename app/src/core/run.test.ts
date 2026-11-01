@@ -432,7 +432,7 @@ test('experience follows what a soldier did: kills and damage its own, feats onl
   expect(soldier.feats).toEqual(['hatTrick'])
 })
 
-test('an ambush has no entrance: the squad is down at once, every posted alien in the fight, more coming, the Hunter half again as strong as its best soldier', () => {
+test('an ambush has no landing: the squad is down at once, every posted alien in the fight, more coming, the Hunter half again as strong as its best soldier', () => {
   const run = travelling(['battle', 'battle'])
   run.threat = THREAT_MAX
   apply(run, { type: 'advance' })

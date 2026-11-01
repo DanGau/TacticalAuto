@@ -1,4 +1,4 @@
-// Designs a battle's encounter as one set-piece, as a DM prepares one: the ground, the overlook, the hazard, the objects, where each alien posts, the ways in and where reinforcements arrive.
+// Designs a battle's encounter as one set-piece, as a DM prepares one: the ground, the overlook, the hazard, the objects, where each alien posts, the way in and where reinforcements arrive.
 import { GRID, type Alien, type Arena, type Battle, type Tile } from './battle'
 import type { Goal } from './goals'
 import { blocked, distance, edgeDepths, NEIGHBORS, onGrid, openNear, walkingDistances, walks } from './grid'
@@ -32,14 +32,6 @@ const GATES: Mark[] = [[13, 0], [8, -12], [8, 12], [-2, -13], [-2, 13]]
 const HEART: Mark = [2, 0]
 const COMMANDER_POST: Mark = [11, 0]
 const BOSS_POST: Mark = [9, 0]
-
-/** A shed a place with nothing left standing gets for entrances to use, its size, and where it stands. */
-const SHED = { w: 6, h: 5 }
-const SHED_MARKS: Mark[] = [[-13, -8], [-13, 8], [-10, -13], [-10, 13]]
-/** How near the arena's centre a building may stand and be kept, how far out one is worth keeping, and how many are. */
-const KEEP_FROM = 8
-const KEEP_TO = 20
-const KEPT = 2
 
 /** A Slog's band of mire, in tiles along the axis; a Firing line's ridge, how far along it runs and how far to each side. */
 const MIRE = [-6, 6]
@@ -94,50 +86,6 @@ function clearArena(battle: Battle, arena: Arena, kept: Set<number>): void {
   }
 }
 
-/** Buildings by the arena's edge, whole, for entrances to use: at most KEPT, nearest first, none reaching the arena's heart. */
-function edgeBuildings(battle: Battle, spot: Tile): Set<number> {
-  const seen = new Set<number>()
-  const found: { tiles: Set<number>; near: number }[] = []
-  battle.ground.forEach((g, t) => {
-    if (g !== 'floor' || seen.has(t)) return
-    const building = buildingAt(battle, { x: t % GRID, y: Math.floor(t / GRID) })
-    for (const b of building) seen.add(b)
-    const near = Math.min(...[...building].map((b) => distance({ x: b % GRID, y: Math.floor(b / GRID) }, spot)))
-    if (near >= KEEP_FROM && near <= KEEP_TO) found.push({ tiles: building, near })
-  })
-  found.sort((a, b) => a.near - b.near)
-  return new Set(found.slice(0, KEPT).flatMap((b) => [...b.tiles]))
-}
-
-/** Raises a shed whose corner is `at`, door toward `spot`, if the ground takes it. */
-function raiseShed(battle: Battle, at: Tile, spot: Tile): boolean {
-  const { w, h } = SHED
-  const x0 = at.x - (w >> 1)
-  const y0 = at.y - (h >> 1)
-  if (x0 < 1 || y0 < 1 || x0 + w >= GRID - 1 || y0 + h >= GRID - 1) return false
-  for (let y = y0 - 1; y <= y0 + h; y++) for (let x = x0 - 1; x <= x0 + w; x++) if (['void', 'water', 'floor'].includes(battle.ground[y * GRID + x])) return false
-  for (let y = y0; y < y0 + h; y++) {
-    for (let x = x0; x < x0 + w; x++) {
-      const t = y * GRID + x
-      battle.ground[t] = 'floor'
-      battle.props[t] = 'none'
-      battle.bulk[t] = 0
-      battle.height[t] = 0
-    }
-    battle.west[y * GRID + x0] = 'wall'
-    battle.west[y * GRID + x0 + w] = 'wall'
-  }
-  for (let x = x0; x < x0 + w; x++) {
-    battle.north[y0 * GRID + x] = 'wall'
-    battle.north[(y0 + h) * GRID + x] = 'wall'
-  }
-  // The door opens on the long side nearer the fight.
-  const middle = x0 + (w >> 1)
-  if (spot.y >= y0 + h / 2) battle.north[(y0 + h) * GRID + middle] = 'none'
-  else battle.north[y0 * GRID + middle] = 'none'
-  return true
-}
-
 /** Raises a mound about `at`, a level at `reach` and two at its crest, clear of what stands on it. */
 function rise(battle: Battle, at: Tile, reach: number, crest: number): void {
   for (let y = at.y - reach; y <= at.y + reach; y++) {
@@ -175,8 +123,7 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal, cha
   const spot = arenaSpot(battle, goal === 'vip')
   const arena = { x: spot.x, y: spot.y, reach: ARENA_REACH }
   battle.arena = arena
-  const standing = edgeBuildings(battle, spot)
-  if (goal === 'vip') for (const t of buildingAt(battle, spot)) standing.add(t)
+  const standing = goal === 'vip' ? buildingAt(battle, spot) : new Set<number>()
   clearArena(battle, arena, standing)
   // The axis the fight flows along: of eight headings, the first whose both ends lie on the map, from a random start.
   const start = randomInt(battle, 8)
@@ -188,8 +135,6 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal, cha
     const clamp = (v: number) => Math.max(0, Math.min(GRID - 1, Math.round(v)))
     return { x: clamp(spot.x + fx * along - fy * across), y: clamp(spot.y + fy * along + fx * across) }
   }
-  // Nothing left for a hero to burst out of: a shed by the edge, but in the hive, which holds nothing human.
-  if (battle.place !== 'hive' && standing.size === 0 && battle.place !== 'compound') SHED_MARKS.some((mark) => raiseShed(battle, raw(mark), spot))
   rise(battle, raw(OVERLOOK), 3, 1)
   if (challenge === 'firingLine') for (let across = -RIDGE_REACH; across <= RIDGE_REACH; across += 2) rise(battle, raw([RIDGE_ALONG, across]), 2, 1)
   if (challenge === 'slog') layMire(battle, spot, fx, fy)

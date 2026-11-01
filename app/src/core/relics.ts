@@ -1,6 +1,6 @@
 // Relics: what each does, and which may be offered.
 import { type RelicEffect, type Stats } from './battle'
-import { CHARGE_BLAST, CHARGE_REACH, LIMELIGHT_ROUNDS } from './entrances'
+import { CHARGE_BLAST, CHARGE_REACH, ENCORE_REACH } from './landing'
 import { BEACON_REACH } from './fighters'
 import { BOUNTY_DAMAGE } from './fighters'
 import { RELAY_REACH } from './fighters'
@@ -66,12 +66,11 @@ const relics = {
   net: { name: "Hunter's Net", text: 'Hits on a rooted alien do +2 damage', effect: 'net' },
   glacial: { name: 'Glacial Snare', text: 'Chilling an alien roots it too', tags: ['frost'], effect: 'glacial' },
   juggernaut: { name: 'Juggernaut Servos', text: '+1 damage while the hero has armor left', tags: ['ward'], effect: 'armored' },
-  // Entrances: each makes how the squad comes in matter more.
-  encore: { name: 'Encore', text: 'Every entrance catches the aliens nearest surprised, holding their fire on their first turn', effect: 'encore' },
-  limelight: { name: 'Limelight', text: `Every battle offers Land and Monologue, and its taunt holds ${LIMELIGHT_ROUNDS} rounds longer`, effect: 'limelight' },
-  charges: { name: 'Breaching Charges', text: `Every entrance blasts each alien within ${CHARGE_REACH} tiles for ${TUNING.impactDamage + CHARGE_BLAST}`, effect: 'entryBlast' },
-  shredder: { name: 'Shredder Charges', text: `Every entrance strips the armor from each alien within ${CHARGE_REACH} tiles and hurts it`, tags: ['ward'], effect: 'entryShred' },
-  cryo: { name: 'Cryo Charges', text: `Every entrance chills each alien within ${CHARGE_REACH} tiles and hurts it`, tags: ['frost'], effect: 'entryFrost' },
+  // Each makes where the squad lands matter more.
+  encore: { name: 'Encore', text: `Every landing catches the aliens within ${ENCORE_REACH} tiles of the nearest surprised, holding their fire on their first turn`, effect: 'encore' },
+  charges: { name: 'Breaching Charges', text: `Every landing blasts each alien within ${CHARGE_REACH} tiles for ${TUNING.impactDamage + CHARGE_BLAST}`, effect: 'entryBlast' },
+  shredder: { name: 'Shredder Charges', text: `Every landing strips the armor from each alien within ${CHARGE_REACH} tiles and hurts it`, tags: ['ward'], effect: 'entryShred' },
+  cryo: { name: 'Cryo Charges', text: `Every landing chills each alien within ${CHARGE_REACH} tiles and hurts it`, tags: ['frost'], effect: 'entryFrost' },
   bulwark: { name: 'Pop-up Barricades', text: 'A barricade springs up beside each hero as it comes in, toward the nearest alien', effect: 'entryWall' },
   turrets: { name: 'Turret Drop', text: 'A turret comes in with the squad: it never moves, and shoots far and true', effect: 'entryTurret' },
   // The goals.

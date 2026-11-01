@@ -1,10 +1,9 @@
-// Marks on the ground and over it: entrances, goals and their fences, acid and fire, fog, and glows of unfound aliens.
+// Marks on the ground and over it: landing, goals and their fences, acid and fire, fog, and glows of unfound aliens.
 import { type Group, type Mesh, type MeshBasicMaterial, type Object3D, Sprite as Billboard, type SpriteMaterial } from 'three'
 import { ENTRY_RADIUS, GRID, type Battle, type Tile } from '../core/battle'
 import { UPLINK_REACH } from '../core/fighters'
 import { EXTRACT_REACH } from '../core/goals'
 import { nearestAlien } from '../core/grid'
-import { ENTRANCE_KINDS } from '../core/entrances'
 import { fuelTanks } from '../core/objects'
 import { visibleTiles } from '../core/sight'
 import { DECAL_LIFT, spot } from './camera'
@@ -44,7 +43,7 @@ const ring = (shapes: Shapes, x: number, y: number, color: number, width: number
   for (let i = 0; i < 4; i++) shapes.band(c[i], c[(i + 1) % 4], w, color, alpha)
 }
 
-/** Before the entrance: tints and names it, and names those the mission turns on. */
+/** Before the landing: tints and names it, and names those the mission turns on. */
 export function drawMarks(s: Stage, battle: Battle): void {
   const tint = new Shapes()
   const marks: Label[] = (s.marks = [])
@@ -62,8 +61,8 @@ export function drawMarks(s: Stage, battle: Battle): void {
     if (u.surprised && s.sprites.has(u.id) && (!s.seen || s.seen[u.y * GRID + u.x])) marks.push(label('❗ SURPRISED', u, COLOR.crit, 16))
   }
   if (battle.phase === 'deploy') {
-    if (!s.briefing && battle.entrance) {
-      const { kind, at: zone, feature } = battle.entrance
+    if (!s.briefing && battle.entry) {
+      const zone = battle.entry
       {
         for (let y = zone.y - ENTRY_RADIUS; y <= zone.y + ENTRY_RADIUS; y++) {
           for (let x = zone.x - ENTRY_RADIUS; x <= zone.x + ENTRY_RADIUS; x++) {
@@ -78,26 +77,16 @@ export function drawMarks(s: Stage, battle: Battle): void {
           const lift = Math.max(a.y, b.y) + DECAL_LIFT * 3
           tint.band({ ...a, y: lift }, { ...b, y: lift }, 4 / ACROSS, battle.uplink ? COLOR.uplink : COLOR.contact, 0.9)
         }
-        // What it comes from, tied to where it lands.
-        if (feature) {
-          const way = feature.path ?? [feature.from, zone]
-          way.slice(1).forEach((t, k) => {
-            const [a, b] = [spot(way[k].x, way[k].y), spot(t.x, t.y)]
-            const lift = Math.max(a.y, b.y) + DECAL_LIFT * 3
-            tint.band({ ...a, y: lift }, { ...b, y: lift }, 6 / ACROSS, COLOR.zoneHover, 0.9)
-          })
-          diamond(tint, feature.from.x, feature.from.y, COLOR.zoneHover, 0.9)
-        }
-        marks.push(label(`${ENTRANCE_KINDS[kind].icon} ${ENTRANCE_KINDS[kind].name}${feature?.name ? ` ${feature.name}` : ''}`, zone, 0xffffff, 26))
+        marks.push(label('⬇ WAY IN', zone, 0xffffff, 26))
       }
     }
     // Those the mission turns on are named; every other alien speaks for itself.
     for (const u of battle.units.filter((a) => a.side === 'alien' && (a.target || a.boss))) marks.push(label(u.target ? '🎯 COMMANDER' : battle.goal === 'ambush' ? 'THE HUNTER' : battle.place === 'hive' ? 'THE SOURCE' : 'GUARDIAN', u, COLOR.contact, 20))
   }
   lay(s.zones, tint)
-  // A fence rings each zone in play: the entrance, the uplink to hold, the way out.
+  // A fence rings each zone in play: the landing, the uplink to hold, the way out.
   const rings: [Tile, number, number][] = []
-  if (battle.phase === 'deploy' && !s.briefing && battle.entrance) rings.push([battle.entrance.at, ENTRY_RADIUS, COLOR.zoneHover])
+  if (battle.phase === 'deploy' && !s.briefing && battle.entry) rings.push([battle.entry, ENTRY_RADIUS, COLOR.zoneHover])
   if (battle.uplink) rings.push([battle.uplink, UPLINK_REACH, COLOR.uplink])
   if (battle.extract) rings.push([battle.extract, EXTRACT_REACH, COLOR.extract])
   const next = new Map<string, ReturnType<typeof fence>>()
@@ -125,7 +114,7 @@ function dim(node: Object3D, tint: number): void {
   })
 }
 
-/** Darkens every tile no soldier sees, and whatever stands on it. Before the entrance nothing is fogged. */
+/** Darkens every tile no soldier sees, and whatever stands on it. Before the landing nothing is fogged. */
 export function drawFog(s: Stage, battle: Battle, snap = false): void {
   const shapes = new Shapes()
   const seen = (s.seen = battle.phase === 'deploy' ? null : visibleTiles(battle))

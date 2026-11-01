@@ -1,5 +1,5 @@
 // The player's actions, checked and applied to the run: the only way a player changes state.
-import { enter } from './entrances'
+import { land } from './landing'
 import { fuelTanks } from './objects'
 import { UTILITY_PRICE } from './utilities'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
@@ -37,7 +37,7 @@ export type Action =
   | { type: 'go'; index: number }
   /** Overworld: travel to the next stop. */
   | { type: 'advance' }
-  /** Deploy phase: make the battle's entrance with the utility held at `utility`, rigging the tank at `tank` of fuelTanks if it is one, and begin. */
+  /** Deploy phase: land with the utility held at `utility`, rigging the tank at `tank` of fuelTanks if it is one, and begin. */
   | { type: 'enter'; utility?: number; tank?: number }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
@@ -69,7 +69,7 @@ export function apply(run: Run, action: Action): Result {
     const utility = action.utility === undefined ? null : run.utilities[action.utility]
     if (utility === undefined) return no('no such utility')
     if (utility === 'tank' && !fuelTanks(battle)[action.tank ?? 0]) return no('no such tank')
-    enter(battle, utility, action.tank)
+    land(battle, utility, action.tank)
     return ok
   }
   if (action.type === 'keep') {

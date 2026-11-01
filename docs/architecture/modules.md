@@ -12,8 +12,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `encounter.ts` | `designEncounter`: the set-piece: arena, overlook, hazard, mire and ridge, objects, posts, approaches, gates |
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
 | `objects.ts` | What heroes do with objects: hurling them, setting off tanks, a rigged tank |
-| `entrances.ts` | Entrances: the one each encounter stages, where it comes in, what it and the picked utility set off |
-| `features.ts` | The real doors, walls, roofs, high points and roads an entrance comes from, and which suit each place |
+| `landing.ts` | The one entry point, the plain landing there, what relics and the picked utility set off |
 | `spawn.ts` | Making units: aliens, soldiers, civilians, mechs, drops |
 | `step.ts` | Advances the run's battle a beat; settles it when it ends |
 | `combat.ts` | `stepBattle`: whose turn, the next unit's action |
@@ -53,14 +52,13 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 | File | Owns |
 |---|---|
-| `view.ts` | `createView`, the `View` the UI drives: show, entrances, framing, panning |
+| `view.ts` | `createView`, the `View` the UI drives: show, framing, panning |
 | `stage.ts` | `Stage`: scene layers, camera and glides, frame loop, what is on screen |
 | `camera.ts` | World and picture points, cameras that frame tiles |
 | `play.ts` | Plays a beat's events in order |
 | `effects.ts` | Shots, lunges, rockets, sparks, shake, callouts |
-| `entrance.ts` | The entrance playing: door, wall, monologue, skylight, rope, smoke, truck, tap, look, blast, shot, stolen kill |
 | `sprites.ts` | Unit pictures and moving them |
-| `marks.ts` | Ground marks: entrances, goals, fences, acid, fog, glows |
+| `marks.ts` | Ground marks: the way in, goals, fences, acid, fog, glows |
 | `board.ts` | Building the battlefield's ground, props, walls, roofs |
 | `props.ts` | Boxes props and walls are drawn from; trees |
 | `palette.ts` | Colours |
@@ -68,6 +66,6 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 ## Elsewhere
 
-- `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `cards.ts` fixed-size cards tapped to arm and again to confirm, and gear comparisons; `briefing.ts` the tour before the entrance; `menu.ts` the title.
+- `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `cards.ts` fixed-size cards tapped to arm and again to confirm, and gear comparisons; `briefing.ts` the tour before the landing; `menu.ts` the title.
 - `bots/bots.ts`: bot strategies. `sim/`: the sim CLI, and `sim/encounter.ts`, the challenge lab.
 - `main.ts`: browser entry and `window.debug`.

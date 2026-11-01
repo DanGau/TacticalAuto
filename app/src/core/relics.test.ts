@@ -1,7 +1,7 @@
 import { freeTilesNear } from './grid'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { CHARGE_REACH } from './entrances'
+import { CHARGE_REACH } from './landing'
 import { distance } from './grid'
 import { current } from './run'
 import { type Run } from './run-state'
@@ -15,18 +15,18 @@ function landed(relics: RelicId[]): Run {
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })
-  const { entrance, units } = run.battle!
+  const { entry, units } = run.battle!
   // Some alien stands within the charges' reach.
-  const [tile] = freeTilesNear(run.battle!, entrance!.at, 20).slice(-1)
+  const [tile] = freeTilesNear(run.battle!, entry!, 20).slice(-1)
   Object.assign(units.find((u) => u.side === 'alien')!, tile)
   enterAt(run)
   return run
 }
 
-test('entrance relics strip, chill and wall in where the squad comes in, and bring a turret', () => {
+test('landing relics strip, chill and wall in where the squad comes in, and bring a turret', () => {
   const plain = landed([]).battle!
   const battle = landed(['shredder', 'cryo', 'bulwark', 'turrets']).battle!
-  const near = battle.units.filter((u) => u.side === 'alien' && distance(u, battle.entrance!.at) <= CHARGE_REACH)
+  const near = battle.units.filter((u) => u.side === 'alien' && distance(u, battle.entry!) <= CHARGE_REACH)
   expect(near.length).toBeGreaterThan(0)
   for (const alien of near) expect(alien).toMatchObject({ armor: 0, chilled: 2 })
   expect(battle.props.filter((p) => p === 'stack').length).toBeGreaterThan(plain.props.filter((p) => p === 'stack').length)

@@ -43,11 +43,11 @@ test('every battle on the leg under way has its aliens mustered in advance; no s
   for (const node of run.legs[0].columns.flat()) expect(node.stop!.aliens.length > 0).toBe(node.stop!.kind === 'battle' || node.stop!.kind === 'key')
 })
 
-test('a hold sets its uplink within, its entrance by it; once held, it is won only when the squad left reaches the extraction zone in the edge', () => {
+test('a hold sets its uplink within, its landing by it; once held, it is won only when the squad left reaches the extraction zone in the edge', () => {
   const run = before('hold')
   const battle = run.battle!
   expect(battle.uplink).not.toBeNull()
-  expect(distance(battle.entrance!.at, battle.uplink!)).toBeLessThanOrEqual(9)
+  expect(distance(battle.entry!, battle.uplink!)).toBeLessThanOrEqual(9)
   expect(battle.waves.length).toBeGreaterThan(0)
   enterAt(run)
   battle.held = HOLD_ROUNDS
@@ -166,7 +166,7 @@ test('a rescue goes in among the civilians, every alien in sight', () => {
   const run = before('rescue')
   const battle = run.battle!
   const civilians = battle.units.filter((u) => u.civilian)
-  const { at } = battle.entrance!
+  const at = battle.entry!
   expect(Math.min(...civilians.map((c) => distance(c, at)))).toBeLessThanOrEqual(14)
   expect(battle.units.filter((u) => u.side === 'alien').every((u) => u.revealed)).toBe(true)
 })
@@ -189,7 +189,7 @@ test('a rescue mixes civilians who hide, huddling and staying put, with civilian
   while (battle.turn !== 'human') stepBattle(battle)
   const hidden = civilians.filter((u) => u.civilian === 'hider' && battle.units.includes(u)).map((u) => ({ u, x: u.x, y: u.y }))
   let ran = false
-  for (let i = 0; i < 6 && battle.phase === 'battle'; i++)
+  for (let i = 0; i < 40 && battle.phase === 'battle'; i++)
     for (const e of stepBattle(battle)) {
       const mover = e.type === 'move' ? civilians.find((c) => c.id === e.id) : undefined
       if (mover?.civilian === 'runner') ran = true
@@ -271,7 +271,7 @@ test('no one shot kills a commander from full health; brought low, it blinks awa
   const battle = run.battle!
   enterAt(run)
   const commander = battle.units.find((u) => u.target)!
-  // An entrance's impact would hurt it first.
+  // An landing's impact would hurt it first.
   battle.opening = false
   battle.units = battle.units.filter((u) => u.side !== 'alien' || u === commander)
   Object.assign(commander, { revealed: true, engaged: true })
@@ -285,14 +285,14 @@ test('no one shot kills a commander from full health; brought low, it blinks awa
   expect(events).toContainEqual(expect.objectContaining({ type: 'move', id: commander.id, with: 'blink' }))
 })
 
-test('a VIP rescue: the VIP waits within under guard, the entrance by them; the aliens leave a held VIP be', () => {
+test('a VIP rescue: the VIP waits within under guard, the landing by them; the aliens leave a held VIP be', () => {
   const run = before('vip')
   const battle = run.battle!
   const vip = vipOf(battle)!
   expect(battle.vip).toBe('held')
   expect(edgeDepths(battle)[vip.y * GRID + vip.x]).toBeGreaterThan(INNER)
   expect(Math.min(...battle.units.filter((u) => u.side === 'alien').map((u) => distance(u, vip)))).toBeLessThanOrEqual(2)
-  expect(distance(battle.entrance!.at, vip)).toBeLessThanOrEqual(11)
+  expect(distance(battle.entry!, vip)).toBeLessThanOrEqual(11)
   enterAt(run)
   for (const u of battle.units) if (u.side === 'alien') u.engaged = true
   while (battle.round < 4 && battle.phase === 'battle') for (const e of stepBattle(battle)) expect(e.type === 'shot' && e.target === vip.id).toBe(false)

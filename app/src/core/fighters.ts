@@ -176,9 +176,6 @@ export function centreOf(units: Unit[]): Tile {
   return { x: mean((u) => u.x), y: mean((u) => u.y) }
 }
 
-/** Whether the unit holds the aliens' attention with its monologue. */
-export const spotlit = (battle: Battle, unit: Unit) => battle.spotlight?.id === unit.id && battle.round <= battle.spotlight.until
-
 /** Alien turns fire lies on a tile. */
 export const FIRE_TURNS = 2
 

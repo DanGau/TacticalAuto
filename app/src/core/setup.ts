@@ -8,7 +8,7 @@ import type { Rule } from './doctrines'
 import { flowOf, type Goal, VIP_HP, CIVILIANS, CIVILIAN_HP } from './goals'
 import { generateTerrain } from './terrain-gen'
 import type { Twist } from './twists'
-import { deploy, planEntrance } from './entrances'
+import { deploy, planEntry } from './landing'
 import { ARENA_REACH, designEncounter } from './encounter'
 import { deadlineFor, sentries, type ChallengeId } from './challenges'
 
@@ -94,8 +94,8 @@ export const TERROR_REACH = 10
 export const CACHES = 3
 
 /**
- * A battle awaiting the squad's entrance, its encounter designed as one piece: see designEncounter. A flood keeps most
- * of its aliens back as waves; a rescue's civilians are scattered about the terror's heart. An ambush has no entrance: the squad
+ * A battle awaiting the squad's landing, its encounter designed as one piece: see designEncounter. A flood keeps most
+ * of its aliens back as waves; a rescue's civilians are scattered about the terror's heart. An ambush has no landing: the squad
  * is down in the arena's middle.
  */
 export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale, challenge: ChallengeId | null = null): Battle {
@@ -137,12 +137,11 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     held: 0,
     actor: null,
     tally: {},
-    entrance: null,
+    entry: null,
     arena: { x: 0, y: 0, reach: ARENA_REACH },
     approach: { x: 0, y: 0 },
     gates: [],
     rallied: 0,
-    spotlight: null,
     uplink: null,
     extract: null,
     escaped: [],
@@ -186,6 +185,6 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     const guard = guards[i] ?? posts[i] ?? null
     return guard ? (freeTilesNear(battle, guard, 4)[3] ?? guard) : freeTilesNear(battle, spot, 40)[10 * i]
   })
-  planEntrance(battle, heart)
+  planEntry(battle, heart)
   return battle
 }

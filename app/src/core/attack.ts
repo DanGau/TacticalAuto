@@ -12,7 +12,7 @@ import { distance } from './grid'
 import { PARRY_SOAK } from './doctrines'
 import { FRAG_SPLASH, type Secondary } from './secondaries'
 import type { GameEvent } from './combat-event'
-import { aiming, powering, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS, spotlit } from './fighters'
+import { aiming, powering, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
 import { wound, knockback } from './wound'
 import { TUNING } from './tuning'
 import { bite, MIN_DAMAGE, odds } from './sight'
@@ -67,7 +67,7 @@ export const VOLATILE_DAMAGE = 2
 
 /**
  * A shot, which always lands, at the enemy the unit can shoot and hurt most, a civilian counting PREY_WORTH; the nearest, then the lowest id, wins a tie.
- * An alien that can shoot a taunting soldier, or one in the spotlight, must. With `only`, the shot is at that enemy or not at all.
+ * An alien that can shoot a taunting soldier, must. With `only`, the shot is at that enemy or not at all.
  * The effects of both units' gear and skills, and of relics, apply. `granted` names the effect that gave a shot
  * beyond the unit's own; such a shot grants no further one. A `secondary` attacks in place of the weapon: its reach, damage and effect.
  * A `blow` is one shot of a weapon's attack, scaled by its kit; what happens once an attack happens on its first.
@@ -76,7 +76,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const aim = blow?.kit.range ? { ...unit, stats: { ...unit.stats, range: blow.kit.range } } : aiming(unit, secondary)
   const first = !blow?.nth
   const inReach = (only ? [only] : battle.units).filter((other) => other.side !== unit.side && shootable(battle, aim, unit, other, seen))
-  const taunting = inReach.filter((other) => has(other, 'taunt') || spotlit(battle, other))
+  const taunting = inReach.filter((other) => has(other, 'taunt'))
   // Aliens spread their fire: a healthier soldier is the likelier target, so wounds fall across the squad.
   const spread = (other: Unit) => (unit.side === 'alien' && !other.civilian ? SPREAD * (other.hp / other.stats.hp) : 0)
   const value = (other: Unit) => spread(other) + preyed(other, bite(battle, unit, other, unit.stats)) + worth(battle, unit, other)

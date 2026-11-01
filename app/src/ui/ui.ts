@@ -9,7 +9,6 @@ import { choice, joined, loot, modal, runEnd, skillChoice, spareChoice, stopRepo
 import { TWISTS } from '../core/twists'
 import { CHALLENGES } from '../core/challenges'
 import { type Battle } from '../core/battle'
-import { ENTRANCE_KINDS } from '../core/entrances'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { button, STOP_NAMES } from './html'
 import { fuelTanks } from '../core/objects'
@@ -39,11 +38,10 @@ function status(run: Run): string {
 }
 
 /**
- * Before the entrance: the twist, what the entrance is, and how the squad goes in: with no utility held, a tap; else a
+ * Before the landing: what the battle tests, the twist, and how the squad goes in: with no utility held, a tap; else a
  * card per utility, tapped to arm and again to go in with it. A rigged tank then asks which tank, `rigging` holding its index.
  */
 function drop(run: Run, battle: Battle, armed: string | null, rigging: number | null): string {
-  const { icon, name, text } = ENTRANCE_KINDS[battle.entrance!.kind]
   const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
   const tanks = fuelTanks(battle)
   const challenge = battle.challenge && CHALLENGES[battle.challenge]
@@ -52,7 +50,7 @@ function drop(run: Run, battle: Battle, armed: string | null, rigging: number | 
     rigging !== null
       ? go('Rig which tank?', tanks.map((_, tank): Pick => utilityPick(`t${tank}`, { type: 'enter', utility: rigging, tank }, 'tank', 'rig', `Tap again to rig tank ${tank + 1} and go in`, { body: `<small>rig</small><b>🛢️ Tank ${tank + 1}</b>` })), 'Tap a tank, then tap it again to go in.')
       : run.utilities.length === 0
-        ? button({ type: 'enter' }, `${icon} ${name}!`)
+        ? button({ type: 'enter' }, 'Go in')
         : go(
             'Pick a utility for this fight.',
             run.utilities.map((id, i): Pick =>
@@ -61,7 +59,7 @@ function drop(run: Run, battle: Battle, armed: string | null, rigging: number | 
             'Tap a utility for its details; tap it again to go in with it.',
           )
   const test = challenge ? `<h2 class="challenge">${challenge.icon} ${challenge.name}</h2><p>${challenge.test}.</p>` : ''
-  return `${test}${twist}<p>${icon} <b>${name}.</b> ${text}.</p>${chosen}`
+  return `${test}${twist}${chosen}`
 }
 
 /** Turns clicks into actions and hands them to `act`. */

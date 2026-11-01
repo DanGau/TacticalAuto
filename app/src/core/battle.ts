@@ -9,8 +9,6 @@ import { type Flow, Goal } from './goals'
 import type { Twist } from './twists'
 import type { UtilityId } from './utilities'
 import type { ChallengeId } from './challenges'
-import type { EntranceKind } from './entrances'
-import type { Feature } from './features'
 import { type Bulk, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
 
 export type { Bulk }
@@ -22,8 +20,6 @@ export const MAX_BEATS = 1000
 export const CRIT_BONUS = 2
 /** Tiles within which a soldier with line of sight reveals an alien. */
 export const SIGHT = 24
-/** How near the squad an alien must be to take an entrance's impact. */
-export const IMPACT_REACH = 4
 /** Damage a rocket does to every unit within BLAST_RADIUS tiles of where it lands. */
 export const ROCKET_DAMAGE = 4
 export const BLAST_RADIUS = 1
@@ -102,7 +98,7 @@ export const PLATING_ARMOR = 3
 export const CLOAK_TURNS = 2
 export const CLOAK_DAMAGE = 3
 export const SHADOW_DAMAGE = 2
-/** Tiles around an entrance that are marked as it, and that its squad comes in on. */
+/** Tiles around an landing that are marked as it, and that its squad comes in on. */
 export const ENTRY_RADIUS = 2
 /** Tiles a wave keeps from the squad. */
 export const POD_CLEARANCE = 7
@@ -220,7 +216,7 @@ export type SkillEffect =
   | 'daze'
   | 'afterimage'
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'limelight' | 'beacon' | 'relay' | 'flare' | 'bounty'
+export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
 export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect | 'block' | 'hover' | 'rangedShield' | 'meleeShield'
 
@@ -334,15 +330,7 @@ export interface Unit {
 export type Order = 'prepare' | 'sprint'
 
 
-/** How the squad comes in, and the tile it comes in at. */
-export interface Entrance {
-  kind: EntranceKind
-  at: Tile
-  /** The real thing on the map it comes from, if it needs one. */
-  feature?: Feature
-}
-
-/** The ground the fight is staged on: where the aliens hang out, and the entrances by them. */
+/** The ground the fight is staged on: where the aliens hang out, and the landing by them. */
 export interface Arena {
   x: number
   y: number
@@ -407,7 +395,7 @@ export interface Battle {
   rigged: Tile | null
   /** The range each alien had before a smoke bomb, by unit id, until the smoke clears. */
   smoked: Record<number, number>
-  /** Set by the entrance until what it sets off lands, as the battle's first beat. */
+  /** Set by the landing until what it sets off lands, as the battle's first beat. */
   opening: boolean
   /** Tiles of acid, each with the alien turns it has left. */
   acid: { x: number; y: number; turns: number }[]
@@ -423,17 +411,15 @@ export interface Battle {
   saved: number
   /** On a VIP rescue, whether the VIP waits for the squad, behind its building's walls or past the breach; keeps by it on the way out; or has lifted off. Null otherwise. */
   vip: 'held' | 'breached' | 'freed' | 'out' | null
-  /** The one entrance the encounter stages; an ambush has none. */
-  entrance: Entrance | null
+  /** The one point where the squad lands; an ambush has none. */
+  entry: Tile | null
   arena: Arena
-  /** Where a push's entrance means to lie: head on down the fight's axis. */
+  /** Where a push's landing means to lie: head on down the fight's axis. */
   approach: Tile
   /** Where reinforcements arrive. */
   gates: Tile[]
   /** The round aliens last joined the fight. */
   rallied: number
-  /** A soldier whose monologue draws every alien's attention until the round `until` ends; null if none. */
-  spotlight: { id: number; until: number } | null
   /** On a hold, the uplink the squad must reach and defend; null otherwise. */
   uplink: Tile | null
   /** On a hold, once it is held, the extraction zone; null otherwise. */

@@ -1,7 +1,5 @@
 // Test helpers that lay a leg's stops and send the squad in.
 import { apply, type Result } from './apply'
-import { type Battle } from './battle'
-import { type EntranceKind } from './entrances'
 import { createRun, legOf } from './run'
 import { type Run } from './run-state'
 import { type Stop } from './run-state'
@@ -22,14 +20,9 @@ export function atKey(run: Run): void {
   leg.path = [...Array<number>(run.stop).fill(-1), 0]
 }
 
-/** For tests: makes the entrance. */
+/** For tests: makes the landing. */
 export function enterAt(run: Run): Result {
   return apply(run, { type: 'enter' })
-}
-
-/** For tests: stages the battle's entrance as `kind`, where it stands. */
-export function stagedAs(battle: Battle, kind: EntranceKind): void {
-  battle.entrance!.kind = kind
 }
 
 /** For tests: a run of `seed` under way, its first soldier the first recruit, a Deadeye with a plain rifle. */

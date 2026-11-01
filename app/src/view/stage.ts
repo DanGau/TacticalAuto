@@ -28,7 +28,7 @@ export interface Sprite {
   cloaked: boolean
 }
 
-/** Words over the map: an entrance's name, or a callout over a unit. */
+/** Words over the map: an landing's name, or a callout over a unit. */
 export interface Label {
   text: string
   color: number
@@ -67,7 +67,7 @@ export class Stage {
   readonly chasm = new Group()
   /** The ground, and the props, walls and windows standing on it. */
   readonly terrain = new Group()
-  /** Marks on the ground, in the order they lie: the entrances' tint, acid and fire, fog, and glows in the fog. */
+  /** Marks on the ground, in the order they lie: the landing' tint, acid and fire, fog, and glows in the fog. */
   readonly zones = new Group()
   readonly acid = new Group()
   readonly fog = new Group()
@@ -79,10 +79,10 @@ export class Stage {
   readonly fences = new Group()
   standing = new Map<string, ReturnType<typeof fence>>()
 
-  /** Shot effects over the scene, and each entrance's props under way. */
+  /** Shot effects over the scene, and each landing's props under way. */
   readonly fx = new Sketch()
   readonly drops = new Set<Sketch>()
-  /** Before the entrance, its name; and the callouts over units. */
+  /** Before the landing, its name; and the callouts over units. */
   marks: Label[] = []
   readonly labels = new Set<Label>()
 
@@ -101,14 +101,14 @@ export class Stage {
   roofs: { tiles: Set<number>; box: { x1: number; y1: number; x2: number; y2: number }; fade: { value: number }; mesh: Mesh }[] = []
   /** The tile the briefing is lighting, which no roof hides. */
   lit: Tile | null = null
-  /** The tiles the squad sees, by index; null before the entrance. */
+  /** The tiles the squad sees, by index; null before the landing. */
   seen: boolean[] | null = null
   /** The battle on screen. */
   shown: Battle | null = null
   camera = aim({ x: 0, y: 0 }, FIT)
   /** Screen pixels the picture is jolted by, as a blow lands. */
   readonly jolt = { x: 0, y: 0 }
-  /** Whether the briefing is under way, so the entrances are hidden. */
+  /** Whether the briefing is under way, so the landing are hidden. */
   briefing = false
   /** The camera's glide under way; a new one takes over from wherever the camera is, so two never fight over it. */
   glides = 0
@@ -231,7 +231,7 @@ export class Stage {
 
   /**
    * Fades away each roof within the circle of the arena, where the fight is staged, and each over a tile that
-   * matters: a unit's, the briefing's lit one, or the entrance's before the squad goes in. Thins each wall standing just
+   * matters: a unit's, the briefing's lit one, or the landing's before the squad goes in. Thins each wall standing just
    * before a unit toward the camera, as XCOM cuts its buildings away. The rest fade back.
    */
   private cutAway(ms: number): void {
@@ -240,9 +240,9 @@ export class Stage {
     const toward = (fade: { value: number }, target: number) => (fade.value = fade.value < target ? Math.min(target, fade.value + step) : Math.max(target, fade.value - step))
     const keys = [...this.sprites.values()].map((s) => ({ x: Math.round(s.tile.x), y: Math.round(s.tile.y) }))
     if (this.lit) keys.push({ x: Math.round(this.lit.x), y: Math.round(this.lit.y) })
-    // Before the squad goes in, the entrance shows whole.
-    if (shown?.phase === 'deploy' && !this.briefing && shown.entrance)
-      for (const { at } of [shown.entrance]) for (let dy = -ENTRY_RADIUS; dy <= ENTRY_RADIUS; dy++) for (let dx = -ENTRY_RADIUS; dx <= ENTRY_RADIUS; dx++) keys.push({ x: at.x + dx, y: at.y + dy })
+    // Before the squad goes in, the landing shows whole.
+    if (shown?.phase === 'deploy' && !this.briefing && shown.entry)
+      for (const at of [shown.entry]) for (let dy = -ENTRY_RADIUS; dy <= ENTRY_RADIUS; dy++) for (let dx = -ENTRY_RADIUS; dx <= ENTRY_RADIUS; dx++) keys.push({ x: at.x + dx, y: at.y + dy })
     const under = new Set(keys.map((k) => k.y * GRID + k.x))
     const arena = shown?.arena
     for (const roof of this.roofs) {

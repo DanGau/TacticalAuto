@@ -33,7 +33,7 @@ export function answerFor(run: Run, challenge: ChallengeId | null): number {
 function tankFor(run: Run): number {
   const battle = run.battle!
   const tanks = fuelTanks(battle)
-  const at = battle.entrance!.at
+  const at = battle.entry!
   const rank = (t: { x: number; y: number }) => (distance(t, at) <= RIG.close + 2 ? -1 : -distance(t, battle.arena))
   return tanks.reduce((best, t, i) => (rank(t) > rank(tanks[best]) ? i : best), 0)
 }

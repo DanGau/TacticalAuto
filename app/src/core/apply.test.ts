@@ -7,7 +7,7 @@ import { bulkAt } from './grid'
 import { current } from './run'
 import { type Run } from './run-state'
 
-/** A run about to make its entrance for its first battle. */
+/** A run about to make its landing for its first battle. */
 function entering(seed = 1): Run & { battle: Battle } {
   const run = begun(seed)
   run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]

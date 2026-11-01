@@ -12,7 +12,7 @@ Test every new mechanic against these. Each cites where it comes from.
 8. **Squeeze and release.** Tension must be followed by relief the player earned, and the alien advance after a win is the next squeeze. [5]
 9. **Rewards that point a build.** A reward that is strong everywhere makes runs alike; one that pays only if the player builds around it makes them differ. Offer a few at a time and make the choice permanent, so each pick matters for the whole run. Relics here are chosen one of three and kept; each skill a soldier learns is kept and opens the next ones in its class's tree. [6]
 10. **Heroes, not hiders.** The squad never sneaks: every turn is a full turn, and soldiers march on the fight from the first. Heroes dash where the fight needs them rather than crawl: a soldier with no shot dashes on to one. The turn dial shows whose turn it is. [7] [8]
-11. **Cut to the fight.** No walk to find the aliens: the game cuts to the heroes' entrance at the fight, and the fight is plainly one of two flows by mission and map: a push, heroes knocking down clusters one at a time, or a flood, heroes holding their ground as clumps pour in. The entrance is chosen with every alien but burrowers in sight. [3] [8]
+11. **Cut to the fight.** No walk to find the aliens: the game cuts to the heroes landing at the fight, and the fight is plainly one of two flows by mission and map: a push, heroes knocking down clusters one at a time, or a flood, heroes holding their ground as clumps pour in. The way in shows with every alien but burrowers in sight. [3] [8]
 
 ## Events
 

@@ -64,7 +64,7 @@ document.getElementById('panel')!.innerHTML = '<p>Loading…</p>'
 const view = await createView()
 document.body.prepend(view.canvas)
 
-/** The battle last briefed, so each is briefed once, as its entrance screen opens. */
+/** The battle last briefed, so each is briefed once, as its landing screen opens. */
 let briefed: Run['battle'] = null
 
 async function show(events: GameEvent[], animate: boolean): Promise<void> {
@@ -76,12 +76,12 @@ async function show(events: GameEvent[], animate: boolean): Promise<void> {
   }
 }
 
-/** What the view is showing outside the battle loop, which the loop waits for: the entrance plays before the first beat. */
+/** What the view is showing outside the battle loop, which the loop waits for: the landing plays before the first beat. */
 let showing = Promise.resolve()
 
 function act(action: Action): Result {
   const result = apply(state, action)
-  // The panels change at once, so the entrance panel is gone before the entrance plays.
+  // The panels change at once, so the landing panel is gone before the landing plays.
   ui.update(state)
   showing = show([], action.type === 'enter' && !params.has('manual'))
   return result

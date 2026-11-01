@@ -14,7 +14,7 @@ export const TUNING = {
   shatterDamage: 2,
   /** Damage Thermal Shock Core adds to hits on a target both burning and chilled. */
   thermalDamage: 3,
-  /** Damage an entrance's impact deals each alien it hits. */
+  /** Damage landing charges deal each alien they reach, before Breaching Charges add theirs. */
   impactDamage: 2,
   /** Supplies an overrun zone pays. */
   dangerSupplies: 4,

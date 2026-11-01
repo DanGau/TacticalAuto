@@ -9,7 +9,7 @@ import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { hasAttack, vipOf, pursuers, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes, spotlit } from './fighters'
+import { hasAttack, vipOf, pursuers, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes } from './fighters'
 import { ESCORT_REACH } from './goals'
 import { canHurlFrom } from './objects'
 import { bite, canShoot, sees } from './sight'
@@ -171,7 +171,7 @@ export function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
  * together: on a hold, the uplink, then the extraction zone; on a VIP rescue, the VIP, then the extraction zone; on an
  * assassination, the commander once sighted; else the alien in the fight nearest the squad's centre; on a rescue, the
  * alien nearest a civilian, or with none near one, the civilian nearest the squad. Aliens close on a soldier in the
- * spotlight; else on a hold the uplink, then the squad; otherwise the soldier nearest, shooting civilians on the way.
+ * else on a hold the uplink, then the squad; otherwise the soldier nearest, shooting civilians on the way.
  */
 export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
   // The squad goes for the VIP until it reaches them.
@@ -185,8 +185,6 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
   // A raider makes for the nearest cache it can walk to until it has as many as it came for; walled off from all, it fights.
   const caches = battle.goal === 'raid' && unit.side === 'human' ? battle.caches.filter((c) => walkingDistances(battle, c)[unit.y * GRID + unit.x] < Infinity) : []
   if (caches.length > 0) return caches.reduce((a, b) => (walkingDistances(battle, b)[unit.y * GRID + unit.x] < walkingDistances(battle, a)[unit.y * GRID + unit.x] ? b : a))
-  const star = unit.side === 'alien' && enemies.find((e) => spotlit(battle, e))
-  if (star) return star
   // On a hold an alien makes for the uplink, then from its zone goes for the squad, so no stand-off lasts.
   if (battle.uplink) return unit.side === 'alien' && distance(unit, battle.uplink) <= UPLINK_REACH ? nearest(enemies, unit) : battle.uplink
   const civilians = battle.units.filter((u) => u.civilian && u.civilian !== 'vip')

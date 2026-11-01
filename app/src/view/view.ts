@@ -8,7 +8,6 @@ import type { Run } from '../core/run-state'
 import { drawTerrain } from './board'
 import { axes, clamped, DECAL_LIFT, framing, setHeights, spot, STILL_FOV, WIDTH, type Camera, type Shot } from './camera'
 import { callout, chest, effectCallout, shotCallout } from './effects'
-import { makeEntrance } from './entrance'
 import { drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
 import { play, squad } from './play'
@@ -19,10 +18,10 @@ import { empty } from './shapes'
 
 /** Screen pixels a press moves before it pans the camera. */
 const DRAG_PX = 6
-/** How long the camera takes to glide to an entrance, and to fly in over a new battle. */
+/** How long the camera takes to glide to an landing, and to fly in over a new battle. */
 const FOCUS_MS = 700
 const FLY_MS = 1600
-/** Screen pixels the entrance panel takes from the bottom of the canvas. */
+/** Screen pixels the landing panel takes from the bottom of the canvas. */
 const PANEL = 230
 /** Screen pixels kept clear around what is in play, which sits in the middle of the screen above the panel. */
 const WHOLE_MARGIN = PANEL - 20
@@ -35,15 +34,15 @@ export interface View {
   /**
    * Shows the run's battle, which `events` produced. Animated, it follows the action with the camera, plays the
    * events, and resolves when they finish. Still, it draws the whole map at once and marks each shot with a line.
-   * Aliens unrevealed are never drawn; before the entrance, every alien but burrowers shows.
+   * Aliens unrevealed are never drawn; before the landing, every alien but burrowers shows.
    * Once landed, fog darkens every tile no soldier sees.
    */
   show(run: Run, events: GameEvent[], animate: boolean): Promise<void>
   /** Resolves once every attack begun has finished. */
   settle(): Promise<void>
-  /** Hides the entrance while the briefing flies over the mission, and shows it once it is done. */
-  hideEntrances(hidden: boolean): void
-  /** Glides the camera to frame the given tiles as `shot` says, above the entrance panel; null pulls back to the whole map. */
+  /** Hides the landing while the briefing flies over the mission, and shows it once it is done. */
+  hideLanding(hidden: boolean): void
+  /** Glides the camera to frame the given tiles as `shot` says, above the landing panel; null pulls back to the whole map. */
   frame(tiles: Tile[] | null, ms?: number, shot?: Shot): Promise<void>
   /** Lights a beam over the tile the briefing is on, so it stands out from the night; null puts it out. */
   spotlight(tile: Tile | null): void
@@ -52,8 +51,6 @@ export interface View {
 export async function createView(): Promise<View> {
   const s = new Stage()
   const { canvas } = s
-  /** Whether the battle last shown was waiting for the entrance, so the next one shown plays it. */
-  let deploying = false
   /** The attacks of the stage under way, which the next beat that is not an attack waits for. */
   let attacks = Promise.resolve()
 
@@ -93,18 +90,18 @@ export async function createView(): Promise<View> {
   })
 
   /**
-   * The camera framing what is in play: before the entrance it, the aliens and goals; after it, the squad and the
+   * The camera framing what is in play: before the landing it, the aliens and goals; after it, the squad and the
    * aliens it has found.
    */
   function inPlay(yaw = YAW): Camera {
     const battle = s.shown!
     const goals = [battle.uplink, battle.extract, ...battle.caches].filter((t): t is Tile => t !== null)
     const units = battle.units.filter((u) => u.side === 'human' || battle.phase === 'deploy' || u.revealed)
-    return framing([...(battle.phase === 'deploy' && battle.entrance ? [battle.entrance.at] : []), ...goals, ...units], yaw, WHOLE_MARGIN)
+    return framing([...(battle.phase === 'deploy' && battle.entry ? [battle.entry] : []), ...goals, ...units], yaw, WHOLE_MARGIN)
   }
 
   /**
-   * The camera framing `tiles` as `shot` says, raised so the entrance panel below covers none of it; null frames what
+   * The camera framing `tiles` as `shot` says, raised so the landing panel below covers none of it; null frames what
    * is in play. A subject on a third is set off the centre, the screen's other two thirds left open before it.
    */
   function above(tiles: Tile[] | null, shot: Shot = {}): Camera {
@@ -145,7 +142,7 @@ export async function createView(): Promise<View> {
       pool.position.set(at.x, at.y + DECAL_LIFT * 5, at.z)
       s.beam.add(pool)
     },
-    hideEntrances(hidden) {
+    hideLanding(hidden) {
       s.briefing = hidden
       if (s.shown) drawMarks(s, s.shown)
     },
@@ -183,9 +180,6 @@ export async function createView(): Promise<View> {
       sync(s, run, battle)
       if (events.some((e) => e.type === 'rocket' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(s, battle)
       drawFog(s, battle, true)
-      const landed = deploying && battle.phase !== 'deploy'
-      deploying = battle.phase === 'deploy'
-      if (landed && animate) await makeEntrance(s, battle)
       if (!animate) {
         if (battle.phase !== 'deploy') s.look(clamped(inPlay(), squad(battle)))
         s.labels.clear()
