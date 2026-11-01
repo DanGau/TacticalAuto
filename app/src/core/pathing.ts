@@ -197,7 +197,10 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
     return hunters[0] ?? nearest(civilians, squad)
   }
   const fighting = enemies.filter((u) => u.engaged)
-  return enemies.find((u) => u.target && u.revealed) ?? nearest(fighting.length > 0 ? fighting : enemies, squad)
+  // Nearest by the walk, not the crow: as the walk there shortens no other can overtake it, so the squad never paces between two far aliens.
+  const walk = (e: Unit) => walkingDistances(battle, e)[Math.round(squad.y) * GRID + Math.round(squad.x)]
+  const byWalk = () => enemies.reduce((a, b) => (walk(b) < walk(a) || (walk(b) === walk(a) && distance(b, squad) < distance(a, squad)) ? b : a))
+  return enemies.find((u) => u.target && u.revealed) ?? (fighting.length > 0 ? nearest(fighting, squad) : byWalk())
 }
 
 /** How near a civilian an alien must be for the squad to go for it on a rescue. */

@@ -3,11 +3,13 @@ import { current } from './run'
 import { expect, test } from 'vitest'
 import { enterAt, begun } from './roads'
 import { apply } from './apply'
-import { HASTE_MOVE, isSoldier, SOLDIER_ATTACKS, type Battle } from './battle'
+import { GRID, HASTE_MOVE, isSoldier, SOLDIER_ATTACKS, type Battle } from './battle'
 import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
 import { detects } from './sight'
-import { costOf, DASH_MOVE } from './pathing'
+import { costOf, DASH_MOVE, goalOf } from './pathing'
+import { blocked, distance, walkingDistances } from './grid'
+
 
 function battle(seed: number): Battle {
   const run = begun(seed)
@@ -120,4 +122,28 @@ test('a soldier may walk between and after its attacks, its walks in a turn toge
     })
   }
   expect(strides).toBeGreaterThan(0)
+})
+
+test('with no alien engaged a squad heads for the nearest by the walk, so it never paces between two that take turns being nearest as the crow flies', () => {
+  let tried = 0
+  for (let seed = 1; seed <= 12; seed++) {
+    const state = battle(seed)
+    const hero = state.units.find(isSoldier)!
+    const [a, b] = state.units.filter((u) => u.side === 'alien')
+    state.units = [hero, a, b]
+    const open: { x: number; y: number }[] = []
+    for (let y = 0; y < GRID; y += 3) for (let x = 0; x < GRID; x += 3) if (!blocked(state, x, y)) open.push({ x, y })
+    const here = hero.y * GRID + hero.x
+    for (const near of open) {
+      for (const far of open) {
+        const [walkNear, walkFar] = [walkingDistances(state, near)[here], walkingDistances(state, far)[here]]
+        if (walkNear === Infinity || walkNear >= walkFar || distance(hero, near) <= distance(hero, far)) continue
+        Object.assign(a, near, { engaged: false, target: false })
+        Object.assign(b, far, { engaged: false, target: false })
+        tried++
+        expect(goalOf(state, hero, [a, b])).toBe(a)
+      }
+    }
+  }
+  expect(tried).toBeGreaterThan(0)
 })
