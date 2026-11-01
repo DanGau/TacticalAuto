@@ -80,7 +80,7 @@
       .strip .bar div { background: #4fe08a; }
       .strip .low .portrait { border-color: #e04848; background: #3a1414; }
       .strip .low .bar div { background: #e04848; }
-      .stopcard { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 2; max-width: 640px; padding: 8px 16px; border-radius: 10px; background: #171d29dd; border: 1px solid #3a465c; white-space: nowrap; pointer-events: none; }
+      .stopcard { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 2; padding: 8px 16px; border-radius: 10px; background: #171d29dd; border: 1px solid #3a465c; width: max-content; max-width: min(640px, calc(100vw - 48px)); box-sizing: border-box; pointer-events: none; }
       .tabs { display: flex; gap: 4px; flex: 1; }
       .tab { padding: 6px 18px; background: none; border-color: transparent; color: #9aa6bd; }
       .tab.active { background: #263042; border-color: #4a5a78; color: #dde; }

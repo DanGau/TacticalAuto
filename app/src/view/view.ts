@@ -118,7 +118,7 @@ export async function createView(): Promise<View> {
       pitch: PITCH + (shot.pitch ?? 0),
       fov: shot.fov ?? STILL_FOV,
       haze: shot.haze ?? 0,
-    })
+    }, tiles === null && s.shown?.phase === 'deploy' ? [...(s.shown.entry ? [s.shown.entry] : []), ...s.shown.units.filter((u) => u.side === 'alien')] : [])
   }
 
   s.resize()
