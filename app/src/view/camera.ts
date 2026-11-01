@@ -124,14 +124,14 @@ const closest = () => Math.max(1, 0.7 / Math.min(innerWidth / WIDTH, innerHeight
 /** The zoom that fits a `width` by `height` of picture on the screen. */
 const seen = (width: number, height: number) => [screen().w / width, screen().h / height]
 
-/** Of the four quarter turns from `yaw`, the one `points` fill the screen best at. */
+/** Of the eight turns from `yaw`, the one `points` fill the screen best at. */
 export function bestTurn(points: Tile[], yaw: number): number {
   const zoom = (y: number) => {
     const at = points.map((p) => picture(spot(p.x, p.y), y))
     const span = (v: number[]) => Math.max(...v) - Math.min(...v) + MARGIN
     return Math.min(...seen(span(at.map((p) => p.x)), span(at.map((p) => p.y))))
   }
-  return [yaw, yaw + Math.PI / 2, yaw - Math.PI / 2, yaw + Math.PI].reduce((a, b) => (zoom(b) > zoom(a) * 1.05 ? b : a))
+  return Array.from({ length: 8 }, (_, i) => yaw + (i * Math.PI) / 4).reduce((a, b) => (zoom(b) > zoom(a) * 1.05 ? b : a))
 }
 
 /**
@@ -145,7 +145,11 @@ export function clamped(to: Camera, keep: Tile[] = []): Camera {
   // The ground the screen shows, in tiles from its centre to its farthest corner at zoom 1, whichever way it turns.
   const corner = Math.hypot(innerWidth / 2 / s / ACROSS, innerHeight / 2 / s / ACROSS / Math.sin(to.pitch))
   const half = (GRID - 1) / 2
-  const zoom = Math.max(to.zoom, corner / half)
+  // Closing in to hide the map's edge gives way if it would push any of `keep` off a tall screen: seeing them matters more.
+  const covering = Math.max(to.zoom, corner / half)
+  const centre = picture(to, to.yaw)
+  const fits = keep.every((p) => { const at = picture(spot(p.x, p.y), to.yaw); return Math.abs(at.x - centre.x) * covering <= WIDTH / 2 * 0.85 })
+  const zoom = fits ? covering : to.zoom
   const reach = corner / zoom
   const within = (v: number) => Math.min(GRID - 1 - reach, Math.max(reach, v))
   const kept = keep.map((p) => picture(spot(p.x, p.y), to.yaw))
