@@ -97,7 +97,7 @@ function fight(run: Run, winner: Side): void {
   onward(run)
   apply(run, { type: 'advance' })
   // Clear of Danger Close, which costs threat.
-  if (run.battle!.phase === 'deploy') enterAt(run, run.battle!.entrances[0].kind === 'strike' ? 1 : 0)
+  if (run.battle!.phase === 'deploy') enterAt(run)
   const battle = run.battle!
   for (const u of battle.units.filter((u) => isSoldier(u) && winner === 'alien')) battle.downed.push({ soldier: u.soldier!, x: u.x, y: u.y, carrier: null })
   battle.units = battle.units.filter((u) => u.side === winner)
@@ -194,7 +194,7 @@ test('a battle lost with every soldier down pays nothing and loses the run, the 
 test('a wipe loses the run even when the last alien falls with the last soldier', () => {
   const run = travelling(['battle', 'battle'])
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  enterAt(run)
   const battle = run.battle!
   const [soldier] = battle.units.filter(isSoldier)
   battle.downed.push({ soldier: soldier.soldier!, x: soldier.x, y: soldier.y, carrier: null })
@@ -209,7 +209,7 @@ function leftBehind(): Run {
   hire(run).skills.splice(1)
   run.phase = 'overworld'
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  enterAt(run)
   const battle = run.battle!
   const fallen = battle.units.find((u) => u.soldier === run.soldiers[1].id)!
   battle.downed.push({ soldier: fallen.soldier!, x: fallen.x, y: fallen.y, carrier: null })
@@ -249,7 +249,7 @@ test('on a recovery, a soldier who reaches a held squadmate gets them up at half
   const run = leftBehind()
   onward(run)
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  enterAt(run)
   const battle = run.battle!
   const [body] = battle.downed
   const rescuer = battle.units.find(isSoldier)!
@@ -270,7 +270,7 @@ test('getting out, a soldier picks up a squadmate down, walks at half its move c
   hire(run).skills.splice(1)
   run.phase = 'overworld'
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  enterAt(run)
   const battle = run.battle!
   const [carrier, fallen] = battle.units.filter(isSoldier)
   // One alien is left, rooted and harmless, and the carrier cannot kill it: the battle ends only by lifting off.
@@ -324,7 +324,7 @@ test('soldiers keep their health between battles, heal TRAVEL_HEAL for each stop
   const [hurt, fallen] = run.soldiers
   const most = soldierStats(run, hurt).hp
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  enterAt(run)
   const battle = run.battle!
   battle.units.find((u) => u.soldier === hurt.id)!.hp = 3
   const body = battle.units.find((u) => u.soldier === fallen.id)!
@@ -406,7 +406,7 @@ test('experience follows what a soldier did: kills and damage its own, feats onl
   const [soldier] = run.soldiers
   const battle = () => {
     apply(run, { type: 'advance' })
-    enterAt(run, 0)
+    enterAt(run)
     const b = run.battle!
     b.tally[soldier.id] = { dealt: 12, kills: 3, taken: 4, feats: ['hatTrick'] }
     b.units = b.units.filter((u) => u.side === 'human')
@@ -700,7 +700,7 @@ test('under fortification every hit does 1 less damage, on either side', () => {
   const run = begun(1)
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  enterAt(run)
   const battle = run.battle!
   const soldier = battle.units.find(isSoldier)!
   const alien = battle.units.find((u) => u.side === 'alien')!
@@ -716,7 +716,7 @@ test("a soldier lands with its class's ability and its uses, the effects of its 
   run.soldiers[0].skills = ['arsenal', 'shredder']
   run.relics = ['echo', 'capacitor']
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  enterAt(run)
   const [unit] = run.battle!.units.filter(isSoldier)
   expect(unit).toMatchObject({ ability: 'rocket', charges: 3, stance: 'anchor', armor: 2, effects: ['shred', 'opener'] })
   expect(unit.hp).toBe(soldierStats(run, run.soldiers[0]).hp)

@@ -25,7 +25,7 @@ const engage = (run: Run) => run.battle!.units.forEach((u) => Object.assign(u, {
 test('a consumable is used only in a battle, and one aimed at the aliens only once one is in the fight', () => {
   const run = landing(['airstrike', 'medkit'])
   expect(apply(run, { type: 'use', index: 0 })).toEqual({ ok: false, reason: 'cannot use that now' })
-  enterAt(run, 0)
+  enterAt(run)
   for (const u of run.battle!.units) if (u.side === 'alien') u.engaged = false
   expect(apply(run, { type: 'use', index: 0 }).ok).toBe(false)
   engage(run)
@@ -37,7 +37,7 @@ test('a squad consumable readied on the landing takes effect at the first beat',
   const run = landing(['plating'])
   expect(apply(run, { type: 'use', index: 0 })).toEqual({ ok: true })
   expect(run.battle!.primed).toEqual(['plating'])
-  enterAt(run, 0)
+  enterAt(run)
   const soldier = run.battle!.units.find(isSoldier)!
   const armor = soldier.armor
   const events = step(run)
@@ -48,7 +48,7 @@ test('a squad consumable readied on the landing takes effect at the first beat',
 
 test('an airstrike wounds the aliens it falls on and adds threat; a medkit heals', () => {
   const run = landing(['airstrike', 'medkit'])
-  enterAt(run, 0)
+  enterAt(run)
   engage(run)
   const soldier = run.battle!.units.find(isSoldier)!
   soldier.hp = 1
@@ -64,7 +64,7 @@ test('an airstrike wounds the aliens it falls on and adds threat; a medkit heals
 
 test('a sentry drop lands a turret for the squad', () => {
   const run = landing(['sentry'])
-  enterAt(run, 0)
+  enterAt(run)
   const before = run.battle!.units.length
   apply(run, { type: 'use', index: 0 })
   const events = step(run)

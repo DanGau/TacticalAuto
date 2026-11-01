@@ -15,7 +15,7 @@ function battle(seed: number): Battle {
   const run = begun(seed)
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  enterAt(run)
   return run.battle!
 }
 

@@ -13,7 +13,7 @@ function play(seed: number, check: (events: GameEvent[], before: Battle) => void
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  enterAt(run)
   const state = run.battle!
   // Wounded, a phantom cloaks once any alien can shoot it.
   for (const u of state.units) if (u.ability === 'cloak') u.hp = Math.floor(u.stats.hp / 2)

@@ -1,9 +1,8 @@
-// The battle view the UI drives: showing a run's battle, picking and framing entrances, and panning.
-import { AdditiveBlending, BoxGeometry, CircleGeometry, Mesh, MeshBasicMaterial, Raycaster, Vector2 } from 'three'
-import { BLAST_RADIUS, ENTRY_RADIUS, type Battle, type Tile } from '../core/battle'
+// The battle view the UI drives: showing a run's battle, framing it, and panning.
+import { AdditiveBlending, BoxGeometry, CircleGeometry, Mesh, MeshBasicMaterial } from 'three'
+import { BLAST_RADIUS, type Battle, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { effectName } from '../core/effects'
-import { distance, nearestAlien } from '../core/grid'
 import { overlaps, staggerOf } from '../core/pace'
 import type { Run } from '../core/run-state'
 import { drawTerrain } from './board'
@@ -42,11 +41,7 @@ export interface View {
   show(run: Run, events: GameEvent[], animate: boolean): Promise<void>
   /** Resolves once every attack begun has finished. */
   settle(): Promise<void>
-  /** The entrance under a point on the canvas as displayed, as an index into battle.entrances; null when there is none to choose. */
-  entranceAt(sx: number, sy: number): number | null
-  /** Before the entrance, glides the camera to one and marks its way in; null pulls back to the whole map. */
-  focus(entrance: number | null): void
-  /** Hides the entrances while the briefing flies over the mission, and shows them once it is done. */
+  /** Hides the entrance while the briefing flies over the mission, and shows it once it is done. */
   hideEntrances(hidden: boolean): void
   /** Glides the camera to frame the given tiles as `shot` says, above the entrance panel; null pulls back to the whole map. */
   frame(tiles: Tile[] | null, ms?: number, shot?: Shot): Promise<void>
@@ -62,23 +57,10 @@ export async function createView(): Promise<View> {
   /** The attacks of the stage under way, which the next beat that is not an attack waits for. */
   let attacks = Promise.resolve()
 
-  const raycaster = new Raycaster()
-  function entranceAt(px: number, py: number): number | null {
-    const { shown } = s
-    if (shown?.phase !== 'deploy') return null
-    raycaster.setFromCamera(new Vector2((px / innerWidth) * 2 - 1, 1 - (py / innerHeight) * 2), s.eye)
-    const hit = raycaster.intersectObject(s.terrain.children[0])[0]
-    if (!hit) return null
-    const tile = { x: Math.round(hit.point.x), y: Math.round(hit.point.z) }
-    const index = shown.entrances.findIndex(({ at }) => distance(at, tile) <= ENTRY_RADIUS)
-    return index < 0 ? null : index
-  }
-
   /** Clears the board for a new battle. */
   function setBattle(battle: Battle): void {
     s.shown = battle
     setHeights(battle.height)
-    s.selected = null
     for (const id of [...s.sprites.keys()]) remove(s, id)
     s.glows.clear()
     empty(s.lurk)
@@ -108,29 +90,17 @@ export async function createView(): Promise<View> {
       s.glides++
       s.look(clamped({ ...camera, x: camera.x + right.x * dx + up.x * dy, y: camera.y + up.y * dy, z: camera.z + right.z * dx + up.z * dy }))
     }
-    const at = entranceAt(e.offsetX, e.offsetY)
-    canvas.style.cursor = at === null ? 'default' : 'pointer'
-    if (at === s.hovered || !s.shown) return
-    s.hovered = at
-    drawMarks(s, s.shown)
   })
 
-  /** What the camera frames for an entrance: where it comes in, and the uplink or nearest contact it heads for. */
-  function entranceView(battle: Battle, zone: Tile): Tile[] {
-    const reach = ENTRY_RADIUS + 3
-    const toward = battle.uplink ?? nearestAlien(battle, zone)
-    return [{ x: zone.x - reach, y: zone.y - reach }, { x: zone.x + reach, y: zone.y + reach }, ...(toward ? [toward] : [])]
-  }
-
   /**
-   * The camera framing what is in play: before the entrance its entrances, aliens and goals; after it, the squad and the
+   * The camera framing what is in play: before the entrance it, the aliens and goals; after it, the squad and the
    * aliens it has found.
    */
   function inPlay(yaw = YAW): Camera {
     const battle = s.shown!
     const goals = [battle.uplink, battle.extract, ...battle.caches].filter((t): t is Tile => t !== null)
     const units = battle.units.filter((u) => u.side === 'human' || battle.phase === 'deploy' || u.revealed)
-    return framing([...(battle.phase === 'deploy' ? battle.entrances.map((e) => e.at) : []), ...goals, ...units], yaw, WHOLE_MARGIN)
+    return framing([...(battle.phase === 'deploy' && battle.entrance ? [battle.entrance.at] : []), ...goals, ...units], yaw, WHOLE_MARGIN)
   }
 
   /**
@@ -157,7 +127,6 @@ export async function createView(): Promise<View> {
   s.resize()
   return {
     canvas,
-    entranceAt,
     frame(tiles, ms = FOCUS_MS, shot = {}) {
       return s.follow(above(tiles, shot), ms)
     },
@@ -179,13 +148,6 @@ export async function createView(): Promise<View> {
     hideEntrances(hidden) {
       s.briefing = hidden
       if (s.shown) drawMarks(s, s.shown)
-    },
-    focus(entrance) {
-      const { shown } = s
-      if (shown?.phase !== 'deploy') return
-      s.selected = entrance
-      drawMarks(s, shown)
-      void s.follow(above(entrance === null ? null : entranceView(shown, shown.entrances[entrance].at)), FOCUS_MS)
     },
     settle: () => attacks,
     async show(run, events, animate) {

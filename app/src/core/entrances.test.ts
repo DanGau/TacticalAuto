@@ -1,18 +1,18 @@
 import { SUITS } from './features'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { ENTRANCES, GRID, isSoldier, type Battle } from './battle'
+import { GRID, isSoldier, type Battle } from './battle'
 import { stepBattle } from './combat'
-import { COMMANDER_GAP, ENTRANCE_KINDS, ENTRY_MARGIN, LOOK_TURNS, STRIKE, TAP_DAMAGE, TAP_REACH, type EntranceKind, closeBy, LOOK_REACH } from './entrances'
+import { COMMANDER_GAP, ENTRANCE_KINDS, ENTRY_MARGIN, LOOK_TURNS, TAP_DAMAGE, TAP_REACH, type EntranceKind, closeBy, LOOK_REACH } from './entrances'
 import { distance, edgeDepths, nearestAlien } from './grid'
 import type { Goal } from './goals'
 import { current } from './run'
 import { type Run } from './run-state'
-import { begun, entranceOf, enterAt, road } from './roads'
+import { begun, stagedAs, enterAt, road } from './roads'
 import { TUNING } from './tuning'
 import { RALLY_EVERY, rally } from './upkeep'
 
-/** A run choosing its entrance for its first battle, of `goal`. */
+/** A run about to make its entrance in its first battle, of `goal`. */
 function entering(seed = 1, goal: Goal = 'exterminate'): Run & { battle: Battle } {
   const run = begun(seed)
   apply(run, { type: 'go', index: 1 })
@@ -21,17 +21,15 @@ function entering(seed = 1, goal: Goal = 'exterminate'): Run & { battle: Battle 
   return run as Run & { battle: Battle }
 }
 
-test('a battle offers entrances of different kinds, each by the fight, with every alien but burrowers in sight and none yet engaged', () => {
+test('a battle stages one entrance, by the fight, with every alien but burrowers in sight and none yet engaged', () => {
   for (let seed = 1; seed <= 8; seed++) {
     const { battle } = entering(seed)
-    expect(battle.entrances).toHaveLength(ENTRANCES)
-    expect(new Set(battle.entrances.map((e) => e.kind)).size).toBe(ENTRANCES)
-    for (const { at } of battle.entrances) expect(distance(at, battle.arena)).toBeLessThanOrEqual(battle.arena.reach + 8)
+    expect(distance(battle.entrance!.at, battle.arena)).toBeLessThanOrEqual(battle.arena.reach + 8)
     for (const alien of battle.units.filter((u) => u.side === 'alien')) expect(alien).toMatchObject({ engaged: false, revealed: alien.kind !== 'burrower' })
   }
 })
 
-test('every battlefield offers three entrances, each where the ground supports it: a door at a doorway, a wall at a wall, a skylight under a roof, a rope on high ground', () => {
+test("every battlefield's entrance stands where the ground supports it and suits its place", () => {
   for (const terrain of ['town', 'city', 'countryside', 'industrial', 'ruins', 'hive'] as const) {
     for (let seed = 1; seed <= 12; seed++) {
       const run = begun(seed)
@@ -39,13 +37,22 @@ test('every battlefield offers three entrances, each where the ground supports i
       Object.assign(current(run)!.stop!, { goal: 'exterminate', terrain })
       apply(run, { type: 'advance' })
       const battle = run.battle!
-      expect(battle.entrances).toHaveLength(ENTRANCES)
-      for (const { kind, at, feature } of battle.entrances) {
-        expect(ENTRANCE_KINDS[kind].fits?.(battle, at) ?? true).toBe(true)
-        if ((SUITS[terrain] as string[]).includes(kind)) expect(feature).toBeDefined()
-        if (feature) expect(SUITS[terrain] as string[]).toContain(kind)
-      }
+      const { kind, at, feature } = battle.entrance!
+      expect(ENTRANCE_KINDS[kind].fits?.(battle, at) ?? true).toBe(true)
+      if (feature) expect(SUITS[terrain] as string[]).toContain(kind)
     }
+  }
+})
+
+test("a push's entrance lies ahead of its clusters on the axis; a flood's by what it holds", () => {
+  for (let seed = 1; seed <= 12; seed++) {
+    const push = entering(seed).battle
+    const aliens = push.units.filter((u) => u.side === 'alien')
+    const near = (t: { x: number; y: number }) => Math.min(...aliens.map((a) => distance(a, t)))
+    expect(near(push.entrance!.at)).toBeGreaterThanOrEqual(2)
+    expect(distance(push.entrance!.at, push.approach)).toBeLessThan(distance(push.entrance!.at, push.arena) + 12)
+    const hold = entering(seed, 'hold').battle
+    expect(distance(hold.entrance!.at, hold.uplink!)).toBeLessThanOrEqual(9)
   }
 })
 
@@ -57,23 +64,24 @@ test('the arena and every entrance lie inside the map, clear of its edge', () =>
       for (const v of [x - reach, y - reach]) expect(v).toBeGreaterThanOrEqual(0)
       for (const v of [x + reach, y + reach]) expect(v).toBeLessThan(GRID)
       const depth = edgeDepths(battle)
-      for (const { at } of battle.entrances) expect(depth[at.y * GRID + at.x]).toBeGreaterThan(ENTRY_MARGIN)
+      const { at } = battle.entrance!
+      expect(depth[at.y * GRID + at.x]).toBeGreaterThan(ENTRY_MARGIN)
     }
   }
 })
 
-test("an assassination never offers an entrance near the commander", () => {
+test("an assassination never stages its entrance near the commander", () => {
   for (let seed = 1; seed <= 8; seed++) {
     const { battle } = entering(seed, 'assassinate')
     const commander = battle.units.find((u) => u.target)!
-    for (const { at } of battle.entrances) expect(distance(at, commander)).toBeGreaterThanOrEqual(COMMANDER_GAP)
+    expect(distance(battle.entrance!.at, commander)).toBeGreaterThanOrEqual(COMMANDER_GAP)
   }
 })
 
 test('entering puts the whole squad down by the entrance and engages only the cluster nearest', () => {
   const run = entering()
-  const { at } = run.battle.entrances[0]
-  expect(enterAt(run, 0)).toEqual({ ok: true })
+  const { at } = run.battle.entrance!
+  expect(enterAt(run)).toEqual({ ok: true })
   const squad = run.battle.units.filter(isSoldier)
   expect(squad).toHaveLength(run.soldiers.length)
   for (const unit of squad) expect(distance(unit, at)).toBeLessThanOrEqual(3)
@@ -85,92 +93,77 @@ test('entering puts the whole squad down by the entrance and engages only the cl
 
 test('kicking the door hurts the nearest alien, which loses its first action', () => {
   const run = entering()
-  const at = run.battle.entrances[entranceOf(run.battle, 'door')].at
-  const first = nearestAlien(run.battle, at)!
-  enterAt(run, entranceOf(run.battle, 'door'))
+  stagedAs(run.battle, 'door')
+  const first = nearestAlien(run.battle, run.battle.entrance!.at)!
+  enterAt(run)
   expect(stepBattle(run.battle)).toContainEqual({ type: 'hurt', id: first.id, amount: TUNING.impactDamage, cause: 'impact' })
   expect(first.panicked || first.hp <= 0).toBe(true)
 })
 
 test('through the wall catches the nearest aliens surprised', () => {
   const run = entering()
-  const index = entranceOf(run.battle, 'wall')
-  const near = nearestAlien(run.battle, run.battle.entrances[index].at)!
-  enterAt(run, index)
+  stagedAs(run.battle, 'wall')
+  const near = nearestAlien(run.battle, run.battle.entrance!.at)!
+  enterAt(run)
   expect(near.surprised).toBe(1)
 })
 
 test("a monologue puts the toughest soldier in the spotlight: aliens that can shoot it must", () => {
   const run = entering()
-  enterAt(run, entranceOf(run.battle, 'monologue'))
+  stagedAs(run.battle, 'monologue')
+  enterAt(run)
   const speaker = run.battle.units.filter(isSoldier).reduce((a, b) => (b.hp > a.hp ? b : a))
   expect(run.battle.spotlight).toEqual({ id: speaker.id, until: 2 })
   expect(stepBattle(run.battle)).toContainEqual({ type: 'effect', id: speaker.id, effect: 'taunt', amount: 0 })
 })
 
-test('Danger Close wounds the nearest aliens, never killing one, for threat', () => {
-  const run = entering()
-  const index = entranceOf(run.battle, 'strike')
-  const near = nearestAlien(run.battle, run.battle.entrances[index].at)!
-  const struck = closeBy(run.battle, near, STRIKE.reach)
-  const aliens = run.battle.units.filter((u) => u.side === 'alien')
-  const before = aliens.map((u) => u.hp)
-  const threat = run.threat
-  enterAt(run, index)
-  stepBattle(run.battle)
-  aliens.forEach((u, i) => struck.includes(u) && expect(u.hp).toBe(Math.max(1, before[i] - STRIKE.damage)))
-  expect(run.threat).toBe(threat + STRIKE.threat)
-})
-
-/** The first battle of `goal` offering `kind`, from seed `from` on; null if 200 seeds offer none. */
+/** The first battle of `goal` staging `kind`, from seed `from` on; null if 40 seeds stage none. */
 function offered(kind: EntranceKind, goal: Goal = 'exterminate', from = 1): (Run & { battle: Battle }) | null {
-  for (let seed = from; seed < from + 200; seed++) {
+  for (let seed = from; seed < from + 40; seed++) {
     const run = entering(seed, goal)
-    if (run.battle.entrances.some((e) => e.kind === kind)) return run
+    if (run.battle.entrance!.kind === kind) return run
   }
   return null
 }
 
 test('a shoulder tap comes in right by an alien, and flattens the nearest', () => {
   const run = offered('tap')!
-  const index = run.battle.entrances.findIndex((e) => e.kind === 'tap')
-  const { at } = run.battle.entrances[index]
+  const { at } = run.battle.entrance!
   const first = nearestAlien(run.battle, at)!
   expect(distance(first, at)).toBeLessThanOrEqual(TAP_REACH)
-  enterAt(run, index)
+  enterAt(run)
   stepBattle(run.battle)
   expect(first.hp).toBeLessThanOrEqual(0)
 })
 
 test('a shoulder tap only wounds a boss', () => {
   const run = entering()
-  const index = entranceOf(run.battle, 'tap')
-  const first = nearestAlien(run.battle, run.battle.entrances[index].at)!
+  stagedAs(run.battle, 'tap')
+  const first = nearestAlien(run.battle, run.battle.entrance!.at)!
   first.boss = true
   first.hp = TAP_DAMAGE + 5
-  enterAt(run, index)
+  enterAt(run)
   stepBattle(run.battle)
   expect(first.hp).toBe(5)
 })
 
 test('a shoulder tap stays clear of a commander and off a raid', () => {
-  for (let from = 1; from <= 300; from += 50) {
+  for (let from = 1; from <= 41; from += 40) {
     const run = offered('tap', 'assassinate', from)
     if (!run) continue
     const commander = run.battle.units.find((u) => u.target)!
-    expect(distance(run.battle.entrances.find((e) => e.kind === 'tap')!.at, commander)).toBeGreaterThanOrEqual(COMMANDER_GAP)
+    expect(distance(run.battle.entrance!.at, commander)).toBeGreaterThanOrEqual(COMMANDER_GAP)
   }
   expect(offered('tap', 'raid')).toBeNull()
 })
 
 test('look over there lands farther out than a wall, and the nearest aliens do nothing for LOOK_TURNS alien turns', () => {
   const run = offered('look')!
-  const index = run.battle.entrances.findIndex((e) => e.kind === 'look')
-  const { at } = run.battle.entrances[index]
+  const { at } = run.battle.entrance!
   const first = nearestAlien(run.battle, at)!
   expect(distance(first, at)).toBeGreaterThanOrEqual(ENTRANCE_KINDS.wall.reach[1])
   for (const alien of run.battle.units.filter((u) => u.side === 'alien')) alien.hp = 10000
-  enterAt(run, index)
+  enterAt(run)
   expect(first.surprised).toBe(LOOK_TURNS)
   const aliensActed = new Set(closeBy(run.battle, first, LOOK_REACH).map((u) => u.id))
   let turns = 0
@@ -184,15 +177,16 @@ test('look over there lands farther out than a wall, and the nearest aliens do n
 test('a big explosion and a stolen kill are style only, and shooting first hurts the nearest alien', () => {
   for (const kind of ['blast', 'mine'] as const) {
     const run = entering()
+    stagedAs(run.battle, kind)
     const before = run.battle.units.filter((u) => u.side === 'alien').map((u) => u.hp)
-    enterAt(run, entranceOf(run.battle, kind))
+    enterAt(run)
     expect(run.battle.units.filter((u) => u.side === 'alien').map((u) => u.hp)).toEqual(before)
     expect(stepBattle(run.battle).some((e) => e.type === 'hurt')).toBe(false)
   }
   const run = entering()
-  const index = entranceOf(run.battle, 'han')
-  const first = nearestAlien(run.battle, run.battle.entrances[index].at)!
-  enterAt(run, index)
+  stagedAs(run.battle, 'han')
+  const first = nearestAlien(run.battle, run.battle.entrance!.at)!
+  enterAt(run)
   expect(stepBattle(run.battle)).toContainEqual({ type: 'hurt', id: first.id, amount: TUNING.impactDamage, cause: 'impact' })
 })
 
@@ -201,7 +195,7 @@ test('with nobody left fighting, the next cluster comes whole after RALLY_EVERY 
   apply(run, { type: 'go', index: 1 })
   road(run, [{ kind: 'battle', risk: 'standard', goal: 'exterminate', terrain: 'town', twist: null, aliens: Array.from({ length: 12 }, () => 'trooper' as const) }])
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  enterAt(run)
   const battle = run.battle!
   battle.units = battle.units.filter((u) => u.side !== 'alien' || !u.engaged)
   const waiting = () => battle.units.filter((u) => u.side === 'alien' && !u.engaged)
@@ -214,4 +208,31 @@ test('with nobody left fighting, the next cluster comes whole after RALLY_EVERY 
   const engaged = battle.units.filter((u) => u.side === 'alien' && u.engaged)
   expect(engaged.length).toBeGreaterThan(0)
   expect(new Set(engaged.map((u) => u.cluster)).size).toBe(1)
+})
+
+test('Encore catches the aliens nearest surprised whatever the entrance', () => {
+  const run = begun(1)
+  run.relics = ['encore']
+  apply(run, { type: 'go', index: 1 })
+  current(run)!.stop!.goal = 'exterminate'
+  apply(run, { type: 'advance' })
+  const battle = run.battle!
+  stagedAs(battle, 'blast')
+  const near = nearestAlien(battle, battle.entrance!.at)!
+  enterAt(run)
+  expect(near.surprised).toBeGreaterThanOrEqual(1)
+})
+
+test('every flow ends with nothing to choose: bots play each goal to a winner, under the beat limit', () => {
+  for (const goal of ['exterminate', 'hold', 'rescue', 'raid', 'vip', 'assassinate'] as Goal[]) {
+    for (let seed = 1; seed <= 3; seed++) {
+      const run = entering(seed, goal)
+      if (goal === 'raid') apply(run, { type: 'grab', caches: 1 })
+      else apply(run, { type: 'enter' })
+      // Heroes that never move: rally and waves must still settle it.
+      for (const u of run.battle.units.filter(isSoldier)) u.stats = { ...u.stats, move: 0, range: 0 }
+      while (run.battle.phase === 'battle') stepBattle(run.battle)
+      expect(run.battle.phase).toBe('over')
+    }
+  }
 })

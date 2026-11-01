@@ -15,7 +15,7 @@ function battle(seed: number): Battle {
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  enterAt(run)
   return run.battle!
 }
 
@@ -106,7 +106,7 @@ test('before contact, soldiers walk their full move from the first turn', () => 
 
 test('a soldier may walk between and after its attacks, its walks in a turn together within its move', () => {
   let strides = 0
-  for (let seed = 1; seed <= 30; seed++) {
+  for (let seed = 1; seed <= 90; seed++) {
     const walked = new Map<string, number>()
     play(seed, (events, before) => {
       for (const e of events) {

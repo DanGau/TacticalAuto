@@ -5,11 +5,10 @@ import { nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { skillOffers } from '../core/squad'
-import type { View } from '../view/view'
 import { choice, joined, loot, modal, runEnd, skillChoice, stopReport } from './aftermath'
 import { TWISTS } from '../core/twists'
 import { type Battle } from '../core/battle'
-import { ENTRANCE_KINDS, STRIKE } from '../core/entrances'
+import { ENTRANCE_KINDS } from '../core/entrances'
 import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { button, STOP_NAMES } from './html'
 import { canUse } from '../core/apply'
@@ -36,24 +35,20 @@ function status(run: Run): string {
   return `${title}${vip}${rounds}`
 }
 
-/** Before the entrance: a button per entrance that flies the camera there, one back to the whole map, and what the chosen one does. */
-function drop(battle: Battle, chosen: number | null, greed: number): string {
-  if (battle.goal === 'raid') return raids(battle, greed)
-  const entrances = battle.entrances.map(({ kind }, i) => `<button data-entrance="${i}" class="${i === chosen ? 'on' : ''}">${ENTRANCE_KINDS[kind].icon} ${ENTRANCE_KINDS[kind].name}</button>`)
-  const overview = `<button data-entrance="" class="overview ${chosen === null ? 'on' : ''}" title="Whole map">🗺️</button>`
-  const kind = chosen === null ? null : battle.entrances[chosen].kind
-  const cost = kind === 'strike' ? ` <span class="up">+${STRIKE.threat} threat</span>` : ''
-  const detail = kind === null ? '<small>Pick an entrance to fly to it.</small>' : `<p>${ENTRANCE_KINDS[kind].text}.${cost}</p>${button({ type: 'enter', entrance: chosen! }, `${ENTRANCE_KINDS[kind].icon} ${ENTRANCE_KINDS[kind].name}!`)}`
+/** Before the entrance: the twist, what the entrance is, and the tap that starts the battle. A raid's choice of caches comes in the middle. */
+function drop(battle: Battle, greed: number): string {
+  const { kind } = battle.entrance!
+  const { icon, name, text } = ENTRANCE_KINDS[kind]
   const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
-  return `${twist}<div class="entrances">${entrances.join('')}${overview}</div>${detail}`
+  const go = battle.goal === 'raid' ? raids(battle, greed) : button({ type: 'enter' }, `${icon} ${name}!`)
+  return `${twist}<p>${icon} <b>${name}.</b> ${text}.</p>${go}`
 }
 
 /** On a raid: a button per number of caches to go for, then what that pays and costs. */
 function raids(battle: Battle, greed: number): string {
   const buttons = battle.caches.map((_, i) => `<button data-greed="${i + 1}" class="${i + 1 === greed ? 'on' : ''}">📦 ${i + 1}</button>`)
-  const { kind } = battle.entrances[0]
   const what = greed === 1 ? 'Grab the nearest cache and lift off.' : `Grab ${greed} caches before lifting off: ${greed} times the supplies, and ${greed - 1} more threat.`
-  return `<div class="entrances">${buttons.join('')}</div><p>${ENTRANCE_KINDS[kind].icon} <b>${ENTRANCE_KINDS[kind].name}.</b> ${ENTRANCE_KINDS[kind].text}.</p><p>${what}</p>${button({ type: 'grab', caches: greed }, `Go for ${greed}`)}`
+  return `<div class="entrances">${buttons.join('')}</div><p>${what}</p>${button({ type: 'grab', caches: greed }, `Go for ${greed}`)}`
 }
 
 /**
@@ -74,7 +69,7 @@ function kit(run: Run): string {
 }
 
 /** Turns clicks into actions and hands them to `act`. */
-export function createUi(view: View, act: (action: Action) => void): Ui {
+export function createUi(act: (action: Action) => void): Ui {
   const statusLine = document.getElementById('status')!
   const overlay = document.getElementById('panel')!
   const dropPanel = document.getElementById('drop')!
@@ -84,8 +79,6 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     const target = (e.target as HTMLElement).closest('button')
     if (target?.dataset.action && !target.disabled) act(JSON.parse(target.dataset.action) as Action)
   })
-  /** The entrance chosen in the deploy phase, and the battle it was chosen in. */
-  let chosen: number | null = null
   /** The caches chosen to go for on a raid. */
   let greed = 1
   let choosing: Battle | null = null
@@ -176,22 +169,11 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     if (!battle) return
     if (battle !== choosing) {
       choosing = battle
-      chosen = null
       greed = 1
     }
-    dropPanel.innerHTML = drop(battle, chosen, greed)
+    dropPanel.innerHTML = drop(battle, greed)
   }
 
-  function choose(next: number | null): void {
-    chosen = next
-    view.focus(chosen)
-    showDrop(shown!)
-  }
-
-  view.canvas.addEventListener('click', (e) => {
-    const at = view.entranceAt(e.offsetX, e.offsetY)
-    if (at !== null) choose(at)
-  })
   dropPanel.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (!target) return
@@ -199,7 +181,7 @@ export function createUi(view: View, act: (action: Action) => void): Ui {
     else if (target.dataset.greed) {
       greed = Number(target.dataset.greed)
       showDrop(shown!)
-    } else choose(target.dataset.entrance ? Number(target.dataset.entrance) : null)
+    }
   })
   addEventListener('resize', () => requestAnimationFrame(shrink))
 

@@ -8,7 +8,7 @@ import type { Rule } from './doctrines'
 import { flowOf, type Goal, VIP_HP, CIVILIANS, CIVILIAN_HP } from './goals'
 import { generateTerrain } from './terrain-gen'
 import type { Twist } from './twists'
-import { deploy, planEntrances } from './entrances'
+import { deploy, planEntrance } from './entrances'
 import { ARENA_REACH, designEncounter } from './encounter'
 
 /** Lays each soldier the aliens hold on a recovery beside an alien, in turn. */
@@ -132,10 +132,9 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     held: 0,
     actor: null,
     tally: {},
-    entrances: [],
-    entered: null,
+    entrance: null,
     arena: { x: 0, y: 0, reach: ARENA_REACH },
-    approaches: [],
+    approach: { x: 0, y: 0 },
     gates: [],
     rallied: 0,
     spotlight: null,
@@ -179,9 +178,10 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
   }
   // A raid's caches each stand by an alien, guarded.
   if (goal === 'raid') battle.caches = Array.from({ length: CACHES }, (_, i) => {
-    const guard = i < posts.length ? posts[Math.floor((i * posts.length) / CACHES)] : null
+    const guards = posts.filter((_, p) => clusters.indexOf(clusters[p]) === p)
+    const guard = guards[i] ?? posts[i] ?? null
     return guard ? (freeTilesNear(battle, guard, 4)[3] ?? guard) : freeTilesNear(battle, spot, 40)[10 * i]
   })
-  planEntrances(battle, heart)
+  planEntrance(battle, heart)
   return battle
 }

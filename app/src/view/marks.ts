@@ -43,9 +43,8 @@ const ring = (shapes: Shapes, x: number, y: number, color: number, width: number
   for (let i = 0; i < 4; i++) shapes.band(c[i], c[(i + 1) % 4], w, color, alpha)
 }
 
-/** Before the entrance: tints and names each entrance, and names those the mission turns on. */
+/** Before the entrance: tints and names it, and names those the mission turns on. */
 export function drawMarks(s: Stage, battle: Battle): void {
-  const { hovered, selected } = s
   const tint = new Shapes()
   const marks: Label[] = (s.marks = [])
   if (battle.uplink) marks.push(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
@@ -60,15 +59,16 @@ export function drawMarks(s: Stage, battle: Battle): void {
     if (u.surprised && s.sprites.has(u.id) && (!s.seen || s.seen[u.y * GRID + u.x])) marks.push(label('❗ SURPRISED', u, COLOR.crit, 16))
   }
   if (battle.phase === 'deploy') {
-    if (!s.briefing)
-      battle.entrances.forEach(({ kind, at: zone, feature }, i) => {
+    if (!s.briefing && battle.entrance) {
+      const { kind, at: zone, feature } = battle.entrance
+      {
         for (let y = zone.y - ENTRY_RADIUS; y <= zone.y + ENTRY_RADIUS; y++) {
           for (let x = zone.x - ENTRY_RADIUS; x <= zone.x + ENTRY_RADIUS; x++) {
-            if (y >= 0 && x >= 0 && y < GRID && x < GRID && battle.ground[y * GRID + x] !== 'void') diamond(tint, x, y, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone, 0.8)
+            if (y >= 0 && x >= 0 && y < GRID && x < GRID && battle.ground[y * GRID + x] !== 'void') diamond(tint, x, y, COLOR.zoneHover, 0.8)
           }
         }
-        // The selected entrance's way in: a line to the uplink, or to the nearest contact.
-        const toward = i === selected && (battle.uplink ?? nearestAlien(battle, zone))
+        // Its way in: a line to the uplink, or to the nearest contact.
+        const toward = battle.uplink ?? nearestAlien(battle, zone)
         if (toward) {
           const a = spot(zone.x, zone.y)
           const b = spot(toward.x, toward.y)
@@ -86,14 +86,15 @@ export function drawMarks(s: Stage, battle: Battle): void {
           diamond(tint, feature.from.x, feature.from.y, COLOR.zoneHover, 0.9)
         }
         marks.push(label(`${ENTRANCE_KINDS[kind].icon} ${ENTRANCE_KINDS[kind].name}${feature?.name ? ` ${feature.name}` : ''}`, zone, 0xffffff, 26))
-      })
+      }
+    }
     // Those the mission turns on are named; every other alien speaks for itself.
     for (const u of battle.units.filter((a) => a.side === 'alien' && (a.target || a.boss))) marks.push(label(u.target ? '🎯 COMMANDER' : battle.goal === 'ambush' ? 'THE HUNTER' : battle.place === 'hive' ? 'THE SOURCE' : 'GUARDIAN', u, COLOR.contact, 20))
   }
   lay(s.zones, tint)
-  // A fence rings each zone in play: the entrances to choose from, the uplink to hold, the way out.
+  // A fence rings each zone in play: the entrance, the uplink to hold, the way out.
   const rings: [Tile, number, number][] = []
-  if (battle.phase === 'deploy' && !s.briefing) battle.entrances.forEach(({ at }, i) => rings.push([at, ENTRY_RADIUS, i === hovered || i === selected ? COLOR.zoneHover : COLOR.zone]))
+  if (battle.phase === 'deploy' && !s.briefing && battle.entrance) rings.push([battle.entrance.at, ENTRY_RADIUS, COLOR.zoneHover])
   if (battle.uplink) rings.push([battle.uplink, UPLINK_REACH, COLOR.uplink])
   if (battle.extract) rings.push([battle.extract, EXTRACT_REACH, COLOR.extract])
   const next = new Map<string, ReturnType<typeof fence>>()

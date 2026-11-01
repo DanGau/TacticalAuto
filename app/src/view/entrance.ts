@@ -1,6 +1,6 @@
 // The squad's entrance on screen, as a film would cut to it: the door kicked in, the wall smashed, the monologue, the tap on the shoulder.
 import { type Battle, type Tile, type Unit } from '../core/battle'
-import { closeBy, LOOK_REACH, STRIKE } from '../core/entrances'
+import { closeBy, LOOK_REACH } from '../core/entrances'
 import { nearestAlien } from '../core/grid'
 import { drawTerrain } from './board'
 import { callout, drawing, float } from './effects'
@@ -35,7 +35,7 @@ const TAUNTS = ['You picked the wrong city.', 'Hey, ugly! Over here!', 'Leave th
  * plays, and the squad stands ready. An ambush has none to play.
  */
 export async function makeEntrance(s: Stage, battle: Battle): Promise<void> {
-  const entrance = battle.entered
+  const entrance = battle.entrance
   const soldiers = battle.units.filter((u) => u.side === 'human' && !u.civilian)
   if (!entrance || soldiers.length === 0) return
   const foe = nearestAlien(battle, entrance.at)
@@ -73,10 +73,6 @@ export async function makeEntrance(s: Stage, battle: Battle): Promise<void> {
     case 'truck':
       await drawing(s, (fx) => truck(s, fx, (entrance.feature?.path ?? [entrance.at]).map((t) => s.toWorld(t.x, t.y))))
       drawTerrain(s, battle)
-      await dashIn(s, sprites, back, 0)
-      break
-    case 'strike':
-      await strike(s, battle, foe)
       await dashIn(s, sprites, back, 0)
       break
     case 'tap':
@@ -259,26 +255,6 @@ async function truck(s: Stage, fx: Sketch, way: Tile[]): Promise<void> {
   })
   shake(s, 8, 500)
   await s.tween(DEBRIS_MS, (t) => fx.clear().ellipse(at.x, at.y - 10, 30 + 80 * t, 14 + 36 * t).fill({ color: 0xb8a888, alpha: 0.7 * (1 - t) }))
-}
-
-/** Shells streak down on the aliens nearest, one after another, before the squad goes in. */
-async function strike(s: Stage, battle: Battle, foe: Unit | undefined): Promise<void> {
-  if (!foe) return
-  const struck = closeBy(battle, foe, STRIKE.reach)
-  await s.follow(struck.map((u) => ({ x: u.x, y: u.y })), 400)
-  await Promise.all(
-    struck.map((u, i) =>
-      drawing(s, async (fx) => {
-        const ground = s.toWorld(u.x, u.y)
-        await s.tween(i * STAGGER_MS, () => {})
-        await s.tween(300, (t) => fx.clear().moveTo(ground.x + 60, ground.y - 400 * (1 - t) - 60).lineTo(ground.x + 60 * (1 - t), ground.y - 400 * (1 - t)).stroke({ color: 0xffe08a, width: 4 }))
-        shake(s, 6, 300)
-        await s.tween(DEBRIS_MS, (t) => fx.clear().ellipse(ground.x, ground.y - 10, 20 + 50 * t, 10 + 25 * t).fill({ color: COLOR.crit, alpha: 0.8 * (1 - t) }))
-      }),
-    ),
-  )
-  const squad = battle.units.filter((u) => u.side === 'human' && !u.civilian)
-  await s.follow([...squad.map((u) => ({ x: u.x, y: u.y })), { x: foe.x, y: foe.y }], 400)
 }
 
 /** The speaker steps up and taunts the aliens, who turn to it. */

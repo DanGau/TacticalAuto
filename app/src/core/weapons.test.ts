@@ -14,18 +14,18 @@ function field(weapon: WeaponId, at: [number, number][], range = WEAPONS[weapon]
   const run = begun(1)
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
-  enterAt(run, 0)
+  enterAt(run)
   const b = run.battle!
   const hero = b.units.find(isSoldier)!
   const template = b.units.find((u) => u.side === 'alien')!
-  const aliens = at.map(([x, y], i) => ({ ...structuredClone(template), id: 900 + i, x, y, hp: 500, armor: 0, kind: 'trooper' as const, boss: false, target: false, revealed: true, engaged: true, stats: { ...template.stats, hp: 500, move: 0, range: 0 } }))
+  const aliens = at.map(([x, y], i) => ({ ...structuredClone(template), id: 900 + i, x, y, hp: 500, armor: 0, kind: 'trooper' as const, boss: false, target: false, surprised: 0, panicked: false, revealed: true, engaged: true, stats: { ...template.stats, hp: 500, move: 0, range: 0 } }))
   b.units = [hero, ...aliens]
   b.props.fill('none')
   b.bulk.fill(0 as never)
   b.height.fill(0)
   b.north.fill('none' as never)
   b.west.fill('none' as never)
-  Object.assign(b, { goal: 'exterminate', uplink: null, waves: [], twist: null })
+  Object.assign(b, { goal: 'exterminate', uplink: null, waves: [], twist: null, opening: false })
   Object.assign(hero, { x: 10, y: 10, weapon, effects: [], ability: null, secondary: 'frag', stats: { ...hero.stats, damage: 10, crit: 0, range, move: 0 }, stance: 'anchor' })
   return { b, hero, aliens }
 }
@@ -34,10 +34,11 @@ const shots = (events: GameEvent[]) => events.filter((e) => e.type === 'shot') a
 
 const heroTurn = (b: Battle, hero: Unit) => {
   Object.assign(b, { turn: 'human', stage: 'shoot', shooter: 0, attacks: 0, strides: {} })
+  const round = b.round
   const events: GameEvent[] = []
   for (let i = 0; i < 4; i++) {
     events.push(...stepBattle(b))
-    if (b.turn !== 'human') break
+    if (b.turn !== 'human' || b.round !== round) break
   }
   return shots(events).filter((s) => s.id === hero.id)
 }

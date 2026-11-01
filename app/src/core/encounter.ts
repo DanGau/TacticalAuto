@@ -10,7 +10,7 @@ import { PROP_BULK, type Prop, type TerrainKind } from './terrain'
 export const ARENA_REACH = 14
 const SIGHT_CLEAR = 22
 
-/** Where an encounter's fight flows, in tiles along its axis from the ways in toward the overlook, and across it. */
+/** Where an encounter's fight flows, in tiles along its axis from the way in toward the overlook, and across it. */
 type Mark = [along: number, across: number]
 
 /** The objects heroes find in the heaps, low and tall, by where the fight is. */
@@ -22,8 +22,8 @@ const LEDGE: Mark = [-8, -9]
 const HAZARD: Mark[] = [[3, -2], [4, 0], [3, 2]]
 /** Heaps of things to hurl, beside each flank and down the middle. */
 const HEAPS: Mark[] = [[-6, -6], [-6, 6], [-2, -8], [-2, 8], [6, -5], [6, 5]]
-/** The ways in: head on, nearest the fight; a flank by the ledge; a flank by the heaps; a far side for an extra. */
-const APPROACHES: Mark[] = [[-12, 0], [-8, -10], [-8, 10], [2, 13]]
+/** The way in, head on. */
+const APPROACH: Mark = [-12, 0]
 /** Where reinforcements arrive: behind the aliens, and on each far flank. */
 const GATES: Mark[] = [[13, 0], [8, -12], [8, 12], [-2, -13], [-2, 13]]
 
@@ -182,7 +182,7 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal): { 
   for (const mark of HAZARD) stand(battle, raw(mark), battle.place === 'hive' ? 'growth' : 'fuel')
   for (const [i, mark] of HEAPS.entries()) stand(battle, raw(mark), i % 3 === 2 ? tall : low)
   walks.delete(battle)
-  battle.approaches = APPROACHES.map((m) => raw(m))
+  battle.approach = raw(APPROACH)
   battle.gates = GATES.map((m) => openNear(battle, raw(m)))
   const heart = goal === 'rescue' ? raw(HEART) : null
   const walk = walkingDistances(battle, openNear(battle, spot))

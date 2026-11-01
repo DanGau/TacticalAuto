@@ -15,7 +15,7 @@ function duel() {
   apply(run, { type: 'advance' })
   const clear = run.battle!
   const walled = clear.north.some((e, t) => e !== 'none' && distance({ x: t % GRID, y: Math.floor(t / GRID) }, clear.arena) < ARENA_REACH / 2)
-  enterAt(run, 0)
+  enterAt(run)
   const battle = run.battle!
   const soldier = battle.units.find(isSoldier)!
   const alien = battle.units.find((u) => u.side === 'alien')!

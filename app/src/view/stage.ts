@@ -82,7 +82,7 @@ export class Stage {
   /** Shot effects over the scene, and each entrance's props under way. */
   readonly fx = new Sketch()
   readonly drops = new Set<Sketch>()
-  /** Before the entrance, the entrances' names; and the callouts over units. */
+  /** Before the entrance, its name; and the callouts over units. */
   marks: Label[] = []
   readonly labels = new Set<Label>()
 
@@ -106,10 +106,6 @@ export class Stage {
   camera = aim({ x: 0, y: 0 }, FIT)
   /** Screen pixels the picture is jolted by, as a blow lands. */
   readonly jolt = { x: 0, y: 0 }
-  /** The entrance under the pointer. */
-  hovered: number | null = null
-  /** The entrance the camera is on before the squad goes in. */
-  selected: number | null = null
   /** Whether the briefing is under way, so the entrances are hidden. */
   briefing = false
   /** The camera's glide under way; a new one takes over from wherever the camera is, so two never fight over it. */
@@ -233,7 +229,7 @@ export class Stage {
 
   /**
    * Fades away each roof within the circle of the arena, where the fight is staged, and each over a tile that
-   * matters: a unit's, the briefing's lit one, or an entrance's while one is chosen. Thins each wall standing just
+   * matters: a unit's, the briefing's lit one, or the entrance's before the squad goes in. Thins each wall standing just
    * before a unit toward the camera, as XCOM cuts its buildings away. The rest fade back.
    */
   private cutAway(ms: number): void {
@@ -242,9 +238,9 @@ export class Stage {
     const toward = (fade: { value: number }, target: number) => (fade.value = fade.value < target ? Math.min(target, fade.value + step) : Math.max(target, fade.value - step))
     const keys = [...this.sprites.values()].map((s) => ({ x: Math.round(s.tile.x), y: Math.round(s.tile.y) }))
     if (this.lit) keys.push({ x: Math.round(this.lit.x), y: Math.round(this.lit.y) })
-    // Choosing an entrance, the entrances show whole.
-    if (shown?.phase === 'deploy' && !this.briefing)
-      for (const { at } of shown.entrances) for (let dy = -ENTRY_RADIUS; dy <= ENTRY_RADIUS; dy++) for (let dx = -ENTRY_RADIUS; dx <= ENTRY_RADIUS; dx++) keys.push({ x: at.x + dx, y: at.y + dy })
+    // Before the squad goes in, the entrance shows whole.
+    if (shown?.phase === 'deploy' && !this.briefing && shown.entrance)
+      for (const { at } of [shown.entrance]) for (let dy = -ENTRY_RADIUS; dy <= ENTRY_RADIUS; dy++) for (let dx = -ENTRY_RADIUS; dx <= ENTRY_RADIUS; dx++) keys.push({ x: at.x + dx, y: at.y + dy })
     const under = new Set(keys.map((k) => k.y * GRID + k.x))
     const arena = shown?.arena
     for (const roof of this.roofs) {

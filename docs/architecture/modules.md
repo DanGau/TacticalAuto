@@ -12,7 +12,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `encounter.ts` | `designEncounter`: the set-piece: arena, overlook, hazard, objects, posts, approaches, gates |
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
 | `objects.ts` | What heroes do with objects: hurling them, setting off tanks |
-| `entrances.ts` | Entrances: their kinds, where each comes in, what each sets off |
+| `entrances.ts` | Entrances: the one each encounter stages, where it comes in, what it sets off |
 | `features.ts` | The real doors, walls, roofs, high points and roads an entrance comes from, and which suit each place |
 | `spawn.ts` | Making units: aliens, soldiers, civilians, mechs, drops |
 | `step.ts` | Advances the run's battle a beat; settles it when it ends |
@@ -58,7 +58,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `camera.ts` | World and picture points, cameras that frame tiles |
 | `play.ts` | Plays a beat's events in order |
 | `effects.ts` | Shots, lunges, rockets, sparks, shake, callouts |
-| `entrance.ts` | The entrance playing: door, wall, monologue, skylight, rope, smoke, truck, strike, tap, look, blast, shot, stolen kill |
+| `entrance.ts` | The entrance playing: door, wall, monologue, skylight, rope, smoke, truck, tap, look, blast, shot, stolen kill |
 | `sprites.ts` | Unit pictures and moving them |
 | `marks.ts` | Ground marks: entrances, goals, fences, acid, fog, glows |
 | `board.ts` | Building the battlefield's ground, props, walls, roofs |

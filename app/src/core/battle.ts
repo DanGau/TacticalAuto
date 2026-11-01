@@ -105,8 +105,6 @@ export const PLATING_ARMOR = 3
 export const CLOAK_TURNS = 2
 export const CLOAK_DAMAGE = 3
 export const SHADOW_DAMAGE = 2
-/** Entrances offered to the squad. */
-export const ENTRANCES = 3
 /** Tiles around an entrance that are marked as it, and that its squad comes in on. */
 export const ENTRY_RADIUS = 2
 /** Tiles a wave keeps from the squad. */
@@ -329,7 +327,7 @@ export interface Unit {
 export type Order = 'prepare' | 'sprint'
 
 
-/** An entrance the squad may make: how, and the tile it comes in at. */
+/** How the squad comes in, and the tile it comes in at. */
 export interface Entrance {
   kind: EntranceKind
   at: Tile
@@ -410,12 +408,11 @@ export interface Battle {
   saved: number
   /** On a VIP rescue, whether the VIP waits for the squad, behind its building's walls or past the breach; keeps by it on the way out; or has lifted off. Null otherwise. */
   vip: 'held' | 'breached' | 'freed' | 'out' | null
-  /** The entrances on offer in the deploy phase, and the one the squad made; null before it enters. */
-  entrances: Entrance[]
-  entered: Entrance | null
+  /** The one entrance the encounter stages; an ambush has none. */
+  entrance: Entrance | null
   arena: Arena
-  /** Where the encounter means each entrance to lie, each its own trade: head on, by a ledge, by heaps to hurl. */
-  approaches: Tile[]
+  /** Where a push's entrance means to lie: head on down the fight's axis. */
+  approach: Tile
   /** Where reinforcements arrive. */
   gates: Tile[]
   /** The round aliens last joined the fight. */

@@ -67,7 +67,7 @@ const relics = {
   glacial: { name: 'Glacial Snare', text: 'Chilling an alien roots it too', tags: ['frost'], effect: 'glacial' },
   juggernaut: { name: 'Juggernaut Servos', text: '+1 damage while the hero has armor left', tags: ['ward'], effect: 'armored' },
   // Entrances: each makes how the squad comes in matter more.
-  encore: { name: 'Encore', text: 'Every battle offers one more entrance', effect: 'encore' },
+  encore: { name: 'Encore', text: 'Every entrance catches the aliens nearest surprised, holding their fire on their first turn', effect: 'encore' },
   limelight: { name: 'Limelight', text: `Every battle offers Land and Monologue, and its taunt holds ${LIMELIGHT_ROUNDS} rounds longer`, effect: 'limelight' },
   charges: { name: 'Breaching Charges', text: `Every entrance blasts each alien within ${CHARGE_REACH} tiles for ${TUNING.impactDamage + CHARGE_BLAST}`, effect: 'entryBlast' },
   shredder: { name: 'Shredder Charges', text: `Every entrance strips the armor from each alien within ${CHARGE_REACH} tiles and hurts it`, tags: ['ward'], effect: 'entryShred' },

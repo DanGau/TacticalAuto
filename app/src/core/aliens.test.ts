@@ -5,7 +5,7 @@ import { TUNING } from './tuning'
 beforeAll(() => void Object.assign(TUNING, { alienHp: 0.5, alienDamage: 1 }))
 import { beforeAll, expect, test } from 'vitest'
 import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, REGEN_HEAL, type AlienKind } from './aliens'
-import { enterAt, entranceOf, begun } from './roads'
+import { enterAt, stagedAs, begun } from './roads'
 import { apply } from './apply'
 import { isSoldier, ACID_DAMAGE, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, GRID, MECH_STATS, DRONE_STATS, TITAN_HEALTH, LEAP_DAMAGE, SLAM_HIT, SLAM_TILES, HURL_DAMAGE, type Battle, type Unit } from './battle'
 import { mechUnit } from './spawn'
@@ -37,8 +37,8 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   // An entrance that sets nothing off.
-  const zone = entranceOf(run.battle!, 'rappel')
-  enterAt(run, zone)
+  stagedAs(run.battle!, 'rappel')
+  enterAt(run)
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [] })
   battle.ground.fill('pavement')

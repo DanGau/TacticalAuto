@@ -1,5 +1,5 @@
 // The player's actions, checked and applied to the run: the only way a player changes state.
-import { enter, STRIKE } from './entrances'
+import { enter } from './entrances'
 import { foesInSight } from './combat'
 import { CONSUMABLES, KIT_SLOTS } from './consumables'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
@@ -35,13 +35,13 @@ export type Action =
   | { type: 'go'; index: number }
   /** Overworld: travel to the next stop. */
   | { type: 'advance' }
-  /** Deploy phase: make the entrance at `entrance` of battle.entrances and begin the battle; Danger Close costs threat. */
-  | { type: 'enter'; entrance: number }
+  /** Deploy phase: make the battle's entrance and begin it. */
+  | { type: 'enter' }
   /** Battle, entering or fighting: use the consumable at `index` of run.kit; it takes effect at the next beat. */
   | { type: 'use'; index: number }
   /** Battle: fight on without using a consumable, when asked to choose. */
   | { type: 'wait' }
-  /** On a raid, in place of a choice of entrance: how many supply caches the squad goes for before it lifts off. */
+  /** On a raid, in place of `enter`: how many supply caches the squad goes for before it lifts off. */
   | { type: 'grab'; caches: number }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
@@ -92,17 +92,14 @@ export function apply(run: Run, action: Action): Result {
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy' || battle.goal !== 'raid') return no('not raiding')
     if (!Number.isInteger(action.caches) || action.caches < 1 || action.caches > battle.caches.length) return no('no such raid')
     battle.greed = action.caches
-    enter(battle, battle.entrances[0])
+    enter(battle)
     return ok
   }
   if (action.type === 'enter') {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not entering')
     if (battle.goal === 'raid') return no('a raid picks how many caches to grab instead')
-    const entrance = battle.entrances[action.entrance]
-    if (!entrance) return no('no such entrance')
-    if (entrance.kind === 'strike') run.threat = Math.min(run.threat + STRIKE.threat, THREAT_MAX)
-    enter(battle, entrance)
+    enter(battle)
     return ok
   }
   if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill') {

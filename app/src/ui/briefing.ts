@@ -1,6 +1,7 @@
 // The briefing: the camera's tour of a mission before the entrance.
 import { ALIENS } from '../core/aliens'
 import { GRID, type Battle, type Tile } from '../core/battle'
+import { ENTRANCE_KINDS } from '../core/entrances'
 import { heightAt } from '../core/grid'
 import type { Prop } from '../core/terrain'
 import { GOALS } from '../core/goals'
@@ -47,7 +48,7 @@ const LINES = 3
 /** Tiles around a thing the briefing frames, and whose ground it names. */
 const NEAR = 4
 
-/** A thing the briefing shows: the tiles the camera frames, or the whole map, and a line on it. `entrances` shows the entrances from it on. */
+/** A thing the briefing shows: the tiles the camera frames, or the whole map, and a line on it. `entrances` shows the entrance from it on. */
 interface Shot {
   tiles: Tile[] | null
   line: string
@@ -97,7 +98,7 @@ export const STOPS = 3
 
 /**
  * What to show before the entrance: tight on the objective, at most two things, naming the ground there, then the whole
- * map, where the entrances show. The first line names the goal; the last any twist and the choice to make.
+ * map, where the entrance shows. The first line names the goal; the last any twist and the way in.
  */
 export function shots(battle: Battle): Shot[] {
   const goal = GOALS[battle.goal]
@@ -118,7 +119,7 @@ export function shots(battle: Battle): Shot[] {
   const where = `${battle.city}, ${REGIONS[battle.region].name.toLowerCase()}. `
   const lines = at.map((t, i) => `${i === 0 ? `${where}Objective: ${goal.text}. ` : ''}${nearby(battle, t)}${ground(battle, t)}.`)
   const twist = battle.twist && TWISTS[battle.twist]
-  const choice = battle.goal === 'raid' ? 'Choose how many caches to go for.' : 'Choose your entrance.'
+  const choice = battle.goal === 'raid' ? 'Choose how many caches to go for.' : `Coming in: ${battle.entrance ? ENTRANCE_KINDS[battle.entrance.kind].name : 'now'}.`
   const last = `${twist ? `${twist.icon} ${twist.name}: ${twist.text}. ` : ''}${choice}`
   return [...at.map((t, i): Shot => ({ tiles: around(t), line: lines[i] })), { tiles: null, line: at.length === 0 ? `${where}Objective: ${goal.text}. ${last}` : last, entrances: true }]
 }
@@ -166,7 +167,7 @@ export async function brief(view: View, battle: Battle): Promise<void> {
     void view.frame(shot.tiles, DWELL_MS, { ...angle, turn: angle.turn + DRIFT, fov: angle.fov * 0.9 })
     await hold(DWELL_MS)
   }
-  // The last shot settles from the lens's depth onto the flat map, the entrances showing as it lands.
+  // The last shot settles from the lens's depth onto the flat map, the entrance showing as it lands.
   view.spotlight(null)
   document.body.classList.remove('cinema')
   await view.frame(null, skipped ? SKIP_MS : SETTLE_MS)

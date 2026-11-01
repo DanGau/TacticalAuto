@@ -1,6 +1,6 @@
 import { roots } from './skills'
 import { expect, test } from 'vitest'
-import { enterAt, entranceOf, begun } from './roads'
+import { enterAt, stagedAs, begun } from './roads'
 import { apply } from './apply'
 import { CHILL_TURNS, CRIT_BONUS, SEARING_DAMAGE, SOLDIER_ATTACKS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
 import { alienUnit } from './spawn'
@@ -61,8 +61,8 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   apply(run, { type: 'advance' })
   // War drums pay off only on a kill, so they leave a duel as it is.
   // An entrance that sets nothing off.
-  const zone = entranceOf(run.battle!, 'rappel')
-  enterAt(run, zone)
+  stagedAs(run.battle!, 'rappel')
+  enterAt(run)
   const battle = run.battle!
   Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist: null })
   battle.ground.fill('pavement')

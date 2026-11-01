@@ -22,17 +22,14 @@ export function atKey(run: Run): void {
   leg.path = [...Array<number>(run.stop).fill(-1), 0]
 }
 
-/** For tests: makes the entrance at `entrance`. */
-export function enterAt(run: Run, entrance: number): Result {
-  return apply(run, { type: 'enter', entrance })
+/** For tests: makes the entrance. */
+export function enterAt(run: Run): Result {
+  return apply(run, { type: 'enter' })
 }
 
-/** For tests: the index of an entrance of `kind`, making entrance 0 one where it stands if none is. */
-export function entranceOf(battle: Battle, kind: EntranceKind): number {
-  const found = battle.entrances.findIndex((e) => e.kind === kind)
-  if (found >= 0) return found
-  battle.entrances[0].kind = kind
-  return 0
+/** For tests: stages the battle's entrance as `kind`, where it stands. */
+export function stagedAs(battle: Battle, kind: EntranceKind): void {
+  battle.entrance!.kind = kind
 }
 
 /** For tests: a run of `seed` under way, its first soldier the first recruit, a Deadeye with a plain rifle. */
