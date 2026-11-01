@@ -384,7 +384,7 @@ test('after the stops of a leg comes its satellite: winning it wins a key, a her
   expect(legOf(run).columns.flat().every((node) => node.stop !== null)).toBe(true)
 })
 
-test("each leg crosses a continent to a hero in one of its cities, who joins seasoned once extracted; the last leads to the hub", () => {
+test("each leg crosses a continent to a hero in one of its cities, who joins seasoned once extracted, its powers to choose; the last leads to the hub", () => {
   const run = started()
   expect(run.route).toHaveLength(KEYS + 1)
   expect(new Set(run.route.slice(0, KEYS).map((stage) => stage.continent)).size).toBe(KEYS)
@@ -394,8 +394,9 @@ test("each leg crosses a continent to a hero in one of its cities, who joins sea
   fight(run, 'human')
   expect(run.soldiers[1]).toBe(hero)
   expect(level(hero)).toBeGreaterThan(1)
-  expect(roots(hero.cls!)).toContain(hero.skills[0])
-  expect(skillOffers(hero)).toEqual([])
+  expect(hero.skills).toEqual([])
+  expect(skillOffers(hero).length).toBeGreaterThan(0)
+  expect(run.phase).toBe('reward')
 })
 
 test("losing a hero's extraction loses the run", () => {
@@ -728,7 +729,7 @@ test('under fortification every hit does 1 less damage, on either side', () => {
 test("a soldier lands with its class's ability and its uses, the effects of its skills and the squad's relics, and armor from its class's skills", () => {
   const run = travelling(['battle'])
   run.soldiers[0].cls = 'heavy'
-  run.soldiers[0].skills = ['arsenal', 'shredder', 'reactive']
+  run.soldiers[0].skills = ['meteorStrike', 'arsenal', 'shredder', 'reactive']
   run.relics = ['echo', 'capacitor']
   apply(run, { type: 'advance' })
   enterAt(run)
@@ -755,7 +756,8 @@ test('a run begins with a choice of recruits of different classes, each with a c
     expect(run.soldiers).toHaveLength(0)
     expect(new Set(run.recruits.map((r) => r.cls)).size).toBe(RECRUITS)
     for (const r of run.recruits) {
-      expect(r.skills).toHaveLength(1)
+      expect(r.skills).toEqual([])
+      expect(r.gear!.stats).toEqual({})
       expect(r.gear).toMatchObject({ rarity: 'common' })
     }
   }

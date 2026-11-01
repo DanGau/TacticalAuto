@@ -59,7 +59,7 @@ test('a flashbang stuns the first cluster, a smoke bomb shortens every alien sho
   expect(new Set(stunned.map((u) => u.cluster)).size).toBe(1)
   expect(stunned.every((u) => u.surprised === (u.boss ? STUN_TURNS - 1 : STUN_TURNS))).toBe(true)
 
-  const smoke = landing(['smoke'])
+  const smoke = landing(['smoke'], 2)
   apply(smoke, { type: 'enter', utility: 0 })
   const shooter = aliens(smoke).find((u) => smoke.battle!.smoked[u.id] > SMOKE.reach)!
   const range = smoke.battle!.smoked[shooter.id]

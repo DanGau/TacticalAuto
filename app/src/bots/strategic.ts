@@ -151,7 +151,7 @@ function shop(run: Run): Action {
   return { type: 'leave' }
 }
 
-/** Takes the first relic and skill offered: on the same seeds that beat choosing by shared keywords. */
+/** Takes the first relic offered, on the same seeds better than choosing by shared keywords, and its class's ability, then the first skill. */
 function reward(run: Run): Action {
   if (run.relicOffers.length > 0) return { type: 'relic', index: 0 }
   if (run.finds.length > 0) {
@@ -159,7 +159,7 @@ function reward(run: Run): Action {
     return holder === null ? { type: 'sell', find: 0 } : { type: 'equip', find: 0, soldier: holder }
   }
   const learner = run.soldiers.find((s) => skillOffers(s).length > 0)!
-  return { type: 'skill', soldier: learner.id, index: 0 }
+  return { type: 'skill', soldier: learner.id, index: Math.max(0, skillOffers(learner).findIndex((id) => SKILLS[id].teaches)) }
 }
 
 /** Classes by how many runs a lone hero of each wins, on the same seeds. */

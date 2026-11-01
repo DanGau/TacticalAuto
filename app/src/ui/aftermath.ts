@@ -89,7 +89,7 @@ function title(report: Report): string {
 export function skillChoice(run: Run, soldier: Soldier): string {
   const held = squadKeywords(run)
   const card = (id: (typeof soldier.skills)[number], index: number) => button({ type: 'skill', soldier: soldier.id, index }, `<small>${ROLES[SKILLS[id].role]}</small><br><b>${SKILLS[id].name}</b><br><small class="use">${usage(SKILLS[id])}</small><br>${describe(SKILLS[id].text, SKILLS[id].tags, held)}`, 'card skill')
-  return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name}, reached level ${soldier.skills.length + 1}. Choose a power; each opens more.</h2>
+  return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name}, level ${level(soldier)}. Choose a power; each opens more.</h2>
     <div class="choices">${skillOffers(soldier).map(card).join('')}</div>`
 }
 

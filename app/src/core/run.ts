@@ -14,7 +14,7 @@ import { TOWNS } from './towns'
 import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
 import { LEG_STOPS, STOP_THREAT, THREAT_MAX } from './progress'
-import { charges, draft, health, join, MAX_SQUAD, offerRecruits, skillOffers, soldierStats, weaponOf, xpFor } from './squad'
+import { abilityOf, charges, draft, health, join, MAX_SQUAD, offerRecruits, soldierStats, weaponOf, xpFor } from './squad'
 import { dropGear, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
 import { forceOf, type ChallengeId } from './challenges'
@@ -50,7 +50,7 @@ function townsBetween(continent: ContinentId, a: LonLat, b: LonLat): number {
   return TOWNS[continent].filter(([, at]) => flat(at).x > x0 && flat(at).x < x1).length
 }
 
-/** A hero's level: elite, it joins seasoned, its skills learned. */
+/** The level of a hero waiting at the first leg's end, and one more each leg on: it joins with powers to choose. */
 const HERO_LEVEL = 2
 
 /**
@@ -72,8 +72,7 @@ function plotRoute(run: Run, home: City): Stage[] {
     const hero = leg < MAX_SQUAD - 1 ? draft(run, []) : null
     if (hero) {
       hero.home = to
-      hero.xp = xpFor(HERO_LEVEL)
-      for (let offers = skillOffers(hero); offers.length > 0; offers = skillOffers(hero)) hero.skills.push(offers[randomInt(run, offers.length)])
+      hero.xp = xpFor(HERO_LEVEL + leg)
     }
     route.push({ continent, from: from.at, to, hero })
     from = to
@@ -406,7 +405,7 @@ export function advance(run: Run): void {
     soldier: s.id,
     stats: soldierStats(run, s),
     hp: health(run, s),
-    ability: s.cls && CLASSES[s.cls].ability,
+    ability: abilityOf(s),
     charges: charges(run, s),
     secondary: secondaryOf(s),
     weapon: doctrines.find((d) => d.fights)?.fights ?? s.gear?.weapon,

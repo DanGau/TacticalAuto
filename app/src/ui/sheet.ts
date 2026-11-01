@@ -32,11 +32,10 @@ const kit = (run: Run, hero: Soldier) => {
   return weapon ? weaponText(weapon, soldierStats(run, hero).damage) : 'Bare hands'
 }
 
-/** A hero's powers: its class's, its bonus attack, then those it learned. */
+/** A hero's powers: its bonus attack, then those it learned, its class's ability with its uses worked out. */
 const powers = (run: Run, hero: Soldier): (Power & { tags?: Keyword[] })[] => [
-  ...(hero.cls ? [classPower(CLASSES[hero.cls], charges(run, hero))] : []),
   secondaryPower(SECONDARIES[secondaryOf(hero)]),
-  ...hero.skills.map((id) => SKILLS[id]),
+  ...hero.skills.map((id) => (SKILLS[id].teaches ? classPower(CLASSES[hero.cls!], charges(run, hero)) : SKILLS[id])),
 ]
 
 /** Class and level, as a sheet heads them. */

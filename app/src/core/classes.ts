@@ -1,9 +1,9 @@
-// Hero classes: stats, positioning, and the ability each uses unprompted.
+// Hero classes: stats, positioning, the bonus attack each starts with, and the ability each can learn.
 import type { Power, Use } from './powers'
 import type { SecondaryId } from './secondaries'
 import { CLOAK_DAMAGE, CLOAK_TURNS, MECH_STATS, MEDIC_HEAL, MEDIC_REACH, NAPALM_DAMAGE, ROCKET_DAMAGE, type Ability, type Stance, type Stats } from './battle'
 
-/** What a hero becomes at first promotion: stat changes, a way of positioning, and one ability used unprompted. */
+/** A hero's calling: stat changes, a way of positioning, a bonus attack, and one ability its tree teaches, used unprompted. */
 export interface SoldierClass {
   name: string
   /** Added to the hero's stats. */
@@ -72,9 +72,9 @@ const classes = {
   },
   engineer: {
     name: 'Gadgeteer',
-    stats: { hp: -1, damage: -1 },
+    stats: {},
     stance: 'anchor',
-    stanceText: 'Hangs back while its machines take the front',
+    stanceText: 'Stands its ground and lets the fight come to it',
     ability: 'mech',
     abilityName: 'Deploy Mech',
     target: 'Beside it',
@@ -98,7 +98,7 @@ const classes = {
     name: 'Cryo',
     stats: {},
     stance: 'standoff',
-    stanceText: 'Hangs back and slows whatever comes on',
+    stanceText: 'Hangs back out of reach',
     ability: 'cryo',
     abilityName: 'Chill Touch',
     abilityText: 'Its hits chill the target',
@@ -109,7 +109,7 @@ const classes = {
     name: 'Phantom',
     stats: { move: 1, damage: 1, hp: -1 },
     stance: 'rush',
-    stanceText: 'Closes in, unseen, for the strike',
+    stanceText: 'Closes in for the strike',
     ability: 'cloak',
     abilityName: 'Cloak',
     target: 'Self, when aliens can shoot it',

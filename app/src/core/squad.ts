@@ -4,13 +4,13 @@ import type { Lasting } from './base'
 import { type Battle, type Stats, BASE_STATS } from './battle'
 import { CLASSES, type ClassId } from './classes'
 import { type Doctrine, DOCTRINES } from './doctrines'
-import { EFFECTS, generateGear } from './gear'
+import { EFFECTS, plainGear } from './gear'
 import { type Relic, RELICS } from './relics'
 import { random, randomInt } from './rng'
 import { type Run } from './run-state'
 import { type Earned } from './run-state'
 import { type Soldier } from './run-state'
-import { TREES, SKILLS, type Role, type SkillId, roots } from './skills'
+import { TREES, SKILLS, type Role, type SkillId } from './skills'
 import { MELEE_RANGE, WEAPONS } from './weapons'
 import { CONTINENT_IDS, type City, CONTINENTS } from './world'
 import type { Keyword } from './keywords'
@@ -41,8 +41,8 @@ export function total(run: Run, effect: (source: Lasting) => number | undefined)
   return sources.reduce((sum, source) => sum + (effect(source) ?? 0), 0)
 }
 
-/** Skills a soldier knows at most: a root, then one more at each level until it has this many. */
-export const MAX_SKILLS = 4
+/** Skills a soldier knows at most: none at level 1, then one more at each level until it has this many. */
+export const MAX_SKILLS = 5
 
 /** Skills a level offers to choose from: one of each role while the tree has one open. */
 export const OFFERS = 3
@@ -52,21 +52,24 @@ export const ROLES: Role[] = ['guard', 'control', 'power']
 /**
  * The skills a soldier chooses the next from, or none if no choice is owed: from those its class's tree has opened to
  * it, one of each role when one is open, filled from the rest, drawn by its own seed so the offer stays put until
- * chosen. A skill passed over may be offered again.
+ * chosen. A skill passed over may be offered again; its class's ability always is.
  */
 export function skillOffers(soldier: Soldier): SkillId[] {
-  if (!soldier.cls || soldier.skills.length >= Math.min(level(soldier), MAX_SKILLS)) return []
+  if (!soldier.cls || soldier.skills.length >= Math.min(level(soldier) - 1, MAX_SKILLS)) return []
   const known = (id: string) => soldier.skills.includes(id as SkillId)
   const open = TREES[soldier.cls].filter((id) => !known(id) && (SKILLS[id].after?.some(known) ?? true))
   const rng = { rng: soldier.seed + soldier.skills.length }
-  const drawn = open.map((id) => ({ id, at: random(rng) })).sort((a, b) => a.at - b.at).map((d) => d.id)
+  const drawn = open.map((id) => ({ id, at: SKILLS[id].teaches ? -1 : random(rng) })).sort((a, b) => a.at - b.at).map((d) => d.id)
   const offers = ROLES.flatMap((role) => drawn.find((id) => SKILLS[id].role === role) ?? [])
   return [...offers, ...drawn.filter((id) => !offers.includes(id))].slice(0, OFFERS)
 }
 
-/** Uses of a soldier's class ability each battle: the class's, plus what skills and relics add to an ability that has uses. */
+/** The class ability a soldier has learned, if any. */
+export const abilityOf = (soldier: Soldier) => (soldier.cls && soldier.skills.some((id) => SKILLS[id].teaches) ? CLASSES[soldier.cls].ability : null)
+
+/** Uses of a soldier's class ability each battle: the class's once learned, plus what skills and relics add to an ability that has uses. */
 export function charges(run: Run, soldier: Soldier): number {
-  const base = soldier.cls ? CLASSES[soldier.cls].charges : 0
+  const base = abilityOf(soldier) ? CLASSES[soldier.cls!].charges : 0
   if (base === 0) return 0
   return base + soldier.skills.reduce((sum, id) => sum + (SKILLS[id].charges ?? 0), 0) + run.relics.reduce((sum, id) => sum + ((RELICS[id] as Relic).charges ?? 0), 0)
 }
@@ -115,7 +118,7 @@ const MIN_MOVE = 2
 export const LEVEL_STATS: Partial<Stats> = { hp: 2, crit: 0.03 }
 
 /**
- * Adds a recruit to the squad, while it has room: a level 1 recruit set on one of its class's paths at random. Under a
+ * Adds a recruit to the squad, while it has room. Under a
  * doctrine of unique classes it takes a class no squadmate has, while one is left.
  */
 export function hire(run: Run): void {
@@ -132,13 +135,13 @@ export function join(run: Run, soldier: Soldier): Soldier {
   return soldier
 }
 
-/** A level 1 soldier of a class none of `taken` has, if one is left, not yet in the squad. */
+/** A plain level 1 soldier of a class none of `taken` has, if one is left, not yet in the squad. */
 export function draft(run: Run, taken: ClassId[]): Soldier {
   const unused = (Object.keys(CLASSES) as ClassId[]).filter((id) => !run.soldiers.some((s) => s.cls === id))
   const unique = run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).uniqueClasses) && unused.length > 0
   const all = (unique ? unused : (Object.keys(CLASSES) as ClassId[])).filter((id) => !taken.includes(id))
   const classes = all.length > 0 ? all : (Object.keys(CLASSES) as ClassId[])
-  const gear = generateGear(run, run.nextGear++, 'common')
+  const gear = plainGear(run, run.nextGear++)
   const free = NAMES.filter((name) => ![...run.soldiers, ...run.recruits].some((s) => s.name === name))
   const name = free[randomInt(run, free.length)]
   const cls = classes[randomInt(run, classes.length)]
@@ -147,7 +150,7 @@ export function draft(run: Run, taken: ClassId[]): Soldier {
     name,
     xp: xpFor(1),
     cls,
-    skills: [roots(cls)[randomInt(run, roots(cls).length)]],
+    skills: [],
     // Read, not drawn: the seed costs the run no draw.
     seed: run.rng,
     feats: [],

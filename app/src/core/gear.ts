@@ -46,6 +46,12 @@ export const EFFECTS: Record<GearEffect, { prefix: string; text: string; tags?: 
   tether: { prefix: 'Tethered', text: 'Hits pull the target a tile toward the wielder' },
 }
 
+/** The weapon a hero starts with: any, with nothing added. */
+export function plainGear(rng: { rng: number }, id: number): Gear {
+  const weapon = (Object.keys(WEAPONS) as WeaponId[])[randomInt(rng, Object.keys(WEAPONS).length)]
+  return { id, rarity: 'common', name: WEAPONS[weapon].name, weapon, stats: {}, effect: null }
+}
+
 /** A new piece of gear of the given rarity: any weapon. */
 export function generateGear(rng: { rng: number }, id: number, rarity: Rarity): Gear {
   const pick = <T>(options: T[]): T => options[randomInt(rng, options.length)]

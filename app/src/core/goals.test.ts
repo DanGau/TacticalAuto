@@ -273,10 +273,11 @@ test('no one shot kills a commander from full health; brought low, it blinks awa
   const commander = battle.units.find((u) => u.target)!
   // An landing's impact would hurt it first.
   battle.opening = false
+  commander.hp = commander.stats.hp
   battle.units = battle.units.filter((u) => u.side !== 'alien' || u === commander)
   Object.assign(commander, { revealed: true, engaged: true })
   const soldier = battle.units.find(isSoldier)!
-  Object.assign(soldier, freeTilesNear(battle, commander, 2)[1], { spent: ['throw', 'throw', 'throw'], stats: { ...soldier.stats, damage: 99, crit: 1, move: 0 } })
+  Object.assign(soldier, freeTilesNear(battle, commander, 2)[1], { weapon: 'sniper', spent: ['throw', 'throw', 'throw'], stats: { ...soldier.stats, damage: 99, crit: 1, move: 0 } })
   Object.assign(battle, { turn: 'human', stage: 'move' })
   const events: GameEvent[] = []
   while (battle.phase === 'battle' && !events.some((e) => e.type === 'shot' && e.target === commander.id)) events.push(...stepBattle(battle))

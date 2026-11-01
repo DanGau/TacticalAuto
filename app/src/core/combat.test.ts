@@ -130,6 +130,7 @@ test('with no alien engaged a squad heads for the nearest by the walk, so it nev
     const state = battle(seed)
     const hero = state.units.find(isSoldier)!
     const [a, b] = state.units.filter((u) => u.side === 'alien')
+    if (!b) continue
     state.units = [hero, a, b]
     const open: { x: number; y: number }[] = []
     for (let y = 0; y < GRID; y += 3) for (let x = 0; x < GRID; x += 3) if (!blocked(state, x, y)) open.push({ x, y })

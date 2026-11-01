@@ -95,7 +95,7 @@ export interface Soldier {
   xp: number
   /** Drawn at random when the soldier is made. */
   cls: ClassId | null
-  /** In the order learned; the first, drawn at random when the soldier is made, sets the soldier's path. */
+  /** In the order learned; none at level 1. */
   skills: SkillId[]
   /** Feats it has pulled off, each paying experience only the first time. */
   feats: FeatId[]

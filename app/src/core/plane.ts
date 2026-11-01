@@ -32,6 +32,8 @@ const cross = (o: Point, a: Point, b: Point) => (a.x - o.x) * (b.y - o.y) - (a.y
 /** Whether the segments a–b and c–d cross. */
 export function crosses(a: Point, b: Point, c: Point, d: Point): boolean {
   const [d1, d2, d3, d4] = [cross(c, d, a), cross(c, d, b), cross(a, b, c), cross(a, b, d)]
+  // Lines in a row differ only by rounding: they lie end to end, and do not cross.
+  if ([d1, d2, d3, d4].some((d) => Math.abs(d) < 1e-6)) return false
   return d1 * d2 < 0 && d3 * d4 < 0
 }
 
