@@ -8,8 +8,7 @@ import type { Run, Soldier } from '../core/run-state'
 import { secondaryOf, charges, health, level, soldierStats, weaponOf } from '../core/squad'
 import { secondaryPower, SECONDARIES } from '../core/secondaries'
 import { SKILLS, TREES, unlocked, type SkillId } from '../core/skills'
-import { weaponText } from '../core/weapons'
-import { describe, resistChip } from './html'
+import { describe, gearText, gearType, resistChip } from './html'
 
 /** A row of named numbers. */
 export const statBlock = (cells: [string, string | number][]) => `<div class="statblock">${cells.map(([name, value]) => `<span><small>${name}</small><b>${value}</b></span>`).join('')}</div>`
@@ -26,11 +25,8 @@ const heroStats = (run: Run, hero: Soldier) => {
   return statBlock([['HP', `${health(run, hero)}/${stats.hp}`], ['Armor', stats.armor], ['Move', stats.move], ['Damage', stats.damage], ['Range', stats.range], ['Crit', `${Math.round(100 * stats.crit)}%`]])
 }
 
-/** What a hero's weapon does, with its damage worked out. */
-const kit = (run: Run, hero: Soldier) => {
-  const weapon = weaponOf(hero)
-  return weapon ? weaponText(weapon, soldierStats(run, hero).damage) : 'Bare hands'
-}
+/** A hero's weapon: its type and special. */
+const kit = ({ gear }: Soldier) => (gear ? `${gearType(gear)}. ${gearText(gear)}` : '')
 
 /** A hero's powers: its bonus attack, then those it learned, its class's ability with its uses worked out. */
 const powers = (run: Run, hero: Soldier): (Power & { tags?: Keyword[] })[] => [
@@ -45,7 +41,7 @@ const heading = (hero: Soldier) => `Level ${level(hero)}${hero.cls ? ` ${CLASSES
 export const heroCard = (run: Run, hero: Soldier) => `<small>${heading(hero)}</small>
   <b class="name">${hero.name}</b>
   ${heroStats(run, hero)}
-  <div class="weapon"><b>${hero.gear?.name ?? 'Empty hands'}</b><small>${kit(run, hero)}</small></div>
+  <div class="weapon"><b>${hero.gear?.name ?? 'Empty hands'}</b><small>${kit(hero)}</small></div>
   <span class="feats">${powers(run, hero).map(powerChip).join('')}</span>`
 
 /** A hero's powers in full. */
@@ -55,7 +51,7 @@ export const powerList = (run: Run, hero: Soldier, held?: Keyword[]) => `<div cl
 export function heroSheet(run: Run, hero: Soldier): string {
   const stance = hero.cls && !weaponOf(hero)?.stance ? `<small>${CLASSES[hero.cls].stanceText}.</small>` : ''
   return `<div class="charsheet"><small>${heading(hero)}</small>${heroStats(run, hero)}
-    <div class="weapon"><b>${hero.gear?.name ?? 'Empty hands'}</b><small>${kit(run, hero)}.</small></div>${stance}
+    <div class="weapon"><b>${hero.gear?.name ?? 'Empty hands'}</b><small>${kit(hero)}</small></div>${stance}
     ${powerList(run, hero)}${heroTree(hero)}</div>`
 }
 

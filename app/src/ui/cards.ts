@@ -7,7 +7,7 @@ import { type Run, type Soldier } from '../core/run-state'
 import { soldierStats, weaponOf } from '../core/squad'
 import { WEAPONS, type Weapon } from '../core/weapons'
 import { UTILITIES, type UtilityId } from '../core/utilities'
-import { badge, describeGear, gearText, STAT_NAMES } from './html'
+import { badge, describeGear, gearText, gearType, STAT_NAMES } from './html'
 
 export interface Pick {
   /** Which card this is among those on screen. */
@@ -49,7 +49,7 @@ const percent = new Set<keyof Stats>(['crit'])
 const show = (key: keyof Stats, n: number) => (percent.has(key) ? `${Math.round(100 * n)}%` : `${n}`)
 
 /** A piece of gear on one line: its rarity's name in its colour, then its name; or empty hands. */
-const named = (gear: Gear | null) => (gear ? `<span class="tier ${gear.rarity}">${gear.rarity}</span> ${gear.name}` : '<span class="tier">empty hands</span>')
+const named = (gear: Gear | null) => (gear ? `<span class="tier ${gear.rarity}">${gear.rarity}</span> ${gear.name} (${gearType(gear)})` : '<span class="tier">empty hands</span>')
 
 /**
  * A card per soldier who could take `gear`, each with what it holds now and what it would hold, in their rarities,

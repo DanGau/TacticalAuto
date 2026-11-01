@@ -19,6 +19,8 @@ export interface Kit {
  */
 export interface Weapon {
   name: string
+  /** What it plainly is, as a card says. */
+  type: string
   stats: Partial<Stats>
   attack: Kit
   melee?: true
@@ -31,24 +33,24 @@ export interface Weapon {
   /** How its wielder positions, in place of its class's way. */
   stance?: Stance
   effect?: Effect
-  /** What else it does. */
-  note?: string
+  /** What it does beyond its look, as a card says. */
+  special?: string
 }
 
 /** Damage a Shield takes off a shot from beyond arm's reach. */
 export const BLOCK_SOAK = 2
 
 const weapons = {
-  rifle: { name: 'Arc Caster', stats: {}, attack: { shots: 3, power: 0.6, ms: 150 } },
-  sniper: { name: 'Star Lance', stats: { range: 3, crit: 0.1, move: -1 }, attack: { shots: 1, power: 1.6, ms: 520 }, stance: 'standoff', note: 'Hangs back' },
-  shotgun: { name: 'Blast Gauntlet', stats: { range: -1 }, attack: { shots: 1, power: 1.8, wide: 0.6 }, stance: 'rush', note: 'Closes in' },
-  smg: { name: 'Storm Darts', stats: { range: -1, move: 1 }, attack: { shots: 4, power: 0.4, ms: 90 } },
-  lmg: { name: 'Storm Engine', stats: { range: 1, move: -1 }, attack: { shots: 5, power: 0.35, ms: 110 }, effect: 'suppress', note: 'A target it hits does 1 less damage on its next turn' },
-  pistols: { name: 'Twin Blasters', stats: { move: 1 }, attack: { shots: 2, power: 0.7, ms: 220 }, note: 'Left, then right' },
-  hammer: { name: 'Thunder Hammer', stats: { move: 2 }, attack: { shots: 1, power: 3, wide: 0.6 }, thrown: { shots: 1, power: 1.3, ms: 700, range: 5 }, melee: true, stance: 'rush', effect: 'thunder', note: 'Hits knock the target a tile back; if something stops it, it slams into that for 1 damage' },
-  sword: { name: 'Sunblade', stats: { crit: 0.1, move: 2 }, attack: { shots: 1, power: 2.7 }, dash: 4, melee: true, stance: 'rush', effect: 'cleave', note: 'A kill does 2 damage to every alien beside the one killed' },
-  shield: { name: 'Star Shield', stats: { armor: 2, move: 1 }, attack: { shots: 1, power: 1.7 }, thrown: { shots: 1, power: 0.8, ms: 700, range: 4 }, melee: true, stance: 'rush', effect: 'block', note: `An attack from beyond arm's reach does ${BLOCK_SOAK} less damage` },
-  fists: { name: 'Power Fists', stats: { move: 2 }, attack: { shots: 2, power: 1, ms: 300 }, rocket: { shots: 2, power: 0.6, ms: 480, range: 5 }, dash: 3, melee: true, stance: 'rush' },
+  rifle: { name: 'Arc Caster', type: 'Rifle', stats: {}, attack: { shots: 3, power: 0.6, ms: 150 } },
+  sniper: { name: 'Star Lance', type: 'Sniper Rifle', stats: { range: 3, crit: 0.1, move: -1 }, attack: { shots: 1, power: 1.6, ms: 520 }, stance: 'standoff' },
+  shotgun: { name: 'Blast Gauntlet', type: 'Shotgun', stats: { range: -1 }, attack: { shots: 1, power: 1.8, wide: 0.6 }, stance: 'rush' },
+  smg: { name: 'Storm Darts', type: 'SMG', stats: { range: -1, move: 1 }, attack: { shots: 4, power: 0.4, ms: 90 } },
+  lmg: { name: 'Storm Engine', type: 'Machine Gun', stats: { range: 1, move: -1 }, attack: { shots: 5, power: 0.35, ms: 110 }, effect: 'suppress', special: 'A target it hits does 1 less damage on its next turn' },
+  pistols: { name: 'Twin Blasters', type: 'Twin Pistols', stats: { move: 1 }, attack: { shots: 2, power: 0.7, ms: 220 } },
+  hammer: { name: 'Thunder Hammer', type: 'Hammer', stats: { move: 2 }, attack: { shots: 1, power: 3, wide: 0.6 }, thrown: { shots: 1, power: 1.3, ms: 700, range: 5 }, melee: true, stance: 'rush', effect: 'thunder', special: 'Hits knock the target a tile back; if something stops it, it slams into that for 1 damage' },
+  sword: { name: 'Sunblade', type: 'Sword', stats: { crit: 0.1, move: 2 }, attack: { shots: 1, power: 2.7 }, dash: 4, melee: true, stance: 'rush', effect: 'cleave', special: 'A kill does 2 damage to every alien beside the one killed' },
+  shield: { name: 'Star Shield', type: 'Shield', stats: { armor: 2, move: 1 }, attack: { shots: 1, power: 1.7 }, thrown: { shots: 1, power: 0.8, ms: 700, range: 4 }, melee: true, stance: 'rush', effect: 'block', special: `An attack from beyond arm's reach does ${BLOCK_SOAK} less damage` },
+  fists: { name: 'Power Fists', type: 'Fists', stats: { move: 2 }, attack: { shots: 2, power: 1, ms: 300 }, rocket: { shots: 2, power: 0.6, ms: 480, range: 5 }, dash: 3, melee: true, stance: 'rush' },
 } satisfies Record<string, Weapon>
 
 export type WeaponId = keyof typeof weapons
@@ -56,21 +58,3 @@ export const WEAPONS: Record<WeaponId, Weapon> = weapons
 
 /** The range a melee weapon reaches. */
 export const MELEE_RANGE = 1
-
-const times = (n: number) => `${n}×`
-/** Its damage worked out when the wielder's is known, else as a multiple. */
-const worth = (power: number, damage?: number) => (damage === undefined ? `${times(power)} damage` : `${Math.round(10 * power * damage) / 10} damage`)
-const told = ({ shots, power, wide }: Kit, damage?: number) => `${shots > 1 ? `${shots} attacks, each` : '1 attack,'} ${worth(power, damage)}${wide ? `; ${Math.round(100 * wide)}% to each alien beside the target` : ''}`
-
-/** What a weapon does, told from its numbers, for a card. */
-export function weaponText(w: Weapon, damage?: number): string {
-  return [
-    w.melee ? `Up close: ${told(w.attack, damage)}` : told(w.attack, damage),
-    w.dash && `Dashes ${w.dash} tiles to strike`,
-    w.thrown && `Else thrown once a turn, range ${w.thrown.range}, ${worth(w.thrown.power, damage)}`,
-    w.rocket && `Else both fists fly out and back, range ${w.rocket.range}, each ${worth(w.rocket.power, damage)}`,
-    w.note,
-  ]
-    .filter(Boolean)
-    .join('. ')
-}

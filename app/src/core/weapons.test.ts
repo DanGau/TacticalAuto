@@ -7,7 +7,8 @@ import { spotted } from './fighters'
 import { apply } from './apply'
 import { begun, enterAt } from './roads'
 import { SECONDARIES } from './secondaries'
-import { BLOCK_SOAK, WEAPONS, weaponText, type WeaponId } from './weapons'
+import { gearCard, gearText } from '../ui/html'
+import { BLOCK_SOAK, WEAPONS, type WeaponId } from './weapons'
 
 /** A hero with `weapon`, its base damage 10, and aliens at `at` on open ground, too tough to fall. */
 function field(weapon: WeaponId, at: [number, number][], range = WEAPONS[weapon].melee ? 1 : 5): { b: Battle; hero: Unit; aliens: Unit[] } {
@@ -153,12 +154,11 @@ test('a hero with any attack in reach takes no order that costs it its turn', ()
   expect(hero.order).toBeNull()
 })
 
-test('every weapon tells its kit on its card', () => {
-  for (const w of Object.values(WEAPONS)) {
-    const text = weaponText(w)
-    if (w.thrown) expect(text).toMatch(/thrown once a turn/)
-    if (w.dash) expect(text).toMatch(/Dashes/)
-    if (w.rocket) expect(text).toMatch(/fly out and back/)
-    expect(text).toMatch(new RegExp(`${w.attack.power}×`))
+test('a weapon card says its type and special, never how the weapon fights', () => {
+  for (const [id, w] of Object.entries(WEAPONS)) {
+    const gear = { id: 1, rarity: 'common' as const, name: w.name, weapon: id as WeaponId, stats: {}, effect: null }
+    expect(gearCard(gear)).toContain(w.type)
+    expect(gearCard(gear)).not.toMatch(/thrown|dash|fly out|attacks?,|× damage/i)
+    if (w.special) expect(gearText(gear)).toContain(w.special)
   }
 })

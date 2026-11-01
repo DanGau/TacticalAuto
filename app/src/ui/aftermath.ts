@@ -18,7 +18,7 @@ import { CAPSTONE_PICKS, SKILLS, TREES, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
 import { gearPicks, pickCard, pickDetail, sellPick, utilityPick, type Pick } from './cards'
 import { heroSheet, skillState, treeGrid } from './sheet'
-import { badge, button, describe, gearCard, gearText, healthBar, signed, STOP_NAMES, threatBar } from './html'
+import { badge, button, describe, gearCard, gearText, gearType, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
 /**
  * A soldier's card: class badge, name, weapon, and an experience bar filling with what the battle earned, flaring on a
@@ -40,7 +40,7 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
     <div class="who"><span class="portrait">${badge(soldier.cls)}</span><span><b>${soldier.name}</b><br><small>Level ${before}${cls ? ` · ${cls}` : ''}</small></span></div>
     <div class="bar"><div class="fill" style="--from: ${filled(soldier.xpBefore)}%; --to: ${filled(soldier.xpAfter)}%"></div></div>
     ${healthBar(soldier.hp, soldier.maxHp, live ? soldierStats(run, live).armor : 0)}
-    ${weapon ? `<small class="gear ${weapon.rarity}" title="${gearText(weapon)}">${weapon.name}</small>` : ''}
+    ${weapon ? `<small class="gear ${weapon.rarity}" title="${gearText(weapon)}">${weapon.name} · ${gearType(weapon)}</small>` : ''}
     ${gained > 0 ? `<small class="gained" title="${soldier.earned.map((e) => `${e.label}: +${e.xp}`).join('&#10;')}">+${gained} xp</small>` : ''} ${note}
     ${feats.length > 0 ? `<ul class="notes">${feats.join('')}</ul>` : ''}
     ${choose}

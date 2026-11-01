@@ -1,7 +1,7 @@
 // Shared HTML pieces: buttons, bars, chips, gear cards and descriptions.
 import type { Action } from '../core/apply'
 import { EFFECTS, type Gear } from '../core/gear'
-import { weaponText, WEAPONS } from '../core/weapons'
+import { WEAPONS } from '../core/weapons'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import type { Stats } from '../core/battle'
 import { KEYWORDS, RESISTS, type Keyword, type Resist } from '../core/keywords'
@@ -64,15 +64,15 @@ const STAT_TEXT: Record<keyof Stats, (n: number) => string> = {
   crit: (n) => `${percent(n)} crit`,
 }
 
-/** What a piece of gear changes, as plain text: its weapon's and its own stat changes, then what its weapon and effect do. */
+/** A piece of gear's special, as plain text: its mod, its weapon's special and its effect; how the weapon fights its look tells. */
 export function gearText(gear: Gear): string {
-  const weapon = WEAPONS[gear.weapon]
-  const changes = (stats: Partial<Stats>) => (Object.keys(stats) as (keyof Stats)[]).map((key) => STAT_TEXT[key](stats[key]!))
-  const merged = { ...weapon.stats }
-  for (const key of Object.keys(gear.stats) as (keyof Stats)[]) merged[key] = (merged[key] ?? 0) + gear.stats[key]!
-  const stats = changes(merged)
-  return [stats.join(', '), weaponText(weapon), gear.effect ? EFFECTS[gear.effect].text : ''].filter(Boolean).join('. ') + '.'
+  const mod = (Object.keys(gear.stats) as (keyof Stats)[]).map((key) => STAT_TEXT[key](gear.stats[key]!)).join(', ')
+  const said = [mod, WEAPONS[gear.weapon].special, gear.effect ? EFFECTS[gear.effect].text : '']
+  return [...new Set(said.filter(Boolean))].map((line) => `${line}.`).join(' ')
 }
+
+/** What a piece of gear plainly is. */
+export const gearType = (gear: Gear) => WEAPONS[gear.weapon].type
 
 /** Words that explain themselves on hover. */
 const tip = (label: string, text: string) => `<span class="tip" title="${text}">${label}</span>`
@@ -122,7 +122,7 @@ export const alienName = (kind: AlienKind, label = ALIENS[kind].name) => `${tip(
 /** What a piece of gear does, its keywords coloured and defined. */
 export const describeGear = (gear: Gear, held: Keyword[] = []) => describe(gearText(gear), gear.effect ? EFFECTS[gear.effect].tags : [], held)
 
-/** A piece of gear as a card's contents: rarity, name, what it changes, and its keywords. */
+/** A piece of gear as a card's contents: rarity, name, type and special. */
 export function gearCard(gear: Gear, held: Keyword[] = []): string {
-  return `<small>${gear.rarity}</small><br><b>${gear.name}</b><br>${describeGear(gear, held)}`
+  return `<small>${gear.rarity} · ${gearType(gear)}</small><br><b>${gear.name}</b><br>${describeGear(gear, held)}`
 }
