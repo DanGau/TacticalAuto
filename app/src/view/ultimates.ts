@@ -65,15 +65,17 @@ export async function playUltimate(s: Stage, battle: Battle, e: Extract<GameEven
   s.drops.add(sketch)
   const seeds = Array.from({ length: STREAKS }, () => ({ x: (Math.random() - 0.5) * 2 * far * TILE_W, y: (Math.random() - 0.5) * 2 * far * TILE_H, t: Math.random() * 0.6 }))
   await s.tween(PACE.ultimate, (t) => {
+    // Holds through most of the moment, then lets go.
+    const hold = 1 - t * t * t
     sketch.clear()
-    if (look.tint) sketch.rect(at.x - COVER, at.y - COVER, 2 * COVER, 2 * COVER).fill({ color: look.color, alpha: look.tint * (1 - t) })
+    if (look.tint) sketch.rect(at.x - COVER, at.y - COVER, 2 * COVER, 2 * COVER).fill({ color: look.color, alpha: look.tint * hold })
     if (look.shape === 'ring') {
-      sketch.ellipse(at.x, at.y, far * TILE_W * t, far * TILE_H * t).stroke({ color: look.color, width: 14 * (1 - t) + 2, alpha: 1 - t })
-      sketch.ellipse(at.x, at.y, far * TILE_W * t, far * TILE_H * t).fill({ color: look.color, alpha: 0.35 * (1 - t) })
+      sketch.ellipse(at.x, at.y, far * TILE_W * t, far * TILE_H * t).stroke({ color: look.color, width: 14 * hold + 2, alpha: hold })
+      sketch.ellipse(at.x, at.y, far * TILE_W * t, far * TILE_H * t).fill({ color: look.color, alpha: 0.35 * hold })
     } else if (look.shape === 'beam') {
       const head = lerp(start, end, Math.min(1, t * 3))
-      sketch.moveTo(start.x, start.y).lineTo(head.x, head.y).stroke({ color: look.color, width: 16 * (1 - t) + 2, alpha: 1 - t * 0.6 })
-      sketch.moveTo(start.x, start.y).lineTo(head.x, head.y).stroke({ color: 0xffffff, width: 5 * (1 - t) + 1, alpha: 1 - t })
+      sketch.moveTo(start.x, start.y).lineTo(head.x, head.y).stroke({ color: look.color, width: 16 * hold + 2, alpha: hold })
+      sketch.moveTo(start.x, start.y).lineTo(head.x, head.y).stroke({ color: 0xffffff, width: 5 * hold + 1, alpha: hold })
     } else if (look.shape === 'rain') {
       for (const drop of seeds) {
         const fall = Math.min(1, Math.max(0, (t - drop.t) / 0.4))
