@@ -21,7 +21,7 @@ const STAGING: Partial<Record<ChallengeId, { sizes: number[]; band: [number, num
   slog: { sizes: [2, 3], band: [7, 11], wander: 10, apart: 6, shape: 'line' },
   firingLine: { sizes: [2, 3], band: [8, 10], wander: 11, apart: 6, shape: 'line' },
   ironWall: { sizes: [4, 5, 6], band: [0, 8], wander: 5, apart: 8, shape: 'line' },
-  scattered: { sizes: [1], band: [-5, 12], wander: 12, apart: 8 },
+  scattered: { sizes: [1], band: [-14, 16], wander: 18, apart: 14 },
   killBox: { sizes: [99], band: [-6, -6], wander: 0, apart: 2, shape: 'crowd' },
 }
 
@@ -97,7 +97,9 @@ const bulk = (alien: Alien) => alien.stats.hp + alien.stats.damage
 
 /** Which aliens stand together: those a set piece holds first, then the rest in clusters of drawn sizes. */
 function groupsOf(battle: Battle, aliens: Alien[], plot: Plot): { members: number[]; at: Tile | null; shape: Shape | null }[] {
-  const left = aliens.map((_, i) => i)
+  // Leaders last, so no retinue swallows another's leader.
+  const leads = (i: number) => (aliens[i].boss || aliens[i].target ? 1 : 0)
+  const left = aliens.map((_, i) => i).sort((a, b) => leads(a) - leads(b))
   const take = (first: number, more: number) => {
     left.splice(left.indexOf(first), 1)
     return [first, ...left.splice(0, more)]
@@ -105,7 +107,7 @@ function groupsOf(battle: Battle, aliens: Alien[], plot: Plot): { members: numbe
   const groups: { members: number[]; at: Tile | null; shape: Shape | null }[] = []
   const lead = aliens.findIndex((a) => a.target)
   if (lead >= 0) groups.push({ members: take(lead, 2), at: plot.commander, shape: 'retinue' })
-  const boss = aliens.findIndex((a) => a.boss)
+  const boss = aliens.findIndex((a, i) => a.boss && left.includes(i))
   if (boss >= 0) groups.push({ members: take(boss, 2 + randomInt(battle, 2)), at: plot.boss, shape: 'retinue' })
   if (plot.objective && left.length > 0) groups.push({ members: left.splice(0, 2 + randomInt(battle, 2)), at: plot.objective, shape: 'ring' })
   for (let i = left.length - 1; i > 0; i--) {

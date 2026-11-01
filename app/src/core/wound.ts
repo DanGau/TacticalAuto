@@ -113,7 +113,7 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
 export const DETONATE_DAMAGE = 4
 
 /** What a burster's explosion does to `unit`. */
-const burstOn = (unit: Unit) => (has(unit, 'meleeShield') ? Math.floor(BURST_DAMAGE / 2) : BURST_DAMAGE)
+const burstOn = (unit: Unit) => (has(unit, 'meleeShield') ? Math.ceil(BURST_DAMAGE / 2) : BURST_DAMAGE)
 
 /** What befalls a unit that has walked `path`: caltrops it stepped on hurt an alien, and a booming charge goes off. */
 export function moved(battle: Battle, unit: Unit, path: Tile[], events: GameEvent[]): void {

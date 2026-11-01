@@ -70,6 +70,21 @@ export function placeAlien(battle: Battle, alien: Alien, tile: Tile, engaged = f
   return unit
 }
 
+/** The tiles a squad of the reach of its longest weapon must walk from the way in to shoot each sentry, nearest first. */
+function sentryTour(battle: Battle): number {
+  const reach = Math.max(...battle.reserve.map((s) => s.stats.range))
+  const left = battle.units.filter((u) => u.side === 'alien')
+  let at: Tile = battle.entry!
+  let tour = 0
+  while (left.length > 0) {
+    const next = left.reduce((a, b) => (distance(b, at) < distance(a, at) ? b : a))
+    tour += Math.max(0, distance(next, at) - reach)
+    left.splice(left.indexOf(next), 1)
+    at = next
+  }
+  return tour
+}
+
 /** The fewest aliens a wave brings, and how many more it may. */
 const WAVE_LEAST = 2
 const WAVE_MORE = 4
@@ -124,7 +139,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     bulk: terrain.props.map((prop) => PROP_BULK[prop]),
     used: [],
     challenge,
-    deadline: challenge === 'scattered' ? deadlineFor(sentries(aliens.length)) : null,
+    deadline: challenge === 'scattered' ? 0 : null,
     utility: null,
     rigged: null,
     smoked: {},
@@ -186,5 +201,6 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     return guard ? (freeTilesNear(battle, guard, 4)[3] ?? guard) : freeTilesNear(battle, spot, 40)[10 * i]
   })
   planEntry(battle, heart)
+  if (battle.deadline !== null) battle.deadline = deadlineFor(sentryTour(battle), Math.max(...reserve.map((s) => s.stats.move)), posted.length)
   return battle
 }

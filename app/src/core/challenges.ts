@@ -3,7 +3,7 @@ import type { AlienKind } from './aliens'
 import type { Stats } from './battle'
 import type { Goal } from './goals'
 import { randomInt } from './rng'
-import type { UtilityId } from './utilities'
+import { THRUST, type UtilityId } from './utilities'
 
 /** What a battle tests. It shapes the ground and the aliens, and shows on the Flight map and the deploy screen. */
 export type ChallengeId = 'slog' | 'firingLine' | 'ironWall' | 'swarm' | 'scattered' | 'bigOne' | 'killBox'
@@ -16,8 +16,8 @@ export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test:
   slog: { name: 'Slog', icon: '🌿', test: 'Shooters behind a band of mire that takes three times the move to cross', answers: ['hover', 'rangedShield', 'thrusters'], volley: true, grim: [[2, 3, 4], [3, 4, 6], [5, 7, 8]] },
   firingLine: { name: 'Firing line', icon: '🎯', test: 'Long-range shooters along a ridge, firing from the moment the squad lands', answers: ['smoke', 'rangedShield'], volley: true, grim: [[2, 3, 4], [3, 5, 6], [6, 7, 9]] },
   ironWall: { name: 'Iron wall', icon: '🧱', test: 'Heavily armored aliens that shrug off small hits', answers: ['crack', 'overcharge'], grim: [[2, 3, 4], [4, 6, 8], [7, 9, 11]] },
-  swarm: { name: 'Swarm', icon: '🐜', test: 'Bodies flood in from every side, and keep coming', answers: ['meleeShield', 'tank'], grim: [[6, 10, 14], [14, 18, 22], [20, 24, 30]] },
-  scattered: { name: 'Scattered', icon: '🗺️', test: 'Sentries spread far apart: clear them before the clock runs out and reinforcements pour in', answers: ['thrusters'], grim: [[5, 8, 11], [10, 13, 16], [13, 16, 20]] },
+  swarm: { name: 'Swarm', icon: '🐜', test: 'Bodies flood in from every side, and keep coming', answers: ['meleeShield', 'tank'], grim: [[8, 12, 16], [14, 18, 22], [20, 24, 30]] },
+  scattered: { name: 'Scattered', icon: '🗺️', test: 'Sentries spread far apart: clear them before the clock runs out and reinforcements pour in', answers: ['thrusters'], grim: [[8, 12, 16], [12, 16, 20], [16, 20, 24]] },
   bigOne: { name: 'Big one', icon: '👹', test: 'One huge, armored alien and its escort', answers: ['overcharge', 'crack'], grim: [[1, 1, 2], [2, 3, 4], [3, 5, 6]] },
   killBox: { name: 'Kill box', icon: '💥', test: 'The way in lands right beside a packed cluster that hits first', answers: ['flashbang', 'smoke', 'meleeShield'], grim: [[3, 5, 7], [7, 9, 12], [10, 14, 18]] },
 }
@@ -71,16 +71,16 @@ export function forceOf(id: ChallengeId, party: number, rung: number, more: numb
 export const STIFFEN: Partial<Record<ChallengeId, { range?: number; armor?: number[] }>> = {
   slog: { range: 3 },
   firingLine: { range: 4 },
-  ironWall: { armor: [3, 8, 10] },
+  ironWall: { armor: [5, 8, 10] },
 }
 
 /** A big one's boss: its health over a soldier's base, its armor and its damage, by party size less one and rung. */
 export function bigOneStats(party: number, rung: number, base: Stats): Stats {
   const size = Math.min(party, 3) - 1
-  return { ...base, hp: [8, 35, 60][size] + [2, 7, 10][size] * rung, armor: [3, 14, 28][size] + [1, 3, 4][size] * rung, damage: base.damage + 2 * size + Math.floor(rung / 2) }
+  return { ...base, hp: [7, 35, 60][size] + [2, 7, 10][size] * rung, armor: [7, 14, 28][size] + [1, 3, 4][size] * rung, damage: base.damage - (size === 0 ? 1 : 0) + 2 * size + Math.floor(rung / 2) }
 }
 
 /** Of a Scattered's force of `count`, the sentries posted; the rest are the reinforcements. */
 export const sentries = (count: number) => Math.ceil(count * 0.3)
-/** The round a Scattered's reinforcements start, by its sentries: about what it takes a party moving at its best. */
-export const deadlineFor = (posted: number) => 3 + Math.ceil(posted * 0.5)
+/** The round a Scattered's reinforcements start: what walking and dashing `tour` tiles takes a squad of `move` with Thrusters on, and a round for each pair of its `posted` sentries to fall. */
+export const deadlineFor = (tour: number, move: number, posted: number) => 1 + Math.ceil(posted / 2) + Math.ceil(tour / (1.6 * (move + THRUST)))

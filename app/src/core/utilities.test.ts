@@ -67,7 +67,7 @@ test('a flashbang stuns the first cluster, a smoke bomb shortens every alien sho
   if (shooter.hp > 0) expect(shooter.stats.range).toBe(range)
 })
 
-test('a shield halves hits of its own kind, down to nothing, and leaves the other kind alone', () => {
+test('a shield halves hits of its own kind and leaves the other kind alone', () => {
   for (const [id, apart, halved] of [['rangedShield', 3, true], ['rangedShield', 1, false], ['meleeShield', 1, true], ['meleeShield', 3, false]] as const) {
     const run = landing([id])
     apply(run, { type: 'enter', utility: 0 })

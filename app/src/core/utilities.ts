@@ -12,7 +12,7 @@ export const SMOKE = { rounds: 3, reach: 2 }
 /** Alien turns a flashbang stuns the nearest cluster, its boss one fewer. */
 export const STUN_TURNS = 2
 /** A rigged tank: blows once `crowd` aliens stand within `near` tiles of it; `damage` to every alien within `radius` and every hero within `close`, and fire within `fireReach` for `fireTurns`. */
-export const RIG = { crowd: 4, near: 4, radius: 6, close: 2, damage: 10, fireReach: 4, fireTurns: 4 }
+export const RIG = { crowd: 3, near: 4, radius: 6, close: 2, damage: 10, fireReach: 4, fireTurns: 4 }
 
 export const UTILITIES: Record<UtilityId, { name: string; icon: string; text: string; tags?: Keyword[] }> = {
   thrusters: { name: 'Thrusters', icon: '🚀', text: `Every hero has +${THRUST} move this fight` },
@@ -22,8 +22,8 @@ export const UTILITIES: Record<UtilityId, { name: string; icon: string; text: st
   tank: { name: 'Rigged Tank', icon: '🛢️', text: `Pick a fuel tank: it blows once ${RIG.crowd} aliens are within ${RIG.near} tiles, ${RIG.damage} damage to every alien within ${RIG.radius} and any hero within ${RIG.close}, and leaves fire` },
   smoke: { name: 'Smoke Bomb', icon: '💨', text: `For ${SMOKE.rounds} rounds no alien shoots farther than ${SMOKE.reach} tiles` },
   flashbang: { name: 'Flashbang', icon: '✴️', text: `The first cluster is stunned for ${STUN_TURNS} turns as the squad comes in; a boss for 1` },
-  rangedShield: { name: 'Ranged Shield', icon: '🛡️', text: 'Attacks from beyond arm\'s reach do half damage, rounded down' },
-  meleeShield: { name: 'Melee Shield', icon: '🔰', text: 'Attacks and blasts from arm\'s reach do half damage, rounded down' },
+  rangedShield: { name: 'Ranged Shield', icon: '🛡️', text: 'Attacks from beyond arm\'s reach do half damage, rounded up' },
+  meleeShield: { name: 'Melee Shield', icon: '🔰', text: 'Attacks and blasts from arm\'s reach do half damage, rounded up' },
 }
 
 export const UTILITY_IDS = Object.keys(UTILITIES) as UtilityId[]

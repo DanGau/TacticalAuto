@@ -5,7 +5,7 @@ import { blocked, distance, edgeDepths, NEIGHBORS, onGrid, openNear, walkingDist
 import { gather } from './formations'
 import { randomInt } from './rng'
 import { PROP_BULK, type Prop, type TerrainKind } from './terrain'
-import type { ChallengeId } from './challenges'
+import { CHALLENGES, type ChallengeId } from './challenges'
 
 /** How far from its centre the arena reaches, and how far out the camera shows it clear of props. */
 export const ARENA_REACH = 14
@@ -141,7 +141,8 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal, cha
   rise(battle, raw(LEDGE), 2, 0)
   const [low, tall] = SCATTER[battle.place] ?? ['crate', 'stack']
   // The hive holds nothing human: its hazard is its own growth.
-  for (const mark of HAZARD) stand(battle, raw(mark), battle.place === 'hive' ? 'growth' : 'fuel')
+  // Shooters that never come to a tank would stand and wait to be blown up.
+  if (!challenge || !CHALLENGES[challenge].volley) for (const mark of HAZARD) stand(battle, raw(mark), battle.place === 'hive' ? 'growth' : 'fuel')
   for (const [i, mark] of HEAPS.entries()) stand(battle, raw(mark), i % 3 === 2 ? tall : low)
   walks.delete(battle)
   battle.approach = raw(APPROACH)

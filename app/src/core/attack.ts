@@ -154,7 +154,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   let damage = base > 0 ? Math.max(MIN_DAMAGE, scaled) : Math.max(0, scaled)
   const warded = has(enemy, distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield')
   if (warded) {
-    damage = Math.floor(damage / 2)
+    damage = Math.ceil(damage / 2)
     events.push({ type: 'effect', id: enemy.id, effect: distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield', amount: 0 })
   }
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0
