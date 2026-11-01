@@ -347,6 +347,7 @@ export function createRun(seed: number): Run {
     nextGear: 1,
     relics: [],
     gains: [],
+    log: [],
     utilities: [],
     spare: null,
     relicOffers: [],

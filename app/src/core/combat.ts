@@ -18,6 +18,7 @@ import { armed, dash, moveSide, stride } from './sides'
 import { IMPACT_DAMAGE, tesla } from './keystones'
 import { bladeDance, command } from './follow-ups'
 import { ultimate } from './ultimates'
+import { tallyOf } from './wound'
 /**
  * The next attack of the side on turn: a soldier makes SOLDIER_ATTACKS a turn, its weapon's then its secondary, an alien one. A panicked soldier loses its turn; a phantom may cloak in place of its attacks.
  * An alien does what its kind does in place of a shot, if anything. Otherwise, first comes what does not cost the
@@ -115,11 +116,23 @@ function act(battle: Battle): GameEvent[] {
   return []
 }
 
+/** Credits each heal to the hero who gave it, or whose mech did; health a hero's own effect gives back, to that hero. */
+function tallyHealing(battle: Battle, events: GameEvent[]): void {
+  for (const e of events) {
+    const amount = e.type === 'heal' || (e.type === 'effect' && e.amount > 0) ? e.amount : 0
+    if (amount === 0 || !('id' in e)) continue
+    const giver = battle.units.find((u) => u.id === e.id && u.side === 'human')
+    const hero = giver?.soldier ?? giver?.summoner
+    if (hero !== null && hero !== undefined) tallyOf(battle, hero).healed += amount
+  }
+}
+
 /** Advances a battle one beat: a side's simultaneous move, or one unit's action. Does nothing outside the battle phase. */
 export function stepBattle(battle: Battle): GameEvent[] {
   if (battle.phase !== 'battle') return []
   battle.beat++
   const events = act(battle)
+  tallyHealing(battle, events)
   const humans = battle.units.some(isSoldier)
   // Every sentry down before the clock runs out: no reinforcements come.
   if (battle.deadline !== null && battle.round < battle.deadline && !battle.units.some((u) => u.side === 'alien')) battle.waves = []

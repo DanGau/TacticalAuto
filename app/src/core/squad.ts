@@ -14,7 +14,7 @@ import { SKILLS, type SkillId, unlocked } from './skills'
 import { MELEE_RANGE, WEAPONS } from './weapons'
 import { CONTINENT_IDS, type City, CONTINENTS } from './world'
 import type { Keyword } from './keywords'
-import { type FeatId, type Tally, FEATS } from './feats'
+import { emptyTally, type FeatId, type Tally, FEATS } from './feats'
 
 /** Experience each level takes beyond the last: level n takes LEVEL_XP × n more. */
 export const LEVEL_XP = 4
@@ -179,7 +179,7 @@ export function squadKeywords(run: Run): Keyword[] {
 
 /** What a soldier earns from a battle, after the feats it ends the battle with are recorded. */
 export function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | null): { earned: Earned[]; feats: FeatId[]; tally: Tally } {
-  const tally = battle.tally[soldier.id] ?? { dealt: 0, kills: 0, taken: 0, feats: [] }
+  const tally = battle.tally[soldier.id] ?? emptyTally()
   // A soldier lifted off has left the field.
   const unit = battle.units.find((u) => u.soldier === soldier.id)
   if (won && tally.taken === 0) tally.feats.push('untouched')

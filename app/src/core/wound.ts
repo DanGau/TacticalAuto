@@ -6,12 +6,12 @@ import { wreck } from './grid'
 import { unitAt } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { OVERKILL, type FeatId, type Tally } from './feats'
+import { emptyTally, OVERKILL, type FeatId, type Tally } from './feats'
 import { engage, has, hostage, fireproof, foeHas, nearest, immune, onTile } from './fighters'
 
 /** A soldier's tally for this battle, begun empty. */
 export function tallyOf(battle: Battle, soldier: number): Tally {
-  return (battle.tally[soldier] ??= { dealt: 0, kills: 0, taken: 0, feats: [] })
+  return (battle.tally[soldier] ??= emptyTally())
 }
 
 export const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || tally.feats.push(id)
@@ -33,7 +33,10 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
   const lost = Math.min(target.hp, damage - absorbed)
   target.armor -= plated ? 1 : absorbed
   target.hp -= damage - absorbed
-  if (target.soldier !== null) tallyOf(battle, target.soldier).taken += lost
+  if (target.soldier !== null) {
+    tallyOf(battle, target.soldier).taken += lost
+    tallyOf(battle, target.soldier).blocked += plated ? 0 : absorbed
+  }
   // A mech's work is its engineer's.
   const by = battle.units.find((u) => u.id === battle.actor)
   const credited = by && by.side !== target.side ? (by.soldier ?? by.summoner) : null

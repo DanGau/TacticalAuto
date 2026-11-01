@@ -135,6 +135,15 @@ export interface Report {
 /** What the squad gained or lost without choosing it from a card the player could read; the player is told, one screen each. */
 export type Gain = { kind: 'relic'; id: RelicId } | { kind: 'relicLost'; id: RelicId } | { kind: 'boon'; id: UtilityId } | { kind: 'hero'; soldier: number }
 
+/** A battle as the run remembers it, for the post-game summary. */
+export interface Fought {
+  stop: Mission['kind']
+  goal: Goal
+  won: boolean
+  rounds: number
+  soldiers: { name: string; cls: ClassId | null; tally: Tally }[]
+}
+
 /** Experience from one source. */
 export interface Earned {
   label: string
@@ -186,6 +195,8 @@ export interface Run {
   nextGear: number
   /** Changed only through gainRelic and loseRelic, so the player hears of it. */
   relics: readonly RelicId[]
+  /** Every battle fought, in order. */
+  log: Fought[]
   /** What the player has yet to be told of. */
   gains: Gain[]
   /** Utilities the party holds, at most UTILITY_SLOTS. One is picked for each fight, and it is never used up. */

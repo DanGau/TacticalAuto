@@ -5,7 +5,8 @@ import { nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { skillOffers } from '../core/squad'
-import { acquired, choice, joined, loot, modal, runEnd, skillChoice, spareChoice, stopReport } from './aftermath'
+import { battlePage, runSummary } from './summary'
+import { acquired, choice, joined, loot, modal, skillChoice, spareChoice, stopReport } from './aftermath'
 import { ALIENS } from '../core/aliens'
 import { TWISTS } from '../core/twists'
 import { CHALLENGES } from '../core/challenges'
@@ -106,6 +107,8 @@ export function createUi(act: (action: Action) => void): Ui {
   /** The fixed card tapped once, whose second tap goes through; and the shop gear whose wearer is being picked. */
   let armed: string | null = null
   let ware: number | null = null
+  /** Whether the battle's statistics page is open over the debrief. */
+  let statsOpen = false
   let html = ''
 
   /** The run's phase when the panel was last drawn. */
@@ -127,7 +130,7 @@ export function createUi(act: (action: Action) => void): Ui {
     const report = run.report
     if (run.phase === 'recruit') return !started ? title() : !told ? story() : recruits(run, recruit)
     if (run.phase === 'battle') return ''
-    if (run.phase === 'won' || run.phase === 'lost') return runEnd(run)
+    if (run.phase === 'won' || run.phase === 'lost') return runSummary(run)
     // After a fight: a hero joining, then the debrief, where each soldier owed a skill chooses it, then the rewards.
     if (report && seen !== report && report.soldiers.length > 0) {
       if (report.hired && met !== report) return joined(run, report.hired)
@@ -136,6 +139,7 @@ export function createUi(act: (action: Action) => void): Ui {
       const find = crate !== null && run.finds[crate] ? crate : null
       // A pop-up opened over it leaves the debrief at rest behind: nothing in it plays again.
       if (learner || find !== null) opened.still = true
+      if (statsOpen && run.log.length > 0) return stopReport(run, report, true) + modal(battlePage(run.log.at(-1)!))
       const debrief = stopReport(run, report, opened.still)
       return learner ? debrief + modal(skillChoice(run, learner, armed)) : find !== null ? debrief + loot(run, find, armed) : debrief
     }
@@ -167,6 +171,8 @@ export function createUi(act: (action: Action) => void): Ui {
   /** Shrinks the panel until its content fits the screen: a game never scrolls. */
   function shrink(): void {
     overlay.style.setProperty('--shrink', '1')
+    // The post-game summary may be long: it scrolls, staying legible.
+    if (overlay.querySelector('.summary')) return
     for (let i = 0; i < 4 && overlay.scrollHeight > overlay.clientHeight + 1; i++) {
       const now = Number(overlay.style.getPropertyValue('--shrink'))
       overlay.style.setProperty('--shrink', String(now * Math.max(0.5, overlay.clientHeight / overlay.scrollHeight)))
@@ -271,6 +277,7 @@ export function createUi(act: (action: Action) => void): Ui {
       if (recruit !== index) recruit = index
       else return act({ type: 'recruit', index })
     }
+    else if (target.dataset.stats !== undefined) statsOpen = target.dataset.stats === 'open'
     else if (target.dataset.seen) seen = shown!.report
     else if (target.dataset.met) met = shown!.report
     else if (target.dataset.ability) ability = Number(target.dataset.ability)

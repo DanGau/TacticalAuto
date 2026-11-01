@@ -1,6 +1,6 @@
 // Screens after a battle or stop: rewards, loot, skill choices, the stop report, and the run's end.
 import { CLASSES } from '../core/classes'
-import { FEATS, type Tally } from '../core/feats'
+import { emptyTally, FEATS } from '../core/feats'
 import type { Keyword } from '../core/keywords'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
@@ -12,7 +12,7 @@ import { squadKeywords } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { health } from '../core/squad'
 import { skillOffers } from '../core/squad'
-import { level, MAX_SQUAD } from '../core/squad'
+import { level } from '../core/squad'
 import { xpFor } from '../core/squad'
 import { CAPSTONE_PICKS, SKILLS, TREES, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
@@ -133,18 +133,6 @@ export function choice(run: Run, armed: string | null = null): string {
   return learner ? skillChoice(run, learner, armed) : ''
 }
 
-/** What each soldier did in the battle, a row each, the squad's best in each column but damage taken marked. */
-function battleStats(report: Report): string {
-  const columns: [string, (t: Tally) => number][] = [
-    ['Damage dealt', (t) => t.dealt],
-    ['Kills', (t) => t.kills],
-    ['Damage taken', (t) => t.taken],
-  ]
-  const best = columns.map(([name, value]) => (name === 'Damage taken' ? null : Math.max(1, ...report.soldiers.map((s) => value(s.tally)))))
-  const rows = report.soldiers.map((s) => `<tr><td><span class="portrait">${badge(s.cls)}</span>${s.name}</td>${columns.map(([, value], i) => `<td class="${value(s.tally) === best[i] ? 'best' : ''}">${value(s.tally)}</td>`).join('')}</tr>`)
-  return `<table class="tally"><tr><th></th>${columns.map(([name]) => `<th>${name}</th>`).join('')}</tr>${rows.join('')}</table>`
-}
-
 /**
  * The summary after a stop, once its choices are made, revealed top to bottom: the threat, what was gained, the squad
  * if it fought with a crate for each find, and a button to go on once every crate is opened and every skill chosen.
@@ -154,9 +142,9 @@ export function stopReport(run: Run, report: Report, still = false): string {
   const threat = after === before ? '' : `<span class="note">${signed(after - before)}</span>`
   // The hero just joined stands with the squad that fought.
   const hero = run.soldiers.find((s) => s.name === report.hired)
-  const all = [...report.soldiers, ...(hero ? [{ id: hero.id, name: hero.name, cls: hero.cls, xpBefore: hero.xp, xpAfter: hero.xp, taken: false, earned: [], feats: [], hp: health(run, hero), maxHp: soldierStats(run, hero).hp, tally: { dealt: 0, kills: 0, taken: 0, feats: [] } }] : [])]
+  const all = [...report.soldiers, ...(hero ? [{ id: hero.id, name: hero.name, cls: hero.cls, xpBefore: hero.xp, xpAfter: hero.xp, taken: false, earned: [], feats: [], hp: health(run, hero), maxHp: soldierStats(run, hero).hp, tally: emptyTally() }] : [])]
   const crates = run.finds.map((_, i) => `<button class="crate" data-crate="${i}" title="Open">🎁</button>`)
-  const squad = report.soldiers.length > 0 ? `<div class="stage second">${battleStats(report)}<div class="squad">${all.map((s) => soldierCard(run, s)).join('')}</div>${crates.length > 0 ? `<div class="crates">${crates.join('')}</div>` : ''}</div>` : ''
+  const squad = report.soldiers.length > 0 ? `<div class="stage second"><div class="squad">${all.map((s) => soldierCard(run, s)).join('')}</div>${crates.length > 0 ? `<div class="crates">${crates.join('')}</div>` : ''}</div>` : ''
   const owed = squad !== '' && (run.finds.length > 0 || run.spare !== null || run.soldiers.some((s) => skillOffers(s).length > 0))
   return `<div class="debrief${still ? ' still' : ''}">
     ${title(report)}
@@ -166,11 +154,6 @@ export function stopReport(run: Run, report: Report, still = false): string {
       ${report.supplies > 0 ? `<p class="supplies">+${report.supplies} supplies</p>` : ''}
     </div>
     ${squad}
-    <div class="stage ${squad ? 'third' : 'second'}"><button data-seen="report"${owed ? ' disabled' : ''}>Continue</button></div>
+    <div class="stage ${squad ? 'third' : 'second'}">${report.soldiers.length > 0 ? '<button data-stats="open">Battle stats</button> ' : ''}<button data-seen="report"${owed ? ' disabled' : ''}>Continue</button></div>
   </div>`
-}
-
-export function runEnd(run: Run): string {
-  if (run.phase === 'won') return `<h1 class="down">The source is destroyed. Earth is saved.</h1><button id="again">New run</button>`
-  return `<h1 class="up">Earth has fallen</h1><h2>Lost: ${STOP_NAMES[run.mission!.kind]}, with ${run.soldiers.length} of ${MAX_SQUAD} heroes</h2><button id="again">New run</button>`
 }

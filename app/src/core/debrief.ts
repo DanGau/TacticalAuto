@@ -38,6 +38,7 @@ export function endBattle(run: Run): void {
     return { id: s.id, name: s.name, cls: s.cls, xpBefore, xpAfter: s.xp, taken: run.captives.includes(s.id), earned, feats, hp, maxHp, tally }
   })
 
+  run.log.push({ stop: mission.kind, goal: mission.goal, won, rounds: battle.round, soldiers: soldiers.map(({ name, cls, tally }) => ({ name, cls, tally })) })
   const before = run.threat
   const risk = RISKS[mission.risk]
   // An ambush won empties the threat; any other battle is a stop, and adds to it.
