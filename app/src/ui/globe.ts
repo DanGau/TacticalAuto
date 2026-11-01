@@ -1,4 +1,4 @@
-import { plane } from '../core/plane'
+import { crosses, plane } from '../core/plane'
 import { along, arc, type LonLat } from '../core/world'
 import type { Run } from '../core/run-state'
 import { geoCentroid, geoContains, geoDistance, geoOrthographic, geoPath, type GeoPermissibleObjects } from 'd3-geo'
@@ -249,15 +249,16 @@ function untangle(stops: { p: { x: number; y: number }; layer: number; order: nu
   // Which way across the page the order runs, as most columns have it.
   const lean = layers.reduce((sum, column) => sum + column.reduce((t, s, i) => t + (i > 0 ? s.p.x - column[i - 1].p.x : 0), 0), 0)
   const dir = lean < 0 ? -1 : 1
-  for (const column of layers) {
-    if (column.some((s) => s.fixed)) continue
-    // Across: each ROOM past the last, then all shifted back by as much as they moved on average.
+  /** Each stop of a column ROOM past the last, in order, then all shifted back by as much as they moved on average. */
+  const spread = (column: (typeof stops)[number][]) => {
+    if (column.some((s) => s.fixed)) return
     const was = column.map((s) => s.p.x * dir)
-    const now = was.map((x) => x)
+    const now = [...was]
     for (let i = 1; i < now.length; i++) now[i] = Math.max(now[i], now[i - 1] + ROOM)
     const shift = was.reduce((sum, x, i) => sum + x - now[i], 0) / now.length
     column.forEach((s, i) => (s.p.x = (now[i] + shift) * dir))
   }
+  layers.forEach(spread)
   // Each column a band, BAND deep about its middle, at least RISE above the column before, out from the squad's both ways.
   const at = Math.max(0, layers.findIndex((column) => column.some((s) => s.fixed)))
   for (const column of layers) {
@@ -269,16 +270,19 @@ function untangle(stops: { p: { x: number; y: number }; layer: number; order: nu
   // A trail far across climbs as steeply as SLANT has it.
   const rise = (a: { p: { x: number } }, b: { p: { x: number } }) => Math.max(RISE, SLANT * Math.abs(a.p.x - b.p.x))
   const linked = (a: (typeof stops)[number], b: (typeof stops)[number]) => lines.some(([u, v]) => (stops[u] === a && stops[v] === b) || (stops[u] === b && stops[v] === a))
-  for (let k = at + 1; k < layers.length; k++) {
-    const over = Math.max(...layers[k].flatMap((s) => layers[k - 1].map((r) => s.p.y - r.p.y + (linked(r, s) ? rise(r, s) : RISE))))
-    if (over > 0) for (const s of layers[k]) s.p.y -= over
+  const stack = () => {
+    for (let k = at + 1; k < layers.length; k++) {
+      const over = Math.max(...layers[k].flatMap((s) => layers[k - 1].map((r) => s.p.y - r.p.y + (linked(r, s) ? rise(r, s) : RISE))))
+      if (over > 0) for (const s of layers[k]) s.p.y -= over
+    }
+    for (let k = at - 1; k >= 0; k--) {
+      const under = Math.max(...layers[k].flatMap((s) => layers[k + 1].map((r) => r.p.y - s.p.y + (linked(r, s) ? rise(r, s) : RISE))))
+      if (under > 0) for (const s of layers[k]) s.p.y += under
+    }
   }
-  for (let k = at - 1; k >= 0; k--) {
-    const under = Math.max(...layers[k].flatMap((s) => layers[k + 1].map((r) => r.p.y - s.p.y + (linked(r, s) ? rise(r, s) : RISE))))
-    if (under > 0) for (const s of layers[k]) s.p.y += under
-  }
+  stack()
   // A stop a trail fans past too near steps out of its way, and stops that crowd step apart.
-  for (let round = 0; round < 12; round++) {
+  for (let round = 0; round < 24; round++) {
     budge(stops)
     for (const [a, b] of lines)
       for (const [k, s] of stops.entries()) {
@@ -293,6 +297,29 @@ function untangle(stops: { p: { x: number; y: number }; layer: number; order: nu
         s.p.y += ny * (CLEAR - d)
       }
   }
+  // Budging can bend trails across each other. A crossing's columns go flat and back in order: with every column flat, in order and stacked, none can cross.
+  for (let crossing = crossed(stops, lines); crossing; crossing = crossed(stops, lines)) {
+    const flats = layers.filter((column) => column.length > 1 && !column.every((s) => s.p.y === column[0].p.y)).filter((column) => crossing.some((s) => column.includes(s)))
+    const bent = flats.length > 0 ? flats : layers.filter((column) => column.some((s) => crossing.includes(s)))
+    for (const column of bent) {
+      const y = column.map((s) => s.p.y).sort((m, n) => m - n)[column.length >> 1]
+      const xs = column.map((s) => s.p.x * dir).sort((m, n) => m - n)
+      column.forEach((s, i) => {
+        if (s.fixed) return
+        s.p.y = y
+        s.p.x = xs[i] * dir
+      })
+      spread(column)
+    }
+    stack()
+    if (flats.length === 0) return
+  }
+}
+
+/** The four stops of the first two trails that cross, if any do. */
+function crossed<S extends { p: { x: number; y: number } }>(stops: S[], lines: [number, number][]): S[] | null {
+  for (const [i, [a, b]] of lines.entries()) for (const [c, d] of lines.slice(i + 1)) if (a !== c && a !== d && b !== c && b !== d && crosses(stops[a].p, stops[b].p, stops[c].p, stops[d].p)) return [a, b, c, d].map((k) => stops[k])
+  return null
 }
 
 /** Pushes stops standing closer than ROOM apart, the squad's own holding still. */
