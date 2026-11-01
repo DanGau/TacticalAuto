@@ -1,5 +1,6 @@
 // A battle's state: units, the board, and the numbers its rules share.
 import type { SecondaryId } from './secondaries'
+import type { WeaponId } from './weapons'
 import { type AlienKind } from './aliens'
 import type { Tally } from './feats'
 import type { DoctrineEffect, Rule } from './doctrines'
@@ -216,7 +217,7 @@ export type SkillEffect =
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'limelight' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
-export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect
+export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect | 'block'
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
@@ -237,6 +238,7 @@ export interface Alien {
 /** A soldier waiting to land. */
 export interface Reserve {
   secondary?: SecondaryId
+  weapon?: WeaponId
   soldier: number
   stats: Stats
   /** Health it lands with. */
@@ -300,6 +302,8 @@ export interface Unit {
   summoner: number | null
   /** A hero's attack after its weapon's. */
   secondary?: SecondaryId
+  /** What a hero fights with; aliens and machines have their one shot. */
+  weapon?: WeaponId
   /** Whether the unit loses its next action. */
   panicked: boolean
   /** Whether the unit has moved this turn. */

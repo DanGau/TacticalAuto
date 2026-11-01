@@ -5,11 +5,11 @@ import type { SecondaryId } from './secondaries'
 
 export type GameEvent =
   /** `path` lists each tile entered, in order. `with` names a skill that granted the move. */
-  | { type: 'move'; id: number; path: Tile[]; with?: Effect }
+  | { type: 'move'; id: number; path: Tile[]; with?: Effect | 'dash' }
   /** Aliens are sighted. `units` gives each one's tile at that moment. */
   | { type: 'reveal'; units: { id: number; x: number; y: number }[] }
-  /** `damage` is 0 if a shield or image took it. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. `secondary` names the attack if not the weapon; `opens` tells of a combo's first blow. */
-  | { type: 'shot'; id: number; target: number; crit: boolean; damage: number; with: Effect[]; secondary?: SecondaryId; opens?: boolean }
+  /** `damage` is 0 if a shield or image took it. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. `secondary` names the attack if not the weapon; `opens` tells of a combo's first blow. `nth` numbers a weapon attack's shots, each playing for `lasts` ms if set; `form` tells of one thrown or rocketed. */
+  | { type: 'shot'; id: number; target: number; crit: boolean; damage: number; with: Effect[]; secondary?: SecondaryId; opens?: boolean; nth?: number; lasts?: number; form?: 'throw' | 'rocket' }
   /** A rocket, grenade or napalm (`fire`) lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */
   | { type: 'rocket'; id: number; x: number; y: number; hits: { target: number; damage: number }[]; fire?: true; label?: string }
   | { type: 'heal'; id: number; target: number; amount: number }

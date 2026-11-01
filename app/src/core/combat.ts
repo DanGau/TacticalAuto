@@ -24,10 +24,10 @@ import type { GameEvent } from './combat-event'
 import { centreOf, fireproof, has, nearest, spotted, vipOf } from './fighters'
 import { SECONDARIES } from './secondaries'
 import { wound } from './wound'
-import { attacksOf, blast, leap, napalm, shoot } from './attack'
+import { attacksOf, blast, leap, napalm, shoot, weaponAttack } from './attack'
 import { leverage } from './objects'
 import { alienAction, cloak, deploy, drone, feed, flashbang, forceField, heal, medkit, polymorph, pulse, secondWind, skirmish, slam, strew } from './abilities'
-import { armed, moveSide, stride } from './sides'
+import { armed, dash, moveSide, stride } from './sides'
 /**
  * The next attack of the side on turn: a soldier makes SOLDIER_ATTACKS a turn, its weapon's then its secondary, an alien one. A panicked soldier loses its turn; a phantom may cloak in place of its attacks.
  * An alien does what its kind does in place of a shot, if anything. Otherwise, first come what does not cost the
@@ -82,7 +82,7 @@ function actNext(battle: Battle): GameEvent[] {
     const powers = [...pulse(battle, unit, 'warcry'), ...pulse(battle, unit, 'emp'), ...flashbang(battle, unit, seen), ...forceField(battle, unit), ...leap(battle, unit, seen)]
     const slammed = fired.length > 0 ? [] : slam(battle, unit)
     const levered = fired.length + slammed.length > 0 ? [] : leverage(battle, unit)
-    const primary = fired.length > 0 ? fired : slammed.length > 0 ? slammed : levered.length > 0 ? levered : shoot(battle, unit, seen)
+    const primary = fired.length > 0 ? fired : slammed.length > 0 ? slammed : levered.length > 0 ? levered : [...dash(battle, unit, seen), ...weaponAttack(battle, unit, seen)]
     // A hero its weapon cannot bring to bear still has its secondary, and that is its turn's attacking.
     const fallback = primary.length === 0 && unit.secondary && unit.stats.range > 0 && unit.stats.damage > 0 ? shoot(battle, unit, seen, undefined, undefined, SECONDARIES[unit.secondary]) : []
     if (fallback.length > 0) battle.attacks = attacksOf(unit)

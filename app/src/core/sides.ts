@@ -1,7 +1,8 @@
 // A side's simultaneous move: sighting aliens, walking, sentries, overwatch, burrowers.
 import { SECONDARIES, type Secondary } from './secondaries'
 import { aiming } from './fighters'
-import { shoot } from './attack'
+import { shoot, weaponAttack } from './attack'
+import { WEAPONS } from './weapons'
 import { GRID, type Battle, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, ENGAGE_REACH, STANDOFF } from './battle'
 import { opening } from './entrances'
 import { soldierUnit } from './spawn'
@@ -175,7 +176,7 @@ export function sentries(battle: Battle, unit: Unit, watched: Set<number>): Game
   for (const sentry of battle.units.filter((u) => isSoldier(u) && has(u, 'sentinel') && !watched.has(u.id) && distance(u, unit) <= 1)) {
     if (unit.hp <= 0) break
     battle.actor = sentry.id
-    const shot = shoot(battle, sentry, spotted(battle), 'sentinel', unit)
+    const shot = weaponAttack(battle, sentry, spotted(battle), 'sentinel', unit)
     battle.actor = null
     if (shot.length > 0) watched.add(sentry.id)
     events.push(...shot)
@@ -206,10 +207,7 @@ export function stride(battle: Battle, unit: Unit, seen: Set<number>, toShot: bo
   const enemies = enemiesOf(battle, unit)
   const shotFrom = (end: Tile) => enemies.some((e) => shootable(battle, aiming(unit, secondary), end, e, seen))
   if (left <= 0 || unit.hp <= 0 || (toShot ? shotFrom(unit) : unit.stance !== 'standoff')) return []
-  const unseen = battle.units.filter((u) => u.side !== unit.side && !u.revealed)
-  const reach = uplinkReach(battle)
-  const barred = (end: Tile) =>
-    onTile(battle.acid, end) || besideFuel(battle, end) || (onTile(battle.fire, end) && !fireproof(battle, unit)) || (battle.uplink !== null && distance(end, battle.uplink) > reach) || unseen.some((alien) => sees(battle, end, alien)) ? 1 : 0
+  const barred = barredFor(battle, unit)
   const path = bestPath(paths(battle, unit, left), unit, (end, steps) =>
     toShot ? [barred(end), shotFrom(end) ? 0 : 1, steps] : [barred(end), Math.max(0, STANDOFF - Math.min(...enemies.map((e) => distance(e, end)))), steps],
   )
@@ -222,6 +220,30 @@ export function stride(battle: Battle, unit: Unit, seen: Set<number>, toShot: bo
   return [...events, ...sight(battle)]
 }
 
+/** Tiles a soldier will not walk to between attacks: into harm, off the uplink, or into sight of an alien not yet revealed; 1 for those. */
+function barredFor(battle: Battle, unit: Unit): (end: Tile) => number {
+  const unseen = battle.units.filter((u) => u.side !== unit.side && !u.revealed)
+  const reach = uplinkReach(battle)
+  return (end) => (onTile(battle.acid, end) || besideFuel(battle, end) || (onTile(battle.fire, end) && !fireproof(battle, unit)) || (battle.uplink !== null && distance(end, battle.uplink) > reach) || unseen.some((alien) => sees(battle, end, alien)) ? 1 : 0)
+}
+
+/** A hero whose weapon dashes, with nothing in arm's reach, dashes to the nearest tile that brings an enemy into it, if one is within the dash. It costs no move. */
+export function dash(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
+  const tiles = unit.weapon && WEAPONS[unit.weapon].dash
+  if (!tiles || unit.rooted > 0) return []
+  const enemies = enemiesOf(battle, unit)
+  const strikes = (end: Tile) => enemies.some((e) => shootable(battle, unit, end, e, seen))
+  if (strikes(unit)) return []
+  const barred = barredFor(battle, unit)
+  const path = bestPath(paths(battle, unit, tiles), unit, (end, steps) => [barred(end), strikes(end) ? 0 : 1, steps])
+  const end = path.at(-1)
+  if (!end || barred(end) || !strikes(end)) return []
+  const events: GameEvent[] = []
+  walk(unit, path, events)
+  moved(battle, unit, path, events)
+  return [...events.map((e) => (e.type === 'move' ? { ...e, with: 'dash' as const } : e)), ...sight(battle)]
+}
+
 /** Overwatch: each soldier with it, or prepared, shoots at the first alien that moved this turn and that it can now shoot. */
 export function overwatch(battle: Battle, moved: number[]): GameEvent[] {
   const events: GameEvent[] = []
@@ -230,7 +252,7 @@ export function overwatch(battle: Battle, moved: number[]): GameEvent[] {
     for (const id of moved) {
       const alien = battle.units.find((u) => u.id === id && u.revealed)
       battle.actor = unit.id
-      const held = alien && unit.hp > 0 ? shoot(battle, unit, seen, 'overwatch', alien) : []
+      const held = alien && unit.hp > 0 ? weaponAttack(battle, unit, seen, 'overwatch', alien) : []
       const shot = held.length === 0 && alien && unit.hp > 0 && has(unit, 'overwatch') && unit.secondary ? shoot(battle, unit, seen, 'overwatch', alien, SECONDARIES[unit.secondary]) : held
       battle.actor = null
       if (shot.length === 0) continue

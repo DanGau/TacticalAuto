@@ -13,6 +13,7 @@ import { soldierStats } from '../core/squad'
 import { health } from '../core/squad'
 import { skillOffers } from '../core/squad'
 import { level, weaponOf } from '../core/squad'
+import { weaponText } from '../core/weapons'
 import { xpFor } from '../core/squad'
 import { SKILLS } from '../core/skills'
 import { gearPicks, pickCard, pickDetail, sellPick } from './cards'
@@ -54,7 +55,7 @@ export function joined(run: Run, name: string): string {
     <h1 class="down">${hero.name} joins</h1>
     <p>${CLASSES[hero.cls!].name} · level ${level(hero)} · 🌍 ${hero.home?.name ?? ''}</p>
     <p class="feats">${named.join('')}</p>
-    <p><b>${hero.gear.weapon!.name}.</b> ${weaponOf(hero)!.text}</p>
+    <p><b>${hero.gear.weapon!.name}.</b> ${weaponText(weaponOf(hero)!)}</p>
     <button class="decide" data-met="report">Continue</button>
   </div>`
 }

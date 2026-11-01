@@ -38,10 +38,10 @@ test('any soldier wields any weapon: a melee one reaches the next tile and charg
   const rifle = soldierStats(run, soldier)
   soldier.gear.weapon = { id: 9, slot: 'weapon', rarity: 'common', name: 'Hammer', weapon: 'hammer', stats: {}, effect: null }
   const hammer = soldierStats(run, soldier)
-  expect(hammer).toMatchObject({ range: MELEE_RANGE, damage: rifle.damage + WEAPONS.hammer.stats.damage! })
+  expect(hammer).toMatchObject({ range: MELEE_RANGE, damage: rifle.damage })
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
-  expect(run.battle!.reserve[0]).toMatchObject({ stance: 'rush', effects: expect.arrayContaining([WEAPONS.hammer.effect]) })
+  expect(run.battle!.reserve[0]).toMatchObject({ stance: 'rush', weapon: 'hammer', effects: expect.arrayContaining([WEAPONS.hammer.effect]) })
 })
 
 /** A run whose soldier has learned its first skill and found `gear`. */
@@ -77,7 +77,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   battle.units = [soldier, alien]
   for (const u of battle.units) Object.assign(u, { revealed: true, engaged: true })
   // A soldier of no class in particular: it holds its ground and has no ability or class skill.
-  Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, effects: gear.effect ? [gear.effect] : [] })
+  Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, weapon: undefined, effects: gear.effect ? [gear.effect] : [] })
   Object.assign(alien, { kind: 'trooper', x: 10, y: 11, hp: 99, armor: 0, target: false, stats: { ...alienStats('trooper', 0, 0), hp: 99, armor: 0, crit: 0 } })
   return { battle, soldier, alien, step: () => stepBattle(battle) }
 }

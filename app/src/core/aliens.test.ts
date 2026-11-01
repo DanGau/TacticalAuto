@@ -49,7 +49,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   battle.west.fill('none')
   reshaped(battle)
   const soldier = battle.units.find(isSoldier)!
-  Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, hp: 30, stats: { ...soldier.stats, hp: 30, crit: 0, damage: 3 } })
+  Object.assign(soldier, { x: 10, y: 10, stance: 'anchor', ability: null, weapon: undefined, hp: 30, stats: { ...soldier.stats, hp: 30, crit: 0, damage: 3 } })
   const units = aliens.map(({ kind, x, y, boss = false }) => alienUnit(battle, { kind, stats: alienStats(kind, 0, 0), stance: ALIENS[kind].stance, boss, spawns: boss || (ALIENS[kind].spawns ?? false), target: false, resists: ALIENS[kind].resists }, { x, y }, true))
   battle.units = [soldier, ...units]
   const until = (done: (events: GameEvent[]) => boolean) => {
@@ -463,6 +463,7 @@ test('a turret never moves, and shoots a soldier in range', () => {
 test('a soldier with no shot and an enemy that could reach it prepares, and shoots the first alien to come in range', () => {
   const { battle, soldier, aliens, until } = arena([{ kind: 'swarmling', x: 10, y: 16 }])
   Object.assign(battle, { turn: 'human', stage: 'move' })
+  soldier.secondary = undefined
   soldier.stats = { ...soldier.stats, move: 0, range: 3 }
   aliens[0].hp = aliens[0].stats.hp = 99
   expect(until((all) => all.some((e) => e.type === 'order'))).toContainEqual({ type: 'order', id: soldier.id, order: 'prepare' })

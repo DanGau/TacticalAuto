@@ -8,7 +8,7 @@ import { instant, PACE, strolls, tilePace, walkMs } from '../core/pace'
 import { attackOf, finisher, opener, secondaryAttack } from './attacks'
 import { drawTerrain } from './board'
 import { along, lerp, spot } from './camera'
-import { callout, chest, drawing, effectCallout, fireRocket, float, playShot } from './effects'
+import { callout, chest, dashTo, drawing, effectCallout, fireRocket, float, playShot } from './effects'
 import { drawAcid, drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
 import { cloakLook, create, fade, letter, place, remove, squash, vitals } from './sprites'
@@ -68,10 +68,16 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
   const { sprites, glows } = s
   for (let i = 0; i < events.length; i++) {
     const e = events[i]
-    if (e.type === 'move') {
+    if (e.type === 'move' && e.with === 'dash') {
+      const sprite = sprites.get(e.id)
+      if (!sprite) continue
+      float(s, callout(s, 'DASH', 0xffffff, sprite, 15))
+      await drawing(s, (fx) => dashTo(s, fx, sprite, e.path))
+      drawFog(s, battle)
+    } else if (e.type === 'move') {
       // Moves in a row, and the instant events among them, play as one: everyone walks together, then the words show.
       const group: GameEvent[] = []
-      for (; events[i] && (events[i].type === 'move' || instant(events[i])); i++) group.push(events[i])
+      for (; events[i] && ((events[i].type === 'move' && (events[i] as { with?: unknown }).with !== 'dash') || instant(events[i])); i++) group.push(events[i])
       i--
       // Each walks the whole way it went, from where it stood.
       const paths = new Map<number, Tile[]>()
@@ -79,7 +85,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const pace = (id: number) => tilePace(!!sprites.get(id)?.ally)
       const ms = walkMs([...paths].map(([id, path]) => ({ path, pace: pace(id) })))
       const walks = [...paths].map(([id, path]) => (sprites.has(id) ? walk(s, sprites.get(id)!, path, ms) : glide(s, glows.get(id)!, path, ms)))
-      for (const m of group) if (m.type === 'move' && m.with && sprites.has(m.id)) float(s, callout(s, effectName(m.with, s.kit()).toUpperCase(), 0xffffff, sprites.get(m.id)!))
+      for (const m of group) if (m.type === 'move' && m.with && m.with !== 'dash' && sprites.has(m.id)) float(s, callout(s, effectName(m.with, s.kit()).toUpperCase(), 0xffffff, sprites.get(m.id)!))
       await Promise.all([s.follow(squad(battle), Math.max(ms, CAMERA_MS)), ...walks])
       // The fog lifts where the squad arrived, before any alien it uncovered appears.
       drawFog(s, battle)
@@ -100,8 +106,8 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const shooter = battle.units.find((u) => u.id === e.id)
       if (!from || !to || !shooter) continue
       const after = vitals(battle, e.target)
-      const weapon = attackOf(shooter, s.soldiers.find((m) => m.id === shooter.soldier)?.gear.weapon?.weapon ?? null, s.blademasters)
-      const gun = e.secondary ? finisher(secondaryAttack(e.secondary)) : e.opens ? opener(weapon) : weapon
+      const weapon = attackOf(shooter, e.form)
+      const gun = e.secondary ? finisher(secondaryAttack(e.secondary)) : e.opens && !e.lasts ? opener(weapon) : weapon
       await drawing(s, (fx) => playShot(s, fx, from, to, e, after, gun))
       // Crumbling ruins have already broken in the battle; show it as the hit lands.
       if (battle.twist === 'crumbling' && e.damage > 0) drawTerrain(s, battle)

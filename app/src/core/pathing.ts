@@ -9,7 +9,7 @@ import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { vipOf, pursuers, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, GUARDIAN_REACH, fireproof, enemiesOf, besideFuel, foes, spotlit } from './fighters'
+import { hasAttack, vipOf, pursuers, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, GUARDIAN_REACH, fireproof, enemiesOf, besideFuel, foes, spotlit } from './fighters'
 import { ESCORT_REACH } from './goals'
 import { canHurlFrom } from './objects'
 import { bite, canShoot, sees } from './sight'
@@ -254,8 +254,8 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const waiting = battle.units.filter((u) => u.side !== unit.side && !u.engaged)
   // The squad is in a fight while some soldier has an alien in sight.
   const fighting = unit.side === 'human' && seen.size > 0
-  /** Whether a soldier on `end` would sight an alien unseen, or draw in one waiting, while the squad is in a fight. */
-  const provokes = (end: Tile) => (fighting && (unseen.some((alien) => sees(battle, end, alien)) || waiting.some((alien) => distance(alien, end) <= ENGAGE_REACH)) ? 1 : 0)
+  /** Whether a soldier on `end` would sight an alien unseen, or draw in one waiting, while the squad is in a fight, until the battle drags on and only moving can end it. */
+  const provokes = (end: Tile) => (fighting && battle.round < RESTLESS_ROUND && (unseen.some((alien) => sees(battle, end, alien)) || waiting.some((alien) => distance(alien, end) <= ENGAGE_REACH)) ? 1 : 0)
   /** Whether `end` would hurt the unit to stand on: acid, or fire unless it cannot burn; for a soldier, a fuel tank beside it, until the battle drags on, for a tank never goes away and tanks can bar the way. Caltrops only slow and hurt the way. */
   const acid = (end: Tile) => (onTile(battle.acid, end) || (unit.side === 'human' && battle.round < RESTLESS_ROUND && besideFuel(battle, end)) || (onTile(battle.fire, end) && !fireproof(battle, unit)) ? 1 : 0)
   /**
@@ -325,13 +325,13 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const path = choose(move)
   if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
   const end = path.at(-1) ?? unit
-  const shot = enemies.some((e) => shootable(battle, unit, end, e, seen))
+  const shot = hasAttack(battle, unit, end, enemies, seen)
   if (unit.side === 'human' && shot && !battle.extract && !carrying(battle, unit)) battle.strides[unit.id] = move - costOf(battle, unit, path)
   if (unit.side !== 'human' || shot) return path
   // A soldier dashes on to a shot, if one is within a dash.
   if (isSoldier(unit) && move > 0 && !battle.extract && !carrying(battle, unit)) {
     const dash = choose(move + DASH_MOVE)
-    if (enemies.some((e) => shootable(battle, unit, dash.at(-1) ?? unit, e, seen))) return dash
+    if (hasAttack(battle, unit, dash.at(-1) ?? unit, enemies, seen)) return dash
   }
   unit.order = orderFor(battle, unit, !unit.cloaked && threats(battle, enemies)(end) > 0)
   if (unit.order !== 'sprint') return path

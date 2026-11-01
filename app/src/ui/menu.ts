@@ -5,6 +5,7 @@ import type { Run } from '../core/run-state'
 import type { Soldier } from '../core/run-state'
 import { SKILLS } from '../core/skills'
 import { weaponOf } from '../core/squad'
+import { weaponText } from '../core/weapons'
 import { places } from './globe'
 
 /** The title screen, before a run begins. */
@@ -42,7 +43,7 @@ function card(recruit: Soldier, index: number, chosen: number | null): string {
     <b class="name">${recruit.name}</b>
     <small class="home">🌍 ${recruit.home!.name}, ${recruit.home!.country}</small>
     <span class="feats">${named.map((n, i) => `<span class="chip ${i === 0 ? 'feat' : ''}" title="${n.text}">${n.name}</span>`).join('')}</span>
-    <div class="weapon"><b>${recruit.gear.weapon!.name}</b><small>${weaponOf(recruit)!.text}</small></div>
+    <div class="weapon"><b>${recruit.gear.weapon!.name}</b><small>${weaponText(weaponOf(recruit)!)}</small></div>
   </button>`
 }
 

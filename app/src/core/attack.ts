@@ -19,6 +19,16 @@ import { bite, MIN_DAMAGE, odds } from './sight'
 import { random } from './rng'
 import { paths, bestPath, preyed, walk, leapTo } from './pathing'
 import { FUEL_DAMAGE } from './twists'
+import { BLOCK_SOAK, WEAPONS, type Kit } from './weapons'
+
+/** One shot of a weapon's attack, and what the attack's shots share: one crit roll, and an attack out of cloak. */
+interface Blow {
+  kit: Kit
+  nth: number
+  form?: 'throw' | 'rocket'
+  crit?: boolean
+  unseen?: boolean
+}
 
 /** Whether an alien closes to fight up close, so rooting or charging it pays most. */
 export const closing = (unit: Unit) => unit.stance === 'rush' || unit.stats.range <= 1
@@ -60,9 +70,11 @@ export const VOLATILE_DAMAGE = 2
  * An alien that can shoot a taunting soldier, or one in the spotlight, must. With `only`, the shot is at that enemy or not at all.
  * The effects of both units' gear and skills, and of relics, apply. `granted` names the effect that gave a shot
  * beyond the unit's own; such a shot grants no further one. A `secondary` attacks in place of the weapon: its reach, damage and effect.
+ * A `blow` is one shot of a weapon's attack, scaled by its kit; what happens once an attack happens on its first.
  */
-export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, only?: Unit, secondary?: Secondary): GameEvent[] {
-  const aim = aiming(unit, secondary)
+export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, only?: Unit, secondary?: Secondary, blow?: Blow): GameEvent[] {
+  const aim = blow?.kit.range ? { ...unit, stats: { ...unit.stats, range: blow.kit.range } } : aiming(unit, secondary)
+  const first = !blow?.nth
   const inReach = (only ? [only] : battle.units).filter((other) => other.side !== unit.side && shootable(battle, aim, unit, other, seen))
   const taunting = inReach.filter((other) => has(other, 'taunt') || spotlit(battle, other))
   // Aliens spread their fire: a healthier soldier is the likelier target, so wounds fall across the squad.
@@ -85,8 +97,9 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (taunting.length > 0 && taunting.length < inReach.length) events.push({ type: 'effect', id: enemy.id, effect: 'taunt', amount: 0 })
   const baned = battle.units.some((u) => u.side !== unit.side && has(u, 'bane') && distance(u, unit) <= BANE_REACH)
   // An attack out of cloak strikes past armor and harder, and breaks the cloak.
-  const unseen = !!unit.cloaked
-  if (unseen) {
+  const unseen = !!unit.cloaked || !!blow?.unseen
+  if (blow) blow.unseen = unseen
+  if (unit.cloaked) {
     unit.cloaked = 0
     events.push({ type: 'cloak', id: unit.id, on: false })
   }
@@ -94,16 +107,19 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const parried = has(enemy, 'parry') && distance(unit, enemy) > 1
   if (has(enemy, 'dodge')) events.push({ type: 'effect', id: enemy.id, effect: 'dodge', amount: 0 })
   if (parried) events.push({ type: 'effect', id: enemy.id, effect: 'parry', amount: 0 })
+  const shielded = has(enemy, 'block') && distance(unit, enemy) > 1
+  if (shielded) events.push({ type: 'effect', id: enemy.id, effect: 'block', amount: 0 })
   const blunted =
     (unit.chilled > 0 ? CHILL_DAMAGE : 0) +
     (inAura(battle, enemy, 'bulwark') ? BULWARK_SOAK : 0) +
     (baned ? BANE_DAMAGE : 0) +
     (unit.suppressed > 0 ? SUPPRESS_DAMAGE : 0) +
     (has(enemy, 'dodge') ? DODGE_SOAK : 0) +
-    (parried ? PARRY_SOAK : 0)
+    (parried ? PARRY_SOAK : 0) +
+    (shielded ? BLOCK_SOAK : 0)
 
   const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) > 0
-  const crit = !enemy.resists.includes('crit') && (sure || random(battle) < unit.stats.crit)
+  const crit = !enemy.resists.includes('crit') && (sure || (blow ? (blow.crit ??= random(battle) < unit.stats.crit) : random(battle) < unit.stats.crit))
   // A mirror hits as hard as the squad's hardest hitter; a feeder as hard as it has grown.
   const base = unit.kind === 'mirror' ? Math.max(unit.stats.damage, ...battle.units.filter(isSoldier).map((s) => s.stats.damage)) : unit.stats.damage
   const dealt =
@@ -133,7 +149,9 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(enemy.rooted > 0, 'net', 2) +
     when(enemy.boss, 'bounty', BOUNTY_DAMAGE) +
     when(unit.fury > 0, 'bloodRite', unit.fury)
-  let damage = base > 0 ? Math.max(MIN_DAMAGE, dealt) : Math.max(0, dealt)
+  // A fraction is a chance of one point more, so small shots add up to their share.
+  const scaled = blow && blow.kit.power !== 1 ? Math.floor(dealt * blow.kit.power + random(battle)) : dealt
+  let damage = base > 0 ? Math.max(MIN_DAMAGE, scaled) : Math.max(0, scaled)
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0
   const pierced = unseen || secondary?.effect === 'pierce' || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) + when(enemy.chilled > 0, 'frostbreak', 1) > 0
   const left = enemy.hp + (pierced ? 0 : enemy.armor)
@@ -153,7 +171,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const beside = battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1)
   // The weapon's attack of a turn with a secondary still to come opens a combo.
   const opens = !secondary && !granted && isSoldier(unit) && battle.actor === unit.id && battle.attacks < attacksOf(unit)
-  events.unshift({ type: 'shot', id: unit.id, target: enemy.id, crit, damage, with: used, ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}) })
+  events.unshift({ type: 'shot', id: unit.id, target: enemy.id, crit, damage, with: used, ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}), ...(blow ? { nth: blow.nth, ...(blow.kit.ms ? { lasts: blow.kit.ms } : {}), ...(blow.form ? { form: blow.form } : {}) } : {}) })
   if (battle.twist === 'crumbling' && damage > 0) crumble(battle, enemy, unit)
   // A bonded squadmate beside the target takes the hit in its place.
   const guard = battle.units.find((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && has(u, 'bond') && distance(u, enemy) <= 1)
@@ -179,6 +197,13 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   for (const other of splash > 0 ? beside : []) {
     events.push({ type: 'effect', id: other.id, effect: has(unit, 'volley') ? 'volley' : 'cleave', amount: -splash })
     wound(battle, other, splash, events)
+  }
+  if (blow?.kit.wide && damage > 0) {
+    for (const other of beside.filter((u) => u.hp > 0)) {
+      const amount = Math.max(MIN_DAMAGE, Math.round(damage * blow.kit.wide))
+      events.push({ type: 'hurt', id: other.id, amount, cause: 'impact' })
+      wound(battle, other, amount, events)
+    }
   }
   // An arc leaps from the target to the nearest alien not yet struck, and on again.
   if (crit && damage > 0 && when(true, 'arc', 1)) {
@@ -216,9 +241,9 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     enemy.panicked = true
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'stasis') ? 'stasis' : 'deepFreeze', amount: 0 })
   }
-  if (enemy.hp > 0 && damage > 0 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
-  else if (enemy.hp > 0 && damage > 0 && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
-  if (enemy.hp > 0 && damage > 0 && when(true, 'tether', 1)) knockback(battle, unit, enemy, events, -1)
+  if (first && enemy.hp > 0 && damage > 0 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
+  else if (first && enemy.hp > 0 && damage > 0 && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
+  if (first && enemy.hp > 0 && damage > 0 && when(true, 'tether', 1)) knockback(battle, unit, enemy, events, -1)
   if (enemy.hp > 0 && when(true, 'snare', 1)) {
     enemy.rooted = CHILL_TURNS
     events.push({ type: 'effect', id: enemy.id, effect: 'snare', amount: 0 })
@@ -245,7 +270,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     enemy.burning = burnFrom(unit)
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'incendiary') ? 'incendiary' : has(unit, 'tinder') ? 'tinder' : 'ignite', amount: 0 })
   }
-  const healing = (damage > 0 && has(unit, 'vampiric') ? 1 : 0) + (enemy.hp <= 0 && has(unit, 'feast') ? FEAST_HEAL : 0)
+  const healing = (first && damage > 0 && has(unit, 'vampiric') ? 1 : 0) + (enemy.hp <= 0 && has(unit, 'feast') ? FEAST_HEAL : 0)
   const healed = Math.min(healing, unit.stats.hp - unit.hp)
   if (healed > 0) {
     unit.hp += healed
@@ -263,13 +288,32 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     events.push({ type: 'effect', id: unit.id, effect: 'thorns', amount: -1 })
     wound(battle, unit, 1, events)
   }
-  if (when(true, 'demolish', 1)) {
+  if (first && when(true, 'demolish', 1)) {
     wreck(battle, enemy)
     events.push({ type: 'effect', id: enemy.id, effect: 'demolish', amount: 0 })
   }
   if (secondary && damage > 0) secondaryHit(battle, unit, enemy, beside, secondary, events)
-  if (enemy.kind === 'brute' && enemy.hp > 0 && unit.hp > 0) charge(battle, enemy, unit, events)
-  return [...events, ...again(battle, unit, seen, granted, enemy.hp <= 0)]
+  if (first && enemy.kind === 'brute' && enemy.hp > 0 && unit.hp > 0) charge(battle, enemy, unit, events)
+  return blow ? events : [...events, ...again(battle, unit, seen, granted, enemy.hp <= 0)]
+}
+
+/**
+ * A unit's weapon attack: its shots, each at whichever enemy suits it then, up close if any is in reach, else thrown or
+ * rocketed if its weapon can and the attack is not `granted`. What the shots earn comes once, after the last.
+ */
+export function weaponAttack(battle: Battle, unit: Unit, seen: Set<number>, granted?: Effect, only?: Unit): GameEvent[] {
+  const weapon = unit.weapon && WEAPONS[unit.weapon]
+  if (!weapon) return shoot(battle, unit, seen, granted, only)
+  const near = (only ? [only] : battle.units).some((other) => other.side !== unit.side && shootable(battle, unit, unit, other, seen))
+  const form = near || granted ? undefined : weapon.thrown ? 'throw' : weapon.rocket ? 'rocket' : undefined
+  const blow: Blow = { kit: form === 'throw' ? weapon.thrown! : form === 'rocket' ? weapon.rocket! : weapon.attack, nth: 0, form }
+  const events: GameEvent[] = []
+  for (; blow.nth < blow.kit.shots && unit.hp > 0 && (!only || only.hp > 0); blow.nth++) {
+    const shot = shoot(battle, unit, seen, granted, only, undefined, blow)
+    if (shot.length === 0) break
+    events.push(...shot)
+  }
+  return events.length === 0 ? [] : [...events, ...again(battle, unit, seen, granted, events.some((e) => e.type === 'death' && e.id !== unit.id))]
 }
 
 /** What a secondary's hit also does. */
@@ -289,7 +333,7 @@ function secondaryHit(battle: Battle, unit: Unit, enemy: Unit, beside: Unit[], {
 }
 
 /**
- * The one more attack, always the weapon's, a shot may grant: after a kill, to a soldier with frenzy or a frenzied weapon; else to one with
+ * The one more attack, always the weapon's and never thrown, an attack may grant: after a kill, to a soldier with frenzy or a frenzied weapon; else to one with
  * double tap who did not move; else, once per battle, to one with action surge.
  */
 export function again(battle: Battle, unit: Unit, seen: Set<number>, granted: Effect | undefined, killed: boolean): GameEvent[] {
@@ -299,7 +343,7 @@ export function again(battle: Battle, unit: Unit, seen: Set<number>, granted: Ef
   const by: Effect | null =
     killed && has(unit, 'frenzy') ? 'frenzy' : killed && has(unit, 'chain') ? 'chain' : last && has(unit, 'twin') ? 'twin' : last && has(unit, 'doubleTap') && !unit.moved ? 'doubleTap' : has(unit, 'surge') && !unit.spent.includes('surge') ? 'surge' : null
   if (!by) return []
-  const shots = shoot(battle, unit, seen, by)
+  const shots = weaponAttack(battle, unit, seen, by)
   if (by === 'surge' && shots.length > 0) unit.spent.push('surge')
   return shots
 }

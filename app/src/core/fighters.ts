@@ -1,5 +1,6 @@
 // Questions every combat module asks about units in a fight: whose enemy, nearest, has what, can shoot.
-import type { Secondary } from './secondaries'
+import { SECONDARIES, type Secondary } from './secondaries'
+import { WEAPONS } from './weapons'
 import { AURA_REACH, BURN_TURNS, type Battle, CHILL_TURNS, type Effect, ELUSIVE_REACH, GRID, LINGER_TURNS, type Tile, type Unit, isSoldier } from './battle'
 import { onGrid, spacedTile, walkingDistances } from './grid'
 import { NEIGHBORS } from './grid'
@@ -67,6 +68,16 @@ const LONGSHOT_REACH = 2
 /** The unit as it aims a secondary: that reach counts, not its weapon's. */
 export const aiming = (unit: Unit, secondary?: Secondary): Unit =>
   secondary ? { ...unit, stats: { ...unit.stats, range: unit.ability === 'squadsight' ? SPOTTED_REACH : secondary.range + (has(unit, 'longshot') ? LONGSHOT_REACH : 0) } } : unit
+
+/** The unit as each of its attacks aims: its weapon, thrown or rocketed, and its secondary. */
+function reaches(unit: Unit): Unit[] {
+  const weapon = unit.weapon && WEAPONS[unit.weapon]
+  const ranged = (range: number | undefined) => (range ? [{ ...unit, stats: { ...unit.stats, range } }] : [])
+  return [unit, ...ranged(weapon?.thrown?.range), ...ranged(weapon?.rocket?.range), ...(unit.secondary ? [aiming(unit, SECONDARIES[unit.secondary])] : [])]
+}
+
+/** Whether any attack of the unit's has something to hit from `end`. */
+export const hasAttack = (battle: Battle, unit: Unit, end: Tile, enemies: Unit[], seen: Set<number>) => reaches(unit).some((aim) => enemies.some((e) => shootable(battle, aim, end, e, seen)))
 
 /** Tiles a hero's powers reach, whatever its weapon. */
 const POWER_REACH = 5

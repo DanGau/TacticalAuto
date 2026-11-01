@@ -1,7 +1,7 @@
 // Shared HTML pieces: buttons, bars, chips, gear cards and descriptions.
 import type { Action } from '../core/apply'
 import { EFFECTS, type Gear } from '../core/gear'
-import { WEAPONS } from '../core/weapons'
+import { weaponText, WEAPONS } from '../core/weapons'
 import type { Role } from '../core/skills'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import type { Stats } from '../core/battle'
@@ -73,7 +73,7 @@ export function gearText(gear: Gear): string {
   const weapon = gear.weapon && WEAPONS[gear.weapon]
   const changes = (stats: Partial<Stats>) => (Object.keys(stats) as (keyof Stats)[]).map((key) => STAT_TEXT[key](stats[key]!))
   const stats = [...(weapon ? changes(weapon.stats) : []), ...changes(gear.stats)]
-  return [stats.join(', '), weapon ? weapon.text : '', gear.effect ? EFFECTS[gear.effect].text : ''].filter(Boolean).join('. ') + '.'
+  return [stats.join(', '), weapon ? weaponText(weapon) : '', gear.effect ? EFFECTS[gear.effect].text : ''].filter(Boolean).join('. ') + '.'
 }
 
 /** Words that explain themselves on hover. */

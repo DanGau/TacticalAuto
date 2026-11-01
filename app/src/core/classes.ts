@@ -39,7 +39,7 @@ const classes = {
     abilityName: 'Rocket',
     abilityText: 'Once per battle, in place of an attack, blasts two or more aliens standing together',
     charges: 1,
-    secondary: 'shieldThrow',
+    secondary: 'slug',
   },
   sniper: {
     name: 'Deadeye',

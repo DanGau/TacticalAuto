@@ -30,7 +30,7 @@ function duel(apart: number, effects: Unit['effects'] = []): { b: Battle; hero: 
   b.height.fill(0)
   b.north.fill('none' as never)
   b.west.fill('none' as never)
-  Object.assign(hero, { x: 5, y: 5, effects, stats: { ...hero.stats, crit: 0 }, secondary: 'frag' })
+  Object.assign(hero, { x: 5, y: 5, effects, weapon: undefined, stats: { ...hero.stats, crit: 0 }, secondary: 'frag' })
   Object.assign(alien, { x: 5 + apart, y: 5, hp: 50, armor: 0, kind: 'trooper', stats: { ...alien.stats, hp: 50 } })
   alien.revealed = true
   alien.engaged = true
@@ -99,7 +99,7 @@ test('each effect lands on a hit', () => {
   expect(hit('flare').alien.marked).toBe(true)
   expect(hit('shockCoil').alien.suppressed).toBeGreaterThan(0)
   expect(hit('iceShard').alien.rooted).toBeGreaterThan(0)
-  expect(hit('shieldThrow').alien.x).toBe(8)
+  expect(hit('slug').alien.x).toBe(8)
 })
 
 test('what grants an extra attack grants the weapon, not the secondary', () => {

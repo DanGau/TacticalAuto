@@ -191,7 +191,6 @@ export async function createView(): Promise<View> {
     async show(run, events, animate) {
       const { fx, sprites } = s
       s.soldiers = run.soldiers
-      s.blademasters = run.doctrines.includes('blades')
       fx.clear()
       const battle = run.battle
       if (!battle) return

@@ -9,7 +9,7 @@ import { current } from './run'
 /** Plays a battle with every soldier a phantom, calling `check` with each beat's events and the battle before it. */
 function play(seed: number, check: (events: GameEvent[], before: Battle) => void): Battle {
   const run = begun(seed)
-  for (const s of run.soldiers) Object.assign(s, { cls: 'phantom', skills: ['shadowStrike'] })
+  for (const s of run.soldiers) Object.assign(s, { cls: 'phantom', skills: ['shadowStrike'], gear: { ...s.gear, weapon: null } })
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })

@@ -18,6 +18,8 @@ export const PACE = {
   attack: 450,
   /** Between the starts of one attack and the next in a side's attack stage, so each attack reads on its own. */
   stagger: 380,
+  /** A hero's dash to strike. */
+  lunge: 200,
   /** Between a hero's weapon attack and its secondary: one combo, tighter than a stagger. */
   combo: 260,
   /** The pause as the turn passes to the other side. */
@@ -27,11 +29,14 @@ export const PACE = {
   blast: 380,
 }
 
+/** What an event adds to a beat's lead on the next: a dash, and how much a weapon's shots run past one attack. */
+const beyond = (e: GameEvent) => (e.type === 'move' && e.with === 'dash' ? PACE.lunge : e.type === 'shot' && e.lasts ? e.lasts - (e.nth ? 0 : PACE.attack) : 0)
+
 /** Whether a beat is one attack of a side's attack stage, which the next beat may start over. */
 export const overlaps = (events: GameEvent[]) => events.some((e) => e.type === 'shot' || e.type === 'rocket' || e.type === 'spit' || e.type === 'panic')
 
 /** How long after a beat's attack starts the next may: a combo's first blow leads straight into the second. */
-export const staggerOf = (events: GameEvent[]) => (events.some((e) => e.type === 'shot' && e.opens) ? PACE.combo : PACE.stagger)
+export const staggerOf = (events: GameEvent[]) => (events.some((e) => e.type === 'shot' && e.opens) ? PACE.combo : PACE.stagger) + events.reduce((sum, e) => sum + beyond(e), 0)
 
 /** Events the view shows at once, as a word over a unit or a change of marks, without waiting on them. */
 const INSTANT = new Set<GameEvent['type']>(['order', 'feed', 'effect', 'carried', 'grabbed', 'extract', 'frozen', 'hurt', 'heal', 'cloak'])
@@ -58,13 +63,13 @@ export function beatMs(events: GameEvent[], pace: Map<number, number>, shown: Se
   let walk = 0
   for (const e of events) {
     if (e.type === 'move') {
-      if (pace.has(e.id)) walk = Math.max(walk, walkMs([{ path: e.path, pace: pace.get(e.id)! }]))
+      if (pace.has(e.id)) walk = e.with === 'dash' ? PACE.lunge : Math.max(walk, walkMs([{ path: e.path, pace: pace.get(e.id)! }]))
       continue
     }
     if (instant(e)) continue
     ms += walk
     walk = 0
-    if (e.type === 'shot') ms += PACE.attack
+    if (e.type === 'shot') ms += e.lasts ?? PACE.attack
     else if (e.type === 'rocket') ms += PACE.rocket + PACE.blast
     else if (e.type === 'spit' || e.type === 'panic') ms += PACE.psi
     else if (e.type === 'reveal' || e.type === 'wave') ms += e.units.some((u) => shown.has(u.id)) ? PACE.reveal : 0

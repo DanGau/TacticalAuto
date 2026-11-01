@@ -1,6 +1,7 @@
 // Doctrines: run-long changes to how battles work.
 import type { Lasting } from './base'
 import type { Stance, Stats } from './battle'
+import type { WeaponId } from './weapons'
 
 /** A change to how battles work, which the battle checks where it applies. */
 export type Rule = 'fortified'
@@ -27,6 +28,8 @@ export interface Doctrine extends Lasting {
   /** How every hero positions, in place of its class's way. */
   stance?: Stance
   effect?: DoctrineEffect
+  /** What every hero fights with, in place of its own weapon. */
+  fights?: WeaponId
 }
 
 /** Damage a parrying soldier takes off a shot from beyond arm's reach. */
@@ -44,9 +47,10 @@ const doctrines = {
   scatterguns: { name: 'Scatterguns', text: 'Every hero has +2 damage and 2 less range', stats: { damage: 2, range: -2 }, weapon: true },
   blades: {
     name: 'Blademasters',
-    text: "Every hero fights with a blade: range 1, +3 damage and +2 move, and charges in. A shot from beyond arm's reach does a hero 1 less damage",
-    stats: { damage: 3, move: 2 },
+    text: "Every hero fights with a Sword and charges in: range 1, +2 move, a dash to strike. A shot from beyond arm's reach does a hero 1 less damage",
+    stats: { move: 2 },
     set: { range: 1 },
+    fights: 'sword',
     stance: 'rush',
     effect: 'parry',
     weapon: true,

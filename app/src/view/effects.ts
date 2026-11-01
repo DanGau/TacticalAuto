@@ -5,7 +5,7 @@ import { effectName } from '../core/effects'
 import { PACE } from '../core/pace'
 import { SECONDARIES } from '../core/secondaries'
 import type { Attack } from './attacks'
-import { lerp } from './camera'
+import { along, lerp } from './camera'
 import { drawFog } from './marks'
 import { drawTerrain } from './board'
 import { COLOR } from './palette'
@@ -19,6 +19,9 @@ const CHEST = 18
 const IMPACT_MS = 140
 const CALLOUT_MS = 900
 const FINISH_LIFT = 44
+const VOLLEY_LIFT = 12
+/** How far apart a two-handed shooter's hands are. */
+const HANDS = 9
 
 export const chest = (sprite: Sprite): Tile => ({ x: sprite.at.x, y: sprite.at.y - CHEST })
 
@@ -33,7 +36,7 @@ export function callout(s: Stage, text: string, color: number, over: Sprite, siz
 /** A shot's result: a hit or crit with its damage. */
 export function shotCallout(s: Stage, e: Extract<GameEvent, { type: 'shot' }>, over: Sprite): Label {
   // A combo's second blow reads over the first, and bigger, so both can be counted.
-  const lift = e.secondary ? FINISH_LIFT : 0
+  const lift = e.secondary ? FINISH_LIFT : (e.nth ?? 0) * VOLLEY_LIFT
   return e.crit ? callout(s, `CRIT -${e.damage}`, COLOR.crit, over, e.secondary ? 22 : 18, lift) : callout(s, `HIT -${e.damage}`, COLOR.hit, over, e.secondary ? 18 : 13, lift)
 }
 
@@ -74,6 +77,46 @@ function shake(s: Stage, power: number, ms = 240): Promise<void> {
   })
 }
 
+/** Something hurled, spun by `angle`. */
+function drawHurled(fx: Sketch, at: Tile, angle: number, from: Tile, gun: Attack): void {
+  const [cos, sin] = [Math.cos(angle), Math.sin(angle)]
+  if (gun.shape === 'shield') {
+    fx.ellipse(at.x, at.y, gun.width, gun.width * (0.45 + 0.55 * Math.abs(cos))).fill(gun.color).circle(at.x, at.y, gun.width / 3).fill(gun.core)
+  } else if (gun.shape === 'hammer') {
+    fx.moveTo(at.x - cos * 9, at.y - sin * 9).lineTo(at.x + cos * 7, at.y + sin * 7).stroke({ color: 0x8a6b43, width: 2 })
+    fx.moveTo(at.x + cos * 7 - sin * gun.width, at.y + sin * 7 + cos * gun.width).lineTo(at.x + cos * 7 + sin * gun.width, at.y + sin * 7 - cos * gun.width).stroke({ color: gun.color, width: 6 })
+  } else {
+    // A fist on a jet of flame, knuckles first along its way.
+    const len = Math.hypot(at.x - from.x, at.y - from.y) || 1
+    const tail = { x: at.x - ((at.x - from.x) / len) * Math.min(len, 22), y: at.y - ((at.y - from.y) / len) * Math.min(len, 22) }
+    fx.moveTo(tail.x, tail.y).lineTo(at.x, at.y).stroke({ color: gun.core, width: 4, alpha: 0.8 })
+    fx.circle(at.x, at.y, gun.width).fill(gun.color).circle(at.x, at.y, gun.width / 2).fill(0xfff0d0)
+  }
+}
+
+/** A hurled thing flies home from where it hit. */
+function flyHome(s: Stage, fx: Sketch, from: Tile, to: Sprite, gun: Attack): Promise<void> {
+  return s.tween(gun.ms, (t) => {
+    const home = chest(to)
+    const at = lerp(from, home, t)
+    at.y -= (gun.arc ?? 0) * Math.sin(Math.PI * t)
+    fx.clear()
+    drawHurled(fx, at, -t * 4 * Math.PI, from, gun)
+  })
+}
+
+/** A hero's dash: it shoots along `path` with a streak behind it. */
+export function dashTo(s: Stage, fx: Sketch, sprite: Sprite, path: Tile[]): Promise<void> {
+  const points = [sprite.tile, ...path]
+  const start = chest(sprite)
+  return s.tween(PACE.lunge, (t) => {
+    place(s, sprite, along(points, t * t))
+    squash(sprite, 0.85, 1.15)
+    const now = chest(sprite)
+    fx.clear().moveTo(lerp(start, now, t * 0.6).x, lerp(start, now, t * 0.6).y).lineTo(now.x, now.y).stroke({ color: 0xffffff, width: 7 * (1 - t) + 2, alpha: 0.65 })
+  }).then(() => squash(sprite, 1, 1))
+}
+
 /** Projectiles fly from the muzzle at `a` to each of `ends`. */
 function fire(s: Stage, fx: Sketch, a: Tile, ends: Tile[], gun: Attack): Promise<void> {
   const total = gun.ms + gun.stagger * (ends.length - 1)
@@ -85,7 +128,11 @@ function fire(s: Stage, fx: Sketch, a: Tile, ends: Tile[], gun: Attack): Promise
       // The muzzle flash: a burst at the barrel that dies as the round leaves.
       if (local < 0.3) fx.circle(a.x, a.y, gun.flash * (1 - local / 0.3)).fill({ color: gun.core, alpha: 0.9 })
       const lift = (gun.arc ?? 0) * Math.sin(Math.PI * local)
-      if (gun.style === 'bolt') {
+      if (gun.style === 'hurled') {
+        const at = lerp(a, b, local)
+        at.y -= lift
+        drawHurled(fx, at, local * 4 * Math.PI, a, gun)
+      } else if (gun.style === 'bolt') {
         const head = lerp(a, b, local)
         const tail = lerp(a, b, Math.max(0, local - 0.35))
         const glint = lerp(a, b, Math.max(0, local - 0.12))
@@ -157,7 +204,9 @@ function burst(s: Stage, fx: Sketch, at: Tile, dir: Tile, color: number, count: 
  */
 export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: [number, number], gun: Attack): Promise<void> {
   const { crit } = e
-  const a = chest(from)
+  const nth = e.nth ?? 0
+  const muzzle = chest(from)
+  const a = gun.hands ? { x: muzzle.x + (nth % 2 === 0 ? -HANDS : HANDS), y: muzzle.y } : muzzle
   const mark = chest(to)
   const len = Math.hypot(mark.x - a.x, mark.y - a.y) || 1
   const dir = { x: (mark.x - a.x) / len, y: (mark.y - a.y) / len }
@@ -171,7 +220,7 @@ export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e
   float(s, shotCallout(s, e, to))
   // What of the shooter's shaped the shot, named over the shooter.
   if (e.secondary) float(s, callout(s, SECONDARIES[e.secondary].name.toUpperCase(), COLOR.crit, from, 15, FINISH_LIFT))
-  if (e.with.length > 0) float(s, callout(s, e.with.map((effect) => effectName(effect, s.kit()).toUpperCase()).join(' · '), 0xffffff, from))
+  if (e.with.length > 0 && !nth) float(s, callout(s, e.with.map((effect) => effectName(effect, s.kit()).toUpperCase()).join(' · '), 0xffffff, from))
   to.drawHp(...after)
   const power = crit ? 2 : 1
   const home = s.toWorld(to.tile.x, to.tile.y)
@@ -186,10 +235,19 @@ export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e
     shift(s, to, { x: home.x + dir.x * push, y: home.y + dir.y * push })
     squash(to, 1.2 - 0.2 * t, 0.8 + 0.2 * t)
   })
-  await burst(s, fx, mark, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, e.secondary ? power * 1.6 : power)
-  place(s, to, to.tile)
-  squash(to, 1, 1)
-  fx.clear()
+  const settle = () => {
+    place(s, to, to.tile)
+    squash(to, 1, 1)
+    fx.clear()
+  }
+  const sparks = (sketch: Sketch) => burst(s, sketch, mark, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, e.secondary ? power * 1.6 : power)
+  // A shot of a rapid attack does not wait on its sparks: the next is already coming.
+  if (e.lasts && e.lasts < PACE.attack) void drawing(s, sparks).then(settle)
+  else {
+    await sparks(fx)
+    settle()
+  }
+  if (gun.back) await flyHome(s, fx, mark, from, gun)
 }
 
 /** A rocket, or napalm in flame's colour, flies from `from` to its tile and bursts, wounding every unit it caught. With no `from`, something burst where it stood. */
