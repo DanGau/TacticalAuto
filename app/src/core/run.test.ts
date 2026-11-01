@@ -163,20 +163,20 @@ test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone
   expect(run.phase).toBe('overworld')
 })
 
-test('a find goes to the soldier the player picks, replacing and selling what it wore in the slot, or is sold; nothing is taken off', () => {
+test('a find goes to the soldier the player picks, replacing and selling what it held, or is sold; nothing is taken off', () => {
   const run = started()
   hire(run)
   const [first, second] = run.soldiers
-  expect(first.gear.weapon).toMatchObject({ slot: 'weapon', rarity: 'common' })
+  expect(first.gear).toMatchObject({ rarity: 'common' })
   dropGear(run, false)
   dropGear(run, false)
   const [gear] = run.finds
-  const old = second.gear[gear.slot]
+  const old = second.gear
   const supplies = run.supplies
   run.phase = 'reward'
   expect(apply(run, { type: 'equip', find: 0, soldier: 99 }).ok).toBe(false)
   expect(apply(run, { type: 'equip', find: 0, soldier: second.id })).toEqual({ ok: true })
-  expect(second.gear[gear.slot]).toBe(gear)
+  expect(second.gear).toBe(gear)
   expect(run.supplies).toBe(supplies + (old ? SELL[old.rarity] : 0))
   const [other] = run.finds
   expect(apply(run, { type: 'sell', find: 0 })).toEqual({ ok: true })
@@ -506,7 +506,7 @@ test('a key mission has one boss, with an escort for each key already won', () =
   }
 })
 
-const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: { weapon: null, armor: null, utility: null }, home: null, wounds: 0, seed: 0, ...extra })
+const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: null, home: null, wounds: 0, seed: 0, ...extra })
 
 test('stats add class, level, skills and relics to the base', () => {
   const run = begun(1)
@@ -599,9 +599,9 @@ test('a shop stocks one-of-a-kind gear for the soldier the player picks, relics 
   expect(shop.relics).toHaveLength(SHOP_RELICS)
   run.supplies = 100
   const { gear } = shop.wares[0]
-  const old = run.soldiers[0].gear[gear.slot]
+  const old = run.soldiers[0].gear
   expect(apply(run, { type: 'gear', index: 0, soldier: buyer })).toEqual({ ok: true })
-  expect(run.soldiers[0].gear[gear.slot]).toBe(gear)
+  expect(run.soldiers[0].gear).toBe(gear)
   expect(run.supplies).toBe(100 - GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] + (old ? SELL[old.rarity] : 0))
   expect(shop.wares).toHaveLength(SHOP_WARES)
   expect(shop.wares[0]).toEqual({ gear, sold: true })
@@ -709,16 +709,15 @@ test('under fortification every hit does 1 less damage, on either side', () => {
   expect(odds(battle, alien, soldier)).toBe(plain - FORTIFIED_SOAK)
 })
 
-test("a soldier lands with its class's ability and its uses, the effects of its skills and the squad's relics, and armor from its gear", () => {
+test("a soldier lands with its class's ability and its uses, the effects of its skills and the squad's relics, and armor from its class's skills", () => {
   const run = travelling(['battle'])
   run.soldiers[0].cls = 'heavy'
-  run.soldiers[0].gear.armor = { id: 1, slot: 'armor', rarity: 'common', name: 'Sturdy Vest', stats: { armor: 2 }, effect: null }
-  run.soldiers[0].skills = ['arsenal', 'shredder']
+  run.soldiers[0].skills = ['arsenal', 'shredder', 'reactive']
   run.relics = ['echo', 'capacitor']
   apply(run, { type: 'advance' })
   enterAt(run)
   const [unit] = run.battle!.units.filter(isSoldier)
-  expect(unit).toMatchObject({ ability: 'rocket', charges: 3, stance: 'anchor', armor: 2, effects: ['shred', 'opener'] })
+  expect(unit).toMatchObject({ ability: 'rocket', charges: 3, stance: 'anchor', armor: 4, effects: ['shred', 'opener'] })
   expect(unit.hp).toBe(soldierStats(run, run.soldiers[0]).hp)
 })
 
@@ -741,7 +740,7 @@ test('a run begins with a choice of recruits of different classes, each with a c
     expect(new Set(run.recruits.map((r) => r.cls)).size).toBe(RECRUITS)
     for (const r of run.recruits) {
       expect(r.skills).toHaveLength(1)
-      expect(r.gear.weapon).toMatchObject({ slot: 'weapon', rarity: 'common' })
+      expect(r.gear).toMatchObject({ rarity: 'common' })
     }
   }
   const run = createRun(1)
@@ -758,9 +757,9 @@ test('heroes start with every weapon between them, melee among them, those on th
   const kinds = new Set<string>()
   for (let seed = 1; seed <= 40; seed++) {
     const run = createRun(seed)
-    kinds.add(run.recruits[0].gear.weapon!.weapon!)
+    kinds.add(run.recruits[0].gear!.weapon)
     apply(run, { type: 'recruit', index: 1 })
-    for (const stage of run.route) if (stage.hero) kinds.add(stage.hero.gear.weapon!.weapon!)
+    for (const stage of run.route) if (stage.hero) kinds.add(stage.hero.gear!.weapon)
   }
   expect([...kinds].sort()).toEqual(Object.keys(WEAPONS).sort())
 })

@@ -377,7 +377,7 @@ test('getting out, a slow hero leaves what it would stand beside, and takes no s
   const toExtract = walkingDistances(battle, battle.extract!)
   const walk = (t: { x: number; y: number }) => toExtract[t.y * GRID + t.x]
   soldier.stats = { ...soldier.stats, move: 1 }
-  soldier.effects = ['bond', 'skirmish']
+  soldier.effects = ['skirmish']
   const mate = soldierUnit(battle, { soldier: 99, stats: soldier.stats, hp: 9, ability: null, charges: 0, stance: 'balanced', effects: [] }, freeTilesNear(battle, soldier, 8).reduce((a, b) => (walk(b) > walk(a) ? b : a)))
   battle.units.push(mate)
   const from = walk(soldier)

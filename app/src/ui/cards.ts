@@ -42,29 +42,28 @@ export function pickDetail(picks: Pick[], armed: string | null, idle: string): s
 const percent = new Set<keyof Stats>(['crit'])
 const show = (key: keyof Stats, n: number) => (percent.has(key) ? `${Math.round(100 * n)}%` : `${n}`)
 
-/** A piece of gear on one line: its rarity's name in its colour, then its name; or an empty slot. */
-const named = (gear: Gear | null | undefined, slot: string) =>
-  gear ? `<span class="tier ${gear.rarity}">${gear.rarity}</span> ${gear.name}` : `<span class="tier">empty</span> ${slot} slot`
+/** A piece of gear on one line: its rarity's name in its colour, then its name; or empty hands. */
+const named = (gear: Gear | null) => (gear ? `<span class="tier ${gear.rarity}">${gear.rarity}</span> ${gear.name}` : '<span class="tier">empty hands</span>')
 
 /**
- * A card per soldier who could take `gear`, each with what it wears now and what it would wear, in their rarities,
+ * A card per soldier who could take `gear`, each with what it holds now and what it would hold, in their rarities,
  * and each stat that changes, before and after.
  */
 export function gearPicks(run: Run, gear: Gear, action: (soldier: Soldier) => Action, verb: string, block: string | null = null): Pick[] {
   return run.soldiers.map((soldier) => {
-    const old = soldier.gear[gear.slot]
+    const old = soldier.gear
     const now = soldierStats(run, soldier)
-    const then = soldierStats(run, { ...soldier, gear: { ...soldier.gear, [gear.slot]: gear } })
+    const then = soldierStats(run, { ...soldier, gear })
     const rows = (Object.keys(now) as (keyof Stats)[]).filter((key) => now[key] !== then[key]).map((key) => `<tr><td>${STAT_NAMES[key]}</td><td>${show(key, now[key])}</td><td>→</td><td class="${then[key] > now[key] ? 'down' : 'up'}">${show(key, then[key])}</td></tr>`)
     return {
       key: `s${soldier.id}`,
       action: action(soldier),
       look: 'compare',
       body: `<span class="who"><span class="portrait">${badge(soldier.cls)}</span><b>${soldier.name}</b></span>
-        <small class="was">Now: ${named(old, gear.slot)}</small>
-        <small class="will">New: ${named(gear, gear.slot)}</small>
+        <small class="was">Now: ${named(old)}</small>
+        <small class="will">New: ${named(gear)}</small>
         <table class="stats">${rows.join('') || '<tr><td>Stats unchanged</td></tr>'}</table>`,
-      detail: `<p><b>Now.</b> ${old ? `${named(old, gear.slot)}: ${gearText(old)}` : `Empty ${gear.slot} slot.`}</p><p><b>New.</b> ${named(gear, gear.slot)}: ${describeGear(gear)}</p>`,
+      detail: `<p><b>Now.</b> ${old ? `${named(old)}: ${gearText(old)}` : 'Empty hands.'}</p><p><b>New.</b> ${named(gear)}: ${describeGear(gear)}</p>`,
       go: `Tap again to ${verb} ${soldier.name}${old ? `, selling ${old.name} for ${SELL[old.rarity]}` : ''}`,
       block,
     }
@@ -76,7 +75,7 @@ export const sellPick = (gear: Gear, find: number): Pick => ({
   key: 'sell',
   action: { type: 'sell', find },
   look: 'compare sell',
-  body: `<b>Sell</b><small class="was">${named(gear, gear.slot)}</small><b class="supplies">+${SELL[gear.rarity]}</b>`,
+  body: `<b>Sell</b><small class="was">${named(gear)}</small><b class="supplies">+${SELL[gear.rarity]}</b>`,
   detail: `<p>Nobody takes ${gear.name}.</p>`,
   go: `Tap again to sell for ${SELL[gear.rarity]} supplies`,
 })

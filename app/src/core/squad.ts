@@ -4,7 +4,7 @@ import type { Lasting } from './base'
 import { type Battle, type Stats, BASE_STATS } from './battle'
 import { CLASSES, type ClassId } from './classes'
 import { type Doctrine, DOCTRINES } from './doctrines'
-import { EFFECTS, type Gear, SLOTS, generateGear } from './gear'
+import { EFFECTS, generateGear } from './gear'
 import { type Relic, RELICS } from './relics'
 import { random, randomInt } from './rng'
 import { type Run } from './run-state'
@@ -64,10 +64,6 @@ export function skillOffers(soldier: Soldier): SkillId[] {
   return [...offers, ...drawn.filter((id) => !offers.includes(id))].slice(0, OFFERS)
 }
 
-export function equipped(soldier: Soldier): Gear[] {
-  return SLOTS.flatMap((slot) => soldier.gear[slot] ?? [])
-}
-
 /** Uses of a soldier's class ability each battle: the class's, plus what skills and relics add to an ability that has uses. */
 export function charges(run: Run, soldier: Soldier): number {
   const base = soldier.cls ? CLASSES[soldier.cls].charges : 0
@@ -95,7 +91,7 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
   const weapon = weaponOf(soldier)
   for (const key of Object.keys(stats) as (keyof Stats)[]) {
     const fromClass = soldier.cls ? (CLASSES[soldier.cls].stats[key] ?? 0) : 0
-    const fromGear = equipped(soldier).reduce((sum, gear) => sum + (gear.stats[key] ?? 0), 0) + (weapon?.stats[key] ?? 0)
+    const fromGear = (soldier.gear?.stats[key] ?? 0) + (weapon?.stats[key] ?? 0)
     const fromSkills = soldier.skills.reduce((sum, id) => sum + (SKILLS[id].stats?.[key] ?? 0), 0)
     stats[key] += fromClass + fromGear + fromSkills + level(soldier) * (LEVEL_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
   }
@@ -110,7 +106,7 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
 export const secondaryOf = (soldier: Soldier): SecondaryId => (soldier.cls ? CLASSES[soldier.cls].secondary : 'sidearm')
 
 /** The weapon a soldier wields, if any. */
-export const weaponOf = (soldier: Soldier) => (soldier.gear.weapon?.weapon ? WEAPONS[soldier.gear.weapon.weapon] : null)
+export const weaponOf = (soldier: Soldier) => (soldier.gear ? WEAPONS[soldier.gear.weapon] : null)
 
 /** The least move a soldier has. */
 const MIN_MOVE = 2
@@ -139,7 +135,7 @@ export function draft(run: Run, taken: ClassId[]): Soldier {
   const unique = run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).uniqueClasses) && unused.length > 0
   const all = (unique ? unused : (Object.keys(CLASSES) as ClassId[])).filter((id) => !taken.includes(id))
   const classes = all.length > 0 ? all : (Object.keys(CLASSES) as ClassId[])
-  const weapon = generateGear(run, run.nextGear++, 'common', 'weapon')
+  const gear = generateGear(run, run.nextGear++, 'common')
   const free = NAMES.filter((name) => ![...run.soldiers, ...run.recruits].some((s) => s.name === name))
   const name = free[randomInt(run, free.length)]
   const cls = classes[randomInt(run, classes.length)]
@@ -152,7 +148,7 @@ export function draft(run: Run, taken: ClassId[]): Soldier {
     // Read, not drawn: the seed costs the run no draw.
     seed: run.rng,
     feats: [],
-    gear: { weapon, armor: null, utility: null },
+    gear,
     home: null,
     wounds: 0,
   }
@@ -178,7 +174,7 @@ export function offerRecruits(run: Run): void {
 /** The keywords of everything the squad has: its soldiers' skills and gear, and its relics. */
 export function squadKeywords(run: Run): Keyword[] {
   const tags = [
-    ...run.soldiers.flatMap((s) => [...s.skills.map((id) => SKILLS[id].tags ?? []), ...equipped(s).map((gear) => (gear.effect && EFFECTS[gear.effect].tags) || [])]),
+    ...run.soldiers.flatMap((s) => [...s.skills.map((id) => SKILLS[id].tags ?? []), (s.gear?.effect && EFFECTS[s.gear.effect].tags) || []]),
     ...run.relics.map((id) => RELICS[id].tags ?? []),
   ].flat()
   return [...new Set(tags)]

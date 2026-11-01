@@ -1,105 +1,61 @@
-// Gear: slots, effects, and generating it.
+// Gear: a hero's one item, a weapon with a mod or an effect, and generating it.
 import type { GearEffect, Stats } from './battle'
 import type { Rarity } from './base'
 import type { Keyword } from './keywords'
 import { randomInt } from './rng'
 import { WEAPONS, type WeaponId } from './weapons'
 
-export const SLOTS = ['weapon', 'armor', 'utility'] as const
-export type Slot = (typeof SLOTS)[number]
-
 /**
- * A piece of gear: a base that names it, and one thing it does. A common has a stat mod; a rare, a simple effect; an
- * epic, an elaborate one. On the weapon slot the base is a weapon, which does what weapons.ts says on top.
+ * A piece of gear: a weapon, and one thing it does beyond what weapons.ts says. A common has a stat mod; a rare, a
+ * simple effect; an epic, an elaborate one.
  */
 export interface Gear {
   id: number
-  slot: Slot
   rarity: Rarity
   name: string
-  /** The weapon it is, on the weapon slot. */
-  weapon?: WeaponId
-  /** Added to the stats of the hero it is equipped to. */
+  weapon: WeaponId
+  /** Added to the stats of the hero who wields it. */
   stats: Partial<Stats>
   effect: GearEffect | null
 }
 
 /** A stat mod and the word it adds to a name. Some trade one stat for another. */
-interface Mod {
-  prefix: string
-  stats: Partial<Stats>
+const MODS: { prefix: string; stats: Partial<Stats> }[] = [
+  { prefix: 'Honed', stats: { damage: 1, range: -1 } },
+  { prefix: 'Keen', stats: { crit: 0.2 } },
+  { prefix: 'Long', stats: { range: 1 } },
+  { prefix: 'Heavy', stats: { damage: 1, move: -1 } },
+  { prefix: 'Snub', stats: { crit: 0.3, range: -1 } },
+]
+
+/** Each effect: the word it adds to a name, what it does, and whether only epics have it. Combat applies them. */
+export const EFFECTS: Record<GearEffect, { prefix: string; text: string; tags?: Keyword[]; epic?: true }> = {
+  incendiary: { prefix: 'Scorching', text: 'Hits set the target burning', tags: ['burn'] },
+  frostbite: { prefix: 'Rimed', text: 'Hits chill the target', tags: ['frost'] },
+  tracer: { prefix: 'Tracer', text: 'Hits mark the target', tags: ['mark'] },
+  piercing: { prefix: 'Piercing', text: "Ignores the target's armor" },
+  vampiric: { prefix: 'Leeching', text: 'Each hit heals the shooter 1' },
+  executioner: { prefix: 'Merciless', text: '+2 damage to targets at half health or less', tags: ['kill'] },
+  chain: { prefix: 'Frenzied', text: 'A kill grants one more attack with this weapon', tags: ['kill'], epic: true },
+  ricochet: { prefix: 'Ricocheting', text: 'Each hit also strikes another alien within 3 tiles of the target for half its damage', epic: true },
+  arc: { prefix: 'Arcing', text: 'A crit leaps to the nearest alien within 3 tiles for half its damage, then leaps once more', tags: ['crit'], epic: true },
+  volatile: { prefix: 'Volatile', text: 'An alien it kills bursts, dealing 2 damage to every alien beside it', tags: ['kill'], epic: true },
+  thunder: { prefix: 'Thundering', text: 'Hits knock the target a tile back; if something stops it, it slams into that for 1 damage', epic: true },
+  snare: { prefix: 'Snaring', text: 'Hits root the target: it cannot move on its next turn' },
+  booming: { prefix: 'Booming', text: 'Hits charge the target: if it moves on its next turn, it takes 3 damage', epic: true },
+  tether: { prefix: 'Tethered', text: 'Hits pull the target a tile toward the shooter' },
 }
 
-const BASES: Record<Exclude<Slot, 'weapon'>, string[]> = {
-  armor: ['Vest', 'Plate', 'Weave', 'Harness'],
-  utility: ['Rig', 'Module', 'Kit', 'Charm'],
-}
-
-const MODS: Record<Slot, Mod[]> = {
-  weapon: [
-    { prefix: 'Honed', stats: { damage: 1, range: -1 } },
-    { prefix: 'Keen', stats: { crit: 0.2 } },
-    { prefix: 'Long', stats: { range: 1 } },
-    { prefix: 'Heavy', stats: { damage: 1, move: -1 } },
-    { prefix: 'Snub', stats: { crit: 0.3, range: -1 } },
-  ],
-  armor: [
-    { prefix: 'Sturdy', stats: { armor: 2 } },
-    { prefix: 'Plated', stats: { armor: 4, move: -1 } },
-    { prefix: 'Light', stats: { armor: 1, move: 1 } },
-  ],
-  utility: [
-    { prefix: 'Fleet', stats: { move: 1 } },
-    { prefix: 'Vital', stats: { hp: 2 } },
-    { prefix: 'Deadeye', stats: { crit: 0.15 } },
-    { prefix: 'Ranging', stats: { range: 1 } },
-  ],
-}
-
-/** Each effect: the slot it appears on, the word it adds to a name, what it does, and whether only epics have it. Combat applies them. */
-export const EFFECTS: Record<GearEffect, { slot: Slot; prefix: string; text: string; tags?: Keyword[]; epic?: true }> = {
-  incendiary: { slot: 'weapon', prefix: 'Scorching', text: 'Hits set the target burning', tags: ['burn'] },
-  frostbite: { slot: 'weapon', prefix: 'Rimed', text: 'Hits chill the target', tags: ['frost'] },
-  tracer: { slot: 'weapon', prefix: 'Tracer', text: 'Hits mark the target', tags: ['mark'] },
-  piercing: { slot: 'weapon', prefix: 'Piercing', text: "Ignores the target's armor" },
-  vampiric: { slot: 'weapon', prefix: 'Leeching', text: 'Each hit heals the shooter 1' },
-  executioner: { slot: 'weapon', prefix: 'Merciless', text: '+2 damage to targets at half health or less', tags: ['kill'] },
-  chain: { slot: 'weapon', prefix: 'Frenzied', text: 'A kill grants one more attack with this weapon', tags: ['kill'], epic: true },
-  thorns: { slot: 'armor', prefix: 'Barbed', text: 'Whoever hits the wearer takes 1 damage' },
-  shield: { slot: 'armor', prefix: 'Warded', text: 'Absorbs the first hit each battle', tags: ['ward'] },
-  rime: { slot: 'armor', prefix: 'Rimeguard', text: 'Whoever hits the wearer is chilled', tags: ['frost', 'ward'] },
-  regen: { slot: 'armor', prefix: 'Mending', text: 'Heals 1 at the start of each turn' },
-  lastStand: { slot: 'armor', prefix: 'Stubborn', text: 'Once per battle, survives a killing hit at 1 health', epic: true },
-  medkit: { slot: 'utility', prefix: "Medic's", text: 'Once per battle, heals the carrier 4 at half health or less, and the carrier still shoots' },
-  grenade: { slot: 'utility', prefix: "Bombardier's", text: 'Once per battle, throws a grenade at two or more aliens standing together, and the carrier still shoots' },
-  ricochet: { slot: 'weapon', prefix: 'Ricocheting', text: 'Each hit also strikes another alien within 3 tiles of the target for half its damage', epic: true },
-  arc: { slot: 'weapon', prefix: 'Arcing', text: 'A crit leaps to the nearest alien within 3 tiles for half its damage, then leaps once more', tags: ['crit'], epic: true },
-  volatile: { slot: 'weapon', prefix: 'Volatile', text: 'An alien it kills bursts, dealing 2 damage to every alien beside it', tags: ['kill'], epic: true },
-  thunder: { slot: 'weapon', prefix: 'Thundering', text: 'Hits knock the target a tile back; if something stops it, it slams into that for 1 damage', epic: true },
-  mirror: { slot: 'armor', prefix: 'Mirrored', text: 'Begins each battle with 2 mirror images; each of the first 2 hits on the wearer pops one instead', tags: ['ward'], epic: true },
-  bond: { slot: 'armor', prefix: 'Bonded', text: 'Takes the hits meant for squadmates beside the wearer', tags: ['ward'], epic: true },
-  guardians: { slot: 'armor', prefix: 'Haloed', text: 'Spirits strike each alien that ends its move within 2 tiles of the wearer for 1 damage', epic: true },
-  blink: { slot: 'utility', prefix: 'Blinking', text: 'Once per battle, when hit to half health or less, the carrier blinks to the tile farthest from the aliens within 5', epic: true },
-  polymorph: { slot: 'utility', prefix: 'Chicken', text: 'Once per battle, turns the toughest alien the carrier can shoot, a boss aside, into a chicken that loses its next action', epic: true },
-  snare: { slot: 'weapon', prefix: 'Snaring', text: 'Hits root the target: it cannot move on its next turn' },
-  booming: { slot: 'weapon', prefix: 'Booming', text: 'Hits charge the target: if it moves on its next turn, it takes 3 damage', epic: true },
-  tether: { slot: 'weapon', prefix: 'Tethered', text: 'Hits pull the target a tile toward the shooter' },
-  caltrops: { slot: 'utility', prefix: 'Spiked', text: 'Once per battle, strews caltrops across the path of an alien closing in; each tile costs 2 more move to cross and hurts an alien 1', epic: true },
-  null: { slot: 'utility', prefix: 'Null', text: 'Aliens within 3 tiles of the carrier cannot spit, panic, spawn or burst' },
-}
-
-/** A new piece of gear of the given rarity, in `chosen` slot or a random one; on the weapon slot, any weapon. */
-export function generateGear(rng: { rng: number }, id: number, rarity: Rarity, chosen?: Slot): Gear {
+/** A new piece of gear of the given rarity: any weapon. */
+export function generateGear(rng: { rng: number }, id: number, rarity: Rarity): Gear {
   const pick = <T>(options: T[]): T => options[randomInt(rng, options.length)]
-  const slot = chosen ?? pick([...SLOTS])
-  const weapon = slot === 'weapon' ? pick(Object.keys(WEAPONS) as WeaponId[]) : undefined
-  const base = weapon ? WEAPONS[weapon].name : pick(BASES[slot as Exclude<Slot, 'weapon'>])
-  const kind = weapon ? { weapon } : {}
+  const weapon = pick(Object.keys(WEAPONS) as WeaponId[])
+  const base = WEAPONS[weapon].name
   if (rarity === 'common') {
     // Range is no mod for a melee weapon, which reaches the next tile whatever.
-    const mod = pick(MODS[slot].filter((m) => !(weapon && WEAPONS[weapon].melee && 'range' in m.stats)))
-    return { id, slot, rarity, name: `${mod.prefix} ${base}`, ...kind, stats: { ...mod.stats }, effect: null }
+    const mod = pick(MODS.filter((m) => !(WEAPONS[weapon].melee && 'range' in m.stats)))
+    return { id, rarity, name: `${mod.prefix} ${base}`, weapon, stats: { ...mod.stats }, effect: null }
   }
-  const effect = pick((Object.keys(EFFECTS) as GearEffect[]).filter((e) => EFFECTS[e].slot === slot && !!EFFECTS[e].epic === (rarity === 'epic')))
-  return { id, slot, rarity, name: `${EFFECTS[effect].prefix} ${base}`, ...kind, stats: {}, effect }
+  const effect = pick((Object.keys(EFFECTS) as GearEffect[]).filter((e) => !!EFFECTS[e].epic === (rarity === 'epic')))
+  return { id, rarity, name: `${EFFECTS[effect].prefix} ${base}`, weapon, stats: {}, effect }
 }

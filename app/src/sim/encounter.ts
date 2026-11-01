@@ -3,7 +3,7 @@ import { parseArgs } from 'node:util'
 import { bots } from '../bots/bots'
 import { apply } from '../core/apply'
 import { CIVILIANS, type Goal } from '../core/goals'
-import { generateGear, SLOTS, type Gear, type Slot } from '../core/gear'
+import { generateGear } from '../core/gear'
 import { offerable } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { atKey, begun, road } from '../core/roads'
@@ -23,14 +23,6 @@ import { ENCOUNTER_BANDS, type Encounter, type Squad } from './report'
  * ENCOUNTER_BANDS. `--mission` picks missions, comma-separated.
  */
 
-/** A rare piece of gear for `slot`. */
-function rare(run: Run, slot: Slot): Gear {
-  for (;;) {
-    const gear = generateGear(run, run.nextGear++, 'rare')
-    if (gear.slot === slot) return gear
-  }
-}
-
 /**
  * Plays one mission in isolation, from a fresh run made to stand at leg `leg` with a squad of `squad` strength:
  * as many soldiers as the leg has, a weak one at the levels a careless run reaches with no gear, a strong one levelled
@@ -46,7 +38,7 @@ function encounter(seed: number, mission: Encounter, leg: number, squad: Squad):
     soldier.xp = xpFor(levels)
     // Skills owed are learned at random.
     while (skillOffers(soldier).length > 0) soldier.skills.push(skillOffers(soldier)[randomInt(run, skillOffers(soldier).length)])
-    if (squad === 'strong') for (const slot of SLOTS) soldier.gear[slot] = rare(run, slot)
+    if (squad === 'strong') soldier.gear = generateGear(run, run.nextGear++, 'rare')
   }
   if (squad === 'strong') for (let i = 0; i <= leg; i++) run.relics.push(offerable(run.relics)[randomInt(run, offerable(run.relics).length)])
   run.phase = 'overworld'

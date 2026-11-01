@@ -14,7 +14,7 @@ import { TOWNS } from './towns'
 import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
 import { LEG_STOPS, STOP_THREAT, THREAT_MAX } from './progress'
-import { charges, draft, equipped, health, join, offerRecruits, skillOffers, soldierStats, weaponOf, xpFor } from './squad'
+import { charges, draft, health, join, offerRecruits, skillOffers, soldierStats, weaponOf, xpFor } from './squad'
 import { dropGear, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
 import { type Leg, type MapNode, type Risk, type Run, type Stage, type Stop, type StopKind } from './run-state'
@@ -401,9 +401,9 @@ export function advance(run: Run): void {
     ability: s.cls && CLASSES[s.cls].ability,
     charges: charges(run, s),
     secondary: secondaryOf(s),
-    weapon: doctrines.find((d) => d.fights)?.fights ?? s.gear.weapon?.weapon,
+    weapon: doctrines.find((d) => d.fights)?.fights ?? s.gear?.weapon,
     stance: doctrines.find((d) => d.stance)?.stance ?? (s.cls === 'support' ? CLASSES.support.stance : weaponOf(s)?.stance) ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
-    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)].flatMap((w) => w?.effect ?? []),...equipped(s).flatMap((gear) => gear.effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
+    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])],
   }))
   const rules = doctrines.flatMap((d) => d.rule ?? [])
   const held = (r: Reserve) => run.captives.includes(r.soldier)

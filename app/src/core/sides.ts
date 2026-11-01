@@ -12,7 +12,7 @@ import { walkingDistances } from './grid'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { engage, immune, onTile, fireproof, foeHas, has, GUARDIAN_REACH, lying, extractReach, carrying, BEACON_REACH, vipOf, nearest, extractionFrom, pursuers, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
+import { engage, immune, onTile, fireproof, foeHas, has, lying, extractReach, carrying, BEACON_REACH, vipOf, nearest, extractionFrom, pursuers, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
 import { fleePath, fightPath, walk, paths, costOf, bestPath, COHESION, POCKET } from './pathing'
 import { detects, sees } from './sight'
 import { upkeep } from './upkeep'
@@ -48,13 +48,6 @@ export function moveSide(battle: Battle): GameEvent[] {
   for (const unit of battle.units.filter((u) => u.side === battle.turn && onTile(battle.fire, u) && !fireproof(battle, u))) {
     unit.burning = BURN_TURNS
     events.push({ type: 'effect', id: unit.id, effect: foeHas(battle, unit, 'pyre') ? 'pyre' : 'napalm', amount: 0 })
-  }
-  // Spirit guardians strike each alien that ends its move near their wearer.
-  if (battle.turn === 'alien') {
-    for (const unit of battle.units.filter((u) => u.side === 'alien' && battle.units.some((g) => g.side === 'human' && g.hp > 0 && has(g, 'guardians') && distance(g, u) <= GUARDIAN_REACH))) {
-      events.push({ type: 'effect', id: unit.id, effect: 'guardians', amount: -1 })
-      wound(battle, unit, 1, events)
-    }
   }
   const sighted = sight(battle)
   // Soldiers on overwatch fire once the aliens have moved and any alien sighted has taken its place.

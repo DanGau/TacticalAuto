@@ -173,12 +173,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const opens = !secondary && !granted && isSoldier(unit) && battle.actor === unit.id && battle.attacks < attacksOf(unit)
   events.unshift({ type: 'shot', id: unit.id, target: enemy.id, crit, damage, with: used, ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}), ...(blow ? { nth: blow.nth, ...(blow.kit.ms ? { lasts: blow.kit.ms } : {}), ...(blow.form ? { form: blow.form } : {}) } : {}) })
   if (battle.twist === 'crumbling' && damage > 0) crumble(battle, enemy, unit)
-  // A bonded squadmate beside the target takes the hit in its place.
-  const guard = battle.units.find((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && has(u, 'bond') && distance(u, enemy) <= 1)
-  if (guard && damage > 0) {
-    events.push({ type: 'effect', id: guard.id, effect: 'bond', amount: -damage })
-    wound(battle, guard, damage, events, pierced, crit)
-  } else wound(battle, enemy, damage, events, pierced, crit)
+  wound(battle, enemy, damage, events, pierced, crit)
   if (battle.twist === 'fuel' && damage > 0) events.push(...ignite(battle, enemy))
   // A ricochet strikes another alien near the target for half.
   const bounce = damage > 0 ? nearest(inReach.filter((u) => u !== enemy && u.hp > 0 && distance(u, enemy!) <= RICOCHET_REACH), enemy) : undefined

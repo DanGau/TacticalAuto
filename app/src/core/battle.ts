@@ -37,10 +37,6 @@ export const MEDIC_HEAL = 4
 export const MEDIC_REACH = 2
 /** Tiles a unit in the standoff stance keeps from every enemy. */
 export const STANDOFF = 7
-/** Damage a grenade does within BLAST_RADIUS. */
-export const GRENADE_DAMAGE = 3
-/** Health a medkit restores to its carrier. */
-export const MEDKIT_HEAL = 4
 /** Turns a burning unit takes BURN_DAMAGE at the start of. */
 export const BURN_TURNS = 2
 export const BURN_DAMAGE = 1
@@ -139,9 +135,19 @@ export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, crit: 0.1, 
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' | 'napalm' | 'cryo' | 'cloak'
 
 /** Something a piece of gear does; gear.ts says what each does. */
-export type GearEffect = 'frostbite' | 'tracer' | 'rime' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'thorns' | 'shield' | 'regen' | 'lastStand' | 'medkit' | 'grenade' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'mirror' | 'bond' | 'guardians' | 'blink' | 'polymorph' | 'null' | 'snare' | 'booming' | 'tether' | 'caltrops'
+export type GearEffect = 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'snare' | 'booming' | 'tether'
 /** Something a skill does; skills.ts says what each does. */
 export type SkillEffect =
+  | 'thorns'
+  | 'shield'
+  | 'rime'
+  | 'regen'
+  | 'lastStand'
+  | 'mirror'
+  | 'blink'
+  | 'polymorph'
+  | 'null'
+  | 'caltrops'
   | 'titan'
   | 'plating'
   | 'servos'
@@ -270,7 +276,7 @@ export interface Unit {
   /** Uses of the ability left this battle. */
   charges: number
   stance: Stance
-  /** Effects of the unit's gear. */
+  /** What the unit's weapon, skills and the squad's relics do. */
   effects: Effect[]
   /** Once-per-battle effects already used. */
   spent: Effect[]

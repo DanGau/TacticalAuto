@@ -70,10 +70,10 @@ const STAT_TEXT: Record<keyof Stats, (n: number) => string> = {
 
 /** What a piece of gear changes, as plain text: its weapon's and its own stat changes, then what its weapon and effect do. */
 export function gearText(gear: Gear): string {
-  const weapon = gear.weapon && WEAPONS[gear.weapon]
+  const weapon = WEAPONS[gear.weapon]
   const changes = (stats: Partial<Stats>) => (Object.keys(stats) as (keyof Stats)[]).map((key) => STAT_TEXT[key](stats[key]!))
-  const stats = [...(weapon ? changes(weapon.stats) : []), ...changes(gear.stats)]
-  return [stats.join(', '), weapon ? weaponText(weapon) : '', gear.effect ? EFFECTS[gear.effect].text : ''].filter(Boolean).join('. ') + '.'
+  const stats = [...changes(weapon.stats), ...changes(gear.stats)]
+  return [stats.join(', '), weaponText(weapon), gear.effect ? EFFECTS[gear.effect].text : ''].filter(Boolean).join('. ') + '.'
 }
 
 /** Words that explain themselves on hover. */
@@ -124,7 +124,7 @@ export const alienName = (kind: AlienKind, label = ALIENS[kind].name) => `${tip(
 /** What a piece of gear does, its keywords coloured and defined. */
 export const describeGear = (gear: Gear, held: Keyword[] = []) => describe(gearText(gear), gear.effect ? EFFECTS[gear.effect].tags : [], held)
 
-/** A piece of gear as a card's contents: rarity and slot, name, what it changes, and its keywords. */
+/** A piece of gear as a card's contents: rarity, name, what it changes, and its keywords. */
 export function gearCard(gear: Gear, held: Keyword[] = []): string {
-  return `<small>${gear.rarity} ${gear.slot}</small><br><b>${gear.name}</b><br>${describeGear(gear, held)}`
+  return `<small>${gear.rarity}</small><br><b>${gear.name}</b><br>${describeGear(gear, held)}`
 }

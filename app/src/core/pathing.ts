@@ -9,7 +9,7 @@ import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { hasAttack, vipOf, pursuers, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, GUARDIAN_REACH, fireproof, enemiesOf, besideFuel, foes, spotlit } from './fighters'
+import { hasAttack, vipOf, pursuers, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes, spotlit } from './fighters'
 import { ESCORT_REACH } from './goals'
 import { canHurlFrom } from './objects'
 import { bite, canShoot, sees } from './sight'
@@ -266,8 +266,6 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
     unit.side !== 'human'
       ? 0
       : (has(unit, 'null') ? 15 * enemies.filter((e) => e.revealed && e.kind !== 'trooper' && distance(end, e) <= NULL_REACH).length : 0) +
-        (has(unit, 'guardians') && hurt < WARY ? 8 * enemies.filter((e) => e.revealed && distance(end, e) <= GUARDIAN_REACH + 2).length : 0) +
-        (has(unit, 'bond') && squadmates.some((u) => distance(u, end) <= 1) ? 15 : 0) +
         (canHurlFrom(battle, unit, end) ? HURL_WORTH : 0)
   const uplink = battle.uplink
   // Measured by the walk there, so a wall between a soldier and the uplink cannot strand it.

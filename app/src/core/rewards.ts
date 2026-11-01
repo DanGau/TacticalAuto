@@ -15,11 +15,10 @@ export function takeSkill(run: Run, soldier: Soldier, index: number): void {
   settle(run)
 }
 
-/** Puts `gear` on `soldier`, selling what it had in the slot: gear is never taken off, only replaced. */
+/** Hands `gear` to `soldier`, selling what it held: gear is never taken off, only replaced. */
 export function wear(run: Run, soldier: Soldier, gear: Gear): void {
-  const old = soldier.gear[gear.slot]
-  if (old) run.supplies += SELL[old.rarity]
-  soldier.gear[gear.slot] = gear
+  if (soldier.gear) run.supplies += SELL[soldier.gear.rarity]
+  soldier.gear = gear
 }
 
 /** Equips the find at `index` on `soldier`. */

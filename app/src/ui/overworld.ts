@@ -2,7 +2,6 @@ import { ALIENS, DANGERS, type AlienKind } from '../core/aliens'
 import { SECONDARIES, secondaryText } from '../core/secondaries'
 import { CLASSES } from '../core/classes'
 import { GOALS } from '../core/goals'
-import { SLOTS } from '../core/gear'
 import { DOCTRINES } from '../core/doctrines'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
@@ -19,7 +18,6 @@ import { squadKeywords } from '../core/squad'
 import { secondaryOf, soldierStats, weaponOf } from '../core/squad'
 import { health } from '../core/squad'
 import { charges } from '../core/squad'
-import { equipped } from '../core/squad'
 import { level } from '../core/squad'
 import { xpFor } from '../core/squad'
 import { weaponText } from '../core/weapons'
@@ -167,7 +165,7 @@ function shopPicks(run: Run): Pick[] {
   const card = (top: string, name: string, foot: string, sold: boolean) => `<small>${top}</small><b>${name}</b>${sold ? PURCHASED : `<small class="price">${foot}</small>`}`
   const gear = shop.wares.map(({ gear, sold }, index): Pick => {
     const price = GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
-    return { key: `g${index}`, attrs: `data-ware="${index}"`, look: `gear ${gear.rarity}`, body: card(`${gear.rarity} ${gear.slot}`, gear.name, `${price} supplies`, sold), detail: `<p><b>${gear.name}.</b> ${describeGear(gear, held)}</p>`, go: `Tap again to choose who wears it, for ${price} supplies`, block: poor(price), spent: sold }
+    return { key: `g${index}`, attrs: `data-ware="${index}"`, look: `gear ${gear.rarity}`, body: card(gear.rarity, gear.name, `${price} supplies`, sold), detail: `<p><b>${gear.name}.</b> ${describeGear(gear, held)}</p>`, go: `Tap again to choose who takes it, for ${price} supplies`, block: poor(price), spent: sold }
   })
   const relics = shop.relics.map(({ id, sold }, index): Pick => ({ key: `r${index}`, action: { type: 'buy', index }, look: 'relic', body: card('relic', RELICS[id].name, `${RELIC_PRICE} supplies`, sold), detail: `<p><b>${RELICS[id].name}.</b> ${describe(RELICS[id].text, RELICS[id].tags, held)}</p>`, go: `Tap again to buy for ${RELIC_PRICE} supplies`, block: poor(RELIC_PRICE), spent: sold }))
   const full = run.kit.length >= KIT_SLOTS
@@ -179,7 +177,7 @@ function shopPicks(run: Run): Pick[] {
   return [...gear, ...relics, ...consumables, bribe]
 }
 
-/** A shop: its cards, what the armed one does, and the way out. What is bought keeps its place, greyed out. With `ware` chosen, who wears it, in a pop-up. */
+/** A shop: its cards, what the armed one does, and the way out. What is bought keeps its place, greyed out. With `ware` chosen, who takes it, in a pop-up. */
 function shopView(run: Run, armed: string | null, ware: number | null): string {
   const picks = shopPicks(run)
   const kit = run.kit.map((k) => `${CONSUMABLES[k].icon} ${CONSUMABLES[k].name}`).join(', ') || 'empty'
@@ -191,7 +189,7 @@ function shopView(run: Run, armed: string | null, ware: number | null): string {
   if (ware === null || run.shop!.wares[ware].sold) return screen
   const { gear } = run.shop!.wares[ware]
   const wearers = gearPicks(run, gear, (s) => ({ type: 'gear', index: ware, soldier: s.id }), 'buy it for')
-  return `${screen}<div class="modal"><div class="sheet"><h2>Who wears ${gear.name}? · ${GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]} supplies</h2>
+  return `${screen}<div class="modal"><div class="sheet"><h2>Who takes ${gear.name}? · ${GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]} supplies</h2>
     <div class="picks">${wearers.map((p) => pickCard(p, armed)).join('')}</div>
     ${pickDetail(wearers, armed, 'Tap a soldier to compare; tap again to buy.')}
     <button data-ware="">Back</button></div></div>`
@@ -235,20 +233,17 @@ function baseView(run: Run): string {
     ${relics.length > 0 ? `<h2>Relics</h2><div class="stash">${relics.join('')}</div>` : ''}`
 }
 
-/** A soldier's card, kept short: level, class, name, experience, and three gear slots. Clicking it opens the soldier's details. */
+/** A soldier's card, kept short: level, class, name, experience, and its weapon. Clicking it opens the soldier's details. */
 function soldierCard(run: Run, soldier: Soldier, open: number | null): string {
   const r = level(soldier)
   const cls = soldier.cls && CLASSES[soldier.cls]
   const filled = (100 * (soldier.xp - xpFor(r))) / (xpFor(r + 1) - xpFor(r))
-  const slots = SLOTS.map((slot) => {
-    const gear = soldier.gear[slot]
-    return `<div class="slot gear ${gear?.rarity ?? ''}" title="${gear ? gearText(gear) : ''}">${gear ? `<b>${gear.name}</b>` : `<small>Empty ${slot} slot</small>`}</div>`
-  })
+  const { gear } = soldier
   return `<button class="soldier who ${open === soldier.id ? 'chosen' : ''}" data-open="${soldier.id}">
     <small>Level ${r}${cls ? ` · ${cls.name}` : ''}</small><br><b>${soldier.name}</b>
     <div class="bar"><div style="width: ${filled}%"></div></div>
     ${healthBar(health(run, soldier), soldierStats(run, soldier).hp, soldierStats(run, soldier).armor)}
-    ${slots.join('')}
+    <div class="slot gear ${gear?.rarity ?? ''}" title="${gear ? gearText(gear) : ''}">${gear ? `<b>${gear.name}</b>` : '<small>Empty hands</small>'}</div>
   </button>`
 }
 
@@ -262,7 +257,7 @@ function details(run: Run, soldier: Soldier): string {
   const secondary = SECONDARIES[secondaryOf(soldier)]
   const weapon = weaponOf(soldier)
   const attacks = `<p><b>Each turn: ${weapon?.name ?? 'bare hands'}, then ${secondary.name}.</b> ${weapon ? `${weaponText(weapon)}. ` : ''}${secondaryText(secondary)}</p>`
-  const gear = equipped(soldier).map((g) => `<div class="gear ${g.rarity}">${gearCard(g)}</div>`)
+  const gear = soldier.gear ? `<div class="gear ${soldier.gear.rarity}">${gearCard(soldier.gear)}</div>` : ''
   const feats = soldier.feats.map((id) => `<span class="chip feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</span>`)
   return `<h2>${soldier.name} · ${xpFor(r + 1) - soldier.xp} experience to level ${r + 1}</h2>
     <div class="details">
@@ -272,7 +267,7 @@ function details(run: Run, soldier: Soldier): string {
         <tr><td>Damage</td><td>${stats.damage}</td><td>Range</td><td>${stats.range}</td></tr>
       </table>
       <div>${attacks}${cls ? `${weaponOf(soldier)?.stance && soldier.cls !== 'support' ? '' : `<p>${cls.stanceText}.</p>`}<p><b>${cls.abilityName}${uses > 0 ? ` ×${uses}` : ''}.</b> ${cls.abilityText}.</p>` : ''}${skills.join('')}${feats.length > 0 ? `<p>${feats.join(' ')}</p>` : ''}</div>
-      ${gear.join('')}
+      ${gear}
     </div>`
 }
 

@@ -7,7 +7,7 @@ import type { Goal } from './goals'
 import type { ContinentId, LonLat, City } from './world'
 import type { ClassId } from './classes'
 import type { FeatId, Tally } from './feats'
-import type { Slot, Gear } from './gear'
+import type { Gear } from './gear'
 import type { SkillId } from './skills'
 import type { ConsumableId } from './consumables'
 import type { RelicId } from './relics'
@@ -96,7 +96,8 @@ export interface Soldier {
   skills: SkillId[]
   /** Feats it has pulled off, each paying experience only the first time. */
   feats: FeatId[]
-  gear: Record<Slot, Gear | null>
+  /** Its one item, the weapon it fights with. */
+  gear: Gear | null
   /** Where it comes from: a recruit's home, a hero's city; none for one who joined on the road. */
   home: City | null
   /** Health lost and not yet healed; it carries from battle to battle. */

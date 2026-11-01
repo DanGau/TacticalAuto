@@ -182,8 +182,6 @@ export const spotlit = (battle: Battle, unit: Unit) => battle.spotlight?.id === 
 /** Alien turns fire lies on a tile. */
 export const FIRE_TURNS = 2
 
-/** Reach of spirit guardians, of a blink, and of a null field. */
-export const GUARDIAN_REACH = 2
 
 /** Mirror images a wearer begins a battle with, and the chance a hit pops one instead. */
 export const MIRROR_IMAGES = 2

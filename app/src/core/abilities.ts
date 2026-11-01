@@ -1,5 +1,5 @@
 // Actions in place of a shot: alien powers, and soldier skills and gear.
-import { type Battle, type Effect, type Unit, BLAST_RADIUS, CLOAK_TURNS, isSoldier, FORCE_FIELD_REACH, FORCE_FIELD_ARMOR, SLAM_HIT, SLAM_TILES, STUN_REACH, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN, SURGEON_HEAL, MEDIC_REACH, MEDIC_HEAL, SECOND_WIND_HEAL, DRONE_REACH, DRONE_DAMAGE, SKIRMISH_MOVE, MEDKIT_HEAL, TITAN_HEALTH, PLATING_ARMOR, MECH_STATS, DRONE_STATS, type Stats, type SkillEffect } from './battle'
+import { type Battle, type Effect, type Unit, BLAST_RADIUS, CLOAK_TURNS, isSoldier, FORCE_FIELD_REACH, FORCE_FIELD_ARMOR, SLAM_HIT, SLAM_TILES, STUN_REACH, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN, SURGEON_HEAL, MEDIC_REACH, MEDIC_HEAL, SECOND_WIND_HEAL, DRONE_REACH, DRONE_DAMAGE, SKIRMISH_MOVE, TITAN_HEALTH, PLATING_ARMOR, MECH_STATS, DRONE_STATS, type Stats, type SkillEffect } from './battle'
 import { mechUnit } from './spawn'
 import { freeTilesNear } from './grid'
 import { onGrid } from './grid'
@@ -165,15 +165,7 @@ export function skirmish(battle: Battle, unit: Unit): GameEvent[] {
   return events.map((e) => (e.type === 'move' ? { ...e, with: 'skirmish' as const } : e))
 }
 
-/** Medkit: heals its carrier at half health or less. */
-export function medkit(unit: Unit): GameEvent[] {
-  if (unit.hp > unit.stats.hp / 2 || !spend(unit, 'medkit')) return []
-  const amount = Math.min(MEDKIT_HEAL, unit.stats.hp - unit.hp)
-  unit.hp += amount
-  return [{ type: 'effect', id: unit.id, effect: 'medkit', amount }]
-}
-
-/** Each feeder in sight grows on a trick the squad's unit used in `events`: its ability, a grenade, or a once-per-battle effect. */
+/** Each feeder in sight grows on a trick the squad's unit used in `events`: its ability or a once-per-battle effect. */
 export function feed(battle: Battle, unit: Unit, events: GameEvent[]): GameEvent[] {
   const tricked = events.some((e) => (e.type === 'rocket' || e.type === 'heal' || e.type === 'spawn' || (e.type === 'effect' && e.amount >= 0)) && e.id === unit.id)
   if (!tricked) return []

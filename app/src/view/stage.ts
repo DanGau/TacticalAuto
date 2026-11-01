@@ -144,7 +144,7 @@ export class Stage {
 
   /** The skills and weapons the squad has, which name the effects shown at work. */
   kit() {
-    return { skills: this.soldiers.flatMap((s) => s.skills), weapons: this.soldiers.flatMap((s) => s.gear.weapon?.weapon ?? []) }
+    return { skills: this.soldiers.flatMap((s) => s.skills), weapons: this.soldiers.flatMap((s) => s.gear?.weapon ?? []) }
   }
 
   /** Where a tile falls in the camera's picture. */

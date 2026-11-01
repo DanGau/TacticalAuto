@@ -399,7 +399,7 @@ test('burrowers stay unseen underground, then once engaged surface beside the so
 
 test('a feeder in sight grows on each trick the squad uses; a mirror hits as hard as the hardest-hitting soldier', () => {
   const { battle, soldier, aliens, until } = arena([{ kind: 'feeder', x: 10, y: 13 }])
-  soldier.effects = ['grenade']
+  Object.assign(soldier, { ability: 'rocket', charges: 1 })
   soldier.stats = { ...soldier.stats, move: 0 }
   battle.units.push(alienUnit(battle, { kind: 'trooper', stats: alienStats('trooper', 0, 0), stance: 'balanced', boss: false, spawns: false, target: false, resists: [] }, { x: 11, y: 13 }, true))
   aliens[0].hp = aliens[0].stats.hp = 99

@@ -32,8 +32,8 @@ const RARITY_ORDER = ['common', 'rare', 'epic']
 const value = (gear: Gear | null) => (gear ? 2 * RARITY_ORDER.indexOf(gear.rarity) + (gear.effect || Object.keys(gear.stats).length > 0 ? 1 : 0) : -1)
 
 /**
- * The soldier a piece of gear does the most for, or null if it does nothing for anyone: the most it raises the slot's
- * worth, less where a weapon would make its wielder fight against its class's way; a `keen` bot also counts the
+ * The soldier a piece of gear does the most for, or null if it does nothing for anyone: the most it raises its
+ * holder's worth, less where a weapon would make its wielder fight against its class's way; a `keen` bot also counts the
  * keywords it shares with the soldier's skills.
  */
 function fitFor(run: Run, gear: Gear, keen: boolean): number | null {
@@ -42,7 +42,7 @@ function fitFor(run: Run, gear: Gear, keen: boolean): number | null {
     const clash = stance && s.cls && stance !== CLASSES[s.cls].stance ? 1.5 : 0
     const own = s.skills.flatMap((id) => SKILLS[id].tags ?? [])
     const shared = keen && gear.effect ? (EFFECTS[gear.effect].tags ?? []).filter((tag) => own.includes(tag)).length : 0
-    return value(gear) - value(s.gear[gear.slot]) - clash + shared
+    return value(gear) - value(s.gear) - clash + shared
   }
   const best = run.soldiers.reduce((a, b) => (gain(b) > gain(a) ? b : a))
   return gain(best) > 0 ? best.id : null

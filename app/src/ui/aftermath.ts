@@ -33,7 +33,7 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
   const note = soldier.taken ? '<b class="up">Taken · recovery next</b>' : up ? `<b class="down promoted">Level ${after}!</b>` : ''
   const feats = soldier.feats.map((id) => `<li class="feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</li>`)
   const live = run.soldiers.find((s) => s.name === soldier.name)
-  const weapon = live?.gear.weapon
+  const weapon = live?.gear
   const choose = live && skillOffers(live).length > 0 ? `<button class="decide" data-ability="${live.id}">Choose ability</button>` : ''
   return `<div class="soldier ${soldier.taken ? 'died' : ''} ${up ? 'levelled' : ''}">
     <div class="who"><span class="portrait">${badge(soldier.cls)}</span><span><b>${soldier.name}</b><br><small>Level ${before}${cls ? ` · ${cls}` : ''}</small></span></div>
@@ -55,7 +55,7 @@ export function joined(run: Run, name: string): string {
     <h1 class="down">${hero.name} joins</h1>
     <p>${CLASSES[hero.cls!].name} · level ${level(hero)} · 🌍 ${hero.home?.name ?? ''}</p>
     <p class="feats">${named.join('')}</p>
-    <p><b>${hero.gear.weapon!.name}.</b> ${weaponText(weaponOf(hero)!)}</p>
+    <p><b>${hero.gear!.name}.</b> ${weaponText(weaponOf(hero)!)}</p>
     <button class="decide" data-met="report">Continue</button>
   </div>`
 }
