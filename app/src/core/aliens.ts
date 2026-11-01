@@ -78,7 +78,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   burster: {
     name: 'Burster',
-    text: 'Runs at the squad and explodes, beside a soldier or wherever it dies, hurting everything near it',
+    text: 'Runs at the party and explodes, beside a hero or wherever it dies, hurting everything near it',
     danger: 'medium',
     hp: 0.6,
     stats: { range: 0, move: 5 },
@@ -87,7 +87,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   brute: {
     name: 'Brute',
-    text: 'Tough, and attacks only up close; each hit it survives sends it charging at the shooter',
+    text: 'Tough, and attacks only up close; each hit it survives sends it charging at the attacker',
     danger: 'large',
     hp: 2,
     stats: { range: 1, move: 3, damage: 5 },
@@ -96,7 +96,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   psion: {
     name: 'Psion',
-    text: 'Panics a soldier, who loses a turn of action; when it dies, the aliens near it are hurt',
+    text: 'Panics a hero, who loses a turn of action; when it dies, the aliens near it are hurt',
     danger: 'medium',
     hp: 0.8,
     stats: { damage: 2 },
@@ -126,7 +126,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   wraith: {
     name: 'Wraith',
     text: 'Only a crit hurts it in full; any other damage does 1',
-    intro: 'Only half here. Ordinary rounds pass straight through. A clean, critical hit might not.',
+    intro: 'Only half here. Ordinary blows pass straight through. A critical hit might not.',
     danger: 'medium',
     hp: 0.6,
     stats: { range: 6 },
@@ -135,7 +135,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   burrower: {
     name: 'Burrower',
-    text: 'Moves underground, unseen; once the squad comes near or the fight is on, it surfaces beside the soldier standing most alone, and attacks up close',
+    text: 'Moves underground, unseen; once the party comes near or the fight is on, it surfaces beside the hero standing most alone, and attacks up close',
     intro: 'Tremors underfoot. It will come up beside whoever stands alone.',
     danger: 'medium',
     hp: 1,
@@ -145,7 +145,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   feeder: {
     name: 'Feeder',
-    text: 'Gains 1 damage each time a soldier uses its class ability, a grenade, or a once-per-battle effect, while it is in sight',
+    text: 'Gains 1 damage each time a hero uses a per-battle power or its class power, while it is in sight',
     intro: 'It feeds on our tricks. Every one we pull, it grows.',
     danger: 'medium',
     hp: 1.2,
@@ -186,7 +186,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   mirror: {
     name: 'Mirror',
-    text: "Each hit does the damage of the squad's hardest-hitting soldier",
+    text: "Each hit does the damage of the party's hardest hitter",
     intro: 'It studies our strongest. However hard they hit, it hits back.',
     danger: 'large',
     hp: 1,
@@ -196,8 +196,8 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   turret: {
     name: 'Turret',
-    text: 'An automated gun: never moves, and shoots any soldier in range it can see',
-    intro: 'An automated gun emplacement. It will not move, so do not stand in its sights.',
+    text: 'An automated gun: never moves, and shoots any hero in range it can see',
+    intro: 'An automated gun. It will not move, so do not stand in its sights.',
     danger: 'medium',
     hp: 1.5,
     stats: { move: 0, range: 7, damage: 4 },

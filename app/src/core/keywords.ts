@@ -2,7 +2,7 @@
 import { TUNING } from './tuning'
 
 /**
- * Words that tie skills, gear and relics together: some cause a keyword, others pay off on it, so a squad built
+ * Words that tie skills, gear and relics together: some cause a keyword, others pay off on it, so a party built
  * around one finds its pieces stronger together.
  */
 export type Keyword = 'burn' | 'frost' | 'mark' | 'crit' | 'kill' | 'ward'
@@ -12,11 +12,11 @@ export const KEYWORDS: Record<Keyword, { name: string; icon: string; text: strin
   frost: { name: 'Frost', icon: '❄️', text: 'A chilled unit has -2 move and does 1 less damage on its next turn' },
   mark: { name: 'Mark', icon: '🎯', text: `Every hit on a marked unit does ${TUNING.markDamage} more damage` },
   crit: { name: 'Crit', icon: '💥', text: 'A crit does 2 more damage' },
-  kill: { name: 'Kill', icon: '💀', text: 'Pays off when the soldier kills' },
-  ward: { name: 'Ward', icon: '🛡️', text: 'Armor: temporary health that takes damage first and is whole again each fight' },
+  kill: { name: 'Kill', icon: '💀', text: 'Pays off when the hero kills' },
+  ward: { name: 'Ward', icon: '🛡️', text: 'Armor: temporary HP that takes damage first and is whole again each fight' },
 }
 
-/** A keyword an alien shrugs off, so a squad built on it must answer that alien some other way. */
+/** A keyword an alien shrugs off, so a party built on it must answer that alien some other way. */
 export type Resist = Exclude<Keyword, 'kill'>
 
 export const RESISTS: Record<Resist, string> = {

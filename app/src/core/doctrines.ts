@@ -39,15 +39,15 @@ export const PARRY_SOAK = 1
 export const FORTIFIED_SOAK = 1
 
 const doctrines = {
-  massCloning: { name: 'Mass Cloning', text: 'Every hero has 2 less health', stats: { hp: -2 } },
-  loneWolf: { name: 'Lone Wolf', text: 'Every hero has +40 health, +4 armor, +5 damage, +25% crit and +2 move; no new soldier ever joins', stats: { hp: 40, armor: 4, damage: 5, crit: 0.25, move: 2 }, noRecruits: true },
-  specialists: { name: 'Specialist Doctrine', text: 'No two soldiers share a class while a class is left unused', uniqueClasses: true },
-  exosuits: { name: 'Exosuits', text: 'Every hero has +3 armor and 1 less move', stats: { armor: 3, move: -1 } },
-  fortified: { name: 'Fortification Doctrine', text: 'Every hit, on either side, does 1 less damage, down to 1', rule: 'fortified' },
-  scatterguns: { name: 'Scatterguns', text: 'Every hero has +2 damage and 2 less range', stats: { damage: 2, range: -2 }, weapon: true },
+  massCloning: { name: 'Mass Cloning', text: 'Every hero has 2 less HP', stats: { hp: -2 } },
+  loneWolf: { name: 'Lone Wolf', text: 'Every hero has +40 HP, +4 armor, +5 damage, +25% crit and +2 move; no new hero ever joins', stats: { hp: 40, armor: 4, damage: 5, crit: 0.25, move: 2 }, noRecruits: true },
+  specialists: { name: 'Specialists', text: 'No two heroes share a class while a class is left unused', uniqueClasses: true },
+  exosuits: { name: 'Power Armor', text: 'Every hero has +3 armor and 1 less move', stats: { armor: 3, move: -1 } },
+  fortified: { name: 'Iron Skin', text: 'Every hit, on either side, does 1 less damage, down to 1', rule: 'fortified' },
+  scatterguns: { name: 'Brawlers', text: 'Every hero has +2 damage and 2 less range', stats: { damage: 2, range: -2 }, weapon: true },
   blades: {
     name: 'Blademasters',
-    text: "Every hero fights with a Sword and charges in: range 1, +2 move, a dash to strike. A shot from beyond arm's reach does a hero 1 less damage",
+    text: "Every hero fights with a Sunblade and charges in: range 1, +2 move, a dash to strike. An attack from beyond arm's reach does a hero 1 less damage",
     stats: { move: 2 },
     set: { range: 1 },
     fights: 'sword',
@@ -56,21 +56,21 @@ const doctrines = {
     weapon: true,
   },
   psionics: {
-    name: 'Psi Operatives',
-    text: 'Every hero attacks with the mind: range 6 and 1 less damage, but attacks pass through walls and ignore armor, at any alien whose pod is revealed',
+    name: 'Psi Awakened',
+    text: 'Every hero attacks with the mind: range 6 and 1 less damage, but attacks pass through walls and ignore armor, at any alien whose cluster is revealed',
     stats: { damage: -1 },
     set: { range: 6 },
     effect: 'psionic',
     weapon: true,
   },
   demolitions: {
-    name: 'Demolitions',
+    name: 'Wreckers',
     text: 'Every hero has +1 damage and 1 less range, and each hit blows apart the objects around its target',
     stats: { damage: 1, range: -1 },
     effect: 'demolish',
     weapon: true,
   },
-  gunslingers: { name: 'Gunslingers', text: 'Every hero has 1 less damage and 2 less range, but fires its weapon a third time each turn', stats: { damage: -1, range: -2 }, effect: 'twin', weapon: true },
+  gunslingers: { name: 'Gunslingers', text: 'Every hero has 1 less damage and 2 less range, but attacks with its weapon a third time each turn', stats: { damage: -1, range: -2 }, effect: 'twin', weapon: true },
 } satisfies Record<string, Doctrine>
 
 export type DoctrineId = keyof typeof doctrines

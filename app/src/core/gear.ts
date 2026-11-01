@@ -25,16 +25,16 @@ const MODS: { prefix: string; stats: Partial<Stats> }[] = [
   { prefix: 'Keen', stats: { crit: 0.2 } },
   { prefix: 'Long', stats: { range: 1 } },
   { prefix: 'Heavy', stats: { damage: 1, move: -1 } },
-  { prefix: 'Snub', stats: { crit: 0.3, range: -1 } },
+  { prefix: 'Wild', stats: { crit: 0.3, range: -1 } },
 ]
 
 /** Each effect: the word it adds to a name, what it does, and whether only epics have it. Combat applies them. */
 export const EFFECTS: Record<GearEffect, { prefix: string; text: string; tags?: Keyword[]; epic?: true }> = {
   incendiary: { prefix: 'Scorching', text: 'Hits set the target burning', tags: ['burn'] },
   frostbite: { prefix: 'Rimed', text: 'Hits chill the target', tags: ['frost'] },
-  tracer: { prefix: 'Tracer', text: 'Hits mark the target', tags: ['mark'] },
+  tracer: { prefix: 'Seeking', text: 'Hits mark the target', tags: ['mark'] },
   piercing: { prefix: 'Piercing', text: "Ignores the target's armor" },
-  vampiric: { prefix: 'Leeching', text: 'Each hit heals the shooter 1' },
+  vampiric: { prefix: 'Leeching', text: 'Each hit heals the wielder 1' },
   executioner: { prefix: 'Merciless', text: '+2 damage to targets at half health or less', tags: ['kill'] },
   chain: { prefix: 'Frenzied', text: 'A kill grants one more attack with this weapon', tags: ['kill'], epic: true },
   ricochet: { prefix: 'Ricocheting', text: 'Each hit also strikes another alien within 3 tiles of the target for half its damage', epic: true },
@@ -43,7 +43,7 @@ export const EFFECTS: Record<GearEffect, { prefix: string; text: string; tags?: 
   thunder: { prefix: 'Thundering', text: 'Hits knock the target a tile back; if something stops it, it slams into that for 1 damage', epic: true },
   snare: { prefix: 'Snaring', text: 'Hits root the target: it cannot move on its next turn' },
   booming: { prefix: 'Booming', text: 'Hits charge the target: if it moves on its next turn, it takes 3 damage', epic: true },
-  tether: { prefix: 'Tethered', text: 'Hits pull the target a tile toward the shooter' },
+  tether: { prefix: 'Tethered', text: 'Hits pull the target a tile toward the wielder' },
 }
 
 /** A new piece of gear of the given rarity: any weapon. */

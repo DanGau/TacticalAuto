@@ -14,7 +14,7 @@ export type ChallengeId = 'slog' | 'firingLine' | 'ironWall' | 'swarm' | 'scatte
  */
 export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test: string; answers: UtilityId[]; volley?: true; grim: number[][] }> = {
   slog: { name: 'Slog', icon: '🌿', test: 'Shooters behind a band of mire that takes three times the move to cross', answers: ['hover', 'rangedShield', 'thrusters'], volley: true, grim: [[2, 3, 4], [3, 4, 6], [5, 7, 8]] },
-  firingLine: { name: 'Firing line', icon: '🎯', test: 'Long-range shooters along a ridge, firing from the moment the squad lands', answers: ['smoke', 'rangedShield'], volley: true, grim: [[2, 3, 4], [3, 5, 6], [6, 7, 9]] },
+  firingLine: { name: 'Firing line', icon: '🎯', test: 'Long-range shooters along a ridge, firing from the moment the party lands', answers: ['smoke', 'rangedShield'], volley: true, grim: [[2, 3, 4], [3, 5, 6], [6, 7, 9]] },
   ironWall: { name: 'Iron wall', icon: '🧱', test: 'Heavily armored aliens that shrug off small hits', answers: ['crack', 'overcharge'], grim: [[2, 3, 4], [4, 6, 8], [7, 9, 11]] },
   swarm: { name: 'Swarm', icon: '🐜', test: 'Bodies flood in from every side, and keep coming', answers: ['meleeShield', 'tank'], grim: [[8, 12, 16], [14, 18, 22], [20, 24, 30]] },
   scattered: { name: 'Scattered', icon: '🗺️', test: 'Sentries spread far apart: clear them before the clock runs out and reinforcements pour in', answers: ['thrusters'], grim: [[8, 12, 16], [12, 16, 20], [16, 20, 24]] },

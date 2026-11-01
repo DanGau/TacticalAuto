@@ -32,19 +32,19 @@ export interface Relic {
 }
 
 const relics = {
-  plasma: { name: 'Plasma Rifles', text: 'Every hero does +1 damage', stats: { damage: 1 } },
+  plasma: { name: 'Plasma Core', text: 'Every hero does +1 damage', stats: { damage: 1 } },
   alloys: { name: 'Alien Alloys', text: 'Every hero has +3 armor', tags: ['ward'], stats: { armor: 3 } },
   servos: { name: 'Overclocked Servos', text: 'Every hero has +1 move', stats: { move: 1 } },
   lens: { name: 'Focusing Lens', text: 'Every hero has +1 range and +10% crit', tags: ['crit'], stats: { range: 1, crit: 0.1 } },
-  glassCannon: { name: 'Glass Cannon Protocol', text: 'Every hero does +2 damage and has 3 less health', stats: { damage: 2, hp: -3 } },
+  glassCannon: { name: 'Glass Cannon Protocol', text: 'Every hero does +2 damage and has 3 less HP', stats: { damage: 2, hp: -3 } },
   capacitor: { name: 'Kinetic Capacitor', text: "Each hero's first hit of a battle is a crit", tags: ['crit'], effect: 'opener' },
   plating: { name: 'Adaptive Plating', text: 'Each hero regrows 1 armor at the start of its turn', tags: ['ward'], effect: 'rearm' },
   nanites: { name: 'Hunger Nanites', text: 'A hero who kills heals 2', tags: ['kill'], effect: 'feast' },
-  phoenix: { name: 'Phoenix Protocol', text: 'Once per battle, the first soldier to fall gets up with 5 health', effect: 'phoenix' },
+  phoenix: { name: 'Phoenix Protocol', text: '1/battle: the first hero to fall gets up with 5 HP', effect: 'phoenix' },
   echo: { name: 'Echo Chamber', text: 'Every class ability with limited uses has one more', charges: 1 },
   drones: { name: 'Scavenger Drones', text: 'Each won battle pays 1 more supply', supplies: 1 },
   contact: { name: 'Black Market Contact', text: 'Every piece of gear found is rare or better', rareGear: true },
-  uplink: { name: 'Recon Uplink', text: 'The flight map names the aliens of each stop, not only how dangerous they are', recon: true },
+  uplink: { name: "Seer's Uplink", text: 'The flight map names the aliens of each stop, not only how dangerous they are', recon: true },
   accelerant: { name: 'Accelerant Gel', text: `Hits on a burning target do +${TUNING.accelerantDamage} damage`, tags: ['burn'], effect: 'accelerant' },
   wildfire: { name: 'Wildfire Spores', text: 'An alien that dies burning sets every alien beside it burning', tags: ['burn', 'kill'], effect: 'wildfire' },
   salamander: { name: 'Salamander Sigil', text: 'Crits set the target burning', tags: ['crit', 'burn'], effect: 'ignite' },
@@ -62,7 +62,7 @@ const relics = {
   pyre: { name: 'Pyre Censer', text: 'A burning alien sets its tile ablaze for 2 turns; an alien that ends its move in fire burns', tags: ['burn'], effect: 'pyre' },
   stasis: { name: 'Stasis Field', text: 'A crit on a chilled alien freezes it solid: it loses its next action', tags: ['frost', 'crit'], effect: 'stasis' },
   hex: { name: "Witch's Hex", text: 'When a marked alien dies, its mark passes to the nearest alien', tags: ['mark', 'kill'], effect: 'hex' },
-  sentinel: { name: 'Sentinel Protocol', text: 'A hero shoots at once at an alien that walks away from beside it', effect: 'sentinel' },
+  sentinel: { name: 'Sentinel Protocol', text: 'A hero attacks at once an alien that walks away from beside it', effect: 'sentinel' },
   net: { name: "Hunter's Net", text: 'Hits on a rooted alien do +2 damage', effect: 'net' },
   glacial: { name: 'Glacial Snare', text: 'Chilling an alien roots it too', tags: ['frost'], effect: 'glacial' },
   juggernaut: { name: 'Juggernaut Servos', text: '+1 damage while the hero has armor left', tags: ['ward'], effect: 'armored' },
@@ -72,13 +72,13 @@ const relics = {
   shredder: { name: 'Shredder Charges', text: `Every landing strips the armor from each alien within ${CHARGE_REACH} tiles and hurts it`, tags: ['ward'], effect: 'entryShred' },
   cryo: { name: 'Cryo Charges', text: `Every landing chills each alien within ${CHARGE_REACH} tiles and hurts it`, tags: ['frost'], effect: 'entryFrost' },
   bulwark: { name: 'Pop-up Barricades', text: 'A barricade springs up beside each hero as it comes in, toward the nearest alien', effect: 'entryWall' },
-  turrets: { name: 'Turret Drop', text: 'A turret comes in with the squad: it never moves, and shoots far and true', effect: 'entryTurret' },
+  turrets: { name: 'Turret Drop', text: 'A turret comes in with the party: it never moves, and attacks far and true', effect: 'entryTurret' },
   // The goals.
   beacon: { name: 'Evac Beacon', text: `A hero gets a civilian out from ${BEACON_REACH} tiles away`, effect: 'beacon' },
   charity: { name: 'Refugee Network', text: 'Each civilian saved pays 1 more supply', civilianSupplies: 1 },
   relay: { name: 'Relay Booster', text: `The uplink's zone reaches ${RELAY_REACH} tiles farther`, effect: 'relay' },
   flare: { name: 'Signal Flare', text: 'A hero lifts off from farther from the extraction zone', effect: 'flare' },
-  bounty: { name: 'Bounty Rounds', text: `Hits on a boss, a Guardian or the Hunter, do +${BOUNTY_DAMAGE} damage`, tags: ['kill'], effect: 'bounty' },
+  bounty: { name: 'Bounty Sigil', text: `Hits on a boss, a Guardian or the Hunter, do +${BOUNTY_DAMAGE} damage`, tags: ['kill'], effect: 'bounty' },
 } satisfies Record<string, Relic>
 
 export type RelicId = keyof typeof relics

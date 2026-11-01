@@ -15,13 +15,13 @@ export const STUN_TURNS = 2
 export const RIG = { crowd: 3, near: 4, radius: 6, close: 2, damage: 10, fireReach: 4, fireTurns: 4 }
 
 export const UTILITIES: Record<UtilityId, { name: string; icon: string; text: string; tags?: Keyword[] }> = {
-  thrusters: { name: 'Thrusters', icon: '🚀', text: `Every hero has +${THRUST} move this fight` },
-  hover: { name: 'Hover Rig', icon: '🛸', text: 'Heroes cross difficult terrain and steep ground at no extra cost' },
+  thrusters: { name: 'Swiftness', icon: '💨', text: `Every hero has +${THRUST} move this fight` },
+  hover: { name: 'Levitation', icon: '🪽', text: 'Heroes cross difficult terrain and steep ground at no extra cost' },
   overcharge: { name: 'Overcharge', icon: '⚡', text: `Every hero has +${OVERCHARGE} damage this fight` },
-  crack: { name: 'Armor Crack', icon: '🔨', text: "Every hero's attacks ignore armor this fight" },
+  crack: { name: 'Sunder', icon: '🔨', text: "Every hero's attacks ignore armor this fight" },
   tank: { name: 'Rigged Tank', icon: '🛢️', text: `Pick a fuel tank: it blows once ${RIG.crowd} aliens are within ${RIG.near} tiles, ${RIG.damage} damage to every alien within ${RIG.radius} and any hero within ${RIG.close}, and leaves fire` },
-  smoke: { name: 'Smoke Bomb', icon: '💨', text: `For ${SMOKE.rounds} rounds no alien shoots farther than ${SMOKE.reach} tiles` },
-  flashbang: { name: 'Flashbang', icon: '✴️', text: `The first cluster is stunned for ${STUN_TURNS} turns as the squad comes in; a boss for 1` },
+  smoke: { name: 'Obscuring Mist', icon: '🌫️', text: `For ${SMOKE.rounds} rounds no alien shoots farther than ${SMOKE.reach} tiles` },
+  flashbang: { name: 'Blinding Flash', icon: '✴️', text: `The first cluster is stunned for ${STUN_TURNS} turns as the party comes in; a boss for 1` },
   rangedShield: { name: 'Ranged Shield', icon: '🛡️', text: 'Attacks from beyond arm\'s reach do half damage, rounded up' },
   meleeShield: { name: 'Melee Shield', icon: '🔰', text: 'Attacks and blasts from arm\'s reach do half damage, rounded up' },
 }
