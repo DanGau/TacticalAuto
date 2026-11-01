@@ -6,6 +6,7 @@ import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { skillOffers } from '../core/squad'
 import { choice, joined, loot, modal, runEnd, skillChoice, spareChoice, stopReport } from './aftermath'
+import { ALIENS } from '../core/aliens'
 import { TWISTS } from '../core/twists'
 import { CHALLENGES } from '../core/challenges'
 import { type Battle } from '../core/battle'
@@ -14,6 +15,7 @@ import { button, STOP_NAMES } from './html'
 import { fuelTanks } from '../core/objects'
 import { UTILITIES } from '../core/utilities'
 import { pickCard, pickDetail, utilityPick, type Pick } from './cards'
+import { alienBlock } from './sheet'
 import { overworld, type Tab } from './overworld'
 import { glide, viewNow } from './globe'
 
@@ -33,7 +35,7 @@ function status(run: Run): string {
   if (battle.phase === 'deploy') return title
   const rounds = battle.extract ? ` · ${battle.escaped.length} lifted off` : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
   const clock = battle.deadline !== null && battle.round < battle.deadline ? ` · reinforcements in ${battle.deadline - battle.round} rounds` : ''
-  const vip = battle.vip ? ` · the VIP ${{ held: 'held', breached: 'held', freed: 'with the squad', out: 'lifted off' }[battle.vip]}` : ''
+  const vip = battle.vip ? ` · the VIP ${{ held: 'held', breached: 'held', freed: 'with the party', out: 'lifted off' }[battle.vip]}` : ''
   return `${title}${vip}${rounds}${clock}`
 }
 
@@ -52,14 +54,26 @@ function drop(run: Run, battle: Battle, armed: string | null, rigging: number | 
       : run.utilities.length === 0
         ? button({ type: 'enter' }, 'Go in')
         : go(
-            'Pick a utility for this fight.',
+            'Pick a boon for this fight.',
             run.utilities.map((id, i): Pick =>
-              utilityPick(`u${i}`, id === 'tank' ? undefined : { type: 'enter', utility: i }, id, challenge?.answers.includes(id) ? 'answers this' : 'utility', id === 'tank' ? 'Tap again to choose a tank' : `Tap again to go in with ${UTILITIES[id].name}`, id === 'tank' ? { attrs: `data-rig="${i}"`, block: tanks.length === 0 ? 'No fuel tanks on this ground' : null } : {}),
+              utilityPick(`u${i}`, id === 'tank' ? undefined : { type: 'enter', utility: i }, id, challenge?.answers.includes(id) ? 'answers this' : 'boon', id === 'tank' ? 'Tap again to choose a tank' : `Tap again to go in with ${UTILITIES[id].name}`, id === 'tank' ? { attrs: `data-rig="${i}"`, block: tanks.length === 0 ? 'No fuel tanks on this ground' : null } : {}),
             ),
-            'Tap a utility for its details; tap it again to go in with it.',
+            'Tap a boon or an alien to read it; tap a boon again to go in with it.',
           )
   const test = challenge ? `<h2 class="challenge">${challenge.icon} ${challenge.name}</h2><p>${challenge.test}.</p>` : ''
-  return `${test}${twist}${chosen}`
+  return `${test}${twist}${foes(battle, armed)}${chosen}`
+}
+
+/** The encounter: each alien kind on the deploy screen and how many; tapped, its stat block. Burrowers stay hidden. */
+function foes(battle: Battle, armed: string | null): string {
+  const seen = battle.units.filter((u) => u.side === 'alien' && u.kind && u.kind !== 'burrower')
+  const kinds = [...new Set(seen.map((u) => u.kind!))]
+  const picks = kinds.map((kind): Pick => {
+    const like = seen.filter((u) => u.kind === kind)
+    return { key: `a${kind}`, look: 'foe', body: `${like.length} ${ALIENS[kind].name}${like.length > 1 ? 's' : ''}`, detail: alienBlock(kind, like[0].stats), go: '' }
+  })
+  const open = picks.find((p) => p.key === armed)
+  return `<div class="foes">${picks.map((p) => pickCard(p, armed)).join('')}</div>${open ? open.detail : ''}`
 }
 
 /** Turns clicks into actions and hands them to `act`. */

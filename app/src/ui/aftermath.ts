@@ -11,11 +11,12 @@ import { squadKeywords } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { health } from '../core/squad'
 import { skillOffers } from '../core/squad'
-import { level, MAX_SQUAD, weaponOf } from '../core/squad'
-import { weaponText } from '../core/weapons'
+import { level, MAX_SQUAD } from '../core/squad'
 import { xpFor } from '../core/squad'
 import { SKILLS } from '../core/skills'
+import { usage } from '../core/powers'
 import { gearPicks, pickCard, pickDetail, sellPick, utilityPick } from './cards'
+import { heroSheet } from './sheet'
 import { badge, button, describe, ROLES, gearCard, gearText, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
 /**
@@ -33,7 +34,7 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
   const feats = soldier.feats.map((id) => `<li class="feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</li>`)
   const live = run.soldiers.find((s) => s.name === soldier.name)
   const weapon = live?.gear
-  const choose = live && skillOffers(live).length > 0 ? `<button class="decide" data-ability="${live.id}">Choose ability</button>` : ''
+  const choose = live && skillOffers(live).length > 0 ? `<button class="decide" data-ability="${live.id}">Choose power</button>` : ''
   return `<div class="soldier ${soldier.taken ? 'died' : ''} ${up ? 'levelled' : ''}">
     <div class="who"><span class="portrait">${badge(soldier.cls)}</span><span><b>${soldier.name}</b><br><small>Level ${before}${cls ? ` · ${cls}` : ''}</small></span></div>
     <div class="bar"><div class="fill" style="--from: ${filled(soldier.xpBefore)}%; --to: ${filled(soldier.xpAfter)}%"></div></div>
@@ -48,13 +49,11 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
 /** A hero joining the squad, alone on its screen: who they are, where from, and what they bring. */
 export function joined(run: Run, name: string): string {
   const hero = run.soldiers.find((s) => s.name === name)!
-  const named = hero.skills.map((id) => `<span class="chip" title="${SKILLS[id].text}">${SKILLS[id].name}</span>`)
   return `<div class="debrief joined">
     <span class="portrait">${badge(hero.cls)}</span>
     <h1 class="down">${hero.name} joins</h1>
-    <p>${CLASSES[hero.cls!].name} · level ${level(hero)} · 🌍 ${hero.home?.name ?? ''}</p>
-    <p class="feats">${named.join('')}</p>
-    <p><b>${hero.gear!.name}.</b> ${weaponText(weaponOf(hero)!)}</p>
+    <p>🌍 ${hero.home?.name ?? ''}</p>
+    ${heroSheet(run, hero)}
     <button class="decide" data-met="report">Continue</button>
   </div>`
 }
@@ -66,7 +65,7 @@ export const modal = (html: string) => `<div class="modal"><div class="sheet">${
 function takers(run: Run, index: number, armed: string | null): string {
   const gear = run.finds[index]
   const picks = [...gearPicks(run, gear, (soldier) => ({ type: 'equip', find: index, soldier: soldier.id }), 'give it to'), sellPick(gear, index)]
-  return `<div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a soldier to compare; tap again to confirm.')}`
+  return `<div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a hero to compare; tap again to confirm.')}`
 }
 
 /** A crate opened, in a pop-up: it shakes, bursts in its gear's rarity, and the gear rises out of it; then the player picks who takes it. */
@@ -89,8 +88,8 @@ function title(report: Report): string {
 /** A skill for a soldier to learn: one of each role its tree has opened, each told by what it does now and nothing after. */
 export function skillChoice(run: Run, soldier: Soldier): string {
   const held = squadKeywords(run)
-  const card = (id: (typeof soldier.skills)[number], index: number) => button({ type: 'skill', soldier: soldier.id, index }, `<small>${ROLES[SKILLS[id].role]}</small><br><b>${SKILLS[id].name}</b><br>${describe(SKILLS[id].text, SKILLS[id].tags, held)}`, 'card skill')
-  return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name}, reached level ${soldier.skills.length + 1}. Choose one; each choice opens more of the tree.</h2>
+  const card = (id: (typeof soldier.skills)[number], index: number) => button({ type: 'skill', soldier: soldier.id, index }, `<small>${ROLES[SKILLS[id].role]}</small><br><b>${SKILLS[id].name}</b><br><small class="use">${usage(SKILLS[id])}</small><br>${describe(SKILLS[id].text, SKILLS[id].tags, held)}`, 'card skill')
+  return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name}, reached level ${soldier.skills.length + 1}. Choose a power; each opens more.</h2>
     <div class="choices">${skillOffers(soldier).map(card).join('')}</div>`
 }
 
@@ -105,7 +104,7 @@ export function spareChoice(run: Run, armed: string | null): string {
 export function choice(run: Run, armed: string | null = null): string {
   const held = squadKeywords(run)
   const relic = (id: RelicId, index: number) => button({ type: 'relic', index }, `<small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic')
-  if (run.relicOffers.length > 0) return `<h2>Alien artifacts lie in the wreckage. The squad can carry one, and keeps it for the run.</h2><div class="choices">${run.relicOffers.map(relic).join('')}</div>`
+  if (run.relicOffers.length > 0) return `<h2>Alien artifacts lie in the wreckage. The party can carry one, and keeps it for the run.</h2><div class="choices">${run.relicOffers.map(relic).join('')}</div>`
   if (run.finds.length > 0) {
     const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
     return `<h2>Gear found. Who takes it?${more}</h2><div class="gear ${run.finds[0].rarity}">${gearCard(run.finds[0], held)}</div>${takers(run, 0, armed)}`

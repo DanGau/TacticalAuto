@@ -1,5 +1,4 @@
 import { ALIENS, DANGERS, type AlienKind } from '../core/aliens'
-import { SECONDARIES, secondaryText } from '../core/secondaries'
 import { CLASSES } from '../core/classes'
 import { GOALS } from '../core/goals'
 import { DOCTRINES } from '../core/doctrines'
@@ -15,24 +14,22 @@ import { huntForce } from '../core/missions'
 import { RISKS } from '../core/missions'
 import { GEAR_PRICE } from '../core/rewards'
 import { squadKeywords } from '../core/squad'
-import { secondaryOf, soldierStats, weaponOf } from '../core/squad'
+import { soldierStats } from '../core/squad'
 import { health } from '../core/squad'
-import { charges } from '../core/squad'
 import { level } from '../core/squad'
 import { xpFor } from '../core/squad'
-import { weaponText } from '../core/weapons'
 import { LEG_STOPS } from '../core/progress'
 import { FEATS } from '../core/feats'
-import { SKILLS } from '../core/skills'
 import { TWISTS } from '../core/twists'
 import { CHALLENGES } from '../core/challenges'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
 import { gearPicks, pickCard, pickDetail, utilityPick, type Pick } from './cards'
+import { heroSheet } from './sheet'
 import { alienName, badge, button, describe, describeGear, gearCard, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
-const TABS = ['Map', 'Base', 'Barracks'] as const
+const TABS = ['Map', 'Team', 'Heroes'] as const
 export type Tab = (typeof TABS)[number]
 
 
@@ -160,7 +157,7 @@ function readChallenge(run: Run, stop: Stop): string {
 function where(run: Run, stop: Stop): string {
   const stage = run.route[run.keys]
   if (stop.kind === 'final') return `The alien hub<br>${readChallenge(run, stop)}`
-  if (stop.kind === 'key') return `${stage.hero ? `Extract ${stage.hero.name}` : 'Storm the stronghold'}<br>${readChallenge(run, stop)}`
+  if (stop.kind === 'key') return `${stage.hero ? `Free ${stage.hero.name}` : 'Storm the stronghold'}<br>${readChallenge(run, stop)}`
   // A stop's icon tells what it is; only a fight says more.
   if (stop.kind !== 'battle') return ''
   return `${GOALS[stop.goal].name} · ${RISKS[stop.risk].name}${stop.twist ? ` · ${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}` : ''}<br>${readChallenge(run, stop)}`
@@ -180,13 +177,13 @@ function shopPicks(run: Run): Pick[] {
   })
   const relics = shop.relics.map(({ id, sold }, index): Pick => ({ key: `r${index}`, action: { type: 'buy', index }, look: 'relic', body: card('relic', RELICS[id].name, `${RELIC_PRICE} supplies`, sold), detail: `<p><b>${RELICS[id].name}.</b> ${describe(RELICS[id].text, RELICS[id].tags, held)}</p>`, go: `Tap again to buy for ${RELIC_PRICE} supplies`, block: poor(RELIC_PRICE), spent: sold }))
   const utilities = shop.utilities.map(({ id, sold }, index): Pick =>
-    utilityPick(`u${index}`, { type: 'utility', index }, id, 'utility', `Tap again to buy for ${UTILITY_PRICE} supplies${run.utilities.length >= UTILITY_SLOTS ? ', dropping one' : ''}`, {
-      body: card('utility', `${UTILITIES[id].icon} ${UTILITIES[id].name}`, `${UTILITY_PRICE} supplies`, sold),
+    utilityPick(`u${index}`, { type: 'utility', index }, id, 'boon', `Tap again to buy for ${UTILITY_PRICE} supplies${run.utilities.length >= UTILITY_SLOTS ? ', dropping one' : ''}`, {
+      body: card('boon', `${UTILITIES[id].icon} ${UTILITIES[id].name}`, `${UTILITY_PRICE} supplies`, sold),
       block: run.utilities.includes(id) ? 'Held' : poor(UTILITY_PRICE),
       spent: sold,
     }),
   )
-  const bribe: Pick = { key: 'b', action: { type: 'bribe' }, look: 'bribe', body: card('bribe', 'Bribe the patrols', `${BRIBE.price} supplies`, shop.bribed), detail: `<p><b>Bribe the patrols.</b> -${BRIBE.threat} threat, once.</p>`, go: `Tap again to pay ${BRIBE.price} supplies`, block: run.threat === 0 ? 'No threat to lower' : poor(BRIBE.price), spent: shop.bribed }
+  const bribe: Pick = { key: 'b', action: { type: 'bribe' }, look: 'bribe', body: card('bribe', 'Buy off the hunters', `${BRIBE.price} supplies`, shop.bribed), detail: `<p><b>Buy off the hunters.</b> -${BRIBE.threat} threat, once.</p>`, go: `Tap again to pay ${BRIBE.price} supplies`, block: run.threat === 0 ? 'No threat to lower' : poor(BRIBE.price), spent: shop.bribed }
   return [...gear, ...relics, ...utilities, bribe]
 }
 
@@ -197,14 +194,14 @@ function shopView(run: Run, armed: string | null, ware: number | null): string {
   const screen = `<h2>A shop. Each piece is one of a kind.</h2>
     <div class="picks">${picks.map((p) => pickCard(p, ware === null ? armed : null)).join('')}</div>
     ${pickDetail(picks, ware === null ? armed : null, 'Tap a card for its details; tap it again to buy.')}
-    <p class="kit">Utilities ${run.utilities.length}/${UTILITY_SLOTS}: ${held}</p>
+    <p class="kit">Boons ${run.utilities.length}/${UTILITY_SLOTS}: ${held}</p>
     <button class="travel" data-action='${JSON.stringify({ type: 'leave' })}'>Leave the shop</button>`
   if (ware === null || run.shop!.wares[ware].sold) return screen
   const { gear } = run.shop!.wares[ware]
   const wearers = gearPicks(run, gear, (s) => ({ type: 'gear', index: ware, soldier: s.id }), 'buy it for')
   return `${screen}<div class="modal"><div class="sheet"><h2>Who takes ${gear.name}? · ${GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]} supplies</h2>
     <div class="picks">${wearers.map((p) => pickCard(p, armed)).join('')}</div>
-    ${pickDetail(wearers, armed, 'Tap a soldier to compare; tap again to buy.')}
+    ${pickDetail(wearers, armed, 'Tap a hero to compare; tap again to buy.')}
     <button data-ware="">Back</button></div></div>`
 }
 
@@ -230,19 +227,19 @@ function mapView(run: Run, picked: number | null, armed: string | null, ware: nu
   if (!node) return `${brief(where(run, ahead!))}${runMap(run, picked)}`
   const next = nextStop(run)!
   const here = node.stop!
-  return `${brief(next === 'recovery' ? '<b class="up">Recover your soldiers</b>' : next === 'ambush' ? '<b class="up">Ambushed: survive</b>' : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
+  return `${brief(next === 'recovery' ? '<b class="up">Recover your heroes</b>' : next === 'ambush' ? '<b class="up">Ambushed: survive</b>' : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
     ${runMap(run, null)}`
 }
 
 function baseView(run: Run): string {
   const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags)}</div>`)
-  const doctrines = run.doctrines.map((id) => `<div class="gear doctrine"><small>doctrine</small><br><b>${DOCTRINES[id].name}</b><br>${DOCTRINES[id].text}</div>`)
-  const utilities = run.utilities.map((id) => `<div class="gear"><small>utility</small><br><b>${UTILITIES[id].icon} ${UTILITIES[id].name}</b><br>${UTILITIES[id].text}</div>`)
+  const doctrines = run.doctrines.map((id) => `<div class="gear doctrine"><small>oath</small><br><b>${DOCTRINES[id].name}</b><br>${DOCTRINES[id].text}</div>`)
+  const utilities = run.utilities.map((id) => `<div class="gear"><small>boon</small><br><b>${UTILITIES[id].icon} ${UTILITIES[id].name}</b><br>${UTILITIES[id].text}</div>`)
   const held = squadKeywords(run)
-  return `${relics.length + doctrines.length + held.length + utilities.length === 0 ? '<h2>Relics, doctrines and utilities the squad gains show here.</h2>' : ''}
-    ${utilities.length > 0 ? `<h2>Utilities ${utilities.length}/${UTILITY_SLOTS}</h2><div class="stash">${utilities.join('')}</div>` : ''}
+  return `${relics.length + doctrines.length + held.length + utilities.length === 0 ? '<h2>Relics, oaths and boons the party gains show here.</h2>' : ''}
+    ${utilities.length > 0 ? `<h2>Boons ${utilities.length}/${UTILITY_SLOTS}</h2><div class="stash">${utilities.join('')}</div>` : ''}
     ${held.length > 0 ? `<h2>Keywords</h2>${keywordChips(held, held)}` : ''}
-    ${doctrines.length > 0 ? `<h2>Doctrines</h2><div class="stash">${doctrines.join('')}</div>` : ''}
+    ${doctrines.length > 0 ? `<h2>Oaths</h2><div class="stash">${doctrines.join('')}</div>` : ''}
     ${relics.length > 0 ? `<h2>Relics</h2><div class="stash">${relics.join('')}</div>` : ''}`
 }
 
@@ -260,34 +257,19 @@ function soldierCard(run: Run, soldier: Soldier, open: number | null): string {
   </button>`
 }
 
-/** Everything about one soldier: progress, stats, how the class fights, its skills, its feats, and what the gear does. */
+/** Everything about one hero: its sheet, its progress and its feats. */
 function details(run: Run, soldier: Soldier): string {
   const r = level(soldier)
-  const cls = soldier.cls && CLASSES[soldier.cls]
-  const stats = soldierStats(run, soldier)
-  const skills = soldier.skills.map((id) => `<p class="described"><b>${SKILLS[id].name}.</b> ${describe(SKILLS[id].text, SKILLS[id].tags)}</p>`)
-  const uses = charges(run, soldier)
-  const secondary = SECONDARIES[secondaryOf(soldier)]
-  const weapon = weaponOf(soldier)
-  const attacks = `<p><b>Each turn: ${weapon?.name ?? 'bare hands'}, then ${secondary.name}.</b> ${weapon ? `${weaponText(weapon)}. ` : ''}${secondaryText(secondary)}</p>`
-  const gear = soldier.gear ? `<div class="gear ${soldier.gear.rarity}">${gearCard(soldier.gear)}</div>` : ''
   const feats = soldier.feats.map((id) => `<span class="chip feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</span>`)
-  return `<h2>${soldier.name} · ${xpFor(r + 1) - soldier.xp} experience to level ${r + 1}</h2>
-    <div class="details">
-      <table class="stats">
-        <tr><td>Health</td><td>${health(run, soldier)}/${stats.hp}</td><td>Armor</td><td>${stats.armor}</td></tr>
-        <tr><td>Crit</td><td>${Math.round(100 * stats.crit)}%</td><td>Move</td><td>${stats.move}</td></tr>
-        <tr><td>Damage</td><td>${stats.damage}</td><td>Range</td><td>${stats.range}</td></tr>
-      </table>
-      <div>${attacks}${cls ? `${weaponOf(soldier)?.stance && (soldier.cls !== 'support' || run.soldiers.length === 1) ? '' : `<p>${cls.stanceText}.</p>`}<p><b>${cls.abilityName}${uses > 0 ? ` ×${uses}` : ''}.</b> ${cls.abilityText}.</p>` : ''}${skills.join('')}${feats.length > 0 ? `<p>${feats.join(' ')}</p>` : ''}</div>
-      ${gear}
-    </div>`
+  const gear = soldier.gear?.effect ? `<div class="gear ${soldier.gear.rarity}">${gearCard(soldier.gear)}</div>` : ''
+  return `<h2>${soldier.name} · ${xpFor(r + 1) - soldier.xp} XP to level ${r + 1}</h2>
+    <div class="details">${heroSheet(run, soldier)}${gear}${feats.length > 0 ? `<p>${feats.join(' ')}</p>` : ''}</div>`
 }
 
 /** The squad as short cards, and below them the details of the soldier opened. */
 function barracksView(run: Run, open: number | null): string {
   const soldier = run.soldiers.find((s) => s.id === open)
-  return `<div class="squad">${run.soldiers.map((s) => soldierCard(run, s, open)).join('')}</div>${soldier ? details(run, soldier) : '<h2>Click a soldier for details.</h2>'}`
+  return `<div class="squad">${run.soldiers.map((s) => soldierCard(run, s, open)).join('')}</div>${soldier ? details(run, soldier) : '<h2>Tap a hero for the full sheet.</h2>'}`
 }
 
 /**
@@ -295,7 +277,7 @@ function barracksView(run: Run, open: number | null): string {
  * `open` is the soldier opened in the Barracks; `armed` the card tapped once, `ware` the shop gear being bought.
  */
 export function overworld(run: Run, tab: Tab, open: number | null, picked: number | null, armed: string | null = null, ware: number | null = null): string {
-  const views = { Map: (r: Run) => mapView(r, picked, armed, ware), Base: baseView, Barracks: (r: Run) => barracksView(r, open) }
+  const views = { Map: (r: Run) => mapView(r, picked, armed, ware), Team: baseView, Heroes: (r: Run) => barracksView(r, open) }
   const tabs = TABS.map((name) => `<button class="tab ${name === tab ? 'active' : ''}" data-tab="${name}">${name}</button>`)
   return `
     <div class="header">

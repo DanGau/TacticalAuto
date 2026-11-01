@@ -1,7 +1,8 @@
 // Introductions to kinds a player meets for the first time.
-import { ALIENS, type AlienKind } from '../core/aliens'
+import { ALIENS, alienStats, type AlienKind } from '../core/aliens'
 import type { Battle } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
+import { alienBlock } from './sheet'
 
 const KEY = 'metAliens'
 
@@ -77,7 +78,7 @@ export function introduce(kind: AlienKind): Promise<void> {
   }
   const screen = document.createElement('div')
   screen.className = 'intro'
-  screen.innerHTML = `<svg viewBox="0 0 200 200" aria-hidden="true">${PORTRAITS[kind] ?? ''}</svg><small>New contact</small><h1>${ALIENS[kind].name}</h1><p>${ALIENS[kind].intro}</p><button>Acknowledged</button>`
+  screen.innerHTML = `<svg viewBox="0 0 200 200" aria-hidden="true">${PORTRAITS[kind] ?? ''}</svg><small>New foe</small><p>${ALIENS[kind].intro}</p>${alienBlock(kind, alienStats(kind, 0, 0))}<button>Understood</button>`
   document.body.append(screen)
   return new Promise((resolve) =>
     screen.querySelector('button')!.addEventListener('click', () => {

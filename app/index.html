@@ -335,7 +335,27 @@
       @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
       .landed { display: inline-block; color: #ffd84d; animation: land 0.6s 0.6s both; }
       @keyframes land { from { opacity: 0; transform: scale(3); } }
+      .statblock { display: flex; gap: 2px; margin: 4px 0; }
+      .statblock span { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 2px 1px; background: #1d2433; border-top: 2px solid #a33; }
+      .statblock small { font-size: 9px; letter-spacing: 0.3px; text-transform: uppercase; color: #9aa6bd; }
+      .statblock b { font-size: 13px; }
+      .use { color: #ffd166; font-size: 11px; }
+      .power { margin: 0 0 6px; text-align: left; font-size: 13px; }
+      .powers { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2px 12px; }
+      .charsheet { text-align: left; flex: 1; min-width: 0; }
+      .charsheet .weapon { display: flex; flex-direction: column; margin: 4px 0; }
+      .charsheet.alien { flex: none; align-self: stretch; margin: 4px 0; padding: 4px 8px; border: 1px solid #a33; border-radius: 4px; background: #1d2433; }
+      .foes { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: 4px 0; }
+      #drop .picks button.pick.foe, button.pick.foe { width: auto; height: auto; padding: 3px 8px; font-size: 12px; border-color: #a33; }
+      .recruit .chip { padding: 2px 6px; font-size: 11px; white-space: normal; }
+      .picking .detail { min-height: 0; text-align: left; }
       @media (max-width: 900px) {
+        .recruit { width: calc((100vw - 48px) / 3); min-width: 104px; padding: 6px; gap: 4px; }
+        .recruit .name { font-size: 14px; }
+        .recruit .home, .recruit .weapon small { font-size: 10px; }
+        .powers { grid-template-columns: 1fr; }
+        .statblock b { font-size: 11px; }
+        .recruit .statblock { display: grid; grid-template-columns: repeat(3, 1fr); }
         body { font-size: 12px; }
         #panel { padding: 8px 12px; }
         .choices, .squad, .details, .header { flex-wrap: wrap; }
@@ -346,7 +366,7 @@
   <body>
     <div class="vignette"></div>
     <div id="hud"><span id="status"></span></div>
-    <div id="dial" hidden><div class="spin"><div class="half ally">Allied<br />turn</div><div class="half enemy">Enemy<br />turn</div></div></div>
+    <div id="dial" hidden><div class="spin"><div class="half ally">Hero<br />turn</div><div class="half enemy">Alien<br />turn</div></div></div>
     <div id="drop" hidden></div>
     <div id="panel"></div>
     <button id="fullscreen" title="Full screen">⛶</button>

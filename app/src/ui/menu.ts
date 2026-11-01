@@ -1,12 +1,8 @@
 // The title screen, story and recruit choice.
-import { SECONDARIES, secondaryText } from '../core/secondaries'
-import { CLASSES } from '../core/classes'
 import type { Run } from '../core/run-state'
 import type { Soldier } from '../core/run-state'
-import { SKILLS } from '../core/skills'
-import { weaponOf } from '../core/squad'
-import { weaponText } from '../core/weapons'
 import { places } from './globe'
+import { heroCard, powerList } from './sheet'
 
 /** The title screen, before a run begins. */
 export function title(): string {
@@ -33,17 +29,11 @@ export function story(): string {
   </div>`
 }
 
-/** A recruit as a card to pick: class, weapon, first skill and home at a glance; hovering an ability or skill tells what it does. */
-function card(recruit: Soldier, index: number, chosen: number | null): string {
-  const cls = CLASSES[recruit.cls!]
-  const secondary = SECONDARIES[cls.secondary]
-  const named = [{ name: cls.abilityName, text: cls.abilityText }, { name: secondary.name, text: `Secondary attack. ${secondaryText(secondary)}` }, ...recruit.skills.map((id) => SKILLS[id])]
+/** A recruit as a card to pick: its sheet at a glance, and where it waits. */
+function card(run: Run, recruit: Soldier, index: number, chosen: number | null): string {
   return `<button data-recruit="${index}" class="card recruit${index === chosen ? ' chosen' : ''}">
-    <small>${cls.name}</small>
-    <b class="name">${recruit.name}</b>
+    ${heroCard(run, recruit)}
     <small class="home">🌍 ${recruit.home!.name}, ${recruit.home!.country}</small>
-    <span class="feats">${named.map((n, i) => `<span class="chip ${i === 0 ? 'feat' : ''}" title="${n.text}">${n.name}</span>`).join('')}</span>
-    <div class="weapon"><b>${recruit.gear!.name}</b><small>${weaponText(weaponOf(recruit)!)}</small></div>
   </button>`
 }
 
@@ -51,8 +41,9 @@ function card(recruit: Soldier, index: number, chosen: number | null): string {
 export function recruits(run: Run, chosen: number | null): string {
   const homes = run.recruits.map((r, i) => ({ at: r.home!.at, chosen: i === chosen, html: `<span class="home${i === chosen ? ' chosen' : ''}">${r.home!.name}</span>` }))
   return `<div class="menu picking">
-    <h2>${chosen === null ? 'Who leads the squad? Each waits in a different city.' : `Tap ${run.recruits[chosen].name} again to begin in ${run.recruits[chosen].home!.name}.`}</h2>
+    <h2>${chosen === null ? 'Who leads the party? Each waits in a different city.' : `Tap ${run.recruits[chosen].name} again to begin in ${run.recruits[chosen].home!.name}.`}</h2>
     <div class="homes">${places({ w: 560, h: 220 }, homes)}</div>
-    <div class="choices">${run.recruits.map((r, i) => card(r, i, chosen)).join('')}</div>
+    <div class="choices">${run.recruits.map((r, i) => card(run, r, i, chosen)).join('')}</div>
+    <div class="detail">${chosen === null ? '<small>Tap a hero to read its powers; tap again to begin.</small>' : powerList(run, run.recruits[chosen])}</div>
   </div>`
 }

@@ -1,6 +1,7 @@
-// Soldier classes: stats, positioning, and the ability each uses unprompted.
+// Hero classes: stats, positioning, and the ability each uses unprompted.
+import type { Power, Use } from './powers'
 import type { SecondaryId } from './secondaries'
-import { CLOAK_DAMAGE, CLOAK_TURNS, MECH_STATS, type Ability, type Stance, type Stats } from './battle'
+import { CLOAK_DAMAGE, CLOAK_TURNS, MECH_STATS, MEDIC_HEAL, MEDIC_REACH, NAPALM_DAMAGE, ROCKET_DAMAGE, type Ability, type Stance, type Stats } from './battle'
 
 /** What a hero becomes at first promotion: stat changes, a way of positioning, and one ability used unprompted. */
 export interface SoldierClass {
@@ -12,6 +13,9 @@ export interface SoldierClass {
   ability: Ability
   abilityName: string
   abilityText: string
+  /** How far the ability reaches and whom it affects, where it says. */
+  range?: string
+  target?: string
   /** Times per battle the ability can be used; 0 for one always in effect. */
   charges: number
   /** The attack after its weapon's each turn. */
@@ -25,7 +29,7 @@ const classes = {
     stance: 'rush',
     stanceText: 'Closes in for the hardest hit',
     ability: 'runAndGun',
-    abilityName: 'Run and Gun',
+    abilityName: 'Mighty Bound',
     abilityText: 'Moves twice as far when that is the only way to reach a target',
     charges: 0,
     secondary: 'frag',
@@ -36,8 +40,9 @@ const classes = {
     stance: 'anchor',
     stanceText: 'Plants itself and holds its ground',
     ability: 'rocket',
-    abilityName: 'Rocket',
-    abilityText: 'Once per battle, in place of an attack, blasts two or more aliens standing together',
+    abilityName: 'Meteor Strike',
+    target: '2+ aliens together',
+    abilityText: `Replaces an attack. ${ROCKET_DAMAGE} damage in a blast`,
     charges: 1,
     secondary: 'slug',
   },
@@ -47,8 +52,8 @@ const classes = {
     stance: 'standoff',
     stanceText: 'Hangs back out of reach',
     ability: 'squadsight',
-    abilityName: 'Squadsight',
-    abilityText: 'Its secondary reaches any alien a squadmate sees, at any distance, given a clear line',
+    abilityName: 'Far Sight',
+    abilityText: 'Bonus attack reaches any alien an ally sees, at any distance, given a clear line',
     charges: 0,
     secondary: 'pistol',
   },
@@ -56,10 +61,12 @@ const classes = {
     name: 'Beacon',
     stats: { move: 1, hp: 2 },
     stance: 'escort',
-    stanceText: 'Stays within reach of a squadmate; alone, fights as its weapon does',
+    stanceText: 'Stays within reach of an ally; alone, fights as its weapon does',
     ability: 'medic',
-    abilityName: 'Medic',
-    abilityText: 'Twice per battle, heals a badly wounded soldier nearby or itself, and still attacks',
+    abilityName: 'Healing Light',
+    range: `${MEDIC_REACH}`,
+    target: 'Ally or self at half HP',
+    abilityText: `Heals ${MEDIC_HEAL}, and it still attacks`,
     charges: 2,
     secondary: 'flare',
   },
@@ -70,7 +77,8 @@ const classes = {
     stanceText: 'Hangs back while its machines take the front',
     ability: 'mech',
     abilityName: 'Deploy Mech',
-    abilityText: `Once per battle, once aliens are in sight, deploys a frail combat mech beside it, ${MECH_STATS.hp} health, that every alien able to shoot it must shoot, and still attacks`,
+    target: 'Beside it',
+    abilityText: `With aliens in sight, deploys a mech of ${MECH_STATS.hp} HP that every alien able must shoot; it still attacks`,
     charges: 1,
     secondary: 'shockCoil',
   },
@@ -80,8 +88,9 @@ const classes = {
     stance: 'rush',
     stanceText: 'Closes in to bring its flames to bear',
     ability: 'napalm',
-    abilityName: 'Napalm',
-    abilityText: 'Twice per battle, in place of an attack, sprays napalm over two or more aliens standing together: 3 damage, and they burn on ground set alight',
+    abilityName: 'Fireball',
+    target: '2+ aliens together',
+    abilityText: `Replaces an attack. ${NAPALM_DAMAGE} damage; they burn, on ground set alight`,
     charges: 2,
     secondary: 'flameBurst',
   },
@@ -91,7 +100,7 @@ const classes = {
     stance: 'standoff',
     stanceText: 'Hangs back and slows whatever comes on',
     ability: 'cryo',
-    abilityName: 'Cryo Touch',
+    abilityName: 'Chill Touch',
     abilityText: 'Its hits chill the target',
     charges: 0,
     secondary: 'iceShard',
@@ -103,7 +112,8 @@ const classes = {
     stanceText: 'Closes in, unseen, for the strike',
     ability: 'cloak',
     abilityName: 'Cloak',
-    abilityText: `Twice per battle, in place of its attacks when aliens can shoot it, it cloaks: no alien sees or targets it for ${CLOAK_TURNS} turns. Its next attack, out of cloak, ignores armor, has +${CLOAK_DAMAGE} damage, and reveals it`,
+    target: 'Self, when aliens can shoot it',
+    abilityText: `Replaces its attacks. Unseen for ${CLOAK_TURNS} turns; its next attack ignores armor, has +${CLOAK_DAMAGE} damage and reveals it`,
     charges: 2,
     secondary: 'knives',
   },
@@ -111,3 +121,9 @@ const classes = {
 
 export type ClassId = keyof typeof classes
 export const CLASSES: Record<ClassId, SoldierClass> = classes
+
+/** A class's ability as a power, with `uses` a battle; Chill Touch rides on each attack, the rest with no uses sit on the sheet. */
+export function classPower(cls: SoldierClass, uses: number): Power {
+  const use: Use = uses > 0 ? `${uses}/battle` : cls.ability === 'cryo' ? 'At will' : 'Passive'
+  return { name: cls.abilityName, use, range: cls.range, target: cls.target, text: cls.abilityText }
+}

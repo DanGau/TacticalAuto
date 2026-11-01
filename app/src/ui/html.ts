@@ -17,7 +17,7 @@ export const button = (action: Action, label: string, cls = '', enabled = true, 
   `<button class="${cls}" data-action='${JSON.stringify(action)}' ${title ? `title="${title}"` : ''} ${enabled ? '' : 'disabled'}>${label}</button>`
 
 /** What each skill role is called on a card. */
-export const ROLES: Record<Role, string> = { guard: '🛡️ Guard', control: '🌀 Control', power: '⚔️ Power' }
+export const ROLES: Record<Role, string> = { guard: '🛡️ Guard', control: '🌀 Control', power: '⚔️ Might' }
 
 export const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`
 
@@ -27,9 +27,9 @@ export const STOP_NAMES: Record<StopKind | Mission['kind'], string> = {
   supply: 'Supply drop',
   cache: 'Gear cache',
   shop: 'Shop',
-  medic: 'Medic',
+  medic: 'Healer',
   unknown: '❓ Unknown',
-  key: 'Extraction',
+  key: 'Guardian',
   final: 'The alien source',
   ambush: 'Ambush',
   recovery: 'Recovery',
@@ -37,30 +37,28 @@ export const STOP_NAMES: Record<StopKind | Mission['kind'], string> = {
 
 /** A soldier's health as a red bar and a count, and the armor it starts each fight with as a yellow bar after it. */
 export const healthBar = (hp: number, max: number, armor = 0) =>
-  `<div class="health" title="Health ${hp} of ${max}${armor > 0 ? `, and ${armor} armor, which takes damage first and is whole again each fight` : ''}">♥ ${hp}/${max}${armor > 0 ? ` <span class="armor">⛨ ${armor}</span>` : ''}<div class="bar"><div style="width: ${(100 * hp) / (max + armor)}%"></div><div class="armor" style="left: ${(100 * max) / (max + armor)}%; width: ${(100 * armor) / (max + armor)}%"></div></div></div>`
+  `<div class="health" title="HP ${hp} of ${max}${armor > 0 ? `, and ${armor} armor, which takes damage first and is whole again each fight` : ''}">♥ ${hp}/${max}${armor > 0 ? ` <span class="armor">⛨ ${armor}</span>` : ''}<div class="bar"><div style="width: ${(100 * hp) / (max + armor)}%"></div><div class="armor" style="left: ${(100 * max) / (max + armor)}%; width: ${(100 * armor) / (max + armor)}%"></div></div></div>`
 
-const BADGES: Record<ClassId, string> = { assault: '🔫', heavy: '🚀', sniper: '🎯', support: '⛑️', engineer: '🔧', pyro: '🔥', cryo: '❄️', phantom: '👻' }
+const BADGES: Record<ClassId, string> = { assault: '⚔️', heavy: '💪', sniper: '🎯', support: '✨', engineer: '🔧', pyro: '🔥', cryo: '❄️', phantom: '👻' }
 
-/** A class's badge; a soldier not yet promoted wears a helmet. */
-export const badge = (cls?: ClassId | null) => (cls ? BADGES[cls] : '🪖')
+/** A class's badge; a hero with no class yet wears a cape. */
+export const badge = (cls?: ClassId | null) => (cls ? BADGES[cls] : '🦸')
 
 /** The threat bar. `landed` is how much of the newest threat animates in. */
 export function threatBar(threat: number, landed = 0): string {
   const pct = (n: number) => `${(100 * n) / THREAT_MAX}%`
-  const meter = `<span class="threat" title="The hunt: the fuller the bar, the more aliens every battle has, up to ${Math.round(100 * TUNING.hunt)}% more. Full, it ambushes the squad"><i style="width:${pct(threat - landed)}"></i><i class="landed" style="width:${pct(landed)}"></i></span>`
+  const meter = `<span class="threat" title="The hunt: the fuller the bar, the more aliens every battle has, up to ${Math.round(100 * TUNING.hunt)}% more. Full, it ambushes the party"><i style="width:${pct(threat - landed)}"></i><i class="landed" style="width:${pct(landed)}"></i></span>`
   return `${meter}${threat === THREAT_MAX ? '<b class="up">ambush next</b>' : ''}`
 }
 
-/** The access keys, won and still to win. */
-
 /** What each stat is called. */
-export const STAT_NAMES: Record<keyof Stats, string> = { hp: 'Health', armor: 'Armor', damage: 'Damage', range: 'Range', move: 'Move', crit: 'Crit' }
+export const STAT_NAMES: Record<keyof Stats, string> = { hp: 'HP', armor: 'Armor', damage: 'Damage', range: 'Range', move: 'Move', crit: 'Crit' }
 
 const percent = (n: number) => `${signed(Math.round(100 * n))}%`
 
 /** How each stat change reads on a piece of gear. */
 const STAT_TEXT: Record<keyof Stats, (n: number) => string> = {
-  hp: (n) => `${signed(n)} health`,
+  hp: (n) => `${signed(n)} HP`,
   armor: (n) => `${signed(n)} armor`,
   damage: (n) => `${signed(n)} damage`,
   range: (n) => `${signed(n)} range`,
