@@ -89,18 +89,19 @@ export function flight(run: Run, picked: number | null): { pins: Pin[]; focus: L
   let focus = run.route[run.keys].from
   run.legs.forEach((leg, l) => {
     const walked = (c: number) => l < run.keys || (l === run.keys && (c < run.stop || (c === run.stop && here !== null)))
-    // Where the squad stands: the stop under way, or else the last it took.
-    const standing = (c: number) => l === run.keys && (here ? c === run.stop : c === run.stop - 1)
+    // Where the squad stands: the stop under way, or else the last it took; a tunnel's columns hold none.
+    const standing = (c: number) => l === run.keys && c === (here ? run.stop : leg.path.slice(0, run.stop).findLastIndex((i) => i >= 0))
     // On the leg under way the stops taken stay shown, the way the squad came across the continent.
     const shown = (c: number, i: number) => (walked(c) ? l === run.keys && leg.path[c] === i : reach[l][c].has(i) && l * (LEG_STOPS + 1) + c <= at + SIGHT)
     leg.columns.forEach((column, c) =>
       column.forEach((node, i) => {
         if (!shown(c, i)) return
         const taken = walked(c)
-        const next = c === leg.columns.length - 1 ? [] : node.next.map((k) => `${l}-${c + 1}-${k}`)
+        const squad = taken && standing(c)
+        // Out of a tunnel, the way on leads past the columns between.
+        const next = squad && !here ? open.map((k) => `${l}-${run.stop}-${k}`) : c === leg.columns.length - 1 ? [] : node.next.map((k) => `${l}-${c + 1}-${k}`)
         const state = taken ? (l === run.keys && c === run.stop ? 'here' : 'done') : ''
         const icon = !node.stop ? (c === leg.columns.length - 1 ? stopIcon(run, { kind: l === KEYS ? 'final' : 'key' } as Stop) : FOG) : stopIcon(run, node.stop, state)
-        const squad = taken && standing(c)
         // A stop the squad stands at but has not yet set in to is tapped to set in.
         const setIn = squad && here !== null
         const choice = setIn || (open.includes(i) && l === run.keys && c === run.stop)

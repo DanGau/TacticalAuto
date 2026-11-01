@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import { tangles } from '../core/plane'
 import { apply } from '../core/apply'
+import { LEG_STOPS } from '../core/progress'
 import { createRun, KEYS, legOf, ways } from '../core/run'
 import { type Run } from '../core/run-state'
 import { layout } from './globe'
@@ -48,6 +49,42 @@ test('on the flight map, at every stop of every leg, trails never cross nor run 
       }
       run.keys++
       run.stop = 0
+    }
+  }
+  expect(found).toEqual([])
+})
+
+test('the tunnel, taken at every stop of every leg, leaves the squad at its last stop, trails to every way out, and a map that reads and plays to the leg end', () => {
+  const found: string[] = []
+  for (let seed = 0; seed < SEEDS; seed += 5) {
+    for (let key = 0; key < KEYS; key++) {
+      for (let at = 0; at + 2 < LEG_STOPS; at++) {
+        const run = createRun(seed)
+        apply(run, { type: 'recruit', index: seed % run.recruits.length })
+        run.keys = key
+        for (let c = 0; c <= at; c++) {
+          legOf(run).path.push(ways(run)[0])
+          if (c < at) run.stop++
+        }
+        run.phase = 'event'
+        run.event = 'tunnel'
+        const label = `seed ${seed} leg ${key} tunnel at ${at}`
+        const taken = apply(run, { type: 'choose', index: 0 })
+        if (!taken.ok) found.push(`${label}: ${taken.reason}`)
+        const { pins, focus } = flight(run, null)
+        const squad = pins.filter((pin) => pin.squad)
+        const stood = `${key}-${at}-${legOf(run).path[at]}`
+        if (squad.length !== 1 || squad[0].id !== stood || squad[0].at !== focus) found.push(`${label}: squad not at ${stood}`)
+        if (squad[0].next.join() !== ways(run).map((i) => `${key}-${at + 3}-${i}`).join()) found.push(`${label}: no trails to the ways out`)
+        for (const [w, h] of [[1280, 800], [390, 844]]) found.push(...tangled(run, w, h).map((t) => `${label} ${w}px: ${t}`))
+        while (run.stop < legOf(run).columns.length) {
+          const open = ways(run)
+          if (open.length === 0) found.push(`${label}: stuck at column ${run.stop}`)
+          legOf(run).path.push(open[seed % open.length])
+          for (const [w, h] of [[1280, 800], [390, 844]]) found.push(...tangled(run, w, h).map((t) => `${label} column ${run.stop} ${w}px: ${t}`))
+          run.stop++
+        }
+      }
     }
   }
   expect(found).toEqual([])
