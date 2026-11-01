@@ -50,8 +50,9 @@ function townsBetween(continent: ContinentId, a: LonLat, b: LonLat): number {
   return TOWNS[continent].filter(([, at]) => flat(at).x > x0 && flat(at).x < x1).length
 }
 
-/** The level of a hero waiting at the first leg's end, and one more each leg on: it joins with powers to choose. */
-const HERO_LEVEL = 2
+/** The level of a hero waiting at the first leg's end, and what each leg on adds: it joins a power behind the squad's lead. */
+const HERO_LEVEL = 3
+const HERO_LEVEL_LEG = 1
 
 /**
  * The journey from `home`: across its own continent to a hero in another of its cities, then on to the nearest
@@ -72,7 +73,7 @@ function plotRoute(run: Run, home: City): Stage[] {
     const hero = leg < MAX_SQUAD - 1 ? draft(run, []) : null
     if (hero) {
       hero.home = to
-      hero.xp = xpFor(HERO_LEVEL + leg)
+      hero.xp = xpFor(HERO_LEVEL + HERO_LEVEL_LEG * leg)
     }
     route.push({ continent, from: from.at, to, hero })
     from = to

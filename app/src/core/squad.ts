@@ -41,12 +41,18 @@ export function total(run: Run, effect: (source: Lasting) => number | undefined)
   return sources.reduce((sum, source) => sum + (effect(source) ?? 0), 0)
 }
 
-/** Skills a soldier knows at most: none at level 1, then one more at each level until it has this many. */
-export const MAX_SKILLS = 5
+/** The levels at which a soldier earns a power: stats grow every level, powers only at these. Tier 3 needs CAPSTONE_PICKS, so five picks reach a tier 4 only by giving the branch all but one. */
+export const PICK_LEVELS = [3, 4, 5, 7, 11]
+
+/** Skills a soldier knows at most. */
+export const MAX_SKILLS = PICK_LEVELS.length
+
+/** Powers a soldier has earned by its level. */
+export const picksEarned = (soldier: { xp: number }) => PICK_LEVELS.filter((at) => at <= level(soldier)).length
 
 /** The skills a soldier chooses the next from, or none if no choice is owed: all its class's tree has unlocked. */
 export function skillOffers(soldier: Soldier): SkillId[] {
-  return !soldier.cls || soldier.skills.length >= Math.min(level(soldier) - 1, MAX_SKILLS) ? [] : unlocked(soldier.cls, soldier.skills)
+  return !soldier.cls || soldier.skills.length >= picksEarned(soldier) ? [] : unlocked(soldier.cls, soldier.skills)
 }
 
 /** The class ability a soldier has learned, if any. */

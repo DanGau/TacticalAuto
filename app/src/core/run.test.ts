@@ -43,7 +43,7 @@ import { soldierStats } from './squad'
 import { health } from './squad'
 import { TRAVEL_HEAL } from './squad'
 import { skillOffers } from './squad'
-import { MAX_SKILLS } from './squad'
+import { MAX_SKILLS, PICK_LEVELS, picksEarned } from './squad'
 import { XP } from './squad'
 import { level } from './squad'
 import { xpFor } from './squad'
@@ -538,13 +538,24 @@ test('each pick owed offers what the tree has unlocked; past the last, levels ad
   const run = begun(1)
   const [soldier] = run.soldiers
   expect(skillOffers(soldier)).toEqual([])
-  soldier.xp = xpFor(MAX_SKILLS + 5)
+  soldier.xp = xpFor(PICK_LEVELS.at(-1)! + 3)
   run.phase = 'reward'
   while (soldier.skills.length < MAX_SKILLS) {
     expect(skillOffers(soldier)).toEqual(unlocked(soldier.cls!, soldier.skills))
     apply(run, { type: 'skill', soldier: soldier.id, index: 0 })
   }
   expect(skillOffers(soldier)).toEqual([])
+})
+
+test('a power comes only at its level: none at level 2, one at the first, none past the last', () => {
+  const [hero] = begun(1).soldiers
+  hero.skills = []
+  hero.xp = xpFor(PICK_LEVELS[0] - 1)
+  expect(skillOffers(hero)).toEqual([])
+  hero.xp = xpFor(PICK_LEVELS[0])
+  expect(skillOffers(hero).length).toBeGreaterThan(0)
+  hero.xp = xpFor(PICK_LEVELS.at(-1)! + 9)
+  expect(picksEarned(hero)).toBe(MAX_SKILLS)
 })
 
 test('a satellite won offers three relics; a relic held changes the run', () => {

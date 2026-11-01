@@ -1,12 +1,12 @@
 import { expect, test } from 'vitest'
 import { CLASSES, type ClassId } from './classes'
 import { begun } from './roads'
-import { MAX_SKILLS, skillOffers, xpFor } from './squad'
+import { MAX_SKILLS, PICK_LEVELS, skillOffers, xpFor } from './squad'
 import { SKILL_EFFECTS } from './skill-effects'
 import { CAPSTONE_PICKS, roots, SKILLS, TREES, unlocked, type SkillId } from './skills'
 
 const classes = Object.keys(CLASSES) as ClassId[]
-const veteran = (cls: ClassId, skills: SkillId[]) => ({ ...begun(1).soldiers[0], cls, skills, xp: xpFor(MAX_SKILLS + 1) })
+const veteran = (cls: ClassId, skills: SkillId[]) => ({ ...begun(1).soldiers[0], cls, skills, xp: xpFor(PICK_LEVELS.at(-1)!) })
 
 test('every skill stands in one tree, every class has 2 or 3 branches of tiers 1 to 4, and each opens with a skill to take', () => {
   const all = classes.flatMap((cls) => TREES[cls].flatMap((b) => b.tiers.flat()))
