@@ -31,7 +31,7 @@ export function equipFind(run: Run, index: number, soldier: Soldier): void {
 export const GEAR_PRICE: Record<Exclude<Rarity, 'common'>, number> = { rare: 5, epic: 8 }
 
 /** Pieces of gear and relics a shop stocks. */
-export const SHOP_WARES = 5
+export const SHOP_WARES = 4
 
 export const SHOP_RELICS = 4
 
@@ -87,9 +87,14 @@ export function buyUtility(run: Run, index: number): void {
   gainUtility(run, item.id)
 }
 
-/** Settles a utility with no room: drops the one held at `drop`, or with -1, the new one. */
+/** Settles a utility with no room: drops the one held at `drop`, or with -1, the new one; one just bought goes back on the shelf, its price repaid. */
 export function keepUtility(run: Run, drop: number): void {
   if (drop >= 0) run.utilities[drop] = run.spare!
+  const bought = run.shop?.utilities.find((item) => item.id === run.spare)
+  if (drop < 0 && bought) {
+    bought.sold = false
+    run.supplies += UTILITY_PRICE
+  }
   run.spare = null
   if (run.phase === 'reward') settle(run)
 }

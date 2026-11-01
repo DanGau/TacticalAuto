@@ -96,8 +96,8 @@ export function skillChoice(run: Run, soldier: Soldier): string {
 /** With a utility found and no room: fixed cards, each held one to drop for it, or the new one left behind. */
 export function spareChoice(run: Run, armed: string | null): string {
   const spare = UTILITIES[run.spare!]
-  const picks = [...run.utilities.map((id, i) => utilityPick(`d${i}`, { type: 'keep', drop: i }, id, 'drop', `Tap again to drop ${UTILITIES[id].name} for ${spare.name}`)), utilityPick('d', { type: 'keep', drop: -1 }, run.spare!, 'leave', `Tap again to leave ${spare.name} behind`)]
-  return modal(`<h2>${spare.icon} ${spare.name} found. ${spare.text}. The party holds three: drop which?</h2><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a card for its details; tap it again to drop it.')}`)
+  const picks = [...run.utilities.map((id, i) => utilityPick(`d${i}`, { type: 'keep', drop: i }, id, 'drop', `Tap again to drop ${UTILITIES[id].name} for ${spare.name}`)), utilityPick('d', { type: 'keep', drop: -1 }, run.spare!, run.shop ? 'put back' : 'leave', run.shop ? `Tap again to put ${spare.name} back, your supplies repaid` : `Tap again to leave ${spare.name} behind`)]
+  return modal(`<h2>${spare.icon} ${spare.name}: ${spare.text}. The party holds three: drop which?</h2><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a card for its details; tap it again to choose it.')}`)
 }
 
 /** The next choice of the reward phase, alone on its screen: a relic, then each find and who takes it, then each skill owed. */

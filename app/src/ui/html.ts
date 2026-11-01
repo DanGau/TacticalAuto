@@ -70,7 +70,9 @@ const STAT_TEXT: Record<keyof Stats, (n: number) => string> = {
 export function gearText(gear: Gear): string {
   const weapon = WEAPONS[gear.weapon]
   const changes = (stats: Partial<Stats>) => (Object.keys(stats) as (keyof Stats)[]).map((key) => STAT_TEXT[key](stats[key]!))
-  const stats = [...changes(weapon.stats), ...changes(gear.stats)]
+  const merged = { ...weapon.stats }
+  for (const key of Object.keys(gear.stats) as (keyof Stats)[]) merged[key] = (merged[key] ?? 0) + gear.stats[key]!
+  const stats = changes(merged)
   return [stats.join(', '), weaponText(weapon), gear.effect ? EFFECTS[gear.effect].text : ''].filter(Boolean).join('. ') + '.'
 }
 

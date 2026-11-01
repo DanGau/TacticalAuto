@@ -12,7 +12,7 @@ import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
 import { SKILLS } from '../core/skills'
 import { health, MAX_SQUAD, skillOffers, soldierStats } from '../core/squad'
-import { RIG, UTILITY_PRICE, type UtilityId } from '../core/utilities'
+import { RIG, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from '../core/utilities'
 import { WEAPONS, type WeaponId } from '../core/weapons'
 import type { Bot } from './bots'
 
@@ -69,7 +69,7 @@ function coverage(run: Run, held: UtilityId[]): number {
 }
 
 /** With a utility to spare, keeps the three that answer the most. */
-function keep(run: Run): Action {
+function keep(run: Run): { type: 'keep'; drop: number } {
   const options = [-1, ...run.utilities.map((_, i) => i)]
   const after = (drop: number) => (drop < 0 ? run.utilities : run.utilities.map((id, i) => (i === drop ? run.spare! : id)))
   return { type: 'keep', drop: options.reduce((best, d) => (coverage(run, after(d)) > coverage(run, after(best)) ? d : best), -1) }
@@ -141,7 +141,7 @@ function shop(run: Run): Action {
   const relic = relics.findIndex((r) => !r.sold && RELIC_PRICE <= run.supplies)
   if (relic >= 0) return { type: 'buy', index: relic }
   const gaps = unanswered(run)
-  const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && gaps.some((c) => CHALLENGES[c].answers.includes(id)))
+  const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && gaps.some((c) => CHALLENGES[c].answers.includes(id)) && (run.utilities.length < UTILITY_SLOTS || keep({ ...run, spare: id }).drop !== -1))
   if (answer >= 0) return { type: 'utility', index: answer }
   for (const [index, { gear, sold }] of wares.entries()) {
     const holder = sold || GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] > run.supplies ? null : holderFor(run, gear)

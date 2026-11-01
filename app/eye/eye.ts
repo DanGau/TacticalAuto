@@ -146,6 +146,8 @@ const commands: Record<string, Command> = {
   async hover(page, x, y) {
     await page.mouse.move(Number(x), Number(y))
   },
+  /** wait <ms>: lets a glide or animation finish. */
+  wait: (page, ms) => page.waitForTimeout(Number(ms)),
   /** screenshot <name>: saves a PNG and returns its path. */
   async screenshot(page, name) {
     const commit = execSync('git rev-parse --short HEAD', { cwd: APP, encoding: 'utf8' }).trim()

@@ -166,8 +166,8 @@ function where(run: Run, stop: Stop): string {
 
 const PURCHASED = '<small class="purchased">Purchased</small>'
 
-/** Everything a shop sells, as cards of one size: gear, relics, utilities, the bribe. */
-function shopPicks(run: Run): Pick[] {
+/** Everything a shop sells, as cards of one size: weapons, relics, then boons and the bribe. */
+function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
   const shop = run.shop!
   const held = squadKeywords(run)
   const poor = (price: number) => (price > run.supplies ? 'Not enough supplies' : null)
@@ -185,18 +185,18 @@ function shopPicks(run: Run): Pick[] {
     }),
   )
   const bribe: Pick = { key: 'b', action: { type: 'bribe' }, look: 'bribe', body: card('bribe', 'Buy off the hunters', `${BRIBE.price} supplies`, shop.bribed), detail: `<p><b>Buy off the hunters.</b> -${BRIBE.threat} threat, once.</p>`, go: `Tap again to pay ${BRIBE.price} supplies`, block: run.threat === 0 ? 'No threat to lower' : poor(BRIBE.price), spent: shop.bribed }
-  return [...gear, ...relics, ...utilities, bribe]
+  return [{ name: 'Weapons', picks: gear }, { name: 'Relics', picks: relics }, { name: 'Boons and favours', picks: [...utilities, bribe] }]
 }
 
 /** A shop: its cards, what the armed one does, and the way out. What is bought keeps its place, greyed out. With `ware` chosen, who takes it, in a pop-up. */
 function shopView(run: Run, armed: string | null, ware: number | null): string {
-  const picks = shopPicks(run)
+  const shelves = shopShelves(run)
+  const picks = shelves.flatMap((shelf) => shelf.picks)
   const held = run.utilities.map((k) => `${UTILITIES[k].icon} ${UTILITIES[k].name}`).join(', ') || 'none'
   const screen = `<h2>A shop. Each piece is one of a kind.</h2>
-    <div class="picks">${picks.map((p) => pickCard(p, ware === null ? armed : null)).join('')}</div>
-    ${pickDetail(picks, ware === null ? armed : null, 'Tap a card for its details; tap it again to buy.')}
-    <p class="kit">Boons ${run.utilities.length}/${UTILITY_SLOTS}: ${held}</p>
-    <button class="travel" data-action='${JSON.stringify({ type: 'leave' })}'>Leave the shop</button>`
+    ${shelves.filter((shelf) => shelf.picks.length > 0).map((shelf) => `<div class="shelf"><small>${shelf.name}</small><div class="picks">${shelf.picks.map((p) => pickCard(p, ware === null ? armed : null)).join('')}</div></div>`).join('')}
+    <div class="shopfoot"><button class="travel" data-action='${JSON.stringify({ type: 'leave' })}'>Leave the shop</button><p class="kit">Boons ${run.utilities.length}/${UTILITY_SLOTS}: ${held}</p></div>
+    ${pickDetail(picks, ware === null ? armed : null, 'Tap a card for its details; tap it again to buy.')}`
   if (ware === null || run.shop!.wares[ware].sold) return screen
   const { gear } = run.shop!.wares[ware]
   const wearers = gearPicks(run, gear, (s) => ({ type: 'gear', index: ware, soldier: s.id }), 'buy it for')

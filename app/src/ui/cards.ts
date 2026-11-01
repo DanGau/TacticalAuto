@@ -4,7 +4,8 @@ import type { Stats } from '../core/battle'
 import type { Gear } from '../core/gear'
 import { SELL } from '../core/rewards'
 import { type Run, type Soldier } from '../core/run-state'
-import { soldierStats } from '../core/squad'
+import { soldierStats, weaponOf } from '../core/squad'
+import { WEAPONS, type Weapon } from '../core/weapons'
 import { UTILITIES, type UtilityId } from '../core/utilities'
 import { badge, describeGear, gearText, STAT_NAMES } from './html'
 
@@ -31,7 +32,7 @@ export interface Pick {
 export function pickCard(pick: Pick, armed: string | null): string {
   const live = !pick.block && !pick.spent
   const action = live && pick.action ? ` data-action='${JSON.stringify(pick.action)}'` : ''
-  return `<button class="pick ${pick.look}${pick.key === armed ? ' armed' : ''}${pick.spent ? ' bought' : ''}" data-arm="${pick.key}"${action}${live && pick.attrs ? ` ${pick.attrs}` : ''}${pick.spent ? ' disabled' : ''}>${pick.body}</button>`
+  return `<button class="pick ${pick.look}${pick.key === armed ? ' armed' : ''}${pick.spent ? ' bought' : ''}${pick.block ? ' blocked' : ''}" data-arm="${pick.key}"${action}${live && pick.attrs ? ` ${pick.attrs}` : ''}${pick.spent ? ' disabled' : ''}>${pick.body}</button>`
 }
 
 /** The strip telling the armed card's details; it keeps its height, so the cards never shift. */
@@ -39,6 +40,10 @@ export function pickDetail(picks: Pick[], armed: string | null, idle: string): s
   const pick = picks.find((p) => p.key === armed && !p.spent)
   return `<div class="detail">${pick ? `${pick.detail}<small class="${pick.block ? 'up' : 'supplies'}">${pick.block ?? pick.go}</small>` : `<small>${idle}</small>`}</div>`
 }
+
+/** A weapon's attack with `damage`: its hits a turn by what each does, and those summed. */
+const attack = ({ attack: { shots, power } }: Weapon, damage: number) => `${shots}×${Math.round(10 * power * damage) / 10}`
+const blow = ({ attack: { shots, power } }: Weapon, damage: number) => shots * power * damage
 
 const percent = new Set<keyof Stats>(['crit'])
 const show = (key: keyof Stats, n: number) => (percent.has(key) ? `${Math.round(100 * n)}%` : `${n}`)
@@ -55,7 +60,12 @@ export function gearPicks(run: Run, gear: Gear, action: (soldier: Soldier) => Ac
     const old = soldier.gear
     const now = soldierStats(run, soldier)
     const then = soldierStats(run, { ...soldier, gear })
-    const rows = (Object.keys(now) as (keyof Stats)[]).filter((key) => now[key] !== then[key]).map((key) => `<tr><td>${STAT_NAMES[key]}</td><td>${show(key, now[key])}</td><td>→</td><td class="${then[key] > now[key] ? 'down' : 'up'}">${show(key, then[key])}</td></tr>`)
+    const row = (name: string, before: string, after: string, better: boolean) => `<tr><td>${name}</td><td>${before}</td><td>→</td><td class="${before === after ? '' : better ? 'down' : 'up'}">${after}</td></tr>`
+    const [was, will] = [weaponOf(soldier), WEAPONS[gear.weapon]]
+    const rows = [
+      row('Attack', was ? attack(was, now.damage) : '–', attack(will, then.damage), !was || blow(will, then.damage) > blow(was, now.damage)),
+      ...(Object.keys(now) as (keyof Stats)[]).filter((key) => now[key] !== then[key]).map((key) => row(STAT_NAMES[key], show(key, now[key]), show(key, then[key]), then[key] > now[key])),
+    ]
     return {
       key: `s${soldier.id}`,
       action: action(soldier),
@@ -63,7 +73,7 @@ export function gearPicks(run: Run, gear: Gear, action: (soldier: Soldier) => Ac
       body: `<span class="who"><span class="portrait">${badge(soldier.cls)}</span><b>${soldier.name}</b></span>
         <small class="was">Now: ${named(old)}</small>
         <small class="will">New: ${named(gear)}</small>
-        <table class="stats">${rows.join('') || '<tr><td>Stats unchanged</td></tr>'}</table>`,
+        <table class="stats">${rows.join('')}</table>`,
       detail: `<p><b>Now.</b> ${old ? `${named(old)}: ${gearText(old)}` : 'Empty hands.'}</p><p><b>New.</b> ${named(gear)}: ${describeGear(gear)}</p>`,
       go: `Tap again to ${verb} ${soldier.name}${old ? `, selling ${old.name} for ${SELL[old.rarity]}` : ''}`,
       block,

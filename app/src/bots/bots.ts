@@ -2,7 +2,7 @@
 import type { Action } from '../core/apply'
 import { strategic } from './strategic'
 import { fuelTanks } from '../core/objects'
-import { UTILITY_PRICE } from '../core/utilities'
+import { UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
 import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
@@ -88,7 +88,7 @@ const affordable = (run: Run): Action[] => [
     return GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] <= run.supplies && soldier !== null ? [{ type: 'gear', index, soldier }] : []
   }),
   ...run.shop!.relics.flatMap((relic, index): Action[] => (!relic.sold && RELIC_PRICE <= run.supplies ? [{ type: 'buy', index }] : [])),
-  ...run.shop!.utilities.flatMap((item, index): Action[] => (!item.sold && !run.utilities.includes(item.id) && UTILITY_PRICE <= run.supplies ? [{ type: 'utility', index }] : [])),
+  ...run.shop!.utilities.flatMap((item, index): Action[] => (!item.sold && !run.utilities.includes(item.id) && run.utilities.length < UTILITY_SLOTS && UTILITY_PRICE <= run.supplies ? [{ type: 'utility', index }] : [])),
 ]
 
 /** Goes in with the first utility held that can be used here; a rigged tank on the first tank. */

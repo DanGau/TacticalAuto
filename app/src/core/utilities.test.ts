@@ -3,11 +3,12 @@ import { apply } from './apply'
 import { isSoldier } from './battle'
 import { endBattle } from './debrief'
 import { fuelTanks } from './objects'
+import { stockShop } from './rewards'
 import { begun, road } from './roads'
 import { type Run } from './run-state'
 import { drawBattle } from './missions'
 import { stepBattle } from './combat'
-import { OVERCHARGE, RIG, SMOKE, STUN_TURNS, THRUST, UTILITY_SLOTS, type UtilityId } from './utilities'
+import { OVERCHARGE, RIG, SMOKE, STUN_TURNS, THRUST, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
 
 /** A run at a battle's deploy screen, holding `held`. */
 function landing(held: UtilityId[], seed = 1): Run {
@@ -127,4 +128,18 @@ test('a utility found with three held forces a choice of which to drop', () => {
   apply(run, { type: 'keep', drop: 1 })
   expect(run.utilities).toEqual(['hover', found, 'crack'])
   expect(run.spare).toBeNull()
+})
+
+test('a boon bought with no room and put back returns to the shelf, its price repaid', () => {
+  const run = begun(1)
+  run.phase = 'shop'
+  run.shop = stockShop(run)
+  run.utilities = UTILITY_IDS.filter((id) => !run.shop!.utilities.some((item) => item.id === id)).slice(0, UTILITY_SLOTS)
+  run.supplies = UTILITY_PRICE
+  apply(run, { type: 'utility', index: 0 })
+  expect(run.spare).toBe(run.shop.utilities[0].id)
+  apply(run, { type: 'keep', drop: -1 })
+  expect(run.spare).toBeNull()
+  expect(run.supplies).toBe(UTILITY_PRICE)
+  expect(run.shop.utilities[0].sold).toBe(false)
 })
