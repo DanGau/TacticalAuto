@@ -128,7 +128,9 @@ export const flightSize = (w: number, h: number) => ({ w, h, top: 70, bottom: 70
 /** The run as a globe, the flight map pinned on it. */
 function runMap(run: Run, picked: number | null): string {
   const { pins, focus, path } = flight(run, picked)
-  return `${squadStrip(run)}<div class="map flight">${globe(flightSize(innerWidth, innerHeight), run, pins, focus, path, picked !== null)}</div>`
+  // The panel is zoomed by --ui, so the window in its own pixels is that much larger.
+  const ui = Number(getComputedStyle(document.documentElement).getPropertyValue('--ui')) || 1
+  return `${squadStrip(run)}<div class="map flight">${globe(flightSize(innerWidth / ui, innerHeight / ui), run, pins, focus, path, picked !== null)}</div>`
 }
 
 /** The squad at a glance over the map: each soldier's badge over a health bar, red at half or less. */

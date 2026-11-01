@@ -109,7 +109,29 @@ export function framing(points: Tile[], yaw = YAW, margin = MARGIN): Camera {
   const height = Math.max(...ys) - Math.min(...ys) + margin
   const middle = { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 }
   const ground = points.reduce((sum, p) => sum + spot(p.x, p.y).y, 0) / points.length
-  return aim(middle, Math.max(FIT, Math.min(1, WIDTH / width, HEIGHT / height)), yaw, ground)
+  return aim(middle, Math.max(FIT, Math.min(closest(), ...seen(width, height))), yaw, ground)
+}
+
+/** The picture's size on this screen: a tall one shows more than HEIGHT of it, a wide one more than WIDTH. */
+const screen = () => {
+  const s = Math.min(innerWidth / WIDTH, innerHeight / HEIGHT)
+  return { w: innerWidth / s, h: innerHeight / s }
+}
+
+/** The closest a shot comes: a phone, its picture scaled down to fit, comes closer so units still read. */
+const closest = () => Math.max(1, 0.7 / Math.min(innerWidth / WIDTH, innerHeight / HEIGHT))
+
+/** The zoom that fits a `width` by `height` of picture on the screen. */
+const seen = (width: number, height: number) => [screen().w / width, screen().h / height]
+
+/** Of the four quarter turns from `yaw`, the one `points` fill the screen best at. */
+export function bestTurn(points: Tile[], yaw: number): number {
+  const zoom = (y: number) => {
+    const at = points.map((p) => picture(spot(p.x, p.y), y))
+    const span = (v: number[]) => Math.max(...v) - Math.min(...v) + MARGIN
+    return Math.min(...seen(span(at.map((p) => p.x)), span(at.map((p) => p.y))))
+  }
+  return [yaw, yaw + Math.PI / 2, yaw - Math.PI / 2, yaw + Math.PI].reduce((a, b) => (zoom(b) > zoom(a) * 1.05 ? b : a))
 }
 
 /**

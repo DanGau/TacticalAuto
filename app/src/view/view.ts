@@ -6,7 +6,7 @@ import { effectName } from '../core/effects'
 import { overlaps, staggerOf } from '../core/pace'
 import type { Run } from '../core/run-state'
 import { drawTerrain } from './board'
-import { axes, clamped, DECAL_LIFT, framing, setHeights, spot, STILL_FOV, WIDTH, type Camera, type Shot } from './camera'
+import { axes, bestTurn, clamped, DECAL_LIFT, framing, setHeights, spot, STILL_FOV, WIDTH, type Camera, type Shot } from './camera'
 import { callout, chest, effectCallout, shotCallout } from './effects'
 import { drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
@@ -105,7 +105,9 @@ export async function createView(): Promise<View> {
    * is in play. A subject on a third is set off the centre, the screen's other two thirds left open before it.
    */
   function above(tiles: Tile[] | null, shot: Shot = {}): Camera {
-    const yaw = YAW + (shot.turn ?? 0)
+    const deploying = tiles === null && s.shown?.phase === 'deploy'
+    // A tall screen shows the fight down its length, so it turns the map to lie that way.
+    const yaw = deploying && innerHeight > innerWidth ? bestTurn([...(s.shown!.entry ? [s.shown!.entry] : []), ...s.shown!.units.filter((u) => u.side === 'alien')], YAW) : YAW + (shot.turn ?? 0)
     const framed = tiles === null ? inPlay(yaw) : framing(tiles, yaw)
     const { up, right } = axes(yaw)
     const lift = -(tiles === null ? PANEL / 2 : PANEL) / framed.zoom / ACROSS
