@@ -18,11 +18,12 @@ Architecture rules: [docs/architecture/CLAUDE.md](docs/architecture/CLAUDE.md). 
 
 Run in `app/`.
 
-- `npm run check` — lint, typecheck, tests, and a sim batch.
+- `npm run check` — lint, typecheck, tests, and sim batches: no battle stuck, and the strategic bot can win runs.
 - `npm run -s sim -- --runs=500 --bot=random` — bots play runs in Node and print a report.
 - `npm run -s sim -- --runs=100 --bot=all --doctrine=blades` — the same, the squad holding a doctrine from the start.
-- `npm run -s sim -- --runs=100 --bot=all` — every bot strategy on the same seeds, ranked, with warnings for win rates outside the balance bands in `app/src/sim/report.ts`.
-- `npm run -s tune -- --rounds=10 --threads=8` — hill-climbs the numbers in `app/src/core/tuning.ts` toward those bands, and rewrites the file if held-out seeds confirm the gain.
+- `npm run -s sim -- --runs=100 --bot=all` — every bot strategy on the same seeds, ranked.
+- `npm run -s sim -- --runs=100 --bot=strategic --diagnose` — battles by challenge and answer, saying of what is off whether the game or the bot is at fault.
+- `npm run -s tsx -- src/sim/encounter.ts --runs=30` — the challenge lab: each challenge by party, rung and utility.
 - `npm run test -- <files>`, `npm run tsx -- <script>` — run tests or a script under a deadline that kills it if it hangs. A hook blocks running `vitest` or `tsx` directly.
 - `npm run -s eye -- <command>` — play and screenshot the game in a headless browser. Commands: `app/eye/eye.ts`. One server and browser serve all worktrees; `eye -- stop` ends them.
 - `npm run dev` — serve the game for a human. Each push to `main` also deploys it to https://dangau.github.io/TacticalAuto/.

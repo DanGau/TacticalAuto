@@ -7,10 +7,21 @@ import { type Mission } from '../core/run-state'
 import { health } from '../core/squad'
 import { timedFlow } from '../core/step'
 import type { DoctrineId } from '../core/doctrines'
+import { CHALLENGES, type ChallengeId } from '../core/challenges'
+import type { Goal } from '../core/goals'
+import type { UtilityId } from '../core/utilities'
 
-/** A battle's toll: the leg it was on, the squad's most health, its health at the start and end, and soldiers downed. */
+/** Whether a party met a challenge with an answer it picked, with one it held and left behind, or with none. */
+export type Answer = 'picked' | 'held' | 'none'
+
+/** A battle's toll: the leg it was on, the squad's most health, its health at the start and end, soldiers downed, whether it was won, and what it tested. */
 export interface Toll {
   leg: number
+  party: number
+  won: boolean
+  goal: Goal
+  challenge: ChallengeId | null
+  answer: Answer
   most: number
   before: number
   after: number
@@ -35,6 +46,13 @@ export interface RunResult {
   actions: Action[]
 }
 
+/** How the party met the battle's challenge, given the utilities it held going in. */
+function answerOf(battle: NonNullable<Run['battle']>, held: UtilityId[]): Answer {
+  const answers: UtilityId[] = battle.challenge ? CHALLENGES[battle.challenge].answers : []
+  if (battle.utility && answers.includes(battle.utility)) return 'picked'
+  return answers.some((id) => held.includes(id)) ? 'held' : 'none'
+}
+
 /** More player actions than any run takes: a run past it is stuck, and fails instead of hanging. */
 const MAX_ACTIONS = 10000
 
@@ -46,11 +64,11 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
   run.doctrines.push(...doctrines)
   const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], tolls: [], actions: [] }
   let clock = { next: 0, done: 0 }
-  /** The battle under way, its leg, and the squad's health as it began. */
-  let begun: [Run['battle'], number, number] = [null, 0, 0]
+  /** The battle under way, its leg, the squad's health as it began, and the utilities it held. */
+  let begun: [Run['battle'], number, number, UtilityId[]] = [null, 0, 0, []]
   while (run.phase !== 'won' && run.phase !== 'lost') {
     const battle = run.battle
-    if (run.phase === 'battle' && begun[0] !== battle) begun = [battle, run.keys, run.soldiers.reduce((sum, s) => sum + health(run, s), 0)]
+    if (run.phase === 'battle' && begun[0] !== battle) begun = [battle, run.keys, run.soldiers.reduce((sum, s) => sum + health(run, s), 0), [...run.utilities]]
     if (run.phase === 'battle' && battle!.phase === 'battle') {
       const played = timedFlow(run, clock)
       clock = played.clock
@@ -60,7 +78,7 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
         const fought = run.report!.soldiers
-        result.tolls.push({ leg: begun[1], most: fought.reduce((sum, s) => sum + s.maxHp, 0), before: begun[2], after: fought.reduce((sum, s) => sum + s.hp, 0), downed: battle!.downed.length })
+        result.tolls.push({ leg: begun[1], party: fought.length, won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3]), most: fought.reduce((sum, s) => sum + s.maxHp, 0), before: begun[2], after: fought.reduce((sum, s) => sum + s.hp, 0), downed: battle!.downed.length })
         clock = { next: 0, done: 0 }
       }
       continue

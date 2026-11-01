@@ -1,5 +1,6 @@
 // Bots: each chooses the next action whenever the run waits for the player.
 import type { Action } from '../core/apply'
+import { strategic } from './strategic'
 import { fuelTanks } from '../core/objects'
 import { UTILITY_PRICE } from '../core/utilities'
 import type { Keyword } from '../core/keywords'
@@ -181,4 +182,5 @@ export const bots: Record<string, Bot> = {
   growing: play({ risk: growing, pick: 'first', build: true, events: 'cautious' }),
   synergy: play({ risk: 'standard', pick: 'synergy', build: true, events: 'cautious' }),
   expert: play({ risk: growing, pick: 'synergy', build: true, events: 'cautious' }),
+  strategic,
 }

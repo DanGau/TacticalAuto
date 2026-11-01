@@ -2,9 +2,8 @@
 import { parseArgs } from 'node:util'
 import { bots } from '../bots/bots'
 import { DOCTRINES, type DoctrineId } from '../core/doctrines'
-import { TUNING } from '../core/tuning'
-import { playAll, winRates } from './pool'
-import { compare, formatReport, report } from './report'
+import { playAll } from './pool'
+import { formatDiagnosis, formatReport, ranked, report, rows, STRATEGIC_FLOOR } from './report'
 
 const { values } = parseArgs({
   options: {
@@ -13,21 +12,31 @@ const { values } = parseArgs({
     bot: { type: 'string', default: 'standard' },
     /** Doctrines, comma-separated, the squad holds from the start of every run. */
     doctrine: { type: 'string', default: '' },
+    /** Print battles by challenge and answer, and whose fault what is off is. */
+    diagnose: { type: 'boolean', default: false },
+    /** Fail if the strategic bot wins fewer runs than STRATEGIC_FLOOR. */
+    floor: { type: 'boolean', default: false },
     json: { type: 'boolean', default: false },
   },
 })
 
+const runs = Number(values.runs)
 const start = Number(values['seed-start'])
 const doctrines = values.doctrine.split(',').filter(Boolean) as DoctrineId[]
 for (const id of doctrines) if (!(id in DOCTRINES)) throw new Error(`unknown doctrine "${id}"; choose from ${Object.keys(DOCTRINES).join(', ')}`)
 
 if (values.bot === 'all') {
-  // Every bot on the same seeds, against the win-rate bands.
-  const { table, warnings } = compare(await winRates(Object.keys(bots), Number(values.runs), start, TUNING, { doctrines }))
-  console.log([table, ...warnings.map((w) => `WARN ${w}`)].join('\n'))
+  // Every bot on the same seeds.
+  const names = Object.keys(bots)
+  const played = await playAll(names, runs, start, { doctrines })
+  console.log(ranked(Object.fromEntries(names.map((bot) => [bot, played[bot].filter((r) => r.won).length / runs]))))
+  if (values.diagnose) for (const bot of ['standard', 'strategic']) console.log(`\n${formatDiagnosis(bot, rows(played[bot]))}`)
 } else {
   if (!bots[values.bot]) throw new Error(`unknown bot "${values.bot}"; choose from all, ${Object.keys(bots).join(', ')}`)
-  const summary = report((await playAll([values.bot], Number(values.runs), start, TUNING, { doctrines }))[values.bot])
+  const results = (await playAll([values.bot], runs, start, { doctrines }))[values.bot]
+  const summary = report(results)
+  if (values.floor && summary.wins / summary.runs < STRATEGIC_FLOOR) summary.failures.push(`the strategic bot won ${summary.wins} of ${summary.runs}, under its floor of ${Math.round(100 * STRATEGIC_FLOOR)}%: the game has become unwinnable, or the bot has broken`)
   console.log(values.json ? JSON.stringify(summary) : formatReport(summary))
+  if (values.diagnose) console.log(`\n${formatDiagnosis(values.bot, rows(results))}`)
   if (summary.failures.length > 0) process.exitCode = 1
 }

@@ -6,10 +6,7 @@ import { availableParallelism, freemem, tmpdir, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DoctrineId } from '../core/doctrines'
-import type { TUNING } from '../core/tuning'
 import type { RunResult } from './run'
-
-export type Tuning = typeof TUNING
 
 /** worker.ts bundled once into plain JavaScript, so sim processes start without tsx. */
 const BUNDLE = (() => {
@@ -39,19 +36,13 @@ interface PoolOptions {
   memoryMb?: number
 }
 
-/** Each bot's win rate over `runs` seeds from `start`, with `tuning` in place. */
-export async function winRates(bots: string[], runs: number, start: number, tuning: Tuning, options: PoolOptions = {}): Promise<Record<string, number>> {
-  const played = await playAll(bots, runs, start, tuning, options)
-  return Object.fromEntries(bots.map((bot) => [bot, played[bot].filter((r) => r.won).length / runs]))
-}
-
 /**
- * Each bot's runs, by seed, over `runs` seeds from `start`, with `tuning` in place, played on up to `threads` child
+ * Each bot's runs, by seed, over `runs` seeds from `start`, played on up to `threads` child
  * processes. Results come back without their actions.
  * Under memory pressure the pool retires processes down to one and grows back once it eases; a process that dies has
  * its batch retried on a fresh one.
  */
-export async function playAll(bots: string[], runs: number, start: number, tuning: Tuning, options: PoolOptions = {}): Promise<Record<string, RunResult[]>> {
+export async function playAll(bots: string[], runs: number, start: number, options: PoolOptions = {}): Promise<Record<string, RunResult[]>> {
   const { threads = availableParallelism() - 1, doctrines = [], memoryMb = (totalmem() / MB) * 0.6 } = options
   const jobs = bots.flatMap((bot) => Array.from({ length: runs }, (_, i) => ({ bot, seed: start + i })))
   // Fewer seeds a batch when there are too few to keep every process busy.
@@ -89,7 +80,7 @@ export async function playAll(bots: string[], runs: number, start: number, tunin
       // Maglev can crash a CPU-starved process (nodejs/node#64841); without it the sim runs as fast.
       const proc = fork(BUNDLE, { execArgv: [`--max-old-space-size=${HEAP_MB}`, '--no-maglev'], stdio: ['ignore', 'inherit', 'inherit', 'ipc'] })
       procs.set(proc, { rss: 0 })
-      proc.send({ tuning, doctrines })
+      proc.send({ doctrines })
       proc.on('message', (m: { ready: true } | { id: number; played: typeof played; rss: number }) => {
         if (failed) return
         if ('ready' in m) return give(proc)

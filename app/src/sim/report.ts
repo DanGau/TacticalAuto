@@ -1,7 +1,7 @@
-// Turns run results into a report, with its balance bands and warnings.
-import type { Goal } from '../core/goals'
+// Turns run results into a report, and says of what is off whether the game or the bot is at fault.
+import { CHALLENGES, type ChallengeId } from '../core/challenges'
 import { KEYS } from '../core/run'
-import type { RunResult, Toll } from './run'
+import type { Answer, RunResult, Toll } from './run'
 
 export interface Report {
   runs: number
@@ -20,7 +20,7 @@ export interface Report {
   attrition: { lost: number; hp: number; points: number; downed: number; worn: number; legs: number[] }
   /** Battles past MAX_BATTLE_SECONDS, which the report warns of without failing. */
   warnings: string[]
-  /** Failed health thresholds. Any entry fails the batch. */
+  /** What fails the batch: battles stuck at the beat limit. */
   failures: string[]
 }
 
@@ -84,57 +84,63 @@ export function formatReport(r: Report): string {
   ].join('\n')
 }
 
+/** Each bot's win rate on the same seeds, best first. */
+export const ranked = (rates: Record<string, number>) => Object.entries(rates).sort((a, b) => b[1] - a[1]).map(([name, rate]) => `${name.padEnd(12)}${`${Math.round(100 * rate)}%`.padStart(5)}`).join('\n')
+
+/** One row of the diagnosis: how battles of a challenge went, by whether the party met it with an answer. */
+export interface Row {
+  challenge: ChallengeId
+  party: number
+  answer: Answer
+  battles: number
+  won: number
+  /** Health lost, as a share of the party's most, in percent. */
+  lost: number
+}
+
+/** Battles of each challenge, by party size and answer. */
+export function rows(results: RunResult[]): Row[] {
+  const tolls = results.flatMap((r) => r.tolls)
+  return (Object.keys(CHALLENGES) as ChallengeId[]).flatMap((challenge) =>
+    [1, 2, 3].flatMap((party) => (['picked', 'held', 'none'] as const).flatMap((answer): Row[] => {
+      const of = tolls.filter((t) => t.challenge === challenge && t.party === party && t.answer === answer)
+      if (of.length === 0) return []
+      return [{ challenge, party, answer, battles: of.length, won: Math.round((100 * of.filter((t) => t.won).length) / of.length), lost: Math.round((100 * of.reduce((sum, t) => sum + (t.before - t.after) / t.most, 0)) / of.length) }]
+    })),
+  )
+}
+
+/** Battles needed before a row is read at all. */
+const READ_FROM = 10
+/** Wins with the answer picked below which a challenge is too hard; wins and health lost without one above and below which a mismatch is too cheap. */
+const HARD = 70
+const CHEAP = { won: 95, lost: 20 }
+
 /**
- * Win-rate bands a healthy game sits in, after roguelikes like Slay the Spire: random play rarely wins but can,
- * the baseline wins about half its runs, the best play still loses some, good choices clearly beat random ones,
- * and building around keywords beats taking the first offer.
+ * What each row says. Won with the answer: the encounter is fine. Lost with it: the encounter is too hard, the game's
+ * fault. Held the answer and went in without it: the bot's fault. No answer held: what a mismatch costs, the game's
+ * if it costs too little; how often it happened is the bot's route and keeping, or the shops' luck.
  */
-const BANDS = { floor: [0.03, 0.25], baseline: [0.35, 0.6], ceiling: [0, 0.85], gap: 0.25, payoff: 0.05 } as const
-
-/** A mission played alone by the encounter sim: a goal, or an extraction or the final mission. */
-export type Encounter = Goal | 'key' | 'final'
-export type Squad = 'weak' | 'strong'
-
-/**
- * Win rates each mission played alone should land in at every leg, for a weak squad (the levels a careless run
- * reaches, no gear) and a strong one (levelled, geared, a relic a leg): a strong squad rampages, a weak one can
- * lose anywhere, so a run that falls behind must route around danger.
- */
-export const ENCOUNTER_BANDS: Record<Encounter, Record<Squad, readonly [number, number]>> = {
-  exterminate: { weak: [0.5, 0.85], strong: [0.9, 1] },
-  assassinate: { weak: [0.4, 0.85], strong: [0.85, 1] },
-  hold: { weak: [0.3, 0.75], strong: [0.8, 1] },
-  rescue: { weak: [0.2, 0.6], strong: [0.85, 1] },
-  vip: { weak: [0.3, 0.75], strong: [0.8, 1] },
-  raid: { weak: [0.5, 0.9], strong: [0.9, 1] },
-  ambush: { weak: [0.3, 0.75], strong: [0.75, 1] },
-  recover: { weak: [0.3, 0.75], strong: [0.8, 1] },
-  key: { weak: [0.3, 0.75], strong: [0.8, 1] },
-  final: { weak: [0.1, 0.5], strong: [0.6, 0.95] },
+export function verdicts(of: Row[]): string[] {
+  const found: string[] = []
+  for (const row of of) {
+    const name = `${CHALLENGES[row.challenge].name} (party of ${row.party})`
+    if (row.answer === 'held') found.push(`BOT: held an answer to ${name} and went in without it, ${row.battles} times`)
+    if (row.battles < READ_FROM) continue
+    if (row.answer === 'picked' && row.won < HARD) found.push(`GAME: ${name} too hard even with its answer: won ${row.won}% of ${row.battles}`)
+    if (row.answer === 'none' && row.won >= CHEAP.won && row.lost < CHEAP.lost) found.push(`GAME: a mismatch on ${name} costs too little: won ${row.won}%, lost ${row.lost}% health`)
+    const none = of.find((r) => r.challenge === row.challenge && r.party === row.party && r.answer === 'none')
+    if (row.answer === 'picked' && none && none.battles >= READ_FROM && row.lost >= none.lost && row.won <= none.won) found.push(`GAME: the answer to ${name} does not answer it: lost ${row.lost}% health with, ${none.lost}% without`)
+  }
+  return found
 }
 
-/** Each band a set of win rates breaks, with how far outside it they fall. */
-function breaches(rates: Record<string, number>): { by: number; text: string }[] {
-  const pct = (n: number) => `${Math.round(100 * n)}%`
-  const [top, topRate] = Object.entries(rates).sort((a, b) => b[1] - a[1])[0]
-  const outside = (name: string, rate: number, [low, high]: readonly [number, number]) =>
-    rate < low || rate > high ? [{ by: Math.max(low - rate, rate - high), text: `${name} wins ${pct(rate)}, outside ${pct(low)}–${pct(high)}` }] : []
-  const short = (by: number, text: string) => (by > 0 ? [{ by, text }] : [])
-  return [
-    ...outside('random (floor)', rates.random, BANDS.floor),
-    ...outside('standard (baseline)', rates.standard, BANDS.baseline),
-    ...outside(`${top} (ceiling)`, topRate, BANDS.ceiling),
-    ...short(BANDS.gap - (topRate - rates.random), `the best play beats random by only ${pct(topRate - rates.random)}; choices matter too little`),
-    ...short(BANDS.payoff - (rates.synergy - rates.standard), `synergy beats standard by only ${pct(rates.synergy - rates.standard)}; keyword builds pay too little`),
-  ]
+export function formatDiagnosis(bot: string, of: Row[]): string {
+  const head = `${bot}: challenge, party, answer, battles, won, health lost`
+  const lines = of.map((r) => `${CHALLENGES[r.challenge].name.padEnd(14)}${r.party}  ${r.answer.padEnd(9)}${String(r.battles).padStart(7)}${`${r.won}%`.padStart(6)}${`${r.lost}%`.padStart(13)}`)
+  const found = verdicts(of)
+  return [head, ...lines, ...(found.length > 0 ? found : ['nothing off'])].join('\n')
 }
 
-/** How far, in total, a set of win rates falls outside the bands: 0 when it breaks none. */
-export const offBand = (rates: Record<string, number>) => breaches(rates).reduce((sum, m) => sum + m.by, 0)
-
-/** Each bot's win rate on the same seeds, best first, and the bands they break. */
-export function compare(rates: Record<string, number>): { table: string; warnings: string[] } {
-  const ranked = Object.entries(rates).sort((a, b) => b[1] - a[1])
-  const table = ranked.map(([name, rate]) => `${name.padEnd(12)}${`${Math.round(100 * rate)}%`.padStart(5)}`).join('\n')
-  return { table, warnings: breaches(rates).map((m) => m.text) }
-}
+/** Wins the strategic bot must reach for `npm run check` to pass: that good choices can win runs, not a target for balance. */
+export const STRATEGIC_FLOOR = 0.05

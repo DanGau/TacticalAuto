@@ -9,17 +9,17 @@ import type { UtilityId } from './utilities'
 export type ChallengeId = 'slog' | 'firingLine' | 'ironWall' | 'swarm' | 'scattered' | 'bigOne' | 'killBox'
 
 /**
- * `answers`: the utilities that meet it. `volley`: every alien fires from the start, across the ground it holds.
+ * `answers`: the utilities that meet it, best first. `volley`: every alien fires from the start, across the ground it holds.
  * `grim`: the alien force, by party size less one and then by rung, each rung harder.
  */
 export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test: string; answers: UtilityId[]; volley?: true; grim: number[][] }> = {
-  slog: { name: 'Slog', icon: '🌿', test: 'Shooters behind a band of mire that takes three times the move to cross', answers: ['hover', 'thrusters', 'rangedShield'], volley: true, grim: [[2, 3, 4], [5, 6, 8], [7, 9, 11]] },
-  firingLine: { name: 'Firing line', icon: '🎯', test: 'Long-range shooters along a ridge, firing from the moment the squad lands', answers: ['rangedShield', 'smoke'], volley: true, grim: [[2, 3, 4], [5, 7, 9], [8, 10, 12]] },
-  ironWall: { name: 'Iron wall', icon: '🧱', test: 'Heavily armored aliens that shrug off small hits', answers: ['crack', 'overcharge'], grim: [[2, 3, 5], [6, 9, 12], [10, 13, 16]] },
-  swarm: { name: 'Swarm', icon: '🐜', test: 'Bodies flood in from every side, and keep coming', answers: ['meleeShield', 'tank'], grim: [[6, 10, 14], [20, 26, 32], [28, 34, 40]] },
-  scattered: { name: 'Scattered', icon: '🗺️', test: 'Sentries spread far apart: clear them before the clock runs out and reinforcements pour in', answers: ['thrusters'], grim: [[5, 8, 11], [14, 19, 24], [18, 22, 26]] },
-  bigOne: { name: 'Big one', icon: '👹', test: 'One huge, armored alien and its escort', answers: ['overcharge', 'crack'], grim: [[1, 1, 2], [3, 5, 6], [5, 7, 9]] },
-  killBox: { name: 'Kill box', icon: '💥', test: 'The way in lands right beside a packed cluster that hits first', answers: ['flashbang', 'meleeShield', 'smoke'], grim: [[3, 5, 7], [10, 13, 17], [15, 20, 25]] },
+  slog: { name: 'Slog', icon: '🌿', test: 'Shooters behind a band of mire that takes three times the move to cross', answers: ['hover', 'rangedShield', 'thrusters'], volley: true, grim: [[2, 3, 4], [3, 4, 6], [5, 7, 8]] },
+  firingLine: { name: 'Firing line', icon: '🎯', test: 'Long-range shooters along a ridge, firing from the moment the squad lands', answers: ['smoke', 'rangedShield'], volley: true, grim: [[2, 3, 4], [3, 5, 6], [6, 7, 9]] },
+  ironWall: { name: 'Iron wall', icon: '🧱', test: 'Heavily armored aliens that shrug off small hits', answers: ['crack', 'overcharge'], grim: [[2, 3, 4], [4, 6, 8], [7, 9, 11]] },
+  swarm: { name: 'Swarm', icon: '🐜', test: 'Bodies flood in from every side, and keep coming', answers: ['meleeShield', 'tank'], grim: [[6, 10, 14], [14, 18, 22], [20, 24, 30]] },
+  scattered: { name: 'Scattered', icon: '🗺️', test: 'Sentries spread far apart: clear them before the clock runs out and reinforcements pour in', answers: ['thrusters'], grim: [[5, 8, 11], [10, 13, 16], [13, 16, 20]] },
+  bigOne: { name: 'Big one', icon: '👹', test: 'One huge, armored alien and its escort', answers: ['overcharge', 'crack'], grim: [[1, 1, 2], [2, 3, 4], [3, 5, 6]] },
+  killBox: { name: 'Kill box', icon: '💥', test: 'The way in lands right beside a packed cluster that hits first', answers: ['flashbang', 'smoke', 'meleeShield'], grim: [[3, 5, 7], [7, 9, 12], [10, 14, 18]] },
 }
 
 /** The challenges a party meets, by its size less one and the rung of the leg: harder ones arrive up each tier. */
@@ -53,7 +53,7 @@ const FORCES: Record<ChallengeId, AlienKind[]> = {
   ironWall: ['trooper', 'trooper', 'brute'],
   swarm: ['swarmling', 'swarmling', 'swarmling', 'burster', 'swarmling', 'brute'],
   scattered: ['trooper'],
-  bigOne: ['brute', 'trooper'],
+  bigOne: ['trooper', 'brute'],
   killBox: ['brute', 'trooper', 'brute'],
 }
 
@@ -71,13 +71,13 @@ export function forceOf(id: ChallengeId, party: number, rung: number, more: numb
 export const STIFFEN: Partial<Record<ChallengeId, { range?: number; armor?: number[] }>> = {
   slog: { range: 3 },
   firingLine: { range: 4 },
-  ironWall: { armor: [4, 8, 10] },
+  ironWall: { armor: [3, 8, 10] },
 }
 
 /** A big one's boss: its health over a soldier's base, its armor and its damage, by party size less one and rung. */
 export function bigOneStats(party: number, rung: number, base: Stats): Stats {
   const size = Math.min(party, 3) - 1
-  return { ...base, hp: [12, 60, 110][size] + [4, 10, 15][size] * rung, armor: [5, 25, 50][size] + [2, 4, 5][size] * rung, damage: base.damage + 2 * size + 1 + rung }
+  return { ...base, hp: [8, 35, 60][size] + [2, 7, 10][size] * rung, armor: [3, 14, 28][size] + [1, 3, 4][size] * rung, damage: base.damage + 2 * size + Math.floor(rung / 2) }
 }
 
 /** Of a Scattered's force of `count`, the sentries posted; the rest are the reinforcements. */

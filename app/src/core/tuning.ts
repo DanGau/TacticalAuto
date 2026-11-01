@@ -1,5 +1,4 @@
-// Balance numbers the tuner climbs; it rewrites this file.
-/** Balance numbers `npm run tune` climbs toward the win-rate bands in sim/report.ts. It rewrites this file. */
+// Balance numbers.
 export const TUNING = {
   /** Every alien's health, as a multiple of its kind's. */
   alienHp: 0.3,
