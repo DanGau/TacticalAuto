@@ -10,7 +10,7 @@ import { THREAT_MAX } from '../core/progress'
 import { GEAR_PRICE } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
-import { SKILLS, TREES } from '../core/skills'
+import { SKILLS, TREES, type SkillId } from '../core/skills'
 import { health, MAX_SQUAD, skillOffers, soldierStats } from '../core/squad'
 import { RIG, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from '../core/utilities'
 import { WEAPONS, type WeaponId } from '../core/weapons'
@@ -151,14 +151,28 @@ function shop(run: Run): Action {
   return { type: 'leave' }
 }
 
-/** The branch each class climbs first: for each, the one that wins most on the same seeds. */
-const PLANS: Record<ClassId, string> = { assault: 'Ironhide', heavy: 'Bastion', sniper: 'Ghost', engineer: 'Drone Hive', support: 'Mending', pyro: 'Ember Hide', cryo: 'Glacier', phantom: 'Wraith' }
+/**
+ * The branch each class climbs, and the power outside it, if any, that it opens with: of what five picks allow, what
+ * wins most on the same seeds. Early battles kill a hero without picks, so the one free pick goes on staying alive.
+ */
+const PLANS: Record<ClassId, { branch: string; opener?: SkillId }> = {
+  assault: { branch: 'Rampage', opener: 'reflexes' },
+  heavy: { branch: 'Bastion' },
+  sniper: { branch: 'Ghost' },
+  engineer: { branch: 'Drone Hive' },
+  support: { branch: 'Aegis', opener: 'healingLight' },
+  pyro: { branch: 'Ember Hide' },
+  cryo: { branch: 'Glacier' },
+  phantom: { branch: 'Shade' },
+}
 
-/** The skill a hero plans on: up its class's planned branch, highest tier open first; that branch done, up the next. */
-function plannedSkill(soldier: Soldier): number {
+/** The skill a hero plans on: its opener, then up its class's planned branch, highest tier open first; that branch done, up the next. */
+export function plannedSkill(soldier: Soldier): number {
   const offers = skillOffers(soldier)
   const branches = TREES[soldier.cls!]
-  for (const { tiers } of [...branches.filter((b) => b.name === PLANS[soldier.cls!]), ...branches]) {
+  const { branch, opener } = PLANS[soldier.cls!]
+  if (opener && offers.includes(opener)) return offers.indexOf(opener)
+  for (const { tiers } of [...branches.filter((b) => b.name === branch), ...branches]) {
     const open = tiers.flat().filter((id) => offers.includes(id))
     if (open.length > 0) return offers.indexOf(open.at(-1)!)
   }
@@ -177,7 +191,7 @@ function reward(run: Run): Action {
 }
 
 /** Classes by how many runs a lone hero of each wins, on the same seeds. */
-const RECRUIT_ORDER: ClassId[] = ['assault', 'sniper', 'support', 'engineer', 'phantom', 'heavy', 'cryo', 'pyro']
+const RECRUIT_ORDER: ClassId[] = ['sniper', 'cryo', 'assault', 'engineer', 'phantom', 'support', 'heavy', 'pyro']
 
 function recruit(run: Run): Action {
   const rank = (s: Soldier) => RECRUIT_ORDER.indexOf(s.cls!)

@@ -9,7 +9,7 @@ import type { GameEvent } from './combat-event'
 import { has, hostage, foes, powering, shootable, nearest, immune, silenced, spend, enemiesOf, onTile } from './fighters'
 import { walk, bestPath, paths } from './pathing'
 import { canShoot, lineOfSight } from './sight'
-import { FONT_REACH, SWARM_LIMIT, WAR_MACHINE } from './keystones'
+import { FONT_REACH, SWARM_BUILDS, SWARM_LIMIT, WAR_MACHINE } from './keystones'
 import { wound, knockback, SLAM_DAMAGE } from './wound'
 
 /** Ground Slam: once per battle, with two or more foes beside it, in place of an attack, it hurts each and hurls it back. */
@@ -190,7 +190,9 @@ export function deploy(battle: Battle, unit: Unit, seen: Set<number>): GameEvent
 /** Endless Swarm: with aliens in sight, a new drone as the engineer's turn begins, while it has room for one. */
 export function replenish(battle: Battle, unit: Unit): GameEvent[] {
   if (!has(unit, 'endlessSwarm') || !has(unit, 'swarm') || foes(battle, unit).length === 0) return []
-  return battle.units.filter((u) => u.summoner === unit.soldier).length < SWARM_LIMIT ? build(battle, unit, 1) : []
+  if (unit.spent.filter((e) => e === 'endlessSwarm').length >= SWARM_BUILDS || battle.units.filter((u) => u.summoner === unit.soldier).length >= SWARM_LIMIT) return []
+  unit.spent.push('endlessSwarm')
+  return build(battle, unit, 1)
 }
 
 /** Builds `count` of an engineer's machines beside it, as its skills shape them. */

@@ -19,7 +19,7 @@ import {
 } from './battle'
 import { ABLAZE, BLIZZARD, BULLET_TIME, COLOSSUS, DRONE_STORM, EXTINCTION, HAIL, INDESTRUCTIBLE, LEGION, LEVEL_BLOCK, MIRRORS, ORBITAL, QUAKE, SENTENCE, SHIELD_TURNS, SPREE, SUPERNOVA, TIME_STOP, TITAN_FORM, ZERO } from './ultimates'
 import { PHOENIX_RISING } from './wound'
-import { AFTERSHOCK_DAMAGE, BLOODBATH_HEAL, CONFLAGRATION_DAMAGE, EARTHSHAKER_DAMAGE, FAN_TARGETS, FONT_REACH, HELLFIRE_REACH, IMPACT_DAMAGE, SACRED_REACH, SHARD_DAMAGE, SWARM_LIMIT, TESLA, WAR_MACHINE } from './keystones'
+import { AFTERSHOCK_DAMAGE, BLOODBATH_HEAL, CONFLAGRATION_DAMAGE, EARTHSHAKER_DAMAGE, FAN_TARGETS, FONT_REACH, HELLFIRE_REACH, IMPACT_DAMAGE, SACRED_REACH, SHARD_DAMAGE, SWARM_BUILDS, SWARM_LIMIT, TESLA, WAR_MACHINE } from './keystones'
 import { TUNING } from './tuning'
 import { classPower, CLASSES, type ClassId } from './classes'
 import type { Keyword } from './keywords'
@@ -117,7 +117,7 @@ const skills = {
   hive: { name: 'Hive Mind', use: 'Passive', text: 'Deploys a third drone', effect: 'hive' },
   emp: { name: 'EMP Pulse', use: '1/battle', range: `${STUN_REACH} of it or machines`, target: '2+ aliens', text: `Each ${stun}; a boss stands firm`, effect: 'emp' },
   warMachine: { name: 'War Machine', use: 'Passive', text: `Its mech has +${WAR_MACHINE.hp} HP, +${WAR_MACHINE.damage} damage and +${WAR_MACHINE.range} range`, effect: 'warMachine' },
-  endlessSwarm: { name: 'Endless Swarm', use: 'Passive', text: `With aliens in sight, a new drone each turn, up to ${SWARM_LIMIT}`, effect: 'endlessSwarm' },
+  endlessSwarm: { name: 'Endless Swarm', use: 'Passive', text: `With aliens in sight, a new drone each turn, up to ${SWARM_LIMIT} at once and ${SWARM_BUILDS} a battle`, effect: 'endlessSwarm' },
   tesla: { name: 'Tesla Coil', use: 'Reaction', range: `${TESLA.reach}`, target: `${TESLA.bolts} nearest aliens`, text: `After it acts, ${TESLA.damage} damage to each`, effect: 'tesla' },
   // Support
   healingLight: taught('support'),
@@ -268,6 +268,9 @@ const opens = (tiers: SkillId[][], tier: number, known: SkillId[]) => tier === 0
 
 /** The skills of `cls` a hero knowing `known` can learn now, in tree order. */
 export const unlocked = (cls: ClassId, known: SkillId[]): SkillId[] => TREES[cls].flatMap(({ tiers }) => tiers.flatMap((skills, tier) => (opens(tiers, tier, known) ? skills.filter((id) => !known.includes(id)) : [])))
+
+/** The tier of a skill in its class's tree, counted from 0. */
+export const tierOf = (cls: ClassId, id: SkillId) => Math.max(...TREES[cls].map(({ tiers }) => tiers.findIndex((skills) => skills.includes(id))))
 
 /** A class's roots: the skills open from the first pick, its ability first. */
 export const roots = (cls: ClassId) => TREES[cls].flatMap((branch) => branch.tiers[0])

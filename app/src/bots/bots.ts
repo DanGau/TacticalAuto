@@ -6,7 +6,7 @@ import { UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
 import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
-import { SKILLS } from '../core/skills'
+import { SKILLS, tierOf } from '../core/skills'
 import { CLASSES } from '../core/classes'
 import { EFFECTS, type Gear } from '../core/gear'
 import { WEAPONS } from '../core/weapons'
@@ -78,7 +78,11 @@ function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
   }
   if (run.finds.length > 0) return decideFind(run, pick === PICKS.synergy)
   const learner = run.soldiers.find((s) => skillOffers(s).length > 0)!
-  return { type: 'skill', soldier: learner.id, index: pick(run, rng, skillOffers(learner).map((id) => SKILLS[id].tags ?? [])) }
+  const offers = skillOffers(learner)
+  // Any but the random bot climbs: it chooses among the highest tier open.
+  const top = pick === PICKS.random ? 0 : Math.max(...offers.map((id) => tierOf(learner.cls!, id)))
+  const climbing = offers.filter((id) => tierOf(learner.cls!, id) >= top)
+  return { type: 'skill', soldier: learner.id, index: offers.indexOf(climbing[pick(run, rng, climbing.map((id) => SKILLS[id].tags ?? []))]) }
 }
 
 /** Purchases the run can pay for now: gear, each for the soldier it does the most for, then relics. */

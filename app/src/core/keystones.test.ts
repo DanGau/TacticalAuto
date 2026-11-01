@@ -101,6 +101,12 @@ test('War Machine builds a stronger mech; Endless Swarm builds a drone a turn, u
   const swarm = arena(['swarm', 'endlessSwarm'], [{ x: 14, y: 10 }])
   for (let i = 0; i < 8; i++) upkeep(swarm.battle)
   expect(swarm.battle.units.filter((u) => u.summoner !== null)).toHaveLength(5)
+  swarm.battle.units = swarm.battle.units.filter((u) => u.summoner === null)
+  for (let i = 0; i < 20; i++) {
+    upkeep(swarm.battle)
+    swarm.battle.units = swarm.battle.units.filter((u) => u.summoner === null)
+  }
+  expect(swarm.hero.spent.filter((e) => e === 'endlessSwarm')).toHaveLength(10)
 })
 
 test('Tesla Coil arcs to the nearest aliens after the hero acts', () => {

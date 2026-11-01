@@ -6,7 +6,10 @@ import { apply } from '../core/apply'
 import { type Run } from '../core/run-state'
 import { rows, verdicts } from '../sim/report'
 import { runWith, type RunResult, type Toll } from '../sim/run'
-import { strategic } from './strategic'
+import { plannedSkill, strategic } from './strategic'
+import { CLASSES, type ClassId } from '../core/classes'
+import { TREES, type SkillId } from '../core/skills'
+import { MAX_SKILLS, skillOffers, xpFor } from '../core/squad'
 
 function deploying(challenge: ChallengeId, held: Run['utilities']): Run {
   const run = begun(3)
@@ -21,6 +24,14 @@ test.each(Object.keys(CHALLENGES) as ChallengeId[])('the strategic bot takes the
   const decoy = (['hover', 'smoke', 'crack'] as const).filter((id) => !CHALLENGES[challenge].answers.includes(id))
   const run = deploying(challenge, [...decoy.slice(0, 2), answer])
   expect(strategic(run, { rng: 1 })).toMatchObject({ type: 'enter', utility: 2 })
+})
+
+test('the plan: every class names a real branch and an opener outside it, reaches tier 4 in the picks it has', () => {
+  for (const cls of Object.keys(CLASSES) as ClassId[]) {
+    const hero = { ...begun(3).soldiers[0], cls, skills: [] as SkillId[], xp: xpFor(20) }
+    for (let i = 0; i < MAX_SKILLS; i++) hero.skills.push(skillOffers(hero)[plannedSkill(hero)])
+    expect(TREES[cls].some(({ tiers }) => tiers[3].some((id) => hero.skills.includes(id)))).toBe(true)
+  }
 })
 
 test('with a utility to spare, it keeps what answers the most, and plays a run to its end', () => {

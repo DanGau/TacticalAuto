@@ -11,7 +11,9 @@ export const SHARD_DAMAGE = 2
 export const IMPACT_DAMAGE = 4
 export const EARTHSHAKER_DAMAGE = 2
 export const WAR_MACHINE = { hp: 10, damage: 3, range: 2 }
+/** Drones Endless Swarm keeps at once, and builds in a battle: without an end, aliens shooting its drones would never come on. */
 export const SWARM_LIMIT = 5
+export const SWARM_BUILDS = 10
 export const TESLA = { reach: 5, bolts: 3, damage: 2 }
 export const FONT_REACH = 4
 export const SACRED_REACH = 3
