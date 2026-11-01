@@ -5,7 +5,7 @@ import { type AlienKind } from './aliens'
 import type { Tally } from './feats'
 import type { DoctrineEffect, Rule } from './doctrines'
 import type { Resist } from './keywords'
-import { type Goal } from './goals'
+import { type Flow, Goal } from './goals'
 import type { Twist } from './twists'
 import type { ConsumableId } from './consumables'
 import type { EntranceKind } from './entrances'
@@ -111,7 +111,7 @@ export const ENTRANCES = 3
 export const ENTRY_RADIUS = 2
 /** Tiles a wave keeps from the squad. */
 export const POD_CLEARANCE = 7
-/** How near a soldier comes to an alien waiting its turn before it engages. */
+/** How near a soldier comes to an alien waiting its turn before its cluster engages. */
 export const ENGAGE_REACH = 5
 
 export type Side = 'human' | 'alien'
@@ -262,6 +262,8 @@ export interface Unit {
   soldier: number | null
   /** In the fight: an alien coming for the squad. One not engaged stands at its post and holds its fire. Humans always are. */
   engaged: boolean
+  /** The cluster an alien stands in, which engages together; 0 alone. */
+  cluster: number
   /** Seen by the squad: drawn, and shot at. Every alien is but burrowers underground and waves not yet sighted. */
   revealed: boolean
   /** Alien turns left caught off guard, doing nothing. */
@@ -353,7 +355,9 @@ export interface Battle {
   place: TerrainKind
   /** Alien turns begun. */
   round: number
-  /** Handfuls of aliens still to arrive as waves, on a hold or a recovery. */
+  /** How this battle plays. */
+  flow: Flow
+  /** Clumps of aliens still to arrive as waves, on a flood. */
   waves: Alien[][]
   /** The unit whose action is under way, credited with the damage it does; null between actions. */
   actor: number | null

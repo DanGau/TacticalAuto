@@ -3,7 +3,7 @@ import { BARRIER_ARMOR, CHILL_TURNS, ENTRANCES, GRID, IMPACT_REACH, isSoldier, t
 import type { GameEvent } from './combat-event'
 import { SMOKE_TURNS } from './consumables'
 import { blocked, breach, distance, edgeDepths, freeTilesNear, NEIGHBORS, onGrid, openNear, reachableFrom, walkingDistances, walks } from './grid'
-import { engageNearest, has, joinSize, nearest } from './fighters'
+import { engageNearest, has, nearest } from './fighters'
 import { sitesOf, SUITS, type FeatureKind, type Site } from './features'
 import { PROP_BULK } from './terrain'
 import { randomInt } from './rng'
@@ -144,7 +144,7 @@ export function planEntrances(battle: Battle, heart: Tile | null): void {
 }
 
 /**
- * The squad makes the entrance: it comes in on the free tiles nearest it, the aliens nearest engage, and the battle
+ * The squad makes the entrance: it comes in on the free tiles nearest it, the cluster nearest engages, and the battle
  * begins. What the entrance sets off lands as the first beat; see opening.
  */
 export function enter(battle: Battle, entrance: Entrance): void {
@@ -177,7 +177,7 @@ export function enter(battle: Battle, entrance: Entrance): void {
   if (held('entryWall')) for (const soldier of squad) barricade(battle, soldier)
 }
 
-/** Puts the whole squad down on the free tiles nearest `at` and begins the battle, the aliens nearest engaging. */
+/** Puts the whole squad down on the free tiles nearest `at` and begins the battle, the cluster nearest engaging. */
 export function deploy(battle: Battle, at: Tile): void {
   const tiles = freeTilesNear(battle, at, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => battle.units.push(soldierUnit(battle, soldier, tiles[i])))
@@ -185,7 +185,7 @@ export function deploy(battle: Battle, at: Tile): void {
   battle.phase = 'battle'
   battle.opening = true
   const squad = battle.units.filter(isSoldier)
-  engageNearest(battle, [at], joinSize(squad.length))
+  engageNearest(battle, [at])
   // A barrier projector armors every squadmate of its carrier.
   for (const carrier of squad.filter((u) => u.effects.includes('barrier'))) {
     for (const mate of squad) if (mate !== carrier) mate.armor += BARRIER_ARMOR

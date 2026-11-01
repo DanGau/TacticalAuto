@@ -10,6 +10,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `grid.ts` | The board: distance, objects, walls, walking costs and routes, free tiles |
 | `setup.ts` | `createBattle`: battle state, placing aliens, civilians, goals by the encounter |
 | `encounter.ts` | `designEncounter`: the set-piece: arena, overlook, hazard, objects, posts, approaches, gates |
+| `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
 | `objects.ts` | What heroes do with objects: hurling them, setting off tanks |
 | `entrances.ts` | Entrances: their kinds, where each comes in, what each sets off |
 | `features.ts` | The real doors, walls, roofs, high points and roads an entrance comes from, and which suit each place |

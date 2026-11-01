@@ -1,3 +1,4 @@
+import { freeTilesNear } from './grid'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { CHARGE_REACH } from './entrances'
@@ -16,7 +17,11 @@ function landed(relics: RelicId[]): Run {
   apply(run, { type: 'advance' })
   const { entrances, units } = run.battle!
   const contact = (i: number) => Math.min(...units.filter((u) => u.side === 'alien').map((u) => distance(u, entrances[i].at)))
-  enterAt(run, entrances.reduce((best, _, i) => (contact(i) < contact(best) ? i : best), 0))
+  const at = entrances.reduce((best, _, i) => (contact(i) < contact(best) ? i : best), 0)
+  // Some alien stands within the charges' reach.
+  const [tile] = freeTilesNear(run.battle!, entrances[at].at, 20).slice(-1)
+  Object.assign(units.find((u) => u.side === 'alien')!, tile)
+  enterAt(run, at)
   return run
 }
 

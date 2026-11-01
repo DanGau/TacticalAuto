@@ -232,7 +232,7 @@ test('soldiers left downed on a field the squad did not hold are taken, and a re
   expect(battle.reserve.map((r) => r.soldier)).toEqual([free.id])
   expect(battle.captives.map((r) => r.soldier)).toEqual([held.id])
   expect(battle.downed).toMatchObject([{ soldier: held.id, carrier: null }])
-  expect(battle.waves.length).toBeGreaterThan(0)
+  expect(battle.flow).toBe('push')
 
   const lost = structuredClone(run)
   fight(lost, 'alien')
@@ -428,14 +428,14 @@ test('experience follows what a soldier did: kills and damage its own, feats onl
   expect(soldier.feats).toEqual(['hatTrick'])
 })
 
-test('an ambush has no entrance: the squad is down at once, every alien in sight, the Hunter engaged first and half again as strong as its best soldier', () => {
+test('an ambush has no entrance: the squad is down at once, every posted alien in the fight, more coming, the Hunter half again as strong as its best soldier', () => {
   const run = travelling(['battle', 'battle'])
   run.threat = THREAT_MAX
   apply(run, { type: 'advance' })
   const battle = run.battle!
-  expect(battle).toMatchObject({ goal: 'ambush', phase: 'battle', waves: [] })
+  expect(battle).toMatchObject({ goal: 'ambush', phase: 'battle', flow: 'flood' })
   expect(battle.units.filter(isSoldier)).toHaveLength(run.soldiers.length)
-  for (const u of battle.units.filter((a) => a.side === 'alien')) expect(u.engaged).toBe(u.boss)
+  for (const u of battle.units.filter((a) => a.side === 'alien')) expect(u.engaged).toBe(true)
   const hunter = battle.units.find((u) => u.boss)!.stats
   const best = soldierStats(run, run.soldiers[0])
   expect(hunter.hp * hunter.damage).toBeGreaterThanOrEqual(1.4 * best.hp * best.damage)

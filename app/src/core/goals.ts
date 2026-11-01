@@ -1,13 +1,26 @@
 // Mission goals: what each asks of the squad, pays, and the numbers its rules use.
 /** What a battle asks of the squad. Each pays differently, so where the squad goes shapes what it builds. */
+import type { TerrainKind } from './terrain'
+
 export type Goal = 'exterminate' | 'assassinate' | 'hold' | 'rescue' | 'vip' | 'raid' | 'ambush' | 'recover'
+
+/** How a battle plays: heroes push through clusters one at a time, or hold their ground as aliens flood in. */
+export type Flow = 'push' | 'flood'
+
+/** The flow of a battle: a hive's clearing and open or ruined raids flood too, for nothing there stands in the aliens' way. */
+export function flowOf(goal: Goal, place: TerrainKind): Flow {
+  if (goal === 'hold' || goal === 'ambush' || goal === 'rescue') return 'flood'
+  if (goal === 'exterminate' && place === 'hive') return 'flood'
+  if (goal === 'raid' && (place === 'ruins' || place === 'countryside')) return 'flood'
+  return 'push'
+}
 
 /** Rounds the squad must hold the uplink before it can extract. */
 export const HOLD_ROUNDS = 6
 /** How near the extraction zone a hero must come to lift off. */
 export const EXTRACT_REACH = 3
-/** Alien turns between waves on a hold or a recovery. */
-export const HOLD_WAVE_EVERY = 2
+/** Alien turns between waves on a flood. */
+export const WAVE_EVERY = 2
 /** Civilians on a rescue, the health of each, how far each flees in a turn, and the supplies each saved pays. */
 export const CIVILIANS = 10
 export const CIVILIAN_HP = 8
@@ -26,7 +39,7 @@ export const ESCORT_REACH = 2
 export const GOALS: Record<Goal, { name: string; text: string; reward: string; force: number; weight: number; from: number }> = {
   exterminate: { name: 'Clear them out', text: 'Kill every alien', reward: 'supplies and gear', force: 0, weight: 3, from: 0 },
   assassinate: { name: 'Takedown', text: 'Kill the commander, armored and guarded, which blinks away when wounded; the rest flee', reward: 'supplies and rare gear', force: -3, weight: 1, from: 1 },
-  hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as aliens come at it a few at a time, then get every hero left to the extraction zone`, reward: 'a relic, no gear', force: -4, weight: 1, from: 1 },
+  hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as aliens pour in, then get every hero left to the extraction zone`, reward: 'a relic, no gear', force: -4, weight: 1, from: 1 },
   rescue: {
     name: 'Rescue',
     text: `A terror site: aliens are killing ${CIVILIANS} civilians. Hiders, squat and amber, huddle and stay put; runners, tall and pale, flee the aliens; and harvesters raise the dead as husks. The squad bursts in among them: aliens shoot civilians when they have no good shot at a hero, so push in. A hero who reaches a civilian gets them out. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and every hero 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
@@ -46,6 +59,6 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
   raid: { name: 'Smash and grab', text: 'Guarded supply caches. Choose how many to go for; each pays supplies, and each beyond the first adds a threat', reward: 'supplies by the cache, no gear', force: -1, weight: 1, from: 0 },
   // Never drawn: a full threat turns the next stop into an ambush.
   // Never drawn: soldiers left behind turn the next stop into a recovery.
-  recover: { name: 'Bring them back', text: 'The aliens hold your downed heroes among them, and more keep coming. Reach each to get them up, and kill every alien. Lose and the run is over', reward: 'your heroes back', force: 0, weight: 0, from: 0 },
-  ambush: { name: 'Hunted', text: 'Hunted down on the road, with no time to plan. Stand and fight the Hunter and its packs to the last alien', reward: 'the threat emptied', force: -7, weight: 0, from: 0 },
+  recover: { name: 'Bring them back', text: 'The aliens hold your downed heroes among them. Reach each to get them up, and kill every alien. Lose and the run is over', reward: 'your heroes back', force: 0, weight: 0, from: 0 },
+  ambush: { name: 'Hunted', text: 'Hunted down on the road, with no time to plan. Stand and fight the Hunter and the aliens flooding in to the last one', reward: 'the threat emptied', force: -7, weight: 0, from: 0 },
 }

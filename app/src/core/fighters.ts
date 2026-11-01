@@ -96,18 +96,21 @@ export function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, 
 }
 
 /** The aliens a soldier's powers may act on: revealed and in the fight. */
-/** Aliens that can walk in the fight at once, and how many join at a time, by soldiers on the field. */
-export const fightCap = (soldiers: number) => 2 * soldiers + 2
-export const joinSize = (soldiers: number) => soldiers + 1
-
 /** Those of a side's aliens in the fight that can walk: a turret or a nest never holds the next back. */
 export const walkersFighting = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.engaged && u.stats.move > 0).length
 
-/** Brings into the fight up to `count` of the aliens waiting nearest `from`. */
-export function engageNearest(battle: Battle, from: Tile[], count: number): void {
+/** Brings `alien` and the rest of its cluster into the fight. */
+export function engage(battle: Battle, alien: Unit): void {
+  for (const u of battle.units) if (u === alien || (alien.cluster > 0 && u.cluster === alien.cluster)) u.engaged = true
+  battle.rallied = battle.round
+}
+
+/** Brings in the cluster waiting nearest `from`; on a flood, every alien. */
+export function engageNearest(battle: Battle, from: Tile[]): void {
+  const waiting = battle.units.filter((u) => u.side === 'alien' && !u.engaged)
   const near = (u: Unit) => Math.min(...from.map((t) => distance(t, u)))
-  const waiting = battle.units.filter((u) => u.side === 'alien' && !u.engaged).sort((a, b) => near(a) - near(b))
-  for (const alien of waiting.slice(0, count)) alien.engaged = true
+  if (battle.flow === 'flood') for (const u of waiting) u.engaged = true
+  else if (waiting.length > 0) engage(battle, waiting.reduce((a, b) => (near(b) < near(a) ? b : a)))
 }
 
 export const foes = (battle: Battle, unit: Unit) => battle.units.filter((u) => u.side !== unit.side && !u.civilian && u.revealed && u.engaged)

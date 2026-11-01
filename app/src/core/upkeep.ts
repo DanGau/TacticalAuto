@@ -7,8 +7,9 @@ import { openNear } from './grid'
 import { freeTilesNear } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { engageNearest, fightCap, joinSize, walkersFighting, has, foeHas, onTile, FIRE_TURNS, uplinkReach, extractionFrom, silenced, centreOf, nearest } from './fighters'
-import { HOLD_ROUNDS, HOLD_WAVE_EVERY } from './goals'
+import { engageNearest, walkersFighting, has, foeHas, onTile, FIRE_TURNS, uplinkReach, extractionFrom, silenced, centreOf } from './fighters'
+import { HOLD_ROUNDS, WAVE_EVERY } from './goals'
+import { randomInt } from './rng'
 import { wound } from './wound'
 
 /**
@@ -70,12 +71,13 @@ export function upkeep(battle: Battle): GameEvent[] {
     events.push({ type: 'wave', units: [{ id: unit.id, x: unit.x, y: unit.y }] })
   }
   rally(battle)
-  // Waves come in a pack at a time, at the encounter's gate nearest the squad yet clear of it; a hold's without end.
+  // Waves come in a pack at a time, at one of the encounter's two gates nearest the squad yet clear of it; a hold's without end.
   const soldiers = battle.units.filter(isSoldier)
-  if (battle.waves.length > 0 && soldiers.length > 0 && battle.round % HOLD_WAVE_EVERY === 0) {
+  if (battle.waves.length > 0 && soldiers.length > 0 && battle.round % WAVE_EVERY === 0) {
     const from = centreOf(soldiers)
     const clear = battle.gates.filter((g) => distance(g, from) >= WAVE_CLEAR)
-    const centre = openNear(battle, nearest(clear, from) ?? battle.gates.reduce((a, b) => (distance(b, from) > distance(a, from) ? b : a)))
+    const near = [...clear].sort((a, b) => distance(a, from) - distance(b, from)).slice(0, 2)
+    const centre = openNear(battle, near[randomInt(battle, near.length)] ?? battle.gates.reduce((a, b) => (distance(b, from) > distance(a, from) ? b : a)))
     const wave = battle.waves.shift()!
     if (battle.goal === 'hold') battle.waves.push(wave)
     // It comes in unseen but in the fight, and shows once the squad sights it.
@@ -107,22 +109,15 @@ export function upkeep(battle: Battle): GameEvent[] {
 /** The nearest to the squad a wave comes in. */
 export const WAVE_CLEAR = 7
 
-/** Rounds those fighting have the squad to themselves before more join them. */
+/** Rounds without a walker fighting before the next cluster comes on its own, and rounds any fight keeps the next back. */
 export const RALLY_EVERY = 2
+export const RALLY_PATIENCE = 6
 
-/**
- * Aliens come a few at a time, the nearest first: more join once none in the fight can walk, or once RALLY_EVERY rounds
- * have passed since the last joined, up to the most that fight at once.
- */
+/** Nobody left to fight, or a fight dragging on, brings in the cluster nearest the squad, so a battle never stands still. */
 export function rally(battle: Battle): void {
   const soldiers = battle.units.filter(isSoldier)
-  if (soldiers.length === 0 || !battle.units.some((u) => u.side === 'alien' && !u.engaged)) return
-  const fighting = walkersFighting(battle)
-  if (fighting > 0 && battle.round - battle.rallied < RALLY_EVERY) return
-  const room = fightCap(soldiers.length) - fighting
-  if (room <= 0) return
-  engageNearest(battle, soldiers, Math.min(room, joinSize(soldiers.length)))
-  battle.rallied = battle.round
+  if (soldiers.length === 0) return
+  if (battle.round - battle.rallied >= (walkersFighting(battle) > 0 ? RALLY_PATIENCE : RALLY_EVERY)) engageNearest(battle, soldiers)
 }
 
 /** An incubator hatches: it is gone, and two brutes stand where it was. */

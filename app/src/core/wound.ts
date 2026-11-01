@@ -7,7 +7,7 @@ import { unitAt } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { OVERKILL, type FeatId, type Tally } from './feats'
-import { has, hostage, fireproof, chillFrom, foeHas, nearest, immune, onTile } from './fighters'
+import { engage, has, hostage, fireproof, chillFrom, foeHas, nearest, immune, onTile } from './fighters'
 
 /** A soldier's tally for this battle, begun empty. */
 export function tallyOf(battle: Battle, soldier: number): Tally {
@@ -23,7 +23,7 @@ export const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || ta
  */
 export function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[], pierce = false, crit = false): void {
   if (target.hp <= 0 || hostage(battle, target)) return
-  target.engaged = true
+  if (!target.engaged) engage(battle, target)
   const damage = target.kind === 'wraith' && !crit ? Math.min(dealt, 1) : dealt
   const full = target.hp === target.stats.hp
   // A juggernaut's plate stops a hit whole, and is lost to it.

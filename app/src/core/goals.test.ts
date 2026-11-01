@@ -69,18 +69,17 @@ test('a hold sets its uplink within, its entrances by it; once held, it is won o
   expect(run.finds).toEqual([])
 })
 
-test("a hold's waves come in a pack at a time, a short way off the squad, without end", () => {
+test("a hold's waves come in clumps, a short way off the squad, without end", () => {
   const run = before('hold')
   const battle = run.battle!
   enterAt(run, 0)
   // The squad holds out for as many waves as it takes.
   for (const soldier of battle.units.filter(isSoldier)) soldier.hp = 999
-  const size = battle.waves[0].length
   for (let wave = 0; wave < 2 && battle.phase === 'battle'; ) {
     for (const e of stepBattle(battle)) {
       if (e.type !== 'wave') continue
       wave++
-      expect(e.units).toHaveLength(size)
+      expect(e.units.length).toBeGreaterThanOrEqual(1)
       for (const at of e.units) expect(Math.min(...battle.gates.map((g) => distance(g, at)))).toBeLessThanOrEqual(4)
     }
   }

@@ -12,7 +12,7 @@ import { walkingDistances } from './grid'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { engageNearest, fightCap, walkersFighting, immune, onTile, fireproof, foeHas, has, GUARDIAN_REACH, lying, extractReach, carrying, BEACON_REACH, vipOf, nearest, extractionFrom, pursuers, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
+import { engage, immune, onTile, fireproof, foeHas, has, GUARDIAN_REACH, lying, extractReach, carrying, BEACON_REACH, vipOf, nearest, extractionFrom, pursuers, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
 import { fleePath, fightPath, walk, paths, costOf, bestPath, COHESION, POCKET } from './pathing'
 import { detects, sees } from './sight'
 import { upkeep } from './upkeep'
@@ -63,15 +63,14 @@ export function moveSide(battle: Battle): GameEvent[] {
 }
 
 /**
- * An alien waiting its turn engages once a soldier comes within ENGAGE_REACH of it, nearest first, up to the most that
- * fight at once; one unseen, a wave coming in, shows once a soldier sights it.
+ * An alien waiting its turn engages with its cluster once a soldier comes within ENGAGE_REACH of it; one unseen, a wave coming in, shows once a soldier sights it.
  */
 export function sight(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
   const soldiers = battle.units.filter(isSoldier)
   const aliens = battle.units.filter((u) => u.side === 'alien' && !burrowing(u))
   const drawn = aliens.filter((u) => !u.engaged && soldiers.some((s) => distance(s, u) <= ENGAGE_REACH))
-  if (drawn.length > 0) engageNearest(battle, soldiers, Math.min(drawn.length, Math.max(0, fightCap(soldiers.length) - walkersFighting(battle))))
+  for (const alien of drawn) engage(battle, alien)
   const sighted = aliens.filter((u) => !u.revealed && soldiers.some((s) => detects(battle, s, u)))
   for (const alien of sighted) alien.revealed = true
   if (sighted.length > 0) events.push({ type: 'reveal', units: sighted.map(({ id, x, y }) => ({ id, x, y })) })

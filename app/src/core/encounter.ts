@@ -2,7 +2,8 @@
 import { GRID, type Alien, type Arena, type Battle, type Tile } from './battle'
 import type { Goal } from './goals'
 import { blocked, distance, edgeDepths, NEIGHBORS, onGrid, openNear, walkingDistances, walks } from './grid'
-import { random, randomInt } from './rng'
+import { gather } from './formations'
+import { randomInt } from './rng'
 import { PROP_BULK, type Prop, type TerrainKind } from './terrain'
 
 /** How far from its centre the arena reaches, and how far out the camera shows it clear of props. */
@@ -19,8 +20,6 @@ const SCATTER: Partial<Record<TerrainKind, [Prop, Prop]>> = { countryside: ['cra
 const OVERLOOK: Mark = [9, 0]
 const LEDGE: Mark = [-8, -9]
 const HAZARD: Mark[] = [[3, -2], [4, 0], [3, 2]]
-/** The gaps a brute holds: between the heaps, and down the middle. */
-const CHOKES: Mark[] = [[-4, -7], [-4, 7], [1, 0], [5, -3], [5, 3]]
 /** Heaps of things to hurl, beside each flank and down the middle. */
 const HEAPS: Mark[] = [[-6, -6], [-6, 6], [-2, -8], [-2, 8], [6, -5], [6, 5]]
 /** The ways in: head on, nearest the fight; a flank by the ledge; a flank by the heaps; a far side for an extra. */
@@ -40,13 +39,6 @@ const SHED_MARKS: Mark[] = [[-13, -8], [-13, 8], [-10, -13], [-10, 13]]
 const KEEP_FROM = 8
 const KEEP_TO = 20
 const KEPT = 2
-
-/** How many aliens stand by what a mission is about; how far each likes to keep from the others, and must. */
-const GUARDS = 2
-const SPREAD = 7
-const ELBOW_ROOM = 3
-/** Tiles a guard stands from what it guards, a VIP's but a step. */
-const GUARD_GAP = 3
 
 /** A random open tile far enough within the map's edge to hold the arena; in a building if `roofed` and one stands there. */
 function arenaSpot(battle: Battle, roofed: boolean): Tile {
@@ -161,10 +153,10 @@ function stand(battle: Battle, at: Tile, prop: Prop): boolean {
 }
 
 /**
- * Sets the arena and lays out the encounter for `goal`. Returns the arena's centre, a post for each alien, and on a
+ * Sets the arena and lays out the encounter for `goal`. Returns the arena's centre, a post and cluster for each alien, and on a
  * rescue the terror's heart. A VIP's building and a satellite's compound stay standing; all else in the arena comes down, and the props around it.
  */
-export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal): { spot: Tile; posts: Tile[]; heart: Tile | null } {
+export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal): { spot: Tile; posts: Tile[]; clusters: number[]; heart: Tile | null } {
   const spot = arenaSpot(battle, goal === 'vip')
   const arena = { x: spot.x, y: spot.y, reach: ARENA_REACH }
   battle.arena = arena
@@ -200,34 +192,7 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal): { 
       if (onGrid(x, y) && !blocked(battle, x, y) && walk[y * GRID + x] < Infinity && distance({ x, y }, spot) <= ARENA_REACH - 1 && battle.ground[y * GRID + x] !== 'void' && battle.ground[y * GRID + x] !== 'water') ground.push({ x, y })
     }
   }
-  const along = (t: Tile) => (t.x - spot.x) * fx + (t.y - spot.y) * fy
-  const chokes = CHOKES.map(raw)
-  const posts: Tile[] = []
-  let objective = goal === 'vip' || goal === 'hold' ? spot : heart
-  let guards = objective ? GUARDS : 0
-  /** How well `t` suits `alien`: a shooter the heights and the far side, a bruiser a gap, one guarding the objective its side, and all room from the others. */
-  const fit = (alien: Alien, t: Tile, guarding: boolean) => {
-    const room = Math.min(SPREAD, ...posts.map((p) => distance(p, t)))
-    const shooter = alien.stats.range > 1 ? 6 * battle.height[t.y * GRID + t.x] + 0.4 * along(t) : 0
-    const bruiser = alien.stats.range <= 1 && alien.stats.hp > 4 && !guarding ? -1.5 * Math.min(...chokes.map((c) => distance(c, t))) : 0
-    const guard = guarding ? -2 * Math.abs(distance(objective!, t) - (goal === 'vip' ? 1 : GUARD_GAP)) : 0
-    const indoors = battle.ground[t.y * GRID + t.x] === 'floor' && !guarding ? -20 : 0
-    const clear = goal === 'ambush' ? Math.min(0, 3 * (distance(t, spot) - 6)) : 0
-    return room + shooter + bruiser + guard + indoors + clear + random(battle) * 2
-  }
-  for (const alien of aliens) {
-    const set = alien.target ? COMMANDER_POST : alien.boss ? (goal === 'ambush' ? OVERLOOK : BOSS_POST) : null
-    const guarding = !set && guards > 0
-    const free = ground.filter((t) => posts.every((p) => distance(p, t) >= (guarding ? 1 : ELBOW_ROOM)) && distance(t, spot) >= (goal === 'vip' ? 1 : 0))
-    if (guarding) guards--
-    const pick = set ? openNear(battle, raw(set)) : (free.length > 0 ? free : ground).reduce<Tile | null>((a, b) => (!a || fit(alien, b, guarding) > fit(alien, a, guarding) ? b : a), null)
-    const post = pick ?? openNear(battle, spot)
-    posts.push(post)
-    // A commander's guards stand by it.
-    if (alien.target) {
-      objective = post
-      guards = GUARDS
-    }
-  }
-  return { spot, posts, heart }
+  const objective = goal === 'vip' || goal === 'hold' ? spot : heart
+  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: openNear(battle, raw(COMMANDER_POST)), boss: openNear(battle, raw(goal === 'ambush' ? OVERLOOK : BOSS_POST)), objective })
+  return { spot, posts, clusters, heart }
 }

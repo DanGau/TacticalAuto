@@ -1,5 +1,4 @@
 import { SUITS } from './features'
-import { fightCap, joinSize } from './fighters'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { ENTRANCES, GRID, isSoldier, type Battle } from './battle'
@@ -71,7 +70,7 @@ test("an assassination never offers an entrance near the commander", () => {
   }
 })
 
-test('entering puts the whole squad down by the entrance and engages only the aliens nearest', () => {
+test('entering puts the whole squad down by the entrance and engages only the cluster nearest', () => {
   const run = entering()
   const { at } = run.battle.entrances[0]
   expect(enterAt(run, 0)).toEqual({ ok: true })
@@ -79,7 +78,8 @@ test('entering puts the whole squad down by the entrance and engages only the al
   expect(squad).toHaveLength(run.soldiers.length)
   for (const unit of squad) expect(distance(unit, at)).toBeLessThanOrEqual(3)
   expect(nearestAlien(run.battle, at)!.engaged).toBe(true)
-  expect(run.battle.units.filter((u) => u.side === 'alien' && u.engaged).length).toBeLessThanOrEqual(joinSize(run.battle.units.filter(isSoldier).length))
+  const first = nearestAlien(run.battle, at)!
+  for (const alien of run.battle.units.filter((u) => u.side === 'alien')) expect(alien.engaged).toBe(alien.cluster === first.cluster)
   expect(run.battle.phase).toBe('battle')
 })
 
@@ -196,21 +196,22 @@ test('a big explosion and a stolen kill are style only, and shooting first hurts
   expect(stepBattle(run.battle)).toContainEqual({ type: 'hurt', id: first.id, amount: TUNING.impactDamage, cause: 'impact' })
 })
 
-test('aliens join the fight a few at a time: more once none fighting stands, or RALLY_EVERY rounds on, up to the cap', () => {
+test('with nobody left fighting, the next cluster comes whole after RALLY_EVERY rounds', () => {
   const run = begun(1)
   apply(run, { type: 'go', index: 1 })
   road(run, [{ kind: 'battle', risk: 'standard', goal: 'exterminate', terrain: 'town', twist: null, aliens: Array.from({ length: 12 }, () => 'trooper' as const) }])
   apply(run, { type: 'advance' })
   enterAt(run, 0)
   const battle = run.battle!
-  const waiting = () => battle.units.filter((u) => u.side === 'alien' && !u.engaged).length
-  const before = waiting()
-  expect(before).toBeLessThan(12)
-  battle.round = RALLY_EVERY - 1
+  battle.units = battle.units.filter((u) => u.side !== 'alien' || !u.engaged)
+  const waiting = () => battle.units.filter((u) => u.side === 'alien' && !u.engaged)
+  const before = waiting().length
+  battle.round = battle.rallied + RALLY_EVERY - 1
   rally(battle)
-  expect(waiting()).toBe(before)
-  battle.round = RALLY_EVERY
+  expect(waiting()).toHaveLength(before)
+  battle.round = battle.rallied + RALLY_EVERY
   rally(battle)
-  expect(waiting()).toBeLessThan(before)
-  expect(12 - waiting()).toBeLessThanOrEqual(fightCap(battle.units.filter(isSoldier).length))
+  const engaged = battle.units.filter((u) => u.side === 'alien' && u.engaged)
+  expect(engaged.length).toBeGreaterThan(0)
+  expect(new Set(engaged.map((u) => u.cluster)).size).toBe(1)
 })

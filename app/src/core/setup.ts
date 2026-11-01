@@ -1,10 +1,11 @@
 // Creating a battle: its state, its encounter, the aliens, civilians and goals placed by it.
 import { type Battle, type Tile, type Reserve, GRID, type Unit, type Alien } from './battle'
+import { randomInt } from './rng'
 import { onGrid, distance, freeTilesNear, walkingDistances, spacedTile, NEIGHBORS, passable, openNear, walks } from './grid'
 import { alienUnit, civilianUnit } from './spawn'
 import { PROP_BULK, type TerrainKind, type Locale } from './terrain'
 import type { Rule } from './doctrines'
-import { type Goal, VIP_HP, CIVILIANS, CIVILIAN_HP } from './goals'
+import { flowOf, type Goal, VIP_HP, CIVILIANS, CIVILIAN_HP } from './goals'
 import { generateTerrain } from './terrain-gen'
 import type { Twist } from './twists'
 import { deploy, planEntrances } from './entrances'
@@ -68,11 +69,20 @@ export function placeAlien(battle: Battle, alien: Alien, tile: Tile, engaged = f
   return unit
 }
 
-/** Aliens a wave brings at a time. */
-export const WAVE_SIZE = 3
+/** The fewest aliens a wave brings, and how many more it may. */
+const WAVE_LEAST = 2
+const WAVE_MORE = 4
 
-/** `aliens` as waves. */
-const inWaves = (aliens: Alien[]) => Array.from({ length: Math.ceil(aliens.length / WAVE_SIZE) }, (_, i) => aliens.slice(i * WAVE_SIZE, (i + 1) * WAVE_SIZE))
+/** `aliens` as clumps of varied size. */
+function clumps(battle: Battle, aliens: Alien[]): Alien[][] {
+  const left = [...aliens]
+  const waves: Alien[][] = []
+  while (left.length > 0) waves.push(left.splice(0, WAVE_LEAST + randomInt(battle, WAVE_MORE)))
+  return waves
+}
+
+/** The share of a flood's aliens posted at the start; the rest come as waves. */
+const FLOOD_POSTED = 1 / 3
 
 /** Tiles apart a rescue's civilians start, from each other and the aliens, and the farthest from the terror's heart. */
 export const CIVILIAN_CLEARANCE = 4
@@ -83,8 +93,8 @@ export const TERROR_REACH = 10
 export const CACHES = 3
 
 /**
- * A battle awaiting the squad's entrance, its encounter designed as one piece: see designEncounter. A hold keeps half
- * its aliens back as waves; a rescue's civilians are scattered about the terror's heart. An ambush has no entrance: the squad
+ * A battle awaiting the squad's entrance, its encounter designed as one piece: see designEncounter. A flood keeps most
+ * of its aliens back as waves; a rescue's civilians are scattered about the terror's heart. An ambush has no entrance: the squad
  * is down in the arena's middle.
  */
 export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale): Battle {
@@ -96,8 +106,8 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     rules,
     twist,
     round: 0,
-    // All of a recovery's aliens come on a second time, as waves.
-    waves: goal === 'hold' ? inWaves(aliens.slice(Math.ceil(aliens.length / 2))) : goal === 'recover' ? inWaves(aliens) : [],
+    flow: flowOf(goal, kind),
+    waves: [],
     beat: 0,
     phase: 'deploy',
     turn: 'human',
@@ -142,19 +152,21 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     captives: [],
   }
   sealPockets(battle)
-  const posted = goal === 'hold' ? aliens.slice(0, Math.ceil(aliens.length / 2)) : aliens
-  const { spot, posts, heart } = designEncounter(battle, posted, goal)
+  const flood = battle.flow === 'flood'
+  const posted = flood ? aliens.slice(0, Math.ceil(aliens.length * FLOOD_POSTED)) : aliens
+  const { spot, posts, clusters, heart } = designEncounter(battle, posted, goal)
+  if (flood) battle.waves = clumps(battle, goal === 'hold' && posted.length === aliens.length ? aliens : aliens.slice(posted.length))
   sealPockets(battle)
   const centre = openNear(battle, spot)
   const vip = goal === 'vip' ? centre : null
   if (goal === 'hold') battle.uplink = centre
   if (vip) battle.units.push(civilianUnit(battle, vip, VIP_HP, 'vip'))
   const ambush = goal === 'ambush'
-  posted.forEach((alien, i) => placeAlien(battle, alien, posts[i]))
+  posted.forEach((alien, i) => {
+    placeAlien(battle, alien, posts[i]).cluster = clusters[i]
+  })
   if (ambush) {
     deploy(battle, centre)
-    // The Hunter engages first, whoever stands nearest.
-    for (const u of battle.units) if (u.side === 'alien') u.engaged = u.boss
     return battle
   }
   // A rescue's civilians are scattered about the terror's heart, half hiding where they are, half running from the aliens.
