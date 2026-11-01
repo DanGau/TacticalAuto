@@ -1,13 +1,15 @@
 // What happens as a side's turn begins: burns, acid, mending, cooldowns, spawns, goals that tick.
 import { REGEN_HEAL, alienStats, ALIENS, NODE_EVERY } from './aliens'
-import { type Battle, AURA_REACH, BURN_DAMAGE, isSoldier, SPAWN_EVERY, type Unit } from './battle'
+import { replenish } from './abilities'
+import { type Battle, AURA_REACH, BURN_DAMAGE, BURN_TURNS, isSoldier, SPAWN_EVERY, type Unit } from './battle'
+import { CONFLAGRATION_DAMAGE, HELLFIRE_REACH } from './keystones'
 import { placeAlien } from './setup'
 import { alienUnit } from './spawn'
 import { openNear } from './grid'
 import { freeTilesNear } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { engageNearest, walkersFighting, has, foeHas, onTile, FIRE_TURNS, uplinkReach, extractionFrom, silenced, centreOf } from './fighters'
+import { engageNearest, walkersFighting, has, fireproof, foeHas, onTile, FIRE_TURNS, uplinkReach, extractionFrom, silenced, centreOf } from './fighters'
 import { HOLD_ROUNDS, WAVE_EVERY } from './goals'
 import { randomInt } from './rng'
 import { SMOKE } from './utilities'
@@ -35,6 +37,11 @@ export function upkeep(battle: Battle): GameEvent[] {
         events.push({ type: 'effect', id: mate.id, effect: 'vitality', amount: 1 })
       }
     }
+    events.push(...replenish(battle, unit))
+    if (has(unit, 'glacialArmor') && unit.armor < unit.stats.armor) {
+      unit.armor = unit.stats.armor
+      events.push({ type: 'effect', id: unit.id, effect: 'glacialArmor', amount: 0 })
+    }
     if (has(unit, 'rearm') && unit.armor < unit.stats.armor) {
       unit.armor++
       events.push({ type: 'effect', id: unit.id, effect: 'rearm', amount: 0 })
@@ -44,11 +51,19 @@ export function upkeep(battle: Battle): GameEvent[] {
       unit.hp += amount
       events.push({ type: 'effect', id: unit.id, effect: 'regen', amount })
     }
+    if (battle.units.some((u) => u.side !== unit.side && has(u, 'hellfire') && distance(u, unit) <= HELLFIRE_REACH) && !fireproof(battle, unit)) {
+      unit.burning = Math.max(unit.burning, 1)
+      events.push({ type: 'effect', id: unit.id, effect: 'hellfire', amount: 0 })
+    }
     if (unit.burning > 0) {
+      const raging = foeHas(battle, unit, 'conflagration')
+      if (raging) {
+        for (const other of battle.units.filter((u) => u.side === unit.side && u !== unit && distance(u, unit) <= 1 && u.burning === 0 && !fireproof(battle, u))) other.burning = BURN_TURNS
+      }
       if (foeHas(battle, unit, 'pyre') && !onTile(battle.fire, unit)) battle.fire.push({ x: unit.x, y: unit.y, turns: FIRE_TURNS })
       unit.burning--
-      events.push({ type: 'effect', id: unit.id, effect: 'incendiary', amount: -BURN_DAMAGE })
-      wound(battle, unit, BURN_DAMAGE, events)
+      events.push({ type: 'effect', id: unit.id, effect: 'incendiary', amount: -(BURN_DAMAGE + (raging ? CONFLAGRATION_DAMAGE : 0)) })
+      wound(battle, unit, BURN_DAMAGE + (raging ? CONFLAGRATION_DAMAGE : 0), events)
     }
     if (unit.hp > 0 && unit.hp < unit.stats.hp && has(unit, 'regen')) {
       unit.hp++

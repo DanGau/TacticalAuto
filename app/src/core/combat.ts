@@ -15,6 +15,8 @@ import { attacksOf, blast, leap, napalm, shoot, weaponAttack } from './attack'
 import { leverage } from './objects'
 import { alienAction, cloak, deploy, drone, feed, flashbang, forceField, heal, polymorph, pulse, secondWind, skirmish, slam, strew } from './abilities'
 import { armed, dash, moveSide, stride } from './sides'
+import { IMPACT_DAMAGE, tesla } from './keystones'
+import { bladeDance, command } from './follow-ups'
 /**
  * The next attack of the side on turn: a soldier makes SOLDIER_ATTACKS a turn, its weapon's then its secondary, an alien one. A panicked soldier loses its turn; a phantom may cloak in place of its attacks.
  * An alien does what its kind does in place of a shot, if anything. Otherwise, first comes what does not cost the
@@ -32,8 +34,9 @@ function actNext(battle: Battle): GameEvent[] {
       battle.actor = unit.id
       const secondary = unit.secondary && SECONDARIES[unit.secondary]
       const events = [...stride(battle, unit, seen, true, secondary)]
-      events.push(...shoot(battle, unit, seen, undefined, undefined, secondary))
-      if (battle.attacks >= attacksOf(unit) && unit.hp > 0) events.push(...drone(battle, unit), ...skirmish(battle, unit), ...stride(battle, unit, seen, false))
+      const bonus = shoot(battle, unit, seen, undefined, undefined, secondary)
+      events.push(...bonus, ...(bonus.length > 0 && secondary ? bladeDance(battle, unit, seen, secondary, bonus) : []))
+      if (battle.attacks >= attacksOf(unit) && unit.hp > 0) events.push(...drone(battle, unit), ...tesla(battle, unit, seen), ...command(battle, unit, seen), ...skirmish(battle, unit), ...stride(battle, unit, seen, false))
       battle.actor = null
       if (events.length === 0) continue
       return events
@@ -62,8 +65,8 @@ function actNext(battle: Battle): GameEvent[] {
     battle.actor = unit.id
     const healed = unit.charges > 0 && unit.ability === 'medic' ? heal(battle, unit) : []
     const fired =
-      unit.charges <= 0 ? [] : unit.ability === 'rocket' ? blast(battle, unit, seen, ROCKET_DAMAGE, has(unit, 'bigBlast') ? BIG_BLAST_RADIUS : BLAST_RADIUS) : unit.ability === 'napalm' ? napalm(battle, unit, seen) : []
-    if (healed.length + fired.length > 0) unit.charges--
+      unit.charges <= 0 ? [] : unit.ability === 'rocket' ? blast(battle, unit, seen, ROCKET_DAMAGE + (has(unit, 'impact') ? IMPACT_DAMAGE : 0), has(unit, 'bigBlast') ? BIG_BLAST_RADIUS : BLAST_RADIUS) : unit.ability === 'napalm' ? napalm(battle, unit, seen) : []
+    if (healed.length + fired.length > 0 && !(has(unit, 'firestorm') && fired.some((e) => e.type === 'death' && e.id !== unit.id))) unit.charges--
     const powers = [...pulse(battle, unit, 'warcry'), ...pulse(battle, unit, 'emp'), ...flashbang(battle, unit, seen), ...forceField(battle, unit), ...leap(battle, unit, seen)]
     const slammed = fired.length > 0 ? [] : slam(battle, unit)
     const levered = fired.length + slammed.length > 0 ? [] : leverage(battle, unit)
@@ -74,7 +77,7 @@ function actNext(battle: Battle): GameEvent[] {
     const struck = [...primary, ...fallback]
     const acted = [...secondWind(unit), ...polymorph(battle, unit, seen), ...strew(battle, unit, 'caltrops'), ...strew(battle, unit, 'firewall'), ...deploy(battle, unit, seen), ...powers, ...healed, ...struck]
     // What follows an action: a drone's shot, then a skirmisher's step back.
-    const events = acted.length > 0 && unit.hp > 0 && attacksOf(unit) === 1 ? [...acted, ...drone(battle, unit), ...skirmish(battle, unit)] : acted
+    const events = acted.length > 0 && unit.hp > 0 && attacksOf(unit) === 1 ? [...acted, ...drone(battle, unit), ...tesla(battle, unit, seen), ...skirmish(battle, unit)] : acted
     battle.actor = null
     if (unit.side === 'human') events.push(...feed(battle, unit, events))
     if (events.length === 0) {

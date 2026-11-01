@@ -9,6 +9,7 @@ import type { GameEvent } from './combat-event'
 import { has, hostage, foes, powering, shootable, nearest, immune, silenced, spend, enemiesOf, onTile, FIRE_TURNS } from './fighters'
 import { walk, bestPath, paths } from './pathing'
 import { canShoot, lineOfSight } from './sight'
+import { FONT_REACH, SWARM_LIMIT, WAR_MACHINE } from './keystones'
 import { wound, knockback, SLAM_DAMAGE } from './wound'
 
 /** Ground Slam: once per battle, with two or more foes beside it, in place of an attack, it hurts each and hurls it back. */
@@ -125,11 +126,21 @@ export function alienAction(battle: Battle, unit: Unit): GameEvent[] | null {
 
 /** Medic: heals the most wounded soldier at half health or less within reach, itself among them. It does not cost the medic's shot. */
 export function heal(battle: Battle, unit: Unit): GameEvent[] {
+  const boost = has(unit, 'surgeon') ? SURGEON_HEAL : 0
+  if (has(unit, 'fontOfLife')) {
+    const hurt = battle.units.filter((u) => u.side === unit.side && u.hp > 0 && u.hp < u.stats.hp && distance(unit, u) <= FONT_REACH)
+    if (hurt.length < 2 && !hurt.some((u) => u.hp <= u.stats.hp / 2)) return []
+    return hurt.map((u) => {
+      const amount = Math.min(MEDIC_HEAL + boost, u.stats.hp - u.hp)
+      u.hp += amount
+      return { type: 'heal', id: unit.id, target: u.id, amount }
+    })
+  }
   const wounded = battle.units
     .filter((u) => u.side === unit.side && u.hp > 0 && u.hp <= u.stats.hp / 2 && distance(unit, u) <= MEDIC_REACH)
     .reduce<Unit | undefined>((worst, u) => (!worst || u.hp < worst.hp ? u : worst), undefined)
   if (!wounded) return []
-  const amount = Math.min(MEDIC_HEAL + (has(unit, 'surgeon') ? SURGEON_HEAL : 0), wounded.stats.hp - wounded.hp)
+  const amount = Math.min(MEDIC_HEAL + boost, wounded.stats.hp - wounded.hp)
   wounded.hp += amount
   return [{ type: 'heal', id: unit.id, target: wounded.id, amount }]
 }
@@ -183,17 +194,28 @@ export function feed(battle: Battle, unit: Unit, events: GameEvent[]): GameEvent
  */
 export function deploy(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
   if (unit.ability !== 'mech' || unit.charges <= 0 || seen.size === 0) return []
+  const events = build(battle, unit, has(unit, 'swarm') ? (has(unit, 'hive') ? 3 : 2) : 1)
+  if (events.length > 0) unit.charges--
+  return events
+}
+
+/** Endless Swarm: with aliens in sight, a new drone as the engineer's turn begins, while it has room for one. */
+export function replenish(battle: Battle, unit: Unit): GameEvent[] {
+  if (!has(unit, 'endlessSwarm') || !has(unit, 'swarm') || foes(battle, unit).length === 0) return []
+  return battle.units.filter((u) => u.summoner === unit.soldier).length < SWARM_LIMIT ? build(battle, unit, 1) : []
+}
+
+/** Builds `count` of an engineer's machines beside it, as its skills shape them. */
+function build(battle: Battle, unit: Unit, count: number): GameEvent[] {
   const swarm = has(unit, 'swarm')
   const stats: Stats = swarm ? { ...DRONE_STATS } : { ...MECH_STATS }
   if (has(unit, 'titan')) Object.assign(stats, { hp: stats.hp + TITAN_HEALTH, damage: stats.damage + 1 })
   if (has(unit, 'plating')) stats.armor += PLATING_ARMOR
   if (has(unit, 'servos')) Object.assign(stats, { move: stats.move + 2, damage: stats.damage + 1 })
+  if (!swarm && has(unit, 'warMachine')) Object.assign(stats, { hp: stats.hp + WAR_MACHINE.hp, damage: stats.damage + WAR_MACHINE.damage, range: stats.range + WAR_MACHINE.range })
   const granted: [SkillEffect, Effect][] = [['spotter', 'mark'], ['linked', 'inspire'], ['shock', 'snare'], ['detonate', 'detonate']]
   const effects = [...(swarm ? [] : ['taunt' as const]), ...granted.flatMap(([skill, effect]) => (has(unit, skill) ? [effect] : []))]
-  const tiles = freeTilesNear(battle, unit, !swarm ? 1 : has(unit, 'hive') ? 3 : 2)
-  if (tiles.length === 0) return []
-  unit.charges--
-  return tiles.map((tile) => {
+  return freeTilesNear(battle, unit, count).map((tile) => {
     const mech = mechUnit(battle, unit, { ...stats }, effects, tile)
     battle.units.push(mech)
     return { type: 'spawn', id: unit.id, unit: { id: mech.id, x: mech.x, y: mech.y } }

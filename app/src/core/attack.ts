@@ -1,6 +1,7 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
 import { type Battle, type Unit, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RECKLESS_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_TURNS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
 import { cloakOn } from './abilities'
+import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './keystones'
 import { freeTilesNear } from './grid'
 import { blocked } from './grid'
 import { walkingDistances } from './grid'
@@ -99,7 +100,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   // An attack out of cloak strikes past armor and harder, and breaks the cloak.
   const unseen = !!unit.cloaked || !!blow?.unseen
   if (blow) blow.unseen = unseen
-  if (unit.cloaked) {
+  if (unit.cloaked && !has(unit, 'livingShadow')) {
     unit.cloaked = 0
     events.push({ type: 'cloak', id: unit.id, on: false })
   }
@@ -118,7 +119,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     (parried ? PARRY_SOAK : 0) +
     (shielded ? BLOCK_SOAK : 0)
 
-  const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) > 0
+  const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.marked, 'apex', 1) > 0
   const crit = !enemy.resists.includes('crit') && (sure || (blow ? (blow.crit ??= random(battle) < unit.stats.crit) : random(battle) < unit.stats.crit))
   // A mirror hits as hard as the squad's hardest hitter; a feeder as hard as it has grown.
   const base = unit.kind === 'mirror' ? Math.max(unit.stats.damage, ...battle.units.filter(isSoldier).map((s) => s.stats.damage)) : unit.stats.damage
@@ -148,7 +149,8 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(unit.armor > 0, 'armored', 1) +
     when(enemy.rooted > 0, 'net', 2) +
     when(enemy.boss, 'bounty', BOUNTY_DAMAGE) +
-    when(unit.fury > 0, 'bloodRite', unit.fury)
+    when(unit.fury > 0, 'bloodRite', unit.fury) +
+    when(unit.fury > 0, 'bloodbath', unit.fury)
   // A fraction is a chance of one point more, so small shots add up to their share.
   const scaled = blow && blow.kit.power !== 1 ? Math.floor(dealt * blow.kit.power + random(battle)) : dealt
   let damage = base > 0 ? Math.max(MIN_DAMAGE, scaled) : Math.max(0, scaled)
@@ -156,6 +158,11 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (warded) {
     damage = Math.ceil(damage / 2)
     events.push({ type: 'effect', id: enemy.id, effect: distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield', amount: 0 })
+  }
+  if (has(enemy, 'fortress') || hallowed(battle, enemy)) damage = Math.ceil(damage / 2)
+  if (has(enemy, 'intangible') && random(battle) < INTANGIBLE_CHANCE) {
+    damage = 0
+    events.push({ type: 'effect', id: enemy.id, effect: 'intangible', amount: 0 })
   }
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0
   const pierced = unseen || secondary?.effect === 'pierce' || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) + when(enemy.chilled > 0, 'frostbreak', 1) > 0
@@ -224,7 +231,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
       wound(battle, other, VOLATILE_DAMAGE, events)
     }
   }
-  if (enemy.hp > 0 && !enemy.resists.includes('mark') && (when(true, 'mark', 1) || when(true, 'tracer', 1) || when(crit, 'exploit', 1))) enemy.marked = true
+  if (enemy.hp > 0 && !enemy.resists.includes('mark') && (when(true, 'mark', 1) || when(true, 'apex', 1) || when(true, 'tracer', 1) || when(crit, 'exploit', 1))) enemy.marked = true
   const cryo = damage > 0 && unit.ability === 'cryo'
   if (enemy.hp > 0 && !enemy.resists.includes('frost') && (when(damage > 0, 'frostbite', 1) || cryo || when(crit, 'freeze', 1))) {
     enemy.chilled = chillFrom(unit)
@@ -293,6 +300,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     events.push({ type: 'effect', id: enemy.id, effect: 'demolish', amount: 0 })
   }
   if (secondary && damage > 0) secondaryHit(battle, unit, enemy, beside, secondary, events)
+  afterHit(battle, unit, enemy, damage, beside, events)
   if (first && enemy.kind === 'brute' && enemy.hp > 0 && unit.hp > 0) charge(battle, enemy, unit, events)
   return blow ? events : [...events, ...again(battle, unit, seen, granted, enemy.hp <= 0)]
 }
@@ -376,7 +384,7 @@ export function blast(battle: Battle, unit: Unit, seen: Set<number>, damage: num
   for (const enemy of battle.units) {
     if (enemy.side === unit.side || !shootable(battle, powering(unit), unit, enemy, seen)) continue
     const caught = inBlast(enemy)
-    if (caught.every((u) => u.side !== unit.side) && caught.length > Math.max(1, best.length)) {
+    if (caught.every((u) => u.side !== unit.side) && caught.length > Math.max(has(unit, 'impact') ? 0 : 1, best.length)) {
       best = caught
       centre = enemy
     }
@@ -423,13 +431,14 @@ export function leap(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[]
   const jump = leapTo(battle, unit)
   const idle = !battle.units.some((u) => u.side !== unit.side && shootable(battle, unit, unit, u, seen))
   if (!jump || (jump.caught.length < 2 && !idle)) return []
-  unit.spent.push('leap')
+  if (!has(unit, 'earthshaker')) unit.spent.push('leap')
+  const hurt = LEAP_DAMAGE + (has(unit, 'earthshaker') ? EARTHSHAKER_DAMAGE : 0)
   Object.assign(unit, { x: jump.to.x, y: jump.to.y, moved: true })
   const events: GameEvent[] = [{ type: 'move', id: unit.id, path: [jump.to], with: 'leap' }]
   for (const foe of jump.caught) {
     foe.rooted = CHILL_TURNS
-    events.push({ type: 'effect', id: foe.id, effect: 'leap', amount: -LEAP_DAMAGE })
-    wound(battle, foe, LEAP_DAMAGE, events)
+    events.push({ type: 'effect', id: foe.id, effect: 'leap', amount: -hurt })
+    wound(battle, foe, hurt, events)
   }
   return events
 }

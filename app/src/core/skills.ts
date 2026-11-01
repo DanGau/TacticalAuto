@@ -17,6 +17,7 @@ import {
   type Effect,
   type Stats,
 } from './battle'
+import { AFTERSHOCK_DAMAGE, BLOODBATH_HEAL, CONFLAGRATION_DAMAGE, EARTHSHAKER_DAMAGE, FAN_TARGETS, FONT_REACH, HELLFIRE_REACH, IMPACT_DAMAGE, SACRED_REACH, SHARD_DAMAGE, SWARM_LIMIT, TESLA, WAR_MACHINE } from './keystones'
 import { TUNING } from './tuning'
 import { classPower, CLASSES, type ClassId } from './classes'
 import type { Keyword } from './keywords'
@@ -62,6 +63,9 @@ const skills = {
   hurl: { name: 'Hurl', use: 'At will', target: 'Creature hit', text: `Thrown ${HURL_TILES} tiles back; ${HURL_DAMAGE} damage if a wall or alien stops it`, effect: 'hurl' },
   hamstring: { name: 'Crippling Blow', use: 'At will', target: 'Creature hit', text: 'Rooted: it cannot move on its next turn', effect: 'snare' },
   sprinter: { name: 'Super Speed', use: 'Passive', text: '+2 move', stats: { move: 2 } },
+  bloodbath: { name: 'Bloodbath', use: 'Reaction', tags: ['kill'], text: `Each kill heals ${BLOODBATH_HEAL} and adds +1 damage for the rest of the battle`, effect: 'bloodbath' },
+  riposte: { name: 'Riposte', use: 'Reaction', target: 'Whoever hits it', text: 'Takes its damage back, each hit, at any range', effect: 'riposte' },
+  earthshaker: { name: 'Earthshaker', use: 'Passive', text: `Heroic Leap is at will and does ${EARTHSHAKER_DAMAGE} more damage`, effect: 'earthshaker' },
   // Heavy
   meteorStrike: taught('heavy'),
   arsenal: { name: 'Second Meteor', use: 'Passive', text: 'One more Meteor Strike each battle', charges: 1 },
@@ -75,6 +79,9 @@ const skills = {
   reactive: { name: 'Stone Skin', use: 'Passive', tags: ['ward'], text: '+4 armor', stats: { armor: 4 } },
   slam: { name: 'Ground Slam', use: '1/battle', range: 'Adjacent', target: '2+ aliens', text: `Replaces an attack. ${SLAM_HIT} damage to each, hurled ${SLAM_TILES} tiles back`, effect: 'slam' },
   intimidate: { name: 'Terrifying Roar', use: '1/battle', range: `${STUN_REACH}`, target: '2+ aliens', text: `Each ${stun}; a boss stands firm`, effect: 'warcry' },
+  impact: { name: 'Impact', use: 'Passive', text: `Meteor Strike does ${IMPACT_DAMAGE} more damage and falls on a lone alien too`, effect: 'impact' },
+  fortress: { name: 'Fortress', use: 'Passive', tags: ['ward'], text: 'Takes half damage from every hit', effect: 'fortress' },
+  aftershock: { name: 'Aftershock', use: 'At will', target: 'Beside creature hit', text: `${AFTERSHOCK_DAMAGE} damage to each`, effect: 'aftershock' },
   // Sniper
   farSight: taught('sniper'),
   steady: { name: 'Steady Hands', use: 'Passive', text: '+1 damage if it did not move this turn', effect: 'steady' },
@@ -90,6 +97,9 @@ const skills = {
   decoy: { name: 'Mirror Image', use: 'Passive', text: 'Starts each battle with 2 images; each of the first 2 hits pops one instead', effect: 'mirror' },
   blink: { name: 'Blink', use: '1/battle', range: '5', target: 'Self', text: 'Hit to half HP or less: blinks to the safest tile', effect: 'blink' },
   relocate: { name: 'Relocate', use: 'Reaction', text: 'After it acts, moves up to 2 tiles away from the aliens', effect: 'skirmish' },
+  sureShot: { name: 'Sure Shot', use: 'Passive', tags: ['crit'], text: 'Every hit is a crit if it did not move this turn', effect: 'sureShot' },
+  apex: { name: 'Apex Predator', use: 'At will', target: 'Creature hit', tags: ['mark', 'crit'], text: 'Marked; every hit on a marked alien is a crit', effect: 'apex' },
+  ghostShot: { name: 'Ghost Shot', use: 'Passive', text: 'Its attacks pass through walls and ignore armor', effect: 'psionic' },
   // Engineer
   deployMech: taught('engineer'),
   titan: { name: 'Titan Frame', use: 'Passive', text: `Its mech has +${TITAN_HEALTH} HP and +1 damage`, effect: 'titan' },
@@ -104,6 +114,9 @@ const skills = {
   linked: { name: 'Linked Targeting', use: 'Aura', range: '2 of a machine', target: 'Allies', text: '+1 damage', effect: 'linked' },
   hive: { name: 'Hive Mind', use: 'Passive', text: 'Deploys a third drone', effect: 'hive' },
   emp: { name: 'EMP Pulse', use: '1/battle', range: `${STUN_REACH} of it or machines`, target: '2+ aliens', text: `Each ${stun}; a boss stands firm`, effect: 'emp' },
+  warMachine: { name: 'War Machine', use: 'Passive', text: `Its mech has +${WAR_MACHINE.hp} HP, +${WAR_MACHINE.damage} damage and +${WAR_MACHINE.range} range`, effect: 'warMachine' },
+  endlessSwarm: { name: 'Endless Swarm', use: 'Passive', text: `With aliens in sight, a new drone each turn, up to ${SWARM_LIMIT}`, effect: 'endlessSwarm' },
+  tesla: { name: 'Tesla Coil', use: 'Reaction', range: `${TESLA.reach}`, target: `${TESLA.bolts} nearest aliens`, text: `After it acts, ${TESLA.damage} damage to each`, effect: 'tesla' },
   // Support
   healingLight: taught('support'),
   fieldKit: { name: 'Deep Wellspring', use: 'Passive', text: 'Two more Healing Lights each battle', charges: 2 },
@@ -120,6 +133,9 @@ const skills = {
   bane: { name: 'Bane', use: 'Aura', range: '3', target: 'Aliens', text: 'Do 1 less damage', effect: 'bane' },
   gravBeam: { name: 'Gravity Lash', use: 'At will', target: 'Creature hit', text: 'Pulled a tile toward it', effect: 'tether' },
   nullifier: { name: 'Silence', use: 'Aura', range: '3', target: 'Aliens', text: 'Cannot spit, panic, spawn or burst', effect: 'null' },
+  fontOfLife: { name: 'Font of Life', use: 'Passive', range: `${FONT_REACH}`, target: 'Every wounded ally', text: 'Healing Light heals them all, once one is at half HP or two are hurt', effect: 'fontOfLife' },
+  sacredGround: { name: 'Sacred Ground', use: 'Aura', range: `${SACRED_REACH}`, target: 'It and allies', tags: ['ward'], text: 'Take half damage from every hit', effect: 'sacredGround' },
+  command: { name: 'Command', use: 'Reaction', target: 'Hardest-hitting ally with a shot', text: 'After it acts, that ally attacks with its weapon', effect: 'command' },
   // Pyro
   fireball: taught('pyro'),
   tanks: { name: 'Deep Flame', use: 'Passive', tags: ['burn'], text: 'One more Fireball each battle', charges: 1 },
@@ -133,6 +149,9 @@ const skills = {
   smolder: { name: 'Smolder', use: 'Passive', tags: ['burn'], text: `Its burns last ${LINGER_TURNS} more turns`, effect: 'smolder' },
   burningAura: { name: 'Fire Shield', use: 'Reaction', target: 'Whoever hits it', text: 'Takes 1 damage', effect: 'thorns' },
   phoenixHeart: { name: 'Phoenix Heart', use: 'Passive', text: 'Heals 1 at the start of each turn', effect: 'regen' },
+  firestorm: { name: 'Firestorm', use: 'Passive', tags: ['burn', 'kill'], text: 'A Fireball that kills gives its use back', effect: 'firestorm' },
+  conflagration: { name: 'Conflagration', use: 'Passive', tags: ['burn'], text: `Aliens burning take ${CONFLAGRATION_DAMAGE} more each turn, and set those beside them burning`, effect: 'conflagration' },
+  hellfire: { name: 'Hellfire', use: 'Aura', range: `${HELLFIRE_REACH}`, target: 'Aliens', tags: ['burn'], text: 'Set burning at the start of each of their turns', effect: 'hellfire' },
   // Cryo
   chillTouch: taught('cryo'),
   icebreak: { name: 'Icebreaker', use: 'Passive', tags: ['frost'], text: `+${SEARING_DAMAGE} damage to a chilled target`, effect: 'icebreak' },
@@ -146,6 +165,9 @@ const skills = {
   frostAura: { name: 'Frost Aura', use: 'Reaction', target: 'Whoever hits it', tags: ['frost'], text: 'Chilled', effect: 'rime' },
   glide: { name: 'Ice Glide', use: 'Reaction', text: 'After it acts, slides up to 2 tiles away from the aliens', effect: 'skirmish' },
   cryostasis: { name: 'Cryostasis', use: '1/battle', target: 'Self', text: 'Survives a killing hit at 1 HP', effect: 'lastStand' },
+  frozenHeart: { name: 'Frozen Heart', use: 'At will', target: 'Chilled alien hit', tags: ['frost'], text: `Frozen solid: it ${stun}; a boss stands firm`, effect: 'frozenHeart' },
+  glacialArmor: { name: 'Glacial Armor', use: 'Passive', tags: ['ward'], text: 'Its armor returns in full at the start of each of its turns', effect: 'glacialArmor' },
+  shardstorm: { name: 'Shardstorm', use: 'At will', target: 'Beside creature hit', tags: ['frost'], text: `${SHARD_DAMAGE} damage to each, and chilled`, effect: 'shardstorm' },
   // Phantom
   cloak: taught('phantom'),
   shadowStrike: { name: 'Shadow Strike', use: 'Passive', text: `Its attack out of Cloak does ${SHADOW_DAMAGE} more damage`, effect: 'shadowStrike' },
@@ -159,6 +181,9 @@ const skills = {
   shadowStep: { name: 'Shadow Step', use: 'Passive', text: '+2 move', stats: { move: 2 } },
   garrote: { name: 'Shadow Grip', use: 'At will', target: 'Creature hit', text: 'Rooted: it cannot move on its next turn', effect: 'snare' },
   smokeBomb: { name: 'Darkness', use: '1/battle', range: 'Attack range', target: '2+ aliens together', text: `Each ${stun}; a boss stands firm`, effect: 'flashbang' },
+  livingShadow: { name: 'Living Shadow', use: 'Passive', text: 'Attacking does not break its Cloak: every attack in it strikes from the dark', effect: 'livingShadow' },
+  intangible: { name: 'Intangible', use: 'Passive', text: 'Half of the hits on it pass through', effect: 'intangible' },
+  bladeDance: { name: 'Blade Dance', use: 'At will', text: `Its bonus attack also strikes ${FAN_TARGETS} more aliens in reach`, effect: 'bladeDance' },
 } satisfies Record<string, Skill>
 
 export type SkillId = keyof typeof skills
@@ -167,44 +192,44 @@ export const SKILLS: Record<SkillId, Skill> = skills
 /** Each class's tree: its branches, each with its name and its skills by tier, lowest first. The first branch holds the class's ability. */
 export const TREES: Record<ClassId, Branch[]> = {
   assault: [
-    { name: 'Rampage', tiers: [['mightyBound', 'bloodlust'], ['rage', 'cleave'], ['surge']] },
-    { name: 'Ironhide', tiers: [['reflexes'], ['secondWind', 'skirmish'], ['unbreakable']] },
-    { name: 'Juggernaut', tiers: [['leap'], ['hamstring', 'hurl'], ['sprinter']] },
+    { name: 'Rampage', tiers: [['mightyBound', 'bloodlust'], ['rage', 'cleave', 'surge'], ['bloodbath']] },
+    { name: 'Ironhide', tiers: [['reflexes'], ['secondWind', 'skirmish', 'unbreakable'], ['riposte']] },
+    { name: 'Juggernaut', tiers: [['leap'], ['hamstring', 'hurl', 'sprinter'], ['earthshaker']] },
   ],
   heavy: [
-    { name: 'Cataclysm', tiers: [['meteorStrike'], ['arsenal', 'shredder'], ['bigBlast']] },
-    { name: 'Bastion', tiers: [['bulwark'], ['taunt', 'steadfast'], ['reactive']] },
-    { name: 'Shockwave', tiers: [['suppression'], ['slam', 'concussion'], ['intimidate']] },
+    { name: 'Cataclysm', tiers: [['meteorStrike'], ['arsenal', 'shredder', 'bigBlast'], ['impact']] },
+    { name: 'Bastion', tiers: [['bulwark'], ['taunt', 'steadfast', 'reactive'], ['fortress']] },
+    { name: 'Shockwave', tiers: [['suppression'], ['slam', 'concussion', 'intimidate'], ['aftershock']] },
   ],
   sniper: [
-    { name: 'Marksman', tiers: [['farSight', 'steady'], ['headshot', 'doubleTap'], ['assassinate']] },
-    { name: 'Hunter', tiers: [['mark', 'kneecap'], ['slayer', 'hollowPoint'], ['volley']] },
-    { name: 'Ghost', tiers: [['elusive'], ['decoy', 'blink'], ['relocate']] },
+    { name: 'Marksman', tiers: [['farSight', 'steady'], ['headshot', 'doubleTap', 'assassinate'], ['sureShot']] },
+    { name: 'Hunter', tiers: [['mark', 'kneecap'], ['slayer', 'hollowPoint', 'volley'], ['apex']] },
+    { name: 'Ghost', tiers: [['elusive'], ['decoy', 'blink', 'relocate'], ['ghostShot']] },
   ],
   engineer: [
-    { name: 'Mech Bay', tiers: [['deployMech'], ['titan', 'plating', 'rebuild'], ['detonate']] },
-    { name: 'Drone Hive', tiers: [['swarm'], ['spotter', 'linked', 'servos'], ['hive']] },
-    { name: 'Tinker', tiers: [['launcher'], ['hardlight'], ['emp']] },
+    { name: 'Mech Bay', tiers: [['deployMech'], ['titan', 'plating', 'rebuild', 'detonate'], ['warMachine']] },
+    { name: 'Drone Hive', tiers: [['swarm'], ['spotter', 'linked', 'servos', 'hive'], ['endlessSwarm']] },
+    { name: 'Tinker', tiers: [['launcher'], ['hardlight', 'emp'], ['tesla']] },
   ],
   support: [
-    { name: 'Mending', tiers: [['healingLight'], ['fieldKit', 'surgeon', 'vitality'], ['revive']] },
-    { name: 'Aegis', tiers: [['barrier'], ['ward', 'bane'], ['forceField']] },
-    { name: 'Zeal', tiers: [['inspire', 'flashbang'], ['haste', 'drone', 'gravBeam'], ['nullifier']] },
+    { name: 'Mending', tiers: [['healingLight'], ['fieldKit', 'surgeon', 'vitality', 'revive'], ['fontOfLife']] },
+    { name: 'Aegis', tiers: [['barrier'], ['ward', 'bane', 'forceField'], ['sacredGround']] },
+    { name: 'Zeal', tiers: [['inspire', 'flashbang'], ['haste', 'drone', 'gravBeam', 'nullifier'], ['command']] },
   ],
   pyro: [
-    { name: 'Inferno', tiers: [['fireball'], ['tanks', 'searing'], ['inferno']] },
-    { name: 'Immolation', tiers: [['tinder'], ['flashpoint', 'smolder'], ['backdraft']] },
-    { name: 'Ember Hide', tiers: [['fireSuit'], ['burningAura', 'asbestos'], ['phoenixHeart']] },
+    { name: 'Inferno', tiers: [['fireball'], ['tanks', 'searing', 'inferno'], ['firestorm']] },
+    { name: 'Immolation', tiers: [['tinder'], ['flashpoint', 'smolder', 'backdraft'], ['conflagration']] },
+    { name: 'Ember Hide', tiers: [['fireSuit'], ['burningAura', 'asbestos', 'phoenixHeart'], ['hellfire']] },
   ],
   cryo: [
-    { name: 'Hoarfrost', tiers: [['chillTouch'], ['icebreak', 'permafrost', 'rimeLock'], ['deepFreeze']] },
-    { name: 'Glacier', tiers: [['iceArmor'], ['frostAura', 'glide'], ['cryostasis']] },
-    { name: 'Icicle', tiers: [['coldSteel'], ['coldEye'], ['longRange']] },
+    { name: 'Hoarfrost', tiers: [['chillTouch'], ['icebreak', 'permafrost', 'rimeLock', 'deepFreeze'], ['frozenHeart']] },
+    { name: 'Glacier', tiers: [['iceArmor'], ['frostAura', 'glide', 'cryostasis'], ['glacialArmor']] },
+    { name: 'Icicle', tiers: [['coldSteel'], ['coldEye', 'longRange'], ['shardstorm']] },
   ],
   phantom: [
-    { name: 'Shade', tiers: [['cloak'], ['shadowStrike', 'daze', 'deepCloak'], ['afterimage']] },
-    { name: 'Wraith', tiers: [['vanish'], ['phaseShift', 'fadeOut'], ['shadowStep']] },
-    { name: 'Knives', tiers: [['knifeWork'], ['garrote'], ['smokeBomb']] },
+    { name: 'Shade', tiers: [['cloak'], ['shadowStrike', 'daze', 'deepCloak', 'afterimage'], ['livingShadow']] },
+    { name: 'Wraith', tiers: [['vanish'], ['phaseShift', 'fadeOut', 'shadowStep'], ['intangible']] },
+    { name: 'Knives', tiers: [['knifeWork'], ['garrote', 'smokeBomb'], ['bladeDance']] },
   ],
 }
 
