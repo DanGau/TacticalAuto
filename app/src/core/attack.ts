@@ -184,7 +184,8 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const beside = battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1)
   // The weapon's attack of a turn with a secondary still to come opens a combo.
   const opens = !secondary && !granted && isSoldier(unit) && battle.actor === unit.id && battle.attacks < attacksOf(unit)
-  events.unshift({ type: 'shot', id: unit.id, target: enemy.id, crit, damage, with: used, ...(deflect ? { deflect: deflect.word } : {}), ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}), ...(blow ? { nth: blow.nth, ...(blow.kit.ms ? { lasts: blow.kit.ms } : {}), ...(blow.form ? { form: blow.form } : {}) } : {}) })
+  const shock = first && !secondary && unit.weapon ? WEAPONS[unit.weapon].stun : undefined
+  events.unshift({ type: 'shot', id: unit.id, target: enemy.id, crit, damage, with: used, ...(deflect ? { deflect: deflect.word } : {}), ...(shock ? { ring: shock.reach } : {}), ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}), ...(blow ? { nth: blow.nth, ...(blow.kit.ms ? { lasts: blow.kit.ms } : {}), ...(blow.form ? { form: blow.form } : {}) } : {}) })
   if (battle.twist === 'crumbling' && damage > 0) crumble(battle, enemy, unit)
   wound(battle, enemy, damage, events, pierced, crit)
   if (battle.twist === 'fuel' && damage > 0) events.push(...ignite(battle, enemy))
@@ -249,8 +250,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     enemy.panicked = true
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'stasis') ? 'stasis' : 'deepFreeze', amount: 0 })
   }
-  // A stunning blow rings out over its target and every foe beside it.
-  if (first && !secondary && damage > 0) for (const other of [enemy, ...beside]) stun(battle, unit, other, events)
+  if (shock) for (const other of battle.units.filter((u) => u.side === enemy.side && distance(u, enemy) <= shock.reach)) stun(other, shock.chance, battle, events)
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
   else if (first && enemy.hp > 0 && damage > 0 && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'tether', 1)) knockback(battle, unit, enemy, events, -1)
@@ -467,10 +467,9 @@ function guard(target: Unit, far: boolean, damage: number): Guard | undefined {
   return g
 }
 
-/** A blow of a stunning weapon may stun `target`, short of a boss, so it loses its next action. */
-function stun(battle: Battle, unit: Unit, target: Unit, events: GameEvent[]): void {
-  const chance = unit.weapon && WEAPONS[unit.weapon].stun
-  if (!chance || target.hp <= 0 || target.boss || target.panicked || random(battle) >= chance) return
+/** Stuns `target` at `chance`, short of a boss or one already stunned, so it loses its next action. */
+function stun(target: Unit, chance: number, battle: Battle, events: GameEvent[]): void {
+  if (target.hp <= 0 || target.boss || target.panicked || random(battle) >= chance) return
   target.panicked = true
   events.push({ type: 'effect', id: target.id, effect: 'stun', amount: 0 })
 }

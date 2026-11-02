@@ -36,8 +36,8 @@ export interface Weapon {
   /** What it does beyond its look, as a card says. */
   special?: string
   guard?: Guard
-  /** The chance its blow stuns its target and each foe beside it, short of a boss: it loses its next action. */
-  stun?: number
+  /** Its blow's shockwave: each foe within `reach` tiles of the target, the target too if it lives, is stunned at `chance`, short of a boss, and loses its next action. */
+  stun?: { chance: number; reach: number }
 }
 
 /** A melee weapon's save each turn: the first hit on its wielder does `lands` of its damage. Each further hit lands whole. */
@@ -59,7 +59,7 @@ const weapons = {
   smg: { name: 'Storm Darts', type: 'SMG', stats: { range: -1, move: 1 }, attack: { shots: 4, power: 0.4, ms: 90 } },
   lmg: { name: 'Storm Engine', type: 'Machine Gun', stats: { range: 1, move: -1 }, attack: { shots: 5, power: 0.35, ms: 110 }, effect: 'suppress', special: 'A target it hits does 1 less damage on its next turn' },
   pistols: { name: 'Twin Blasters', type: 'Twin Pistols', stats: { move: 1 }, attack: { shots: 2, power: 0.7, ms: 220 } },
-  hammer: { name: 'Thunder Hammer', type: 'Hammer', stats: { move: 2 }, attack: { shots: 1, power: 3, wide: 0.6 }, thrown: { shots: 1, power: 1.3, ms: 700, range: 5 }, melee: true, stance: 'rush', effect: 'thunder', stun: 0.5, special: 'Half the time a hit stuns its target and each alien beside it, which lose their next action; never a boss. Hits knock the target a tile back; if something stops it, it slams into that for 1 damage' },
+  hammer: { name: 'Thunder Hammer', type: 'Hammer', stats: { move: 2 }, attack: { shots: 1, power: 3, wide: 0.6 }, thrown: { shots: 1, power: 1.3, ms: 700, range: 5 }, melee: true, stance: 'rush', effect: 'thunder', stun: { chance: 1, reach: 2 }, special: 'Each hit stuns every alien within 2 tiles of where it lands, the target too if it lives: each loses its next action; never a boss or one already stunned. Hits knock the target a tile back; if something stops it, it slams into that for 1 damage' },
   sword: { name: 'Sunblade', type: 'Sword', stats: { crit: 0.1, move: 2 }, attack: { shots: 1, power: 2.7 }, dash: 4, melee: true, stance: 'rush', effect: 'cleave', guard: { word: 'Parry', lands: 0 }, special: 'Parries the first hit each turn. A kill does 2 damage to every alien beside the one killed' },
   shield: { name: 'Star Shield', type: 'Shield', stats: { armor: 2, move: 1 }, attack: { shots: 1, power: 1.7 }, thrown: { shots: 1, power: 0.8, ms: 700, range: 4 }, melee: true, stance: 'rush', effect: 'block', guard: { word: 'Block', lands: 0 }, special: `Blocks the first hit each turn; any other from beyond arm's reach does ${BLOCK_SOAK} less damage` },
   fists: { name: 'Power Fists', type: 'Fists', stats: { move: 2 }, attack: { shots: 2, power: 1, ms: 300 }, rocket: { shots: 2, power: 0.6, ms: 480, range: 5 }, dash: 3, melee: true, stance: 'rush', guard: { word: 'Slip', lands: 0, each: true }, special: 'Slips the first hit each turn from beside it, and the first from afar' },

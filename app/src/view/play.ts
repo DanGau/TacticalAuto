@@ -8,7 +8,7 @@ import { instant, PACE, strolls, tilePace, walkMs } from '../core/pace'
 import { attackOf, finisher, opener, secondaryAttack } from './attacks'
 import { drawTerrain } from './board'
 import { along, lerp, spot } from './camera'
-import { callout, chest, dashTo, daze, drawing, effectCallout, fireRocket, float, playShot } from './effects'
+import { callout, chest, dashTo, daze, drawing, effectCallout, fireRocket, float, playShot, shockwave } from './effects'
 import { drawAcid, drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
 import { cloakLook, create, fade, letter, place, remove, squash, vitals } from './sprites'
@@ -109,7 +109,9 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const after = vitals(battle, e.target)
       const weapon = attackOf(shooter, e.form)
       const gun = e.secondary ? finisher(secondaryAttack(e.secondary)) : e.opens && !e.lasts ? opener(weapon) : weapon
+      const ground = { x: to.at.x, y: to.at.y }
       await drawing(s, (fx) => playShot(s, fx, from, to, e, after, gun))
+      if (e.ring) void drawing(s, (fx) => shockwave(s, fx, ground, e.ring!))
       // Crumbling ruins have already broken in the battle; show it as the hit lands.
       if (battle.twist === 'crumbling' && e.damage > 0) drawTerrain(s, battle)
     } else if (e.type === 'rocket') {

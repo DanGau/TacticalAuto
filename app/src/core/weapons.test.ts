@@ -136,8 +136,8 @@ test.each(Object.entries(WEAPONS).filter(([, w]) => w.guard) as [WeaponId, (type
 })
 
 test('a hammer blow stuns at its chance, never a boss', () => {
-  const chance = WEAPONS.hammer.stun!
-  WEAPONS.hammer.stun = 1
+  const shock = WEAPONS.hammer.stun!
+  WEAPONS.hammer.stun = { chance: 1, reach: 1 }
   const { b, hero, aliens } = field('hammer', [[11, 10]])
   weaponAttack(b, hero, new Set(aliens.map((a) => a.id)))
   expect(aliens[0].panicked).toBe(true)
@@ -145,7 +145,7 @@ test('a hammer blow stuns at its chance, never a boss', () => {
   boss.aliens[0].boss = true
   weaponAttack(boss.b, boss.hero, new Set([boss.aliens[0].id]))
   expect(boss.aliens[0].panicked).toBe(false)
-  WEAPONS.hammer.stun = chance
+  WEAPONS.hammer.stun = shock
 })
 
 test('a sword dashes in to strike, within its dash and no farther', () => {

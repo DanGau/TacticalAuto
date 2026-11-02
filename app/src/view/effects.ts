@@ -47,6 +47,15 @@ export function effectCallout(s: Stage, e: Extract<GameEvent, { type: 'effect' }
   return callout(s, e.amount === 0 ? word : `${word} ${e.amount > 0 ? '+' : ''}${e.amount}`, e.amount > 0 ? COLOR.heal : e.amount < 0 ? COLOR.crit : COLOR.hit, over)
 }
 
+/** A stunning blow's shockwave spreads over the ground about `at`, as far as `tiles` reach. */
+export function shockwave(s: Stage, fx: Sketch, at: Tile, tiles: number): Promise<void> {
+  const reach = (tiles + 0.5) * TILE_W
+  return s.tween(CALLOUT_MS, (t) => {
+    const r = reach * (0.4 + 0.6 * Math.sqrt(t))
+    fx.clear().ellipse(at.x, at.y, r, r / 2).stroke({ color: COLOR.hit, width: 5 - 3 * t, alpha: 1 - t * t })
+  })
+}
+
 /** Stars circle a stunned unit's head. */
 export function daze(s: Stage, fx: Sketch, over: Sprite): Promise<void> {
   const head = { x: over.at.x, y: over.at.y - 40 }
