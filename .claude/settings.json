@@ -1,4 +1,8 @@
 {
+  "permissions": {
+    "allow": ["Bash", "PowerShell", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSearch"],
+    "additionalDirectories": ["C:/Users/danga/AppData/Local/Temp/claude"]
+  },
   "hooks": {
     "PreToolUse": [
       {
