@@ -37,6 +37,7 @@ export function callout(s: Stage, text: string, color: number, over: Sprite, siz
 export function shotCallout(s: Stage, e: Extract<GameEvent, { type: 'shot' }>, over: Sprite): Label {
   // A combo's second blow reads over the first, and bigger, so both can be counted.
   const lift = e.secondary ? FINISH_LIFT : (e.nth ?? 0) * VOLLEY_LIFT
+  if (e.deflect) return callout(s, e.damage > 0 ? `${e.deflect.toUpperCase()} -${e.damage}` : e.deflect.toUpperCase(), COLOR.deflect, over, 16, lift)
   return e.crit ? callout(s, `CRIT -${e.damage}`, COLOR.crit, over, e.secondary ? 22 : 18, lift) : callout(s, `HIT -${e.damage}`, COLOR.hit, over, e.secondary ? 18 : 13, lift)
 }
 
@@ -44,6 +45,18 @@ export function shotCallout(s: Stage, e: Extract<GameEvent, { type: 'shot' }>, o
 export function effectCallout(s: Stage, e: Extract<GameEvent, { type: 'effect' }>, over: Sprite): Label {
   const word = effectName(e.effect, s.kit()).toUpperCase()
   return callout(s, e.amount === 0 ? word : `${word} ${e.amount > 0 ? '+' : ''}${e.amount}`, e.amount > 0 ? COLOR.heal : e.amount < 0 ? COLOR.crit : COLOR.hit, over)
+}
+
+/** Stars circle a stunned unit's head. */
+export function daze(s: Stage, fx: Sketch, over: Sprite): Promise<void> {
+  const head = { x: over.at.x, y: over.at.y - 40 }
+  return s.tween(CALLOUT_MS * 1.5, (t) => {
+    fx.clear()
+    for (let i = 0; i < 3; i++) {
+      const a = t * Math.PI * 4 + (i * Math.PI * 2) / 3
+      fx.circle(head.x + Math.cos(a) * 14, head.y + Math.sin(a) * 5, 3.5).fill({ color: COLOR.hit, alpha: 1 - t * t })
+    }
+  })
 }
 
 /** Floats a callout up and away. It does not hold up the next beat. */
@@ -240,7 +253,8 @@ export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e
     squash(to, 1, 1)
     fx.clear()
   }
-  const sparks = (sketch: Sketch) => burst(s, sketch, mark, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, e.secondary ? power * 1.6 : power)
+  // A deflected blow throws a bright spray back at the attacker.
+  const sparks = (sketch: Sketch) => (e.deflect ? burst(s, sketch, mark, { x: -dir.x, y: -dir.y }, COLOR.deflect, 14, 1.4) : burst(s, sketch, mark, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, e.secondary ? power * 1.6 : power))
   // A shot of a rapid attack does not wait on its sparks: the next is already coming.
   if (e.lasts && e.lasts < PACE.attack) void drawing(s, sparks).then(settle)
   else {

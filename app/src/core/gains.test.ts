@@ -55,7 +55,8 @@ test('in whole bot runs, only a relic chosen from a card goes untold', () => {
       if (run.phase === 'battle' && run.battle!.phase === 'battle') {
         const before = held(run)
         step(run)
-        found.push(...untold(before, run))
+        // A hero met at the leg's end shows on the battle report.
+        found.push(...untold(before, run).filter((t) => !run.report?.hired || t !== `hero ${run.report.hired}`))
         continue
       }
       const action: Action = bots.strategic(run, rng)

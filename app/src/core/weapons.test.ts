@@ -117,10 +117,35 @@ test('a shield takes off shots from afar, not up close', () => {
   Object.assign(shooter, { stats: { ...shooter.stats, damage: 6, range: 8 } })
   hero.hp = hero.stats.hp = 100
   hero.effects = ['block']
+  hero.guarded = ['any']
   const far = shots(shoot(b, shooter, new Set([hero.id])))[0]
   Object.assign(shooter, { x: 11 })
   const close = shots(shoot(b, shooter, new Set([hero.id])))[0]
   expect(far.damage).toBe(close.damage - BLOCK_SOAK)
+})
+
+test.each(Object.entries(WEAPONS).filter(([, w]) => w.guard) as [WeaponId, (typeof WEAPONS)[WeaponId]][])('a %s saves only the first hit each turn it guards, so a crowd breaks through', (id, w) => {
+  const { b, hero, aliens } = field(id, [[11, 10], [9, 10], [10, 11], [13, 10]])
+  hero.hp = hero.stats.hp = 100
+  for (const a of aliens) Object.assign(a, { stats: { ...a.stats, damage: 6, range: 8 } })
+  const hit = (a: Unit) => shots(shoot(b, a, new Set([hero.id])))[0]
+  const crowd = aliens.slice(0, 3).map(hit)
+  expect(crowd.map((s) => s.deflect)).toEqual([w.guard!.word, undefined, undefined])
+  expect(crowd[0].damage).toBeLessThan(crowd[1].damage)
+  expect(hit(aliens[3]).deflect).toBe(w.guard!.each ? w.guard!.word : undefined)
+})
+
+test('a hammer blow stuns at its chance, never a boss', () => {
+  const chance = WEAPONS.hammer.stun!
+  WEAPONS.hammer.stun = 1
+  const { b, hero, aliens } = field('hammer', [[11, 10]])
+  weaponAttack(b, hero, new Set(aliens.map((a) => a.id)))
+  expect(aliens[0].panicked).toBe(true)
+  const boss = field('hammer', [[11, 10]])
+  boss.aliens[0].boss = true
+  weaponAttack(boss.b, boss.hero, new Set([boss.aliens[0].id]))
+  expect(boss.aliens[0].panicked).toBe(false)
+  WEAPONS.hammer.stun = chance
 })
 
 test('a sword dashes in to strike, within its dash and no farther', () => {

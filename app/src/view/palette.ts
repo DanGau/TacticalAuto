@@ -23,6 +23,8 @@ export const COLOR = {
   line: 0x10141c,
   hit: 0xffd84d,
   crit: 0xff7a3d,
+  /** A weapon guard saving a hit: steel catching light. */
+  deflect: 0xbfe8ff,
   heal: 0x7ddc5a,
   acid: 0xa6e22e,
   fire: 0xff6a1f,

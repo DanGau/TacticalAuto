@@ -20,7 +20,7 @@ import { bite, MIN_DAMAGE, odds } from './sight'
 import { random } from './rng'
 import { paths, bestPath, preyed, walk, leapTo } from './pathing'
 import { FUEL_DAMAGE } from './twists'
-import { BLOCK_SOAK, WEAPONS, type Kit } from './weapons'
+import { BLOCK_SOAK, WEAPONS, type Guard, type Kit } from './weapons'
 
 /** One shot of a weapon's attack, and what the attack's shots share: one crit roll, and an attack out of cloak. */
 interface Blow {
@@ -163,6 +163,8 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     damage = 0
     events.push({ type: 'effect', id: enemy.id, effect: 'intangible', amount: 0 })
   }
+  const deflect = guard(enemy, distance(unit, enemy) > 1, damage)
+  if (deflect) damage = Math.floor(damage * deflect.lands)
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0
   const pierced = unseen || secondary?.effect === 'pierce' || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) > 0
   const left = enemy.hp + (pierced ? 0 : enemy.armor)
@@ -182,7 +184,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const beside = battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1)
   // The weapon's attack of a turn with a secondary still to come opens a combo.
   const opens = !secondary && !granted && isSoldier(unit) && battle.actor === unit.id && battle.attacks < attacksOf(unit)
-  events.unshift({ type: 'shot', id: unit.id, target: enemy.id, crit, damage, with: used, ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}), ...(blow ? { nth: blow.nth, ...(blow.kit.ms ? { lasts: blow.kit.ms } : {}), ...(blow.form ? { form: blow.form } : {}) } : {}) })
+  events.unshift({ type: 'shot', id: unit.id, target: enemy.id, crit, damage, with: used, ...(deflect ? { deflect: deflect.word } : {}), ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}), ...(blow ? { nth: blow.nth, ...(blow.kit.ms ? { lasts: blow.kit.ms } : {}), ...(blow.form ? { form: blow.form } : {}) } : {}) })
   if (battle.twist === 'crumbling' && damage > 0) crumble(battle, enemy, unit)
   wound(battle, enemy, damage, events, pierced, crit)
   if (battle.twist === 'fuel' && damage > 0) events.push(...ignite(battle, enemy))
@@ -247,6 +249,8 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     enemy.panicked = true
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'stasis') ? 'stasis' : 'deepFreeze', amount: 0 })
   }
+  // A stunning blow rings out over its target and every foe beside it.
+  if (first && !secondary && damage > 0) for (const other of [enemy, ...beside]) stun(battle, unit, other, events)
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
   else if (first && enemy.hp > 0 && damage > 0 && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'tether', 1)) knockback(battle, unit, enemy, events, -1)
@@ -452,4 +456,21 @@ export function blink(battle: Battle, unit: Unit, events: GameEvent[]): void {
   unit.x = to.x
   unit.y = to.y
   events.push({ type: 'move', id: unit.id, path: [to], with: 'blink' })
+}
+
+/** The target's weapon guard, if it saves this hit, spending it for the turn. */
+function guard(target: Unit, far: boolean, damage: number): Guard | undefined {
+  const g = target.weapon && WEAPONS[target.weapon].guard
+  const reach = g?.each ? (far ? 'far' : 'near') : 'any'
+  if (!g || damage <= 0 || target.guarded?.includes(reach)) return undefined
+  ;(target.guarded ??= []).push(reach)
+  return g
+}
+
+/** A blow of a stunning weapon may stun `target`, short of a boss, so it loses its next action. */
+function stun(battle: Battle, unit: Unit, target: Unit, events: GameEvent[]): void {
+  const chance = unit.weapon && WEAPONS[unit.weapon].stun
+  if (!chance || target.hp <= 0 || target.boss || target.panicked || random(battle) >= chance) return
+  target.panicked = true
+  events.push({ type: 'effect', id: target.id, effect: 'stun', amount: 0 })
 }

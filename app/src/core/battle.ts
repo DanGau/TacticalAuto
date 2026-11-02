@@ -138,7 +138,7 @@ export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty'
 /** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
-export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect | 'block' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw'
+export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw'
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
@@ -231,6 +231,8 @@ export interface Unit {
   panicked: boolean
   /** Whether the unit has moved this turn. */
   moved: boolean
+  /** The reaches its weapon's guard has saved a hit from this turn: `any`, or for a guard of `each`, `near` and `far`. */
+  guarded?: ('any' | 'near' | 'far')[]
   /** Own turns for which its attacks do SUPPRESS_DAMAGE less. */
   suppressed: number
   /** Whether every hit on it does TUNING.markDamage more damage. */

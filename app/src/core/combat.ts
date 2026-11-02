@@ -112,6 +112,7 @@ function act(battle: Battle): GameEvent[] {
     if (battle.turn === 'alien') for (const u of battle.units) u.surprised = Math.max(0, u.surprised - 1)
     battle.turn = battle.turn === 'human' ? 'alien' : 'human'
     battle.stage = 'move'
+    for (const u of battle.units) u.guarded = []
   }
   return []
 }

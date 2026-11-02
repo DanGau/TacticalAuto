@@ -8,7 +8,7 @@ import { instant, PACE, strolls, tilePace, walkMs } from '../core/pace'
 import { attackOf, finisher, opener, secondaryAttack } from './attacks'
 import { drawTerrain } from './board'
 import { along, lerp, spot } from './camera'
-import { callout, chest, dashTo, drawing, effectCallout, fireRocket, float, playShot } from './effects'
+import { callout, chest, dashTo, daze, drawing, effectCallout, fireRocket, float, playShot } from './effects'
 import { drawAcid, drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
 import { cloakLook, create, fade, letter, place, remove, squash, vitals } from './sprites'
@@ -162,6 +162,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       on.drawHp(...vitals(battle, e.id))
       // A demolishing hit has already wrecked what stood in the battle; show it as the hit lands.
       if (e.effect === 'demolish') drawTerrain(s, battle)
+      if (e.effect === 'stun') void drawing(s, (fx) => daze(s, fx, on))
       float(s, effectCallout(s, e, on))
     } else if (e.type === 'saved' || e.type === 'escaped') {
       const sprite = sprites.get(e.id)
