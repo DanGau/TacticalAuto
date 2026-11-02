@@ -224,7 +224,7 @@ function burst(s: Stage, fx: Sketch, at: Tile, dir: Tile, color: number, count: 
  * A shot plays as its weapon: the projectile or lunge, then on a hit a freeze on the blow with the target squashed and
  * flashing, a camera jolt, a knockback and sparks, all harder on a crit.
  */
-export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: [number, number], gun: Attack): Promise<void> {
+export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: [number, number, number], gun: Attack): Promise<void> {
   const { crit } = e
   const nth = e.nth ?? 0
   const muzzle = chest(from)

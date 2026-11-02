@@ -77,16 +77,16 @@ export function shimmer(sprite: Sprite, now: number): void {
   fade(sprite, low + (high - low) * (0.5 + 0.5 * Math.sin(now / 140 + sprite.tile.x)) * (0.75 + 0.25 * Math.sin(now / 37)))
 }
 
-/** A unit's health and armor in the battle; none of either once it is gone. */
-export const vitals = (battle: Battle, id: number): [number, number] => {
+/** A unit's health, armor and temp HP in the battle; none of either once it is gone. */
+export const vitals = (battle: Battle, id: number): [number, number, number] => {
   const unit = battle.units.find((u) => u.id === id)
-  return [unit?.hp ?? 0, unit?.armor ?? 0]
+  return [unit?.hp ?? 0, unit?.armor ?? 0, unit?.temp ?? 0]
 }
 
 /**
  * `pips` marks a soldier's level above its health; `letter` is the initial of its class. Its health and armor show as
  * pips, one each, ten to a row, rows stacking upward: health left in green on an ally and red on an enemy, health
- * lost in a dark shade of it, then armor in yellow.
+ * lost in a dark shade of it, then armor in yellow, then temp HP in pale blue.
  */
 export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite {
   const picture = document.createElement('canvas')
@@ -113,7 +113,7 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
     scale: unit.giant ? GIANT : unit.boss ? 1.6 : unit.target ? 1.3 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1,
     ally,
     cloaked: false,
-    drawHp(hp, armor) {
+    drawHp(hp, armor, temp = 0) {
       g.setTransform(BODY_RES, 0, 0, BODY_RES, BODY.left * BODY_RES, BODY.up * BODY_RES)
       g.clearRect(-BODY.left, -BODY.up, 2 * BODY.left, BODY.up + BODY.down)
       g.fillStyle = css(color)
@@ -144,7 +144,7 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
         g.fillText(letter, 0, -17)
       }
       const lost = maxHp - Math.max(hp, 0)
-      const colors = [...Array(Math.max(hp, 0)).fill(ally ? COLOR.allyHp : COLOR.enemyHp), ...Array(Math.max(lost, 0)).fill(ally ? COLOR.allyLost : COLOR.enemyLost), ...Array(armor).fill(COLOR.hit)]
+      const colors = [...Array(Math.max(hp, 0)).fill(ally ? COLOR.allyHp : COLOR.enemyHp), ...Array(Math.max(lost, 0)).fill(ally ? COLOR.allyLost : COLOR.enemyLost), ...Array(armor).fill(COLOR.hit), ...Array(temp).fill(COLOR.temp)]
       colors.forEach((c, i) => {
         g.fillStyle = css(c)
         g.fillRect(-PIP_ROW / 2 + (i % 10) * PIP_STEP, -38 - Math.floor(i / 10) * PIP_STEP, PIP, PIP)
@@ -158,7 +158,7 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
   s.units.add(node)
   s.sprites.set(unit.id, sprite)
   place(s, sprite, { x: unit.x, y: unit.y })
-  sprite.drawHp(unit.hp, unit.armor)
+  sprite.drawHp(unit.hp, unit.armor, unit.temp)
   return sprite
 }
 
@@ -183,6 +183,6 @@ export function sync(s: Stage, run: Run, battle: Battle): void {
     if (unit.giant) grow(sprite)
     cloakLook(sprite, !!unit.cloaked)
     fade(sprite, 1)
-    sprite.drawHp(unit.hp, unit.armor)
+    sprite.drawHp(unit.hp, unit.armor, unit.temp)
   }
 }

@@ -14,8 +14,8 @@ export interface Sprite {
   node: Group
   body: Billboard
   shadow: Mesh
-  /** Redraws the picture with the given health and armor. */
-  drawHp(hp: number, armor: number): void
+  /** Redraws the picture with the given health, armor and temp HP. */
+  drawHp(hp: number, armor: number, temp?: number): void
   /** The tile the sprite stands on, which lags the battle while a beat animates. */
   tile: Tile
   /** Where its feet show in the camera's picture, which a lunge, knockback or fall moves off its tile. */

@@ -4,6 +4,7 @@ import { stepBattle } from './combat'
 import { shoot, weaponAttack } from './attack'
 import type { GameEvent } from './combat-event'
 import { spotted } from './fighters'
+import { wound } from './wound'
 import { apply } from './apply'
 import { begun, enterAt } from './roads'
 import { SECONDARIES } from './secondaries'
@@ -196,4 +197,18 @@ test('a hammer charges the alien in reach, though a cluster still waiting stands
   Object.assign(b, { turn: 'human', stage: 'move', shooter: 0, attacks: 0, strides: {}, round: 0 })
   stepBattle(b)
   expect(Math.max(Math.abs(hero.x - aliens[0].x), Math.abs(hero.y - aliens[0].y))).toBeLessThanOrEqual(1)
+})
+
+test('a hammer kill gives temp HP to its cap, which takes damage before health', () => {
+  const { b, hero, aliens } = field('hammer', [[11, 10]])
+  const surge = WEAPONS.hammer.surge!
+  for (let i = 0; i < 2; i++) {
+    Object.assign(aliens[0], { hp: 1, x: 11, y: 10 })
+    b.units = [hero, aliens[0]]
+    shoot(b, hero, spotted(b))
+  }
+  expect(hero.temp).toBe(surge.cap)
+  const hp = hero.hp
+  wound(b, hero, surge.cap + 1, [])
+  expect([hero.temp, hero.hp]).toEqual([0, hp - 1])
 })

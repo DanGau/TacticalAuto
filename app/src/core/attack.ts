@@ -20,7 +20,7 @@ import { bite, MIN_DAMAGE, odds } from './sight'
 import { random } from './rng'
 import { paths, bestPath, preyed, walk, leapTo } from './pathing'
 import { FUEL_DAMAGE } from './twists'
-import { BLOCK_SOAK, WEAPONS, type Guard, type Kit } from './weapons'
+import { BLOCK_SOAK, WEAPONS, type Guard, type Kit, type Weapon } from './weapons'
 
 /** One shot of a weapon's attack, and what the attack's shots share: one crit roll, and an attack out of cloak. */
 interface Blow {
@@ -187,7 +187,10 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const shock = first && !secondary && unit.weapon ? WEAPONS[unit.weapon].stun : undefined
   events.unshift({ type: 'shot', id: unit.id, target: enemy.id, crit, damage, with: used, ...(deflect ? { deflect: deflect.word } : {}), ...(shock ? { ring: shock.reach } : {}), ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}), ...(blow ? { nth: blow.nth, ...(blow.kit.ms ? { lasts: blow.kit.ms } : {}), ...(blow.form ? { form: blow.form } : {}) } : {}) })
   if (battle.twist === 'crumbling' && damage > 0) crumble(battle, enemy, unit)
+  const alive = enemy.hp > 0
   wound(battle, enemy, damage, events, pierced, crit)
+  const surged = !secondary && alive && enemy.hp <= 0 && unit.weapon ? WEAPONS[unit.weapon].surge : undefined
+  if (surged) surge(unit, surged, events)
   if (battle.twist === 'fuel' && damage > 0) events.push(...ignite(battle, enemy))
   // A ricochet strikes another alien near the target for half.
   const bounce = damage > 0 ? nearest(inReach.filter((u) => u !== enemy && u.hp > 0 && distance(u, enemy!) <= RICOCHET_REACH), enemy) : undefined
@@ -472,4 +475,12 @@ function stun(target: Unit, chance: number, battle: Battle, events: GameEvent[])
   if (target.hp <= 0 || target.boss || target.panicked || random(battle) >= chance) return
   target.panicked = true
   events.push({ type: 'effect', id: target.id, effect: 'stun', amount: 0 })
+}
+
+/** Its wielder gains its weapon's surge of temp HP, to the surge's cap. */
+function surge(unit: Unit, { gain, cap }: NonNullable<Weapon['surge']>, events: GameEvent[]): void {
+  const temp = Math.min(cap, (unit.temp ?? 0) + gain)
+  if (temp <= (unit.temp ?? 0)) return
+  unit.temp = temp
+  events.push({ type: 'effect', id: unit.id, effect: 'surge', amount: 0 })
 }
