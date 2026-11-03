@@ -1,21 +1,18 @@
 // A jump on screen, read without words: a crouch, a stretched lift-off in a puff of dust, the shadow left on the
 // ground below, a hang at the peak, and a squashed landing in a ring of dust, a heavy one jolting the camera.
 import type { SpriteMaterial } from 'three'
+import { PACE } from '../core/pace'
 import { DECAL_LIFT, picture, type Stride } from './camera'
 import { drawing, shake } from './effects'
 import { squash } from './sprites'
 import type { Sprite, Stage } from './stage'
 import type { Point3 } from './shapes'
 
-/** How deep a crouch or a landing squashes, how far lift-off stretches, and how long a landing settles, in ms. */
+/** How deep a crouch or a landing squashes, and how far lift-off stretches. */
 const CROUCH = 0.22
 const STRETCH = 0.25
 const LAND = 0.3
-const LAND_MS = 220
-/** How long the crouch before a jump that starts a walk holds, in ms. */
-export const CROUCH_MS = 150
-/** The share of a stride before a jump that the crouch takes. */
-export const WIND_UP = 0.35
+
 /** How much the shadow shrinks and fades a level up, and the least it keeps. */
 const SHRINK = 0.15
 const SHADOW_MIN = 0.45
@@ -28,8 +25,8 @@ const AIRBORNE = 999
 /** A crouch `k` deep, 0 standing to 1 deepest, before a jump. */
 export const crouch = (sprite: Sprite, k: number) => squash(sprite, 1 + CROUCH * k, 1 - CROUCH * k)
 
-/** Poses a sprite at `at`, its shadow on the ground under it; mid-jump it stretches rising and falling, deepest at lift-off and touch-down. `ahead` is how near a jump is coming, 0 none to 1 at lift-off. */
-export function pose(sprite: Sprite, at: Stride, ahead: number): void {
+/** Poses a sprite at `at`, its shadow on the ground under it; mid-jump it stretches rising and falling, deepest at lift-off and touch-down. `crouched` is how deep it crouches before a jump, 0 standing to 1 deepest. */
+export function pose(sprite: Sprite, at: Stride, crouched: number): void {
   const { feet, ground, leap } = at
   sprite.node.position.set(feet.x, feet.y, feet.z)
   const up = feet.y - ground.y
@@ -39,7 +36,7 @@ export function pose(sprite: Sprite, at: Stride, ahead: number): void {
   // In the air it shows over the cliff it clears, as it would against the sky.
   ;(sprite.body.material as SpriteMaterial).depthTest = !leap
   sprite.body.renderOrder = leap ? AIRBORNE : 0
-  if (!leap) return crouch(sprite, ahead)
+  if (!leap) return crouch(sprite, crouched)
   const k = STRETCH * Math.abs(Math.cos(Math.PI * leap.f))
   squash(sprite, 1 - k / 2, 1 + k)
 }
@@ -51,9 +48,6 @@ export function ground(sprite: Sprite): void {
   sprite.shadow.position.y = DECAL_LIFT * 2
   sprite.shadow.scale.setScalar(sprite.scale)
 }
-
-/** How near a jump is, 0 none to 1 at lift-off, from where the walker is and where it will be a crouch's share of a stride on. */
-export const nearing = (now: Stride, soon: Stride) => (!now.leap && soon.leap ? Math.min(1, soon.leap.f / WIND_UP) : 0)
 
 /** Dust kicked up at `at`: a few puffs on lift-off, a wider ring on landing, sized to the jumper. */
 export function dust(s: Stage, at: Point3, size: number, landing: boolean): Promise<void> {
@@ -77,7 +71,7 @@ export function land(s: Stage, sprite: Sprite, at: Point3, strength: number): vo
   ground(sprite)
   void dust(s, at, sprite.scale, true)
   if (strength >= HEAVY) void shake(s, 2 * (strength - HEAVY + 1), 200)
-  void s.tween(LAND_MS, (t) => {
+  void s.tween(PACE.landing, (t) => {
     const k = LAND * (1 - t) * Math.cos(t * Math.PI * 1.5)
     squash(sprite, 1 + k, 1 - k)
   })

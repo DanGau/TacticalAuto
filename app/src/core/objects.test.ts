@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { GRID, isSoldier } from './battle'
 import { distance, reshaped } from './grid'
-import { leverage, THROW_DAMAGE } from './objects'
+import { HURL_MAX, leverage, THROW_DAMAGE } from './objects'
 import { begun, enterAt } from './roads'
 import { current } from './run'
 import { ARENA_REACH } from './encounter'
@@ -81,6 +81,24 @@ test('a hero of strength 3 throws a small alien beside it over the edge; one of 
   expect(events).toContainEqual(expect.objectContaining({ type: 'throw', object: 'alien', thrown: alien.id }))
   expect(events).toContainEqual(expect.objectContaining({ type: 'fall', drop: 'edge', fatal: true }))
   expect(battle.units).not.toContain(alien)
+})
+
+test('nothing thrown flies farther than HURL_MAX, however strong the thrower, nor goes over the edge past where it was aimed', () => {
+  const { battle, soldier, alien } = duel()
+  soldier.stats.strength = 12
+  Object.assign(alien, { x: 10, y: 11, kind: 'trooper', boss: false, target: false })
+  for (let y = 0; y < GRID; y++) {
+    battle.ground[y * GRID + 15] = 'void'
+    battle.props[y * GRID + 15] = 'void'
+    battle.bulk[y * GRID + 15] = 1
+  }
+  reshaped(battle)
+  const start = { x: alien.x, y: alien.y }
+  const events = leverage(battle, soldier)
+  const thrown = events.find((e) => e.type === 'throw')!
+  const over = events.find((e) => e.type === 'fall')!
+  expect(thrown.type === 'throw' && distance(thrown.from, thrown.to)).toBeLessThanOrEqual(HURL_MAX)
+  expect(over.type === 'fall' && distance(start, over.to)).toBeLessThanOrEqual(HURL_MAX)
 })
 
 test('a hero sets off a fuel tank beside an alien, but not one beside a human', () => {

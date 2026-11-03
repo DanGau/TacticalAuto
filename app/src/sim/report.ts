@@ -16,8 +16,8 @@ export interface Report {
   meanBattles: number
   /** Seconds a battle takes to play in the view: the median, the 90th percentile, and the longest. */
   seconds: { median: number; p90: number; max: number }
-  /** Falls, fall kills and throws a battle. */
-  moments: { falls: number; fallKills: number; throws: number }
+  /** Falls, fall kills and throws a battle, and the farthest throw in tiles. */
+  moments: { falls: number; fallKills: number; throws: number; farthest: number }
   /** Jumps a battle, by arena kind. */
   jumps: Record<string, number>
   /** What battles cost the squad, as shares of its most health in percent: lost and left, each by mean, and left by leg; points lost; soldiers downed a battle; battles ended under 75%. */
@@ -69,7 +69,7 @@ export function report(results: RunResult[]): Report {
     meanKeys: mean((r) => r.keys),
     meanBattles: mean((r) => r.battles),
     seconds: { median: at(0.5), p90: at(0.9), max: at(1) },
-    moments: { falls: per((m) => m.falls), fallKills: per((m) => m.fallKills), throws: per((m) => m.throws) },
+    moments: { falls: per((m) => m.falls), fallKills: per((m) => m.fallKills), throws: per((m) => m.throws), farthest: Math.max(0, ...results.map((r) => r.moments.farthest)) },
     jumps: jumpsByArena(results),
     attrition: {
       lost: share(tolls, (t) => t.before - t.after),
@@ -97,7 +97,7 @@ export function formatReport(r: Report): string {
     `mean keys won       ${r.meanKeys} of ${KEYS}`,
     `mean battles        ${r.meanBattles}`,
     `battle seconds      median ${r.seconds.median}, p90 ${r.seconds.p90}, max ${r.seconds.max}`,
-    `a battle            ${r.moments.falls} falls, ${r.moments.fallKills} fall kills, ${r.moments.throws} throws`,
+    `a battle            ${r.moments.falls} falls, ${r.moments.fallKills} fall kills, ${r.moments.throws} throws, farthest ${r.moments.farthest} tiles`,
     `jumps a battle      ${Object.entries(r.jumps).map(([kind, n]) => `${kind} ${n}`).join(', ')}`,
     `squad health        loses ${r.attrition.lost}% (${r.attrition.points}) a battle, ends at ${r.attrition.hp}%; ${r.attrition.worn}% of battles end under 75%; ${r.attrition.downed} downed a battle`,
     `ends at, by leg     ${r.attrition.legs.map((n) => `${n}%`).join(', ')}`,

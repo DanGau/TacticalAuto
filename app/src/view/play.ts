@@ -7,8 +7,9 @@ import { effectName } from '../core/effects'
 import { instant, PACE, strolls, tilePace, walkMs } from '../core/pace'
 import { attackOf, finisher, opener, secondaryAttack } from './attacks'
 import { drawTerrain } from './board'
-import { along, lerp, spot, strideAlong } from './camera'
-import { crouch, CROUCH_MS, dust, ground as grounded, land, nearing, pose, WIND_UP } from './leaps'
+import { along, leaping, lerp, spot, strideOf } from './camera'
+import { dust, ground as grounded, land, pose } from './leaps'
+import { momentum, timeline, type Moment } from './timing'
 import { CLIFF } from '../core/grid'
 import { callout, chest, dashTo, daze, drawing, effectCallout, fireRocket, float, playShot, shockwave } from './effects'
 import { drawAcid, drawFog, drawMarks } from './marks'
@@ -24,9 +25,6 @@ const ORDERS: Record<Order, string> = { prepare: '👁 READY', sprint: '» SPRIN
 
 /** Where the squad stands: the camera keeps to it, and never leaves it for action elsewhere. */
 export const squad = (battle: Battle): Tile[] => battle.units.filter((u) => u.side === 'human' && !u.civilian)
-
-/** How far along a walk a unit is at time `t`: it gathers speed, carries it, and slows to a stop. */
-const momentum = (t: number) => t * t * t * (t * (6 * t - 15) + 10)
 
 /** How much a unit stretches into its stride at full speed, and squashes as its weight lands, and for how long, in ms. */
 const LEAN = 0.07
@@ -58,20 +56,19 @@ async function walk(s: Stage, sprite: Sprite, path: Tile[], ms: number, strength
     void s.tween(SETTLE_MS, (t) => squash(sprite, 1 + SETTLE * (1 - t), 1 - SETTLE * (1 - t)))
     return
   }
-  // A jumper crouches first if its first stride is a jump, else in the stride before one.
-  const stride = (t: number) => strideAlong(points, momentum(t), CLIFF)
-  if (stride(0.001).leap) await s.tween(CROUCH_MS, (t) => crouch(sprite, Math.sin((Math.PI / 2) * t)))
-  const ahead = WIND_UP / path.length
-  let last = stride(0)
+  // Each jump takes its full time: a crouch where it stands, the flight, and a landing it settles from.
+  const when = timeline(points, points.slice(1).map((b, i) => leaping(points[i], b, CLIFF)), ms)
+  let was: Moment = when(0)
   await s.tween(ms, (t) => {
-    place(s, sprite, along(points, momentum(t)))
-    const now = stride(t)
-    pose(sprite, now, nearing(now, stride(Math.min(1, t + ahead))))
-    if (now.leap && !last.leap) void dust(s, last.ground, sprite.scale, false)
-    if (!now.leap && last.leap) land(s, sprite, now.ground, strength)
-    last = now
+    const now = when(t)
+    const [a, b] = [points[now.i - 1], points[now.i]]
+    const at = strideOf(a, b, now.f, CLIFF)
+    place(s, sprite, lerp(a, b, now.f))
+    if (now.phase === 'air' && was.phase !== 'air') void dust(s, at.ground, sprite.scale, false)
+    if (now.phase === 'land' && (was.phase !== 'land' || was.i !== now.i)) land(s, sprite, at.ground, strength)
+    if (now.phase !== 'land') pose(sprite, at, now.phase === 'crouch' ? Math.sin((Math.PI / 2) * now.k) : 0)
+    was = now
   })
-  if (last.leap) land(s, sprite, last.ground, strength)
   grounded(sprite)
 }
 
@@ -107,7 +104,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       for (const m of group) if (m.type === 'move' && (sprites.has(m.id) || glows.has(m.id))) paths.set(m.id, [...(paths.get(m.id) ?? []), ...m.path])
       const leapers = new Set(group.flatMap((m) => (m.type === 'move' && m.leaps ? [m.id] : [])))
       const pace = (id: number) => tilePace(!!sprites.get(id)?.ally)
-      const ms = walkMs([...paths].map(([id, path]) => ({ path, pace: pace(id) })))
+      const ms = walkMs([...paths].map(([id, path]) => ({ path, pace: pace(id), leaps: group.reduce((sum, m) => sum + (m.type === 'move' && m.id === id ? (m.leaps ?? 0) : 0), 0) })))
       const walks = [...paths].map(([id, path]) => (sprites.has(id) ? walk(s, sprites.get(id)!, path, ms, leapers.has(id) ? (battle.units.find((u) => u.id === id)?.stats.strength ?? 2) : undefined) : glide(s, glows.get(id)!, path, ms)))
       for (const m of group) if (m.type === 'move' && m.with && m.with !== 'dash' && sprites.has(m.id)) float(s, callout(s, effectName(m.with, s.kit()).toUpperCase(), 0xffffff, sprites.get(m.id)!))
       // The camera takes in where each jump leaves from as well as where it lands, rather than chasing the jumper.

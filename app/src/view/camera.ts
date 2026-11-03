@@ -86,17 +86,18 @@ export interface Stride {
   leap?: { f: number; size: number }
 }
 
-/** Where a walker through `points` is at a share `t` of the way. A stride across a gap or up or down `cliff` levels or more is a jump: it arcs high over, hanging at its peak. */
-export function strideAlong(points: Tile[], t: number, cliff: number): Stride {
-  const on = along(points, t)
-  const p = spot(on.x, on.y)
-  if (points.length < 2) return { feet: p, ground: p }
-  const { i, f } = strideAt(points, t)
-  const [a, b] = [points[i - 1], points[i]]
+/** Whether the stride from `a` to `b` is a jump: across a gap, or up or down `cliff` levels or more. */
+export const leaping = (a: Tile, b: Tile, cliff: number) => Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) > 1 || Math.abs((heights[b.y * GRID + b.x] ?? 0) - (heights[a.y * GRID + a.x] ?? 0)) >= cliff
+
+/** A walker a share `f` along the stride from `a` to `b`; a jump arcs high over, hanging at its peak. */
+export function strideOf(a: Tile, b: Tile, f: number, cliff: number): Stride {
+  if (!leaping(a, b, cliff)) {
+    const p = lerp(a, b, f)
+    const at = spot(p.x, p.y)
+    return { feet: at, ground: at }
+  }
   const [ha, hb] = [heights[a.y * GRID + a.x] ?? 0, heights[b.y * GRID + b.x] ?? 0]
-  const across = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y))
-  if (across <= 1 && Math.abs(hb - ha) < cliff) return { feet: p, ground: p }
-  const size = HOP + across - 1 + Math.abs(hb - ha)
+  const size = HOP + Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) - 1 + Math.abs(hb - ha)
   const g = f + (HANG * Math.sin(2 * Math.PI * f)) / (2 * Math.PI)
   const at = lerp(a, b, g)
   const ground = { x: at.x, y: LEVEL * (ha + (hb - ha) * g), z: at.y }

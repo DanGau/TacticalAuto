@@ -21,8 +21,11 @@ const ALIEN_WEIGHT = { small: 3, medium: 5, large: Infinity }
 export const OBJECT_USES = 3
 export const THROW_DAMAGE = 4
 
-/** Tiles a hero throws: 2 more than its strength. */
-export const hurlRange = (unit: Unit) => unit.stats.strength + 2
+/** The farthest anything flies, in tiles from where it starts. */
+export const HURL_MAX = 6
+
+/** Tiles a hero throws: 2 more than its strength, to at most HURL_MAX. */
+export const hurlRange = (unit: Unit) => Math.min(HURL_MAX, unit.stats.strength + 2)
 
 /** What a throw is worth, in aliens struck, for each alien it sends off a ledge or over the edge. */
 const FALL_WORTH = 3
@@ -114,15 +117,16 @@ function alienThrow(battle: Battle, unit: Unit, held: Unit, to: Tile, aliens: Un
   return {
     worth,
     make: (events) => {
-      // Out over the edge, from the last ground on the way.
-      const step = away(unit, to)
-      let edge: Tile = { x: unit.x, y: unit.y }
-      while (drop && !isDrop(battle, { x: edge.x + step.x, y: edge.y + step.y }) && distance(edge, to) > 1) edge = { x: edge.x + step.x, y: edge.y + step.y }
-      const lands = drop ? edge : onto ? (NEIGHBORS.map(([dx, dy]) => ({ x: to.x + dx, y: to.y + dy })).find((t) => !blocked(battle, t.x, t.y) && !isDrop(battle, t)) ?? { x: unit.x, y: unit.y }) : to
+      // Out over the edge, from the last ground on the straight way there.
+      const n = distance(held, to)
+      const way = Array.from({ length: n + 1 }, (_, i) => ({ x: Math.round(held.x + ((to.x - held.x) * i) / n), y: Math.round(held.y + ((to.y - held.y) * i) / n) }))
+      const over = way.findIndex((t) => isDrop(battle, t))
+      const edge = way[Math.max(0, over - 1)]
+      const lands = drop ? edge : onto ? (NEIGHBORS.map(([dx, dy]) => ({ x: to.x + dx, y: to.y + dy })).find((t) => !blocked(battle, t.x, t.y) && !isDrop(battle, t) && distance(t, held) <= distance(to, held)) ?? { x: unit.x, y: unit.y }) : to
       const damage = THROW_DAMAGE + (below >= CLIFF ? FALL_DAMAGE * below : 0)
       events.push({ type: 'throw', id: unit.id, from: { x: held.x, y: held.y }, to: lands, object: 'alien', thrown: held.id, hits: drop ? [] : [held, ...(onto ? [onto] : [])].map((a) => ({ target: a.id, damage: a === held ? damage : THROW_DAMAGE })) })
       Object.assign(held, lands)
-      if (drop) return fall(battle, held, edge, to, events)
+      if (drop) return fall(battle, held, edge, way[over], events)
       wound(battle, held, damage, events)
       if (onto) wound(battle, onto, THROW_DAMAGE, events)
     },
@@ -135,10 +139,10 @@ function bestThrow(battle: Battle, unit: Unit): Throw | null {
   const options: Throw[] = []
   const range = hurlRange(unit)
   const [object] = hurlables(battle, unit, unit)
-  if (object) for (const target of aliens) if (canShoot(battle, unit, target, range)) options.push(objectThrow(battle, unit, object, target, aliens))
+  if (object) for (const target of aliens) if (canShoot(battle, unit, target, range) && distance(object, target) <= range) options.push(objectThrow(battle, unit, object, target, aliens))
   for (const held of aliens.filter((a) => throwable(unit, a) && distance(a, unit) === 1 && a.hp > 0)) {
-    for (let y = unit.y - range; y <= unit.y + range; y++)
-      for (let x = unit.x - range; x <= unit.x + range; x++) {
+    for (let y = held.y - range; y <= held.y + range; y++)
+      for (let x = held.x - range; x <= held.x + range; x++) {
         const to = { x, y }
         if (!onGrid(x, y) || (x === held.x && y === held.y) || (x === unit.x && y === unit.y) || !lineOfSight(battle, unit, to)) continue
         if (!isDrop(battle, to) && blocked(battle, x, y) && !aliens.some((a) => a.x === x && a.y === y)) continue
