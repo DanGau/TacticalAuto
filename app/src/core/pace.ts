@@ -31,6 +31,8 @@ export const PACE = {
   duo: 450,
   /** A tier 4's moment. */
   ultimate: 900,
+  /** A unit falling off a ledge or over the edge. */
+  fall: 560,
 }
 
 /** What an event adds to a beat's lead on the next: a dash, and how much a weapon's shots run past one attack. */
@@ -76,6 +78,7 @@ export function beatMs(events: GameEvent[], pace: Map<number, number>, shown: Se
     if (e.type === 'shot') ms += e.lasts ?? PACE.attack
     else if (e.type === 'rocket') ms += PACE.rocket + PACE.blast
     else if (e.type === 'ultimate') ms += PACE.ultimate
+    else if (e.type === 'fall') ms += PACE.fall
     else if (e.type === 'duo') ms += PACE.duo
     else if (e.type === 'spit' || e.type === 'panic') ms += PACE.psi
     else if (e.type === 'reveal' || e.type === 'wave') ms += e.units.some((u) => shown.has(u.id)) ? PACE.reveal : 0

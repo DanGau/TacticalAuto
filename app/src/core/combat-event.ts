@@ -12,6 +12,8 @@ export type GameEvent =
   /** `damage` is 0 if a shield or image took it. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. `secondary` names the attack if not the weapon; `opens` tells of a combo's first blow. `nth` numbers a weapon attack's shots, each playing for `lasts` ms if set; `form` tells of one thrown or rocketed; `deflect` is the word of the target's weapon guard that saved it; `ring` is the reach in tiles of a stunning shockwave. */
   | { type: 'shot'; id: number; target: number; crit: boolean; damage: number; with: Effect[]; deflect?: string; ring?: number; secondary?: SecondaryId; opens?: boolean; nth?: number; lasts?: number; form?: 'throw' | 'rocket' }
   /** A rocket, grenade or napalm (`fire`) lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */
+  /** A unit off a ledge, `drop` levels, onto `to`, landing on `onto` if anyone stood there; or over the edge, caught or lost. */
+  | { type: 'fall'; id: number; to: Tile; drop: number | 'edge'; damage: number; onto?: number; fatal?: true }
   | { type: 'rocket'; id: number; x: number; y: number; hits: { target: number; damage: number }[]; fire?: true; label?: string }
   | { type: 'heal'; id: number; target: number; amount: number }
   /** An effect of gear, a skill, a relic or a class ability acts on the unit `id`. `amount` is the health it gained, or lost if negative; 0 when neither. */

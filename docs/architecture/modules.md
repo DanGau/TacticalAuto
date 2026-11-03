@@ -12,7 +12,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `encounter.ts` | `designEncounter`: the set-piece: arena, overlook, hazard, mire and ridge, objects, posts, approaches, gates |
 | `arena-kinds.ts` | The arena's shape by encounter: skyscraper roof, overpass, quarry, mesa, chasm; ledges, ramps, drops |
 | `levels.ts` | Smoothing heights so ledges stand only where meant |
-| `knockback.ts` | Knockback: driving a unit back, and what it hits |
+| `knockback.ts` | Knockback and falls: off a ledge, through glass, over the edge |
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
 | `objects.ts` | What heroes do with objects: hurling them, setting off tanks, a rigged tank |
 | `landing.ts` | The one entry point, the plain landing there, what relics and the picked utility set off |
@@ -71,6 +71,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `board.ts` | Building the battlefield's ground, props, walls, roofs |
 | `props.ts` | Boxes props and walls are drawn from; trees |
 | `palette.ts` | Colours |
+| `falls.ts` | A fall off a ledge or over the edge |
 | `attacks`, `chasm`, `fences`, `looks`, `roofs`, `shapes`, `space` | Weapon looks, cliffs, zone fences, region looks, roofs, mesh building, view units |
 
 ## Elsewhere

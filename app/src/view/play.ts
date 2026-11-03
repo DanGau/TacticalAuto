@@ -14,6 +14,7 @@ import { COLOR } from './palette'
 import { cloakLook, create, fade, letter, place, remove, squash, vitals } from './sprites'
 import { CAMERA_MS, type Sprite, type Stage } from './stage'
 import { playUltimate } from './ultimates'
+import { playFall } from './falls'
 import { playDuo } from './duos'
 
 /** What a soldier's order says over it. */
@@ -119,6 +120,8 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const from = sprites.get(e.id)
       if (!from && !e.hits.some((hit) => sprites.has(hit.target))) continue
       await drawing(s, (fx) => fireRocket(s, fx, battle, from, e))
+    } else if (e.type === 'fall') {
+      await playFall(s, battle, e)
     } else if (e.type === 'ultimate') {
       await playUltimate(s, battle, e)
     } else if (e.type === 'duo') {

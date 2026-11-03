@@ -19,13 +19,17 @@ const ROCK: Record<TerrainKind, number> = {
   hive: 0x2a1838,
 }
 
-/** Wherever narrow ground falls away, a cliff: banded rock fading into the depths. */
+/** A skyscraper's face: storeys of dark glass between lit floors, fading far down to the street. */
+const TOWER = { fall: 3 * FALL, glass: 0x1f2d40, floor: 0x7fa6c8, storeys: 9 }
+
+/** Wherever the ground falls away, a cliff: banded rock fading into the depths, or a skyscraper's face. */
 export function buildChasm(battle: Battle): Group {
   const group = new Group()
   const shapes = new Shapes()
-  const rock = ROCK[battle.place]
+  const tower = battle.arenaKind === 'skyscraper'
+  const rock = tower ? TOWER.glass : ROCK[battle.place]
   const gone = (x: number, y: number) => x >= 0 && y >= 0 && x < GRID && y < GRID && battle.ground[y * GRID + x] === 'void'
-  const fall = tall(FALL)
+  const fall = tall(tower ? TOWER.fall : FALL)
   for (let y = 0; y < GRID; y++)
     for (let x = 0; x < GRID; x++) {
       if (gone(x, y)) continue
@@ -37,11 +41,13 @@ export function buildChasm(battle: Battle): Group {
         [x - 0.5, y - 0.5, x - 0.5, y + 0.5, 0.48, gone(x - 1, y)],
       ] as const) {
         if (!open) continue
-        const bands = 6
+        const bands = tower ? 2 * TOWER.storeys : 6
         for (let k = 0; k < bands; k++) {
           const top = lift - (fall * k) / bands
           const bottom = lift - (fall * (k + 1)) / bands
-          shapes.quad({ x: ax, y: top, z: az }, { x: bx, y: top, z: bz }, { x: bx, y: bottom, z: bz }, { x: ax, y: bottom, z: az }, shade(rock, light * (1 - k * 0.09)), 1 - k / bands)
+          // A tower's lit floors are thin bands between its storeys of glass.
+          const band = tower && k % 2 === 1 ? { top, bottom: top - (top - bottom) * 0.25, color: TOWER.floor } : { top, bottom, color: rock }
+          shapes.quad({ x: ax, y: band.top, z: az }, { x: bx, y: band.top, z: bz }, { x: bx, y: band.bottom, z: bz }, { x: ax, y: band.bottom, z: az }, shade(band.color, light * (1 - (k / bands) * 0.5)), 1 - k / bands)
         }
         // The lip where ground meets the drop.
         shapes.line({ x: ax, y: lift + 0.005, z: az }, { x: bx, y: lift + 0.005, z: bz }, shade(rock, 1.25))

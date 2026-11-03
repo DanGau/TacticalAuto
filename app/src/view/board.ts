@@ -1,6 +1,7 @@
 // Builds the battlefield in its region's look: the ground, props, walls, windows and roofs.
 import { Group, type MeshBasicMaterial, type Object3D } from 'three'
 import { GRID, type Battle, type Tile } from '../core/battle'
+import { CLIFF } from '../core/grid'
 import type { Edge, Prop } from '../core/terrain'
 import { onGridTile, spot } from './camera'
 import { buildChasm } from './chasm'
@@ -11,6 +12,11 @@ import { addRoof } from './roofs'
 import { ditherable, empty, shade, Shapes } from './shapes'
 import { LEVEL, tall } from './space'
 import type { Stage } from './stage'
+
+/** How dark a ledge's face is against a gentle rise's, how bright its lip, and how far its shadow falls, in tiles. */
+const LEDGE_FACE = 0.7
+const LIP = 1.45
+const LEDGE_SHADOW = 0.45
 
 /** Adds a box to `shapes`, centred on the tile at x, z standing at height y. */
 function addBox(shapes: Shapes, x: number, y: number, z: number, box: Box): void {
@@ -133,12 +139,22 @@ export function drawTerrain(s: Stage, battle: Battle): void {
     // The faces a raised tile shows above its lower neighbours.
     const drop = (nx: number, ny: number) => (onGridTile(nx, ny) ? Math.max(0, battle.height[tile] - battle.height[ny * GRID + nx]) * LEVEL : 0)
     const sides = [
-      [x - 0.5, y + 0.5, x + 0.5, y + 0.5, drop(x, y + 1), 0.6],
-      [x + 0.5, y - 0.5, x + 0.5, y + 0.5, drop(x + 1, y), 0.45],
-      [x - 0.5, y - 0.5, x + 0.5, y - 0.5, drop(x, y - 1), 0.6],
-      [x - 0.5, y - 0.5, x - 0.5, y + 0.5, drop(x - 1, y), 0.45],
+      [x - 0.5, y + 0.5, x + 0.5, y + 0.5, drop(x, y + 1), 0.6, 0, 1],
+      [x + 0.5, y - 0.5, x + 0.5, y + 0.5, drop(x + 1, y), 0.45, 1, 0],
+      [x - 0.5, y - 0.5, x + 0.5, y - 0.5, drop(x, y - 1), 0.6, 0, -1],
+      [x - 0.5, y - 0.5, x - 0.5, y + 0.5, drop(x - 1, y), 0.45, -1, 0],
     ] as const
-    for (const [ax, az, bx, bz, fall, light] of sides) if (fall > 0) ground.quad({ x: ax, y: top, z: az }, { x: bx, y: top, z: bz }, { x: bx, y: top - fall, z: bz }, { x: ax, y: top - fall, z: az }, shade(color, light))
+    for (const [ax, az, bx, bz, fall, light, nx, nz] of sides) {
+      if (fall <= 0) continue
+      // A ledge's face is darker, its lip lit, and it casts a shadow on the ground below.
+      const sheer = fall >= CLIFF * LEVEL - 1e-6
+      ground.quad({ x: ax, y: top, z: az }, { x: bx, y: top, z: bz }, { x: bx, y: top - fall, z: bz }, { x: ax, y: top - fall, z: az }, shade(color, sheer ? light * LEDGE_FACE : light))
+      if (!sheer) continue
+      ground.line({ x: ax, y: top + 0.004, z: az }, { x: bx, y: top + 0.004, z: bz }, shade(color, LIP), 0.9)
+      const low = top - fall + 0.004
+      const far = (p: number, n: number) => p + n * LEDGE_SHADOW
+      ground.quad({ x: ax, y: low, z: az }, { x: bx, y: low, z: bz }, { x: far(bx, nx), y: low, z: far(bz, nz) }, { x: far(ax, nx), y: low, z: far(az, nz) }, 0x000000, 0.3)
+    }
     ground.flat(x - 0.5, y - 0.5, x + 0.5, y + 0.5, top, highland(color, battle.height[tile]))
     for (const [ax, az, bx, bz] of [
         [x - 0.5, y - 0.5, x + 0.5, y - 0.5],

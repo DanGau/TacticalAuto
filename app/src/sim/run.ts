@@ -41,6 +41,8 @@ export interface RunResult {
   draws: number
   /** How long each battle takes to play in the view, in ms. */
   durations: number[]
+  /** Units fallen off a ledge or over the edge, those the fall killed, and objects or aliens thrown, over all its battles. */
+  moments: { falls: number; fallKills: number; throws: number }
   /** Each battle's toll on the squad's health. */
   tolls: Toll[]
   /** With `forks` asked for: each deploy screen played on with every utility. */
@@ -65,7 +67,7 @@ const MAX_ACTIONS = 10000
 function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = [], forks = false): { run: Run; result: RunResult } {
   const run = createRun(seed)
   run.doctrines.push(...doctrines)
-  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], tolls: [], forks: [], actions: [] }
+  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0 }, tolls: [], forks: [], actions: [] }
   let clock = { next: 0, done: 0 }
   /** The battle under way, its leg, the squad's health as it began, and the utilities it held. */
   let begun: [Run['battle'], number, number, UtilityId[]] = [null, 0, 0, []]
@@ -76,6 +78,9 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
       const played = timedFlow(run, clock)
       clock = played.clock
       for (const event of played.events) {
+        if (event.type === 'fall') result.moments.falls++
+        if (event.type === 'fall' && !!event.fatal) result.moments.fallKills++
+        if (event.type === 'rocket' && event.label === 'HURLED') result.moments.throws++
         if (event.type !== 'end') continue
         result.battles++
         if (event.winner === null) result.draws++
