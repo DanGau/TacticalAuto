@@ -16,7 +16,7 @@ test('Bloodbath: a kill heals and adds damage for the battle', () => {
 
 test('Riposte: whoever hits the hero takes its damage back', () => {
   const { battle, hero, aliens, beats } = arena(['riposte'], [{ x: 11, y: 10 }])
-  hero.stats = { ...hero.stats, damage: 0 }
+  hero.stats = { ...hero.stats, damage: 0, crit: 0 }
   battle.turn = 'alien'
   beats(2)
   expect(aliens[0].hp).toBe(40)

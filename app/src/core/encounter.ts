@@ -5,6 +5,7 @@ import { blocked, distance, edgeDepths, NEIGHBORS, onGrid, openNear, walkingDist
 import { gather } from './formations'
 import { randomInt } from './rng'
 import { PROP_BULK, type Prop, type TerrainKind } from './terrain'
+import { pickArenaKind, shapeArena } from './arena-kinds'
 import { CHALLENGES, type ChallengeId } from './challenges'
 
 /** How far from its centre the arena reaches, and how far out the camera shows it clear of props. */
@@ -135,10 +136,11 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal, cha
     const clamp = (v: number) => Math.max(0, Math.min(GRID - 1, Math.round(v)))
     return { x: clamp(spot.x + fx * along - fy * across), y: clamp(spot.y + fy * along + fx * across) }
   }
-  rise(battle, raw(OVERLOOK), 3, 1)
+  shapeArena(battle, pickArenaKind(battle, battle.place, goal, challenge, battle.twist), spot, [fx, fy])
+  if (battle.arenaKind === 'open') rise(battle, raw(OVERLOOK), 3, 1)
   if (challenge === 'firingLine') for (let across = -RIDGE_REACH; across <= RIDGE_REACH; across += 2) rise(battle, raw([RIDGE_ALONG, across]), 2, 1)
   if (challenge === 'slog') layMire(battle, spot, fx, fy)
-  rise(battle, raw(LEDGE), 2, 0)
+  if (battle.arenaKind === 'open') rise(battle, raw(LEDGE), 2, 0)
   const [low, tall] = SCATTER[battle.place] ?? ['crate', 'stack']
   // The hive holds nothing human: its hazard is its own growth.
   // Shooters that never come to a tank would stand and wait to be blown up.

@@ -10,6 +10,9 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `grid.ts` | The board: distance, objects, walls, walking costs and routes, free tiles |
 | `setup.ts` | `createBattle`: battle state, placing aliens, civilians, goals by the encounter |
 | `encounter.ts` | `designEncounter`: the set-piece: arena, overlook, hazard, mire and ridge, objects, posts, approaches, gates |
+| `arena-kinds.ts` | The arena's shape by encounter: skyscraper roof, overpass, quarry, mesa, chasm; ledges, ramps, drops |
+| `levels.ts` | Smoothing heights so ledges stand only where meant |
+| `knockback.ts` | Knockback: driving a unit back, and what it hits |
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
 | `objects.ts` | What heroes do with objects: hurling them, setting off tanks, a rigged tank |
 | `landing.ts` | The one entry point, the plain landing there, what relics and the picked utility set off |

@@ -1,4 +1,5 @@
 // A battle's state: units, the board, and the numbers its rules share.
+import type { ArenaKind } from './arena-kinds'
 import type { SecondaryId } from './secondaries'
 import type { SKILL_EFFECTS } from './skill-effects'
 import type { WeaponId } from './weapons'
@@ -278,6 +279,8 @@ export interface Battle {
   twist: Twist | null
   /** The kind of place it is fought in. */
   place: TerrainKind
+  /** The shape of the ground the fight is on. */
+  arenaKind: ArenaKind
   /** Alien turns begun. */
   round: number
   /** How this battle plays. */

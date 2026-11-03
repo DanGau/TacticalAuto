@@ -23,8 +23,8 @@ export function holdCaptives(battle: Battle, captives: Reserve[]): void {
   })
 }
 
-/** Fills every open tile outside the largest walkable area with stacks, so any open tile can reach any other. */
-export function sealPockets(battle: Battle): void {
+/** Fills every open tile outside the walkable area holding `keep`, or else the largest, with stacks, so any open tile can reach any other. */
+export function sealPockets(battle: Battle, keep?: Tile): void {
   const area = Array<number>(GRID * GRID).fill(-1)
   const sizes: number[] = []
   for (let start = 0; start < GRID * GRID; start++) {
@@ -43,7 +43,8 @@ export function sealPockets(battle: Battle): void {
     }
     sizes.push(queue.length)
   }
-  const largest = sizes.indexOf(Math.max(...sizes))
+  const held = keep ? area[keep.y * GRID + keep.x] : -1
+  const largest = held >= 0 ? held : sizes.indexOf(Math.max(...sizes))
   area.forEach((id, tile) => {
     if (id < 0 || id === largest) return
     battle.bulk[tile] = 2
@@ -136,6 +137,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     units: [],
     nextId: 1,
     place: kind,
+    arenaKind: 'open',
     ...terrain,
     bulk: terrain.props.map((prop) => PROP_BULK[prop]),
     used: [],
@@ -176,7 +178,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
   const posted = flood ? aliens.slice(0, Math.ceil(aliens.length * FLOOD_POSTED)) : battle.deadline !== null ? aliens.slice(0, sentries(aliens.length)) : aliens
   const { spot, posts, clusters, heart } = designEncounter(battle, posted, goal, challenge)
   if (flood || battle.deadline !== null) battle.waves = clumps(battle, goal === 'hold' && posted.length === aliens.length ? aliens : aliens.slice(posted.length))
-  sealPockets(battle)
+  sealPockets(battle, openNear(battle, spot))
   const centre = openNear(battle, spot)
   const vip = goal === 'vip' ? centre : null
   if (goal === 'hold') battle.uplink = centre

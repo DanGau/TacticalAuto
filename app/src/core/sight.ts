@@ -4,13 +4,13 @@ import { GRID, SIGHT, type Battle, type Stats, type Tile, type Unit } from './ba
 import { bulkAt } from './grid'
 import { HIGH_DAMAGE } from './grid'
 import { HIGH_SIGHT } from './grid'
-import { heightAt } from './grid'
+import { above } from './grid'
 import { distance } from './grid'
 import { FOG_SIGHT, NIGHT_DETECT } from './twists'
 
 /** What the ground does to a shot from `shooter` at `target`: damage gained, negative if lost, from height and the fortified rule. */
 export function odds(battle: Battle, shooter: Tile, target: Tile): number {
-  return HIGH_DAMAGE * (heightAt(battle, shooter) - heightAt(battle, target)) - (battle.rules.includes('fortified') ? FORTIFIED_SOAK : 0)
+  return HIGH_DAMAGE * above(battle, shooter, target) - (battle.rules.includes('fortified') ? FORTIFIED_SOAK : 0)
 }
 
 /** Every attack by a unit that deals damage lands for at least this. */
@@ -59,7 +59,7 @@ export function canShoot(battle: Battle, from: Tile, target: Tile, range: number
 
 /** Whether a soldier on `from` sees the tile `to`: within its sight, less in fog, farther from higher ground, with line of sight. */
 export function sees(battle: Battle, from: Tile, to: Tile): boolean {
-  return distance(from, to) <= SIGHT - (battle.twist === 'fog' ? FOG_SIGHT : 0) + HIGH_SIGHT * (heightAt(battle, from) - heightAt(battle, to)) && lineOfSight(battle, from, to)
+  return distance(from, to) <= SIGHT - (battle.twist === 'fog' ? FOG_SIGHT : 0) + HIGH_SIGHT * above(battle, from, to) && lineOfSight(battle, from, to)
 }
 
 /** Tiles within which a soldier notices an alien not yet seen, before stillness hides it. */
@@ -72,7 +72,7 @@ const HIDE_STILL = 1
  * when the enemy holds still, with line of sight.
  */
 export function detects(battle: Battle, from: Unit, to: Unit): boolean {
-  const range = DETECT - (battle.twist === 'night' ? NIGHT_DETECT : 0) + HIGH_SIGHT * (heightAt(battle, from) - heightAt(battle, to)) - (to.moved ? 0 : HIDE_STILL)
+  const range = DETECT - (battle.twist === 'night' ? NIGHT_DETECT : 0) + HIGH_SIGHT * above(battle, from, to) - (to.moved ? 0 : HIDE_STILL)
   return distance(from, to) <= range && lineOfSight(battle, from, to)
 }
 

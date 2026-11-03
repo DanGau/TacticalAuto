@@ -4,6 +4,7 @@ import { layStreets, type Way } from './streets'
 import { randomInt } from './rng'
 import type { Twist } from './twists'
 import type { Edge, Ground, Locale, Terrain, TerrainKind } from './terrain'
+import { soften } from './levels'
 import { createPlot, PLOTS, type Layout, type Rect } from './terrain-lots'
 
 /** Hills each kind of place has. */
@@ -237,6 +238,7 @@ export function generateTerrain(rng: { rng: number }, size: number, kind: Terrai
     connect()
     if (twist === 'fuel') for (let i = 0; i < scaled(scaled(14)); i++) put(between(1, size - 2), between(1, size - 2), 'fuel')
     const height = hills().map((h, t) => (ground[t] === 'void' ? 0 : h))
+    soften({ height, ground, north, west }, size)
     return { ground, props, north, west, height, region, city }
   }
 }

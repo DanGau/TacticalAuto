@@ -1,9 +1,6 @@
 // Damage landing on a unit, what it sets off, and the tally it adds to.
-import { REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_TURNS, BLAST_RADIUS, type Battle, type Unit, type Tile, type Effect } from './battle'
-import { blocked } from './grid'
-import { passable } from './grid'
+import { REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_TURNS, BLAST_RADIUS, type Battle, type Unit, type Tile } from './battle'
 import { wreck } from './grid'
-import { unitAt } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { emptyTally, OVERKILL, type FeatId, type Tally } from './feats'
@@ -145,35 +142,5 @@ export function moved(battle: Battle, unit: Unit, path: Tile[], events: GameEven
 /** Damage a booming charge does to a target that moves. */
 export const BOOM_DAMAGE = 3
 
-/**
- * A knockback: the target is driven `tiles` straight back from `unit`; if something stops it, it slams into that for
- * `slam` damage, and an alien it slams into takes as much. With `way` -1, a tethered hit pulls it a tile toward the
- * shooter, as far as the way is free.
- */
-export function knockback(battle: Battle, unit: Unit, target: Unit, events: GameEvent[], way = 1, tiles = 1, slam = SLAM_DAMAGE, effect: Effect = way > 0 ? 'thunder' : 'tether'): void {
-  const step = { x: way * Math.sign(target.x - unit.x), y: way * Math.sign(target.y - unit.y) }
-  const path: Tile[] = []
-  let stopped = false
-  for (let i = 0; i < tiles && !stopped; i++) {
-    const from = path.at(-1) ?? target
-    const to = { x: from.x + step.x, y: from.y + step.y }
-    stopped = blocked(battle, to.x, to.y) || !passable(battle, from, to)
-    if (!stopped) path.push(to)
-  }
-  const end = path.at(-1)
-  if (end) {
-    target.x = end.x
-    target.y = end.y
-    events.push({ type: 'move', id: target.id, path, with: effect })
-  }
-  if (!stopped || way < 0) return
-  const into = unitAt(battle, target.x + step.x, target.y + step.y)
-  events.push({ type: 'effect', id: target.id, effect, amount: -slam })
-  wound(battle, target, slam, events)
-  if (into && into.side === target.side) {
-    events.push({ type: 'effect', id: into.id, effect, amount: -slam })
-    wound(battle, into, slam, events)
-  }
-}
-
+/** Damage a unit knocked into something takes, and so does an alien it slams into. */
 export const SLAM_DAMAGE = 1

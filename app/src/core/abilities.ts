@@ -11,7 +11,8 @@ import { has, hostage, foes, powering, shootable, nearest, immune, silenced, spe
 import { walk, bestPath, paths } from './pathing'
 import { canShoot, lineOfSight } from './sight'
 import { FONT_REACH, SWARM_BUILDS, SWARM_LIMIT, WAR_MACHINE } from './keystones'
-import { wound, knockback, SLAM_DAMAGE } from './wound'
+import { wound, SLAM_DAMAGE } from './wound'
+import { knockback } from './knockback'
 
 /** Ground Slam: once per battle, with two or more foes beside it, in place of an attack, it hurts each and hurls it back. */
 export function slam(battle: Battle, unit: Unit): GameEvent[] {

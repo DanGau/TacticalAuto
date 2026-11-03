@@ -4,7 +4,8 @@ import { createBattle } from './setup'
 import { passable } from './grid'
 import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
-import { PROP_BULK, TERRAIN_KINDS, ZONE_TERRAINS } from './terrain'
+import { PROP_BULK, TERRAIN_KINDS, ZONE_TERRAINS, type Terrain } from './terrain'
+import { generateTerrain } from './terrain-gen'
 
 const cases = TERRAIN_KINDS.flatMap((kind) => [1, 2].map((seed) => [kind, seed] as const))
 
@@ -27,14 +28,16 @@ test.each(cases)('%s map %i: bulk matches its props and every open tile can be w
   expect(reached.size).toBe(battle.bulk.filter((c) => c === 0).length)
 })
 
-const maps = new Map<string, ReturnType<typeof createBattle>[]>()
+type Map_ = Terrain & { bulk: number[] }
+const maps = new Map<string, Map_[]>()
 
-/** The share of tiles of the first sixteen maps of a kind that `count` counts. */
-function share(kind: (typeof TERRAIN_KINDS)[number], count: (battle: ReturnType<typeof createBattle>, tile: number) => boolean): number {
-  const battles = maps.get(kind) ?? Array.from({ length: 16 }, (_, i) => i + 1).map((seed) => createBattle(seed, kind, [], []))
-  maps.set(kind, battles)
-  const hits = battles.reduce((sum, battle) => sum + battle.bulk.filter((_, tile) => count(battle, tile)).length, 0)
-  return hits / (battles.length * GRID * GRID)
+/** The share of tiles of the first sixteen maps of a kind, as generated before an encounter shapes them, that `count` counts. */
+function share(kind: (typeof TERRAIN_KINDS)[number], count: (map: Map_, tile: number) => boolean): number {
+  const generated = maps.get(kind) ?? Array.from({ length: 16 }, (_, i) => i + 1).map((seed) => generateTerrain({ rng: seed }, GRID, kind))
+  const terrains = generated.map((t) => ({ ...t, bulk: t.props.map((prop) => PROP_BULK[prop]) }))
+  maps.set(kind, terrains)
+  const hits = terrains.reduce((sum, map) => sum + map.bulk.filter((_, tile) => count(map, tile)).length, 0)
+  return hits / (terrains.length * GRID * GRID)
 }
 
 test('each kind of place is itself: the countryside is the most open, a city is more indoors than a town, a yard has the most crates; water is no part of a place', () => {

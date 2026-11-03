@@ -12,6 +12,18 @@ export const onGrid = (x: number, y: number) => x >= 0 && y >= 0 && x < GRID && 
 
 export const heightAt = (battle: Battle, tile: Tile) => battle.height[tile.y * GRID + tile.x]
 
+/** Levels between neighbouring tiles that make a ledge: no unit walks up or down it, and one pushed off it falls. */
+export const CLIFF = 2
+
+/** Whether a ledge stands between neighbouring tiles. */
+export const ledge = (battle: Battle, a: Tile, b: Tile) => Math.abs(heightAt(battle, a) - heightAt(battle, b)) >= CLIFF
+
+/** The most levels of height count for, up or down, in damage and sight. */
+export const HIGH_CAP = 2
+
+/** Levels `from` stands above `to`, at most HIGH_CAP either way. */
+export const above = (battle: Battle, from: Tile, to: Tile) => Math.max(-HIGH_CAP, Math.min(HIGH_CAP, heightAt(battle, from) - heightAt(battle, to)))
+
 /** Tiles of sight a unit gains for each level it stands above what it looks at, and loses for each below. */
 export const HIGH_SIGHT = 2
 
@@ -93,8 +105,13 @@ export function edgeBetween(battle: Battle, a: Tile, b: Tile): Edge {
   return a.y === b.y ? battle.west[a.y * GRID + Math.max(a.x, b.x)] : battle.north[Math.max(a.y, b.y) * GRID + a.x]
 }
 
-/** Whether a unit may step between two neighbouring tiles: no wall or window in the way, and on a diagonal, none at the corner it turns. */
+/** Whether a unit may step between two neighbouring tiles: no ledge, no wall or window in the way, and on a diagonal, none at the corner it turns. */
 export function passable(battle: Battle, from: Tile, to: Tile): boolean {
+  return !ledge(battle, from, to) && unwalled(battle, from, to)
+}
+
+/** Whether no wall or window stands between two neighbouring tiles, nor on a diagonal at the corner it turns. */
+export function unwalled(battle: Battle, from: Tile, to: Tile): boolean {
   if (from.x === to.x || from.y === to.y) return edgeBetween(battle, from, to) === 'none'
   // Both ways round the corner: through the tile beside `from` on `to`'s column, and through the one on its row.
   return open(battle, from.x, from.y, to.x, from.y) && open(battle, to.x, from.y, to.x, to.y) && open(battle, from.x, from.y, from.x, to.y) && open(battle, from.x, to.y, to.x, to.y)
