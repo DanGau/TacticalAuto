@@ -164,7 +164,7 @@ export function skirmish(battle: Battle, unit: Unit): GameEvent[] {
   if (!has(unit, 'skirmish') || (unit.side === 'human' && (battle.extract || battle.uplink))) return []
   const enemies = enemiesOf(battle, unit)
   const events: GameEvent[] = []
-  walk(unit, bestPath(paths(battle, unit, SKIRMISH_MOVE), unit, (end) => [-Math.min(...enemies.map((e) => distance(e, end)))]), events)
+  walk(battle, unit, bestPath(paths(battle, unit, SKIRMISH_MOVE), unit, (end) => [-Math.min(...enemies.map((e) => distance(e, end)))]), events)
   return events.map((e) => (e.type === 'move' ? { ...e, with: 'skirmish' as const } : e))
 }
 

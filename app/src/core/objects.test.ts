@@ -35,13 +35,13 @@ test('the arena opens a fighting space at its heart', () => {
   expect(duel().walled).toBe(false)
 })
 
-test('only a strong hero throws: a car at two aliens together, knocking them back and leaving a wreck where it lands', () => {
+test('a hero throws only what its strength lifts: a car at two aliens together, knocking them back and leaving a wreck where it lands', () => {
   const { battle, soldier, alien } = duel()
   battle.props[10 * GRID + 11] = 'car'
   battle.bulk[10 * GRID + 11] = 1
-  Object.assign(soldier, { ability: 'medic', weapon: undefined })
+  soldier.stats.strength = 3
   expect(leverage(battle, soldier)).toEqual([])
-  soldier.weapon = 'hammer'
+  soldier.stats.strength = 4
   const other = { ...alien, id: 900, x: 11, y: 13, hp: 99 }
   battle.units.push(other)
   const events = leverage(battle, soldier)
@@ -56,18 +56,18 @@ test('a lone alien is not worth a car, but a car that sends it off a ledge is', 
   const { battle, soldier, alien } = duel()
   battle.props[10 * GRID + 11] = 'car'
   battle.bulk[10 * GRID + 11] = 1
-  soldier.weapon = 'fists'
+  soldier.stats.strength = 4
   expect(leverage(battle, soldier)).toEqual([])
   for (let x = 0; x < GRID; x++) battle.height[14 * GRID + x] = 0
-  for (let t = 0; t < 14 * GRID; t++) battle.height[t] = 2
+  for (let t = 0; t < 14 * GRID; t++) battle.height[t] = alien.stats.jump + 1
   reshaped(battle)
   expect(leverage(battle, soldier)).toContainEqual(expect.objectContaining({ type: 'throw' }))
   expect(alien.y).toBe(14)
 })
 
-test('a strong hero throws a small alien beside it over the edge', () => {
+test('a hero of strength 3 throws a small alien beside it over the edge; one of 2 cannot', () => {
   const { battle, soldier, alien } = duel()
-  soldier.weapon = 'hammer'
+  soldier.stats.strength = 2
   Object.assign(alien, { x: 10, y: 11, kind: 'trooper', boss: false, target: false })
   for (let x = 0; x < GRID; x++) {
     battle.ground[13 * GRID + x] = 'void'
@@ -75,6 +75,8 @@ test('a strong hero throws a small alien beside it over the edge', () => {
     battle.bulk[13 * GRID + x] = 1
   }
   reshaped(battle)
+  expect(leverage(battle, soldier)).toEqual([])
+  soldier.stats.strength = 3
   const events = leverage(battle, soldier)
   expect(events).toContainEqual(expect.objectContaining({ type: 'throw', object: 'alien', thrown: alien.id }))
   expect(events).toContainEqual(expect.objectContaining({ type: 'fall', drop: 'edge', fatal: true }))

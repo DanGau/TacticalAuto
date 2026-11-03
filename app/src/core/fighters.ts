@@ -161,8 +161,7 @@ export function extractionFrom(battle: Battle, start: Tile): Tile {
 
 /** Aliens in sight that can walk to `vip`, and so make its column keep together. A turret, or an alien walled off, never comes. */
 export const pursuers = (battle: Battle, vip: Unit) => {
-  const walk = walkingDistances(battle, vip)
-  return battle.units.filter((u) => u.side === 'alien' && u.revealed && u.stats.move > 0 && walk[u.y * GRID + u.x] < Infinity)
+  return battle.units.filter((u) => u.side === 'alien' && u.revealed && u.stats.move > 0 && walkingDistances(battle, vip, u.stats.jump)[u.y * GRID + u.x] < Infinity)
 }
 
 /** How near the extraction zone lifts a soldier off; a Signal Flare widens it. */

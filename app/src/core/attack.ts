@@ -437,8 +437,8 @@ export function napalm(battle: Battle, unit: Unit, seen: Set<number>): GameEvent
 
 /** A brute that survives a hit charges: it moves at once as near the shooter as its move allows. */
 export function charge(battle: Battle, brute: Unit, shooter: Unit, events: GameEvent[]): void {
-  const toShooter = walkingDistances(battle, shooter)
-  walk(brute, bestPath(paths(battle, brute, brute.stats.move), brute, (end) => [toShooter[end.y * GRID + end.x]]), events)
+  const toShooter = walkingDistances(battle, shooter, brute.stats.jump)
+  walk(battle, brute, bestPath(paths(battle, brute, brute.stats.move), brute, (end) => [toShooter[end.y * GRID + end.x]]), events)
 }
 
 export const BLINK_REACH = 5

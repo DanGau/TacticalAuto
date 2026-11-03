@@ -9,6 +9,7 @@ import { timedFlow } from '../core/step'
 import type { DoctrineId } from '../core/doctrines'
 import { CHALLENGES, type ChallengeId } from '../core/challenges'
 import type { Goal } from '../core/goals'
+import type { ArenaKind } from '../core/arena-kinds'
 import type { UtilityId } from '../core/utilities'
 import { forksOf, type Fork } from './forks'
 
@@ -43,6 +44,8 @@ export interface RunResult {
   durations: number[]
   /** Units fallen off a ledge or over the edge, those the fall killed, and objects or aliens thrown, over all its battles. */
   moments: { falls: number; fallKills: number; throws: number }
+  /** By arena kind: battles fought there, and the jumps units made in them. */
+  jumps: Partial<Record<ArenaKind, { battles: number; jumps: number }>>
   /** Each battle's toll on the squad's health. */
   tolls: Toll[]
   /** With `forks` asked for: each deploy screen played on with every utility. */
@@ -67,8 +70,9 @@ const MAX_ACTIONS = 10000
 function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = [], forks = false): { run: Run; result: RunResult } {
   const run = createRun(seed)
   run.doctrines.push(...doctrines)
-  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0 }, tolls: [], forks: [], actions: [] }
+  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0 }, jumps: {}, tolls: [], forks: [], actions: [] }
   let clock = { next: 0, done: 0 }
+  let leaps = 0
   /** The battle under way, its leg, the squad's health as it began, and the utilities it held. */
   let begun: [Run['battle'], number, number, UtilityId[]] = [null, 0, 0, []]
   while (run.phase !== 'won' && run.phase !== 'lost') {
@@ -81,8 +85,13 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
         if (event.type === 'fall') result.moments.falls++
         if (event.type === 'fall' && !!event.fatal) result.moments.fallKills++
         if (event.type === 'throw') result.moments.throws++
+        if (event.type === 'move') leaps += event.leaps ?? 0
         if (event.type !== 'end') continue
         result.battles++
+        const arena = (result.jumps[battle!.arenaKind] ??= { battles: 0, jumps: 0 })
+        arena.battles++
+        arena.jumps += leaps
+        leaps = 0
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
         const fought = run.report!.soldiers

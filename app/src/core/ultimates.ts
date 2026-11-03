@@ -185,7 +185,7 @@ const ultimates = {
     go(battle, unit, events) {
       const [tile] = freeTilesNear(battle, unit, 1)
       if (!tile) return
-      const giant = mechUnit(battle, unit, { hp: COLOSSUS.hp, armor: COLOSSUS.armor, damage: COLOSSUS.damage, range: COLOSSUS.range, move: COLOSSUS.move, crit: COLOSSUS.crit }, ['taunt'], tile)
+      const giant = mechUnit(battle, unit, { hp: COLOSSUS.hp, armor: COLOSSUS.armor, damage: COLOSSUS.damage, range: COLOSSUS.range, move: COLOSSUS.move, crit: COLOSSUS.crit, strength: 6, jump: 1 }, ['taunt'], tile)
       giant.giant = true
       battle.units.push(giant)
       events.push({ type: 'spawn', id: unit.id, unit: { id: giant.id, x: giant.x, y: giant.y } })

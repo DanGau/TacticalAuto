@@ -1,4 +1,4 @@
-// What heroes do with the objects about them: the strong throw what stands beside them, or a small alien, and anyone sets off fuel tanks among the aliens.
+// What heroes do with the objects about them: the strong throw what stands beside them, or an alien, and anyone sets off fuel tanks among the aliens.
 import { ALIENS } from './aliens'
 import { GRID, isSoldier, type Battle, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
@@ -11,30 +11,32 @@ import { FUEL_DAMAGE } from './twists'
 import { RIG } from './utilities'
 import { SLAM_DAMAGE, wound } from './wound'
 
-/** What a hero can pick up and throw. */
-const HURLABLE = new Set<Prop>(['car', 'truck', 'tree', 'crate', 'stack', 'rubble', 'growth', 'wreck'])
+/** What a hero can pick up and throw, by the strength it takes. */
+const WEIGHT: Partial<Record<Prop, number>> = { crate: 3, stack: 3, rubble: 3, growth: 3, tree: 4, car: 4, wreck: 4, truck: 5 }
 
-/** Objects or aliens a hero throws in a battle, how far, and the damage to each alien struck. */
+/** The strength it takes to throw an alien, by its size; a large one is never thrown. */
+const ALIEN_WEIGHT = { small: 3, medium: 5, large: Infinity }
+
+/** Objects or aliens a hero throws in a battle, and the damage to each alien struck. */
 export const OBJECT_USES = 3
-export const HURL_RANGE = 5
 export const THROW_DAMAGE = 4
+
+/** Tiles a hero throws: 2 more than its strength. */
+export const hurlRange = (unit: Unit) => unit.stats.strength + 2
 
 /** What a throw is worth, in aliens struck, for each alien it sends off a ledge or over the edge. */
 const FALL_WORTH = 3
 
-/** Who is strong enough to throw: a Vanguard, a Powerhouse, or any hero with a hammer or fists. */
-export const strong = (unit: Unit) => isSoldier(unit) && (unit.ability === 'runAndGun' || unit.ability === 'rocket' || unit.weapon === 'hammer' || unit.weapon === 'fists')
-
 const usesLeft = (unit: Unit) => unit.spent.filter((e) => e === 'throw').length < OBJECT_USES
 
-/** A small alien, light enough to throw: no boss, commander or still thing. */
-export const throwable = (unit: Unit) => unit.side === 'alien' && !!unit.kind && ALIENS[unit.kind].danger === 'small' && !unit.boss && !unit.target && unit.stats.move > 0
+/** Whether `thrower` is strong enough to throw the alien `held`: never a boss, commander or still thing. */
+export const throwable = (thrower: Unit, held: Unit) => held.side === 'alien' && !!held.kind && ALIEN_WEIGHT[ALIENS[held.kind].danger] <= thrower.stats.strength && !held.boss && !held.target && held.stats.move > 0
 
-/** The tiles beside `at` holding something a hero can throw. */
-const hurlables = (battle: Battle, at: Tile) => NEIGHBORS.map(([dx, dy]) => ({ x: at.x + dx, y: at.y + dy })).filter((t) => onGrid(t.x, t.y) && HURLABLE.has(battle.props[t.y * GRID + t.x]))
+/** The tiles beside `at` holding something `unit` is strong enough to throw. */
+const hurlables = (battle: Battle, unit: Unit, at: Tile) => NEIGHBORS.map(([dx, dy]) => ({ x: at.x + dx, y: at.y + dy })).filter((t) => onGrid(t.x, t.y) && (WEIGHT[battle.props[t.y * GRID + t.x]] ?? Infinity) <= unit.stats.strength)
 
 /** Whether a hero standing on `at` could throw something, for it to weigh the tile. */
-export const canHurlFrom = (battle: Battle, unit: Unit, at: Tile) => strong(unit) && usesLeft(unit) && hurlables(battle, at).length > 0
+export const canHurlFrom = (battle: Battle, unit: Unit, at: Tile) => isSoldier(unit) && usesLeft(unit) && hurlables(battle, unit, at).length > 0
 
 const away = (from: Tile, to: Tile): Tile => ({ x: Math.sign(to.x - from.x), y: Math.sign(to.y - from.y) })
 
@@ -131,11 +133,12 @@ function alienThrow(battle: Battle, unit: Unit, held: Unit, to: Tile, aliens: Un
 function bestThrow(battle: Battle, unit: Unit): Throw | null {
   const aliens = foes(battle, unit)
   const options: Throw[] = []
-  const [object] = hurlables(battle, unit)
-  if (object) for (const target of aliens) if (canShoot(battle, unit, target, HURL_RANGE)) options.push(objectThrow(battle, unit, object, target, aliens))
-  for (const held of aliens.filter((a) => throwable(a) && distance(a, unit) === 1 && a.hp > 0)) {
-    for (let y = unit.y - HURL_RANGE; y <= unit.y + HURL_RANGE; y++)
-      for (let x = unit.x - HURL_RANGE; x <= unit.x + HURL_RANGE; x++) {
+  const range = hurlRange(unit)
+  const [object] = hurlables(battle, unit, unit)
+  if (object) for (const target of aliens) if (canShoot(battle, unit, target, range)) options.push(objectThrow(battle, unit, object, target, aliens))
+  for (const held of aliens.filter((a) => throwable(unit, a) && distance(a, unit) === 1 && a.hp > 0)) {
+    for (let y = unit.y - range; y <= unit.y + range; y++)
+      for (let x = unit.x - range; x <= unit.x + range; x++) {
         const to = { x, y }
         if (!onGrid(x, y) || (x === held.x && y === held.y) || (x === unit.x && y === unit.y) || !lineOfSight(battle, unit, to)) continue
         if (!isDrop(battle, to) && blocked(battle, x, y) && !aliens.some((a) => a.x === x && a.y === y)) continue
@@ -146,7 +149,7 @@ function bestThrow(battle: Battle, unit: Unit): Throw | null {
   return best && best.worth >= 2 ? best : null
 }
 
-/** In place of a soldier's attack: sets off a fuel tank it can shoot with aliens beside it and no human; else, if strong, makes the best throw worth making. */
+/** In place of a soldier's attack: sets off a fuel tank it can shoot with aliens beside it and no human; else makes the best throw worth making its strength allows. */
 export function leverage(battle: Battle, unit: Unit): GameEvent[] {
   if (!isSoldier(unit) || !usesLeft(unit)) return []
   const aliens = foes(battle, unit)
@@ -165,7 +168,6 @@ export function leverage(battle: Battle, unit: Unit): GameEvent[] {
     wreck(battle, tank, 0)
     return events
   }
-  if (!strong(unit)) return []
   const chosen = bestThrow(battle, unit)
   if (!chosen) return []
   unit.spent.push('throw')

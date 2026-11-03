@@ -25,7 +25,7 @@ export interface SoldierClass {
 const classes = {
   assault: {
     name: 'Vanguard',
-    stats: { damage: 1, hp: 1, move: 1 },
+    stats: { damage: 1, hp: 1, move: 1, strength: 1, jump: 2 },
     stance: 'rush',
     stanceText: 'Closes in for the hardest hit',
     ability: 'runAndGun',
@@ -36,7 +36,7 @@ const classes = {
   },
   heavy: {
     name: 'Powerhouse',
-    stats: { move: -1, hp: 3, damage: 1 },
+    stats: { move: -1, hp: 3, damage: 1, strength: 3 },
     stance: 'anchor',
     stanceText: 'Plants itself and holds its ground',
     ability: 'rocket',
@@ -48,7 +48,7 @@ const classes = {
   },
   sniper: {
     name: 'Deadeye',
-    stats: { move: -1, damage: 1, crit: 0.25, hp: -1 },
+    stats: { move: -1, damage: 1, crit: 0.25, hp: -1, strength: -1 },
     stance: 'standoff',
     stanceText: 'Hangs back out of reach',
     ability: 'squadsight',
@@ -59,7 +59,7 @@ const classes = {
   },
   support: {
     name: 'Beacon',
-    stats: { move: 1, hp: 2 },
+    stats: { move: 1, hp: 2, jump: 1 },
     stance: 'escort',
     stanceText: 'Stays within reach of an ally; alone, fights as its weapon does',
     ability: 'medic',
@@ -84,7 +84,7 @@ const classes = {
   },
   pyro: {
     name: 'Pyro',
-    stats: { hp: 2, armor: 1 },
+    stats: { hp: 2, armor: 1, strength: 1, jump: 1 },
     stance: 'rush',
     stanceText: 'Closes in to bring its flames to bear',
     ability: 'napalm',
@@ -107,7 +107,7 @@ const classes = {
   },
   phantom: {
     name: 'Phantom',
-    stats: { move: 1, damage: 1, hp: -1 },
+    stats: { move: 1, damage: 1, hp: -1, jump: 3 },
     stance: 'rush',
     stanceText: 'Closes in for the strike',
     ability: 'cloak',

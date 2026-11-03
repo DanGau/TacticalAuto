@@ -32,7 +32,7 @@ const powerChip = (power: Power) => `<span class="chip">${power.name} <small cla
 /** A hero's numbers. */
 const heroStats = (run: Run, hero: Soldier) => {
   const stats = soldierStats(run, hero)
-  return statBlock([['HP', `${health(run, hero)}/${stats.hp}`], ['Armor', stats.armor], ['Move', stats.move], ['Damage', stats.damage], ['Range', stats.range], ['Crit', `${Math.round(100 * stats.crit)}%`]])
+  return statBlock([['HP', `${health(run, hero)}/${stats.hp}`], ['Armor', stats.armor], ['Move', stats.move], ['Damage', stats.damage], ['Range', stats.range], ['Crit', `${Math.round(100 * stats.crit)}%`], ['Strength', stats.strength], ['Jump', stats.jump]])
 }
 
 /** A hero's weapon: its type and special. */
@@ -80,5 +80,5 @@ export const heroTree = (hero: Soldier) => (hero.cls ? treeGrid(hero, (id) => `<
 
 /** An alien's stat block: name, numbers, what it does, what it resists. */
 export const alienBlock = (kind: AlienKind, stats: Stats, hp = stats.hp) => `<div class="charsheet alien"><b class="name">${ALIENS[kind].name}</b> ${ALIENS[kind].resists.map(resistChip).join('')}
-  ${statBlock([['HP', hp], ['Armor', stats.armor], ['Move', stats.move], ['Damage', stats.damage], ['Range', stats.range]])}
+  ${statBlock([['HP', hp], ['Armor', stats.armor], ['Move', stats.move], ['Damage', stats.damage], ['Range', stats.range], ['Strength', stats.strength], ['Jump', stats.jump]])}
   <small>${ALIENS[kind].text}.</small></div>`

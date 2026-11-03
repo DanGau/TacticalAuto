@@ -39,9 +39,44 @@ export const CALTROP_COST = 2
 /** Move a step onto mire costs beyond its one tile. */
 export const MIRE_COST = 2
 
-/** What a step between neighbouring tiles costs of a unit's move: one tile, CLIMB more for each level up, and more onto mire or caltrops; one tile whatever for a unit that `hovers`. */
-export const stepCost = (battle: Battle, from: Tile, to: Tile, hovers = false) =>
-  hovers ? 1 : 1 + CLIMB * Math.max(0, heightAt(battle, to) - heightAt(battle, from)) + (battle.ground[to.y * GRID + to.x] === 'mire' ? MIRE_COST : 0) + (battle.caltrops.some((t) => t.x === to.x && t.y === to.y) ? CALTROP_COST : 0)
+/** Whether a stride from `from` to `to` is a jump: up or down a ledge, or across a gap. */
+export const jumps = (battle: Battle, from: Tile, to: Tile) => distance(from, to) > 1 || ledge(battle, from, to)
+
+/**
+ * What a stride costs of a unit's move: a walk is one tile, CLIMB more for each level up; a jump is a tile for each
+ * tile across and each level up. Either costs more onto mire or caltrops. A unit that `hovers` pays only the tiles.
+ */
+export const stepCost = (battle: Battle, from: Tile, to: Tile, hovers = false) => {
+  const up = Math.max(0, heightAt(battle, to) - heightAt(battle, from))
+  if (hovers) return distance(from, to)
+  const stride = jumps(battle, from, to) ? distance(from, to) + up : 1 + CLIMB * up
+  return stride + (battle.ground[to.y * GRID + to.x] === 'mire' ? MIRE_COST : 0) + (battle.caltrops.some((t) => t.x === to.x && t.y === to.y) ? CALTROP_COST : 0)
+}
+
+/**
+ * The tiles a unit with `jump` can stride to from `from`, whatever stands on them: a neighbour it may step to, one up
+ * or down a ledge of at most `jump` levels, and straight across a gap of void at most `jump` - 1 tiles wide to ground
+ * at most `jump` levels off.
+ */
+export function strides(battle: Battle, from: Tile, jump: number): Tile[] {
+  const out: Tile[] = []
+  const near = (to: Tile) => Math.abs(heightAt(battle, to) - heightAt(battle, from)) <= jump
+  const isVoid = (t: Tile) => battle.ground[t.y * GRID + t.x] === 'void'
+  for (const [dx, dy] of NEIGHBORS) {
+    const to = { x: from.x + dx, y: from.y + dy }
+    if (!onGrid(to.x, to.y) || !unwalled(battle, from, to)) continue
+    if (!ledge(battle, from, to) || near(to)) out.push(to)
+    if (dx !== 0 && dy !== 0) continue
+    for (let gap = 1; gap < jump && isVoid({ x: from.x + gap * dx, y: from.y + gap * dy }); gap++) {
+      const land = { x: from.x + (gap + 1) * dx, y: from.y + (gap + 1) * dy }
+      if (!onGrid(land.x, land.y)) break
+      if (isVoid(land)) continue
+      if (near(land) && unwalled(battle, { x: land.x - dx, y: land.y - dy }, land)) out.push(land)
+      break
+    }
+  }
+  return out
+}
 
 export function bulkAt(battle: Battle, x: number, y: number): Bulk {
   return battle.bulk[y * GRID + x]
@@ -105,7 +140,7 @@ export function edgeBetween(battle: Battle, a: Tile, b: Tile): Edge {
   return a.y === b.y ? battle.west[a.y * GRID + Math.max(a.x, b.x)] : battle.north[Math.max(a.y, b.y) * GRID + a.x]
 }
 
-/** Whether a unit may step between two neighbouring tiles: no ledge, no wall or window in the way, and on a diagonal, none at the corner it turns. */
+/** Whether a unit may walk between two neighbouring tiles: no ledge, no wall or window in the way, and on a diagonal, none at the corner it turns. */
 export function passable(battle: Battle, from: Tile, to: Tile): boolean {
   return !ledge(battle, from, to) && unwalled(battle, from, to)
 }
@@ -122,40 +157,41 @@ export const open = (battle: Battle, ax: number, ay: number, bx: number, by: num
   (ay === by ? battle.west[ay * GRID + Math.max(ax, bx)] : battle.north[Math.max(ay, by) * GRID + ax]) === 'none'
 
 /**
- * A battle's walking graph and the distance fields found on it. Both follow from terrain and the units that never move,
- * such as a hive node, which stand as walls: wreck forgets them, and so does such a unit's death.
+ * A battle's walking graphs by jump, and the distance fields found on each. Both follow from terrain and the units that
+ * never move, such as a hive node, which stand as walls: wreck forgets them, and so does such a unit's death.
  */
-export const walks = new WeakMap<Battle, { fixed: string; into: number[][]; fields: Map<number, number[]> }>()
+export const walks = new WeakMap<Battle, { fixed: string; graphs: Map<number, { into: number[][]; fields: Map<number, number[]> }> }>()
 
 /** Drops what was worked out from the battle's terrain, once something has changed it. */
 export const reshaped = (battle: Battle) => walks.delete(battle)
 
-/** For each tile, the open tiles a unit can step onto it from, each followed by that step's cost. */
-export function walkGraph(battle: Battle) {
+/** For each tile, the open tiles a unit with `jump` can stride onto it from, each followed by that stride's cost. */
+export function walkGraph(battle: Battle, jump = 0) {
   // A civilian waits to be reached, not to wall a way off: it leaves once a soldier is beside it.
   const still = battle.units.filter((u) => u.stats.move === 0 && u.hp > 0 && !u.civilian)
   const fixed = still.map((u) => u.y * GRID + u.x).join()
   let walk = walks.get(battle)
-  if (walk?.fixed === fixed) return walk
+  if (walk?.fixed !== fixed) {
+    walk = { fixed, graphs: new Map() }
+    walks.set(battle, walk)
+  }
+  const known = walk.graphs.get(jump)
+  if (known) return known
   const walls = new Set(still.map((u) => u.y * GRID + u.x))
-  const into = Array.from({ length: GRID * GRID }, (_, t) => {
-    const tile = { x: t % GRID, y: Math.floor(t / GRID) }
-    const steps: number[] = []
-    for (const [dx, dy] of NEIGHBORS) {
-      const from = { x: tile.x + dx, y: tile.y + dy }
-      const f = from.y * GRID + from.x
-      if (onGrid(from.x, from.y) && battle.bulk[f] === 0 && !walls.has(f) && passable(battle, tile, from)) steps.push(f, stepCost(battle, from, tile))
-    }
-    return steps
-  })
-  walk = { fixed, into, fields: new Map() }
-  walks.set(battle, walk)
-  return walk
+  const into: number[][] = Array.from({ length: GRID * GRID }, () => [])
+  for (let f = 0; f < GRID * GRID; f++) {
+    if (battle.bulk[f] > 0 || walls.has(f)) continue
+    const from = { x: f % GRID, y: Math.floor(f / GRID) }
+    for (const to of strides(battle, from, jump)) into[to.y * GRID + to.x].push(f, stepCost(battle, from, to))
+  }
+  const graph = { into, fields: new Map<number, number[]>() }
+  walk.graphs.set(jump, graph)
+  return graph
 }
 
-/** Walking distance from every tile to `goal`, row by row, ignoring units that move. Infinity where no path exists. Do not change it: it is shared. */
-export function walkingDistances(battle: Battle, goal: Tile): readonly number[] {
-  const { into, fields } = walkGraph(battle)
+/** Walking distance from every tile to `goal` for a unit with `jump`, row by row, ignoring units that move. Infinity where no path exists. Do not change it: it is shared. */
+export function walkingDistances(battle: Battle, goal: Tile, jump = 0): readonly number[] {
+  const { into, fields } = walkGraph(battle, jump)
   const start = goal.y * GRID + goal.x
   const known = fields.get(start)
   if (known) return known

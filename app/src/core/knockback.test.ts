@@ -40,12 +40,12 @@ test('knocked off a ledge, an alien falls to the ground below for FALL_DAMAGE a 
 })
 
 test('falling onto an alien hurts both, and the faller lands beside it', () => {
-  const { battle, hero, aliens } = ledge(2)
+  const { battle, hero, aliens } = ledge(3)
   const below = { ...aliens[0], id: 1100, x: 12, y: 10 }
   battle.units.push(below)
   knockback(battle, hero, aliens[0], [])
-  expect(aliens[0].hp).toBe(40 - 2 * FALL_DAMAGE)
-  expect(below.hp).toBe(40 - 2 * FALL_DAMAGE)
+  expect(aliens[0].hp).toBe(40 - 3 * FALL_DAMAGE)
+  expect(below.hp).toBe(40 - 3 * FALL_DAMAGE)
   expect(aliens[0].x === 12 && aliens[0].y === 10).toBe(false)
 })
 
@@ -78,8 +78,16 @@ test('glass on the edge breaks; a wall holds', () => {
   expect(battle.west[10 * GRID + 12]).toBe('none')
 })
 
+test('a fall within its jump a unit lands unhurt, and no hero aims to knock it off one', () => {
+  const { battle, hero, aliens } = ledge(2)
+  aliens[0].stats.jump = 2
+  expect(worth(battle, hero, aliens[0])).toBe(worth(battle, hero, { ...aliens[0], stats: { ...aliens[0].stats, jump: 3 } }))
+  knockback(battle, hero, aliens[0], [])
+  expect(aliens[0]).toMatchObject({ x: 12, y: 10, hp: 40 })
+})
+
 test("any hero's hit knocks an alien at a ledge off it, and heroes aim at one", () => {
-  const { battle, hero, aliens, beats } = ledge(2)
+  const { battle, hero, aliens, beats } = ledge(3)
   const far = { ...aliens[0], id: 1300, x: 10, y: 12 }
   battle.units.push(far)
   expect(worth(battle, hero, aliens[0])).toBeGreaterThan(worth(battle, hero, far))

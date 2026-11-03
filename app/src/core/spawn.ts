@@ -47,7 +47,7 @@ export function mechUnit(battle: Battle, owner: Unit, stats: Stats, effects: Eff
 
 /** A civilian of `kind` with `hp` health, standing on `tile`. */
 export function civilianUnit(battle: Battle, tile: Tile, hp: number, kind: NonNullable<Unit['civilian']>): Unit {
-  const stats = { ...BASE_STATS, hp, damage: 0, range: 0, move: CIVILIAN_MOVE, crit: 0 }
+  const stats = { ...BASE_STATS, hp, damage: 0, range: 0, move: CIVILIAN_MOVE, crit: 0, strength: 1, jump: 1 }
   return { id: battle.nextId++, side: 'human', ...tile, hp, armor: 0, stats, soldier: null, engaged: true, cluster: 0, revealed: true, surprised: 0, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], burning: 0, chilled: 0, rooted: 0, booming: 0, fury: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: kind, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null }
 }
 

@@ -5,7 +5,7 @@ import { blocked, CLIFF, edgeBetween, freeTilesNear, heightAt, onGrid, unitAt, u
 import { has } from './fighters'
 import { SLAM_DAMAGE, wound } from './wound'
 
-/** Damage a fall does for each level dropped; what one over the edge does to a hero or a boss, which catches the edge. Any other alien is lost. */
+/** Damage a fall beyond the unit's jump does for each level dropped; what one over the edge does to a hero or a boss, which catches the edge. Any other alien is lost. */
 export const FALL_DAMAGE = 2
 export const EDGE_DAMAGE = 6
 
@@ -30,32 +30,41 @@ function ways(from: Tile, target: Tile): Tile[] {
 /** The eight headings in turn round the compass. */
 const COMPASS = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]]
 
-/** Whether `target` falls off a ledge or is lost over the edge driven a tile along `step`. */
+/** Damage a fall of `levels` does `unit`: none within its jump, which it lands. */
+export const fallDamage = (unit: Unit, levels: number) => (levels > unit.stats.jump ? FALL_DAMAGE * levels : 0)
+
+/** Whether `target`, driven a tile along `step`, is hurt off a ledge or lost over the edge. */
 const fellsAlong = (battle: Battle, target: Unit, step: Tile) => {
   const beyond = fallBeyond(battle, target, { x: target.x + step.x, y: target.y + step.y })
-  return beyond !== 0 && !(beyond === 'drop' && target.boss) && !has(target, 'hover')
+  if (beyond === 0 || has(target, 'hover')) return false
+  return beyond === 'drop' ? !target.boss : fallDamage(target, beyond) > 0
 }
 
-/** The way a knockback from `from` drives `target`: of straight back and a step to either side, one that sends it off a ledge or the edge if any does, else straight back. */
+/** The way a knockback from `from` drives `target`: of straight back and a step to either side, one that sends it off a ledge hurt or over the edge if any does, else straight back. */
 export const knockWay = (battle: Battle, from: Tile, target: Unit): Tile | undefined => {
   const options = ways(from, target)
   return options.find((step) => fellsAlong(battle, target, step)) ?? options[0]
 }
 
-/** Whether a knockback from `from` sends `target` off a ledge, or over the edge to be lost. */
+/** Whether a knockback from `from` sends `target` off a ledge hurt, or over the edge to be lost. */
 export function pushesOff(battle: Battle, from: Tile, target: Unit): boolean {
   const step = knockWay(battle, from, target)
   return !!step && fellsAlong(battle, target, step)
 }
 
+/** Strength from which an alien's blow knocks a hero back anyway, and from which any shove drives a second tile. */
+export const HEAVY = 4
+export const MIGHTY = 5
+
 /**
  * A hero's hit on an alien standing at a ledge or the edge knocks it off, as an alien's blow from beside does a hero;
- * a brute's or a juggernaut's blow knocks a hero a tile back anyway.
+ * a HEAVY alien's blow knocks a hero back anyway. A MIGHTY one's shove drives 2 tiles.
  */
 export function shoveOff(battle: Battle, unit: Unit, target: Unit, events: GameEvent[]): void {
   if (target.civilian) return
   const reaches = unit.side === 'human' || Math.max(Math.abs(unit.x - target.x), Math.abs(unit.y - target.y)) <= 1
-  if ((reaches && pushesOff(battle, unit, target)) || (target.side === 'human' && (unit.kind === 'brute' || unit.kind === 'juggernaut'))) knockback(battle, unit, target, events, 1, 1, SLAM_DAMAGE, 'shove')
+  const tiles = unit.stats.strength >= MIGHTY ? 2 : 1
+  if ((reaches && pushesOff(battle, unit, target)) || (target.side === 'human' && unit.stats.strength >= HEAVY)) knockback(battle, unit, target, events, 1, tiles, SLAM_DAMAGE, 'shove')
 }
 
 /** Breaks the glass between neighbouring tiles, if any. */
@@ -68,8 +77,8 @@ function shatter(battle: Battle, from: Tile, to: Tile): void {
 
 /**
  * `unit`, standing on `from`, goes over toward `to`. Over the edge, a hero or a boss catches it and takes EDGE_DAMAGE,
- * and any other alien is lost; one that hovers stays where it is. Off a ledge it lands below, FALL_DAMAGE a level, on
- * whoever stands there too, and lands beside them. A fall ignores armor.
+ * and any other alien is lost; one that hovers stays where it is. Off a ledge it lands below, hurt by fallDamage, as
+ * is whoever stands there, and lands beside them. A fall ignores armor.
  */
 export function fall(battle: Battle, unit: Unit, from: Tile, to: Tile, events: GameEvent[]): void {
   const beyond = fallBeyond(battle, from, to)
@@ -91,13 +100,13 @@ export function fall(battle: Battle, unit: Unit, from: Tile, to: Tile, events: G
   }
   const under = unitAt(battle, to.x, to.y)
   const land = under || blocked(battle, to.x, to.y) ? (freeTilesNear(battle, to, 1)[0] ?? from) : to
-  const damage = FALL_DAMAGE * beyond
+  const damage = fallDamage(unit, beyond)
   const event: Extract<GameEvent, { type: 'fall' }> = { type: 'fall', id: unit.id, to: land, drop: beyond, damage, onto: under?.id }
   events.push(event)
   unit.x = land.x
   unit.y = land.y
-  wound(battle, unit, damage, events, true)
-  if (under) wound(battle, under, damage, events, true)
+  if (damage > 0) wound(battle, unit, damage, events, true)
+  if (under && damage > 0) wound(battle, under, damage, events, true)
   event.fatal = unit.hp <= 0 || undefined
 }
 

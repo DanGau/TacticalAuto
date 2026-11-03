@@ -125,13 +125,17 @@ export interface Stats {
   move: number
   /** Chance a hit crits. */
   crit: number
+  /** What it can lift, throw and shove, and how far; see objects and knockback. */
+  strength: number
+  /** Levels it leaps up or down a ledge, landing unhurt; it leaps a gap of one tile fewer. */
+  jump: number
 }
 
-export const BASE_STATS: Stats = { hp: 10, armor: 0, damage: 3, range: 5, move: 4, crit: 0.2 }
+export const BASE_STATS: Stats = { hp: 10, armor: 0, damage: 3, range: 5, move: 4, crit: 0.2, strength: 2, jump: 2 }
 
 /** A mech's stats, a frail decoy the aliens must shoot, and a light drone's, before its engineer's skills. */
-export const MECH_STATS: Stats = { ...BASE_STATS, hp: 3, crit: 0.1, range: 4 }
-export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, crit: 0.1, range: 4, move: 6 }
+export const MECH_STATS: Stats = { ...BASE_STATS, hp: 3, crit: 0.1, range: 4, strength: 4, jump: 1 }
+export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, crit: 0.1, range: 4, move: 6, strength: 1, jump: 4 }
 
 /** Something a unit does unprompted beyond moving and shooting; each is described where combat applies it. */
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' | 'napalm' | 'cryo' | 'cloak'

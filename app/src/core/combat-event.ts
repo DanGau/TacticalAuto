@@ -7,7 +7,7 @@ import type { DuoId } from './duos'
 
 export type GameEvent =
   /** `path` lists each tile entered, in order. `with` names a skill that granted the move. */
-  | { type: 'move'; id: number; path: Tile[]; with?: Effect | 'dash' }
+  | { type: 'move'; id: number; path: Tile[]; with?: Effect | 'dash'; /** Strides of the path that are jumps. */ leaps?: number }
   /** Aliens are sighted. `units` gives each one's tile at that moment. */
   | { type: 'reveal'; units: { id: number; x: number; y: number }[] }
   /** `damage` is 0 if a shield or image took it. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. `secondary` names the attack if not the weapon; `opens` tells of a combo's first blow. `nth` numbers a weapon attack's shots, each playing for `lasts` ms if set; `form` tells of one thrown or rocketed; `deflect` is the word of the target's weapon guard that saved it; `ring` is the reach in tiles of a stunning shockwave. */

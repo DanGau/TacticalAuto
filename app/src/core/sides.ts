@@ -36,7 +36,7 @@ export function moveSide(battle: Battle): GameEvent[] {
     // A sentry fires as the alien turns to go.
     if (unit.side === 'alien') events.push(...sentries(battle, unit, watched))
     if (unit.hp <= 0) continue
-    walk(unit, path, events)
+    walk(battle, unit, path, events)
     moved(battle, unit, path, events)
     if (unit.order) events.push({ type: 'order', id: unit.id, order: unit.order })
   }
@@ -211,7 +211,7 @@ export function stride(battle: Battle, unit: Unit, seen: Set<number>, toShot: bo
   if (!end || barred(end) || (toShot && !shotFrom(end))) return []
   battle.strides[unit.id] = left - costOf(battle, unit, path)
   const events: GameEvent[] = []
-  walk(unit, path, events)
+  walk(battle, unit, path, events)
   moved(battle, unit, path, events)
   return [...events, ...sight(battle)]
 }
@@ -235,7 +235,7 @@ export function dash(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[]
   const end = path.at(-1)
   if (!end || barred(end) || !strikes(end)) return []
   const events: GameEvent[] = []
-  walk(unit, path, events)
+  walk(battle, unit, path, events)
   moved(battle, unit, path, events)
   return [...events.map((e) => (e.type === 'move' ? { ...e, with: 'dash' as const } : e)), ...sight(battle)]
 }

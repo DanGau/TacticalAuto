@@ -137,7 +137,7 @@ test('with no alien engaged a squad heads for the nearest by the walk, so it nev
     const here = hero.y * GRID + hero.x
     for (const near of open) {
       for (const far of open) {
-        const [walkNear, walkFar] = [walkingDistances(state, near)[here], walkingDistances(state, far)[here]]
+        const [walkNear, walkFar] = [walkingDistances(state, near, hero.stats.jump)[here], walkingDistances(state, far, hero.stats.jump)[here]]
         if (walkNear === Infinity || walkNear >= walkFar || distance(hero, near) <= distance(hero, far)) continue
         Object.assign(a, near, { engaged: false, target: false })
         Object.assign(b, far, { engaged: false, target: false })

@@ -1,13 +1,6 @@
 // Where a unit moves: candidate paths, scored by stance, goal and threat.
 import { type Battle, type Unit, type Tile, GRID, type Stance, isSoldier, STANDOFF, MEDIC_REACH, HASTE_MOVE, CHILL_MOVE, type Order, ENGAGE_REACH } from './battle'
-import { blocked, breach } from './grid'
-import { walkingDistances } from './grid'
-import { passable } from './grid'
-import { bulkAt } from './grid'
-import { stepCost } from './grid'
-import { onGrid } from './grid'
-import { NEIGHBORS } from './grid'
-import { distance } from './grid'
+import { blocked, breach, walkingDistances, bulkAt, stepCost, onGrid, NEIGHBORS, distance, strides, jumps } from './grid'
 import type { GameEvent } from './combat-event'
 import { hasAttack, vipOf, pursuers, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes } from './fighters'
 import { ESCORT_REACH } from './goals'
@@ -17,7 +10,7 @@ import { bite, canShoot, sees } from './sight'
 import { WEAPONS } from './weapons'
 
 /**
- * The cheapest path to each tile the unit can reach with `move`, climbing costing more, cheapest first,
+ * The cheapest path to each tile the unit can reach with `move`, climbing costing more and jumping as its jump allows, cheapest first,
  * starting with the empty path. Any first step is in reach. Of equally cheap paths to a tile, the one that turns least
  * is kept, so a unit walks straight rather than weaving.
  */
@@ -35,12 +28,11 @@ export function paths(battle: Battle, unit: Unit, move: number): Tile[][] {
       turns.set(key, -1)
       found.push(path)
       const back = path.at(-2) ?? (path.length > 0 ? unit : null)
-      for (const [dx, dy] of NEIGHBORS) {
-        const x = from.x + dx
-        const y = from.y + dy
-        if (blocked(battle, x, y) || !passable(battle, from, { x, y })) continue
+      for (const { x, y } of strides(battle, from, unit.stats.jump)) {
+        if (blocked(battle, x, y)) continue
         const next = cost + stepCost(battle, from, { x, y }, has(unit, 'hover'))
-        const bent = bends + (back && (from.x - back.x !== dx || from.y - back.y !== dy) ? 1 : 0)
+        const heading = (a: Tile, b: Tile) => `${Math.sign(b.x - a.x)},${Math.sign(b.y - a.y)}`
+        const bent = bends + (back && heading(back, from) !== heading(from, { x, y }) ? 1 : 0)
         const known = best.get(y * GRID + x) ?? Infinity
         // A first step is always within reach of a unit that can move, so a climb dearer than its move cannot wall it in.
         if (next > move && !(cost === 0 && move > 0)) continue
@@ -155,7 +147,7 @@ export const NO_SHOT: Record<Stance, (spot: Spot) => number[]> = {
  */
 export function threats(battle: Battle, enemies: Unit[]): (tile: Tile) => number {
   const known = enemies.filter((e) => !e.civilian && e.revealed && e.engaged && e.stats.range > 0)
-  const fields = known.map((e) => ({ walk: walkingDistances(battle, e), reach: e.stats.move + e.stats.range }))
+  const fields = known.map((e) => ({ walk: walkingDistances(battle, e, e.stats.jump), reach: e.stats.move + e.stats.range }))
   // A tile no walk ends on, such as one a unit that never moves stands on, is as near as its nearest neighbour.
   const near = (walk: readonly number[], tile: Tile) =>
     Math.min(walk[tile.y * GRID + tile.x], ...NEIGHBORS.map(([dx, dy]) => (onGrid(tile.x + dx, tile.y + dy) ? walk[(tile.y + dy) * GRID + tile.x + dx] + 1 : Infinity)))
@@ -185,8 +177,8 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
   const captive = unit.side === 'human' && nearest(lying(battle).filter((d) => battle.captives.some((r) => r.soldier === d.soldier)), unit)
   if (captive) return captive
   // A raider makes for the nearest cache it can walk to until it has as many as it came for; walled off from all, it fights.
-  const caches = battle.goal === 'raid' && unit.side === 'human' ? battle.caches.filter((c) => walkingDistances(battle, c)[unit.y * GRID + unit.x] < Infinity) : []
-  if (caches.length > 0) return caches.reduce((a, b) => (walkingDistances(battle, b)[unit.y * GRID + unit.x] < walkingDistances(battle, a)[unit.y * GRID + unit.x] ? b : a))
+  const caches = battle.goal === 'raid' && unit.side === 'human' ? battle.caches.filter((c) => walkingDistances(battle, c, unit.stats.jump)[unit.y * GRID + unit.x] < Infinity) : []
+  if (caches.length > 0) return caches.reduce((a, b) => (walkingDistances(battle, b, unit.stats.jump)[unit.y * GRID + unit.x] < walkingDistances(battle, a, unit.stats.jump)[unit.y * GRID + unit.x] ? b : a))
   // On a hold an alien makes for the uplink, then from its zone goes for the squad, so no stand-off lasts.
   if (battle.uplink) return unit.side === 'alien' && distance(unit, battle.uplink) <= UPLINK_REACH ? nearest(enemies, unit) : battle.uplink
   const civilians = battle.units.filter((u) => u.civilian && u.civilian !== 'vip')
@@ -200,7 +192,7 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
   }
   const fighting = enemies.filter((u) => u.engaged)
   // Nearest by the walk, not the crow: as the walk there shortens no other can overtake it, so the squad never paces between two far aliens.
-  const walk = (e: Unit) => walkingDistances(battle, e)[Math.round(squad.y) * GRID + Math.round(squad.x)]
+  const walk = (e: Unit) => walkingDistances(battle, e, unit.stats.jump)[Math.round(squad.y) * GRID + Math.round(squad.x)]
   const byWalk = () => enemies.reduce((a, b) => (walk(b) < walk(a) || (walk(b) === walk(a) && distance(b, squad) < distance(a, squad)) ? b : a))
   const named = enemies.find((u) => u.target && u.revealed) ?? (fighting.length > 0 ? nearest(fighting, squad) : undefined)
   if (named) return named
@@ -243,12 +235,12 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   // A melee hero fights only by reaching someone: it goes for the alien in the fight nearest it, and neither the squad nor what its charge might stir holds it back.
   const melee = isSoldier(unit) && !!unit.weapon && !!WEAPONS[unit.weapon].melee
   const shared = goalOf(battle, unit, enemies)
-  const quarry = melee && battle.round < RESTLESS_ROUND && shared && enemies.some((e) => e === shared) ? nearest(enemies.filter((e) => e.engaged && e.revealed && walkingDistances(battle, e)[unit.y * GRID + unit.x] < Infinity), unit) : undefined
+  const quarry = melee && battle.round < RESTLESS_ROUND && shared && enemies.some((e) => e === shared) ? nearest(enemies.filter((e) => e.engaged && e.revealed && walkingDistances(battle, e, unit.stats.jump)[unit.y * GRID + unit.x] < Infinity), unit) : undefined
   const goal = quarry ?? shared
   if (!goal) return []
   // A soldier walled off from where it is going punches through the walls about whichever of it and the goal is boxed in.
-  if (unit.side === 'human' && walkingDistances(battle, goal)[unit.y * GRID + unit.x] === Infinity) breach(battle, walkingDistances(battle, unit).filter(Number.isFinite).length < POCKET ? unit : goal)
-  const toGoal = walkingDistances(battle, goal)
+  if (unit.side === 'human' && walkingDistances(battle, goal, unit.stats.jump)[unit.y * GRID + unit.x] === Infinity) breach(battle, walkingDistances(battle, unit, unit.stats.jump).filter(Number.isFinite).length < POCKET ? unit : goal)
+  const toGoal = walkingDistances(battle, goal, unit.stats.jump)
   const seen = spotted(battle)
   /** The most of its damage it lands from `end`, in whole percent; 0 with no shot. */
   const mine = (end: Tile) => {
@@ -401,13 +393,13 @@ export function fleePath(battle: Battle, unit: Unit): Tile[] {
   if (unit.civilian === 'hider') return hideout(battle, unit) > 0 ? [] : bestPath(paths(battle, unit, unit.stats.move), unit, (end, steps) => [-hideout(battle, end), steps])
   const aliens = battle.units.filter((u) => u.side === 'alien')
   const soldier = nearest(battle.units.filter(isSoldier), unit)
-  const toSquad = soldier ? walkingDistances(battle, soldier) : null
+  const toSquad = soldier ? walkingDistances(battle, soldier, unit.stats.jump) : null
   return bestPath(paths(battle, unit, unit.stats.move), unit, (end) => [SAFE - Math.min(SAFE, ...aliens.map((a) => distance(a, end))), toSquad ? toSquad[end.y * GRID + end.x] : 0])
 }
 
 /** A freed VIP's path: toward the extraction zone, away from the aliens' shots and, while hunted, never beyond ESCORT_REACH of a soldier. */
 export function escapePath(battle: Battle, unit: Unit): Tile[] {
-  const toExtract = walkingDistances(battle, battle.extract!)
+  const toExtract = walkingDistances(battle, battle.extract!, unit.stats.jump)
   const soldiers = battle.units.filter(isSoldier)
   const aliens = battle.units.filter((u) => u.side === 'alien' && u.revealed)
   const hunted = pursuers(battle, unit).length > 0
@@ -425,13 +417,16 @@ export function costOf(battle: Battle, unit: Unit, path: Tile[]): number {
   return path.reduce((sum, tile, i) => sum + stepCost(battle, path[i - 1] ?? unit, tile, has(unit, 'hover')), 0)
 }
 
-export function walk(unit: Unit, path: Tile[], events: GameEvent[]): void {
+/** Moves `unit` along `path`, saying how many of its strides are jumps. */
+export function walk(battle: Battle, unit: Unit, path: Tile[], events: GameEvent[]): void {
+  const start = { x: unit.x, y: unit.y }
   const end = path.at(-1)
   if (!end) return
   unit.x = end.x
   unit.y = end.y
   unit.moved = true
-  events.push({ type: 'move', id: unit.id, path })
+  const leaps = path.filter((tile, i) => jumps(battle, path[i - 1] ?? start, tile)).length
+  events.push({ type: 'move', id: unit.id, path, leaps: leaps || undefined })
 }
 
 /** Tiles further a soldier may dash in the fight to reach a shot. */

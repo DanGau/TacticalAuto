@@ -56,15 +56,41 @@ export const lerp = (a: Tile, b: Tile, t: number): Tile => ({ x: a.x + (b.x - a.
 /** How far a walk through `points` goes over the ground, in tiles: a diagonal step is the longer. */
 const ground = (points: Tile[]) => points.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - points[i].x, p.y - points[i].y), 0)
 
-/** Where a walk through `points` is once it has gone a share `t` of the way, at a steady pace. */
-export function along(points: Tile[], t: number): Tile {
+/** Where a walk through `points` is once it has gone a share `t` of the way, at a steady pace: the stride it is on, and how far along it. */
+function strideAt(points: Tile[], t: number): { i: number; f: number } {
   let left = t * ground(points)
   for (let i = 1; i < points.length; i++) {
     const step = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y)
-    if (left <= step && step > 0) return lerp(points[i - 1], points[i], left / step)
+    if (left <= step && step > 0) return { i, f: left / step }
     left -= step
   }
-  return points.at(-1)!
+  return { i: points.length - 1, f: 1 }
+}
+
+/** Where a walk through `points` is once it has gone a share `t` of the way, at a steady pace. */
+export function along(points: Tile[], t: number): Tile {
+  if (points.length < 2) return points.at(-1)!
+  const { i, f } = strideAt(points, t)
+  return lerp(points[i - 1], points[i], f)
+}
+
+/** Levels a jump arcs over the line between its ends, besides half a level for each tile across past the first and each level between them. */
+const HOP = 1
+
+/**
+ * Where a walker through `points` is at a share `t` of the way, as a world point. A stride across a gap or up or down
+ * `cliff` levels or more is a jump: it arcs over, rather than stepping from one tile's height to the next's.
+ */
+export function hopAlong(points: Tile[], t: number, cliff: number): Point3 {
+  const at = along(points, t)
+  const p = spot(at.x, at.y)
+  if (points.length < 2) return p
+  const { i, f } = strideAt(points, t)
+  const [a, b] = [points[i - 1], points[i]]
+  const [ha, hb] = [heights[a.y * GRID + a.x] ?? 0, heights[b.y * GRID + b.x] ?? 0]
+  const across = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y))
+  if (across <= 1 && Math.abs(hb - ha) < cliff) return p
+  return { ...p, y: LEVEL * (ha + (hb - ha) * f + (HOP + (across - 1 + Math.abs(hb - ha)) / 2) * 4 * f * (1 - f)) }
 }
 
 /**

@@ -18,6 +18,8 @@ export interface Report {
   seconds: { median: number; p90: number; max: number }
   /** Falls, fall kills and throws a battle. */
   moments: { falls: number; fallKills: number; throws: number }
+  /** Jumps a battle, by arena kind. */
+  jumps: Record<string, number>
   /** What battles cost the squad, as shares of its most health in percent: lost and left, each by mean, and left by leg; points lost; soldiers downed a battle; battles ended under 75%. */
   attrition: { lost: number; hp: number; points: number; downed: number; worn: number; legs: number[] }
   /** Battles past MAX_BATTLE_SECONDS, which the report warns of without failing. */
@@ -28,6 +30,18 @@ export interface Report {
 
 /** Seconds a battle may take to play in the view before the report warns. */
 const MAX_BATTLE_SECONDS = 60
+
+/** Jumps a battle on each arena kind, over all runs. */
+function jumpsByArena(results: RunResult[]): Record<string, number> {
+  const sum: Record<string, { battles: number; jumps: number }> = {}
+  for (const r of results)
+    for (const [kind, { battles, jumps }] of Object.entries(r.jumps)) {
+      const s = (sum[kind] ??= { battles: 0, jumps: 0 })
+      s.battles += battles
+      s.jumps += jumps
+    }
+  return Object.fromEntries(Object.entries(sum).map(([kind, s]) => [kind, Math.round((10 * s.jumps) / s.battles) / 10]))
+}
 
 export function report(results: RunResult[]): Report {
   const mean = (value: (r: RunResult) => number) => Math.round((10 * results.reduce((sum, r) => sum + value(r), 0)) / results.length) / 10
@@ -56,6 +70,7 @@ export function report(results: RunResult[]): Report {
     meanBattles: mean((r) => r.battles),
     seconds: { median: at(0.5), p90: at(0.9), max: at(1) },
     moments: { falls: per((m) => m.falls), fallKills: per((m) => m.fallKills), throws: per((m) => m.throws) },
+    jumps: jumpsByArena(results),
     attrition: {
       lost: share(tolls, (t) => t.before - t.after),
       hp: share(tolls, (t) => t.after),
@@ -83,6 +98,7 @@ export function formatReport(r: Report): string {
     `mean battles        ${r.meanBattles}`,
     `battle seconds      median ${r.seconds.median}, p90 ${r.seconds.p90}, max ${r.seconds.max}`,
     `a battle            ${r.moments.falls} falls, ${r.moments.fallKills} fall kills, ${r.moments.throws} throws`,
+    `jumps a battle      ${Object.entries(r.jumps).map(([kind, n]) => `${kind} ${n}`).join(', ')}`,
     `squad health        loses ${r.attrition.lost}% (${r.attrition.points}) a battle, ends at ${r.attrition.hp}%; ${r.attrition.worn}% of battles end under 75%; ${r.attrition.downed} downed a battle`,
     `ends at, by leg     ${r.attrition.legs.map((n) => `${n}%`).join(', ')}`,
     ...r.warnings.map((w) => `WARN                ${w}`),

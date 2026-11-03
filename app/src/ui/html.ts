@@ -50,7 +50,7 @@ export function threatBar(threat: number, landed = 0): string {
 }
 
 /** What each stat is called. */
-export const STAT_NAMES: Record<keyof Stats, string> = { hp: 'HP', armor: 'Armor', damage: 'Damage', range: 'Range', move: 'Move', crit: 'Crit' }
+export const STAT_NAMES: Record<keyof Stats, string> = { hp: 'HP', armor: 'Armor', damage: 'Damage', range: 'Range', move: 'Move', crit: 'Crit', strength: 'Strength', jump: 'Jump' }
 
 const percent = (n: number) => `${signed(Math.round(100 * n))}%`
 
@@ -62,6 +62,8 @@ const STAT_TEXT: Record<keyof Stats, (n: number) => string> = {
   range: (n) => `${signed(n)} range`,
   move: (n) => `${signed(n)} move`,
   crit: (n) => `${percent(n)} crit`,
+  strength: (n) => `${signed(n)} strength`,
+  jump: (n) => `${signed(n)} jump`,
 }
 
 /** A piece of gear's special, as plain text: its mod, its weapon's special and its effect; how the weapon fights its look tells. */
