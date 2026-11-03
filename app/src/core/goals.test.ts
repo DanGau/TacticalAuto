@@ -331,10 +331,10 @@ test('a held VIP takes no harm, and no one frees a VIP while an alien in the fig
   battle.units = battle.units.filter((u) => u.side !== 'alien' || u === guard)
   guard.engaged = true
   battle.vip = 'breached'
-  escortVip(battle, [soldier])
+  escortVip(battle)
   expect(battle.vip).toBe('breached')
   battle.units = battle.units.filter((u) => u !== guard)
-  escortVip(battle, [soldier])
+  escortVip(battle)
   expect(battle.vip).toBe('freed')
 })
 
@@ -406,7 +406,7 @@ test('a VIP joined to the zone through a crowd of the squad lifts off', () => {
   battle.extract = along(5)
   Object.assign(soldier, along(2))
   battle.units.push({ ...soldier, id: battle.nextId++, soldier: null, ...along(1) })
-  escortVip(battle, [soldier])
+  escortVip(battle)
   expect(battle.vip).toBe('out')
 })
 

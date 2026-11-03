@@ -89,7 +89,7 @@ export function sight(battle: Battle): GameEvent[] {
     battle.units.push(unit)
     events.push({ type: 'freed', id: rescuer.id, unit: { id: unit.id, x: unit.x, y: unit.y } })
   }
-  events.push(...escortVip(battle, soldiers))
+  events.push(...escortVip(battle))
   // A soldier at the extraction zone, or in the crowd at it, lifts off, with whoever it carries, once any VIP has.
   for (const soldier of battle.extract && battle.vip !== 'freed' ? soldiers.filter((s) => atExtraction(battle, s)) : []) {
     battle.units.splice(battle.units.indexOf(soldier), 1)
@@ -124,16 +124,18 @@ function atExtraction(battle: Battle, unit: Unit): boolean {
 }
 
 /**
- * A VIP rescue's steps. The first soldier within BREACH_REACH of the VIP blows in the wall between them, catching the
- * guards: they engage, but do not shoot on their next turn. A soldier beside the VIP, once no alien in the fight stands
+ * A VIP rescue's steps. The first of the squad within BREACH_REACH of the VIP blows in the wall between them, catching the
+ * guards: they engage, but do not shoot on their next turn. One of the squad beside the VIP, once no alien in the fight stands
  * within FREE_REACH of it, frees them: the extraction zone
  * appears at the edge. A VIP at the extraction zone lifts off.
  */
-export function escortVip(battle: Battle, soldiers: Unit[]): GameEvent[] {
+export function escortVip(battle: Battle): GameEvent[] {
   const vip = vipOf(battle)
   if (!vip) return []
+  // A drone or mech beside the VIP will do, so the squad's own machines never stand in its way.
+  const squad = battle.units.filter((u) => u.side === 'human' && !u.civilian)
   const events: GameEvent[] = []
-  const breacher = battle.vip === 'held' && nearest(soldiers.filter((s) => distance(s, vip) <= BREACH_REACH), vip)
+  const breacher = battle.vip === 'held' && nearest(squad.filter((s) => distance(s, vip) <= BREACH_REACH), vip)
   if (breacher) {
     battle.vip = 'breached'
     const at = { x: vip.x + Math.sign(breacher.x - vip.x), y: vip.y + Math.sign(breacher.y - vip.y) }
@@ -143,7 +145,7 @@ export function escortVip(battle: Battle, soldiers: Unit[]): GameEvent[] {
     events.push({ type: 'rocket', id: breacher.id, x: at.x, y: at.y, hits: [] })
   }
   const guarded = pursuers(battle, vip).some((u) => u.engaged && distance(u, vip) <= FREE_REACH)
-  if (battle.vip === 'breached' && !guarded && soldiers.some((s) => distance(s, vip) <= BREACH_REACH)) {
+  if (battle.vip === 'breached' && !guarded && squad.some((s) => distance(s, vip) <= BREACH_REACH)) {
     battle.vip = 'freed'
     // A VIP still walled in is broken out.
     if (walkingDistances(battle, vip).filter(Number.isFinite).length < POCKET) breach(battle, vip)
