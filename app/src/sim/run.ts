@@ -80,7 +80,7 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
       for (const event of played.events) {
         if (event.type === 'fall') result.moments.falls++
         if (event.type === 'fall' && !!event.fatal) result.moments.fallKills++
-        if (event.type === 'rocket' && event.label === 'HURLED') result.moments.throws++
+        if (event.type === 'throw') result.moments.throws++
         if (event.type !== 'end') continue
         result.battles++
         if (event.winner === null) result.draws++

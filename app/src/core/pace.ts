@@ -33,13 +33,15 @@ export const PACE = {
   ultimate: 900,
   /** A unit falling off a ledge or over the edge. */
   fall: 560,
+  /** Something thrown, in its arc. */
+  throw: 620,
 }
 
 /** What an event adds to a beat's lead on the next: a dash, and how much a weapon's shots run past one attack. */
 const beyond = (e: GameEvent) => (e.type === 'move' && e.with === 'dash' ? PACE.lunge : e.type === 'shot' && e.lasts ? e.lasts - (e.nth ? 0 : PACE.attack) : 0)
 
 /** Whether a beat is one attack of a side's attack stage, which the next beat may start over. */
-export const overlaps = (events: GameEvent[]) => events.some((e) => e.type === 'shot' || e.type === 'rocket' || e.type === 'spit' || e.type === 'panic')
+export const overlaps = (events: GameEvent[]) => events.some((e) => e.type === 'shot' || e.type === 'rocket' || e.type === 'throw' || e.type === 'spit' || e.type === 'panic')
 
 /** How long after a beat's attack starts the next may: a combo's first blow leads straight into the second. */
 export const staggerOf = (events: GameEvent[]) => (events.some((e) => e.type === 'shot' && e.opens) ? PACE.combo : PACE.stagger) + events.reduce((sum, e) => sum + beyond(e), 0)
@@ -79,6 +81,7 @@ export function beatMs(events: GameEvent[], pace: Map<number, number>, shown: Se
     else if (e.type === 'rocket') ms += PACE.rocket + PACE.blast
     else if (e.type === 'ultimate') ms += PACE.ultimate
     else if (e.type === 'fall') ms += PACE.fall
+    else if (e.type === 'throw') ms += PACE.throw
     else if (e.type === 'duo') ms += PACE.duo
     else if (e.type === 'spit' || e.type === 'panic') ms += PACE.psi
     else if (e.type === 'reveal' || e.type === 'wave') ms += e.units.some((u) => shown.has(u.id)) ? PACE.reveal : 0

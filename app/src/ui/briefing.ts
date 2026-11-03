@@ -77,7 +77,7 @@ function ground(battle: Battle, at: Tile): string {
 }
 
 /** What a prop makes of the ground it stands on. */
-const FEATURES: Partial<Record<Prop, string>> = { car: 'wrecked cars', truck: 'wrecked cars', tree: 'trees', crate: 'crates', stack: 'crates', fence: 'fences', rubble: 'rubble', spire: 'alien growth', growth: 'alien growth', water: 'water', fuel: 'fuel tanks', void: 'a sheer drop' }
+const FEATURES: Partial<Record<Prop, string>> = { car: 'wrecked cars', truck: 'wrecked cars', tree: 'trees', crate: 'crates', stack: 'crates', fence: 'fences', rubble: 'rubble', spire: 'alien growth', growth: 'alien growth', water: 'water', fuel: 'fuel tanks', void: 'a sheer drop', wreck: 'wrecked cars' }
 
 /** The aliens about `at`, as the briefing names them. */
 function nearby(battle: Battle, at: Tile): string {

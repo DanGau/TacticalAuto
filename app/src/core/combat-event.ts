@@ -1,4 +1,5 @@
 // The events a beat emits for the view to play.
+import type { Prop } from './terrain'
 import type { Tile, Effect, Ability, Order, Side } from './battle'
 import type { UtilityId } from './utilities'
 import type { SecondaryId } from './secondaries'
@@ -14,6 +15,8 @@ export type GameEvent =
   /** A rocket, grenade or napalm (`fire`) lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */
   /** A unit off a ledge, `drop` levels, onto `to`, landing on `onto` if anyone stood there; or over the edge, caught or lost. */
   | { type: 'fall'; id: number; to: Tile; drop: number | 'edge'; damage: number; onto?: number; fatal?: true }
+  /** A hero throws the object on `from`, or the alien `thrown`, onto `to`, striking each of `hits`. */
+  | { type: 'throw'; id: number; from: Tile; to: Tile; object: Prop | 'alien'; thrown?: number; hits: { target: number; damage: number }[] }
   | { type: 'rocket'; id: number; x: number; y: number; hits: { target: number; damage: number }[]; fire?: true; label?: string }
   | { type: 'heal'; id: number; target: number; amount: number }
   /** An effect of gear, a skill, a relic or a class ability acts on the unit `id`. `amount` is the health it gained, or lost if negative; 0 when neither. */

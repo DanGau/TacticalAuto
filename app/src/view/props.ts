@@ -38,6 +38,10 @@ const PROP_BOXES: Record<Exclude<Prop, 'none' | 'tree' | 'car'>, Box[]> = {
   growth: [{ wide: 0.8, deep: 0.8, base: 0, up: 9, color: 0x8f4fb5 }],
   water: [{ wide: 1, deep: 1, base: 0, up: 2, color: 0x2f9e96, alpha: 0.85 }],
   void: [],
+  wreck: [
+    { wide: 0.9, deep: 0.65, base: 0, up: 6, color: 0x3d3632 },
+    { wide: 0.5, deep: 0.5, base: 6, up: 4, color: 0x2a2420 },
+  ],
   fuel: [
     { wide: 0.6, deep: 0.6, base: 0, up: 16, color: 0xc0392b },
     { wide: 0.35, deep: 0.35, base: 16, up: 3, color: 0xf1c40f },

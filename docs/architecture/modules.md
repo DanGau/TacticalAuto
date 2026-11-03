@@ -14,7 +14,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `levels.ts` | Smoothing heights so ledges stand only where meant |
 | `knockback.ts` | Knockback and falls: off a ledge, through glass, over the edge |
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
-| `objects.ts` | What heroes do with objects: hurling them, setting off tanks, a rigged tank |
+| `objects.ts` | What heroes do with objects: the strong throwing them or small aliens, setting off tanks, a rigged tank |
 | `landing.ts` | The one entry point, the plain landing there, what relics and the picked utility set off |
 | `spawn.ts` | Making units: aliens, soldiers, civilians, mechs, drops |
 | `step.ts` | Advances the run's battle a beat; settles it when it ends |
@@ -71,7 +71,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `board.ts` | Building the battlefield's ground, props, walls, roofs |
 | `props.ts` | Boxes props and walls are drawn from; trees |
 | `palette.ts` | Colours |
-| `falls.ts` | A fall off a ledge or over the edge |
+| `falls.ts` | A fall off a ledge or over the edge; a throw in its arc |
 | `attacks`, `chasm`, `fences`, `looks`, `roofs`, `shapes`, `space` | Weapon looks, cliffs, zone fences, region looks, roofs, mesh building, view units |
 
 ## Elsewhere
