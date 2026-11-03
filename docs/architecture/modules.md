@@ -69,6 +69,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `sprites.ts` | Unit pictures and moving them |
 | `marks.ts` | Ground marks: the way in, goals, fences, acid, fog, glows |
 | `board.ts` | Building the battlefield's ground, props, walls, roofs |
+| `edges.ts` | The ground's edge lines, each drawn once |
 | `props.ts` | Boxes props and walls are drawn from; trees |
 | `palette.ts` | Colours |
 | `falls.ts` | A fall off a ledge or over the edge; a throw in its arc |

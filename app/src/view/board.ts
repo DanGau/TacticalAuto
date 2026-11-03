@@ -5,6 +5,7 @@ import { CLIFF } from '../core/grid'
 import type { Edge, Prop } from '../core/terrain'
 import { onGridTile, spot } from './camera'
 import { buildChasm } from './chasm'
+import { edgeLines } from './edges'
 import { LOOKS, type Look } from './looks'
 import { COLOR, GROUND_COLOR, highland } from './palette'
 import { addTree, CAP_UP, EDGE_BOXES, EDGE_UP, pick, propBoxes, WALL_THICK, type Box } from './props'
@@ -127,7 +128,13 @@ export function drawTerrain(s: Stage, battle: Battle): void {
     ...EDGE_BOXES[edge].map((box) => ({ ...box, base: box.base * lift, up: box.up * lift, color: box.alpha ? look.glass : color })),
     { wide: 1, deep: WALL_THICK * 1.5, base: EDGE_UP * lift, up: CAP_UP, color: look.cap },
   ]
+  const tileColor = (tile: number) => {
+    const kind = battle.ground[tile]
+    return kind === 'floor' ? look.floor : (look.ground[kind as Exclude<typeof kind, 'void'>] ?? GROUND_COLOR[kind])
+  }
   const ground = new Shapes()
+  // Apart from the ground, so the ground stays opaque and hides what is behind it.
+  const shadows = new Shapes()
   for (let tile = 0; tile < GRID * GRID; tile++) {
     const kind = battle.ground[tile]
     // Where the ground falls away there is nothing to draw.
@@ -135,9 +142,9 @@ export function drawTerrain(s: Stage, battle: Battle): void {
     const x = tile % GRID
     const y = Math.floor(tile / GRID)
     const top = LEVEL * battle.height[tile]
-    const color = kind === 'floor' ? look.floor : (look.ground[kind] ?? GROUND_COLOR[kind])
-    // The faces a raised tile shows above its lower neighbours.
-    const drop = (nx: number, ny: number) => (onGridTile(nx, ny) ? Math.max(0, battle.height[tile] - battle.height[ny * GRID + nx]) * LEVEL : 0)
+    const color = tileColor(tile)
+    // The faces a raised tile shows above its lower neighbours; the chasm draws those onto void.
+    const drop = (nx: number, ny: number) => (onGridTile(nx, ny) && battle.ground[ny * GRID + nx] !== 'void' ? Math.max(0, battle.height[tile] - battle.height[ny * GRID + nx]) * LEVEL : 0)
     const sides = [
       [x - 0.5, y + 0.5, x + 0.5, y + 0.5, drop(x, y + 1), 0.6, 0, 1],
       [x + 0.5, y - 0.5, x + 0.5, y + 0.5, drop(x + 1, y), 0.45, 1, 0],
@@ -150,22 +157,22 @@ export function drawTerrain(s: Stage, battle: Battle): void {
       const sheer = fall >= CLIFF * LEVEL - 1e-6
       ground.quad({ x: ax, y: top, z: az }, { x: bx, y: top, z: bz }, { x: bx, y: top - fall, z: bz }, { x: ax, y: top - fall, z: az }, shade(color, sheer ? light * LEDGE_FACE : light))
       if (!sheer) continue
-      ground.line({ x: ax, y: top + 0.004, z: az }, { x: bx, y: top + 0.004, z: bz }, shade(color, LIP), 0.9)
       const low = top - fall + 0.004
       const far = (p: number, n: number) => p + n * LEDGE_SHADOW
-      ground.quad({ x: ax, y: low, z: az }, { x: bx, y: low, z: bz }, { x: far(bx, nx), y: low, z: far(bz, nz) }, { x: far(ax, nx), y: low, z: far(az, nz) }, 0x000000, 0.3)
+      shadows.quad({ x: ax, y: low, z: az }, { x: bx, y: low, z: bz }, { x: far(bx, nx), y: low, z: far(bz, nz) }, { x: far(ax, nx), y: low, z: far(az, nz) }, 0x000000, 0.3)
     }
     ground.flat(x - 0.5, y - 0.5, x + 0.5, y + 0.5, top, highland(color, battle.height[tile]))
-    for (const [ax, az, bx, bz] of [
-        [x - 0.5, y - 0.5, x + 0.5, y - 0.5],
-        [x - 0.5, y - 0.5, x - 0.5, y + 0.5],
-      ])
-        ground.line({ x: ax, y: top + 0.002, z: az }, { x: bx, y: top + 0.002, z: bz }, COLOR.line, 0.5)
+  }
+  for (const e of edgeLines(battle)) {
+    const y = LEVEL * e.level + 0.003
+    if (e.lip) ground.line({ x: e.x1, y, z: e.z1 }, { x: e.x2, y, z: e.z2 }, shade(tileColor(e.tile), LIP), 0.9)
+    else ground.line({ x: e.x1, y, z: e.z1 }, { x: e.x2, y, z: e.z2 }, COLOR.line, 0.5)
   }
   const built = ground.build()
   // The ground is the terrain's first child, which a click on the map is tested against.
   s.terrain.add(built.mesh)
   if (built.lines) s.terrain.add(built.lines)
+  s.terrain.add(shadows.build().mesh)
   for (let tile = 0; tile < GRID * GRID; tile++) {
     const props = battle.props
     if (battle.ground[tile] === 'void') continue

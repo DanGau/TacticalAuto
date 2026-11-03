@@ -1,5 +1,5 @@
 // Units on the board: each one's picture with its health pips, and moving, squashing, fading and removing it.
-import { CanvasTexture, CircleGeometry, Group, Mesh, MeshBasicMaterial, Sprite as Billboard, SpriteMaterial } from 'three'
+import { CanvasTexture, CircleGeometry, GreaterDepth, Group, Mesh, MeshBasicMaterial, Sprite as Billboard, SpriteMaterial } from 'three'
 import { ALIENS } from '../core/aliens'
 import { type Battle, type Tile, type Unit } from '../core/battle'
 import { CLASSES } from '../core/classes'
@@ -19,6 +19,8 @@ const PIP_ROW = 10 * PIP_STEP - 1
 /** A unit's picture, in screen pixels about its feet, and the pixels per one drawn, for a crisp edge. */
 const BODY = { left: 36, up: 100, down: 4 }
 const BODY_RES = 2
+/** How strongly a unit's picture shows through whatever stands in front of it. */
+const GHOST = 0.5
 
 /** The letter over a unit that is no soldier: its kind's initial, C for a commander, nothing for a boss or civilian. */
 export const letter = (unit: Unit) => (unit.target ? 'C' : unit.summoner !== null ? 'M' : unit.boss || !unit.kind ? '' : ALIENS[unit.kind].name[0])
@@ -58,6 +60,7 @@ export function squash(sprite: Sprite, wide: number, high: number): void {
 
 export function fade(sprite: Sprite, alpha: number): void {
   ;(sprite.body.material as SpriteMaterial).opacity = alpha
+  ;(sprite.ghost.material as SpriteMaterial).opacity = GHOST * alpha
   ;(sprite.shadow.material as MeshBasicMaterial).opacity = 0.4 * alpha
 }
 
@@ -96,6 +99,11 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
   const texture = new CanvasTexture(picture)
   const body = new Billboard(new SpriteMaterial({ map: texture, transparent: true, depthWrite: false }))
   body.center.set(0.5, BODY.down / (BODY.up + BODY.down))
+  // Drawn only where terrain hides the unit, so it shows through cliffs, props and walls, as XCOM's do.
+  const ghost = new Billboard(new SpriteMaterial({ map: texture, transparent: true, depthWrite: false, depthFunc: GreaterDepth, opacity: GHOST }))
+  ghost.center.copy(body.center)
+  ghost.renderOrder = 2
+  body.add(ghost)
   const shadow = new Mesh(new CircleGeometry(14 / ACROSS, 20).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4, depthWrite: false }))
   shadow.position.y = DECAL_LIFT * 2
   const node = new Group()
@@ -107,6 +115,7 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
   const sprite: Sprite = {
     node,
     body,
+    ghost,
     shadow,
     tile: unit,
     at: { x: 0, y: 0 },

@@ -13,6 +13,8 @@ export interface Sprite {
   /** The unit's feet, with its shadow; its picture stands on them, facing the camera. */
   node: Group
   body: Billboard
+  /** The picture again, faint, where terrain in front of the unit hides it. */
+  ghost: Billboard
   shadow: Mesh
   /** Redraws the picture with the given health, armor and temp HP. */
   drawHp(hp: number, armor: number, temp?: number): void
