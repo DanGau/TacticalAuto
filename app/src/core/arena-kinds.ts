@@ -45,6 +45,23 @@ export function pickArenaKind(battle: { rng: number }, place: TerrainKind, goal:
   return fits[randomInt(battle, fits.length)]
 }
 
+/** Tiles within `reach` of a drop: the void, or the low side of a ledge. */
+export function dropsNear(battle: Battle, reach: number): Set<number> {
+  const near = new Set<number>()
+  for (let t = 0; t < GRID * GRID; t++) {
+    if (battle.ground[t] === 'void') continue
+    const x = t % GRID
+    const y = Math.floor(t / GRID)
+    const lip = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
+      const n = (y + dy) * GRID + x + dx
+      return x + dx >= 0 && y + dy >= 0 && x + dx < GRID && y + dy < GRID && (battle.ground[n] === 'void' || battle.height[t] - battle.height[n] >= 2)
+    })
+    if (!lip) continue
+    for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) if (x + dx >= 0 && y + dy >= 0 && x + dx < GRID && y + dy < GRID) near.add((y + dy) * GRID + x + dx)
+  }
+  return near
+}
+
 /** Half the side of the square about the arena's centre an arena kind shapes; beyond it the ground slopes back to its own. */
 const FOOT = 16
 
@@ -62,7 +79,7 @@ const within = (v: number, lo: number, hi: number) => v >= lo && v <= hi
 const SHAPES: Record<Exclude<ArenaKind, 'open'>, Shape> = {
   // The roof, a machine deck over the aliens' end and a stair up to it; all else is the drop.
   skyscraper: (a, c) => {
-    if (Math.abs(a) > 14.5 || Math.abs(c) > 12.5) return 'drop'
+    if (Math.abs(a) > 12.5 || Math.abs(c) > 7.5) return 'drop'
     if (within(a, 5, 10) && Math.abs(c) <= 5) return 2
     return within(a, 3.5, 5) && Math.abs(c) <= 1.5 ? 1 : 0
   },

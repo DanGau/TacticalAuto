@@ -18,7 +18,7 @@ export interface Secondary {
 
 const secondaries = {
   sidearm: { name: 'Sidearm', range: 5, damage: 0, text: 'A quick follow-up' },
-  frag: { name: 'Force Burst', range: 6, damage: -1, effect: 'splash', text: `${FRAG_SPLASH} damage to each alien beside the target` },
+  frag: { name: 'Force Burst', range: 6, damage: -1, effect: 'splash', text: `${FRAG_SPLASH} damage to each alien beside the target, knocking it a tile away` },
   slug: { name: 'Kinetic Blast', range: 5, damage: 0, effect: 'knock', text: `Knocks the target ${KNOCK_TILES} tiles back` },
   pistol: { name: 'Trick Shot', range: 10, damage: 0, text: 'A quick follow-up' },
   flare: { name: 'Guiding Bolt', range: 5, damage: -1, effect: 'mark', text: 'Marks the target' },

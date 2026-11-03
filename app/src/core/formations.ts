@@ -1,4 +1,5 @@
 // Gathers a battle's aliens into clusters: how they are grouped, the shapes they stand in, and how the ground shapes those.
+import { dropsNear } from './arena-kinds'
 import { ENGAGE_REACH, GRID, type Alien, type Battle, type Tile } from './battle'
 import { distance, onGrid } from './grid'
 import { random, randomInt } from './rng'
@@ -119,6 +120,10 @@ function groupsOf(battle: Battle, aliens: Alien[], plot: Plot): { members: numbe
   return groups
 }
 
+/** How near a drop a cluster on shaped ground wants to stand, and how many tiles off its mark it goes for that. */
+const EDGE_REACH = 1
+const EDGE_PULL = 14
+
 /** The nearest two clusters of a push stand, so that a soldier nearing one wakes only it. */
 const WAKE_CLEAR = ENGAGE_REACH + 1
 
@@ -131,6 +136,8 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
   const outdoors = plot.ground.filter((t) => battle.ground[t.y * GRID + t.x] !== 'floor' && distance(t, spot) >= clear)
   const open = outdoors.length > 0 ? outdoors : plot.ground
   const groups = groupsOf(battle, aliens, plot)
+  // On shaped ground, clusters gather by the drops, where a knockback sends them over.
+  const lips = battle.arenaKind === 'open' ? new Set<number>() : dropsNear(battle, EDGE_REACH)
   const staged = plot.challenge ? STAGING[plot.challenge] : undefined
   const free = groups.filter((g) => !g.at)
   const centres: Tile[] = groups.flatMap((g) => g.at ?? [])
@@ -157,7 +164,7 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
       const want = FEATURES[randomInt(battle, FEATURES.length)]
       for (let sep = staged?.apart ?? SEPARATION[battle.flow]; !at && sep >= (keepApart ? WAKE_CLEAR : 2); sep--) {
         const room = open.filter((t) => centres.every((c) => distance(c, t) >= sep) && clearOfOthers(t, Math.ceil(Math.sqrt(n))))
-        const score = (t: Tile) => -Math.hypot(t.x - aim.x, t.y - aim.y) + (!staged && featureAt(battle, t) === want ? SETTLE : 0) + r()
+        const score = (t: Tile) => -Math.hypot(t.x - aim.x, t.y - aim.y) + (!staged && featureAt(battle, t) === want ? SETTLE : 0) + (lips.has(t.y * GRID + t.x) ? EDGE_PULL : 0) + r()
         at = room.reduce<Tile | null>((a, b) => (!a || score(b) > score(a) ? b : a), null)
       }
       // No room stands clear: it joins the nearest cluster, which engages as one.

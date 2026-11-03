@@ -19,6 +19,12 @@ export const onGridTile = (x: number, y: number) => x >= 0 && y >= 0 && x < GRID
 /** The height of each tile of the battle shown, row by row. */
 let heights: number[] = []
 
+/** Whether the battle shown is ringed by a drop, so the map's edge is dark sky and the camera need not hide it. */
+let ringed = false
+
+/** Sets whether the battle shown is ringed by a drop. */
+export const setRinged = (to: boolean) => void (ringed = to)
+
 /** Sets the heights of the battle shown, which `spot` stands points on. */
 export const setHeights = (to: number[]) => void (heights = to)
 
@@ -140,7 +146,7 @@ export function bestTurn(points: Tile[], yaw: number): number {
  * distance by design, and is left alone.
  */
 export function clamped(to: Camera, keep: Tile[] = []): Camera {
-  if (to.fov > STILL_FOV) return to
+  if (to.fov > STILL_FOV || ringed) return to
   const s = Math.min(innerWidth / WIDTH, innerHeight / HEIGHT)
   // The ground the screen shows, in tiles from its centre to its farthest corner at zoom 1, whichever way it turns.
   const corner = Math.hypot(innerWidth / 2 / s / ACROSS, innerHeight / 2 / s / ACROSS / Math.sin(to.pitch))

@@ -9,9 +9,6 @@ import { SLAM_DAMAGE, wound } from './wound'
 export const FALL_DAMAGE = 2
 export const EDGE_DAMAGE = 6
 
-/** Effects that knock a target back, which heroes aim at a ledge. */
-export const KNOCKS: Effect[] = ['thunder', 'hurl', 'repulse', 'shove']
-
 /** Whether `to` is the drop: off the map or void. */
 export const isDrop = (battle: Battle, to: Tile) => !onGrid(to.x, to.y) || battle.ground[to.y * GRID + to.x] === 'void'
 
@@ -24,10 +21,41 @@ export function fallBeyond(battle: Battle, from: Tile, to: Tile): 'drop' | numbe
   return down >= CLIFF ? down : 0
 }
 
-/** Whether knocking `target` a tile straight back from `from` sends it off a ledge, or over the edge to be lost. */
-export function pushesOff(battle: Battle, from: Tile, target: Unit): boolean {
-  const beyond = fallBeyond(battle, target, { x: target.x + Math.sign(target.x - from.x), y: target.y + Math.sign(target.y - from.y) })
+/** The ways back from `from` a knockback may drive `target`: straight back, or a step to either side of it. */
+function ways(from: Tile, target: Tile): Tile[] {
+  const i = COMPASS.findIndex(([dx, dy]) => dx === Math.sign(target.x - from.x) && dy === Math.sign(target.y - from.y))
+  return i < 0 ? [] : [i, i + 1, i + 7].map((k) => ({ x: COMPASS[k % 8][0], y: COMPASS[k % 8][1] }))
+}
+
+/** The eight headings in turn round the compass. */
+const COMPASS = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]]
+
+/** Whether `target` falls off a ledge or is lost over the edge driven a tile along `step`. */
+const fellsAlong = (battle: Battle, target: Unit, step: Tile) => {
+  const beyond = fallBeyond(battle, target, { x: target.x + step.x, y: target.y + step.y })
   return beyond !== 0 && !(beyond === 'drop' && target.boss) && !has(target, 'hover')
+}
+
+/** The way a knockback from `from` drives `target`: of straight back and a step to either side, one that sends it off a ledge or the edge if any does, else straight back. */
+export const knockWay = (battle: Battle, from: Tile, target: Unit): Tile | undefined => {
+  const options = ways(from, target)
+  return options.find((step) => fellsAlong(battle, target, step)) ?? options[0]
+}
+
+/** Whether a knockback from `from` sends `target` off a ledge, or over the edge to be lost. */
+export function pushesOff(battle: Battle, from: Tile, target: Unit): boolean {
+  const step = knockWay(battle, from, target)
+  return !!step && fellsAlong(battle, target, step)
+}
+
+/**
+ * A hero's hit on an alien standing at a ledge or the edge knocks it off, as an alien's blow from beside does a hero;
+ * a brute's or a juggernaut's blow knocks a hero a tile back anyway.
+ */
+export function shoveOff(battle: Battle, unit: Unit, target: Unit, events: GameEvent[]): void {
+  if (target.civilian) return
+  const reaches = unit.side === 'human' || Math.max(Math.abs(unit.x - target.x), Math.abs(unit.y - target.y)) <= 1
+  if ((reaches && pushesOff(battle, unit, target)) || (target.side === 'human' && (unit.kind === 'brute' || unit.kind === 'juggernaut'))) knockback(battle, unit, target, events, 1, 1, SLAM_DAMAGE, 'shove')
 }
 
 /** Breaks the glass between neighbouring tiles, if any. */
@@ -74,12 +102,13 @@ export function fall(battle: Battle, unit: Unit, from: Tile, to: Tile, events: G
 }
 
 /**
- * A knockback: the target is driven `tiles` straight back from `unit`. Driven off a ledge or over the edge, it falls;
+ * A knockback: the target is driven `tiles` back from `unit`, straight or a step aside toward a drop; see knockWay. Driven off a ledge or over the edge, it falls;
  * if something else stops it, it slams into that for `slam` damage, and an alien it slams into takes as much. With
  * `way` -1, a tethered hit pulls it a tile toward the shooter, as far as the way is free.
  */
 export function knockback(battle: Battle, unit: Unit, target: Unit, events: GameEvent[], way = 1, tiles = 1, slam = SLAM_DAMAGE, effect: Effect = way > 0 ? 'thunder' : 'tether'): void {
-  const step = { x: way * Math.sign(target.x - unit.x), y: way * Math.sign(target.y - unit.y) }
+  const back = way > 0 ? knockWay(battle, unit, target) : undefined
+  const step = back ?? { x: way * Math.sign(target.x - unit.x), y: way * Math.sign(target.y - unit.y) }
   drive(battle, target, step, tiles, events, way > 0 ? slam : 0, effect)
 }
 

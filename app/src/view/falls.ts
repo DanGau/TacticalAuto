@@ -10,7 +10,7 @@ import { drawFog } from './marks'
 import { COLOR } from './palette'
 import { fade, place, remove, vitals } from './sprites'
 import { LEVEL, tall } from './space'
-import type { Stage } from './stage'
+import { CAMERA_MS, type Stage } from './stage'
 
 /** How far a unit over the edge is seen to fall before it is gone, in screen pixels seen from the still camera. */
 const LONG_FALL = 420
@@ -28,6 +28,8 @@ export async function playFall(s: Stage, battle: Battle, e: Extract<GameEvent, {
   const b = over ? { ...spot(e.to.x, e.to.y), y: a.y } : spot(e.to.x, e.to.y)
   const sink = lost ? tall(LONG_FALL) : 0
   float(s, callout(s, over ? 'OVER THE EDGE' : 'FALL', COLOR.crit, sprite, 15))
+  // The camera takes in the fall with the squad, so a fall at the edge of the frame is not missed.
+  void s.follow([...battle.units.filter((u) => u.side === 'human' && !u.civilian), e.to], CAMERA_MS)
   await s.tween(PACE.fall, (t) => {
     // Out over the lip, then down as if dropped.
     const out = Math.min(1, t * 2)
@@ -62,6 +64,7 @@ export async function playThrow(s: Stage, battle: Battle, e: Extract<GameEvent, 
   const a = spot(e.from.x, e.from.y)
   const b = spot(e.to.x, e.to.y)
   const held = e.thrown !== undefined ? s.sprites.get(e.thrown) : undefined
+  void s.follow([...battle.units.filter((u) => u.side === 'human' && !u.civilian), e.from, e.to], CAMERA_MS)
   const thrower = s.sprites.get(e.id)
   if (thrower) float(s, callout(s, e.object === 'alien' ? 'THROW' : `THROWS A ${e.object === 'wreck' ? 'WRECK' : e.object.toUpperCase()}`, 0xffffff, thrower, 15))
   let mesh: Mesh | null = null

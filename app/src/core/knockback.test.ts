@@ -78,9 +78,8 @@ test('glass on the edge breaks; a wall holds', () => {
   expect(battle.west[10 * GRID + 12]).toBe('none')
 })
 
-test('a Shoving hit knocks off only a target at a ledge, and heroes aim their knockbacks at one', () => {
+test("any hero's hit knocks an alien at a ledge off it, and heroes aim at one", () => {
   const { battle, hero, aliens, beats } = ledge(2)
-  hero.effects = ['shove']
   const far = { ...aliens[0], id: 1300, x: 10, y: 12 }
   battle.units.push(far)
   expect(worth(battle, hero, aliens[0])).toBeGreaterThan(worth(battle, hero, far))

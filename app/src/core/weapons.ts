@@ -59,7 +59,7 @@ const HAMMER_SURGE = { gain: 3, cap: 4 }
 const weapons = {
   rifle: { name: 'Arc Caster', type: 'Rifle', stats: {}, attack: { shots: 3, power: 0.6, ms: 150 } },
   sniper: { name: 'Star Lance', type: 'Sniper Rifle', stats: { range: 3, crit: 0.1, move: -1 }, attack: { shots: 1, power: 1.6, ms: 520 }, stance: 'standoff' },
-  shotgun: { name: 'Blast Gauntlet', type: 'Shotgun', stats: { range: -1 }, attack: { shots: 1, power: 1.8, wide: 0.6 }, stance: 'rush' },
+  shotgun: { name: 'Blast Gauntlet', type: 'Shotgun', stats: { range: -1 }, attack: { shots: 1, power: 1.8, wide: 0.6 }, stance: 'rush', effect: 'thunder', special: 'Hits knock the target a tile back; if something stops it, it slams into that for 1 damage' },
   smg: { name: 'Storm Darts', type: 'SMG', stats: { range: -1, move: 1 }, attack: { shots: 4, power: 0.4, ms: 90 } },
   lmg: { name: 'Storm Engine', type: 'Machine Gun', stats: { range: 1, move: -1 }, attack: { shots: 5, power: 0.35, ms: 110 }, effect: 'suppress', special: 'A target it hits does 1 less damage on its next turn' },
   pistols: { name: 'Twin Blasters', type: 'Twin Pistols', stats: { move: 1 }, attack: { shots: 2, power: 0.7, ms: 220 } },

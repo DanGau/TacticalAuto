@@ -43,7 +43,7 @@ export const EFFECTS: Record<GearEffect, { prefix: string; text: string; tags?: 
   thunder: { prefix: 'Thundering', text: 'Hits knock the target a tile back; if something stops it, it slams into that for 1 damage', epic: true },
   snare: { prefix: 'Snaring', text: 'Hits root the target: it cannot move on its next turn' },
   booming: { prefix: 'Booming', text: 'Hits charge the target: if it moves on its next turn, it takes 3 damage', epic: true },
-  shove: { prefix: 'Shoving', text: 'A hit on a target at a ledge or the edge knocks it off' },
+  shove: { prefix: 'Shoving', text: 'Hits knock the target a tile back' },
   tether: { prefix: 'Tethered', text: 'Hits pull the target a tile toward the wielder' },
 }
 

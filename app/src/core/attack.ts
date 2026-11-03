@@ -16,7 +16,7 @@ import { FRAG_SPLASH, KNOCK_TILES, type Secondary } from './secondaries'
 import type { GameEvent } from './combat-event'
 import { aiming, powering, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
 import { wound } from './wound'
-import { KNOCKS, knockback, pushesOff } from './knockback'
+import { shoveOff, drive, knockback, pushesOff } from './knockback'
 import { SLAM_DAMAGE } from './wound'
 import { TUNING } from './tuning'
 import { bite, MIN_DAMAGE, odds } from './sight'
@@ -50,7 +50,7 @@ export function worth(battle: Battle, unit: Unit, enemy: Unit): number {
     (has(unit, 'booming') && closing(enemy) && enemy.booming === 0 ? 0.15 : 0) +
     (has(unit, 'tether') && !closing(enemy) ? 0.15 : 0) +
     (has(unit, 'thunder') && harmful ? 0.2 : 0) +
-    (KNOCKS.some((e) => has(unit, e)) && pushesOff(battle, unit, enemy) ? LEDGE_WORTH : 0) +
+    (unit.side === 'human' && pushesOff(battle, unit, enemy) ? LEDGE_WORTH : 0) +
     (has(unit, 'net') && enemy.rooted > 0 ? 0.1 : 0) +
     (has(unit, 'volatile') && enemy.hp + enemy.armor <= unit.stats.damage ? 0.1 * near(1) : 0) +
     (has(unit, 'arc') ? 0.05 * Math.min(ARC_LEAPS, near(ARC_REACH)) : 0)
@@ -265,10 +265,9 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
   else if (first && enemy.hp > 0 && damage > 0 && when(true, 'repulse', 1)) knockback(battle, unit, enemy, events, 1, REPULSE_TILES, SLAM_DAMAGE, 'repulse')
   else if (first && enemy.hp > 0 && damage > 0 && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
-  else if (first && enemy.hp > 0 && damage > 0 && pushesOff(battle, unit, enemy) && when(true, 'shove', 1)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'shove')
+  else if (first && enemy.hp > 0 && damage > 0 && when(true, 'shove', 1)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'shove')
   if (first && enemy.hp > 0 && crit && when(true, 'gale', 1)) knockback(battle, unit, enemy, events, 1, REPULSE_TILES, SLAM_DAMAGE, 'gale')
-  // A brute's blow knocks a hero a tile back.
-  if (enemy.hp > 0 && damage > 0 && unit.kind === 'brute' && isSoldier(enemy)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'shove')
+  if (first && enemy.hp > 0 && damage > 0) shoveOff(battle, unit, enemy, events)
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'tether', 1)) knockback(battle, unit, enemy, events, -1)
   if (enemy.hp > 0 && when(true, 'snare', 1)) {
     enemy.rooted = CHILL_TURNS
@@ -350,6 +349,7 @@ function secondaryHit(battle: Battle, unit: Unit, enemy: Unit, beside: Unit[], {
     for (const other of beside.filter((u) => u.hp > 0)) {
       events.push({ type: 'hurt', id: other.id, amount: FRAG_SPLASH, cause: 'impact' })
       wound(battle, other, FRAG_SPLASH, events)
+      if (other.hp > 0) drive(battle, other, { x: Math.sign(other.x - enemy.x), y: Math.sign(other.y - enemy.y) }, 1, events, 0, 'shove')
     }
   }
   if (enemy.hp <= 0) return

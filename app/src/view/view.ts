@@ -6,7 +6,7 @@ import { effectName } from '../core/effects'
 import { overlaps, staggerOf } from '../core/pace'
 import type { Run } from '../core/run-state'
 import { drawTerrain } from './board'
-import { axes, bestTurn, clamped, DECAL_LIFT, framing, setHeights, spot, STILL_FOV, WIDTH, type Camera, type Shot } from './camera'
+import { axes, bestTurn, clamped, DECAL_LIFT, framing, setHeights, setRinged, spot, STILL_FOV, WIDTH, type Camera, type Shot } from './camera'
 import { callout, chest, effectCallout, shotCallout } from './effects'
 import { drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
@@ -58,6 +58,7 @@ export async function createView(): Promise<View> {
   function setBattle(battle: Battle): void {
     s.shown = battle
     setHeights(battle.height)
+    setRinged(battle.arenaKind === 'skyscraper')
     for (const id of [...s.sprites.keys()]) remove(s, id)
     s.glows.clear()
     empty(s.lurk)
