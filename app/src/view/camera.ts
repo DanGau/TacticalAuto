@@ -74,23 +74,33 @@ export function along(points: Tile[], t: number): Tile {
   return lerp(points[i - 1], points[i], f)
 }
 
-/** Levels a jump arcs over the line between its ends, besides half a level for each tile across past the first and each level between them. */
-const HOP = 1
+/** Levels a jump arcs over the line between its ends, besides a level for each tile across past the first and each level between them. */
+const HOP = 1.5
+/** How much a jump slows at its peak, so it hangs there. */
+const HANG = 0.6
 
-/**
- * Where a walker through `points` is at a share `t` of the way, as a world point. A stride across a gap or up or down
- * `cliff` levels or more is a jump: it arcs over, rather than stepping from one tile's height to the next's.
- */
-export function hopAlong(points: Tile[], t: number, cliff: number): Point3 {
-  const at = along(points, t)
-  const p = spot(at.x, at.y)
-  if (points.length < 2) return p
+/** A walker through `points` at a share `t` of the way, as world points: its feet, and the ground under them; and, mid-jump, how far through the jump it is and how big a jump it is. */
+export interface Stride {
+  feet: Point3
+  ground: Point3
+  leap?: { f: number; size: number }
+}
+
+/** Where a walker through `points` is at a share `t` of the way. A stride across a gap or up or down `cliff` levels or more is a jump: it arcs high over, hanging at its peak. */
+export function strideAlong(points: Tile[], t: number, cliff: number): Stride {
+  const on = along(points, t)
+  const p = spot(on.x, on.y)
+  if (points.length < 2) return { feet: p, ground: p }
   const { i, f } = strideAt(points, t)
   const [a, b] = [points[i - 1], points[i]]
   const [ha, hb] = [heights[a.y * GRID + a.x] ?? 0, heights[b.y * GRID + b.x] ?? 0]
   const across = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y))
-  if (across <= 1 && Math.abs(hb - ha) < cliff) return p
-  return { ...p, y: LEVEL * (ha + (hb - ha) * f + (HOP + (across - 1 + Math.abs(hb - ha)) / 2) * 4 * f * (1 - f)) }
+  if (across <= 1 && Math.abs(hb - ha) < cliff) return { feet: p, ground: p }
+  const size = HOP + across - 1 + Math.abs(hb - ha)
+  const g = f + (HANG * Math.sin(2 * Math.PI * f)) / (2 * Math.PI)
+  const at = lerp(a, b, g)
+  const ground = { x: at.x, y: LEVEL * (ha + (hb - ha) * g), z: at.y }
+  return { feet: { ...ground, y: ground.y + LEVEL * size * 4 * g * (1 - g) }, ground, leap: { f, size } }
 }
 
 /**

@@ -7,7 +7,8 @@ import { effectName } from '../core/effects'
 import { instant, PACE, strolls, tilePace, walkMs } from '../core/pace'
 import { attackOf, finisher, opener, secondaryAttack } from './attacks'
 import { drawTerrain } from './board'
-import { along, hopAlong, lerp, spot } from './camera'
+import { along, lerp, spot, strideAlong } from './camera'
+import { crouch, CROUCH_MS, dust, ground as grounded, land, nearing, pose, WIND_UP } from './leaps'
 import { CLIFF } from '../core/grid'
 import { callout, chest, dashTo, daze, drawing, effectCallout, fireRocket, float, playShot, shockwave } from './effects'
 import { drawAcid, drawFog, drawMarks } from './marks'
@@ -35,10 +36,10 @@ const SETTLE_MS = 160
 /** How much a unit rocks with each step of its cool walk. */
 const SWAGGER = 0.05
 
-async function walk(s: Stage, sprite: Sprite, path: Tile[], ms: number, leaps: boolean): Promise<void> {
+async function walk(s: Stage, sprite: Sprite, path: Tile[], ms: number, strength: number | undefined): Promise<void> {
   const points = [sprite.tile, ...path]
   // A hero going a short way does not hurry: even steps, rocking side to side, no run and no landing.
-  if (sprite.ally && strolls(path, PACE.dash) && !leaps) {
+  if (sprite.ally && strolls(path, PACE.dash) && strength === undefined) {
     await s.tween(ms, (t) => {
       place(s, sprite, along(points, t))
       const rock = SWAGGER * Math.sin(t * path.length * 2 * Math.PI)
@@ -47,15 +48,31 @@ async function walk(s: Stage, sprite: Sprite, path: Tile[], ms: number, leaps: b
     squash(sprite, 1, 1)
     return
   }
+  if (strength === undefined) {
+    await s.tween(ms, (t) => {
+      place(s, sprite, along(points, momentum(t)))
+      const lean = LEAN * Math.sin(Math.PI * t)
+      squash(sprite, 1 - lean, 1 + lean)
+    })
+    // The weight lands after the walk, while whatever comes next begins.
+    void s.tween(SETTLE_MS, (t) => squash(sprite, 1 + SETTLE * (1 - t), 1 - SETTLE * (1 - t)))
+    return
+  }
+  // A jumper crouches first if its first stride is a jump, else in the stride before one.
+  const stride = (t: number) => strideAlong(points, momentum(t), CLIFF)
+  if (stride(0.001).leap) await s.tween(CROUCH_MS, (t) => crouch(sprite, Math.sin((Math.PI / 2) * t)))
+  const ahead = WIND_UP / path.length
+  let last = stride(0)
   await s.tween(ms, (t) => {
     place(s, sprite, along(points, momentum(t)))
-    const p = hopAlong(points, momentum(t), CLIFF)
-    sprite.node.position.set(p.x, p.y, p.z)
-    const lean = LEAN * Math.sin(Math.PI * t)
-    squash(sprite, 1 - lean, 1 + lean)
+    const now = stride(t)
+    pose(sprite, now, nearing(now, stride(Math.min(1, t + ahead))))
+    if (now.leap && !last.leap) void dust(s, last.ground, sprite.scale, false)
+    if (!now.leap && last.leap) land(s, sprite, now.ground, strength)
+    last = now
   })
-  // The weight lands after the walk, while whatever comes next begins.
-  void s.tween(SETTLE_MS, (t) => squash(sprite, 1 + SETTLE * (1 - t), 1 - SETTLE * (1 - t)))
+  if (last.leap) land(s, sprite, last.ground, strength)
+  grounded(sprite)
 }
 
 /** Slides an unfound alien's glow along its path through the fog. */
@@ -91,10 +108,11 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const leapers = new Set(group.flatMap((m) => (m.type === 'move' && m.leaps ? [m.id] : [])))
       const pace = (id: number) => tilePace(!!sprites.get(id)?.ally)
       const ms = walkMs([...paths].map(([id, path]) => ({ path, pace: pace(id) })))
-      const walks = [...paths].map(([id, path]) => (sprites.has(id) ? walk(s, sprites.get(id)!, path, ms, leapers.has(id)) : glide(s, glows.get(id)!, path, ms)))
+      const walks = [...paths].map(([id, path]) => (sprites.has(id) ? walk(s, sprites.get(id)!, path, ms, leapers.has(id) ? (battle.units.find((u) => u.id === id)?.stats.strength ?? 2) : undefined) : glide(s, glows.get(id)!, path, ms)))
       for (const m of group) if (m.type === 'move' && m.with && m.with !== 'dash' && sprites.has(m.id)) float(s, callout(s, effectName(m.with, s.kit()).toUpperCase(), 0xffffff, sprites.get(m.id)!))
-      for (const id of leapers) if (sprites.has(id)) float(s, callout(s, 'JUMP', 0xffffff, sprites.get(id)!, 15))
-      await Promise.all([s.follow(squad(battle), Math.max(ms, CAMERA_MS)), ...walks])
+      // The camera takes in where each jump leaves from as well as where it lands, rather than chasing the jumper.
+      const takeoffs = [...leapers].flatMap((id) => (sprites.has(id) ? [sprites.get(id)!.tile] : []))
+      await Promise.all([s.follow([...squad(battle), ...takeoffs], Math.max(ms, CAMERA_MS)), ...walks])
       // The fog lifts where the squad arrived, before any alien it uncovered appears.
       drawFog(s, battle)
       await play(s, battle, group.filter((m) => m.type !== 'move'))
