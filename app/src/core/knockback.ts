@@ -9,6 +9,9 @@ import { SLAM_DAMAGE, wound } from './wound'
 export const FALL_DAMAGE = 2
 export const EDGE_DAMAGE = 6
 
+/** Effects that knock a target back, which heroes aim at a ledge. */
+export const KNOCKS: Effect[] = ['thunder', 'hurl', 'repulse', 'shove']
+
 /** Whether `to` is the drop: off the map or void. */
 export const isDrop = (battle: Battle, to: Tile) => !onGrid(to.x, to.y) || battle.ground[to.y * GRID + to.x] === 'void'
 
@@ -19,6 +22,12 @@ export function fallBeyond(battle: Battle, from: Tile, to: Tile): 'drop' | numbe
   if (isDrop(battle, to)) return 'drop'
   const down = heightAt(battle, from) - heightAt(battle, to)
   return down >= CLIFF ? down : 0
+}
+
+/** Whether knocking `target` a tile straight back from `from` sends it off a ledge, or over the edge to be lost. */
+export function pushesOff(battle: Battle, from: Tile, target: Unit): boolean {
+  const beyond = fallBeyond(battle, target, { x: target.x + Math.sign(target.x - from.x), y: target.y + Math.sign(target.y - from.y) })
+  return beyond !== 0 && !(beyond === 'drop' && target.boss) && !has(target, 'hover')
 }
 
 /** Breaks the glass between neighbouring tiles, if any. */

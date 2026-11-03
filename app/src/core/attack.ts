@@ -1,5 +1,5 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
-import { type Battle, type Unit, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_TURNS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
+import { type Battle, type Unit, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_TURNS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
 import { cloakOn } from './abilities'
 import { duoCrit, duoDamage, duoHit } from './duo-effects'
 import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './keystones'
@@ -12,11 +12,12 @@ import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import { PARRY_SOAK } from './doctrines'
-import { FRAG_SPLASH, type Secondary } from './secondaries'
+import { FRAG_SPLASH, KNOCK_TILES, type Secondary } from './secondaries'
 import type { GameEvent } from './combat-event'
 import { aiming, powering, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
 import { wound } from './wound'
-import { knockback } from './knockback'
+import { KNOCKS, knockback, pushesOff } from './knockback'
+import { SLAM_DAMAGE } from './wound'
 import { TUNING } from './tuning'
 import { bite, MIN_DAMAGE, odds } from './sight'
 import { random } from './rng'
@@ -49,11 +50,15 @@ export function worth(battle: Battle, unit: Unit, enemy: Unit): number {
     (has(unit, 'booming') && closing(enemy) && enemy.booming === 0 ? 0.15 : 0) +
     (has(unit, 'tether') && !closing(enemy) ? 0.15 : 0) +
     (has(unit, 'thunder') && harmful ? 0.2 : 0) +
+    (KNOCKS.some((e) => has(unit, e)) && pushesOff(battle, unit, enemy) ? LEDGE_WORTH : 0) +
     (has(unit, 'net') && enemy.rooted > 0 ? 0.1 : 0) +
     (has(unit, 'volatile') && enemy.hp + enemy.armor <= unit.stats.damage ? 0.1 * near(1) : 0) +
     (has(unit, 'arc') ? 0.05 * Math.min(ARC_LEAPS, near(ARC_REACH)) : 0)
   )
 }
+
+/** What knocking a target off a ledge or the edge is worth beyond a shot's share. */
+const LEDGE_WORTH = 0.6
 
 /** What a soldier's full health adds to its worth as an alien's target. */
 export const SPREAD = 0.5
@@ -258,7 +263,12 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   }
   if (shock) for (const other of battle.units.filter((u) => u.side === enemy.side && distance(u, enemy) <= shock.reach)) stun(other, shock.chance, battle, events)
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
+  else if (first && enemy.hp > 0 && damage > 0 && when(true, 'repulse', 1)) knockback(battle, unit, enemy, events, 1, REPULSE_TILES, SLAM_DAMAGE, 'repulse')
   else if (first && enemy.hp > 0 && damage > 0 && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
+  else if (first && enemy.hp > 0 && damage > 0 && pushesOff(battle, unit, enemy) && when(true, 'shove', 1)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'shove')
+  if (first && enemy.hp > 0 && crit && when(true, 'gale', 1)) knockback(battle, unit, enemy, events, 1, REPULSE_TILES, SLAM_DAMAGE, 'gale')
+  // A brute's blow knocks a hero a tile back.
+  if (enemy.hp > 0 && damage > 0 && unit.kind === 'brute' && isSoldier(enemy)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'shove')
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'tether', 1)) knockback(battle, unit, enemy, events, -1)
   if (enemy.hp > 0 && when(true, 'snare', 1)) {
     enemy.rooted = CHILL_TURNS
@@ -343,7 +353,7 @@ function secondaryHit(battle: Battle, unit: Unit, enemy: Unit, beside: Unit[], {
     }
   }
   if (enemy.hp <= 0) return
-  if (effect === 'knock') knockback(battle, unit, enemy, events)
+  if (effect === 'knock') knockback(battle, unit, enemy, events, 1, KNOCK_TILES)
   if (effect === 'mark' && !enemy.resists.includes('mark')) enemy.marked = true
   if (effect === 'suppress') enemy.suppressed = 2
   if (effect === 'burn' && !fireproof(battle, enemy)) enemy.burning = burnFrom(unit)

@@ -5,6 +5,7 @@ import {
   FORCE_FIELD_REACH,
   HURL_DAMAGE,
   HURL_TILES,
+  REPULSE_TILES,
   LEAP_DAMAGE,
   LINGER_TURNS,
   PLATING_ARMOR,
@@ -75,6 +76,8 @@ const skills = {
   suppression: { name: 'Staggering Blow', use: 'At will', target: 'Creature hit', text: 'It does 1 less damage on its next turn', effect: 'suppress' },
   bigBlast: { name: 'Greater Meteor', use: 'Passive', text: 'Meteor Strike blasts 2 tiles around where it lands', effect: 'bigBlast' },
   shredder: { name: 'Sundering Blow', use: 'At will', target: 'Creature hit', tags: ['ward'], text: 'Destroys all its armor before doing damage', effect: 'shred' },
+  repulse: { name: 'Repulsor', use: 'At will', target: 'Creature hit', text: `Driven ${REPULSE_TILES} tiles back; off a ledge or the edge, it falls`, effect: 'repulse' },
+  gale: { name: 'Gale', use: 'Reaction', target: 'Creature crit', tags: ['crit'], text: `Blown ${REPULSE_TILES} tiles back; off a ledge or the edge, it falls`, effect: 'gale' },
   concussion: { name: 'Concussive Blows', use: 'Reaction', target: 'Creature crit', tags: ['crit'], text: `Stunned: it ${stun}`, effect: 'concussion' },
   taunt: { name: 'Taunt', use: 'Passive', text: 'An alien that can shoot it must shoot it', effect: 'taunt' },
   steadfast: { name: 'Steadfast', use: 'Passive', text: 'Cannot be panicked; acid and explosions do it no harm', effect: 'steadfast' },
@@ -226,7 +229,7 @@ export const TREES: Record<ClassId, Branch[]> = {
   heavy: [
     { name: 'Cataclysm', tiers: [['meteorStrike'], ['arsenal', 'shredder', 'bigBlast'], ['impact'], ['extinction']] },
     { name: 'Bastion', tiers: [['bulwark'], ['taunt', 'steadfast', 'reactive'], ['fortress'], ['titanForm']] },
-    { name: 'Shockwave', tiers: [['suppression'], ['slam', 'concussion', 'intimidate'], ['aftershock'], ['earthquake']] },
+    { name: 'Shockwave', tiers: [['suppression'], ['slam', 'repulse', 'concussion', 'intimidate'], ['aftershock'], ['earthquake']] },
   ],
   sniper: [
     { name: 'Marksman', tiers: [['farSight', 'steady'], ['headshot', 'doubleTap', 'assassinate'], ['sureShot'], ['bulletTime']] },
@@ -250,7 +253,7 @@ export const TREES: Record<ClassId, Branch[]> = {
   ],
   cryo: [
     { name: 'Hoarfrost', tiers: [['chillTouch'], ['icebreak', 'permafrost', 'rimeLock', 'deepFreeze'], ['frozenHeart'], ['absoluteZero']] },
-    { name: 'Glacier', tiers: [['iceArmor'], ['frostAura', 'glide', 'cryostasis'], ['glacialArmor'], ['blizzard']] },
+    { name: 'Glacier', tiers: [['iceArmor'], ['frostAura', 'glide', 'gale', 'cryostasis'], ['glacialArmor'], ['blizzard']] },
     { name: 'Icicle', tiers: [['coldSteel'], ['coldEye', 'longRange'], ['shardstorm'], ['hailOfIcicles']] },
   ],
   phantom: [

@@ -12,6 +12,7 @@ import type { GameEvent } from './combat-event'
 import { hasAttack, vipOf, pursuers, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes } from './fighters'
 import { ESCORT_REACH } from './goals'
 import { canHurlFrom } from './objects'
+import { KNOCKS, pushesOff } from './knockback'
 import { bite, canShoot, sees } from './sight'
 import { WEAPONS } from './weapons'
 
@@ -214,8 +215,9 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
 /** How near a civilian an alien must be for the squad to go for it on a rescue. */
 export const PREY_REACH = 8
 
-/** What standing beside something to hurl makes a tile worth, in points of `mine`. */
+/** What standing beside something to hurl makes a tile worth, in points of `mine`; and each alien a knockback from it would send off a ledge or the edge. */
 const HURL_WORTH = 25
+const LEDGE_WORTH = 20
 
 /**
  * What a shot at a civilian is worth to an alien beside the same chance at a soldier: it takes a good shot at a soldier,
@@ -275,11 +277,13 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
    * What a soldier's gear makes a tile worth, in points of `mine`: a null field over aliens with abilities, spirit
    * guardians where aliens will come while the wearer is healthy, a bond beside a squadmate, something to hurl.
    */
+  const knocks = unit.side === 'human' && KNOCKS.some((e) => has(unit, e))
   const role = (end: Tile) =>
     unit.side !== 'human'
       ? 0
       : (has(unit, 'null') ? 15 * enemies.filter((e) => e.revealed && e.kind !== 'trooper' && distance(end, e) <= NULL_REACH).length : 0) +
-        (canHurlFrom(battle, unit, end) ? HURL_WORTH : 0)
+        (canHurlFrom(battle, unit, end) ? HURL_WORTH : 0) +
+        (knocks ? LEDGE_WORTH * enemies.filter((e) => e.revealed && distance(end, e) <= unit.stats.range && pushesOff(battle, end, e)).length : 0)
   const uplink = battle.uplink
   // Measured by the walk there, so a wall between a soldier and the uplink cannot strand it.
   const leash = (end: Tile) => (uplink && unit.side === 'human' && distance(end, uplink) > uplinkReach(battle) ? toGoal[end.y * GRID + end.x] : 0)

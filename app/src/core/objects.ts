@@ -4,7 +4,7 @@ import { GRID, isSoldier, type Battle, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { foes } from './fighters'
 import { blocked, CLIFF, distance, NEIGHBORS, onGrid, passable, walks, wreck } from './grid'
-import { drive, fall, FALL_DAMAGE, fallBeyond, isDrop } from './knockback'
+import { drive, fall, FALL_DAMAGE, isDrop, pushesOff } from './knockback'
 import { canShoot, lineOfSight } from './sight'
 import type { Prop } from './terrain'
 import { FUEL_DAMAGE } from './twists'
@@ -38,11 +38,6 @@ export const canHurlFrom = (battle: Battle, unit: Unit, at: Tile) => strong(unit
 
 const away = (from: Tile, to: Tile): Tile => ({ x: Math.sign(to.x - from.x), y: Math.sign(to.y - from.y) })
 
-/** Whether driving `alien` a tile along `step` sends it off a ledge, or over the edge to be lost. */
-const fells = (battle: Battle, alien: Unit, step: Tile) => {
-  const beyond = fallBeyond(battle, alien, { x: alien.x + step.x, y: alien.y + step.y })
-  return beyond !== 0 && !(beyond === 'drop' && alien.boss)
-}
 
 /** The fuel tanks standing in the arena, nearest the way in first: what a rigged tank is picked from. */
 export function fuelTanks(battle: Battle): Tile[] {
@@ -83,7 +78,7 @@ interface Throw {
 function objectThrow(battle: Battle, unit: Unit, from: Tile, target: Unit, aliens: Unit[]): Throw {
   const struck = aliens.filter((a) => distance(a, target) <= 1)
   const push = (a: Unit) => (a === target ? away(unit, target) : away(target, a))
-  const worth = struck.length + FALL_WORTH * struck.filter((a) => fells(battle, a, push(a))).length
+  const worth = struck.length + FALL_WORTH * struck.filter((a) => pushesOff(battle, { x: a.x - push(a).x, y: a.y - push(a).y }, a)).length
   return {
     worth,
     make: (events) => {
@@ -97,10 +92,13 @@ function objectThrow(battle: Battle, unit: Unit, from: Tile, target: Unit, alien
         if (alien.hp > 0) drive(battle, alien, push(alien), 1, events, SLAM_DAMAGE, 'hurl')
       }
       if (prop !== 'car' && prop !== 'truck') return
-      const spot = [{ x: target.x, y: target.y }, ...NEIGHBORS.map(([dx, dy]) => ({ x: target.x + dx, y: target.y + dy }))].find((t) => !blocked(battle, t.x, t.y) && !isDrop(battle, t) && (t.x === target.x && t.y === target.y ? true : passable(battle, target, t)))
+      // A wreck stands only clear of anything else solid, so it walls no way off.
+      const clear = (t: Tile) => !blocked(battle, t.x, t.y) && NEIGHBORS.every(([dx, dy]) => onGrid(t.x + dx, t.y + dy) && battle.bulk[(t.y + dy) * GRID + t.x + dx] === 0)
+      const spot = [{ x: target.x, y: target.y }, ...NEIGHBORS.map(([dx, dy]) => ({ x: target.x + dx, y: target.y + dy }))].find((t) => clear(t) && (t.x === target.x && t.y === target.y ? true : passable(battle, target, t)))
       if (!spot) return
       battle.props[spot.y * GRID + spot.x] = 'wreck'
       battle.bulk[spot.y * GRID + spot.x] = 1
+      walks.delete(battle)
     },
   }
 }

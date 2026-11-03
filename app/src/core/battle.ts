@@ -90,6 +90,8 @@ export const DRONE_REACH = 5
 export const LEAP_DAMAGE = 2
 export const HURL_TILES = 3
 export const HURL_DAMAGE = 2
+/** Tiles a Repulsor hit or a Gale crit drives its target back. */
+export const REPULSE_TILES = 2
 export const SLAM_HIT = 3
 export const SLAM_TILES = 2
 export const STUN_REACH = 3
@@ -135,7 +137,7 @@ export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, crit: 0.1, 
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' | 'napalm' | 'cryo' | 'cloak'
 
 /** Something a piece of gear does; gear.ts says what each does. */
-export type GearEffect = 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'snare' | 'booming' | 'tether'
+export type GearEffect = 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'snare' | 'booming' | 'tether' | 'shove'
 /** Something a skill does; skills.ts says what each does. */
 export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */

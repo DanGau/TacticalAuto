@@ -8,7 +8,7 @@ import { CLASSES } from './classes'
 import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
 import { spotted } from './fighters'
-import { SECONDARIES } from './secondaries'
+import { KNOCK_TILES, SECONDARIES } from './secondaries'
 import { PACE, staggerOf, tick } from './pace'
 
 function battle(seed: number): Battle {
@@ -98,7 +98,7 @@ test('each effect lands on a hit', () => {
   expect(hit('flare').alien.marked).toBe(true)
   expect(hit('shockCoil').alien.suppressed).toBeGreaterThan(0)
   expect(hit('iceShard').alien.rooted).toBeGreaterThan(0)
-  expect(hit('slug').alien.x).toBe(8)
+  expect(hit('slug').alien.x).toBe(7 + KNOCK_TILES)
 })
 
 test('what grants an extra attack grants the weapon, not the secondary', () => {

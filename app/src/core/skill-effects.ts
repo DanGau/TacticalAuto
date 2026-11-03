@@ -19,6 +19,6 @@ export const SKILL_EFFECTS = [
   'emp', 'flashbang', 'forceField', 'shadowStrike', 'vanish', 'daze', 'afterimage', 'bloodbath',
   'riposte', 'earthshaker', 'impact', 'fortress', 'aftershock', 'sureShot', 'apex', 'warMachine', 'endlessSwarm',
   'tesla', 'fontOfLife', 'sacredGround', 'command', 'firestorm', 'conflagration', 'hellfire', 'frozenHeart',
-  'glacialArmor', 'shardstorm', 'livingShadow', 'intangible', 'bladeDance',
+  'glacialArmor', 'shardstorm', 'repulse', 'gale', 'livingShadow', 'intangible', 'bladeDance',
   ...ULTIMATE_EFFECTS,
 ] as const

@@ -4,6 +4,7 @@ import { GRID } from './battle'
 import type { GameEvent } from './combat-event'
 import { passable, reshaped } from './grid'
 import { EDGE_DAMAGE, FALL_DAMAGE, knockback } from './knockback'
+import { worth } from './attack'
 
 /** A hero at 10,10 beside an alien at 11,10, both on a roof `high` levels up whose edge is past 11,10. */
 function ledge(high: number) {
@@ -75,4 +76,14 @@ test('glass on the edge breaks; a wall holds', () => {
   knockback(battle, hero, aliens[0], [])
   expect(battle.units).not.toContain(aliens[0])
   expect(battle.west[10 * GRID + 12]).toBe('none')
+})
+
+test('a Shoving hit knocks off only a target at a ledge, and heroes aim their knockbacks at one', () => {
+  const { battle, hero, aliens, beats } = ledge(2)
+  hero.effects = ['shove']
+  const far = { ...aliens[0], id: 1300, x: 10, y: 12 }
+  battle.units.push(far)
+  expect(worth(battle, hero, aliens[0])).toBeGreaterThan(worth(battle, hero, far))
+  beats(1)
+  expect(aliens[0].x).toBe(12)
 })
