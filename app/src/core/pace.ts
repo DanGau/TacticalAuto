@@ -27,6 +27,8 @@ export const PACE = {
   psi: 320,
   rocket: 320,
   blast: 380,
+  /** A duo's moment. */
+  duo: 450,
   /** A tier 4's moment. */
   ultimate: 900,
 }
@@ -74,6 +76,7 @@ export function beatMs(events: GameEvent[], pace: Map<number, number>, shown: Se
     if (e.type === 'shot') ms += e.lasts ?? PACE.attack
     else if (e.type === 'rocket') ms += PACE.rocket + PACE.blast
     else if (e.type === 'ultimate') ms += PACE.ultimate
+    else if (e.type === 'duo') ms += PACE.duo
     else if (e.type === 'spit' || e.type === 'panic') ms += PACE.psi
     else if (e.type === 'reveal' || e.type === 'wave') ms += e.units.some((u) => shown.has(u.id)) ? PACE.reveal : 0
     else if (e.type === 'spawn' || e.type === 'freed') ms += shown.has(e.unit.id) ? PACE.reveal : 0

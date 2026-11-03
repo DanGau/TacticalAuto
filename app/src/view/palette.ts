@@ -43,6 +43,8 @@ export const COLOR = {
   enemyHp: 0xff5555,
   enemyLost: 0x3a2226,
   uplink: 0xffd84d,
+  /** Two heroes acting as a duo. */
+  duo: 0xff8ff0,
   extract: 0x5dff9a,
 }
 

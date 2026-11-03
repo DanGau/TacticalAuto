@@ -1,6 +1,7 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
 import { type Battle, type Unit, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_TURNS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
 import { cloakOn } from './abilities'
+import { duoCrit, duoDamage, duoHit } from './duo-effects'
 import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './keystones'
 import { freeTilesNear } from './grid'
 import { blocked } from './grid'
@@ -119,7 +120,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     (parried ? PARRY_SOAK : 0) +
     (shielded ? BLOCK_SOAK : 0)
 
-  const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.marked, 'apex', 1) > 0
+  const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.marked, 'apex', 1) > 0 || duoCrit(battle, unit, enemy, events)
   const crit = !enemy.resists.includes('crit') && (sure || (blow ? (blow.crit ??= random(battle) < unit.stats.crit) : random(battle) < unit.stats.crit))
   // A mirror hits as hard as the squad's hardest hitter; a feeder as hard as it has grown.
   const base = unit.kind === 'mirror' ? Math.max(unit.stats.damage, ...battle.units.filter(isSoldier).map((s) => s.stats.damage)) : unit.stats.damage
@@ -148,7 +149,8 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(enemy.rooted > 0, 'net', 2) +
     when(enemy.boss, 'bounty', BOUNTY_DAMAGE) +
     when(unit.fury > 0, 'bloodRite', unit.fury) +
-    when(unit.fury > 0, 'bloodbath', unit.fury)
+    when(unit.fury > 0, 'bloodbath', unit.fury) +
+    duoDamage(battle, unit, enemy, events)
   // A fraction is a chance of one point more, so small shots add up to their share.
   const scaled = blow && blow.kit.power !== 1 ? Math.floor(dealt * blow.kit.power + random(battle)) : dealt
   let damage = base > 0 ? Math.max(MIN_DAMAGE, scaled) : Math.max(0, scaled)
@@ -307,6 +309,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   }
   if (secondary && damage > 0) secondaryHit(battle, unit, enemy, beside, secondary, events)
   afterHit(battle, unit, enemy, damage, beside, events)
+  duoHit(battle, unit, enemy, damage, { crit, unseen }, beside, events)
   if (first && enemy.kind === 'brute' && enemy.hp > 0 && unit.hp > 0) charge(battle, enemy, unit, events)
   return blow ? events : [...events, ...again(battle, unit, seen, granted, enemy.hp <= 0)]
 }

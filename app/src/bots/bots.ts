@@ -69,8 +69,9 @@ const PICKS = {
   },
 } satisfies Record<string, Pick>
 
-/** The reward phase's next choice: a relic, then finds, then skills. A random bot puts a find on anyone, or sells it. */
+/** The reward phase's next choice: a relic, or a duo with none, then finds, then skills. A random bot puts a find on anyone, or sells it. */
 function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
+  if (run.duoOffer && run.relicOffers.length === 0) return { type: 'duo' }
   if (run.relicOffers.length > 0) return { type: 'relic', index: pick(run, rng, run.relicOffers.map((id) => RELICS[id].tags ?? [])) }
   if (run.finds.length > 0 && pick === PICKS.random) {
     const who = randomInt(rng, run.soldiers.length + 1)

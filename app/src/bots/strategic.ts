@@ -179,8 +179,9 @@ export function plannedSkill(soldier: Soldier): number {
   return 0
 }
 
-/** Takes the first relic offered, on the same seeds better than choosing by shared keywords, and the skill its hero plans on. */
+/** Takes a duo offered, else the first relic, on the same seeds better than choosing by shared keywords; and the skill its hero plans on. */
 function reward(run: Run): Action {
+  if (run.duoOffer) return { type: 'duo' }
   if (run.relicOffers.length > 0) return { type: 'relic', index: 0 }
   if (run.finds.length > 0) {
     const holder = holderFor(run, run.finds[0])

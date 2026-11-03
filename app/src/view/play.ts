@@ -14,6 +14,7 @@ import { COLOR } from './palette'
 import { cloakLook, create, fade, letter, place, remove, squash, vitals } from './sprites'
 import { CAMERA_MS, type Sprite, type Stage } from './stage'
 import { playUltimate } from './ultimates'
+import { playDuo } from './duos'
 
 /** What a soldier's order says over it. */
 const ORDERS: Record<Order, string> = { prepare: '👁 READY', sprint: '» SPRINT' }
@@ -120,6 +121,8 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       await drawing(s, (fx) => fireRocket(s, fx, battle, from, e))
     } else if (e.type === 'ultimate') {
       await playUltimate(s, battle, e)
+    } else if (e.type === 'duo') {
+      await playDuo(s, e)
     } else if (e.type === 'spit' || e.type === 'panic') {
       const from = sprites.get(e.id)
       const to = sprites.get(e.target)

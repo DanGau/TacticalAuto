@@ -4,6 +4,7 @@ import { secondaryOf } from './squad'
 import { createBattle } from './setup'
 import { holdCaptives } from './setup'
 import { CLASSES } from './classes'
+import { duoHeroes } from './duos'
 import { DOCTRINES, type Doctrine } from './doctrines'
 import { RESISTS, type Resist } from './keywords'
 import { RELICS, type Relic } from './relics'
@@ -351,6 +352,8 @@ export function createRun(seed: number): Run {
     utilities: [],
     spare: null,
     relicOffers: [],
+    duos: [],
+    duoOffer: null,
     recruits: [],
     route: [],
     bosses: [],
@@ -419,6 +422,7 @@ export function advance(run: Run): void {
   const held = (r: Reserve) => run.captives.includes(r.soldier)
   const challenge = stop === 'battle' || stop === 'key' || stop === 'final' ? here.challenge : null
   run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), reserve.filter((r) => !held(r)), mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city } : undefined, challenge)
+  run.battle.duos.pairs = duoHeroes(run)
   holdCaptives(run.battle, reserve.filter(held))
 }
 

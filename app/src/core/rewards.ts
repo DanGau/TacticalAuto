@@ -122,7 +122,7 @@ export function sellFind(run: Run, index: number): void {
 
 /** Ends the reward phase once no choice is left: no relic, find, spare utility or skill. */
 export function settle(run: Run): void {
-  const owed = run.relicOffers.length > 0 || run.finds.length > 0 || run.spare !== null || run.soldiers.some((s) => skillOffers(s).length > 0)
+  const owed = run.relicOffers.length > 0 || run.duoOffer !== null || run.finds.length > 0 || run.spare !== null || run.soldiers.some((s) => skillOffers(s).length > 0)
   run.phase = owed ? 'reward' : 'overworld'
 }
 
@@ -145,5 +145,14 @@ export function dropGear(run: Run, lucky: boolean): void {
 export function takeRelic(run: Run, id: RelicId): void {
   gainRelic(run, id, true)
   run.relicOffers = []
+  run.duoOffer = null
+  settle(run)
+}
+
+/** Takes the offered duo in place of a relic. */
+export function takeDuo(run: Run): void {
+  run.duos = [...run.duos, run.duoOffer!]
+  run.relicOffers = []
+  run.duoOffer = null
   settle(run)
 }

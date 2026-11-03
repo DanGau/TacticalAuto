@@ -2,6 +2,7 @@
 import type { Tile, Effect, Ability, Order, Side } from './battle'
 import type { UtilityId } from './utilities'
 import type { SecondaryId } from './secondaries'
+import type { DuoId } from './duos'
 
 export type GameEvent =
   /** `path` lists each tile entered, in order. `with` names a skill that granted the move. */
@@ -47,6 +48,8 @@ export type GameEvent =
   | { type: 'wave'; units: { id: number; x: number; y: number }[] }
   /** A boss spawns a swarmling, or an engineer deploys a mech. */
   | { type: 'spawn'; id: number; unit: { id: number; x: number; y: number } }
+  /** A duo's two heroes, `ids`, act together, on the unit `target` if any. */
+  | { type: 'duo'; duo: DuoId; ids: number[]; target?: number }
   | { type: 'death'; id: number }
   /** A utility takes hold, acting on the units `on`. */
   | { type: 'used'; utility: UtilityId; on: number[] }

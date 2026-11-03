@@ -5,6 +5,18 @@ import type { GameEvent } from './combat-event'
 import { aiming, has, shootable } from './fighters'
 import { FAN_TARGETS } from './keystones'
 import type { Secondary } from './secondaries'
+import { pinced, pincerOn } from './duo-effects'
+
+/** Pincer: the Phantom strikes the alien the Vanguard last hit, once a round. */
+export function pincer(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
+  const on = pincerOn(battle, unit)
+  if (!on) return []
+  const actor = battle.actor
+  battle.actor = on.pair[1].id
+  const events = weaponAttack(battle, on.pair[1], seen, 'pincer', on.target)
+  battle.actor = actor
+  return events.length > 0 ? [pinced(battle, on.pair, on.target), ...events] : []
+}
 
 /** Command: after a hero acts, the squadmate hitting hardest that has a shot makes an attack with its weapon. */
 export function command(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {

@@ -2,6 +2,7 @@
 import type { Ability, Effect } from './battle'
 import { CLASSES } from './classes'
 import { DOCTRINES } from './doctrines'
+import { DUOS, type DuoId } from './duos'
 import { EFFECTS } from './gear'
 import { UTILITIES } from './utilities'
 import { RELICS } from './relics'
@@ -17,6 +18,7 @@ export function effectName(effect: Effect | Ability, squad: { skills: SkillId[];
   if (effect === 'overwatch') return 'Overwatch'
   if (effect === 'stun') return 'Stunned'
   if (effect === 'surge') return 'Temp HP'
+  if (effect in DUOS) return DUOS[effect as DuoId].name
   const ability = Object.values(CLASSES).find((cls) => cls.ability === effect)
   if (ability) return ability.abilityName
   const own = [...squad.skills.map((id) => SKILLS[id]), ...squad.weapons.map((id) => WEAPONS[id]), ...Object.values(RELICS), ...Object.values(DOCTRINES)].find((source) => source.effect === effect)

@@ -4,6 +4,7 @@ import { emptyTally, FEATS } from '../core/feats'
 import type { Keyword } from '../core/keywords'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
+import { DUOS } from '../core/duos'
 import { UTILITIES } from '../core/utilities'
 import { type Gain, type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
@@ -124,7 +125,9 @@ export function spareChoice(run: Run, armed: string | null): string {
 export function choice(run: Run, armed: string | null = null): string {
   const held = squadKeywords(run)
   const relic = (id: RelicId, index: number) => button({ type: 'relic', index }, `<small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic')
-  if (run.relicOffers.length > 0) return `<h2>Alien artifacts lie in the wreckage. The party can carry one, and keeps it for the run.</h2><div class="choices">${run.relicOffers.map(relic).join('')}</div>`
+  const duo = run.duoOffer && DUOS[run.duoOffer]
+  const bond = duo ? button({ type: 'duo' }, `<small>duo · ${duo.pair.map((cls) => CLASSES[cls].name).join(' + ')}</small><br><b>✦ ${duo.name}</b><br>${describe(duo.text, [], held)}`, 'card duo') : ''
+  if (run.relicOffers.length > 0 || duo) return `<h2>Alien artifacts lie in the wreckage. The party can carry one, and keeps it for the run${duo ? `, or ${duo.pair.map((cls) => CLASSES[cls].name).join(' and ')} can train as a duo in its place` : ''}.</h2><div class="choices">${run.relicOffers.map(relic).join('')}${bond}</div>`
   if (run.finds.length > 0) {
     const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
     return `<h2>Gear found. Who takes it?${more}</h2><div class="gear ${run.finds[0].rarity}">${gearCard(run.finds[0], held)}</div>${takers(run, 0, armed)}`

@@ -6,6 +6,7 @@ import { STOP_THREAT, LOSS_THREAT, THREAT_MAX } from './progress'
 import { type Relic, RELICS, offerable, RELIC_OFFERS } from './relics'
 import { dropGear, findUtility, settle } from './rewards'
 import { random, randomInt } from './rng'
+import { openDuos } from './duos'
 import { drawStops, passStop } from './run'
 import { type Run } from './run-state'
 import { earn, soldierStats, join, MAX_SQUAD, squadKeywords } from './squad'
@@ -79,6 +80,9 @@ export function endBattle(run: Run): void {
     const fits = pool.filter((id) => RELICS[id].tags?.some((tag) => held.includes(tag)))
     if (fits.length > 0) run.relicOffers.push(...pool.splice(pool.indexOf(fits[randomInt(run, fits.length)]), 1))
     while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(...pool.splice(randomInt(run, pool.length), 1))
+    // A duo the squad's classes form stands beside them, taken in place of a relic.
+    const duos = openDuos(run)
+    if (duos.length > 0) run.duoOffer = duos[randomInt(run, duos.length)]
   }
   settle(run)
 }

@@ -10,6 +10,8 @@ import { type Flow, Goal } from './goals'
 import type { Twist } from './twists'
 import type { UtilityId } from './utilities'
 import type { ChallengeId } from './challenges'
+import type { DuoId } from './duos'
+import type { DuoState } from './duo-effects'
 import { type Bulk, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
 
 export type { Bulk }
@@ -137,8 +139,8 @@ export type GearEffect = 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'v
 export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty'
-/** Anything a unit's gear, skills, the squad's relics or its weapon doctrine do. Combat applies them. */
-export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge'
+/** Anything a unit's gear, skills, the squad's relics or duos or its weapon doctrine do. Combat applies them. */
+export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect | DuoId | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge'
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
@@ -317,6 +319,7 @@ export interface Battle {
   city: string
   /** Once-per-battle effects of the whole squad already used. */
   used: Effect[]
+  duos: DuoState
   /** What this battle tests; an ambush or a recovery has none. */
   challenge: ChallengeId | null
   /** The round reinforcements start coming, one clump a round, if the aliens posted are not all down; null when they come on a flood's beat. */

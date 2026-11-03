@@ -9,6 +9,16 @@ import { secondaryOf, charges, health, level, soldierStats, weaponOf } from '../
 import { secondaryPower, SECONDARIES } from '../core/secondaries'
 import { SKILLS, TREES, unlocked, type SkillId } from '../core/skills'
 import { describe, gearText, gearType, resistChip } from './html'
+import { DUOS, duosFor } from '../core/duos'
+
+/** The duos a hero forms with the squad, or with no squad yet, the classes it can: each by name and partner, its effect on hover. */
+export function duoHint(run: Run, hero: Soldier): string {
+  const duos = duosFor(run, hero)
+  if (duos.length === 0) return ''
+  const alone = run.soldiers.every((s) => s === hero)
+  const chips = duos.map(({ id, partner }) => `<span title="${DUOS[id].text}">${alone ? partner : `${DUOS[id].name} with ${partner}${run.duos.includes(id) ? ' ✓' : ''}`}</span>`)
+  return `<small class="duos">✦ Duos${alone ? ' with' : ':'} ${chips.join(', ')}</small>`
+}
 
 /** A row of named numbers. */
 export const statBlock = (cells: [string, string | number][]) => `<div class="statblock">${cells.map(([name, value]) => `<span><small>${name}</small><b>${value}</b></span>`).join('')}</div>`
@@ -42,7 +52,8 @@ export const heroCard = (run: Run, hero: Soldier) => `<small>${heading(hero)}</s
   <b class="name">${hero.name}</b>
   ${heroStats(run, hero)}
   <div class="weapon"><b>${hero.gear?.name ?? 'Empty hands'}</b><small>${kit(hero)}</small></div>
-  <span class="feats">${powers(run, hero).map(powerChip).join('')}</span>`
+  <span class="feats">${powers(run, hero).map(powerChip).join('')}</span>
+  ${duoHint(run, hero)}`
 
 /** A hero's powers in full. */
 export const powerList = (run: Run, hero: Soldier, held?: Keyword[]) => `<div class="powers">${powers(run, hero).map((p) => powerBlock(p, p.tags, held)).join('')}</div>`
@@ -52,7 +63,7 @@ export function heroSheet(run: Run, hero: Soldier): string {
   const stance = hero.cls && !weaponOf(hero)?.stance ? `<small>${CLASSES[hero.cls].stanceText}.</small>` : ''
   return `<div class="charsheet"><small>${heading(hero)}</small>${heroStats(run, hero)}
     <div class="weapon"><b>${hero.gear?.name ?? 'Empty hands'}</b><small>${kit(hero)}</small></div>${stance}
-    ${powerList(run, hero)}${heroTree(hero)}</div>`
+    ${powerList(run, hero)}${duoHint(run, hero)}${heroTree(hero)}</div>`
 }
 
 /** A class's tree as a grid, a column per branch and a row per tier, with `cell` drawing each skill. */

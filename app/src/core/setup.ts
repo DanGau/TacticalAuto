@@ -9,6 +9,7 @@ import { flowOf, type Goal, VIP_HP, CIVILIANS, CIVILIAN_HP } from './goals'
 import { generateTerrain } from './terrain-gen'
 import type { Twist } from './twists'
 import { deploy, planEntry } from './landing'
+import { noDuos } from './duo-effects'
 import { ARENA_REACH, designEncounter } from './encounter'
 import { deadlineFor, sentries, type ChallengeId } from './challenges'
 
@@ -138,6 +139,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     ...terrain,
     bulk: terrain.props.map((prop) => PROP_BULK[prop]),
     used: [],
+    duos: noDuos(),
     challenge,
     deadline: challenge === 'scattered' ? 0 : null,
     utility: null,

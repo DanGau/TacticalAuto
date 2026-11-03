@@ -12,6 +12,7 @@ import type { SkillId } from './skills'
 import type { UtilityId } from './utilities'
 import type { ChallengeId } from './challenges'
 import type { RelicId } from './relics'
+import type { DuoId } from './duos'
 import type { Battle } from './battle'
 import type { DoctrineId } from './doctrines'
 import type { EventId } from './events'
@@ -205,6 +206,10 @@ export interface Run {
   spare: UtilityId | null
   /** Relics to choose from in the reward phase. */
   relicOffers: RelicId[]
+  /** Duos taken, kept for the run. */
+  duos: DuoId[]
+  /** A duo offered beside the relics, taken in place of one. */
+  duoOffer: DuoId | null
   /** At the run's start, the recruits to choose the first soldier from. */
   recruits: Soldier[]
   /** The journey across the globe, a stage for each leg; set once the first soldier is chosen, from its home. */

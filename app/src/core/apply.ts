@@ -5,7 +5,7 @@ import { UTILITY_PRICE } from './utilities'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
 import { advance, current, go, nextStop, recruit, ways } from './run'
 import { type Run } from './run-state'
-import { gainRelic, takeRelic } from './rewards'
+import { gainRelic, takeDuo, takeRelic } from './rewards'
 import { sellFind } from './rewards'
 import { buyWare } from './rewards'
 import { buyUtility, keepUtility } from './rewards'
@@ -41,6 +41,8 @@ export type Action =
   | { type: 'enter'; utility?: number; tank?: number }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
+  /** Reward phase: take the offered duo in place of a relic. */
+  | { type: 'duo' }
   /** Reward phase: put the find at `find` of run.finds on the soldier with id `soldier`, selling what it replaces. */
   | { type: 'equip'; find: number; soldier: number }
   /** Reward phase: sell the find at `find` of run.finds. */
@@ -83,6 +85,11 @@ export function apply(run: Run, action: Action): Result {
     if (run.spare === null) return no('no utility to spare')
     if (action.drop !== -1 && !run.utilities[action.drop]) return no('no such utility')
     keepUtility(run, action.drop)
+    return ok
+  }
+  if (action.type === 'duo') {
+    if (run.phase !== 'reward' || run.duoOffer === null) return no('no duo on offer')
+    takeDuo(run)
     return ok
   }
   if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill') {
