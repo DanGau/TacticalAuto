@@ -20,6 +20,7 @@ import { bladeDance, command, pincer } from './follow-ups'
 import { ultimate } from './ultimates'
 import { tallyOf } from './wound'
 import { firefall } from './duo-effects'
+import { thaw } from './stacks'
 /**
  * The next attack of the side on turn: a soldier makes SOLDIER_ATTACKS a turn, its weapon's then its secondary, an alien one. A panicked soldier loses its turn; a phantom may cloak in place of its attacks.
  * An alien does what its kind does in place of a shot, if anything. Otherwise, first comes what does not cost the
@@ -46,6 +47,7 @@ function actNext(battle: Battle): GameEvent[] {
     }
     if (unit.panicked) {
       unit.panicked = false
+      thaw(unit)
       battle.shooter = unit.id
       battle.attacks = attacksOf(unit)
       return [{ type: 'frozen', id: unit.id }]

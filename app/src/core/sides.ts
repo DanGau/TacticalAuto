@@ -3,7 +3,7 @@ import type { Secondary } from './secondaries'
 import { aiming } from './fighters'
 import { weaponAttack } from './attack'
 import { WEAPONS } from './weapons'
-import { GRID, type Battle, ACID_DAMAGE, BURN_TURNS, isSoldier, type Unit, type Tile, ENGAGE_REACH, STANDOFF } from './battle'
+import { GRID, type Battle, ACID_DAMAGE, BURN_STACKS, isSoldier, type Unit, type Tile, ENGAGE_REACH, STANDOFF } from './battle'
 import { opening } from './landing'
 import { soldierUnit } from './spawn'
 import { breach } from './grid'
@@ -48,7 +48,7 @@ export function moveSide(battle: Battle): GameEvent[] {
     wound(battle, unit, ACID_DAMAGE, events)
   }
   for (const unit of battle.units.filter((u) => u.side === battle.turn && onTile(battle.fire, u) && !fireproof(battle, u))) {
-    unit.burning = BURN_TURNS
+    unit.burn = Math.max(unit.burn, BURN_STACKS)
     events.push({ type: 'effect', id: unit.id, effect: foeHas(battle, unit, 'pyre') ? 'pyre' : 'napalm', amount: 0 })
   }
   const sighted = sight(battle)

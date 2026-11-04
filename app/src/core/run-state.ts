@@ -202,6 +202,9 @@ export interface Run {
   gains: Gain[]
   /** Utilities the party holds, at most UTILITY_SLOTS. One is picked for each fight, and it is never used up. */
   utilities: UtilityId[]
+  /** Boon Reservoir's charges, and fights won in a row with no hero down, for Unbroken Line. */
+  boons: number
+  streak: number
   /** A utility gained with no room for it: the player drops it or one held. */
   spare: UtilityId | null
   /** Relics to choose from in the reward phase. */

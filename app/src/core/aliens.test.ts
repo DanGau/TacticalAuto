@@ -417,14 +417,14 @@ test('a regenerator heals each turn unless burning; a chilled sprinter cannot mo
     soldier.stats = { ...soldier.stats, move: 0, range: 0 }
     aliens[0].stats = { ...aliens[0].stats, move: 0, range: 0 }
     aliens[0].hp = aliens[0].stats.hp - REGEN_HEAL - 2
-    aliens[0].burning = burning
-    const events = until(() => aliens[0].burning < burning || aliens[0].hp !== aliens[0].stats.hp - REGEN_HEAL - 2)
+    aliens[0].burn = burning
+    const events = until(() => aliens[0].burn < burning || aliens[0].hp !== aliens[0].stats.hp - REGEN_HEAL - 2)
     expect(events.some((e) => e.type === 'effect' && e.effect === 'regen')).toBe(burning === 0)
   }
 
   const run = arena([{ kind: 'sprinter', x: 10, y: 25 }])
   run.soldier.stats = { ...run.soldier.stats, move: 0, range: 0 }
-  run.aliens[0].chilled = 9
+  run.aliens[0].chill = 9
   const moves = run.until(() => run.battle.round >= 2)
   expect(moves.some((e) => e.type === 'move' && e.id === run.aliens[0].id)).toBe(false)
 

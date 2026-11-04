@@ -77,7 +77,7 @@ test('what the tier 4s do', () => {
   const stormed = storm.aliens[0].hp
   upkeep(storm.battle)
   expect(storm.aliens[0].hp).toBeLessThan(stormed)
-  expect(storm.aliens[0].chilled).toBeGreaterThan(0)
+  expect(storm.aliens[0].chill).toBeGreaterThan(0)
 
   const reap = arena(['reap'], crowd)
   reap.aliens[0].hp = 10

@@ -1,10 +1,11 @@
 // Damage landing on a unit, what it sets off, and the tally it adds to.
-import { REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_TURNS, BLAST_RADIUS, type Battle, type Unit, type Tile } from './battle'
+import { REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_STACKS, BLAST_RADIUS, type Battle, type Unit, type Tile } from './battle'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { emptyTally, OVERKILL, type FeatId, type Tally } from './feats'
 import { engage, has, hostage, fireproof, foeHas, nearest, immune, onTile } from './fighters'
+import { died, kindle } from './stacks'
 
 /** A soldier's tally for this battle, begun empty. */
 export function tallyOf(battle: Battle, soldier: number): Tally {
@@ -50,9 +51,9 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
   const wildfire = battle.units.some((u) => u.side !== target.side && has(u, 'wildfire'))
   const killer = by && by.side !== target.side ? by : null
   const beside = battle.units.filter((u) => u.side === target.side && u !== target && distance(u, target) <= 1)
-  if (target.burning > 0 && (wildfire || (killer && has(killer, 'backdraft')))) {
+  if (target.burn > 0 && (wildfire || (killer && has(killer, 'backdraft')))) {
     for (const other of beside.filter((u) => !fireproof(battle, u))) {
-      other.burning = BURN_TURNS
+      kindle(battle, other, BURN_STACKS)
       events.push({ type: 'effect', id: other.id, effect: wildfire ? 'wildfire' : 'backdraft', amount: 0 })
     }
   }
@@ -71,7 +72,7 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
     target.hp = target.stats.hp
     events.push({ type: 'ultimate', id: target.id, effect: 'phoenixRising', x: target.x, y: target.y, radius: PHOENIX_RISING.radius })
     for (const foe of battle.units.filter((u) => u.side !== target.side && !u.civilian && distance(u, target) <= PHOENIX_RISING.radius)) {
-      if (!fireproof(battle, foe)) foe.burning = BURN_TURNS
+      kindle(battle, foe, BURN_STACKS)
       events.push({ type: 'effect', id: foe.id, effect: 'phoenixRising', amount: -PHOENIX_RISING.damage })
       wound(battle, foe, PHOENIX_RISING.damage, events)
     }
@@ -84,6 +85,7 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
     battle.downed.push({ soldier: target.soldier!, x: target.x, y: target.y, carrier: null, unit: target })
   }
   events.push({ type: 'death', id: target.id })
+  died(battle, target, killer, events)
   if (target.civilian && killer?.kind === 'harvester') battle.husks.push({ x: target.x, y: target.y })
   if (has(target, 'detonate')) {
     const caught = battle.units.filter((u) => u.side !== target.side && distance(u, target) <= 1)

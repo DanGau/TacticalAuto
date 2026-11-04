@@ -2,7 +2,8 @@
 import { isSoldier, type Battle, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { CROSSFIRE_DAMAGE, PAYLOAD_DAMAGE, SHATTER_HIT, SHATTER_SPLASH, SPOTTER_REACH, type DuoId } from './duos'
-import { burnFrom, fireproof } from './fighters'
+import { fireproof } from './fighters'
+import { burnFrom, chillUnit, kindle } from './stacks'
 import { distance } from './grid'
 import { wound } from './wound'
 
@@ -69,9 +70,9 @@ export function duoHit(battle: Battle, unit: Unit, enemy: Unit, damage: number, 
     battle.duos.last[unit.soldier!] = enemy.id
   }
   const thermal = as(battle, 'thermalShock', unit)
-  if (thermal && enemy.hp > 0 && enemy.burning > 0 && enemy.chilled > 0) {
-    enemy.burning = 0
-    enemy.chilled = 0
+  if (thermal && enemy.hp > 0 && enemy.burn > 0 && enemy.chill > 0) {
+    enemy.burn = 0
+    enemy.chill = 0
     events.push(moment('thermalShock', thermal, enemy), { type: 'effect', id: enemy.id, effect: 'thermalShock', amount: -SHATTER_HIT })
     wound(battle, enemy, SHATTER_HIT, events)
     for (const other of beside.filter((u) => u.hp > 0)) {
@@ -85,7 +86,7 @@ export function duoHit(battle: Battle, unit: Unit, enemy: Unit, damage: number, 
     events.push(moment('anvil', anvil, enemy), { type: 'effect', id: enemy.id, effect: 'stun', amount: 0 })
   }
   const frozen = as(battle, 'flashFreeze', unit, 0)
-  if (frozen && crit && enemy.hp > 0 && enemy.chilled > 0 && !enemy.panicked) {
+  if (frozen && crit && enemy.hp > 0 && enemy.chill > 0 && !enemy.panicked) {
     enemy.panicked = true
     events.push(moment('flashFreeze', frozen, enemy), { type: 'effect', id: enemy.id, effect: 'flashFreeze', amount: 0 })
   }
@@ -112,7 +113,7 @@ function summonHit(battle: Battle, alien: Unit, machine: Unit, events: GameEvent
   for (const other of battle.units.filter((u) => u.side === 'alien' && u.hp > 0 && distance(u, machine) <= 1)) {
     events.push({ type: 'effect', id: other.id, effect: 'payload', amount: -PAYLOAD_DAMAGE })
     wound(battle, other, PAYLOAD_DAMAGE, events)
-    if (other.hp > 0 && !fireproof(battle, other)) other.burning = burnFrom(payload[1])
+    kindle(battle, other, burnFrom(payload[1]))
   }
   battle.actor = actor
 }
@@ -135,8 +136,8 @@ export function duoHeal(battle: Battle, medic: Unit, target: Unit, amount: numbe
   if (!cold || near.length === 0) return
   events.push(moment('coldComfort', cold, target))
   for (const alien of near) {
-    alien.chilled = Math.max(alien.chilled, 2)
     events.push({ type: 'effect', id: alien.id, effect: 'coldComfort', amount: 0 })
+    chillUnit(battle, alien, 1, events)
   }
 }
 
@@ -146,7 +147,7 @@ export function firefall(battle: Battle, unit: Unit, fired: GameEvent[]): GameEv
   const hit = fired.flatMap((e) => (e.type === 'rocket' ? e.hits.map((h) => battle.units.find((u) => u.id === h.target)) : []))
   const burnt = hit.filter((u): u is Unit => !!u && u.side === 'alien' && u.hp > 0 && !fireproof(battle, u))
   if (!pair || burnt.length === 0) return []
-  for (const alien of burnt) alien.burning = burnFrom(pair[1])
+  for (const alien of burnt) kindle(battle, alien, burnFrom(pair[1]))
   return [moment('firefall', pair), ...burnt.map((u): GameEvent => ({ type: 'effect', id: u.id, effect: 'firefall', amount: 0 }))]
 }
 

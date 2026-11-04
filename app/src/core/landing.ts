@@ -1,5 +1,6 @@
 // The squad's arrival: the one point the encounter chooses, the plain landing there, and what relics and the picked utility set off.
-import { BARRIER_ARMOR, CHILL_TURNS, GRID, isSoldier, type Battle, type Effect, type Tile, type Unit } from './battle'
+import { chillUnit } from './stacks'
+import { BARRIER_ARMOR, GRID, isSoldier, type Battle, type Effect, type Tile, type Unit } from './battle'
 import { CHALLENGES, type ChallengeId } from './challenges'
 import type { GameEvent } from './combat-event'
 import { engageNearest, has, nearest } from './fighters'
@@ -66,8 +67,8 @@ export function planEntry(battle: Battle, heart: Tile | null): void {
   battle.entry = options.reduce((a, b) => (distance(b, approach) < distance(a, approach) ? b : a))
 }
 
-/** The squad lands, with the utility the player picked, and the battle begins. What it sets off lands as the first beat; see opening. */
-export function land(battle: Battle, utility: UtilityId | null = null, tank = 0): void {
+/** The squad lands, with the utility the player picked and any second from the reservoir, and the battle begins. What it sets off lands as the first beat; see opening. */
+export function land(battle: Battle, utility: UtilityId | null = null, tank = 0, second: UtilityId | null = null): void {
   const at = battle.entry!
   deploy(battle, at)
   if (battle.challenge && CHALLENGES[battle.challenge].volley) for (const u of battle.units) if (u.side === 'alien') u.engaged = true
@@ -77,16 +78,18 @@ export function land(battle: Battle, utility: UtilityId | null = null, tank = 0)
   if (held('encore') && closest) for (const alien of battle.units.filter((u) => u.side === 'alien' && distance(u, closest) <= ENCORE_REACH)) alien.surprised = Math.max(alien.surprised, 1)
   for (const alien of battle.units.filter((u) => u.side === 'alien' && distance(u, at) <= CHARGE_REACH)) {
     if (held('entryShred')) alien.armor = 0
-    if (held('entryFrost') && !alien.resists.includes('frost')) alien.chilled = CHILL_TURNS
+    if (held('entryFrost')) chillUnit(battle, alien, 1, [])
   }
   if (held('entryTurret')) dropUnit(battle, squad[0], TURRET, at)
   if (held('entryWall')) for (const soldier of squad) barricade(battle, soldier)
+  battle.utility = utility
+  battle.second = second
   takeUtility(battle, utility, tank)
+  takeUtility(battle, second, tank)
 }
 
 /** The utility the player picked takes hold as the squad comes in. */
 function takeUtility(battle: Battle, utility: UtilityId | null, tank: number): void {
-  battle.utility = utility
   const squad = battle.units.filter(isSoldier)
   const effect = utility === 'crack' ? 'piercing' : utility === 'hover' || utility === 'rangedShield' || utility === 'meleeShield' ? utility : null
   for (const u of squad) {
@@ -145,7 +148,7 @@ export function opening(battle: Battle): GameEvent[] {
   battle.opening = false
   const events: GameEvent[] = []
   const soldiers = battle.units.filter(isSoldier)
-  if (battle.utility) events.push({ type: 'used', utility: battle.utility, on: battle.utility === 'flashbang' ? battle.units.filter((u) => u.surprised > 0).map((u) => u.id) : soldiers.map((u) => u.id) })
+  for (const utility of [battle.utility, battle.second]) if (utility) events.push({ type: 'used', utility, on: utility === 'flashbang' ? battle.units.filter((u) => u.surprised > 0).map((u) => u.id) : soldiers.map((u) => u.id) })
   const held = (effect: Effect) => soldiers.some((s) => has(s, effect))
   const at = battle.entry
   if (at && (held('entryBlast') || held('entryShred') || held('entryFrost'))) {

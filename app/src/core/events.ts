@@ -164,6 +164,11 @@ const encounters = {
     text: 'A drifter in a long coat leans on a burned-out car, a pistol in each hand, spinning both. "Care," they drawl, "is for people with one gun."',
     options: [{ quip: 'Two guns. Zero plans. Infinite style.', text: `Gunslingers: ${DOCTRINES.gunslingers.text}`, take: (run) => adopt(run, 'gunslingers') }, leave('Point out that they just dropped one. Walk away while they look.')],
   },
+  headsman: {
+    name: 'The Headsman',
+    text: 'A hooded figure sharpens an axe on the steps of the courthouse, counting under its breath. "Glory is for one," it says. "Count your dead together, and the third is for all."',
+    options: [{ quip: 'We count together.', text: `Executioner's Oath: ${DOCTRINES.reckoning.text}`, take: (run) => adopt(run, 'reckoning') }, leave('Back away. Do not let it count you.')],
+  },
   refugees: {
     name: 'Refugees',
     text: 'A column of survivors blocks the road: grandparents, a goat, a teenager livestreaming. The aliens are not far behind, and the goat is very loud.',

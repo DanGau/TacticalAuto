@@ -1,5 +1,7 @@
 // Relics: what each does, and which may be offered.
-import { type RelicEffect, type Stats } from './battle'
+import { BURN_STACKS, FRACTURE_DAMAGE, MIGHT_MAX, type RelicEffect, type Stats } from './battle'
+import type { Rarity } from './base'
+import { random } from './rng'
 import { MOMENTUM_MAX } from './attack'
 import { CHARGE_BLAST, CHARGE_REACH, ENCORE_REACH } from './landing'
 import { BEACON_REACH } from './fighters'
@@ -16,6 +18,8 @@ export interface Relic {
   name: string
   text: string
   tags?: Keyword[]
+  /** How seldom it is offered: a feeder common, a payoff or engine epic; rare unless set. */
+  rarity?: Rarity
   /** Added to every hero's stats. */
   stats?: Partial<Stats>
   /** Given to every hero. */
@@ -30,15 +34,25 @@ export interface Relic {
   recon?: boolean
   /** Added to the supplies each civilian saved pays. */
   civilianSupplies?: number
+  /** Whether a fight won with no boon charges the reservoir, which spends BOON_CHARGES to take a second boon in. */
+  boons?: true
+  /** Supplies each STREAK_FIGHTS fights in a row won with no hero down pay. */
+  streak?: number
 }
 
+/** Charges a second boon costs, and the fights in a row a clean streak pays after. */
+export const BOON_CHARGES = 3
+export const STREAK_FIGHTS = 2
+/** The battles Zenith Chronometer's come every. */
+export const ZENITH_EVERY = 3
+
 const relics = {
-  plasma: { name: 'Plasma Core', text: 'Every hero does +1 damage', stats: { damage: 1 } },
-  alloys: { name: 'Alien Alloys', text: 'Every hero has +3 armor', tags: ['ward'], stats: { armor: 3 } },
-  servos: { name: 'Overclocked Servos', text: 'Every hero has +1 move', stats: { move: 1 } },
+  plasma: { name: 'Plasma Core', text: 'Every hero does +1 damage', rarity: 'common', stats: { damage: 1 } },
+  alloys: { name: 'Alien Alloys', text: 'Every hero has +3 armor', tags: ['ward'], rarity: 'common', stats: { armor: 3 } },
+  servos: { name: 'Overclocked Servos', text: 'Every hero has +1 move', rarity: 'common', stats: { move: 1 } },
   lens: { name: 'Focusing Lens', text: 'Every hero has +1 range and +10% crit', tags: ['crit'], stats: { range: 1, crit: 0.1 } },
   glassCannon: { name: 'Glass Cannon Protocol', text: 'Every hero does +2 damage and has 3 less HP', stats: { damage: 2, hp: -3 } },
-  capacitor: { name: 'Kinetic Capacitor', text: "Each hero's first hit of a battle is a crit", tags: ['crit'], effect: 'opener' },
+  capacitor: { name: 'Kinetic Capacitor', text: "Each hero's first hit of a battle is a crit", tags: ['crit'], rarity: 'common', effect: 'opener' },
   plating: { name: 'Adaptive Plating', text: 'Each hero regrows 1 armor at the start of its turn', tags: ['ward'], effect: 'rearm' },
   nanites: { name: 'Hunger Nanites', text: 'A hero who kills heals 2', tags: ['kill'], effect: 'feast' },
   phoenix: { name: 'Phoenix Protocol', text: '1/battle: the first hero to fall gets up with 5 HP', effect: 'phoenix' },
@@ -46,22 +60,30 @@ const relics = {
   drones: { name: 'Scavenger Drones', text: 'Each won battle pays 1 more supply', supplies: 1 },
   contact: { name: 'Black Market Contact', text: 'Every piece of gear found is rare or better', rareGear: true },
   uplink: { name: "Seer's Uplink", text: 'The flight map names the aliens of each stop, not only how dangerous they are', recon: true },
-  accelerant: { name: 'Accelerant Gel', text: `Hits on a burning target do +${TUNING.accelerantDamage} damage`, tags: ['burn'], effect: 'accelerant' },
-  wildfire: { name: 'Wildfire Spores', text: 'An alien that dies burning sets every alien beside it burning', tags: ['burn', 'kill'], effect: 'wildfire' },
-  salamander: { name: 'Salamander Sigil', text: 'Crits set the target burning', tags: ['crit', 'burn'], effect: 'ignite' },
-  lattice: { name: 'Frost Lattice', text: 'Crits chill the target', tags: ['crit', 'frost'], effect: 'freeze' },
+  accelerant: { name: 'Accelerant Gel', text: 'Hits on a burning target do +1 damage for each burn stack on it', tags: ['burn'], rarity: 'epic', effect: 'accelerant' },
+  wildfire: { name: 'Wildfire Spores', text: `An alien that dies burning adds ${BURN_STACKS} burn stacks to every alien beside it`, tags: ['burn', 'kill'], effect: 'wildfire' },
+  salamander: { name: 'Salamander Sigil', text: `Crits add ${BURN_STACKS} burn stacks to the target`, tags: ['crit', 'burn'], rarity: 'common', effect: 'ignite' },
+  lattice: { name: 'Frost Lattice', text: 'Crits add a chill stack to the target', tags: ['crit', 'frost'], rarity: 'common', effect: 'freeze' },
   shatter: { name: 'Shatterglass Edge', text: `Hits on a chilled target do +${TUNING.shatterDamage} damage`, tags: ['frost'], effect: 'shatter' },
   thermal: { name: 'Thermal Shock Core', text: `Hits on a target both burning and chilled do +${TUNING.thermalDamage} damage`, tags: ['burn', 'frost'], effect: 'thermal' },
   spotter: { name: 'Spotter Network', text: '+1 damage against a marked target', tags: ['mark'], effect: 'spotter' },
-  hunt: { name: 'Eye of the Hunt', text: 'Crits mark the target', tags: ['crit', 'mark'], effect: 'exploit' },
+  hunt: { name: 'Eye of the Hunt', text: 'Crits mark the target', tags: ['crit', 'mark'], rarity: 'common', effect: 'exploit' },
   bloodforged: { name: 'Bloodforged Plate', text: `A kill gives the hero 1 armor, up to ${MOMENTUM_MAX}`, tags: ['kill', 'ward'], effect: 'momentum' },
-  rite: { name: 'Blood Rite', text: 'Each kill gives the hero +1 damage for the rest of the battle', tags: ['kill'], effect: 'bloodRite' },
-  conductor: { name: 'Cryo Conductor', text: 'Chilling a marked target chills every alien beside it', tags: ['frost', 'mark'], effect: 'conductor' },
-  kindling: { name: 'Kindling Plates', text: 'Whoever hits a hero who has armor left is set burning', tags: ['ward', 'burn'], effect: 'kindling' },
+  rite: { name: 'Blood Rite', text: `Each kill gives the hero 1 Might, to at most ${MIGHT_MAX}`, tags: ['kill', 'might'], effect: 'bloodRite' },
+  impetus: { name: 'Kinetic Engine', text: 'A hero gains 1 Might for each alien it knocks off a ledge or into something solid', tags: ['force', 'might'], effect: 'impetus' },
+  catalyst: { name: 'Catalyst Prism', text: 'A crit doubles the burn and chill stacks on its target', tags: ['crit', 'burn', 'frost'], rarity: 'epic', effect: 'catalyst' },
+  chrono: { name: 'Chrono Coil', text: 'Every 3rd turn, the hardest-hitting hero attacks twice over', effect: 'chrono' },
+  reservoir: { name: 'Boon Reservoir', text: `Each fight won with no boon adds a charge; at the deploy screen, ${BOON_CHARGES} charges take a second boon in`, boons: true },
+  zenith: { name: 'Zenith Chronometer', text: `Every ${ZENITH_EVERY}rd battle, each hero's tier 4 fires twice`, rarity: 'epic', effect: 'zenith' },
+  streak: { name: 'Unbroken Line', text: `Every ${STREAK_FIGHTS} fights in a row won with no hero down pay 3 more supplies`, rarity: 'common', streak: 3 },
+  embers: { name: 'Ember Brand', text: 'A marked alien that dies passes its burn stacks to the nearest alien', tags: ['mark', 'burn', 'kill'], effect: 'embers' },
+  fracture: { name: 'Frost Fracture', text: `A frozen alien that dies shatters: ${FRACTURE_DAMAGE} damage for each chill stack on it to every alien beside it`, tags: ['frost', 'kill'], rarity: 'epic', effect: 'fracture' },
+  conductor: { name: 'Cryo Conductor', text: 'Chilling a marked target adds a chill stack to every alien beside it', tags: ['frost', 'mark'], effect: 'conductor' },
+  kindling: { name: 'Kindling Plates', text: `Whoever hits a hero who has armor left takes ${BURN_STACKS} burn stacks`, tags: ['ward', 'burn'], effect: 'kindling' },
   overkill: { name: 'Overkill Coils', text: 'Damage beyond what a kill needs hits the nearest other alien', tags: ['kill', 'crit'], effect: 'overkill' },
   brittle: { name: 'Brittle Frost', text: 'Hits on a chilled target ignore its armor', tags: ['frost', 'ward'], effect: 'brittle' },
-  pyre: { name: 'Pyre Censer', text: 'A burning alien sets its tile ablaze for 2 turns; an alien that ends its move in fire burns', tags: ['burn'], effect: 'pyre' },
-  stasis: { name: 'Stasis Field', text: 'A crit on a chilled alien freezes it solid: it loses its next action', tags: ['frost', 'crit'], effect: 'stasis' },
+  pyre: { name: 'Pyre Censer', text: `A burning alien sets its tile ablaze for 2 turns; an alien that ends its move in fire has at least ${BURN_STACKS} burn stacks`, tags: ['burn'], effect: 'pyre' },
+  stasis: { name: 'Stasis Field', text: 'A crit on a chilled alien freezes it solid: it loses its next action', tags: ['frost', 'crit'], rarity: 'epic', effect: 'stasis' },
   hex: { name: "Witch's Hex", text: 'When a marked alien dies, its mark passes to the nearest alien', tags: ['mark', 'kill'], effect: 'hex' },
   sentinel: { name: 'Sentinel Protocol', text: 'A hero attacks at once an alien that walks away from beside it', effect: 'sentinel' },
   net: { name: "Hunter's Net", text: 'Hits on a rooted alien do +2 damage', effect: 'net' },
@@ -95,3 +117,14 @@ export function offerable(held: readonly RelicId[]): RelicId[] {
 
 /** Relics offered at a time. */
 export const RELIC_OFFERS = 3
+
+/** How often each rarity is drawn against the others. */
+const WEIGHT: Record<Rarity, number> = { common: 3, rare: 2, epic: 1 }
+
+/** Takes a relic out of `pool`, the commoner the likelier. */
+export function drawRelic(rng: { rng: number }, pool: RelicId[]): RelicId {
+  const weight = (id: RelicId) => WEIGHT[RELICS[id].rarity ?? 'rare']
+  let roll = random(rng) * pool.reduce((sum, id) => sum + weight(id), 0)
+  const i = Math.max(0, pool.findIndex((id) => (roll -= weight(id)) < 0))
+  return pool.splice(i, 1)[0]
+}

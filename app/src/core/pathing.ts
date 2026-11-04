@@ -328,9 +328,9 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const shotHere = enemies.some((enemy) => enemy.revealed && shootable(battle, unit, unit, enemy, seen))
   if (still && shotHere && !battle.extract && !leash(unit) && !acid(unit)) return []
   // A booming charge pins a unit that can fight from where it stands; a rooted one cannot move at all.
-  if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || (unit.kind === 'sprinter' && unit.chilled > 0)) return []
+  if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || unit.frozen || (unit.kind === 'sprinter' && unit.chill > 0)) return []
   // A carrier walks at half its move.
-  const move = Math.ceil(Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chilled > 0 ? CHILL_MOVE : 0)) / (carrying(battle, unit) ? 2 : 1))
+  const move = Math.ceil(Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chill > 0 ? CHILL_MOVE : 0)) / (carrying(battle, unit) ? 2 : 1))
   const path = choose(move)
   if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
   const end = path.at(-1) ?? unit

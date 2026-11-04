@@ -1,5 +1,5 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
-import { type Battle, type Unit, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_TURNS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
+import { type Battle, type Unit, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_STACKS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
 import { cloakOn } from './abilities'
 import { duoCrit, duoDamage, duoHit } from './duo-effects'
 import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './keystones'
@@ -7,7 +7,8 @@ import { freeTilesNear, blocked, walkingDistances, crumble, wreck, onGrid, NEIGH
 import { PARRY_SOAK } from './doctrines'
 import { FRAG_SPLASH, KNOCK_TILES, type Secondary } from './secondaries'
 import type { GameEvent } from './combat-event'
-import { aiming, powering, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, chillFrom, burnFrom, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
+import { aiming, powering, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
+import { burnFrom, chillFrom, chillUnit, empower, highCrit, kindle, scaledDamage, stackDamage, struck } from './stacks'
 import { wound } from './wound'
 import { shoveOff, drive, knockback, pushesOff } from './knockback'
 import { SLAM_DAMAGE } from './wound'
@@ -114,7 +115,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const shielded = has(enemy, 'block') && distance(unit, enemy) > 1
   if (shielded) events.push({ type: 'effect', id: enemy.id, effect: 'block', amount: 0 })
   const blunted =
-    (unit.chilled > 0 ? CHILL_DAMAGE : 0) +
+    (unit.chill > 0 ? CHILL_DAMAGE : 0) +
     (inAura(battle, enemy, 'bulwark') ? BULWARK_SOAK : 0) +
     (baned ? BANE_DAMAGE : 0) +
     (unit.suppressed > 0 ? SUPPRESS_DAMAGE : 0) +
@@ -123,7 +124,8 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     (shielded ? BLOCK_SOAK : 0)
 
   const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.marked, 'apex', 1) > 0 || duoCrit(battle, unit, enemy, events)
-  const crit = !enemy.resists.includes('crit') && (sure || (blow ? (blow.crit ??= random(battle) < unit.stats.crit) : random(battle) < unit.stats.crit))
+  const crit = !enemy.resists.includes('crit') && (sure || (blow ? (blow.crit ??= random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)) : random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)))
+  unit.hits++
   // A mirror hits as hard as the squad's hardest hitter; a feeder as hard as it has grown.
   const base = unit.kind === 'mirror' ? Math.max(unit.stats.damage, ...battle.units.filter(isSoldier).map((s) => s.stats.damage)) : unit.stats.damage
   const dealt =
@@ -134,7 +136,6 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     (inAura(battle, unit, 'inspire') ? INSPIRE_DAMAGE : 0) +
     when(enemy.marked, 'spotter', SPOTTER_DAMAGE) +
     when(!unit.moved, 'steady', 1) +
-    (unit.kind === 'feeder' ? unit.fury : 0) +
     (unseen ? CLOAK_DAMAGE + when(true, 'shadowStrike', SHADOW_DAMAGE) : 0) +
     (crit ? CRIT_BONUS + when(true, 'headshot', HEADSHOT_DAMAGE) : 0) +
     when(enemy.hp <= enemy.stats.hp / 2, 'executioner', EXECUTE_BONUS) +
@@ -142,20 +143,19 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(unit.hp <= unit.stats.hp / 2, 'rage', RAGE_DAMAGE) +
     when(enemy.hp < enemy.stats.hp, 'slayer', SLAYER_DAMAGE) +
     (enemy.marked ? TUNING.markDamage : 0) +
-    when(enemy.burning > 0, 'accelerant', TUNING.accelerantDamage) +
-    when(enemy.chilled > 0, 'shatter', TUNING.shatterDamage) +
-    when(enemy.burning > 0, 'searing', SEARING_DAMAGE) +
-    when(enemy.chilled > 0, 'icebreak', SEARING_DAMAGE) +
-    when(enemy.burning > 0 && enemy.chilled > 0, 'thermal', TUNING.thermalDamage) +
+    when(enemy.burn > 0, 'accelerant', enemy.burn) +
+    when(enemy.chill > 0, 'shatter', TUNING.shatterDamage) +
+    when(enemy.burn > 0, 'searing', SEARING_DAMAGE) +
+    when(enemy.chill > 0, 'icebreak', SEARING_DAMAGE) +
+    when(enemy.burn > 0 && enemy.chill > 0, 'thermal', TUNING.thermalDamage) +
     when(unit.armor > 0, 'armored', 1) +
     when(enemy.rooted > 0, 'net', 2) +
     when(enemy.boss, 'bounty', BOUNTY_DAMAGE) +
-    when(unit.fury > 0, 'bloodRite', unit.fury) +
-    when(unit.fury > 0, 'bloodbath', unit.fury) +
+    stackDamage(unit, enemy, used) +
     duoDamage(battle, unit, enemy, events)
   // A fraction is a chance of one point more, so small shots add up to their share.
   const scaled = blow && blow.kit.power !== 1 ? Math.floor(dealt * blow.kit.power + random(battle)) : dealt
-  let damage = base > 0 ? Math.max(MIN_DAMAGE, scaled) : Math.max(0, scaled)
+  let damage = scaledDamage(unit, enemy, base > 0 ? Math.max(MIN_DAMAGE, scaled) : Math.max(0, scaled), used)
   const warded = has(enemy, distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield')
   if (warded) {
     damage = Math.ceil(damage / 2)
@@ -170,7 +170,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const deflect = guard(enemy, distance(unit, enemy) > 1, damage)
   if (deflect) damage = Math.floor(damage * deflect.lands)
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0
-  const pierced = unseen || secondary?.effect === 'pierce' || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chilled > 0, 'brittle', 1) > 0
+  const pierced = unseen || secondary?.effect === 'pierce' || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chill > 0, 'brittle', 1) > 0
   const left = enemy.hp + (pierced ? 0 : enemy.armor)
   if (has(enemy, 'mirror') && enemy.spent.filter((e) => e === 'mirror').length < MIRROR_IMAGES) {
     damage = 0
@@ -193,7 +193,8 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (battle.twist === 'crumbling' && damage > 0) crumble(battle, enemy, unit)
   const alive = enemy.hp > 0
   wound(battle, enemy, damage, events, pierced, crit)
-  const surged = !secondary && alive && enemy.hp <= 0 && unit.weapon ? WEAPONS[unit.weapon].surge : undefined
+  if (damage > 0) struck(battle, unit, enemy, crit, events)
+  const surged = !secondary && alive && enemy.hp <= 0 && unit.weapon && !battle.rules.includes('reckoning') ? WEAPONS[unit.weapon].surge : undefined
   if (surged) surge(unit, surged, events)
   if (battle.twist === 'fuel' && damage > 0) events.push(...ignite(battle, enemy))
   // A ricochet strikes another alien near the target for half.
@@ -242,18 +243,16 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   }
   if (enemy.hp > 0 && !enemy.resists.includes('mark') && (when(true, 'mark', 1) || when(true, 'apex', 1) || when(true, 'tracer', 1) || when(crit, 'exploit', 1))) enemy.marked = true
   const cryo = damage > 0 && unit.ability === 'cryo'
-  if (enemy.hp > 0 && !enemy.resists.includes('frost') && (when(damage > 0, 'frostbite', 1) || cryo || when(crit, 'freeze', 1))) {
-    enemy.chilled = chillFrom(unit)
-    if (when(true, 'glacial', 1) + when(true, 'rimeLock', 1) > 0) enemy.rooted = CHILL_TURNS
+  if (enemy.hp > 0 && !enemy.resists.includes('frost') && (when(first && damage > 0, 'frostbite', 1) || (first && cryo) || when(crit, 'freeze', 1))) {
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'frostbite') ? 'frostbite' : cryo ? 'cryo' : 'freeze', amount: 0 })
-    if (enemy.marked && has(unit, 'conductor')) {
-      for (const other of battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1 && !u.resists.includes('frost'))) {
-        other.chilled = CHILL_TURNS
-        events.push({ type: 'effect', id: other.id, effect: 'conductor', amount: 0 })
-      }
+    chillUnit(battle, enemy, chillFrom(unit), events)
+    if (when(true, 'glacial', 1) + when(true, 'rimeLock', 1) > 0) enemy.rooted = CHILL_TURNS
+    for (const other of enemy.marked && has(unit, 'conductor') ? battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1) : []) {
+      events.push({ type: 'effect', id: other.id, effect: 'conductor', amount: 0 })
+      chillUnit(battle, other, 1, events)
     }
   }
-  if (enemy.hp > 0 && crit && enemy.chilled > 0 && when(true, 'stasis', 1) + when(true, 'deepFreeze', 1) > 0) {
+  if (enemy.hp > 0 && crit && enemy.chill > 0 && when(true, 'stasis', 1) + when(true, 'deepFreeze', 1) > 0) {
     enemy.panicked = true
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'stasis') ? 'stasis' : 'deepFreeze', amount: 0 })
   }
@@ -281,14 +280,14 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (enemy.hp > 0 && enemy.hp <= enemy.stats.hp / 2 && spend(enemy, 'blink')) blink(battle, enemy, events)
   if (enemy.hp > 0 && enemy.hp <= enemy.stats.hp / 2 && !enemy.cloaked && spend(enemy, 'vanish')) events.push(cloakOn(enemy))
   if (enemy.hp <= 0 && unit.armor < unit.stats.armor + MOMENTUM_MAX && when(true, 'momentum', 1)) unit.armor++
-  if (enemy.hp <= 0 && when(true, 'bloodRite', 1)) unit.fury++
+  if (enemy.hp <= 0 && has(unit, 'bloodRite')) empower(unit, 1, 'bloodRite', events)
   if (enemy.hp > 0 && when(true, 'suppress', 1)) enemy.suppressed = 2
   if (enemy.hp > 0 && crit && has(unit, 'concussion')) {
     enemy.panicked = true
     events.push({ type: 'effect', id: enemy.id, effect: 'concussion', amount: 0 })
   }
-  if (enemy.hp > 0 && !fireproof(battle, enemy) && ((damage > 0 && (has(unit, 'incendiary') || has(unit, 'tinder'))) || when(crit, 'ignite', 1))) {
-    enemy.burning = burnFrom(unit)
+  if (enemy.hp > 0 && !fireproof(battle, enemy) && ((first && damage > 0 && (has(unit, 'incendiary') || has(unit, 'tinder'))) || when(crit, 'ignite', 1))) {
+    kindle(battle, enemy, burnFrom(unit))
     events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'incendiary') ? 'incendiary' : has(unit, 'tinder') ? 'tinder' : 'ignite', amount: 0 })
   }
   const healing = (first && damage > 0 && has(unit, 'vampiric') ? 1 : 0) + (enemy.hp <= 0 && has(unit, 'feast') ? FEAST_HEAL : 0)
@@ -298,12 +297,12 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     events.push({ type: 'effect', id: unit.id, effect: enemy.hp <= 0 && has(unit, 'feast') ? 'feast' : 'vampiric', amount: healed })
   }
   if (has(enemy, 'kindling') && enemy.armor > 0 && !fireproof(battle, unit)) {
-    unit.burning = BURN_TURNS
+    kindle(battle, unit, BURN_STACKS)
     events.push({ type: 'effect', id: unit.id, effect: 'kindling', amount: 0 })
   }
   if (has(enemy, 'rime')) {
-    unit.chilled = CHILL_TURNS
     events.push({ type: 'effect', id: unit.id, effect: 'rime', amount: 0 })
+    chillUnit(battle, unit, 1, events)
   }
   if (has(enemy, 'thorns')) {
     events.push({ type: 'effect', id: unit.id, effect: 'thorns', amount: -1 })
@@ -352,7 +351,7 @@ function secondaryHit(battle: Battle, unit: Unit, enemy: Unit, beside: Unit[], {
   if (effect === 'knock') knockback(battle, unit, enemy, events, 1, KNOCK_TILES)
   if (effect === 'mark' && !enemy.resists.includes('mark')) enemy.marked = true
   if (effect === 'suppress') enemy.suppressed = 2
-  if (effect === 'burn' && !fireproof(battle, enemy)) enemy.burning = burnFrom(unit)
+  if (effect === 'burn') kindle(battle, enemy, burnFrom(unit))
   if (effect === 'root') enemy.rooted = CHILL_TURNS
 }
 
@@ -373,7 +372,7 @@ export function again(battle: Battle, unit: Unit, seen: Set<number>, granted: Ef
 }
 
 /** Primary attacks the unit makes each turn. */
-export const attacksOf = (unit: Unit) => (isSoldier(unit) ? SOLDIER_ATTACKS : 1)
+export const attacksOf = (unit: Unit) => (isSoldier(unit) ? SOLDIER_ATTACKS * (unit.twice ? 2 : 1) : 1)
 
 /** A shot struck `target`: a fuel tank beside it goes up, hurting and setting burning everyone beside the tank. */
 export function ignite(battle: Battle, target: Unit): GameEvent[] {
@@ -384,7 +383,7 @@ export function ignite(battle: Battle, target: Unit): GameEvent[] {
   wreck(battle, tank, 0)
   for (const unit of caught) {
     wound(battle, unit, FUEL_DAMAGE, events)
-    if (unit.hp > 0 && !fireproof(battle, unit)) unit.burning = BURN_TURNS
+    kindle(battle, unit, BURN_STACKS)
   }
   return events
 }
@@ -426,7 +425,7 @@ export function napalm(battle: Battle, unit: Unit, seen: Set<number>): GameEvent
   }
   for (const hit of landed.hits) {
     const target = battle.units.find((u) => u.id === hit.target)
-    if (target && target.hp > 0 && !fireproof(battle, target)) target.burning = burnFrom(unit)
+    if (target) kindle(battle, target, burnFrom(unit))
   }
   return events
 }

@@ -1,10 +1,10 @@
 // Doctrines: run-long changes to how battles work.
 import type { Lasting } from './base'
-import type { Stance, Stats } from './battle'
+import type { Effect, Stance, Stats } from './battle'
 import type { WeaponId } from './weapons'
 
 /** A change to how battles work, which the battle checks where it applies. */
-export type Rule = 'fortified'
+export type Rule = 'fortified' | 'reckoning'
 
 /** A way of attacking a weapon doctrine gives every hero; combat applies it. */
 export type DoctrineEffect = 'parry' | 'psionic' | 'demolish' | 'twin'
@@ -34,6 +34,10 @@ export interface Doctrine extends Lasting {
 
 /** Damage a parrying soldier takes off a shot from beyond arm's reach. */
 export const PARRY_SOAK = 1
+
+/** Kills a squad makes under Executioner's Oath for each Might it gives, and what a kill no longer pays a hero under it. */
+export const RECKONING_KILLS = 3
+export const KILL_REWARDS: Effect[] = ['feast', 'momentum', 'bloodRite', 'bloodbath', 'frenzy', 'chain', 'afterimage', 'firestorm']
 
 /** Damage every hit loses under the fortified rule. */
 export const FORTIFIED_SOAK = 1
@@ -69,6 +73,11 @@ const doctrines = {
     stats: { damage: 1, range: -1 },
     effect: 'demolish',
     weapon: true,
+  },
+  reckoning: {
+    name: "Executioner's Oath",
+    text: `Kills give a hero nothing: no heal, armor, Might, extra attack or experience. Every ${RECKONING_KILLS}rd kill of a battle gives every hero 1 Might`,
+    rule: 'reckoning',
   },
   gunslingers: { name: 'Gunslingers', text: 'Every hero has 1 less damage and 2 less range, but attacks with its weapon a third time each turn', stats: { damage: -1, range: -2 }, effect: 'twin', weapon: true },
 } satisfies Record<string, Doctrine>

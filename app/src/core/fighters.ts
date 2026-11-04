@@ -1,7 +1,7 @@
 // Questions every combat module asks about units in a fight: whose enemy, nearest, has what, can shoot.
 import { SECONDARIES, type Secondary } from './secondaries'
 import { WEAPONS } from './weapons'
-import { AURA_REACH, BURN_TURNS, type Battle, CHILL_TURNS, type Effect, ELUSIVE_REACH, GRID, LINGER_TURNS, type Tile, type Unit, isSoldier } from './battle'
+import { AURA_REACH, type Battle, type Effect, ELUSIVE_REACH, GRID, type Tile, type Unit, isSoldier } from './battle'
 import { onGrid, spacedTile, walkingDistances } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
@@ -36,11 +36,6 @@ export const silenced = (battle: Battle, unit: Unit) => battle.units.some((u) =>
 export const NULL_REACH = 3
 
 export const onTile = (pools: Tile[], unit: Tile) => pools.some((pool) => pool.x === unit.x && pool.y === unit.y)
-
-/** Turns a target `unit` sets burning burns, and one it chills stays chilled. */
-export const burnFrom = (unit: Unit) => BURN_TURNS + (has(unit, 'smolder') ? LINGER_TURNS : 0)
-
-export const chillFrom = (unit: Unit) => CHILL_TURNS + (has(unit, 'permafrost') ? LINGER_TURNS : 0)
 
 /** Uses a once-per-battle effect. False if the unit lacks it or has used it. */
 export function spend(unit: Unit, effect: Effect): boolean {

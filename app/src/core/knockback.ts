@@ -4,6 +4,7 @@ import type { GameEvent } from './combat-event'
 import { blocked, CLIFF, edgeBetween, freeTilesNear, heightAt, onGrid, unitAt, unwalled, walks } from './grid'
 import { has } from './fighters'
 import { SLAM_DAMAGE, wound } from './wound'
+import { fell, slammed } from './stacks'
 
 /** Damage a fall beyond the unit's jump does for each level dropped; what one over the edge does to a hero or a boss, which catches the edge. Any other alien is lost. */
 export const FALL_DAMAGE = 2
@@ -89,6 +90,7 @@ export function fall(battle: Battle, unit: Unit, from: Tile, to: Tile, events: G
     const caught = unit.side === 'human' || unit.boss
     const event: Extract<GameEvent, { type: 'fall' }> = { type: 'fall', id: unit.id, to, drop: 'edge', damage: caught ? EDGE_DAMAGE : unit.hp }
     events.push(event)
+    fell(battle, unit, 0, events)
     if (caught) return void wound(battle, unit, EDGE_DAMAGE, events, true)
     unit.x = to.x
     unit.y = to.y
@@ -100,7 +102,8 @@ export function fall(battle: Battle, unit: Unit, from: Tile, to: Tile, events: G
   }
   const under = unitAt(battle, to.x, to.y)
   const land = under || blocked(battle, to.x, to.y) ? (freeTilesNear(battle, to, 1)[0] ?? from) : to
-  const damage = fallDamage(unit, beyond)
+  const fallen = fallDamage(unit, beyond)
+  const damage = fallen + (fallen > 0 ? fell(battle, unit, beyond, events) : 0)
   const event: Extract<GameEvent, { type: 'fall' }> = { type: 'fall', id: unit.id, to: land, drop: beyond, damage, onto: under?.id }
   events.push(event)
   unit.x = land.x
@@ -148,6 +151,7 @@ export function drive(battle: Battle, target: Unit, step: Tile, tiles: number, e
   const into = unitAt(battle, target.x + step.x, target.y + step.y)
   events.push({ type: 'effect', id: target.id, effect, amount: -slam })
   wound(battle, target, slam, events)
+  slammed(battle, target, events)
   if (into && into.side === target.side) {
     events.push({ type: 'effect', id: into.id, effect, amount: -slam })
     wound(battle, into, slam, events)

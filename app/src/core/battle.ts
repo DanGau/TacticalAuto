@@ -31,17 +31,30 @@ export const BLAST_RADIUS = 1
 export const NAPALM_DAMAGE = 3
 /** Damage Searing adds and Icebreaker adds against a burning or chilled target. */
 export const SEARING_DAMAGE = 2
-/** Turns Smolder adds to burning, and Permafrost to chill. */
-export const LINGER_TURNS = 2
+/** Stacks Smolder adds to each burn, and Permafrost to each chill. */
+export const LINGER_STACKS = 1
 /** Health a medic restores, to a soldier within MEDIC_REACH tiles. */
 export const MEDIC_HEAL = 4
 export const MEDIC_REACH = 2
 /** Tiles a unit in the standoff stance keeps from every enemy. */
 export const STANDOFF = 7
-/** Turns a burning unit takes BURN_DAMAGE at the start of. */
-export const BURN_TURNS = 2
-export const BURN_DAMAGE = 1
-
+/** Burn stacks a source adds; each own turn a burning unit takes its stacks in damage, then loses one. At most BURN_MAX. */
+export const BURN_STACKS = 2
+export const BURN_MAX = 6
+/** Chill stacks freeze a unit at CHILL_FREEZE: it loses its next action, then thaws with none. */
+export const CHILL_FREEZE = 3
+/** The most Might a unit holds, the most a combo adds, and what makes a hit exposed or every-Nth. */
+export const MIGHT_MAX = 8
+export const COMBO_MAX = 4
+export const EXPOSED = { turns: 2, factor: 1.5 }
+export const CADENCE = 10
+export const FAULT = { every: 5, levels: 2, damage: 4 }
+/** Damage Frost Fracture does to each alien beside a frozen alien broken, per chill stack on it. */
+export const FRACTURE_DAMAGE = 3
+/** Crit chance a level above the target adds, for Lofty gear, to at most HIGH_LEVELS levels. */
+export const HIGH_CRIT = 0.1
+export const HIGH_LEVELS = 4
+/** Own turns a root, a suppression or a charge lasts. */
 export const CHILL_TURNS = 2
 export const CHILL_MOVE = 2
 export const CHILL_DAMAGE = 1
@@ -141,13 +154,13 @@ export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, crit: 0.1, 
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' | 'napalm' | 'cryo' | 'cloak'
 
 /** Something a piece of gear does; gear.ts says what each does. */
-export type GearEffect = 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'snare' | 'booming' | 'tether' | 'shove'
+export type GearEffect = 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'snare' | 'booming' | 'tether' | 'shove' | 'cadence' | 'lofty' | 'topple' | 'kiln' | 'quench'
 /** Something a skill does; skills.ts says what each does. */
 export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty'
+export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'zenith' | 'embers' | 'fracture'
 /** Anything a unit's gear, skills, the squad's relics or duos or its weapon doctrine do. Combat applies them. */
-export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect | DuoId | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge'
+export type Effect = GearEffect | SkillEffect | RelicEffect | DoctrineEffect | DuoId | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning'
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
@@ -179,6 +192,9 @@ export interface Reserve {
   effects: Effect[]
 }
 
+/** What every unit starts a battle with: no stacks, no counts. */
+export const FRESH = { burn: 0, chill: 0, frozen: false, might: 0, combo: 0, comboOn: 0, exposed: 0, hits: 0 }
+
 export interface Unit {
   id: number
   side: Side
@@ -208,16 +224,27 @@ export interface Unit {
   effects: Effect[]
   /** Once-per-battle effects already used. */
   spent: Effect[]
-  /** Turns of burning left. */
-  burning: number
-  /** Own turns for which it is chilled. */
-  chilled: number
+  /** Burn stacks. */
+  burn: number
+  /** Chill stacks: while any, -CHILL_MOVE move and CHILL_DAMAGE less damage. */
+  chill: number
+  /** Frozen by its chill: it loses its next action. */
+  frozen: boolean
   /** Own turns for which it is rooted and cannot move. */
   rooted: number
   /** Own turns for which moving hurts it, by a booming hit. */
   booming: number
-  /** Damage its kills this battle have added, by blood rite. */
-  fury: number
+  /** Damage its hits do more this battle: Might, from kills, falls and slams; a feeder's growth. */
+  might: number
+  /** Hits in a row on the alien `comboOn`, for Focus Fire. */
+  combo: number
+  comboOn: number
+  /** Own turns for which hits on it do half again, after a fall. */
+  exposed: number
+  /** Its shots that struck this battle, toward its every-Nth triggers. */
+  hits: number
+  /** Whether it attacks twice over this turn. */
+  twice?: boolean
   /** The kind of alien; null for humans. */
   kind: AlienKind | null
   boss: boolean
@@ -328,13 +355,16 @@ export interface Battle {
   city: string
   /** Once-per-battle effects of the whole squad already used. */
   used: Effect[]
+  /** Aliens the squad has killed this battle, toward the oath's every-Nth. */
+  kills: number
   duos: DuoState
   /** What this battle tests; an ambush or a recovery has none. */
   challenge: ChallengeId | null
   /** The round reinforcements start coming, one clump a round, if the aliens posted are not all down; null when they come on a flood's beat. */
   deadline: number | null
-  /** The utility the player picked for this fight. */
+  /** The utility the player picked for this fight, and a second the reservoir paid for. */
   utility: UtilityId | null
+  second: UtilityId | null
   /** A fuel tank rigged to blow; null once it has. */
   rigged: Tile | null
   /** The range each alien had before a smoke bomb, by unit id, until the smoke clears. */

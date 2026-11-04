@@ -1,5 +1,6 @@
 // Tier 3 powers: what each keystone adds to a hit, and the reactions and numbers they share.
-import { CHILL_TURNS, type Unit, type Battle } from './battle'
+import { type Unit, type Battle, MIGHT_MAX } from './battle'
+import { chillUnit } from './stacks'
 import type { GameEvent } from './combat-event'
 import { has, shootable, nearest } from './fighters'
 import { distance } from './grid'
@@ -25,7 +26,7 @@ export const FAN_TARGETS = 2
 /** What a keystone sets off once a hit has landed: `unit` struck `enemy`, with `beside` those next to it before the hit. */
 export function afterHit(battle: Battle, unit: Unit, enemy: Unit, damage: number, beside: Unit[], events: GameEvent[]): void {
   if (enemy.hp <= 0 && has(unit, 'bloodbath')) {
-    unit.fury++
+    unit.might = Math.min(MIGHT_MAX, unit.might + 1)
     const healed = Math.min(BLOODBATH_HEAL, unit.stats.hp - unit.hp)
     unit.hp += healed
     events.push({ type: 'effect', id: unit.id, effect: 'bloodbath', amount: healed })
@@ -33,13 +34,13 @@ export function afterHit(battle: Battle, unit: Unit, enemy: Unit, damage: number
   if (damage > 0 && (has(unit, 'aftershock') || has(unit, 'shardstorm'))) {
     const effect = has(unit, 'aftershock') ? 'aftershock' : 'shardstorm'
     for (const other of beside.filter((u) => u.hp > 0)) {
-      if (effect === 'shardstorm' && !other.resists.includes('frost')) other.chilled = CHILL_TURNS
+      if (effect === 'shardstorm') chillUnit(battle, other, 1, events)
       const amount = effect === 'aftershock' ? AFTERSHOCK_DAMAGE : SHARD_DAMAGE
       events.push({ type: 'effect', id: other.id, effect, amount: -amount })
       wound(battle, other, amount, events)
     }
   }
-  if (enemy.hp > 0 && damage > 0 && !enemy.boss && enemy.chilled > 0 && has(unit, 'frozenHeart')) {
+  if (enemy.hp > 0 && damage > 0 && !enemy.boss && enemy.chill > 0 && has(unit, 'frozenHeart')) {
     enemy.panicked = true
     events.push({ type: 'effect', id: enemy.id, effect: 'frozenHeart', amount: 0 })
   }

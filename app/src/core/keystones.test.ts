@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { arena } from './arena'
-import { BLOODBATH_HEAL, TESLA } from './keystones'
+import { BLOODBATH_HEAL, CONFLAGRATION_DAMAGE, TESLA } from './keystones'
 import { upkeep } from './upkeep'
 
 const shots = (events: { type: string }[]) => events.filter((e) => e.type === 'shot') as { type: 'shot'; id: number; target: number; crit: boolean; damage: number }[]
@@ -11,7 +11,7 @@ test('Bloodbath: a kill heals and adds damage for the battle', () => {
   hero.hp = 2
   beats(1)
   expect(hero.hp).toBe(2 + BLOODBATH_HEAL)
-  expect(hero.fury).toBe(1)
+  expect(hero.might).toBe(1)
 })
 
 test('Riposte: whoever hits the hero takes its damage back', () => {
@@ -66,7 +66,7 @@ test('Aftershock and Shardstorm hurt those beside the target; Shardstorm chills 
     const [hit] = shots(beats(1))
     const other = aliens.find((a) => a.id !== hit.target)!
     expect(other.hp).toBe(38)
-    expect(other.chilled > 0).toBe(effect === 'shardstorm')
+    expect(other.chill > 0).toBe(effect === 'shardstorm')
   }
 })
 
@@ -145,11 +145,11 @@ test('Firestorm gives a Fireball back on a kill', () => {
 
 test('Conflagration burns harder and spreads; Hellfire sets aliens near the hero burning', () => {
   const fire = arena(['conflagration'], [{ x: 14, y: 10 }, { x: 15, y: 10 }])
-  fire.aliens[0].burning = 2
+  fire.aliens[0].burn = 2
   fire.battle.turn = 'alien'
   upkeep(fire.battle)
-  expect(fire.aliens[0].hp).toBe(37)
-  expect(fire.aliens[1].burning).toBeGreaterThan(0)
+  expect(fire.aliens[0].hp).toBe(40 - 2 - CONFLAGRATION_DAMAGE)
+  expect(fire.aliens[1].burn).toBeGreaterThan(0)
   const hell = arena(['hellfire'], [{ x: 11, y: 10 }])
   hell.battle.turn = 'alien'
   upkeep(hell.battle)
@@ -158,11 +158,11 @@ test('Conflagration burns harder and spreads; Hellfire sets aliens near the hero
 
 test('Frozen Heart freezes a chilled alien it hits; a boss stands firm', () => {
   const { aliens, beats } = arena(['frozenHeart'], [{ x: 11, y: 10 }])
-  aliens[0].chilled = 2
+  aliens[0].chill = 2
   beats(1)
   expect(aliens[0].panicked).toBe(true)
   const big = arena(['frozenHeart'], [{ x: 11, y: 10 }])
-  Object.assign(big.aliens[0], { chilled: 2, boss: true })
+  Object.assign(big.aliens[0], { chill: 2, boss: true })
   big.beats(1)
   expect(big.aliens[0].panicked).toBe(false)
 })

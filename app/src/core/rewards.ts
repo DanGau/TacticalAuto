@@ -3,7 +3,7 @@ import { RARITY_CHANCE, type Rarity } from './base'
 import { SHOP_UTILITIES, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
 import { generateGear, type Gear } from './gear'
 import { random, randomInt } from './rng'
-import { offerable, type RelicId } from './relics'
+import { drawRelic, offerable, type RelicId } from './relics'
 import { type Run } from './run-state'
 import { type Shop } from './run-state'
 import { type Soldier } from './run-state'
@@ -49,7 +49,7 @@ export function stockShop(run: Run): Shop {
   }
   const relics = offerable(run.relics)
   const stocked: RelicId[] = []
-  while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(relics.splice(randomInt(run, relics.length), 1)[0])
+  while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(drawRelic(run, relics))
   const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
   const utilities = Array.from({ length: Math.min(SHOP_UTILITIES, kinds.length) }, () => ({ id: kinds.splice(randomInt(run, kinds.length), 1)[0], sold: false }))
   return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, bribed: false }

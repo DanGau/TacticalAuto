@@ -18,6 +18,8 @@ export function effectName(effect: Effect | Ability, squad: { skills: SkillId[];
   if (effect === 'overwatch') return 'Overwatch'
   if (effect === 'stun') return 'Stunned'
   if (effect === 'surge') return 'Temp HP'
+  if (effect === 'frozen') return 'Frozen'
+  if (effect === 'reckoning') return "Executioner's Oath"
   if (effect in DUOS) return DUOS[effect as DuoId].name
   const ability = Object.values(CLASSES).find((cls) => cls.ability === effect)
   if (ability) return ability.abilityName

@@ -2,7 +2,7 @@ import { roots } from './skills'
 import { expect, test } from 'vitest'
 import { enterAt, begun } from './roads'
 import { apply } from './apply'
-import { CHILL_TURNS, CRIT_BONUS, SEARING_DAMAGE, SOLDIER_ATTACKS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
+import { BURN_STACKS, CRIT_BONUS, SEARING_DAMAGE, SOLDIER_ATTACKS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
 import { alienUnit } from './spawn'
 import { reshaped } from './grid'
 import { stepBattle } from './combat'
@@ -20,9 +20,10 @@ test('gear does one thing: commons a stat mod, rares a simple effect, epics an e
   for (let id = 0; id < 900; id++) {
     const rarity = (['common', 'rare', 'epic'] as const)[id % 3]
     const gear = generateGear(rng, id, rarity)
-    expect(gear.effect === null).toBe(rarity === 'common')
-    expect(Object.keys(gear.stats).length > 0).toBe(rarity === 'common')
-    if (gear.effect) expect(!!EFFECTS[gear.effect].epic).toBe(rarity === 'epic')
+    // A common has a stat mod or feeds a build; better gear has an effect of its rarity.
+    expect(gear.effect === null).toBe(Object.keys(gear.stats).length > 0)
+    if (rarity !== 'common') expect(gear.effect).not.toBeNull()
+    if (gear.effect) expect(EFFECTS[gear.effect].rarity ?? 'rare').toBe(rarity)
     kinds.add(gear.weapon)
     expect(gear.name.endsWith(WEAPONS[gear.weapon].name)).toBe(true)
   }
@@ -93,8 +94,9 @@ test('a scorching weapon burns its target at the start of the target\'s turns', 
   d.soldier.stats = { ...d.soldier.stats, damage: 1, crit: 0 }
   const events = untilAlienShoots(d)
   expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'incendiary', amount: 0 })
-  expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'incendiary', amount: -1 })
-  expect(d.alien.hp).toBe(99 - SOLDIER_ATTACKS - 1)
+  // Each attack adds its stacks; the alien takes them all at the start of its turn.
+  expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'incendiary', amount: -SOLDIER_ATTACKS * BURN_STACKS })
+  expect(d.alien.hp).toBe(99 - SOLDIER_ATTACKS - SOLDIER_ATTACKS * BURN_STACKS)
 })
 
 test('a rimed weapon chills its target, and a shatterglass edge and thermal shock core pay off on it', () => {
@@ -107,8 +109,8 @@ test('a rimed weapon chills its target, and a shatterglass edge and thermal shoc
   }
   const [first] = shots()
   expect(first).toMatchObject({ damage: 2 })
-  expect(d.alien.chilled).toBeGreaterThan(0)
-  d.alien.burning = 5
+  expect(d.alien.chill).toBeGreaterThan(0)
+  d.alien.burn = 5
   const [second] = shots()
   expect(second).toMatchObject({ damage: 2 + TUNING.shatterDamage + TUNING.thermalDamage })
 })
@@ -119,8 +121,8 @@ test('an alien that resists frost and burn is neither chilled nor set burning', 
   d.soldier.effects.push('incendiary')
   d.alien.resists = ['frost', 'burn']
   untilAlienShoots(d)
-  expect(d.alien.chilled).toBe(0)
-  expect(d.alien.burning).toBe(0)
+  expect(d.alien.chill).toBe(0)
+  expect(d.alien.burn).toBe(0)
 })
 
 test('overkill coils carry damage beyond a kill to the nearest other alien', () => {
@@ -208,7 +210,7 @@ test('a null field stops a spitter spitting', () => {
 
 test('a pyre censer sets the ground under a burning alien ablaze', () => {
   const d = armed(['pyre'], { damage: 0 })
-  d.alien.burning = 3
+  d.alien.burn = 3
   const { x, y } = d.alien
   untilAlienShoots(d)
   expect(d.battle.fire).toContainEqual(expect.objectContaining({ x, y }))
@@ -216,7 +218,7 @@ test('a pyre censer sets the ground under a burning alien ablaze', () => {
 
 test('a stasis field freezes a chilled alien a crit lands on', () => {
   const d = armed(['stasis'], { crit: 1 })
-  d.alien.chilled = 5
+  d.alien.chill = 5
   const events = untilAlienShoots(d)
   expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'stasis', amount: 0 })
   expect(events).toContainEqual({ type: 'frozen', id: d.alien.id })
@@ -309,20 +311,25 @@ test("a soldier's kills, damage and feats are credited to it", () => {
   expect(d.battle.tally[d.soldier.soldier!]).toMatchObject({ kills: 1, dealt: 99, feats: ['overkill', 'oneShot'] })
 })
 
-test('cryo rounds chill the target; an icebreaker hits a chilled one harder, and permafrost holds the chill longer', () => {
+test('cryo rounds chill the target, an icebreaker hits a chilled one harder, and permafrost adds a stack to each chill', () => {
   const d = armed(['icebreak', 'permafrost'])
   d.soldier.ability = 'cryo'
-  const shots = () => untilAlienShoots(d).filter((e) => e.type === 'shot' && e.id === d.soldier.id)
-  expect(shots()[0]).toMatchObject({ damage: 1 })
-  expect(d.alien.chilled).toBeGreaterThan(CHILL_TURNS)
-  expect(shots()[0]).toMatchObject({ damage: 1 + SEARING_DAMAGE })
+  const events = []
+  while (d.battle.turn === 'human' || d.battle.beat < 2) events.push(...d.step())
+  const shots = events.filter((e) => e.type === 'shot' && e.id === d.soldier.id)
+  expect(shots[0]).toMatchObject({ damage: 1 })
+  expect(shots[1]).toMatchObject({ damage: 1 + SEARING_DAMAGE })
+  // Two attacks of two stacks each: past CHILL_FREEZE it freezes, loses its action, and thaws with no chill.
+  expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'frozen', amount: 0 })
+  expect(events).toContainEqual({ type: 'frozen', id: d.alien.id })
+  expect(d.alien).toMatchObject({ frozen: false, chill: 0 })
 })
 
 test('incendiary rounds set the target burning, and searing hits a burning one harder', () => {
   const d = armed(['tinder', 'searing'])
   const shots = () => untilAlienShoots(d).filter((e) => e.type === 'shot' && e.id === d.soldier.id)
   expect(shots()[0]).toMatchObject({ damage: 1 })
-  expect(d.alien.burning).toBeGreaterThan(0)
+  expect(d.alien.burn).toBeGreaterThan(0)
   expect(shots()[0]).toMatchObject({ damage: 1 + SEARING_DAMAGE })
 })
 
@@ -334,7 +341,7 @@ test('napalm blasts aliens standing together, setting them burning and the groun
   const events = untilAlienShoots(d)
   expect(events).toContainEqual(expect.objectContaining({ type: 'rocket', id: d.soldier.id, fire: true }))
   expect(d.soldier.charges).toBe(0)
-  expect([d.alien.burning, other.burning].every((turns) => turns > 0)).toBe(true)
+  expect([d.alien.burn, other.burn].every((turns) => turns > 0)).toBe(true)
   expect(d.battle.fire).toContainEqual(expect.objectContaining({ x: 10, y: 13 }))
 })
 
@@ -342,12 +349,12 @@ test('a fire suit keeps its wearer from burning in fire', () => {
   const d = armed(['fireSuit'])
   d.battle.fire.push({ x: d.soldier.x, y: d.soldier.y, turns: 9 })
   untilAlienShoots(d)
-  expect(d.soldier.burning).toBe(0)
+  expect(d.soldier.burn).toBe(0)
 })
 
 test('a kill on a burning alien spreads the fire to those beside it, with backdraft', () => {
   const d = armed(['backdraft'], { damage: 5 })
-  Object.assign(d.alien, { hp: 1, burning: 9 })
+  Object.assign(d.alien, { hp: 1, burn: 9 })
   const other = another(d, 1, 0)
   const events = []
   while (d.alien.hp > 0) events.push(...d.step())

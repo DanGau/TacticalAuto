@@ -175,8 +175,8 @@ export function feed(battle: Battle, unit: Unit, events: GameEvent[]): GameEvent
   return battle.units
     .filter((u) => u.kind === 'feeder' && u.revealed)
     .map((u) => {
-      u.fury++
-      return { type: 'feed', id: u.id, damage: u.fury }
+      u.might++
+      return { type: 'feed', id: u.id, damage: u.might }
     })
 }
 

@@ -49,11 +49,11 @@ const fired = (events: GameEvent[], id: DuoId) => events.some((e) => e.type === 
 test('Thermal Shock shatters a target both burning and chilled', () => {
   const { battle, hero, aliens } = duo('thermalShock', { x: 2, y: 2 }, [{ x: 12, y: 10 }, { x: 13, y: 10 }])
   const [target, beside] = aliens
-  Object.assign(target, { burning: 2, chilled: 2 })
+  Object.assign(target, { burn: 2, chill: 2 })
   const events: GameEvent[] = []
   duoHit(battle, hero, target, 1, plain, [beside], events)
   expect(fired(events, 'thermalShock')).toBe(true)
-  expect(target).toMatchObject({ hp: 40 - SHATTER_HIT, burning: 0, chilled: 0 })
+  expect(target).toMatchObject({ hp: 40 - SHATTER_HIT, burn: 0, chill: 0 })
   expect(beside.hp).toBe(40 - SHATTER_SPLASH)
 })
 
@@ -74,7 +74,7 @@ test("Lifeline reaches the Vanguard anywhere and turns overflow into armor; Cold
     const events = heal(battle, hero)
     expect(fired(events, id)).toBe(true)
     if (id === 'lifeline') expect(mate).toMatchObject({ hp: mate.stats.hp, armor: 3 })
-    else expect(aliens[0].chilled).toBeGreaterThan(0)
+    else expect(aliens[0].chill).toBeGreaterThan(0)
   }
 })
 
@@ -84,7 +84,7 @@ test('Hammer and Anvil stuns beside the Vanguard; Flash Freeze freezes a chilled
   duoHit(anvil.battle, anvil.hero, anvil.aliens[0], 1, plain, [], events)
   expect(anvil.aliens[0].panicked && fired(events, 'anvil')).toBe(true)
   const freeze = duo('flashFreeze', { x: 2, y: 2 }, [{ x: 12, y: 10 }])
-  freeze.aliens[0].chilled = 2
+  freeze.aliens[0].chill = 2
   duoHit(freeze.battle, freeze.hero, freeze.aliens[0], 1, { crit: true, unseen: false }, [], events)
   expect(freeze.aliens[0].panicked && fired(events, 'flashFreeze')).toBe(true)
 })
@@ -98,14 +98,14 @@ test("Target Painter marks who hits the Gadgeteer's mech; Napalm Payload bursts 
     duoHit(battle, aliens[0], mech, 3, plain, [], events)
     expect(fired(events, id)).toBe(true)
     if (id === 'painter') expect(aliens[0].marked).toBe(true)
-    else expect(aliens[0]).toMatchObject({ hp: 40 - PAYLOAD_DAMAGE, burning: expect.any(Number) })
+    else expect(aliens[0]).toMatchObject({ hp: 40 - PAYLOAD_DAMAGE, burn: expect.any(Number) })
   }
 })
 
 test('Firefall sets burning each alien a Meteor Strike hits', () => {
   const { battle, hero, aliens } = duo('firefall', { x: 2, y: 2 }, [{ x: 12, y: 10 }])
   const events = firefall(battle, hero, [{ type: 'rocket', id: hero.id, x: 12, y: 10, hits: [{ target: aliens[0].id, damage: 4 }] }])
-  expect(fired(events, 'firefall') && aliens[0].burning > 0).toBe(true)
+  expect(fired(events, 'firefall') && aliens[0].burn > 0).toBe(true)
 })
 
 test('Pincer sends the Phantom at the alien the Vanguard hit, once a round', () => {

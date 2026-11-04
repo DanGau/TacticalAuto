@@ -1,23 +1,26 @@
 // Keywords builds share, and the resists aliens have.
 import { TUNING } from './tuning'
+import { BURN_MAX, CHILL_FREEZE } from './battle'
 
 /**
  * Words that tie skills, gear and relics together: some cause a keyword, others pay off on it, so a party built
  * around one finds its pieces stronger together.
  */
-export type Keyword = 'burn' | 'frost' | 'mark' | 'crit' | 'kill' | 'ward'
+export type Keyword = 'burn' | 'frost' | 'mark' | 'crit' | 'kill' | 'ward' | 'might' | 'force'
 
 export const KEYWORDS: Record<Keyword, { name: string; icon: string; text: string }> = {
-  burn: { name: 'Burn', icon: '🔥', text: 'A burning unit takes 1 damage at the start of each of its next 2 turns' },
-  frost: { name: 'Frost', icon: '❄️', text: 'A chilled unit has -2 move and does 1 less damage on its next turn' },
+  burn: { name: 'Burn', icon: '🔥', text: `Burn stacks: at the start of each of its turns a unit takes its stacks in damage, then loses one; at most ${BURN_MAX}` },
+  frost: { name: 'Frost', icon: '❄️', text: `Chill stacks: a chilled unit has -2 move and does 1 less damage, and loses a stack each turn; at ${CHILL_FREEZE} it freezes, losing its next action` },
   mark: { name: 'Mark', icon: '🎯', text: `Every hit on a marked unit does ${TUNING.markDamage} more damage` },
   crit: { name: 'Crit', icon: '💥', text: 'A crit does 2 more damage' },
   kill: { name: 'Kill', icon: '💀', text: 'Pays off when the hero kills' },
   ward: { name: 'Ward', icon: '🛡️', text: 'Armor: temporary HP that takes damage first and is whole again each fight' },
+  might: { name: 'Might', icon: '⚔️', text: 'Might stacks: +1 damage each, for the rest of the battle' },
+  force: { name: 'Force', icon: '💪', text: 'Knockbacks, throws, slams and falls' },
 }
 
 /** A keyword an alien shrugs off, so a party built on it must answer that alien some other way. */
-export type Resist = Exclude<Keyword, 'kill'>
+export type Resist = Exclude<Keyword, 'kill' | 'might' | 'force'>
 
 export const RESISTS: Record<Resist, string> = {
   burn: 'Cannot burn',

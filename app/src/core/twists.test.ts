@@ -90,7 +90,7 @@ test('a hit on a unit beside a fuel tank sets it off', () => {
   const events = untilShot(battle)
   expect(events).toContainEqual(expect.objectContaining({ type: 'rocket', x: 11, y: 12 }))
   expect(alien.hp).toBeLessThanOrEqual(99 - FUEL_DAMAGE)
-  expect(alien.burning).toBeGreaterThan(0)
+  expect(alien.burn).toBeGreaterThan(0)
   expect(battle.props[12 * GRID + 11]).toBe('none')
 })
 
@@ -99,7 +99,7 @@ test('in the rain nothing burns', () => {
   const [soldier, alien] = battle.units
   Object.assign(soldier, { effects: ['incendiary'], stats: { ...soldier.stats } })
   untilShot(battle)
-  expect(alien.burning).toBe(0)
+  expect(alien.burn).toBe(0)
 })
 
 test('fog shortens sight, and night noticing', () => {

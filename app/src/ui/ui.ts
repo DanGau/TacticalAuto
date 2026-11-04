@@ -15,6 +15,8 @@ import { GOALS, HOLD_ROUNDS } from '../core/goals'
 import { button, STOP_NAMES } from './html'
 import { fuelTanks } from '../core/objects'
 import { UTILITIES } from '../core/utilities'
+import { BOON_CHARGES } from '../core/relics'
+import { RECKONING_KILLS } from '../core/doctrines'
 import { pickCard, pickDetail, utilityPick, type Pick } from './cards'
 import { alienBlock } from './sheet'
 import { overworld, type Tab } from './overworld'
@@ -37,32 +39,49 @@ function status(run: Run): string {
   const rounds = battle.extract ? ` · ${battle.escaped.length} lifted off` : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
   const clock = battle.deadline !== null && battle.round < battle.deadline ? ` · reinforcements in ${battle.deadline - battle.round} rounds` : ''
   const vip = battle.vip ? ` · the VIP ${{ held: 'held', breached: 'held', freed: 'with the party', out: 'lifted off' }[battle.vip]}` : ''
-  return `${title}${vip}${rounds}${clock}`
+  return `${title}${vip}${rounds}${clock}${counts(run, battle)}`
+}
+
+/** The squad's counts toward its every-Nth triggers. */
+function counts(run: Run, battle: Battle): string {
+  const turn = (battle.round % 3) + 1
+  const chrono = run.relics.includes('chrono') ? ` · Chrono Coil: turn ${turn} of 3` : ''
+  const oath = battle.rules.includes('reckoning') ? ` · Oath: kill ${battle.kills % RECKONING_KILLS} of ${RECKONING_KILLS}` : ''
+  return `${chrono}${oath}`
 }
 
 /**
  * Before the landing: what the battle tests, the twist, and how the squad goes in: with no utility held, a tap; else a
  * card per utility, tapped to arm and again to go in with it. A rigged tank then asks which tank, `rigging` holding its index.
+ * With the reservoir charged, a boon picked, `doubling` its index, asks for a second or none.
  */
-function drop(run: Run, battle: Battle, armed: string | null, rigging: number | null): string {
+function drop(run: Run, battle: Battle, armed: string | null, rigging: number | null, doubling: number | null): string {
   const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
   const tanks = fuelTanks(battle)
   const challenge = battle.challenge && CHALLENGES[battle.challenge]
   const go = (detail: string, picks: Pick[], idle: string) => `<p>${detail}</p><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, idle)}`
+  const charged = run.relics.includes('reservoir') && run.boons >= BOON_CHARGES && run.utilities.filter((id) => id !== 'tank').length >= 2
+  const reservoir = run.relics.includes('reservoir') ? `<p class="reservoir">🔋 Boon Reservoir: ${run.boons} charge${run.boons === 1 ? '' : 's'}${charged ? `; ${BOON_CHARGES} take a second boon in` : `; go in with no boon to charge it`}.</p>` : ''
+  const second = (i: number): Pick[] => [
+    { key: 'one', action: { type: 'enter', utility: i }, look: 'utility', body: `<small>keep charges</small><b>${UTILITIES[run.utilities[i]].icon} Just one</b>`, detail: '', go: `Tap again to go in with ${UTILITIES[run.utilities[i]].name} alone` },
+    ...run.utilities.flatMap((id, j): Pick[] => (j === i || id === 'tank' ? [] : [utilityPick(`s${j}`, { type: 'enter', utility: i, second: j }, id, `+${BOON_CHARGES} charges`, `Tap again to go in with ${UTILITIES[run.utilities[i]].name} and ${UTILITIES[id].name}`)])),
+  ]
   const chosen =
-    rigging !== null
+    doubling !== null
+      ? go(`Spend ${BOON_CHARGES} charges on a second boon?`, second(doubling), 'Tap a second boon, or Just one, then tap it again to go in.')
+      : rigging !== null
       ? go('Rig which tank?', tanks.map((_, tank): Pick => utilityPick(`t${tank}`, { type: 'enter', utility: rigging, tank }, 'tank', 'rig', `Tap again to rig tank ${tank + 1} and go in`, { body: `<small>rig</small><b>🛢️ Tank ${tank + 1}</b>` })), 'Tap a tank, then tap it again to go in.')
       : run.utilities.length === 0
         ? button({ type: 'enter' }, 'Go in')
         : go(
             'Pick a boon for this fight.',
             run.utilities.map((id, i): Pick =>
-              utilityPick(`u${i}`, id === 'tank' ? undefined : { type: 'enter', utility: i }, id, challenge?.answers.includes(id) ? 'answers this' : 'boon', id === 'tank' ? 'Tap again to choose a tank' : `Tap again to go in with ${UTILITIES[id].name}`, id === 'tank' ? { attrs: `data-rig="${i}"`, block: tanks.length === 0 ? 'No fuel tanks on this ground' : null } : {}),
+              utilityPick(`u${i}`, id === 'tank' || charged ? undefined : { type: 'enter', utility: i }, id, challenge?.answers.includes(id) ? 'answers this' : 'boon', id === 'tank' ? 'Tap again to choose a tank' : charged ? 'Tap again, then choose a second' : `Tap again to go in with ${UTILITIES[id].name}`, id === 'tank' ? { attrs: `data-rig="${i}"`, block: tanks.length === 0 ? 'No fuel tanks on this ground' : null } : charged ? { attrs: `data-double="${i}"` } : {}),
             ),
             'Tap a boon or an alien to read it; tap a boon again to go in with it.',
           )
   const test = challenge ? `<h2 class="challenge">${challenge.icon} ${challenge.name}</h2><p>${challenge.test}.</p>` : ''
-  return `${test}${twist}${foes(battle, armed)}${chosen}`
+  return `${test}${twist}${foes(battle, armed)}${reservoir}${chosen}`
 }
 
 /** The encounter: each alien kind on the deploy screen and how many; tapped, its stat block. Burrowers stay hidden. */
@@ -85,6 +104,8 @@ export function createUi(act: (action: Action) => void): Ui {
   let choosing: Battle | null = null
   /** On the deploy screen, the rigged tank held at this index awaiting its tank. */
   let rigging: number | null = null
+  /** On the deploy screen, the boon picked whose second the reservoir may pay for. */
+  let doubling: number | null = null
   /** The report the player has continued past. */
   let seen: Report | null = null
   let tab: Tab = 'Map'
@@ -186,9 +207,10 @@ export function createUi(act: (action: Action) => void): Ui {
     if (battle !== choosing) {
       choosing = battle
       rigging = null
+      doubling = null
       armed = null
     }
-    dropPanel.innerHTML = drop(run, battle, armed, rigging)
+    dropPanel.innerHTML = drop(run, battle, armed, rigging, doubling)
   }
 
   dropPanel.addEventListener('click', (e) => {
@@ -200,6 +222,10 @@ export function createUi(act: (action: Action) => void): Ui {
     }
     if (target.dataset.rig) {
       rigging = Number(target.dataset.rig)
+      armed = null
+      showDrop(shown!)
+    } else if (target.dataset.double) {
+      doubling = Number(target.dataset.double)
       armed = null
       showDrop(shown!)
     } else if (target.dataset.action) {

@@ -145,6 +145,8 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     challenge,
     deadline: challenge === 'scattered' ? 0 : null,
     utility: null,
+    second: null,
+    kills: 0,
     rigged: null,
     smoked: {},
     acid: [],

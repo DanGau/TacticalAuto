@@ -2,8 +2,8 @@
 import { ALIENS } from './aliens'
 import { GRID, isSoldier, type Battle, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
-import { foes } from './fighters'
-import { blocked, CLIFF, distance, NEIGHBORS, onGrid, passable, walks, wreck } from './grid'
+import { foes, has } from './fighters'
+import { blocked, CLIFF, distance, NEIGHBORS, onGrid, passable, walkingDistances, walks, wreck } from './grid'
 import { drive, fall, FALL_DAMAGE, isDrop, pushesOff } from './knockback'
 import { canShoot, lineOfSight } from './sight'
 import type { Prop } from './terrain'
@@ -101,8 +101,14 @@ function objectThrow(battle: Battle, unit: Unit, from: Tile, target: Unit, alien
       const clear = (t: Tile) => !blocked(battle, t.x, t.y) && NEIGHBORS.every(([dx, dy]) => onGrid(t.x + dx, t.y + dy) && battle.bulk[(t.y + dy) * GRID + t.x + dx] === 0)
       const spot = [{ x: target.x, y: target.y }, ...NEIGHBORS.map(([dx, dy]) => ({ x: target.x + dx, y: target.y + dy }))].find((t) => clear(t) && (t.x === target.x && t.y === target.y ? true : passable(battle, target, t)))
       if (!spot) return
+      const open = walkingDistances(battle, unit).filter(Number.isFinite).length
       battle.props[spot.y * GRID + spot.x] = 'wreck'
       battle.bulk[spot.y * GRID + spot.x] = 1
+      walks.delete(battle)
+      // Nor does one stand where walls about it would make it cut ground off.
+      if (walkingDistances(battle, unit).filter(Number.isFinite).length >= open - 1) return
+      battle.props[spot.y * GRID + spot.x] = 'none'
+      battle.bulk[spot.y * GRID + spot.x] = 0
       walks.delete(battle)
     },
   }
@@ -127,8 +133,11 @@ function alienThrow(battle: Battle, unit: Unit, held: Unit, to: Tile, aliens: Un
       events.push({ type: 'throw', id: unit.id, from: { x: held.x, y: held.y }, to: lands, object: 'alien', thrown: held.id, hits: drop ? [] : [held, ...(onto ? [onto] : [])].map((a) => ({ target: a.id, damage: a === held ? damage : THROW_DAMAGE })) })
       Object.assign(held, lands)
       if (drop) return fall(battle, held, edge, way[over], events)
+      // A living projectile hits as hard as it has health.
+      const projectile = onto && has(unit, 'projectile') ? held.hp : 0
       wound(battle, held, damage, events)
-      if (onto) wound(battle, onto, THROW_DAMAGE, events)
+      if (projectile > 0) events.push({ type: 'effect', id: onto!.id, effect: 'projectile', amount: -projectile })
+      if (onto) wound(battle, onto, THROW_DAMAGE + projectile, events)
     },
   }
 }

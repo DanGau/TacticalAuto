@@ -190,7 +190,7 @@ export function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: nu
   const earned: Earned[] = [
     { label: 'fought', xp: XP.fought },
     { label: 'won', xp: won ? XP.won : 0 },
-    { label: `${tally.kills} kill${tally.kills === 1 ? '' : 's'}`, xp: tally.kills * XP.kill },
+    { label: `${tally.kills} kill${tally.kills === 1 ? '' : 's'}`, xp: battle.rules.includes('reckoning') ? 0 : tally.kills * XP.kill },
     { label: `${tally.dealt} damage`, xp: Math.floor(tally.dealt / XP.damage) },
     { label: `${saved} civilians saved`, xp: saved * XP.civilian },
     ...feats.map((id) => ({ label: FEATS[id].name, xp: XP.feat })),

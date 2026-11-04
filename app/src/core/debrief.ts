@@ -3,7 +3,7 @@ import { DOCTRINES, type Doctrine } from './doctrines'
 import { CIVILIANS, CIVILIANS_PER_THREAT, CIVILIAN_SUPPLIES } from './goals'
 import { RISKS } from './missions'
 import { STOP_THREAT, LOSS_THREAT, THREAT_MAX } from './progress'
-import { type Relic, RELICS, offerable, RELIC_OFFERS } from './relics'
+import { type Relic, RELICS, offerable, RELIC_OFFERS, drawRelic, STREAK_FIGHTS } from './relics'
 import { dropGear, findUtility, settle } from './rewards'
 import { random, randomInt } from './rng'
 import { openDuos } from './duos'
@@ -46,7 +46,11 @@ export function endBattle(run: Run): void {
   if (mission.kind === 'ambush') run.threat = won ? 0 : run.threat
   else if (mission.kind !== 'recovery') run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT) + (rescued === null ? 0 : Math.floor((CIVILIANS - (won ? rescued : 0)) / CIVILIANS_PER_THREAT)), THREAT_MAX)
   const held = run.relics.map((id): Relic => RELICS[id])
-  const supplies = won ? risk.supplies * (mission.goal === 'raid' ? battle.grabbed : 1) + (rescued ?? 0) * (CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.civilianSupplies ?? 0), 0)) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
+  const earned = won ? risk.supplies * (mission.goal === 'raid' ? battle.grabbed : 1) + (rescued ?? 0) * (CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.civilianSupplies ?? 0), 0)) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
+  // The reservoir charges on a fight won with no boon; a clean streak pays every STREAK_FIGHTS fights.
+  if (won && battle.utility === null && held.some((relic) => relic.boons)) run.boons++
+  run.streak = won && battle.downed.length === 0 ? run.streak + 1 : 0
+  const supplies = earned + (run.streak > 0 && run.streak % STREAK_FIGHTS === 0 ? held.reduce((sum, relic) => sum + (relic.streak ?? 0), 0) : 0)
   run.supplies += supplies
   // At most a piece of gear: a key mission always drops one, rare or better; a battle by its goal and risk; nothing else does.
   const byGoal = { exterminate: risk.gear, assassinate: 1, hold: 0, rescue: 0, vip: 0, raid: 0, ambush: 0, recover: 0 }[mission.goal]
@@ -79,7 +83,7 @@ export function endBattle(run: Run): void {
     const held = squadKeywords(run)
     const fits = pool.filter((id) => RELICS[id].tags?.some((tag) => held.includes(tag)))
     if (fits.length > 0) run.relicOffers.push(...pool.splice(pool.indexOf(fits[randomInt(run, fits.length)]), 1))
-    while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(...pool.splice(randomInt(run, pool.length), 1))
+    while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(drawRelic(run, pool))
     // A duo the squad's classes form stands beside them, taken in place of a relic.
     const duos = openDuos(run)
     if (duos.length > 0) run.duoOffer = duos[randomInt(run, duos.length)]

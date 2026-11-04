@@ -47,12 +47,12 @@ export function effectCallout(s: Stage, e: Extract<GameEvent, { type: 'effect' }
   return callout(s, e.amount === 0 ? word : `${word} ${e.amount > 0 ? '+' : ''}${e.amount}`, e.amount > 0 ? COLOR.heal : e.amount < 0 ? COLOR.crit : COLOR.hit, over)
 }
 
-/** A stunning blow's shockwave spreads over the ground about `at`, as far as `tiles` reach. */
-export function shockwave(s: Stage, fx: Sketch, at: Tile, tiles: number): Promise<void> {
+/** A stunning blow's shockwave spreads over the ground about `at`, as far as `tiles` reach; a trigger's, in its colour. */
+export function shockwave(s: Stage, fx: Sketch, at: Tile, tiles: number, color: number = COLOR.hit): Promise<void> {
   const reach = (tiles + 0.5) * TILE_W
   return s.tween(CALLOUT_MS, (t) => {
     const r = reach * (0.4 + 0.6 * Math.sqrt(t))
-    fx.clear().ellipse(at.x, at.y, r, r / 2).stroke({ color: COLOR.hit, width: 5 - 3 * t, alpha: 1 - t * t })
+    fx.clear().ellipse(at.x, at.y, r, r / 2).stroke({ color, width: 5 - 3 * t, alpha: 1 - t * t })
   })
 }
 
@@ -224,7 +224,7 @@ function burst(s: Stage, fx: Sketch, at: Tile, dir: Tile, color: number, count: 
  * A shot plays as its weapon: the projectile or lunge, then on a hit a freeze on the blow with the target squashed and
  * flashing, a camera jolt, a knockback and sparks, all harder on a crit.
  */
-export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: [number, number, number], gun: Attack): Promise<void> {
+export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e: Extract<GameEvent, { type: 'shot' }>, after: ReturnType<typeof vitals>, gun: Attack): Promise<void> {
   const { crit } = e
   const nth = e.nth ?? 0
   const muzzle = chest(from)

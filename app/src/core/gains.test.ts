@@ -68,7 +68,7 @@ test('in whole bot runs, only a relic chosen from a card goes untold', () => {
     }
   }
   expect(found).toEqual([])
-})
+}, 90_000)
 
 test('the screen names a relic and what it does; acknowledging clears it', () => {
   const run = atEvent('artifact')

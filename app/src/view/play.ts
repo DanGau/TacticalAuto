@@ -20,6 +20,20 @@ import { playUltimate } from './ultimates'
 import { playFall, playThrow } from './falls'
 import { playDuo } from './duos'
 
+/** Triggers that ring out when they fire: how far, in what colour. */
+const TRIGGERS = {
+  frozen: { tiles: 0, color: 0x7fd6ff },
+  fracture: { tiles: 1, color: 0x7fd6ff },
+  catalyst: { tiles: 0, color: COLOR.psi },
+  faultLine: { tiles: 1, color: COLOR.crit },
+  chrono: { tiles: 0, color: COLOR.hit },
+  reckoning: { tiles: 0, color: COLOR.crit },
+  impetus: { tiles: 0, color: COLOR.crit },
+  embers: { tiles: 0, color: COLOR.crit },
+  projectile: { tiles: 1, color: COLOR.crit },
+  topple: { tiles: 0, color: COLOR.crit },
+}
+
 /** What a soldier's order says over it. */
 const ORDERS: Record<Order, string> = { prepare: '👁 READY', sprint: '» SPRINT' }
 
@@ -134,6 +148,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const ground = { x: to.at.x, y: to.at.y }
       await drawing(s, (fx) => playShot(s, fx, from, to, e, after, gun))
       if (e.ring) void drawing(s, (fx) => shockwave(s, fx, ground, e.ring!))
+      if (e.with.includes('cadence')) void drawing(s, (fx) => shockwave(s, fx, ground, 0, COLOR.crit))
       // Crumbling ruins have already broken in the battle; show it as the hit lands.
       if (battle.twist === 'crumbling' && e.damage > 0) drawTerrain(s, battle)
     } else if (e.type === 'rocket') {
@@ -197,6 +212,13 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       // A demolishing hit has already wrecked what stood in the battle; show it as the hit lands.
       if (e.effect === 'demolish') drawTerrain(s, battle)
       if (e.effect === 'stun') void drawing(s, (fx) => daze(s, fx, on))
+      // A trigger that fires rings out from the unit it fires on; Fault Line drops the ground first.
+      if (e.effect === 'faultLine') {
+        drawTerrain(s, battle)
+        for (const u of battle.units) if (sprites.has(u.id)) place(s, sprites.get(u.id)!, u)
+      }
+      const ring = TRIGGERS[e.effect as keyof typeof TRIGGERS]
+      if (ring) void drawing(s, (fx) => shockwave(s, fx, { x: on.at.x, y: on.at.y }, ring.tiles, ring.color))
       float(s, effectCallout(s, e, on))
     } else if (e.type === 'saved' || e.type === 'escaped') {
       const sprite = sprites.get(e.id)

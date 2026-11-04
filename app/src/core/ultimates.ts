@@ -1,8 +1,9 @@
 // Tier 4 powers: once a battle, each hero's moment. Each says when it is worth spending and what it does.
 import { cloakOn } from './abilities'
-import { BURN_TURNS, CHILL_TURNS, CRIT_BONUS, isSoldier, type Battle, type Tile, type Unit } from './battle'
+import { chillUnit, kindle } from './stacks'
+import { BURN_STACKS, CRIT_BONUS, isSoldier, type Battle, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
-import { fireproof, foes, FIRE_TURNS, has, onTile } from './fighters'
+import { foes, FIRE_TURNS, has, onTile } from './fighters'
 import { distance, freeTilesNear, NEIGHBORS, onGrid, wreck } from './grid'
 import { randomInt } from './rng'
 import type { ULTIMATE_EFFECTS } from './skill-effects'
@@ -24,7 +25,7 @@ export const ORBITAL = { length: 30, damage: 12 }
 export const SHIELD_TURNS = 2
 export const TIME_STOP = 2
 export const SUPERNOVA = { radius: 5, damage: 10 }
-export const ABLAZE = { burn: 6, damage: 2 }
+export const ABLAZE = { burn: 3, damage: 2 }
 export const ZERO = { damage: 4, frozen: 2 }
 export const BLIZZARD = { turns: 3, radius: 6, damage: 2 }
 export const HAIL = { shards: 16, damage: 3 }
@@ -61,7 +62,7 @@ function barrage(battle: Battle, unit: Unit, count: number, amount: number, effe
     if (left.length === 0) return
     const target = left[randomInt(battle, left.length)]
     events.push({ type: 'shot', id: unit.id, target: target.id, crit: true, damage: amount, with: [effect], nth: 1 + (i % 3), lasts: 90 })
-    if (chill && !target.resists.includes('frost')) target.chilled = CHILL_TURNS
+    if (chill) chillUnit(battle, target, 1, events)
     wound(battle, target, amount, events, pierce, true)
   }
 }
@@ -70,9 +71,6 @@ const freeze = (unit: Unit, turns: number) => {
   unit.surprised = Math.max(unit.surprised, unit.boss ? 1 : turns)
 }
 
-const burn = (battle: Battle, unit: Unit, turns: number) => {
-  if (unit.hp > 0 && !fireproof(battle, unit)) unit.burning = Math.max(unit.burning, turns)
-}
 
 /** How an ultimate lands, for the view: how far it reaches, and for a beam where it ends. */
 type Landing = { radius?: number; to?: Tile } | void
@@ -216,7 +214,7 @@ const ultimates = {
       const tiles = freeTilesNear(battle, unit, fallen.length)
       fallen.forEach((d, i) => {
         const risen = d.unit!
-        Object.assign(risen, { ...(tiles[i] ?? { x: d.x, y: d.y }), hp: risen.stats.hp, armor: risen.stats.armor, burning: 0, chilled: 0, panicked: false })
+        Object.assign(risen, { ...(tiles[i] ?? { x: d.x, y: d.y }), hp: risen.stats.hp, armor: risen.stats.armor, burn: 0, chill: 0, panicked: false })
         battle.units.push(risen)
         events.push({ type: 'freed', id: unit.id, unit: { id: risen.id, x: risen.x, y: risen.y } })
       })
@@ -246,7 +244,7 @@ const ultimates = {
       unit.hp = Math.max(1, Math.ceil(unit.hp / 2))
       wreck(battle, unit, 2)
       strike(battle, caught, SUPERNOVA.damage, 'supernova', events)
-      for (const foe of caught) burn(battle, foe, BURN_TURNS)
+      for (const foe of caught) kindle(battle, foe, BURN_STACKS)
       return { radius: SUPERNOVA.radius }
     },
   },
@@ -256,7 +254,7 @@ const ultimates = {
       const caught = foes(battle, unit)
       for (const foe of caught) {
         foe.armor = 0
-        burn(battle, foe, ABLAZE.burn)
+        kindle(battle, foe, ABLAZE.burn)
         if (!onTile(battle.fire, foe)) battle.fire.push({ x: foe.x, y: foe.y, turns: FIRE_TURNS })
       }
       strike(battle, caught, ABLAZE.damage, 'worldAblaze', events)
@@ -314,7 +312,9 @@ const ultimates = {
 /** The hero's tier 4, if it has one unspent and now is its moment. It costs no attack. */
 export function ultimate(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
   for (const [effect, power] of Object.entries(ultimates) as [keyof typeof ultimates, Ultimate][]) {
-    if (!has(unit, effect) || unit.spent.includes(effect) || !power.when(battle, unit, seen)) continue
+    // Zenith Chronometer's battle, a tier 4 fires twice.
+    const uses = has(unit, 'zenith') ? 2 : 1
+    if (!has(unit, effect) || unit.spent.filter((e) => e === effect).length >= uses || !power.when(battle, unit, seen)) continue
     unit.spent.push(effect)
     const events: GameEvent[] = []
     const at = { x: unit.x, y: unit.y }
@@ -327,6 +327,6 @@ export function ultimate(battle: Battle, unit: Unit, seen: Set<number>): GameEve
 /** A blizzard's blow: each alien near its owner is chilled and hurt. */
 export function stormBlows(battle: Battle, unit: Unit, events: GameEvent[]): void {
   const caught = near(battle, unit, BLIZZARD.radius)
-  for (const foe of caught) if (!foe.resists.includes('frost')) foe.chilled = CHILL_TURNS
+  for (const foe of caught) chillUnit(battle, foe, 1, events)
   strike(battle, caught, BLIZZARD.damage, 'blizzard', events)
 }

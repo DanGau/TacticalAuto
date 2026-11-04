@@ -1,6 +1,7 @@
 // The player's actions, checked and applied to the run: the only way a player changes state.
 import { land } from './landing'
 import { fuelTanks } from './objects'
+import { BOON_CHARGES } from './relics'
 import { UTILITY_PRICE } from './utilities'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
 import { advance, current, go, nextStop, recruit, ways } from './run'
@@ -37,8 +38,8 @@ export type Action =
   | { type: 'go'; index: number }
   /** Overworld: travel to the next stop. */
   | { type: 'advance' }
-  /** Deploy phase: land with the utility held at `utility`, rigging the tank at `tank` of fuelTanks if it is one, and begin. */
-  | { type: 'enter'; utility?: number; tank?: number }
+  /** Deploy phase: land with the utility held at `utility`, and with the reservoir's charges another at `second`, rigging the tank at `tank` of fuelTanks if one is a tank, and begin. */
+  | { type: 'enter'; utility?: number; tank?: number; second?: number }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
   /** Reward phase: take the offered duo in place of a relic. */
@@ -77,8 +78,11 @@ export function apply(run: Run, action: Action): Result {
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not entering')
     const utility = action.utility === undefined ? null : run.utilities[action.utility]
     if (utility === undefined) return no('no such utility')
-    if (utility === 'tank' && !fuelTanks(battle)[action.tank ?? 0]) return no('no such tank')
-    land(battle, utility, action.tank)
+    const second = action.second === undefined ? null : run.utilities[action.second]
+    if (second === undefined || (second && (second === utility || run.boons < BOON_CHARGES))) return no('no second boon to take')
+    if ((utility === 'tank' || second === 'tank') && !fuelTanks(battle)[action.tank ?? 0]) return no('no such tank')
+    if (second) run.boons -= BOON_CHARGES
+    land(battle, utility, action.tank, second)
     return ok
   }
   if (action.type === 'keep') {
