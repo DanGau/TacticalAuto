@@ -38,9 +38,9 @@ function before(goal: Goal): Run {
   return run
 }
 
-test('every battle on the leg under way has its aliens mustered in advance; no stop but an extraction has any', () => {
+test('every challenge on the leg under way has its aliens mustered in advance; no stop but a challenge has any', () => {
   const run = begun(1)
-  for (const node of run.legs[0].columns.flat()) expect(node.stop!.aliens.length > 0).toBe(node.stop!.kind === 'battle' || node.stop!.kind === 'key')
+  for (const node of run.legs[0].columns.flat()) expect(node.stop!.aliens.length > 0).toBe(node.stop!.challenge !== null)
 })
 
 test('a hold sets its uplink within, its landing by it; once held, it is won only when the squad left reaches the extraction zone in the edge', () => {

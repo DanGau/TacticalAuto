@@ -252,6 +252,7 @@ export const PACKS: Pack[] = [
   { kinds: ['swarmling', 'swarmling', 'swarmling', 'swarmling'], cost: 2, from: 0 },
   { kinds: ['spitter', 'spitter', 'trooper'], cost: 3, from: 1 },
   { kinds: ['spitter', 'swarmling', 'swarmling'], cost: 2, from: 0 },
+  { kinds: ['trooper', 'swarmling', 'swarmling'], cost: 2, from: 0 },
   { kinds: ['burster', 'burster', 'swarmling', 'swarmling'], cost: 3, from: 2 },
   { kinds: ['brute', 'swarmling', 'swarmling'], cost: 3, from: 2 },
   { kinds: ['brute', 'spitter'], cost: 3, from: 3 },

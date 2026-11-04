@@ -12,6 +12,7 @@ import { EVENTS } from './events'
 import { odds } from './sight'
 import { FORTIFIED_SOAK } from './doctrines'
 import { HUB } from './world'
+import { OPENING } from './progress'
 import {
   createRun,
   DROP_SUPPLIES,
@@ -492,7 +493,7 @@ test('alien force follows the leg; an alien\'s health never grows, but deeper al
   expect(missionAt(late, 'battle', 'standard').force).toBe(TUNING.legForce[2])
   apply(late, { type: 'advance' })
   const troopers = (units: typeof early) => units.filter((u) => u.kind === 'trooper' && !u.boss && !u.target)
-  for (const alien of late.battle!.units.filter((u) => u.side === 'alien' && !u.target)) expect(alien.stats.armor).toBe(4)
+  for (const trooper of troopers(late.battle!.units)) expect(trooper.stats.armor).toBe(4)
   for (const trooper of troopers(late.battle!.units)) expect(trooper.stats.hp).toBe(Math.round(BASE_STATS.hp * TUNING.alienHp))
   for (const trooper of troopers(early)) expect(trooper.stats.hp).toBe(Math.round(BASE_STATS.hp * TUNING.alienHp))
 })
@@ -766,4 +767,14 @@ test('heroes start with every weapon between them, melee among them, those on th
     for (const stage of run.route) if (stage.hero) kinds.add(stage.hero.gear!.weapon)
   }
   expect([...kinds].sort()).toEqual(Object.keys(WEAPONS).sort())
+})
+
+test('the first leg opens with OPENING battles and meets no challenge before its satellite', () => {
+  for (let seed = 1; seed <= 40; seed++) {
+    const run = createRun(seed)
+    apply(run, { type: 'recruit', index: 0 })
+    const columns = legOf(run).columns.slice(0, LEG_STOPS)
+    for (const column of columns.slice(0, OPENING)) for (const node of column) expect(node.stop!.kind).toBe('battle')
+    for (const column of columns) for (const node of column) expect(node.stop!.challenge).toBeNull()
+  }
 })

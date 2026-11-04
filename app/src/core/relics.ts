@@ -1,5 +1,6 @@
 // Relics: what each does, and which may be offered.
 import { type RelicEffect, type Stats } from './battle'
+import { MOMENTUM_MAX } from './attack'
 import { CHARGE_BLAST, CHARGE_REACH, ENCORE_REACH } from './landing'
 import { BEACON_REACH } from './fighters'
 import { BOUNTY_DAMAGE } from './fighters'
@@ -53,7 +54,7 @@ const relics = {
   thermal: { name: 'Thermal Shock Core', text: `Hits on a target both burning and chilled do +${TUNING.thermalDamage} damage`, tags: ['burn', 'frost'], effect: 'thermal' },
   spotter: { name: 'Spotter Network', text: '+1 damage against a marked target', tags: ['mark'], effect: 'spotter' },
   hunt: { name: 'Eye of the Hunt', text: 'Crits mark the target', tags: ['crit', 'mark'], effect: 'exploit' },
-  bloodforged: { name: 'Bloodforged Plate', text: 'A kill gives the hero 1 armor', tags: ['kill', 'ward'], effect: 'momentum' },
+  bloodforged: { name: 'Bloodforged Plate', text: `A kill gives the hero 1 armor, up to ${MOMENTUM_MAX}`, tags: ['kill', 'ward'], effect: 'momentum' },
   rite: { name: 'Blood Rite', text: 'Each kill gives the hero +1 damage for the rest of the battle', tags: ['kill'], effect: 'bloodRite' },
   conductor: { name: 'Cryo Conductor', text: 'Chilling a marked target chills every alien beside it', tags: ['frost', 'mark'], effect: 'conductor' },
   kindling: { name: 'Kindling Plates', text: 'Whoever hits a hero who has armor left is set burning', tags: ['ward', 'burn'], effect: 'kindling' },

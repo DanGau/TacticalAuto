@@ -17,8 +17,10 @@ import { forksOf, type Fork } from './forks'
 /** Whether a party met a challenge with an answer it picked, with one it held and left behind, or with none. */
 export type Answer = 'picked' | 'held' | 'none'
 
-/** A battle's toll: the leg it was on, the squad's most health, its health at the start and end, soldiers downed, whether it was won, and what it tested. */
+/** A battle's toll: which of the run it was, the leg it was on, the squad's most health, its health at the start and end, soldiers downed, whether it was won, and what it tested. */
 export interface Toll {
+  /** Which battle of the run it was, from 1. */
+  nth: number
   leg: number
   party: number
   won: boolean
@@ -97,7 +99,7 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
         const fought = run.report!.soldiers
-        result.tolls.push({ leg: begun[1], party: fought.length, won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3]), most: fought.reduce((sum, s) => sum + s.maxHp, 0), before: begun[2], after: fought.reduce((sum, s) => sum + s.hp, 0), downed: battle!.downed.length })
+        result.tolls.push({ nth: result.battles, leg: begun[1], party: fought.length, won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3]), most: fought.reduce((sum, s) => sum + s.maxHp, 0), before: begun[2], after: fought.reduce((sum, s) => sum + s.hp, 0), downed: battle!.downed.length })
         clock = { next: 0, done: 0 }
       }
       continue

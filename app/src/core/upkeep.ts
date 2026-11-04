@@ -94,7 +94,7 @@ export function upkeep(battle: Battle): GameEvent[] {
   }
   rally(battle)
   if (battle.round === SMOKE.rounds) clearSmoke(battle)
-  // Waves come in a pack at a time, at one of the encounter's two gates nearest the squad yet clear of it; a hold's without end.
+  // Waves come in a pack at a time, at one of the encounter's two gates nearest the squad yet clear of it; a hold's without end until it is held.
   const soldiers = battle.units.filter(isSoldier)
   if (battle.waves.length > 0 && soldiers.length > 0 && (battle.deadline === null ? battle.challenge === 'swarm' || battle.round % WAVE_EVERY === 0 : battle.round >= battle.deadline)) {
     const from = centreOf(soldiers)
@@ -102,7 +102,7 @@ export function upkeep(battle: Battle): GameEvent[] {
     const near = [...clear].sort((a, b) => distance(a, from) - distance(b, from)).slice(0, 2)
     const centre = openNear(battle, near[randomInt(battle, near.length)] ?? battle.gates.reduce((a, b) => (distance(b, from) > distance(a, from) ? b : a)))
     const wave = battle.waves.shift()!
-    if (battle.goal === 'hold') battle.waves.push(wave)
+    if (battle.goal === 'hold' && !battle.extract) battle.waves.push(wave)
     // It comes in unseen but in the fight, and shows once the squad sights it.
     const units = freeTilesNear(battle, centre, wave.length).map((tile, i) => placeAlien(battle, wave[i], tile, true, false))
     events.push({ type: 'wave', units: units.map(({ id, x, y }) => ({ id, x, y })) })

@@ -3,14 +3,7 @@ import { type Battle, type Unit, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE,
 import { cloakOn } from './abilities'
 import { duoCrit, duoDamage, duoHit } from './duo-effects'
 import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './keystones'
-import { freeTilesNear } from './grid'
-import { blocked } from './grid'
-import { walkingDistances } from './grid'
-import { crumble } from './grid'
-import { wreck } from './grid'
-import { onGrid } from './grid'
-import { NEIGHBORS } from './grid'
-import { distance } from './grid'
+import { freeTilesNear, blocked, walkingDistances, crumble, wreck, onGrid, NEIGHBORS, distance } from './grid'
 import { PARRY_SOAK } from './doctrines'
 import { FRAG_SPLASH, KNOCK_TILES, type Secondary } from './secondaries'
 import type { GameEvent } from './combat-event'
@@ -72,6 +65,9 @@ export const ARC_LEAPS = 2
 
 /** Damage a volatile kill bursts for, and a thundering hit slams a target into what stops it for. */
 export const VOLATILE_DAMAGE = 2
+
+/** The most armor Bloodforged Plate's kills add over a hero's own. */
+export const MOMENTUM_MAX = 5
 
 /**
  * A shot, which always lands, at the enemy the unit can shoot and hurt most, a civilian counting PREY_WORTH; the nearest, then the lowest id, wins a tie.
@@ -284,7 +280,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (enemy.hp <= 0 && unseen && when(true, 'afterimage', 1)) events.push(cloakOn(unit))
   if (enemy.hp > 0 && enemy.hp <= enemy.stats.hp / 2 && spend(enemy, 'blink')) blink(battle, enemy, events)
   if (enemy.hp > 0 && enemy.hp <= enemy.stats.hp / 2 && !enemy.cloaked && spend(enemy, 'vanish')) events.push(cloakOn(enemy))
-  if (enemy.hp <= 0 && when(true, 'momentum', 1)) unit.armor++
+  if (enemy.hp <= 0 && unit.armor < unit.stats.armor + MOMENTUM_MAX && when(true, 'momentum', 1)) unit.armor++
   if (enemy.hp <= 0 && when(true, 'bloodRite', 1)) unit.fury++
   if (enemy.hp > 0 && when(true, 'suppress', 1)) enemy.suppressed = 2
   if (enemy.hp > 0 && crit && has(unit, 'concussion')) {

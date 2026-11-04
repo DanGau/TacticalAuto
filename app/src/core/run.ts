@@ -14,7 +14,7 @@ import { random, randomInt } from './rng'
 import { TOWNS } from './towns'
 import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
-import { LEG_STOPS, STOP_THREAT, THREAT_MAX } from './progress'
+import { LEG_STOPS, OPENING, STOP_THREAT, THREAT_MAX } from './progress'
 import { abilityOf, charges, draft, health, join, MAX_SQUAD, offerRecruits, soldierStats, weaponOf, xpFor } from './squad'
 import { dropGear, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
@@ -282,7 +282,7 @@ function drawShape(run: Run): MapNode[][] {
   return [...nodes, [{ row: Math.floor(MAP_ROWS / 2), next: [], stop: null, town: null, at: null }]]
 }
 
-/** Fills the stops of the leg under way: its first column battles, the rest drawn at random, each battle mustered for where it stands. */
+/** Fills the stops of the leg under way: its first column battles, the first leg's first OPENING, the rest drawn at random, each battle mustered for where it stands. */
 export function drawStops(run: Run): void {
   const leg = run.legs[run.keys]
   if (run.keys === KEYS) {
@@ -296,7 +296,7 @@ export function drawStops(run: Run): void {
     const taken: ChallengeId[] = []
     for (const node of column) {
       let roll = random(run)
-      const kind = c === 0 ? undefined : (Object.keys(STOP_CHANCE) as (keyof typeof STOP_CHANCE)[]).find((k) => (roll -= STOP_CHANCE[k]) < 0)
+      const kind = c < (run.keys === 0 ? OPENING : 1) ? undefined : (Object.keys(STOP_CHANCE) as (keyof typeof STOP_CHANCE)[]).find((k) => (roll -= STOP_CHANCE[k]) < 0)
       node.stop = c === LEG_STOPS ? { ...fixed('key', 'compound'), ...placed(run, 'compound'), challenge: 'bigOne', aliens: forceOf('bigOne', party, 2, 0), city: run.route[run.keys].to.name } : kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], { ...run, stop: c }, taken)
       if (node.stop.challenge) taken.push(node.stop.challenge)
       // A stop is named for the town it is at.

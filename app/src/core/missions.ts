@@ -110,14 +110,15 @@ export function placed(run: Run, kind: TerrainKind): { region: RegionId; city: s
   return { region, city: cities[randomInt(run, cities.length)] }
 }
 
-/** A battle of `risk` with a goal and place drawn at random, its aliens mustered for the squad as it will be at `when`. */
+/** A battle of `risk` with a goal and place drawn at random, and from the second leg a challenge, its aliens mustered for the squad as it will be at `when`. */
 export function drawBattle(run: Run, risk: Risk, when: Run = run, taken: ChallengeId[] = []): Stop {
   const goal = drawGoal(run, when)
   const party = Math.max(1, run.soldiers.length)
   const rung = rungOf(when.stop)
-  const challenge = drawChallenge(run, party, rung, goal, taken)
+  // The first leg is normal fights, so the squad builds a kit before its first test.
+  const challenge = when.keys === 0 ? null : drawChallenge(run, party, rung, goal, taken)
   // Each battle's force varies a little either way, so two battles of one risk are not the same fight.
-  const aliens = forceOf(challenge, party, rung, RISKS[risk].aliens + GOALS[goal].force + randomInt(run, 3) - 1)
+  const aliens = challenge ? forceOf(challenge, party, rung, RISKS[risk].aliens + GOALS[goal].force + randomInt(run, 3) - 1) : []
   const terrain = ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)]
   return { kind: 'battle', risk, goal, terrain, challenge, twist: drawTwist(run, when.keys), aliens, ...placed(run, terrain) }
 }

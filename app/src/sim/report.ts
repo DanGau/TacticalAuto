@@ -157,6 +157,22 @@ export function verdicts(of: Row[]): string[] {
   return found
 }
 
+/** Battles 1 to `upTo` by their place in the run, as `nth won% lost% of n`, and what each met. */
+export function byBattle(results: RunResult[], upTo = 10): string {
+  const tolls = results.flatMap((r) => r.tolls)
+  return Array.from({ length: upTo }, (_, i) => {
+    const of = tolls.filter((t) => t.nth === i + 1)
+    if (of.length === 0) return ''
+    const won = Math.round((100 * of.filter((t) => t.won).length) / of.length)
+    const lost = Math.round((100 * of.reduce((sum, t) => sum + (t.before - t.after) / t.most, 0)) / of.length)
+    const met = [...new Set(of.map((t) => t.challenge))].map((c) => {
+      const each = of.filter((t) => t.challenge === c)
+      return `${c ?? 'normal'} ${each.length} (${Math.round((100 * each.filter((t) => t.won).length) / each.length)}%)`
+    }).join(', ')
+    return `${String(i + 1).padStart(2)}  won ${won}%  lost ${lost}%  of ${of.length}: ${met}`
+  }).filter(Boolean).join('\n')
+}
+
 /** Battle wins by goal, as `name won% of n`. */
 export function byGoal(results: RunResult[]): string {
   const tolls = results.flatMap((r) => r.tolls)
@@ -175,3 +191,5 @@ export function formatDiagnosis(bot: string, of: Row[]): string {
 
 /** Wins the strategic bot must reach for `npm run check` to pass: that good choices can win runs, not a target for balance. */
 export const STRATEGIC_FLOOR = 0.15
+/** Of the first leg's opening battles, the share it must win: they pace the run, not test it. */
+export const OPENING_FLOOR = 0.95
