@@ -9,7 +9,7 @@ import { axes, DECAL_LIFT, picture, spot } from './camera'
 import { drawAcid } from './marks'
 import { ALIEN_LOOK, COLOR } from './palette'
 import { css } from './shapes'
-import { badges, type Badge } from './badges'
+import { BADGE_UP, badgeBoard, badges, type Badge } from './badges'
 import { ACROSS } from './space'
 import type { Sprite, Stage } from './stage'
 
@@ -32,6 +32,7 @@ const GIANT = 2.2
 /** Makes a sprite a giant's size. */
 export function grow(sprite: Sprite): void {
   sprite.scale = GIANT
+  sprite.marks.board.position.y = (BADGE_UP * GIANT) / ACROSS
   sprite.shadow.scale.setScalar(GIANT)
   squash(sprite, 1, 1)
 }
@@ -87,9 +88,7 @@ export const vitals = (battle: Battle, id: number): [number, number, number, Bad
   return [unit?.hp ?? 0, unit?.armor ?? 0, unit?.temp ?? 0, unit ? badges(unit) : []]
 }
 
-/** A badge pill's height and the gap between pills; a row holds as many as fit across the picture. */
-const PILL = 11
-const PILL_GAP = 2
+
 
 /**
  * `pips` marks a soldier's level above its health; `letter` is the initial of its class. Its health and armor show as
@@ -117,6 +116,8 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
   const rows = Math.ceil((unit.stats.hp + unit.stats.armor) / 10)
   const maxHp = unit.stats.hp
   const ally = unit.side === 'human'
+  const marks = badgeBoard()
+  node.add(marks.board)
   const sprite: Sprite = {
     node,
     body,
@@ -127,7 +128,8 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
     scale: unit.giant ? GIANT : unit.boss ? 1.6 : unit.target ? 1.3 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1,
     ally,
     cloaked: false,
-    drawHp(hp, armor, temp = 0, marks = []) {
+    marks,
+    drawHp(hp, armor, temp = 0, badges = []) {
       g.setTransform(BODY_RES, 0, 0, BODY_RES, BODY.left * BODY_RES, BODY.up * BODY_RES)
       g.clearRect(-BODY.left, -BODY.up, 2 * BODY.left, BODY.up + BODY.down)
       g.fillStyle = css(color)
@@ -163,38 +165,12 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
         g.fillStyle = css(c)
         g.fillRect(-PIP_ROW / 2 + (i % 10) * PIP_STEP, -38 - Math.floor(i / 10) * PIP_STEP, PIP, PIP)
       })
-      // Badges in rows above the pips, centred, as many to a row as fit.
-      g.font = 'bold 9px sans-serif'
-      g.textAlign = 'center'
-      g.textBaseline = 'middle'
-      const widths = marks.map((m) => Math.ceil(g.measureText(m.text).width) + 5)
-      const rowsOf: number[][] = []
-      widths.forEach((w, i) => {
-        const row = rowsOf.at(-1)
-        if (row && row.reduce((sum, j) => sum + widths[j] + PILL_GAP, w) <= 2 * BODY.left) row.push(i)
-        else rowsOf.push([i])
-      })
-      const top = -44 - rows * PIP_STEP - (pips > 0 ? 6 : 0)
-      rowsOf.forEach((row, r) => {
-        let x = -(row.reduce((sum, j) => sum + widths[j], 0) + PILL_GAP * (row.length - 1)) / 2
-        const y = top - (r + 1) * (PILL + PILL_GAP)
-        for (const j of row) {
-          g.fillStyle = 'rgba(16, 20, 28, 0.85)'
-          g.beginPath()
-          g.roundRect(x, y, widths[j], PILL, 4)
-          g.fill()
-          g.strokeStyle = css(marks[j].color)
-          g.lineWidth = 1.2
-          g.stroke()
-          g.fillStyle = css(marks[j].color)
-          g.fillText(marks[j].text, x + widths[j] / 2, y + PILL / 2 + 0.5)
-          x += widths[j] + PILL_GAP
-        }
-      })
+      marks.redraw(badges)
       texture.needsUpdate = true
     },
   }
   node.scale.setScalar(1)
+  marks.board.position.y = (BADGE_UP * sprite.scale) / ACROSS
   shadow.scale.setScalar(sprite.scale)
   squash(sprite, 1, 1)
   s.units.add(node)
@@ -209,6 +185,7 @@ export function remove(s: Stage, id: number): void {
   if (!sprite) return
   s.units.remove(sprite.node)
   ;(sprite.body.material as SpriteMaterial).map?.dispose()
+  sprite.marks.dispose()
   s.sprites.delete(id)
 }
 

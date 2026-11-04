@@ -8,7 +8,7 @@ import { COLOR, NIGHT } from './palette'
 import { css, Sketch, type Point3 } from './shapes'
 import { ACROSS } from './space'
 import { shimmer } from './sprites'
-import type { Badge } from './badges'
+import type { Badge, BadgeBoard } from './badges'
 
 export interface Sprite {
   /** The unit's feet, with its shadow; its picture stands on them, facing the camera. */
@@ -17,6 +17,8 @@ export interface Sprite {
   /** The picture again, faint, where terrain in front of the unit hides it. */
   ghost: Billboard
   shadow: Mesh
+  /** Its badges over its head, the same size on any screen. */
+  marks: BadgeBoard
   /** Redraws the picture with the given health, armor and temp HP. */
   drawHp(hp: number, armor: number, temp?: number, badges?: Badge[]): void
   /** The tile the sprite stands on, which lags the battle while a beat animates. */
@@ -137,7 +139,10 @@ export class Stage {
       const ms = now - last
       last = now
       for (const tick of [...this.ticks]) tick(ms)
-      for (const sprite of this.sprites.values()) if (sprite.cloaked) shimmer(sprite, now)
+      for (const sprite of this.sprites.values()) {
+        if (sprite.cloaked) shimmer(sprite, now)
+        sprite.marks.fit(this.eye.fov)
+      }
       for (const f of this.standing.values()) {
         f.time.value = now / 1000
         f.rise.value = Math.min(1, f.rise.value + ms / RISE_MS)
