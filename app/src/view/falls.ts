@@ -5,17 +5,22 @@ import type { GameEvent } from '../core/combat-event'
 import { distance } from '../core/grid'
 import { PACE } from '../core/pace'
 import { drawTerrain } from './board'
-import { spot } from './camera'
-import { callout, float, shake } from './effects'
+import { ballistic } from './ballistic'
+import { picture, spot } from './camera'
+import { callout, drawing, float, shake } from './effects'
 import { crouch, dust, land } from './leaps'
 import { drawFog } from './marks'
 import { COLOR } from './palette'
 import { fade, place, remove, vitals } from './sprites'
+import type { Point3 } from './shapes'
 import { LEVEL, tall } from './space'
-import { CAMERA_MS, type Stage } from './stage'
+import { CAMERA_MS, type Sprite, type Stage } from './stage'
 
-/** How far a unit over the edge is seen to fall before it is gone, in screen pixels seen from the still camera. */
-const LONG_FALL = 420
+/** How far below the lip a unit lost over the edge falls before it is gone in a burst, in levels. */
+const SINK = 7
+
+/** How long the burst of a unit lost over the edge lasts. */
+const KO_MS = 420
 
 /** How high a throw arcs, in levels. */
 const ARC = 3
@@ -28,18 +33,16 @@ export async function playFall(s: Stage, battle: Battle, e: Extract<GameEvent, {
   const over = e.drop === 'edge'
   const lost = over && !!e.fatal
   const b = over ? { ...spot(e.to.x, e.to.y), y: a.y } : spot(e.to.x, e.to.y)
-  const sink = lost ? tall(LONG_FALL) : 0
-  float(s, callout(s, over ? 'OVER THE EDGE' : 'FALL', COLOR.crit, sprite, 15))
   // The camera takes in the fall with the squad, so a fall at the edge of the frame is not missed.
   void s.follow([...battle.units.filter((u) => u.side === 'human' && !u.civilian), e.to], CAMERA_MS)
+  if (lost) return fallOff(s, e.id, sprite, ballistic(a, b, LEVEL * 0.6, LEVEL * SINK, PACE.fall / 2))
+  float(s, callout(s, over ? 'OVER THE EDGE' : 'FALL', COLOR.crit, sprite, 15))
   await s.tween(PACE.fall, (t) => {
     // Out over the lip, then down as if dropped.
     const out = Math.min(1, t * 2)
     const down = t * t
-    sprite.node.position.set(a.x + (b.x - a.x) * out, a.y + (b.y - a.y) * down - sink * down + LEVEL * 0.6 * Math.sin(Math.PI * Math.min(1, t * 1.6)), a.z + (b.z - a.z) * out)
-    if (lost) fade(sprite, 1 - down)
+    sprite.node.position.set(a.x + (b.x - a.x) * out, a.y + (b.y - a.y) * down + LEVEL * 0.6 * Math.sin(Math.PI * Math.min(1, t * 1.6)), a.z + (b.z - a.z) * out)
   })
-  if (lost) return remove(s, e.id)
   // One that catches the edge climbs back up where it was.
   place(s, sprite, over ? sprite.tile : e.to)
   void shake(s, 4 + Math.min(6, 2 * (typeof e.drop === 'number' ? e.drop : 3)))
@@ -50,6 +53,38 @@ export async function playFall(s: Stage, battle: Battle, e: Extract<GameEvent, {
     under.drawHp(...vitals(battle, e.onto!))
     float(s, callout(s, `LANDED ON -${e.damage}`, COLOR.crit, under))
   }
+}
+
+/** A unit lost over the edge flies `flight` in one arc, fading as it drops out of sight, and is gone in a burst. `frame` runs alongside each moment. */
+async function fallOff(s: Stage, id: number, sprite: Sprite, flight: ReturnType<typeof ballistic>, frame: (time: number) => void = () => {}): Promise<void> {
+  await s.tween(flight.ms, (t) => {
+    const p = flight.at(t * flight.ms)
+    sprite.node.position.set(p.x, p.y, p.z)
+    fade(sprite, Math.min(1, 4 * (1 - t)))
+    frame(t * flight.ms)
+  })
+  remove(s, id)
+  await knockedOut(s, flight.at(flight.ms), sprite.ally ? COLOR.allyHp : COLOR.crit)
+}
+
+/** The burst where a unit lost over the edge goes: a flash, a ring and streaks thrown back up, and a short jolt. */
+function knockedOut(s: Stage, at: Point3, color: number): Promise<void> {
+  const c = picture(at, s.camera.yaw)
+  void shake(s, 5, 180)
+  return drawing(s, (fx) =>
+    s.tween(KO_MS, (t) => {
+      fx.clear()
+      const out = 1 - (1 - t) ** 3
+      if (t < 0.3) fx.circle(c.x, c.y, 16 * (1 - t / 0.3) + 4).fill({ color: 0xffffff, alpha: 0.9 })
+      fx.circle(c.x, c.y, 8 + 44 * out).stroke({ color, width: 5 * (1 - t) + 1, alpha: 1 - t })
+      for (let i = 0; i < 7; i++) {
+        const angle = -Math.PI / 2 + (i - 3) * 0.32
+        const [cos, sin] = [Math.cos(angle), Math.sin(angle)]
+        const [near, far] = [14 + 50 * out, 30 + 90 * out]
+        fx.moveTo(c.x + cos * near, c.y + sin * near).lineTo(c.x + cos * far, c.y + sin * far).stroke({ color: i % 2 ? 0xffffff : color, width: 3 * (1 - t) + 0.5, alpha: 1 - t })
+      }
+    }),
+  )
 }
 
 /** What each thrown object looks like in the air: its size in tiles, its colour, and how hard it shakes the camera landing. */
@@ -69,14 +104,14 @@ const OVERHEAD = 1.6
  * A hero throws an object or an alien: crouches and lifts it overhead, holds it a beat, lets fly in an arc that takes
  * longer the farther it goes, and it lands with a jolt by its weight in a ring of dust; each alien it strikes shows its damage.
  */
-export async function playThrow(s: Stage, battle: Battle, e: Extract<GameEvent, { type: 'throw' }>): Promise<void> {
+export async function playThrow(s: Stage, battle: Battle, e: Extract<GameEvent, { type: 'throw' }>, off?: Extract<GameEvent, { type: 'fall' }>): Promise<void> {
   const thrower = s.sprites.get(e.id)
   const a = spot(e.from.x, e.from.y)
   const b = spot(e.to.x, e.to.y)
   const feet = thrower ? spot(thrower.tile.x, thrower.tile.y) : a
   const top = { x: feet.x, y: feet.y + LEVEL * OVERHEAD, z: feet.z }
   const held = e.thrown !== undefined ? s.sprites.get(e.thrown) : undefined
-  void s.follow([...battle.units.filter((u) => u.side === 'human' && !u.civilian), e.from, e.to], CAMERA_MS)
+  void s.follow([...battle.units.filter((u) => u.side === 'human' && !u.civilian), e.from, off?.to ?? e.to], CAMERA_MS)
   if (thrower) float(s, callout(s, e.object === 'alien' ? 'THROW' : `THROWS A ${e.object === 'wreck' ? 'WRECK' : e.object.toUpperCase()}`, 0xffffff, thrower, 15))
   const look = e.object === 'alien' ? undefined : (THROWN[e.object] ?? CRATE)
   let mesh: Mesh | null = null
@@ -103,8 +138,13 @@ export async function playThrow(s: Stage, battle: Battle, e: Extract<GameEvent, 
     put(top.x, top.y + LEVEL * 0.15 * Math.sin((Math.PI / 2) * t), top.z, 0)
     if (thrower) crouch(thrower, -0.6 * Math.sin((Math.PI / 2) * t))
   })
-  const tiles = distance(e.from, e.to)
+  const tiles = distance(e.from, off?.to ?? e.to)
   const arc = LEVEL * (ARC + tiles * 0.3)
+  if (held && off) {
+    // Thrown over the edge, it flies on past the lip in the one arc.
+    const flight = ballistic(top, { ...spot(off.to.x, off.to.y), y: b.y }, arc, LEVEL * SINK, PACE.flight + PACE.flightTile * tiles)
+    return fallOff(s, off.id, held, flight, (time) => thrower && crouch(thrower, -0.6 * Math.max(0, 1 - time / PACE.flight)))
+  }
   await s.tween(PACE.flight + PACE.flightTile * tiles, (t) => {
     if (thrower) crouch(thrower, -0.6 * (1 - t))
     put(top.x + (b.x - top.x) * t, top.y + (b.y - top.y) * t + arc * 4 * t * (1 - t), top.z + (b.z - top.z) * t, t)

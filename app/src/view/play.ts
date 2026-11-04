@@ -143,7 +143,11 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
     } else if (e.type === 'fall') {
       await playFall(s, battle, e)
     } else if (e.type === 'throw') {
-      await playThrow(s, battle, e)
+      // An alien thrown over the edge and lost flies on in the one arc.
+      const next = events[i + 1]
+      const off = next?.type === 'fall' && next.id === e.thrown && next.fatal ? next : undefined
+      if (off) i++
+      await playThrow(s, battle, e, off)
     } else if (e.type === 'ultimate') {
       await playUltimate(s, battle, e)
     } else if (e.type === 'duo') {
