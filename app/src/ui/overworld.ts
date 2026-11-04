@@ -149,7 +149,8 @@ function travelLabel(run: Run, stop: Stop, next: 'battle' | 'key' | 'final'): st
 
 /** What a stop tests, and which utility held answers it, or that none does. */
 function readChallenge(run: Run, stop: Stop): string {
-  const challenge = CHALLENGES[stop.challenge!]
+  if (!stop.challenge) return ''
+  const challenge = CHALLENGES[stop.challenge]
   const held = challenge.answers.filter((id) => run.utilities.includes(id))
   return `${challenge.icon} <b>${challenge.name}.</b> ${challenge.test}. <small class="${held.length > 0 ? 'down' : 'up'}">${held.length > 0 ? `Held: ${held.map((id) => UTILITIES[id].name).join(', ')}` : 'No answer held'}</small>`
 }

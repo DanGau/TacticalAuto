@@ -11,7 +11,9 @@ import { GEAR_PRICE } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
 import { SKILLS, TREES, type SkillId } from '../core/skills'
-import { health, MAX_SQUAD, skillOffers, soldierStats } from '../core/squad'
+import { health, MAX_SQUAD, skillOffers, soldierStats, squadKeywords } from '../core/squad'
+import { BOON_CHARGES, RELICS, type RelicId } from '../core/relics'
+import type { Keyword } from '../core/keywords'
 import { RIG, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from '../core/utilities'
 import { WEAPONS, type WeaponId } from '../core/weapons'
 import type { Bot } from './bots'
@@ -36,10 +38,20 @@ export function tankFor(run: Run): number {
   return tanks.reduce((best, t, i) => (rank(t) > rank(tanks[best]) ? i : best), 0)
 }
 
+/**
+ * Goes in with the best answer held. With Boon Reservoir, an easy fight goes in bare to charge it, and a charged
+ * reservoir takes the next best answer in too where the fight is a test.
+ */
 function deploy(run: Run): Action {
-  const index = answerFor(run, run.battle!.challenge)
+  const battle = run.battle!
+  const reservoir = run.relics.includes('reservoir')
+  const easy = !battle.challenge && run.mission?.kind === 'battle' && run.mission.risk === 'safe'
+  if (reservoir && easy) return { type: 'enter' }
+  const index = answerFor(run, battle.challenge)
   if (index < 0) return { type: 'enter' }
-  return run.utilities[index] === 'tank' ? { type: 'enter', utility: index, tank: tankFor(run) } : { type: 'enter', utility: index }
+  if (run.utilities[index] === 'tank') return { type: 'enter', utility: index, tank: tankFor(run) }
+  const second = reservoir && run.boons >= BOON_CHARGES && battle.challenge ? answerFor({ ...run, utilities: run.utilities.map((id, i) => (i === index ? 'tank' : id)) }, battle.challenge) : -1
+  return second >= 0 && run.utilities[second] !== 'tank' ? { type: 'enter', utility: index, second } : { type: 'enter', utility: index }
 }
 
 /** The stops reachable in the next few columns, nearest first. */
@@ -121,7 +133,7 @@ const RARITY = { common: 0, rare: 2, epic: 4 }
 /** What a weapon is worth now: its rarity, and what it covers that no utility does. */
 function gearWorth(run: Run, gear: Gear | null, soldier: Soldier): number {
   if (!gear) return -1
-  const own = soldier.skills.flatMap((id) => SKILLS[id].tags ?? [])
+  const own = [...soldier.skills.flatMap((id) => SKILLS[id].tags ?? []), ...run.relics.flatMap((id) => RELICS[id].tags ?? [])]
   const shared = gear.effect ? (EFFECTS[gear.effect].tags ?? []).filter((tag) => own.includes(tag)).length : 0
   // A weapon against its class's way fights badly.
   const clash = WEAPONS[gear.weapon]?.stance && soldier.cls && WEAPONS[gear.weapon].stance !== CLASSES[soldier.cls].stance ? 1.5 : 0
@@ -166,23 +178,46 @@ const PLANS: Record<ClassId, { branch: string; opener?: SkillId }> = {
   phantom: { branch: 'Shade' },
 }
 
-/** The skill a hero plans on: its opener, then up its class's planned branch, highest tier open first; that branch done, up the next. */
+/** Whether a skill pays for this hero: Shield Slam only with a Star Shield, Fault Line only up close, Living Projectile only for the strong. */
+const pays = (soldier: Soldier, id: SkillId) =>
+  id === 'shieldSlam' ? soldier.gear?.weapon === 'shield' : id === 'faultLine' ? !!soldier.gear && !!WEAPONS[soldier.gear.weapon].melee : id === 'projectile' ? (soldier.gear?.weapon === 'hammer' || soldier.gear?.weapon === 'fists') : true
+
+/** The skill a hero plans on: its opener, then up its class's planned branch, highest tier open first, one that pays; that branch done, up the next. */
 export function plannedSkill(soldier: Soldier): number {
-  const offers = skillOffers(soldier)
+  const offers = skillOffers(soldier).filter((id, _, all) => pays(soldier, id) || all.every((other) => !pays(soldier, other)))
+  const all = skillOffers(soldier)
   const branches = TREES[soldier.cls!]
   const { branch, opener } = PLANS[soldier.cls!]
-  if (opener && offers.includes(opener)) return offers.indexOf(opener)
+  if (opener && offers.includes(opener)) return all.indexOf(opener)
   for (const { tiers } of [...branches.filter((b) => b.name === branch), ...branches]) {
     const open = tiers.flat().filter((id) => offers.includes(id))
-    if (open.length > 0) return offers.indexOf(open.at(-1)!)
+    if (open.length > 0) return all.indexOf(open.at(-1)!)
   }
   return 0
+}
+
+/** What a relic is worth beside what the squad holds: a bridge or engine pays only with its pieces, and is dead without them. */
+function relicWorth(run: Run, id: RelicId): number {
+  const held = squadKeywords(run)
+  const has = (...tags: Keyword[]) => tags.every((tag) => held.includes(tag))
+  const needs: Partial<Record<RelicId, boolean>> = {
+    catalyst: has('crit') && (has('burn') || has('frost')),
+    fracture: has('frost'),
+    embers: has('mark', 'burn'),
+    impetus: has('force'),
+    accelerant: has('burn'),
+  }
+  const fit = needs[id]
+  return fit === undefined ? 0 : fit ? 2 : -2
 }
 
 /** Takes a duo offered, else the first relic, on the same seeds better than choosing by shared keywords; and the skill its hero plans on. */
 function reward(run: Run): Action {
   if (run.duoOffer) return { type: 'duo' }
-  if (run.relicOffers.length > 0) return { type: 'relic', index: 0 }
+  if (run.relicOffers.length > 0) {
+    const score = (id: RelicId, i: number) => relicWorth(run, id) + (i === 0 ? 1 : 0)
+    return { type: 'relic', index: run.relicOffers.reduce((best, id, i) => (score(id, i) > score(run.relicOffers[best], best) ? i : best), 0) }
+  }
   if (run.finds.length > 0) {
     const holder = holderFor(run, run.finds[0])
     return holder === null ? { type: 'sell', find: 0 } : { type: 'equip', find: 0, soldier: holder }
