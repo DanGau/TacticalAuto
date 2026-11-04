@@ -6,8 +6,9 @@ import { distance } from '../core/grid'
 import { PACE } from '../core/pace'
 import { drawTerrain } from './board'
 import { ballistic } from './ballistic'
-import { picture, spot } from './camera'
-import { callout, drawing, float, shake } from './effects'
+import { spot } from './camera'
+import { callout, float, shake } from './effects'
+import { burst, KO_MS, scrap } from './ko'
 import { crouch, dust, land } from './leaps'
 import { drawFog } from './marks'
 import { COLOR } from './palette'
@@ -18,9 +19,6 @@ import { CAMERA_MS, type Sprite, type Stage } from './stage'
 
 /** How far below the lip a unit lost over the edge falls before it is gone in a burst, in levels. */
 const SINK = 7
-
-/** How long the burst of a unit lost over the edge lasts. */
-const KO_MS = 420
 
 /** How high a throw arcs, in levels. */
 const ARC = 3
@@ -67,24 +65,12 @@ async function fallOff(s: Stage, id: number, sprite: Sprite, flight: ReturnType<
   await knockedOut(s, flight.at(flight.ms), sprite.ally ? COLOR.allyHp : COLOR.crit)
 }
 
-/** The burst where a unit lost over the edge goes: a flash, a ring and streaks thrown back up, and a short jolt. */
+/** The burst where a unit lost over the edge goes, in the world below the lip, and a slight jolt. */
 function knockedOut(s: Stage, at: Point3, color: number): Promise<void> {
-  const c = picture(at, s.camera.yaw)
-  void shake(s, 5, 180)
-  return drawing(s, (fx) =>
-    s.tween(KO_MS, (t) => {
-      fx.clear()
-      const out = 1 - (1 - t) ** 3
-      if (t < 0.3) fx.circle(c.x, c.y, 16 * (1 - t / 0.3) + 4).fill({ color: 0xffffff, alpha: 0.9 })
-      fx.circle(c.x, c.y, 8 + 44 * out).stroke({ color, width: 5 * (1 - t) + 1, alpha: 1 - t })
-      for (let i = 0; i < 7; i++) {
-        const angle = -Math.PI / 2 + (i - 3) * 0.32
-        const [cos, sin] = [Math.cos(angle), Math.sin(angle)]
-        const [near, far] = [14 + 50 * out, 30 + 90 * out]
-        fx.moveTo(c.x + cos * near, c.y + sin * near).lineTo(c.x + cos * far, c.y + sin * far).stroke({ color: i % 2 ? 0xffffff : color, width: 3 * (1 - t) + 0.5, alpha: 1 - t })
-      }
-    }),
-  )
+  const { node, frame } = burst(at, color, SINK)
+  s.scene.add(node)
+  void shake(s, 2, 160)
+  return s.tween(KO_MS, frame).then(() => scrap(node))
 }
 
 /** What each thrown object looks like in the air: its size in tiles, its colour, and how hard it shakes the camera landing. */
