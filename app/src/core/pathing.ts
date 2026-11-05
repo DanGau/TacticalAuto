@@ -9,6 +9,7 @@ import { pushesOff } from './knockback'
 import { bite, canShoot, sees } from './sight'
 import { WEAPONS } from './weapons'
 import { pounce, turned } from './brawlers'
+import { threat } from './threat'
 
 /**
  * The cheapest path to each tile the unit can reach with `move`, climbing costing more and jumping as its jump allows, cheapest first,
@@ -243,12 +244,16 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   if (unit.side === 'human' && walkingDistances(battle, goal, unit.stats.jump)[unit.y * GRID + unit.x] === Infinity) breach(battle, walkingDistances(battle, unit, unit.stats.jump).filter(Number.isFinite).length < POCKET ? unit : goal)
   const toGoal = walkingDistances(battle, goal, unit.stats.jump)
   const seen = spotted(battle)
-  /** The most of its damage it lands from `end`, in whole percent; 0 with no shot. */
+  // A hero weighs each shot by its threat, as a share of the greatest, so it walks to where it can shoot what harms the squad most.
+  const menace = (end: Tile, enemy: Unit) => (isSoldier(unit) && enemy.side === 'alien' ? threat(battle, enemy, bite(battle, end, enemy, unit.stats) * unit.stats.damage) : 1)
+  const worst = Math.max(...enemies.map((e) => menace(unit, e)))
+  /** The most of its damage it lands from `end`, weighed by threat, in whole percent; 0 with no shot. */
   const mine = (end: Tile) => {
     const chances = enemies
       .filter((enemy) => shootable(battle, unit, end, enemy, seen))
-      .map((enemy) => preyed(enemy, bite(battle, end, enemy, unit.stats)) / (turned(end, enemy) ? 2 : 1))
-    return Math.round(100 * Math.max(0, ...chances))
+      .map((enemy) => (preyed(enemy, bite(battle, end, enemy, unit.stats)) / (turned(end, enemy) ? 2 : 1)) * (menace(end, enemy) / worst))
+    const best = Math.max(0, ...chances)
+    return best > 0 ? Math.max(1, Math.round(100 * best)) : 0
   }
   // Heroes fight in the open; a cloaked unit fears no shot.
   const theirs = (end: Tile) => (unit.side === 'human' || unit.cloaked ? 0 : exposure(battle, enemies, end))

@@ -17,6 +17,7 @@ import { bite, MIN_DAMAGE, odds } from './sight'
 import { random } from './rng'
 import { preyed, leapTo } from './pathing'
 import { charge, fury, hold, turned } from './brawlers'
+import { threat } from './threat'
 import { FUEL_DAMAGE } from './twists'
 import { BLOCK_SOAK, WEAPONS, type Guard, type Kit, type Weapon } from './weapons'
 
@@ -85,7 +86,9 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const taunting = inReach.filter((other) => has(other, 'taunt'))
   // Aliens spread their fire: a healthier soldier is the likelier target, so wounds fall across the squad.
   const spread = (other: Unit) => (unit.side === 'alien' && !other.civilian ? SPREAD * (other.hp / other.stats.hp) : 0)
-  const value = (other: Unit) => spread(other) + preyed(other, bite(battle, unit, other, unit.stats)) / (turned(unit, other) ? 2 : 1) + worth(battle, unit, other)
+  const landed = (other: Unit) => preyed(other, bite(battle, unit, other, unit.stats)) / (turned(unit, other) ? 2 : 1) + worth(battle, unit, other)
+  // Heroes weigh each alien by the harm a shot stops: see threat.
+  const value = (other: Unit) => (unit.side === 'human' && other.side === 'alien' ? landed(other) * threat(battle, other, bite(battle, unit, other, unit.stats) * unit.stats.damage) : spread(other) + landed(other))
   let enemy: Unit | undefined
   for (const other of taunting.length > 0 ? taunting : inReach) {
     const gain = enemy ? value(other) - value(enemy) : 1

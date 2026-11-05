@@ -103,7 +103,7 @@ test('a burster explodes where it dies, hurting everything beside it', () => {
   soldier.stats = { ...soldier.stats, move: 0, damage: 50 }
   aliens[1].hp = aliens[1].stats.hp = BURST_DAMAGE + 5
   aliens[0].stats = { ...aliens[0].stats, move: 0 }
-  aliens[1].stats = { ...aliens[1].stats, move: 0 }
+  aliens[1].stats = { ...aliens[1].stats, move: 0, damage: 0 }
   const events = until(has('rocket'))
   expect(events).toContainEqual({ type: 'rocket', id: aliens[0].id, x: 10, y: 13, hits: [{ target: aliens[1].id, damage: BURST_DAMAGE }] })
   expect(aliens[1].hp).toBeLessThanOrEqual(5)
