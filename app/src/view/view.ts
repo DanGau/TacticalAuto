@@ -6,7 +6,7 @@ import { effectName } from '../core/effects'
 import { overlaps, staggerOf } from '../core/pace'
 import type { Run } from '../core/run-state'
 import { drawTerrain } from './board'
-import { axes, bestTurn, clamped, DECAL_LIFT, framing, setHeights, setRinged, spot, STILL_FOV, WIDTH, type Camera, type Shot } from './camera'
+import { axes, bestTurn, clamped, DECAL_LIFT, framing, panned, setHeights, setRinged, spot, still, STILL_FOV, WIDTH, type Camera, type Shot } from './camera'
 import { callout, chest, effectCallout, shotCallout } from './effects'
 import { drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
@@ -18,6 +18,8 @@ import { empty } from './shapes'
 
 /** Screen pixels a press moves before it pans the camera. */
 const DRAG_PX = 6
+/** How long after a drag the camera is left where the player put it. */
+const HOLD_MS = 2000
 /** How long the camera takes to glide to an landing, and to fly in over a new battle. */
 const FOCUS_MS = 700
 const FLY_MS = 1600
@@ -57,6 +59,7 @@ export async function createView(): Promise<View> {
   /** Clears the board for a new battle. */
   function setBattle(battle: Battle): void {
     s.shown = battle
+    s.held = 0
     setHeights(battle.height)
     setRinged(battle.arenaKind === 'skyscraper')
     for (const id of [...s.sprites.keys()]) remove(s, id)
@@ -65,10 +68,25 @@ export async function createView(): Promise<View> {
     drawTerrain(s, battle)
   }
 
-  // Dragging pans the still camera; the next glide to the action takes it back. A drag is not a click.
-  let drag: { x: number; y: number; moved: boolean } | null = null
-  canvas.addEventListener('pointerdown', (e) => (drag = { x: e.clientX, y: e.clientY, moved: false }))
-  addEventListener('pointerup', () => setTimeout(() => (drag = null)))
+  // One finger or the mouse drags the still camera, the ground staying under it; a second finger ends the drag.
+  // Glides leave the camera alone until HOLD_MS after. A drag is not a click.
+  canvas.style.touchAction = 'none'
+  let drag: { id: number; x: number; y: number; moved: boolean } | null = null
+  const pointers = new Set<number>()
+  canvas.addEventListener('pointerdown', (e) => {
+    pointers.add(e.pointerId)
+    drag = pointers.size === 1 ? { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false } : null
+    if (drag) canvas.setPointerCapture(e.pointerId)
+  })
+  const release = (e: PointerEvent) => {
+    pointers.delete(e.pointerId)
+    if (drag?.id !== e.pointerId) return
+    if (drag.moved) s.held = performance.now() + HOLD_MS
+    const ended = drag
+    setTimeout(() => drag === ended && (drag = null))
+  }
+  canvas.addEventListener('pointerup', release)
+  canvas.addEventListener('pointercancel', release)
   canvas.addEventListener(
     'click',
     (e) => {
@@ -77,19 +95,14 @@ export async function createView(): Promise<View> {
     { capture: true },
   )
   canvas.addEventListener('pointermove', (e) => {
-    const { camera } = s
-    if (drag && (drag.moved || Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > DRAG_PX) && camera.fov <= STILL_FOV) {
-      drag.moved = true
-      const { right, up } = axes(camera.yaw, camera.pitch)
-      const per = s.scale() * ACROSS
-      const dx = -(e.clientX - drag.x) / per
-      const dy = (e.clientY - drag.y) / per
-      Object.assign(drag, { x: e.clientX, y: e.clientY })
-      s.glides++
-      s.look(clamped({ ...camera, x: camera.x + right.x * dx + up.x * dy, y: camera.y + up.y * dy, z: camera.z + right.z * dx + up.z * dy }))
-    }
+    if (drag?.id !== e.pointerId || !pointers.has(e.pointerId) || !still(s.camera)) return
+    if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) <= DRAG_PX) return
+    drag.moved = true
+    s.held = Infinity
+    s.glides++
+    s.look(clamped(panned(s.camera, e.clientX - drag.x, e.clientY - drag.y, s.scale())))
+    Object.assign(drag, { x: e.clientX, y: e.clientY })
   })
-
   /**
    * The camera framing what is in play: before the landing it, the aliens and goals; after it, the squad and the
    * aliens it has found.

@@ -2,7 +2,7 @@
 import { ColorManagement, Fog, Group, LinearSRGBColorSpace, type Mesh, PerspectiveCamera, Scene, type Sprite as Billboard, type Object3D, Vector3, WebGLRenderer } from 'three'
 import { ENTRY_RADIUS, GRID, type Battle, type Tile } from '../core/battle'
 import type { Run } from '../core/run-state'
-import { aim, axes, clamped, FIT, framing, HAZE_REACH, HEIGHT, picture, spot, WIDTH, type Camera } from './camera'
+import { aim, axes, clamped, FIT, framing, HAZE_REACH, HEIGHT, picture, settled, spot, WIDTH, type Camera } from './camera'
 import { RISE_MS, type fence } from './fences'
 import { COLOR, NIGHT } from './palette'
 import { css, Sketch, type Point3 } from './shapes'
@@ -117,6 +117,8 @@ export class Stage {
   briefing = false
   /** The camera's glide under way; a new one takes over from wherever the camera is, so two never fight over it. */
   glides = 0
+  /** Until when, by `performance.now`, glides leave the camera alone: the player is panning it. */
+  held = 0
 
   /** Each rendered frame's work for a tween under way, given the milliseconds since the last frame. */
   private readonly ticks = new Set<(ms: number) => void>()
@@ -225,7 +227,7 @@ export class Stage {
    */
   follow(points: Tile[] | Camera, ms = CAMERA_MS): Promise<void> {
     const from = this.camera
-    const to = Array.isArray(points) ? clamped(framing(points, this.camera.yaw), points) : clamped(points)
+    const to = Array.isArray(points) ? clamped(framing(points, settled(this.camera.yaw)), points) : clamped(points)
     const mine = ++this.glides
     return this.tween(ms, (t) => {
       if (mine !== this.glides) return

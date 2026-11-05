@@ -167,14 +167,27 @@ const closest = () => Math.max(1, 0.7 / Math.min(innerWidth / WIDTH, innerHeight
 /** The zoom that fits a `width` by `height` of picture on the screen. */
 const seen = (width: number, height: number) => [screen().w / width, screen().h / height]
 
-/** Of the eight turns from `yaw`, the one `points` fill the screen best at. */
+/** The isometric turn nearest `yaw`: the still turn, or a quarter turn from it, never between. */
+export const settled = (yaw: number) => YAW + Math.round((yaw - YAW) / (Math.PI / 2)) * (Math.PI / 2)
+
+/** Whether the camera holds still, at an isometric turn and tilt, so a drag may pan it. */
+export const still = (c: Camera) => c.fov <= STILL_FOV && Math.abs(c.yaw - settled(c.yaw)) < 1e-6 && Math.abs(c.pitch - PITCH) < 1e-6
+
+/** `c` panned so the ground follows a drag of `dx`, `dy` screen pixels, at `scale` screen pixels per picture pixel. */
+export function panned(c: Camera, dx: number, dy: number, scale: number): Camera {
+  const { right, up } = axes(c.yaw, c.pitch)
+  const [r, u] = [-dx / scale / ACROSS, dy / scale / ACROSS]
+  return { ...c, x: c.x + right.x * r + up.x * u, y: c.y + up.y * u, z: c.z + right.z * r + up.z * u }
+}
+
+/** Of the four isometric turns from `yaw`, the one `points` fill the screen best at. */
 export function bestTurn(points: Tile[], yaw: number): number {
   const zoom = (y: number) => {
     const at = points.map((p) => picture(spot(p.x, p.y), y))
     const span = (v: number[]) => Math.max(...v) - Math.min(...v) + MARGIN
     return Math.min(...seen(span(at.map((p) => p.x)), span(at.map((p) => p.y))))
   }
-  return Array.from({ length: 8 }, (_, i) => yaw + (i * Math.PI) / 4).reduce((a, b) => (zoom(b) > zoom(a) * 1.05 ? b : a))
+  return Array.from({ length: 4 }, (_, i) => settled(yaw) + (i * Math.PI) / 2).reduce((a, b) => (zoom(b) > zoom(a) * 1.05 ? b : a))
 }
 
 /**

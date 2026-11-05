@@ -158,6 +158,22 @@ const commands: Record<string, Command> = {
   },
   /** viewport <w> <h>: resizes the page for the rest of a playbook, to see phone widths. */
   viewport: (page, w, h) => page.setViewportSize({ width: Number(w), height: Number(h) }),
+  /** drag <x1> <y1> <x2> <y2> [touch]: drags from one screen point to another, by mouse or one finger. */
+  async drag(page, x1, y1, x2, y2, touch) {
+    const [a, b, c, d] = [x1, y1, x2, y2].map(Number)
+    const at = (i: number) => ({ x: a + ((c - a) * i) / 10, y: b + ((d - b) * i) / 10 })
+    if (touch !== 'touch') {
+      await page.mouse.move(a, b)
+      await page.mouse.down()
+      for (let i = 1; i <= 10; i++) await page.mouse.move(at(i).x, at(i).y)
+      return page.mouse.up()
+    }
+    const cdp = await page.context().newCDPSession(page)
+    const send = (type: 'touchStart' | 'touchMove' | 'touchEnd', i: number) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [at(i)] })
+    await send('touchStart', 0)
+    for (let i = 1; i <= 10; i++) await send('touchMove', i)
+    await send('touchEnd', 10)
+  },
   /** hover <x> <y>: moves the mouse to a screen point. */
   async hover(page, x, y) {
     await page.mouse.move(Number(x), Number(y))
