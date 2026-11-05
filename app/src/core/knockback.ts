@@ -1,7 +1,7 @@
 // Driving a unit back, and what it hits or falls from: a ledge, a window, or the edge of the world.
 import { GRID, type Battle, type Effect, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
-import { blocked, CLIFF, edgeBetween, freeTilesNear, heightAt, onGrid, unitAt, unwalled, walks } from './grid'
+import { blocked, CLIFF, edgeBetween, freeTilesNear, heightAt, onGrid, openNear, unitAt, unwalled, walks } from './grid'
 import { has } from './fighters'
 import { SLAM_DAMAGE, wound } from './wound'
 import { fell, slammed } from './stacks'
@@ -157,4 +157,12 @@ export function drive(battle: Battle, target: Unit, step: Tile, tiles: number, e
     wound(battle, into, slam, events)
   }
   return false
+}
+
+/** A unit over the void that no longer levitates drifts to the nearest open ground, unhurt. */
+export function settle(battle: Battle, unit: Unit): GameEvent[] {
+  if (has(unit, 'hover') || !isDrop(battle, unit)) return []
+  const to = openNear(battle, unit)
+  Object.assign(unit, to)
+  return [{ type: 'move', id: unit.id, path: [to], with: 'hover' }]
 }

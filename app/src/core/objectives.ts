@@ -17,7 +17,7 @@ const GOAL_ORDERS: Record<Exclude<Goal, 'exterminate'>, string> = {
 
 /** A clear-out's orders by its challenge, one chosen by the ground. */
 const CHALLENGE_ORDERS: Record<ChallengeId, string[]> = {
-  slog: ['Cross the mire', 'Clear the mire'],
+  slog: ['Wade the swamp', 'Clear the swamp'],
   firingLine: ['Take the ridge', 'Silence the guns'],
   ironWall: ['Break the wall', 'Crack the armor'],
   swarm: ['Stem the swarm', 'Burn the brood'],
@@ -39,7 +39,7 @@ const GROUND_ORDERS: Record<TerrainKind, string> = {
 
 /** What a challenge throws at the squad, and how to meet it. */
 export const THREATS: Record<ChallengeId, string> = {
-  slog: 'Mire under fire. Levitate or shield.',
+  slog: 'Swamp, foes scattered. Levitate or shield.',
   firingLine: 'Snipers. Mist or ranged shield.',
   ironWall: 'Heavy armor. Sunder or overcharge.',
   swarm: 'Swarm. Melee shield or tank.',

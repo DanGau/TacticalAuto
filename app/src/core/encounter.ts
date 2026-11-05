@@ -34,8 +34,7 @@ const HEART: Mark = [2, 0]
 const COMMANDER_POST: Mark = [11, 0]
 const BOSS_POST: Mark = [9, 0]
 
-/** A Slog's band of mire, in tiles along the axis; a Firing line's ridge, how far along it runs and how far to each side. */
-const MIRE = [-6, 6]
+/** A Firing line's ridge: how far along it runs and how far to each side. */
 const RIDGE_ALONG = 9
 const RIDGE_REACH = 12
 
@@ -98,15 +97,6 @@ function rise(battle: Battle, at: Tile, reach: number, crest: number): void {
   }
 }
 
-/** Lays a band of mire across the axis, from one flank of the arena to the other. */
-function layMire(battle: Battle, spot: Tile, fx: number, fy: number): void {
-  for (let t = 0; t < GRID * GRID; t++) {
-    const [x, y] = [(t % GRID) - spot.x, Math.floor(t / GRID) - spot.y]
-    const along = x * fx + y * fy
-    if (along >= MIRE[0] && along <= MIRE[1] && Math.hypot(x, y) <= SIGHT_CLEAR && !['void', 'water', 'floor'].includes(battle.ground[t])) battle.ground[t] = 'mire'
-  }
-}
-
 /** Stands `prop` on an open tile near `at`, none touching another, so it walls nothing off. */
 function stand(battle: Battle, at: Tile, prop: Prop): boolean {
   if (!onGrid(at.x, at.y) || blocked(battle, at.x, at.y) || battle.ground[at.y * GRID + at.x] === 'void') return false
@@ -139,7 +129,6 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal, cha
   shapeArena(battle, pickArenaKind(battle, battle.place, goal, challenge, battle.twist), spot, [fx, fy])
   if (battle.arenaKind === 'open') rise(battle, raw(OVERLOOK), 3, 1)
   if (challenge === 'firingLine') for (let across = -RIDGE_REACH; across <= RIDGE_REACH; across += 2) rise(battle, raw([RIDGE_ALONG, across]), 2, 1)
-  if (challenge === 'slog') layMire(battle, spot, fx, fy)
   if (battle.arenaKind === 'open') rise(battle, raw(LEDGE), 2, 0)
   const [low, tall] = SCATTER[battle.place] ?? ['crate', 'stack']
   // The hive holds nothing human: its hazard is its own growth.

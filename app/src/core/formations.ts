@@ -19,7 +19,7 @@ export interface Plot {
 
 /** How a challenge stands its clusters: their sizes, how far along the axis and off it, how far apart, and in what shape. */
 const STAGING: Partial<Record<ChallengeId, { sizes: number[]; band: [number, number]; wander: number; apart: number; shape?: Shape }>> = {
-  slog: { sizes: [2, 3], band: [7, 11], wander: 10, apart: 6, shape: 'line' },
+  slog: { sizes: [2, 3], band: [-4, 13], wander: 12, apart: 7, shape: 'crowd' },
   firingLine: { sizes: [2, 3], band: [8, 10], wander: 11, apart: 6, shape: 'line' },
   ironWall: { sizes: [4, 5, 6], band: [0, 8], wander: 5, apart: 8, shape: 'line' },
   scattered: { sizes: [1], band: [-14, 16], wander: 18, apart: 14 },

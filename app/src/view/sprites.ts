@@ -82,6 +82,22 @@ export function shimmer(sprite: Sprite, now: number): void {
   fade(sprite, low + (high - low) * (0.5 + 0.5 * Math.sin(now / 140 + sprite.tile.x)) * (0.75 + 0.25 * Math.sin(now / 37)))
 }
 
+/** How high a levitating unit floats over its tile, and how far it bobs either way, in screen pixels. */
+const HOVER_LIFT = 16
+const HOVER_BOB = 3
+
+/** Sets a sprite levitating or not: aloft, its shadow glows. */
+export function hoverLook(sprite: Sprite, on: boolean): void {
+  sprite.hovering = on
+  ;(sprite.shadow.material as MeshBasicMaterial).color.set(on ? COLOR.hover : 0x000000)
+  if (!on) sprite.lift = 0
+}
+
+/** A levitating sprite's lift at `now` ms, rising and sinking slowly. */
+export function bob(sprite: Sprite, now: number): void {
+  sprite.lift = (HOVER_LIFT + HOVER_BOB * Math.sin(now / 400 + sprite.tile.x)) / ACROSS
+}
+
 /** A unit's health, armor, temp HP and badges in the battle; none once it is gone. */
 export const vitals = (battle: Battle, id: number): [number, number, number, Badge[]] => {
   const unit = battle.units.find((u) => u.id === id)
@@ -128,6 +144,8 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
     scale: unit.giant ? GIANT : unit.boss ? 1.6 : unit.target ? 1.3 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1,
     ally,
     cloaked: false,
+    hovering: false,
+    lift: 0,
     marks,
     drawHp(hp, armor, temp = 0, badges = []) {
       g.setTransform(BODY_RES, 0, 0, BODY_RES, BODY.left * BODY_RES, BODY.up * BODY_RES)
@@ -201,6 +219,7 @@ export function sync(s: Stage, run: Run, battle: Battle): void {
     place(s, sprite, { x: unit.x, y: unit.y })
     if (unit.giant) grow(sprite)
     cloakLook(sprite, !!unit.cloaked)
+    hoverLook(sprite, unit.effects.includes('hover'))
     fade(sprite, 1)
     sprite.drawHp(unit.hp, unit.armor, unit.temp, badges(unit))
   }

@@ -4,15 +4,17 @@ import type { ChallengeId } from './challenges'
 import type { Goal } from './goals'
 import { soften } from './levels'
 import { randomInt } from './rng'
-import type { TerrainKind } from './terrain'
+import { PROP_BULK, type TerrainKind } from './terrain'
+import { NEIGHBORS, onGrid } from './grid'
 import type { Twist } from './twists'
 
 /**
  * The kinds of arena. Open ground has gentle rises. A skyscraper's roof has a drop on every side, some of it behind
  * glass; an overpass runs a raised road down one flank; a quarry climbs in terraces toward the aliens; a mesa is a
- * plateau they hold; a chasm splits the ground, crossed by one bridge, another broken off over the drop.
+ * plateau they hold; a chasm splits the ground, crossed by one bridge, another broken off over the drop; a swamp is
+ * mire about islands of firm ground, with pools and trees.
  */
-export type ArenaKind = 'open' | 'skyscraper' | 'overpass' | 'quarry' | 'mesa' | 'chasm'
+export type ArenaKind = 'open' | 'skyscraper' | 'overpass' | 'quarry' | 'mesa' | 'chasm' | 'swamp'
 
 /** What the player is told of each. */
 export const ARENA_KINDS: Record<ArenaKind, { name: string; text: string }> = {
@@ -22,6 +24,7 @@ export const ARENA_KINDS: Record<ArenaKind, { name: string; text: string }> = {
   quarry: { name: 'Quarry', text: 'terraces climbing toward the aliens, joined by ramps' },
   mesa: { name: 'Mesa', text: 'a sheer plateau the aliens hold, two ramps up' },
   chasm: { name: 'Chasm', text: 'a bottomless split, one bridge across and one broken' },
+  swamp: { name: 'Swamp', text: 'mire about islands of firm ground, pools and trees' },
 }
 
 /** The arena kinds each kind of place may have, each as likely as the others. */
@@ -38,9 +41,10 @@ const FITS: Record<TerrainKind, ArenaKind[]> = {
 /** Kinds whose drop is void, which narrow ground's own void would cut too small. */
 const VOIDED: ArenaKind[] = ['skyscraper', 'chasm']
 
-/** An arena kind fitting the place, goal, challenge and twist: a VIP's building and a challenge's ridge or mire need open ground. */
+/** An arena kind fitting the place, goal, challenge and twist: a VIP's building and a ridge need open ground; a Slog is a swamp. */
 export function pickArenaKind(battle: { rng: number }, place: TerrainKind, goal: Goal, challenge: ChallengeId | null, twist: Twist | null): ArenaKind {
-  if (goal === 'vip' || challenge === 'slog' || challenge === 'firingLine') return 'open'
+  if (challenge === 'slog') return 'swamp'
+  if (goal === 'vip' || challenge === 'firingLine') return 'open'
   const fits = FITS[place].filter((k) => twist !== 'narrow' || !VOIDED.includes(k))
   return fits[randomInt(battle, fits.length)]
 }
@@ -116,6 +120,35 @@ const SHAPES: Record<Exclude<ArenaKind, 'open'>, Shape> = {
     }
     return Math.abs(a) > FOOT || Math.abs(c) > FOOT ? null : 0
   },
+  swamp: (a, c) => (Math.abs(a) > FOOT || Math.abs(c) > FOOT ? null : 0),
+}
+
+/** A swamp's islands and pools: how many of each and their radii; the firm shore the way in lands on, in tiles along the axis; the share of island tiles that hold a tree. */
+const ISLANDS = 9
+const ISLAND_RADIUS = [1.5, 3]
+const POOLS = 8
+const POOL_RADIUS = [1, 2]
+const SHORE = -10
+const TREES = 0.3
+
+/** Lays a swamp over the shaped tiles: mire about pools, and islands a level up, firm and wooded, as is the shore the way in lands on. */
+function bog(battle: Battle, shaped: Set<number>, axis: (t: number) => [number, number]): void {
+  const span = 2 * FOOT - 4
+  const blobs = (n: number, [lo, hi]: number[]) => Array.from({ length: n }, () => ({ a: SHORE + 3 + randomInt(battle, FOOT - SHORE - 4), c: randomInt(battle, span) - span / 2, r: lo + (randomInt(battle, 4) / 3) * (hi - lo) }))
+  const islands = blobs(ISLANDS, ISLAND_RADIUS)
+  const pools = blobs(POOLS, POOL_RADIUS)
+  const inside = (t: number, of: typeof islands) => { const [a, c] = axis(t); return of.some((b) => Math.hypot(a - b.a, c - b.c) <= b.r) }
+  const clear = (x: number, y: number) => NEIGHBORS.every(([dx, dy]) => !onGrid(x + dx, y + dy) || battle.bulk[(y + dy) * GRID + x + dx] === 0)
+  for (const t of shaped) {
+    const shore = axis(t)[0] < SHORE
+    const island = !shore && inside(t, islands)
+    battle.ground[t] = shore || island ? 'grass' : inside(t, pools) ? 'water' : 'mire'
+    if (island) battle.height[t] = 1
+    const prop = battle.ground[t] === 'water' ? 'water' : island && randomInt(battle, 100) < 100 * TREES && clear(t % GRID, Math.floor(t / GRID)) ? 'tree' : null
+    if (!prop) continue
+    battle.props[t] = prop
+    battle.bulk[t] = PROP_BULK[prop]
+  }
 }
 
 /** The parapet: glass along the roof's edge in runs of this many tiles, with as long gaps between. */
@@ -170,5 +203,6 @@ export function shapeArena(battle: Battle, kind: ArenaKind, spot: Tile, [fx, fy]
       if (t + GRID < GRID * GRID && battle.ground[t + GRID] === 'void') battle.north[t + GRID] = 'window'
     }
   }
+  if (kind === 'swamp') bog(battle, shaped, axis)
   soften(battle, GRID, (t) => shaped.has(t))
 }

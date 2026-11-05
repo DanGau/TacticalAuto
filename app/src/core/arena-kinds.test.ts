@@ -14,6 +14,21 @@ const force = (n: number): Alien[] =>
   })
 
 const battles = TERRAIN_KINDS.flatMap((place) => Array.from({ length: 14 }, (_, seed) => createBattle(seed + 1, place, force(10), [], seed % 4 === 3 ? 'hold' : 'exterminate')))
+const swamps = Array.from({ length: 4 }, (_, seed) => createBattle(seed + 1, 'countryside', force(8), [], 'exterminate', [], null, undefined, 'slog'))
+battles.push(...swamps)
+
+test('a swamp is mostly mire, with firm islands, pools and trees, its aliens in three groups or more', () => {
+  for (const b of swamps) {
+    const near = b.ground.filter((_, t) => distance({ x: t % GRID, y: Math.floor(t / GRID) }, b.arena) <= b.arena.reach)
+    const share = (g: string) => near.filter((x) => x === g).length / near.length
+    expect(share('mire')).toBeGreaterThan(0.5)
+    expect(share('grass')).toBeGreaterThan(0.1)
+    expect(share('water')).toBeGreaterThan(0)
+    const aliens = b.units.filter((u) => u.side === 'alien')
+    expect(new Set(aliens.map((u) => u.cluster)).size).toBeGreaterThanOrEqual(3)
+    expect(b.props.some((p, t) => p === 'tree' && distance({ x: t % GRID, y: Math.floor(t / GRID) }, b.arena) <= b.arena.reach)).toBe(true)
+  }
+})
 
 test('every arena kind is fought on', () => {
   for (const kind of Object.keys(ARENA_KINDS) as ArenaKind[]) expect(battles.filter((b) => b.arenaKind === kind).length, kind).toBeGreaterThanOrEqual(3)
@@ -34,7 +49,7 @@ test.each(battles.map((b, i) => [i, b.place, b.arenaKind, b] as const))('map %i,
   }
   expect(joined / open).toBeGreaterThan(0.85)
   for (const alien of battle.units.filter((u) => u.side === 'alien' && u.stats.move > 0)) expect(walk[alien.y * GRID + alien.x], `${alien.kind} at ${alien.x},${alien.y}`).toBeLessThan(Infinity)
-  if (kind === 'open') return
+  if (kind === 'open' || kind === 'swamp') return
   let drops = 0
   for (let t = 0; t < GRID * GRID; t++) {
     const tile = { x: t % GRID, y: Math.floor(t / GRID) }

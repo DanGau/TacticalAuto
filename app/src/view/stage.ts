@@ -7,7 +7,7 @@ import { RISE_MS, type fence } from './fences'
 import { COLOR, NIGHT } from './palette'
 import { css, Sketch, type Point3 } from './shapes'
 import { ACROSS } from './space'
-import { shimmer } from './sprites'
+import { bob, shimmer } from './sprites'
 import type { Badge, BadgeBoard } from './badges'
 
 export interface Sprite {
@@ -31,6 +31,10 @@ export interface Sprite {
   ally: boolean
   /** Whether it is cloaked, so it shimmers, faint, for the player alone. */
   cloaked: boolean
+  /** Whether it levitates, so it bobs above its tile over a glowing shadow. */
+  hovering: boolean
+  /** How far its picture floats above its feet, in world units. */
+  lift: number
 }
 
 /** Words over the map: an landing's name, or a callout over a unit. */
@@ -133,6 +137,8 @@ export class Stage {
     this.scene.add(this.chasm, this.terrain, this.zones, this.fences, this.acid, this.fog, this.lurk, this.units, this.beam)
     this.scene.fog = this.haze
     this.zones.renderOrder = 1
+    // The cliffs fade into the depths, so draw before the units, or they paint over one levitating over the drop.
+    this.chasm.renderOrder = -1
     // Nothing shows until a battle exists.
     this.scene.visible = false
     addEventListener('resize', () => requestAnimationFrame(() => this.resize()))
@@ -143,6 +149,7 @@ export class Stage {
       for (const tick of [...this.ticks]) tick(ms)
       for (const sprite of this.sprites.values()) {
         if (sprite.cloaked) shimmer(sprite, now)
+        if (sprite.hovering) bob(sprite, now)
         sprite.marks.fit(this.eye.fov)
       }
       for (const f of this.standing.values()) {
@@ -275,7 +282,7 @@ export class Stage {
   render(): void {
     const { ctx, overlay, camera, jolt } = this
     const { back } = axes(camera.yaw)
-    for (const sprite of this.sprites.values()) sprite.body.position.copy(back).multiplyScalar(STANDOFF)
+    for (const sprite of this.sprites.values()) sprite.body.position.copy(back).multiplyScalar(STANDOFF).setY(sprite.body.position.y + sprite.lift)
     this.renderer.render(this.scene, this.eye)
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.clearRect(0, 0, overlay.width, overlay.height)

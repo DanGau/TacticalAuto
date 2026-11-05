@@ -34,6 +34,8 @@ export const COLOR = {
   rooted: 0x8fd14f,
   booming: 0xff9a3d,
   psi: 0xff6bd6,
+  /** A levitating unit's shadow. */
+  hover: 0x7fd8ff,
   /** A cloaked unit's tint. */
   cloak: 0x8fe8ff,
   contact: 0xff6b5e,

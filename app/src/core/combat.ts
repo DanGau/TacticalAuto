@@ -1,4 +1,5 @@
 // A battle's beat: whose turn it is, and the next unit's action.
+import { settle } from './knockback'
 import { RESCUE_QUORUM } from './goals'
 import {
   BIG_BLAST_RADIUS,
@@ -28,6 +29,10 @@ import { thaw } from './stacks'
  * Empty when no unit is left.
  */
 function actNext(battle: Battle): GameEvent[] {
+  for (const unit of battle.units) {
+    const drift = settle(battle, unit)
+    if (drift.length > 0) return drift
+  }
   const seen = spotted(battle)
   for (const unit of battle.units) {
     if (unit.side !== battle.turn || unit.id < battle.shooter || unit.civilian || !armed(unit)) continue

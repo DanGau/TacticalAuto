@@ -39,6 +39,12 @@ export const CALTROP_COST = 2
 /** Move a step onto mire costs beyond its one tile. */
 export const MIRE_COST = 2
 
+/** The jump a hovering unit strides with: onto any neighbour, up or down any ledge, out over the void. */
+export const HOVER = 99
+
+/** Whether a unit may not stand on the tile; one that `hovers` may stand over the void. */
+export const barred = (battle: Battle, x: number, y: number, hovers = false) => blocked(battle, x, y) && !(hovers && battle.ground[y * GRID + x] === 'void' && !unitAt(battle, x, y))
+
 /** Whether a stride from `from` to `to` is a jump: up or down a ledge, or across a gap. */
 export const jumps = (battle: Battle, from: Tile, to: Tile) => distance(from, to) > 1 || ledge(battle, from, to)
 
@@ -56,9 +62,10 @@ export const stepCost = (battle: Battle, from: Tile, to: Tile, hovers = false) =
 /**
  * The tiles a unit with `jump` can stride to from `from`, whatever stands on them: a neighbour it may step to, one up
  * or down a ledge of at most `jump` levels, and straight across a gap of void at most `jump` - 1 tiles wide to ground
- * at most `jump` levels off.
+ * at most `jump` levels off. With HOVER, every unwalled neighbour.
  */
 export function strides(battle: Battle, from: Tile, jump: number): Tile[] {
+  if (jump >= HOVER) return NEIGHBORS.map(([dx, dy]) => ({ x: from.x + dx, y: from.y + dy })).filter((to) => onGrid(to.x, to.y) && unwalled(battle, from, to))
   const out: Tile[] = []
   const near = (to: Tile) => Math.abs(heightAt(battle, to) - heightAt(battle, from)) <= jump
   const isVoid = (t: Tile) => battle.ground[t.y * GRID + t.x] === 'void'
@@ -180,9 +187,9 @@ export function walkGraph(battle: Battle, jump = 0) {
   const walls = new Set(still.map((u) => u.y * GRID + u.x))
   const into: number[][] = Array.from({ length: GRID * GRID }, () => [])
   for (let f = 0; f < GRID * GRID; f++) {
-    if (battle.bulk[f] > 0 || walls.has(f)) continue
     const from = { x: f % GRID, y: Math.floor(f / GRID) }
-    for (const to of strides(battle, from, jump)) into[to.y * GRID + to.x].push(f, stepCost(battle, from, to))
+    if ((battle.bulk[f] > 0 && !(jump >= HOVER && battle.ground[f] === 'void')) || walls.has(f)) continue
+    for (const to of strides(battle, from, jump)) into[to.y * GRID + to.x].push(f, stepCost(battle, from, to, jump >= HOVER))
   }
   const graph = { into, fields: new Map<number, number[]>() }
   walk.graphs.set(jump, graph)

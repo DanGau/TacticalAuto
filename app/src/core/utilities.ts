@@ -16,7 +16,7 @@ export const RIG = { crowd: 3, near: 4, radius: 6, close: 2, damage: 10, fireRea
 
 export const UTILITIES: Record<UtilityId, { name: string; icon: string; text: string; tags?: Keyword[] }> = {
   thrusters: { name: 'Swiftness', icon: '💨', text: `Every hero has +${THRUST} move this fight` },
-  hover: { name: 'Levitation', icon: '🪽', text: 'Heroes cross difficult terrain and steep ground at no extra cost' },
+  hover: { name: 'Levitation', icon: '🪽', text: 'Heroes cross difficult terrain and steep ground at no extra cost, float over chasms and never fall' },
   overcharge: { name: 'Overcharge', icon: '⚡', text: `Every hero has +${OVERCHARGE} damage this fight` },
   crack: { name: 'Sunder', icon: '🔨', text: "Every hero's attacks ignore armor this fight" },
   tank: { name: 'Rigged Tank', icon: '🛢️', text: `Pick a fuel tank: it blows once ${RIG.crowd} aliens are within ${RIG.near} tiles, ${RIG.damage} damage to every alien within ${RIG.radius} and any hero within ${RIG.close}, and leaves fire` },

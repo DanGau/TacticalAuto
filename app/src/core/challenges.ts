@@ -13,7 +13,7 @@ export type ChallengeId = 'slog' | 'firingLine' | 'ironWall' | 'swarm' | 'scatte
  * `grim`: the alien force, by party size less one and then by rung, each rung harder.
  */
 export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test: string; answers: UtilityId[]; volley?: true; grim: number[][] }> = {
-  slog: { name: 'Slog', icon: '🌿', test: 'Shooters behind a band of mire that takes three times the move to cross', answers: ['hover', 'rangedShield', 'thrusters'], volley: true, grim: [[2, 3, 4], [3, 4, 6], [5, 7, 8]] },
+  slog: { name: 'Slog', icon: '🌿', test: 'Small groups of shooters scattered across a swamp, firing from the start; its mire takes three times the move to cross', answers: ['hover', 'rangedShield', 'thrusters'], volley: true, grim: [[2, 3, 4], [3, 4, 6], [5, 7, 8]] },
   firingLine: { name: 'Firing line', icon: '🎯', test: 'Long-range shooters along a ridge, firing from the moment the party lands', answers: ['smoke', 'rangedShield'], volley: true, grim: [[2, 3, 4], [3, 5, 6], [6, 7, 9]] },
   ironWall: { name: 'Iron wall', icon: '🧱', test: 'Heavily armored aliens that shrug off small hits', answers: ['crack', 'overcharge'], grim: [[2, 3, 4], [4, 6, 8], [7, 9, 11]] },
   swarm: { name: 'Swarm', icon: '🐜', test: 'Bodies flood in from every side, and keep coming', answers: ['meleeShield', 'tank'], grim: [[8, 12, 16], [14, 18, 22], [20, 24, 30]] },
