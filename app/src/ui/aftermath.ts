@@ -122,7 +122,7 @@ export function choice(run: Run, armed: string | null = null): string {
   if (run.relicOffers.length > 0 || duo) return `<h2>Alien artifacts lie in the wreckage. The party can carry one, and keeps it for the run${duo ? `, or ${duo.pair.map((cls) => CLASSES[cls].name).join(' and ')} can train as a duo in its place` : ''}.</h2><div class="choices">${run.relicOffers.map(relic).join('')}${bond}</div>`
   if (run.finds.length > 0) {
     const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
-    return `<h2>Gear found. Who takes it?${more}</h2>${findSwap(run, 0, armed)}`
+    return findSwap(run, 0, armed, more)
   }
   const learner = run.soldiers.find((s) => skillOffers(s).length > 0)
   return learner ? skillChoice(run, learner, armed) : ''

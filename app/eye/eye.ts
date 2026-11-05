@@ -140,6 +140,22 @@ const commands: Record<string, Command> = {
   async tap(page, selector) {
     await page.locator(selector).first().click({ force: true })
   },
+  /** centred <selector>: fails unless the elements matching are equal in width and, together, centred on the page. */
+  async centred(page, selector) {
+    const fault = await page.evaluate((selector) => {
+      const rects = [...document.querySelectorAll(selector)].map((e) => e.getBoundingClientRect())
+      if (rects.length === 0) return `nothing matches ${selector}`
+      const panel = document.getElementById('panel')!
+      const page = innerWidth - (panel.offsetWidth - panel.clientWidth)
+      const left = Math.min(...rects.map((r) => r.left))
+      const right = Math.max(...rects.map((r) => r.right))
+      const widths = rects.map((r) => Math.round(r.width))
+      if (Math.max(...widths) - Math.min(...widths) > 1) return `${selector} widths differ: ${widths.join(', ')}`
+      if (Math.abs(left - (page - right)) > 3) return `${selector} sits off centre: ${Math.round(left)}px left, ${Math.round(page - right)}px right`
+      return null
+    }, selector)
+    if (fault) throw new Error(`${page.viewportSize()?.width}x${page.viewportSize()?.height}: ${fault}`)
+  },
   /** viewport <w> <h>: resizes the page for the rest of a playbook, to see phone widths. */
   viewport: (page, w, h) => page.setViewportSize({ width: Number(w), height: Number(h) }),
   /** hover <x> <y>: moves the mouse to a screen point. */
