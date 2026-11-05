@@ -82,30 +82,20 @@ export function kept(soldier: Soldier, armed: string | null): Keep {
 /** What confirming does: keeping the find equips it, selling the held; keeping the held sells the find. */
 export const swapAction = (find: number, soldier: Soldier, keep: Keep): Action => (keep === 'new' ? { type: 'equip', find, soldier: soldier.id } : { type: 'sell', find })
 
-/**
- * A card per soldier who could take the find at `index`, and one to sell it. Armed, a hero's card sets their weapon
- * beside the find: one tapped is kept, the other sold, and Confirm does it.
- */
-export function findPicks(run: Run, index: number, armed: string | null): Pick[] {
+/** The swap for the find at `index`: whose weapon it sets against, then the two, one kept and one sold, and Confirm. */
+export function findSwap(run: Run, index: number, armed: string | null): string {
   const gear = run.finds[index]
-  const heroes = run.soldiers.map((soldier): Pick => {
-    const keep = kept(soldier, armed)
-    const option = (which: Keep, item: Gear | null) => {
-      const on = which === keep
-      const extra = !on && item ? ` · +${SELL[item.rarity]}` : ''
-      return `<button class="side ${on ? 'keep' : 'sell'}" role="radio" aria-checked="${on}" data-arm="${swapKey(soldier, which)}"><small class="verb">${on ? 'keep' : 'sell'}${extra}</small><small class="label">${which === 'new' ? 'Found' : 'Held'}</small>${full(item)}</button>`
-    }
-    const sold = keep === 'new' ? soldier.gear : gear
-    return {
-      key: `s${soldier.id}`,
-      look: 'compare',
-      body: heroBody(soldier, gear),
-      detail: `<div class="swap" role="radiogroup" aria-label="Keep which weapon">${option('old', soldier.gear)}${option('new', gear)}</div>
-        <button class="decide confirm" data-action='${JSON.stringify(swapAction(index, soldier, keep))}'>Confirm</button>`,
-      go: sold ? `Sells ${sold.name} for ${SELL[sold.rarity]} supplies` : `${soldier.name} takes ${gear.name}`,
-    }
-  })
-  return [...heroes, sellPick(gear, index)]
+  const chosen = armed?.split('~')[0]
+  const soldier = run.soldiers.find((s) => `s${s.id}` === chosen) ?? run.soldiers[0]
+  const keep = kept(soldier, armed)
+  const option = (which: Keep, item: Gear | null) => {
+    const on = which === keep
+    const extra = !on && item ? ` · +${SELL[item.rarity]} supplies` : ''
+    return `<button class="side ${on ? 'keep' : 'sell'}" role="radio" aria-checked="${on}" data-arm="${swapKey(soldier, which)}"><small class="verb">${on ? 'keep' : 'sell'}${extra}</small><small class="label">${which === 'new' ? 'Found' : `${soldier.name} holds`}</small>${full(item)}</button>`
+  }
+  const heroes = run.soldiers.length > 1 ? `<div class="takers">${run.soldiers.map((s) => `<button class="who${s === soldier ? ' chosen' : ''}" data-arm="${swapKey(s, kept(s, null))}"><span class="portrait">${badge(s.cls)}</span>${s.name}</button>`).join('')}</div>` : ''
+  return `${heroes}<div class="swap" role="radiogroup" aria-label="Keep which weapon">${option('old', soldier.gear)}${option('new', gear)}</div>
+    <button class="decide confirm" data-action='${JSON.stringify(swapAction(index, soldier, keep))}'>Confirm</button>`
 }
 
 /** A utility as a card: `top` says what tapping it means, `go` what the second tap does. */
@@ -113,13 +103,3 @@ export function utilityPick(key: string, action: Action | undefined, id: Utility
   const { icon, name, text } = UTILITIES[id]
   return { key, action, look: 'utility', body: `<small>${top}</small><b>${icon} ${name}</b>`, detail: `<p><b>${name}.</b> ${text}.</p>`, go, ...extra }
 }
-
-/** Selling a find, as a card among those who could take it: every hero keeps what it holds. */
-export const sellPick = (gear: Gear, find: number): Pick => ({
-  key: 'sell',
-  action: { type: 'sell', find },
-  look: 'compare sell',
-  body: `<b>Sell it</b><small class="was">${named(gear)}</small><b class="supplies">+${SELL[gear.rarity]}</b>`,
-  detail: `<div class="swap">${side('sell', gear, ` · +${SELL[gear.rarity]}`)}</div>`,
-  go: `Tap again to sell for ${SELL[gear.rarity]} supplies`,
-})

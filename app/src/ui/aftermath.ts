@@ -17,9 +17,9 @@ import { level } from '../core/squad'
 import { xpFor } from '../core/squad'
 import { CAPSTONE_PICKS, SKILLS, TREES, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
-import { findPicks, pickCard, pickDetail, utilityPick, type Pick } from './cards'
+import { findSwap, pickCard, pickDetail, utilityPick, type Pick } from './cards'
 import { heroSheet, skillState, treeGrid } from './sheet'
-import { badge, button, describe, gearCard, gearText, gearType, healthBar, signed, STOP_NAMES, threatBar } from './html'
+import { badge, button, describe, gearText, gearType, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
 /**
  * A soldier's card: class badge, name, weapon, and an experience bar filling with what the battle earned, flaring on a
@@ -75,21 +75,13 @@ export function acquired(run: Run, gain: Gain): string {
 /** A pop-up over the debrief, `html` inside it. */
 export const modal = (html: string) => `<div class="modal"><div class="sheet">${html}</div></div>`
 
-/** Who takes the find at `index`, or sell it: a hero tapped sets what they hold beside it, to keep one and sell the other. */
-function takers(run: Run, index: number, armed: string | null): string {
-  const picks = findPicks(run, index, armed)
-  const hero = armed?.split('~')[0] ?? null
-  return `<div class="picks">${picks.map((p) => pickCard(p, hero)).join('')}</div>${pickDetail(picks, hero, 'Tap a hero to choose what they keep.')}`
-}
-
-/** A crate opened, in a pop-up: it shakes, bursts in its gear's rarity, and the gear rises out of it; then the player picks who takes it. */
+/** A crate opened, in a pop-up: it shakes and bursts in its gear's rarity, and the swap rises out of it. */
 export function loot(run: Run, index: number, armed: string | null): string {
   const gear = run.finds[index]
   return modal(`<div class="loot ${gear.rarity}${armed ? ' still' : ''}">
     <div class="burst"></div>
     <span class="box">🎁</span>
-    <div class="prize gear ${gear.rarity}">${gearCard(gear, squadKeywords(run))}</div>
-    <div class="said">${takers(run, index, armed)}</div>
+    <div class="said">${findSwap(run, index, armed)}</div>
   </div>`)
 }
 
@@ -130,7 +122,7 @@ export function choice(run: Run, armed: string | null = null): string {
   if (run.relicOffers.length > 0 || duo) return `<h2>Alien artifacts lie in the wreckage. The party can carry one, and keeps it for the run${duo ? `, or ${duo.pair.map((cls) => CLASSES[cls].name).join(' and ')} can train as a duo in its place` : ''}.</h2><div class="choices">${run.relicOffers.map(relic).join('')}${bond}</div>`
   if (run.finds.length > 0) {
     const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
-    return `<h2>Gear found. Who takes it?${more}</h2><div class="gear ${run.finds[0].rarity}">${gearCard(run.finds[0], held)}</div>${takers(run, 0, armed)}`
+    return `<h2>Gear found. Who takes it?${more}</h2>${findSwap(run, 0, armed)}`
   }
   const learner = run.soldiers.find((s) => skillOffers(s).length > 0)
   return learner ? skillChoice(run, learner, armed) : ''
