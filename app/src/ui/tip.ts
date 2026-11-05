@@ -35,7 +35,17 @@ export function installTips(root: HTMLElement): void {
   root.addEventListener('pointerout', (e) => e.pointerType === 'mouse' && hide(markOf(e)))
   root.addEventListener('focusin', (e) => markOf(e) && show(markOf(e)!))
   root.addEventListener('focusout', (e) => hide(markOf(e)))
-  root.addEventListener('click', (e) => markOf(e)?.focus())
+  // Caught before the card under it hears it: a tap on a mark shows its tip, and does not also choose the card.
+  root.addEventListener(
+    'click',
+    (e) => {
+      const mark = markOf(e)
+      if (!mark) return
+      e.stopPropagation()
+      mark.focus()
+    },
+    true,
+  )
   root.addEventListener('scroll', () => held && show(held), true)
   new MutationObserver(() => hide(held)).observe(root, { childList: true })
 }

@@ -180,12 +180,17 @@ test('a hero with any attack in reach takes no order that costs it its turn', ()
   expect(hero.order).toBeNull()
 })
 
-test('a weapon card says its type and special, never how the weapon fights', () => {
+test("a weapon card's face says its type and special; its numbers are the type's tip", () => {
   for (const [id, w] of Object.entries(WEAPONS)) {
-    const gear = { id: 1, rarity: 'common' as const, name: w.name, weapon: id as WeaponId, stats: {}, effect: null }
-    expect(gearCard(gear)).toContain(w.type)
-    expect(gearCard(gear)).not.toMatch(/thrown|dash|fly out|attacks?,|× damage/i)
+    const gear = { id: 1, rarity: 'common' as const, name: `Heavy ${w.name}`, weapon: id as WeaponId, stats: { damage: 1, move: -1 }, effect: null }
+    const card = gearCard(gear)
+    const face = card.replace(/<[^>]*>/g, '')
+    expect(face).toContain(w.type)
+    expect(face).not.toMatch(/×|%|[+-]\d|\b(range|move|crit|armor|strength|thrown|dash)\b/i)
     if (w.special) expect(gearText(gear)).toContain(w.special)
+    const tip = card.match(/data-tip="([^"]*)"/)![1]
+    expect(tip).toContain(`Attack: ${w.attack.shots} × ${Math.round(100 * w.attack.power)}% damage`)
+    expect(tip).toContain('Heavy: +1 damage, -1 move')
   }
 })
 

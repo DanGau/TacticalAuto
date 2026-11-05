@@ -1,7 +1,8 @@
 // Shared HTML pieces: buttons, bars, chips, gear cards and descriptions.
 import type { Action } from '../core/apply'
 import { EFFECTS, type Gear } from '../core/gear'
-import { WEAPONS } from '../core/weapons'
+import { WEAPONS, type Kit } from '../core/weapons'
+import { tip as markTip } from './charts'
 import { ALIENS, type AlienKind } from '../core/aliens'
 import type { Stats } from '../core/battle'
 import { KEYWORDS, RESISTS, type Keyword, type Resist } from '../core/keywords'
@@ -66,15 +67,31 @@ const STAT_TEXT: Record<keyof Stats, (n: number) => string> = {
   jump: (n) => `${signed(n)} jump`,
 }
 
-/** A piece of gear's special, as plain text: its mod, its weapon's special and its effect; how the weapon fights its look tells. */
+const statText = (stats: Partial<Stats>) => (Object.keys(stats) as (keyof Stats)[]).map((key) => STAT_TEXT[key](stats[key]!)).join(', ')
+
+/** A piece of gear's special, as plain text: its weapon's special and its effect. Its numbers are its type's tip. */
 export function gearText(gear: Gear): string {
-  const mod = (Object.keys(gear.stats) as (keyof Stats)[]).map((key) => STAT_TEXT[key](gear.stats[key]!)).join(', ')
-  const said = [mod, WEAPONS[gear.weapon].special, gear.effect ? EFFECTS[gear.effect].text : '']
+  const said = [WEAPONS[gear.weapon].special, gear.effect ? EFFECTS[gear.effect].text : '']
   return [...new Set(said.filter(Boolean))].map((line) => `${line}.`).join(' ')
 }
 
-/** What a piece of gear plainly is. */
-export const gearType = (gear: Gear) => WEAPONS[gear.weapon].type
+const kitText = (kit: Kit) => `${kit.shots} × ${Math.round(100 * kit.power)}% damage${kit.wide ? `, ${Math.round(100 * kit.wide)}% splash beside` : ''}${kit.range ? `, range ${kit.range}` : ''}`
+
+/** A piece of gear's numbers: its weapon's attacks and stat changes, then its mod's. */
+export function gearStats(gear: Gear): string[] {
+  const w = WEAPONS[gear.weapon]
+  return [
+    `Attack: ${kitText(w.attack)}`,
+    w.thrown && `Thrown: ${kitText(w.thrown)}`,
+    w.rocket && `Rocket: ${kitText(w.rocket)}`,
+    w.dash && `Dashes ${w.dash} tiles to strike`,
+    statText(w.stats),
+    Object.keys(gear.stats).length > 0 && `${gear.name.split(' ')[0]}: ${statText(gear.stats)}`,
+  ].filter((line): line is string => Boolean(line))
+}
+
+/** What a piece of gear plainly is, its numbers shown on hover, focus or tap. */
+export const gearType = (gear: Gear) => `<span class="tip" ${markTip([WEAPONS[gear.weapon].type, ...gearStats(gear)])}>${WEAPONS[gear.weapon].type}</span>`
 
 /** Words that explain themselves on hover. */
 const tip = (label: string, text: string) => `<span class="tip" title="${text}">${label}</span>`
