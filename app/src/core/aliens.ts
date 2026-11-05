@@ -12,6 +12,10 @@ export const REGEN_HEAL = 3
 export const NODE_EVERY = 2
 /** Swarmlings a hive node has in it. */
 export const NODE_SPAWNS = 4
+/** Tiles a leaper's pounce reaches; what a dreadhorn's ram adds; the most a kinhound's pack adds. */
+export const POUNCE_REACH = 9
+export const RAM_DAMAGE = 2
+export const PACK_MAX = 3
 /** Plates a juggernaut has over its equipment's armor. */
 const PLATES = 3
 
@@ -35,6 +39,12 @@ export type AlienKind =
   | 'turret'
   | 'harvester'
   | 'husk'
+  | 'leaper'
+  | 'vise'
+  | 'dreadhorn'
+  | 'aegis'
+  | 'kinhound'
+  | 'zealot'
 
 /** How much of a threat an alien is, as the map tells it before the fight. */
 export const DANGERS = ['small', 'medium', 'large'] as const
@@ -223,8 +233,69 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     stance: 'rush',
     resists: [],
   },
+  leaper: {
+    name: 'Leaper',
+    text: `Attacks up close. Once a fight, it pounces up to ${POUNCE_REACH} tiles, over walls and heights, onto the hero who shoots farthest`,
+    intro: 'It does not come through the front line. It comes over it, for whoever hangs back.',
+    danger: 'medium',
+    hp: 0.8,
+    stats: { range: 1, move: 5, damage: 3, strength: 1, jump: 6 },
+    stance: 'rush',
+    resists: [],
+  },
+  vise: {
+    name: 'Vise',
+    text: 'Attacks up close; its hit holds the hero where they stand through their next turn',
+    intro: 'Claws like a clamp. Whoever it grabs is going nowhere.',
+    danger: 'medium',
+    hp: 1.2,
+    stats: { range: 1, move: 3, damage: 3, strength: 3, jump: 1 },
+    stance: 'rush',
+    resists: [],
+  },
+  dreadhorn: {
+    name: 'Dreadhorn',
+    text: `Attacks up close; a hit after it moves rams for ${RAM_DAMAGE} more, and drives the hero 2 tiles back, off a ledge if one is near`,
+    intro: 'It needs a run-up. Meet it before it gets one, and keep away from the edge.',
+    danger: 'large',
+    hp: 1.6,
+    stats: { range: 1, move: 5, damage: 4, strength: 5, jump: 1 },
+    stance: 'rush',
+    resists: [],
+  },
+  aegis: {
+    name: 'Aegis',
+    text: 'Attacks up close; its shield halves every hit but one from beside it',
+    intro: 'A living shield. Shots glance off; someone has to get in close.',
+    danger: 'medium',
+    hp: 1.2,
+    stats: { range: 1, move: 3, damage: 3, strength: 3, jump: 1 },
+    stance: 'rush',
+    resists: [],
+  },
+  kinhound: {
+    name: 'Kinhound',
+    text: `Fast, and attacks up close; each other alien beside its prey adds 1 to its hit, up to ${PACK_MAX}`,
+    danger: 'small',
+    hp: 0.6,
+    stats: { range: 1, move: 6, damage: 2, strength: 2, jump: 3 },
+    stance: 'rush',
+    resists: [],
+  },
+  zealot: {
+    name: 'Zealot',
+    text: 'Attacks up close; each quarter of its health lost adds 1 to its hit',
+    intro: 'Wounding it only makes it angrier. Finish what you start.',
+    danger: 'medium',
+    hp: 1.2,
+    stats: { range: 1, move: 4, damage: 3, strength: 3, jump: 2 },
+    stance: 'rush',
+    resists: [],
+  },
 }
 
+/** Whether a kind fights only up close. */
+export const melee = (kind: AlienKind) => (ALIENS[kind].stats.range ?? BASE_STATS.range) <= 1 && (ALIENS[kind].stats.move ?? 1) > 0
 
 /**
  * An alien's stats: its kind's, with the equipment given. A kind's health is the same all game; what grows is its
@@ -248,26 +319,32 @@ export interface Pack {
 
 export const PACKS: Pack[] = [
   { kinds: ['trooper'], cost: 1, from: 0 },
-  { kinds: ['trooper', 'trooper'], cost: 2, from: 0 },
+  { kinds: ['kinhound', 'kinhound', 'kinhound'], cost: 2, from: 0 },
   { kinds: ['swarmling', 'swarmling', 'swarmling', 'swarmling'], cost: 2, from: 0 },
-  { kinds: ['spitter', 'spitter', 'trooper'], cost: 3, from: 1 },
+  { kinds: ['zealot', 'swarmling', 'swarmling'], cost: 2, from: 0 },
+  { kinds: ['vise', 'zealot'], cost: 2, from: 0 },
   { kinds: ['spitter', 'swarmling', 'swarmling'], cost: 2, from: 0 },
   { kinds: ['trooper', 'swarmling', 'swarmling'], cost: 2, from: 0 },
+  { kinds: ['aegis', 'spitter'], cost: 3, from: 1 },
+  { kinds: ['spitter', 'kinhound', 'kinhound'], cost: 3, from: 2 },
   { kinds: ['burster', 'burster', 'swarmling', 'swarmling'], cost: 3, from: 2 },
   { kinds: ['brute', 'swarmling', 'swarmling'], cost: 3, from: 2 },
+  { kinds: ['leaper', 'leaper'], cost: 3, from: 2 },
+  { kinds: ['dreadhorn', 'kinhound', 'kinhound'], cost: 3, from: 2 },
+  { kinds: ['aegis', 'aegis', 'spitter'], cost: 3, from: 2 },
   { kinds: ['brute', 'spitter'], cost: 3, from: 3 },
-  { kinds: ['psion', 'trooper', 'trooper'], cost: 4, from: 3 },
+  { kinds: ['psion', 'vise', 'aegis'], cost: 4, from: 3 },
   { kinds: ['brute', 'brute', 'burster'], cost: 5, from: 4 },
   { kinds: ['burrower', 'burrower'], cost: 3, from: 1 },
   { kinds: ['sprinter', 'sprinter', 'sprinter'], cost: 3, from: 1 },
-  { kinds: ['juggernaut', 'trooper'], cost: 3, from: 2 },
+  { kinds: ['juggernaut', 'aegis'], cost: 3, from: 2 },
   { kinds: ['incubator', 'swarmling', 'swarmling'], cost: 3, from: 2 },
   { kinds: ['regenerator', 'regenerator'], cost: 3, from: 2 },
   { kinds: ['wraith', 'wraith'], cost: 3, from: 3 },
-  { kinds: ['feeder', 'trooper', 'trooper'], cost: 3, from: 3 },
-  { kinds: ['hiveNode', 'trooper'], cost: 3, from: 3 },
-  { kinds: ['mirror', 'trooper'], cost: 3, from: 4 },
-  { kinds: ['turret', 'trooper'], cost: 3, from: 1 },
+  { kinds: ['feeder', 'zealot', 'kinhound'], cost: 3, from: 3 },
+  { kinds: ['hiveNode', 'vise'], cost: 3, from: 3 },
+  { kinds: ['mirror', 'zealot'], cost: 3, from: 4 },
+  { kinds: ['turret', 'vise'], cost: 3, from: 1 },
 ]
 
 /** The packs a mission of the given force sends, at the given depth: random picks that the force can pay for. */

@@ -3,7 +3,7 @@ import { type Battle, type Unit, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE,
 import { cloakOn } from './abilities'
 import { duoCrit, duoDamage, duoHit } from './duo-effects'
 import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './keystones'
-import { freeTilesNear, blocked, walkingDistances, crumble, wreck, onGrid, NEIGHBORS, distance } from './grid'
+import { freeTilesNear, blocked, crumble, wreck, onGrid, NEIGHBORS, distance } from './grid'
 import { PARRY_SOAK } from './doctrines'
 import { FRAG_SPLASH, KNOCK_TILES, type Secondary } from './secondaries'
 import type { GameEvent } from './combat-event'
@@ -15,7 +15,8 @@ import { SLAM_DAMAGE } from './wound'
 import { TUNING } from './tuning'
 import { bite, MIN_DAMAGE, odds } from './sight'
 import { random } from './rng'
-import { paths, bestPath, preyed, walk, leapTo } from './pathing'
+import { preyed, leapTo } from './pathing'
+import { charge, fury, hold, turned } from './brawlers'
 import { FUEL_DAMAGE } from './twists'
 import { BLOCK_SOAK, WEAPONS, type Guard, type Kit, type Weapon } from './weapons'
 
@@ -84,7 +85,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const taunting = inReach.filter((other) => has(other, 'taunt'))
   // Aliens spread their fire: a healthier soldier is the likelier target, so wounds fall across the squad.
   const spread = (other: Unit) => (unit.side === 'alien' && !other.civilian ? SPREAD * (other.hp / other.stats.hp) : 0)
-  const value = (other: Unit) => spread(other) + preyed(other, bite(battle, unit, other, unit.stats)) + worth(battle, unit, other)
+  const value = (other: Unit) => spread(other) + preyed(other, bite(battle, unit, other, unit.stats)) / (turned(unit, other) ? 2 : 1) + worth(battle, unit, other)
   let enemy: Unit | undefined
   for (const other of taunting.length > 0 ? taunting : inReach) {
     const gain = enemy ? value(other) - value(enemy) : 1
@@ -152,6 +153,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(enemy.rooted > 0, 'net', 2) +
     when(enemy.boss, 'bounty', BOUNTY_DAMAGE) +
     stackDamage(unit, enemy, used) +
+    fury(battle, unit, enemy) +
     duoDamage(battle, unit, enemy, events)
   // A fraction is a chance of one point more, so small shots add up to their share.
   const scaled = blow && blow.kit.power !== 1 ? Math.floor(dealt * blow.kit.power + random(battle)) : dealt
@@ -161,7 +163,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     damage = Math.ceil(damage / 2)
     events.push({ type: 'effect', id: enemy.id, effect: distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield', amount: 0 })
   }
-  if (has(enemy, 'fortress') || hallowed(battle, enemy)) damage = Math.ceil(damage / 2)
+  if (has(enemy, 'fortress') || hallowed(battle, enemy) || turned(unit, enemy)) damage = Math.ceil(damage / 2)
   if (enemy.invulnerable) damage = 0
   if (has(enemy, 'intangible') && random(battle) < INTANGIBLE_CHANCE) {
     damage = 0
@@ -316,6 +318,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   afterHit(battle, unit, enemy, damage, beside, events)
   duoHit(battle, unit, enemy, damage, { crit, unseen }, beside, events)
   if (first && enemy.kind === 'brute' && enemy.hp > 0 && unit.hp > 0) charge(battle, enemy, unit, events)
+  if (first && damage > 0) hold(unit, enemy, events)
   return blow ? events : [...events, ...again(battle, unit, seen, granted, enemy.hp <= 0)]
 }
 
@@ -428,12 +431,6 @@ export function napalm(battle: Battle, unit: Unit, seen: Set<number>): GameEvent
     if (target) kindle(battle, target, burnFrom(unit))
   }
   return events
-}
-
-/** A brute that survives a hit charges: it moves at once as near the shooter as its move allows. */
-export function charge(battle: Battle, brute: Unit, shooter: Unit, events: GameEvent[]): void {
-  const toShooter = walkingDistances(battle, shooter, brute.stats.jump)
-  walk(battle, brute, bestPath(paths(battle, brute, brute.stats.move), brute, (end) => [toShooter[end.y * GRID + end.x]]), events)
 }
 
 export const BLINK_REACH = 5

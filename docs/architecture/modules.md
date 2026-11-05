@@ -23,6 +23,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `sides.ts` | A side's simultaneous move: sighting, walking, sentries, overwatch |
 | `pathing.ts` | Where a unit moves: candidate paths scored by stance, goal and threat |
 | `attack.ts` | A shot and what a hit or kill sets off |
+| `brawlers.ts` | Rules of aliens that fight up close: charge, pounce, hold, ram, shield, pack, fury |
 | `abilities.ts` | Actions in place of a shot: alien powers, soldier skills and gear |
 | `keystones.ts` | Tier 3 powers: what a hit sets off, their numbers |
 | `follow-ups.ts` | Command's ally attack, Blade Dance's extra strikes |

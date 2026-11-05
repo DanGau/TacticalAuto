@@ -4,7 +4,9 @@ import { TUNING } from './tuning'
 // These duels stage exact hits and survivals, whatever the balance numbers are.
 beforeAll(() => void Object.assign(TUNING, { alienHp: 0.5, alienDamage: 1 }))
 import { beforeAll, expect, test } from 'vitest'
-import { ALIENS, alienStats, HATCH_TURNS, muster, NODE_EVERY, REGEN_HEAL, type AlienKind } from './aliens'
+import { ALIENS, alienStats, HATCH_TURNS, melee, muster, NODE_EVERY, RAM_DAMAGE, REGEN_HEAL, type AlienKind } from './aliens'
+import { fury, hold, pounce, turned } from './brawlers'
+import { fightPath } from './pathing'
 import { enterAt, begun } from './roads'
 import { apply } from './apply'
 import { isSoldier, ACID_DAMAGE, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH, PSI_BACKLASH, SPAWN_EVERY, SPIT_DAMAGE, GRID, MECH_STATS, DRONE_STATS, TITAN_HEALTH, LEAP_DAMAGE, SLAM_HIT, SLAM_TILES, HURL_DAMAGE, type Battle, type Unit } from './battle'
@@ -530,4 +532,52 @@ test('Intimidate stuns every alien near the soldier but a boss; Force Field armo
   Object.assign(field.soldier, { effects: ['forceField'], hp: 10 })
   field.until((all) => all.some((e) => e.type === 'effect' && e.effect === 'forceField'))
   expect(field.soldier.spent).toContain('forceField')
+})
+
+test('a leaper pounces once, over a wall, onto the hero who shoots farthest', () => {
+  const { battle, soldier, aliens, until } = arena([{ kind: 'leaper', x: 10, y: 18 }])
+  const sniper: Unit = { ...soldier, id: 99, x: 4, y: 10, stats: { ...soldier.stats, range: 9, move: 0, damage: 0 }, effects: [], spent: [] }
+  battle.units.push(sniper)
+  soldier.stats = { ...soldier.stats, move: 0, range: 0 }
+  for (let x = 0; x < GRID; x++) battle.north[15 * GRID + x] = 'wall'
+  reshaped(battle)
+  until((all) => all.some((e) => e.type === 'move' && e.id === aliens[0].id))
+  expect(distance(aliens[0], sniper)).toBe(1)
+  expect(aliens[0].spent).toContain('leap')
+  expect(pounce(battle, aliens[0])).toEqual([])
+})
+
+test("a vise's hit holds the hero through their next turn", () => {
+  const { battle, soldier, aliens } = arena([{ kind: 'vise', x: 10, y: 11 }])
+  hold(aliens[0], soldier, [])
+  expect(soldier.rooted).toBe(2)
+  expect(fightPath(battle, soldier)).toEqual([])
+})
+
+test('a dreadhorn rams harder after moving, a kinhound per ally beside its prey, a zealot per quarter of health lost', () => {
+  const { battle, soldier, aliens } = arena([
+    { kind: 'dreadhorn', x: 10, y: 11 },
+    { kind: 'kinhound', x: 9, y: 11 },
+    { kind: 'zealot', x: 11, y: 11 },
+  ])
+  const [horn, hound, zealot] = aliens
+  expect(fury(battle, horn, soldier)).toBe(0)
+  horn.moved = true
+  expect(fury(battle, horn, soldier)).toBe(RAM_DAMAGE)
+  expect(fury(battle, hound, soldier)).toBe(2)
+  expect(fury(battle, zealot, soldier)).toBe(0)
+  zealot.hp = Math.floor(zealot.stats.hp / 2)
+  expect(fury(battle, zealot, soldier)).toBe(2)
+})
+
+test("an aegis's shield halves a hit from afar, but not one from beside it", () => {
+  const { aliens } = arena([{ kind: 'aegis', x: 10, y: 14 }])
+  expect(turned({ x: 10, y: 10 }, aliens[0])).toBe(true)
+  expect(turned({ x: 10, y: 13 }, aliens[0])).toBe(false)
+})
+
+test('most aliens a mission musters fight up close', () => {
+  const rng = { rng: 3 }
+  const kinds = Array.from({ length: 200 }, (_, i) => muster(rng, 6, i % 5)).flat().flatMap((p) => p.kinds)
+  expect(kinds.filter(melee).length / kinds.length).toBeGreaterThan(0.6)
 })

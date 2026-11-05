@@ -8,6 +8,7 @@ import { canHurlFrom } from './objects'
 import { pushesOff } from './knockback'
 import { bite, canShoot, sees } from './sight'
 import { WEAPONS } from './weapons'
+import { pounce, turned } from './brawlers'
 
 /**
  * The cheapest path to each tile the unit can reach with `move`, climbing costing more and jumping as its jump allows, cheapest first,
@@ -246,7 +247,7 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const mine = (end: Tile) => {
     const chances = enemies
       .filter((enemy) => shootable(battle, unit, end, enemy, seen))
-      .map((enemy) => preyed(enemy, bite(battle, end, enemy, unit.stats)))
+      .map((enemy) => preyed(enemy, bite(battle, end, enemy, unit.stats)) / (turned(end, enemy) ? 2 : 1))
     return Math.round(100 * Math.max(0, ...chances))
   }
   // Heroes fight in the open; a cloaked unit fears no shot.
@@ -329,6 +330,8 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   if (still && shotHere && !battle.extract && !leash(unit) && !acid(unit)) return []
   // A booming charge pins a unit that can fight from where it stands; a rooted one cannot move at all.
   if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || unit.frozen || (unit.kind === 'sprinter' && unit.chill > 0)) return []
+  const pounced = pounce(battle, unit)
+  if (pounced.length > 0) return pounced
   // A carrier walks at half its move.
   const move = Math.ceil(Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chill > 0 ? CHILL_MOVE : 0)) / (carrying(battle, unit) ? 2 : 1))
   const path = choose(move)

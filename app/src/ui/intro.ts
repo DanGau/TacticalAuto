@@ -63,6 +63,18 @@ const PORTRAITS: Partial<Record<AlienKind, string>> = {
   harvester: `<ellipse cx="100" cy="104" rx="34" ry="44" fill="#7a2fd1"/>
     ${[[-1, 60], [1, 60], [-1, 100], [1, 100]].map(([s, y]) => `<path d="M${100 + s * 28} ${y} Q${100 + s * 80} ${y - 30} ${100 + s * 70} ${y + 50}" stroke="#4a1a80" stroke-width="7" fill="none"/>`).join('')}
     <path d="M86 140 L92 176 L100 146 L108 176 L114 140Z" fill="#4a1a80"/><circle cx="90" cy="88" r="5" fill="#ffd166"/><circle cx="110" cy="88" r="5" fill="#ffd166"/>`,
+  leaper: `<path d="M30 170 Q70 150 90 120 L60 80 Q90 90 104 110 L120 60 Q150 70 150 100 L176 92 L150 124 Q140 150 170 176" fill="#38d6c9"/>
+    <circle cx="136" cy="80" r="6" fill="#10141c"/><path d="M20 190 Q100 20 190 60" stroke="#38d6c9" stroke-width="3" fill="none" stroke-dasharray="8 8" opacity="0.5"/>`,
+  vise: `<ellipse cx="100" cy="124" rx="46" ry="52" fill="#4a7bd8"/>
+    ${[-1, 1].map((s) => `<path d="M${100 + s * 40} 100 Q${100 + s * 90} 70 ${100 + s * 74} 30 L${100 + s * 56} 52 Q${100 + s * 70} 74 ${100 + s * 44} 88Z" fill="#2c4f96"/>`).join('')}
+    <circle cx="88" cy="104" r="5" fill="#ffd166"/><circle cx="112" cy="104" r="5" fill="#ffd166"/>`,
+  dreadhorn: `<ellipse cx="100" cy="128" rx="72" ry="50" fill="#7a2e1e"/><ellipse cx="60" cy="110" rx="34" ry="30" fill="#5a1e12"/>
+    <path d="M40 96 Q10 70 30 40 Q40 76 60 88Z M56 84 Q60 50 86 40 Q72 66 72 88Z" fill="#e8dcc0"/><circle cx="52" cy="106" r="5" fill="#ff5555"/>`,
+  aegis: `<ellipse cx="100" cy="120" rx="40" ry="56" fill="#8a7430"/>
+    <path d="M60 50 L140 50 L140 120 Q140 160 100 180 Q60 160 60 120Z" fill="#d4b44a" stroke="#6a5a20" stroke-width="5"/>
+    <path d="M100 66 L100 160 M72 104 L128 104" stroke="#6a5a20" stroke-width="5"/>`,
+  zealot: `<path d="M100 20 Q120 60 150 50 Q140 90 170 100 Q130 110 140 150 Q110 130 100 180 Q90 130 60 150 Q70 110 30 100 Q60 90 50 50 Q80 60 100 20Z" fill="#ff8a3d" opacity="0.6"/>
+    <ellipse cx="100" cy="112" rx="40" ry="46" fill="#e8332a"/><path d="M80 96 L96 104 M120 96 L104 104" stroke="#10141c" stroke-width="5"/>`,
 }
 
 /**

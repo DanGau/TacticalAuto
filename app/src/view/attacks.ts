@@ -1,4 +1,5 @@
 // How each weapon's attack looks on screen.
+import { melee } from '../core/aliens'
 import type { Unit } from '../core/battle'
 import type { SecondaryId } from '../core/secondaries'
 import type { WeaponId } from '../core/weapons'
@@ -88,8 +89,7 @@ export const finisher = (gun: Attack): Attack => ({ ...gun, hitstop: gun.hitstop
 /** How a unit's attack looks: a soldier's by its weapon and the `form` of the shot; an alien's by kind, a boss's lance, a mech's cannons. */
 export function attackOf(unit: Unit, form?: Extract<GameEvent, { type: 'shot' }>['form']): Attack {
   if (unit.boss) return ATTACKS.lance
-  if (unit.kind === 'swarmling') return ATTACKS.claw
-  if (unit.kind === 'brute') return ATTACKS.maul
+  if (unit.kind && melee(unit.kind)) return unit.stats.strength >= 3 ? ATTACKS.maul : ATTACKS.claw
   if (unit.kind) return ATTACKS.plasma
   if (unit.summoner !== null) return ATTACKS.cannon
   if (form === 'rocket') return ATTACKS.fistRocket

@@ -71,6 +71,12 @@ export const ALIEN_LOOK: Record<AlienKind, { color: number; scale: number }> = {
   turret: { color: 0x5f7a6a, scale: 1.1 },
   harvester: { color: 0x7a2fd1, scale: 1.1 },
   husk: { color: 0x9a9a7a, scale: 0.9 },
+  leaper: { color: 0x38d6c9, scale: 0.9 },
+  vise: { color: 0x4a7bd8, scale: 1.15 },
+  dreadhorn: { color: 0x7a2e1e, scale: 1.5 },
+  aegis: { color: 0xd4b44a, scale: 1.2 },
+  kinhound: { color: 0xc9a27a, scale: 0.75 },
+  zealot: { color: 0xe8332a, scale: 1.1 },
 }
 
 /** A colour lightened toward white, a step for each level of height, so high ground reads at a glance. */

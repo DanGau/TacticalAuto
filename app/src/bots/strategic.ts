@@ -51,7 +51,7 @@ function deploy(run: Run): Action {
   if (index < 0) return { type: 'enter' }
   if (run.utilities[index] === 'tank') return { type: 'enter', utility: index, tank: tankFor(run) }
   const second = reservoir && run.boons >= BOON_CHARGES && battle.challenge ? answerFor({ ...run, utilities: run.utilities.map((id, i) => (i === index ? 'tank' : id)) }, battle.challenge) : -1
-  return second >= 0 && run.utilities[second] !== 'tank' ? { type: 'enter', utility: index, second } : { type: 'enter', utility: index }
+  return second >= 0 && !['tank', run.utilities[index]].includes(run.utilities[second]) ? { type: 'enter', utility: index, second } : { type: 'enter', utility: index }
 }
 
 /** The stops reachable in the next few columns, nearest first. */

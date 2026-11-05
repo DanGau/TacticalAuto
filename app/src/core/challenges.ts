@@ -50,11 +50,11 @@ export function drawChallenge(rng: { rng: number }, party: number, rung: number,
 const FORCES: Record<ChallengeId, AlienKind[]> = {
   slog: ['trooper', 'trooper', 'spitter'],
   firingLine: ['trooper'],
-  ironWall: ['trooper', 'trooper', 'brute'],
-  swarm: ['swarmling', 'swarmling', 'swarmling', 'burster', 'swarmling', 'brute'],
-  scattered: ['trooper'],
-  bigOne: ['trooper', 'brute'],
-  killBox: ['brute', 'trooper', 'brute'],
+  ironWall: ['aegis', 'trooper', 'brute', 'vise'],
+  swarm: ['swarmling', 'swarmling', 'kinhound', 'burster', 'swarmling', 'brute'],
+  scattered: ['zealot', 'trooper', 'vise'],
+  bigOne: ['dreadhorn', 'zealot', 'brute', 'trooper'],
+  killBox: ['brute', 'kinhound', 'vise', 'trooper'],
 }
 
 /** What comes when a Scattered's clock runs out. */

@@ -23,7 +23,7 @@ export const RISKS: Record<Risk, { name: string; aliens: number; supplies: numbe
   dangerous: { name: 'Overrun', aliens: 1, supplies: TUNING.dangerSupplies, gear: 1, rareGear: true, utility: 1, text: 'More aliens, and a piece of rare or better gear' },
 }
 
-/** What an assassination's commander has over a trooper, its guards, and the depth from which it has one more. */
+/** What an assassination's commander has over a trooper, its guards (a trooper, then aegises), and the depth from which it has one more. */
 export const COMMANDER = { hp: 6, armor: 2, guards: 2, moreFrom: 3 }
 
 /** The force the hunt adds to a mission: at full threat, TUNING.hunt of its own. */
@@ -39,7 +39,7 @@ export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goa
 /**
  * The aliens of a mission: mustered at random for its force. A kind's health never changes;
  * deeper along the road aliens are better equipped: a point of armor each step, a point of damage every second. A key or final mission adds a boss, a trooper built up by the keys
- * already won: each adds health, armor and an escorting trooper; from the second satellite on it hits harder and
+ * already won: each adds health, armor and an escort, a zealot and a vise in turn; from the second satellite on it hits harder and
  * spawns swarmlings, and from the third it shoots farther.
  */
 export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], challenge: ChallengeId | null = null): Alien[] {
@@ -57,7 +57,7 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], cha
   if (mission.goal === 'assassinate') {
     const commander = alien('trooper')
     commander.stats = { ...commander.stats, hp: commander.stats.hp + COMMANDER.hp, armor: commander.stats.armor + COMMANDER.armor, damage: commander.stats.damage + 1 }
-    const guards = Array.from({ length: COMMANDER.guards + (tier >= COMMANDER.moreFrom ? 1 : 0) }, () => alien('trooper'))
+    const guards = Array.from({ length: COMMANDER.guards + (tier >= COMMANDER.moreFrom ? 1 : 0) }, (_, i) => alien(i === 0 ? 'trooper' : 'aegis'))
     aliens.unshift({ ...commander, target: true, stance: 'anchor' }, ...guards)
   }
   // A terror site's harvesters, more of them deeper along the road.
@@ -80,7 +80,7 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], cha
     const k = run.keys
     const rung = extraction ? 2 : rungOf(run.stop)
     const stats = { ...bigOneStats(run.soldiers.length, rung, BASE_STATS), range: BASE_STATS.range + (k >= 2 ? 1 : 0) }
-    const escorts = Array.from({ length: escort }, () => alien('trooper'))
+    const escorts = Array.from({ length: escort }, (_, i) => alien(i % 2 === 0 ? 'zealot' : 'vise'))
     aliens.unshift({ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: extraction && k >= 1, target: false, resists: [run.bosses[k]] }, ...escorts)
   }
   return aliens
