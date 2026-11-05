@@ -5,7 +5,7 @@ import { dropGear, GEAR_PRICE, SELL } from '../core/rewards'
 import { findSwap, gearPicks, kept, swapKey } from './cards'
 
 /** Each card's label and the name on it, as the player reads them. */
-const cards = (html: string) => [...html.matchAll(/class="side (keep|sell)".*?<small class="verb">(\w+).*?<b class="tier \w+">\w+ ([^<]+)<\/b>/g)].map(([, look, verb, name]) => ({ look, verb, name }))
+const cards = (html: string) => [...html.matchAll(/class="side (keep|sell)[^"]*".*?<small class="verb">(\w+).*?<b class="tier \w+">\w+ ([^<]+)<\/b>/g)].map(([, look, verb, name]) => ({ look, verb, name }))
 const confirm = (html: string): Action => JSON.parse(html.match(/class="decide confirm" data-action='([^']+)'/)![1])
 
 test.each(['old', 'new'] as const)('a find swap keeping the %s weapon: Confirm keeps the KEEP card and sells the SELL card', (keep) => {
@@ -34,6 +34,16 @@ test('a find swap keeps the held weapon until the found one is chosen', () => {
   dropGear(run, false)
   expect(cards(findSwap(run, 0, null))[0]).toMatchObject({ verb: 'keep', name: hero.gear!.name })
   expect(kept({ ...hero, gear: null }, null)).toBe('new')
+})
+
+test('the found card is tagged new and arrives when the swap opens; the held card is plain', () => {
+  const run = begun(1)
+  const [hero] = run.soldiers
+  dropGear(run, false)
+  const sides = (html: string) => [...html.matchAll(/<button class="side ([^"]*)"[^>]*>(<span class="new">NEW<\/span>)?/g)].map(([, cls, tag]) => ({ found: cls.includes('found'), arrive: cls.includes('arrive'), tag: !!tag }))
+  expect(sides(findSwap(run, 0, null))).toEqual([{ found: false, arrive: false, tag: false }, { found: true, arrive: true, tag: true }])
+  expect(sides(findSwap(run, 0, swapKey(hero, 'old')))).toEqual([{ found: false, arrive: false, tag: false }, { found: true, arrive: false, tag: true }])
+  expect(sides(findSwap(run, 0, swapKey(hero, 'new')))[1].arrive).toBe(false)
 })
 
 test('a shop buy keeps the bought weapon and sells the held one, as its cards say', () => {

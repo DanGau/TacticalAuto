@@ -82,7 +82,7 @@ export function kept(soldier: Soldier, armed: string | null): Keep {
 /** What confirming does: keeping the find equips it, selling the held; keeping the held sells the find. */
 export const swapAction = (find: number, soldier: Soldier, keep: Keep): Action => (keep === 'new' ? { type: 'equip', find, soldier: soldier.id } : { type: 'sell', find })
 
-/** The swap for the find at `index`: whose weapon it sets against, then the two, one kept and one sold, and Confirm. */
+/** The swap for the find at `index`: whose weapon it sets against, then the two, one kept and one sold, and Confirm. Unarmed, the swap has just opened and the find arrives. */
 export function findSwap(run: Run, index: number, armed: string | null): string {
   const gear = run.finds[index]
   const chosen = armed?.split('~')[0]
@@ -91,7 +91,9 @@ export function findSwap(run: Run, index: number, armed: string | null): string 
   const option = (which: Keep, item: Gear | null) => {
     const on = which === keep
     const extra = !on && item ? ` · +${SELL[item.rarity]} supplies` : ''
-    return `<button class="side ${on ? 'keep' : 'sell'}" role="radio" aria-checked="${on}" data-arm="${swapKey(soldier, which)}"><small class="verb">${on ? 'keep' : 'sell'}${extra}</small><small class="label">${which === 'new' ? 'Found' : `${soldier.name} holds`}</small>${full(item)}</button>`
+    const found = which === 'new' ? ` found${armed ? '' : ' arrive'} ${gear.rarity}` : ''
+    const tag = which === 'new' ? '<span class="new">NEW</span>' : ''
+    return `<button class="side ${on ? 'keep' : 'sell'}${found}" role="radio" aria-checked="${on}" data-arm="${swapKey(soldier, which)}">${tag}<small class="verb">${on ? 'keep' : 'sell'}${extra}</small><small class="label">${which === 'new' ? 'Found' : `${soldier.name} holds`}</small>${full(item)}</button>`
   }
   const heroes = run.soldiers.length > 1 ? `<div class="takers">${run.soldiers.map((s) => `<button class="who${s === soldier ? ' chosen' : ''}" data-arm="${swapKey(s, kept(s, null))}"><span class="portrait">${badge(s.cls)}</span>${s.name}</button>`).join('')}</div>` : ''
   return `${heroes}<div class="swap" role="radiogroup" aria-label="Keep which weapon">${option('old', soldier.gear)}${option('new', gear)}</div>

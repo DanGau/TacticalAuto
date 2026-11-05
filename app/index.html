@@ -289,6 +289,18 @@
       .swap .keep .verb { color: #6fe08c; }
       .swap .sell .verb { color: #ffd166; }
       .swap .label { color: #9aa6bd; }
+      .swap .found { position: relative; overflow: hidden; --glow: #9aa6bd; }
+      .swap .found.rare { --glow: #4da3ff; }
+      .swap .found.epic { --glow: #c77dff; }
+      .swap .found .new { position: absolute; top: 0; right: 0; padding: 2px 7px; border-bottom-left-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 1px; color: #10141c; background: var(--glow); }
+      .swap .arrive { animation: arrive 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both, arriveglow 0.6s ease-out both; }
+      .swap .arrive::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, color-mix(in srgb, var(--glow) 55%, transparent) 50%, transparent 65%); transform: translateX(-100%); animation: shine 0.55s 0.15s ease-out forwards; pointer-events: none; }
+      .loot .swap .arrive, .loot .swap .arrive::after { animation-delay: 1.5s; }
+      @keyframes arrive { from { opacity: 0; transform: translateY(-28px) scale(0.85); } }
+      @keyframes arriveglow { 50% { box-shadow: 0 0 22px var(--glow); } }
+      @keyframes shine { to { transform: translateX(100%); } }
+      @media (prefers-reduced-motion: reduce) { .swap .arrive { animation: fadein 0.4s both; } .swap .arrive::after { display: none; } }
+      @keyframes fadein { from { opacity: 0; } }
       .swap ~ .confirm { display: block; margin: 10px auto 0; }
       .takers { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 10px; }
       .takers .who { display: flex; align-items: center; gap: 6px; width: auto; border-radius: 20px; }
