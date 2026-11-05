@@ -21,6 +21,7 @@ import { xpFor } from '../core/squad'
 import { LEG_STOPS } from '../core/progress'
 import { FEATS } from '../core/feats'
 import { TWISTS } from '../core/twists'
+import { objective, THREATS } from '../core/objectives'
 import { CHALLENGES } from '../core/challenges'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
@@ -152,17 +153,17 @@ function readChallenge(run: Run, stop: Stop): string {
   if (!stop.challenge) return ''
   const challenge = CHALLENGES[stop.challenge]
   const held = challenge.answers.filter((id) => run.utilities.includes(id))
-  return `${challenge.icon} <b>${challenge.name}.</b> ${challenge.test}. <small class="${held.length > 0 ? 'down' : 'up'}">${held.length > 0 ? `Held: ${held.map((id) => UTILITIES[id].name).join(', ')}` : 'No answer held'}</small>`
+  return `<span title="${challenge.name}: ${challenge.test}">${challenge.icon} ${THREATS[stop.challenge]}</span> <small class="${held.length > 0 ? 'down' : 'up'}">${held.length > 0 ? `Held: ${held.map((id) => UTILITIES[id].name).join(', ')}` : 'No answer held'}</small>`
 }
 
 /** What the squad faces at a stop, as the map's heading. */
 function where(run: Run, stop: Stop): string {
   const stage = run.route[run.keys]
-  if (stop.kind === 'final') return `The alien hub<br>${readChallenge(run, stop)}`
-  if (stop.kind === 'key') return `${stage.hero ? `Free ${stage.hero.name}` : 'Storm the stronghold'}<br>${readChallenge(run, stop)}`
   // A stop's icon tells what it is; only a fight says more.
-  if (stop.kind !== 'battle') return ''
-  return `${GOALS[stop.goal].name} · ${RISKS[stop.risk].name}${stop.twist ? ` · ${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}` : ''}<br>${readChallenge(run, stop)}`
+  if (stop.kind !== 'battle' && stop.kind !== 'key' && stop.kind !== 'final') return ''
+  const order = `<b title="${GOALS[stop.goal].text}">${objective(stop.kind, stop.goal, stop.challenge, stop.terrain, stage.hero?.name)}</b>`
+  const extras = stop.kind === 'battle' ? ` · ${RISKS[stop.risk].name}${stop.twist ? ` · <span title="${TWISTS[stop.twist].text}">${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}</span>` : ''}` : ''
+  return `${order}${extras}<br>${readChallenge(run, stop)}`
 }
 
 const PURCHASED = '<small class="purchased">Purchased</small>'
@@ -229,7 +230,7 @@ function mapView(run: Run, picked: number | null, armed: string | null, ware: nu
   if (!node) return `${brief(where(run, ahead!))}${runMap(run, picked)}`
   const next = nextStop(run)!
   const here = node.stop!
-  return `${brief(next === 'recovery' ? '<b class="up">Recover your heroes</b>' : next === 'ambush' ? '<b class="up">Ambushed: survive</b>' : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
+  return `${brief(next === 'recovery' || next === 'ambush' ? `<b class="up">${objective(next, next === 'ambush' ? 'ambush' : 'recover', null, here.terrain)}</b>` : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
     ${runMap(run, null)}`
 }
 

@@ -1,4 +1,5 @@
 // The browser entry: wires the run, view and UI, the battle loop, and window.debug.
+import { missionOrder } from './core/objectives'
 import { apply, type Action, type Result } from './core/apply'
 import type { GameEvent } from './core/combat-event'
 import { createRun } from './core/run'
@@ -72,7 +73,7 @@ async function show(events: GameEvent[], animate: boolean): Promise<void> {
   ui.update(state)
   if (state.battle?.phase === 'deploy' && state.battle !== briefed && !params.has('manual')) {
     briefed = state.battle
-    void brief(view, state.battle)
+    void brief(view, state.battle, missionOrder(state))
   }
 }
 

@@ -12,7 +12,8 @@ import { ALIENS } from '../core/aliens'
 import { TWISTS } from '../core/twists'
 import { CHALLENGES } from '../core/challenges'
 import { type Battle } from '../core/battle'
-import { GOALS, HOLD_ROUNDS } from '../core/goals'
+import { HOLD_ROUNDS } from '../core/goals'
+import { missionOrder, THREATS } from '../core/objectives'
 import { button, STOP_NAMES } from './html'
 import { fuelTanks } from '../core/objects'
 import { UTILITIES } from '../core/utilities'
@@ -34,8 +35,7 @@ export interface Ui {
 function status(run: Run): string {
   const battle = run.battle
   if (run.phase !== 'battle' || !battle) return ''
-  const mission = run.mission!
-  const title = mission.kind === 'battle' || mission.kind === 'ambush' || mission.kind === 'recovery' ? `${GOALS[mission.goal].name}: ${GOALS[mission.goal].text}` : STOP_NAMES[mission.kind]
+  const title = missionOrder(run)
   if (battle.phase === 'deploy') return title
   const rounds = battle.extract ? ` · ${battle.escaped.length} lifted off` : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
   const clock = battle.deadline !== null && battle.round < battle.deadline ? ` · reinforcements in ${battle.deadline - battle.round} rounds` : ''
@@ -57,7 +57,7 @@ function counts(run: Run, battle: Battle): string {
  * With the reservoir charged, a boon picked, `doubling` its index, asks for a second or none.
  */
 function drop(run: Run, battle: Battle, armed: string | null, rigging: number | null, doubling: number | null): string {
-  const twist = battle.twist ? `<p>${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}.</b> ${TWISTS[battle.twist].text}.</p>` : ''
+  const twist = battle.twist ? `<p title="${TWISTS[battle.twist].text}">${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}</b></p>` : ''
   const tanks = fuelTanks(battle)
   const challenge = battle.challenge && CHALLENGES[battle.challenge]
   const go = (detail: string, picks: Pick[], idle: string) => `<p>${detail}</p><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, idle)}`
@@ -81,7 +81,7 @@ function drop(run: Run, battle: Battle, armed: string | null, rigging: number | 
             ),
             'Tap a boon or an alien to read it; tap a boon again to go in with it.',
           )
-  const test = challenge ? `<h2 class="challenge">${challenge.icon} ${challenge.name}</h2><p>${challenge.test}.</p>` : ''
+  const test = battle.challenge ? `<h2 class="challenge" title="${CHALLENGES[battle.challenge].test}">${CHALLENGES[battle.challenge].icon} ${THREATS[battle.challenge]}</h2>` : ''
   return `${test}${twist}${foes(battle, armed)}${reservoir}${chosen}`
 }
 

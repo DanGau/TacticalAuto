@@ -10,7 +10,7 @@ const trooper = (target = false): Alien => ({ kind: 'trooper', stats: BASE_STATS
 test('a briefing makes one to three stops, the last over the whole map', () => {
   for (const goal of Object.keys(GOALS) as Goal[]) {
     for (let seed = 1; seed <= 2; seed++) {
-      const all = shots(createBattle(seed, 'town', [trooper(goal === 'assassinate'), trooper(), trooper()], [], goal))
+      const all = shots(createBattle(seed, 'town', [trooper(goal === 'assassinate'), trooper(), trooper()], [], goal), 'Clear the streets')
       expect(all.length).toBeGreaterThanOrEqual(1)
       expect(all.length).toBeLessThanOrEqual(STOPS)
       expect(all.at(-1)!.tiles).toBeNull()

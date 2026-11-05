@@ -3,7 +3,6 @@ import { ALIENS } from '../core/aliens'
 import { GRID, type Battle, type Tile } from '../core/battle'
 import { heightAt } from '../core/grid'
 import type { Prop } from '../core/terrain'
-import { GOALS } from '../core/goals'
 import { REGIONS } from '../core/regions'
 import { TWISTS } from '../core/twists'
 import { YAW } from '../view/space'
@@ -97,10 +96,9 @@ export const STOPS = 3
 
 /**
  * What to show before the landing: tight on the objective, at most two things, naming the ground there, then the whole
- * map, where the landing shows. The first line names the goal; the last any twist and the way in.
+ * map, where the landing shows. The first line gives the order; the last any twist and the way in.
  */
-export function shots(battle: Battle): Shot[] {
-  const goal = GOALS[battle.goal]
+export function shots(battle: Battle, order: string): Shot[] {
   const aliens = battle.units.filter((u) => u.side === 'alien')
   const commander = aliens.find((u) => u.target)
   // The objective: the uplink, the commander, the caches, or failing those the alien most surrounded.
@@ -116,14 +114,14 @@ export function shots(battle: Battle): Shot[] {
             ? [biggest]
             : []
   const where = `${battle.city}, ${REGIONS[battle.region].name.toLowerCase()}. `
-  const lines = at.map((t, i) => `${i === 0 ? `${where}Objective: ${goal.text}. ` : ''}${nearby(battle, t)}${ground(battle, t)}.`)
+  const lines = at.map((t, i) => `${i === 0 ? `${where}${order}. ` : ''}${nearby(battle, t)}${ground(battle, t)}.`)
   const twist = battle.twist && TWISTS[battle.twist]
   const last = `${twist ? `${twist.icon} ${twist.name}: ${twist.text}.` : ''}`
-  return [...at.map((t, i): Shot => ({ tiles: around(t), line: lines[i] })), { tiles: null, line: at.length === 0 ? `${where}Objective: ${goal.text}. ${last}` : last, landing: true }]
+  return [...at.map((t, i): Shot => ({ tiles: around(t), line: lines[i] })), { tiles: null, line: at.length === 0 ? `${where}${order}. ${last}` : last, landing: true }]
 }
 
 /** Flies the camera in over the mission before the landing, adding a line on each thing it shows. Any click ends it early. */
-export async function brief(view: View, battle: Battle): Promise<void> {
+export async function brief(view: View, battle: Battle, order: string): Promise<void> {
   const caption = document.createElement('div')
   caption.className = 'brief'
   document.body.append(caption)
@@ -141,7 +139,7 @@ export async function brief(view: View, battle: Battle): Promise<void> {
   view.hideLanding(true)
   document.getElementById('drop')!.classList.add('briefing')
   document.body.classList.add('cinema')
-  const all = shots(battle)
+  const all = shots(battle, order)
   const first = all[0].tiles
   const middle = (tiles: Tile[]) => ({ x: (tiles[0].x + tiles[1].x) / 2, y: (tiles[0].y + tiles[1].y) / 2 })
   const turn = first ? facing(middle(first)) : -SWING / 2
