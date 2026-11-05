@@ -29,6 +29,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `duo-effects.ts` | What each duo does in battle |
 | `ultimates.ts` | Tier 4 powers: when each fires and what it does |
 | `wound.ts` | Damage landing, what it sets off, the battle tally |
+| `stacks.ts` | Stacks a fight builds and what they set off: burn, chill and freezing, Might, combos, exposure, every-Nth hits |
 | `upkeep.ts` | What happens as a side's turn begins: more aliens engaging, waves |
 | `fighters.ts` | Unit queries every combat module asks |
 | `sight.ts` | Line of sight, what height does to a shot, noticing |
@@ -67,6 +68,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `ultimates.ts` | A tier 4 on screen: its name, colour and shape |
 | `duos.ts` | A duo's moment on screen |
 | `sprites.ts` | Unit pictures and moving them |
+| `badges.ts` | The stacks and counts over a unit's head, the same size on any screen |
 | `marks.ts` | Ground marks: the way in, goals, fences, acid, fog, glows |
 | `board.ts` | Building the battlefield's ground, props, walls, roofs |
 | `edges.ts` | The ground's edge lines, each drawn once |
