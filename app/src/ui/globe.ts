@@ -15,6 +15,8 @@ const MARGIN = 60
 /** The fewest degrees the view spans from its middle. */
 const MIN_REACH = 3
 const RAD = Math.PI / 180
+/** A made-up island's radius in pixels, under a stop to choose and under any other. */
+export const ISLE = { choice: 7.5, stop: 5.5 }
 
 /** The window the globe is seen through, in pixels, and how much of its top and bottom the page covers. */
 interface Size {
@@ -105,7 +107,7 @@ const onLand = (at: LonLat) => {
  * A made-up island under a stop out at sea, `size` pixels round, its shore wobbling by a seed from where it stands, so
  * the way across reads as island hopping.
  */
-function island(p: { x: number; y: number }, at: LonLat, size: number): string {
+export function island(p: { x: number; y: number }, at: LonLat, size: number): string {
   const seed = Math.abs(Math.sin(at[0] * 12.9898 + at[1] * 78.233)) * 43758.5453
   const points = Array.from({ length: 24 }, (_, i) => {
     const angle = (i / 24) * 2 * Math.PI
@@ -456,7 +458,7 @@ function drawRun(size: Size, run: Run, pins: Pin[], focus: LonLat, path: string[
   const isles = pins.flatMap((pin) => {
     const p = placed.get(pin.id)!
     const face = Math.hypot(p.x - size.w / 2, p.y - open(size).middle) < view.r - 24
-    return pin.html && p.front && face && !onLand(project.invert(p.x, p.y)) ? [island(p, pin.at, pin.choice ? 24 : 18)] : []
+    return pin.html && p.front && face && !onLand(project.invert(p.x, p.y)) ? [island(p, pin.at, pin.choice ? ISLE.choice : ISLE.stop)] : []
   })
   const stops = pins.flatMap((pin) => {
     const p = placed.get(pin.id)!
