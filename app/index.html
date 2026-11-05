@@ -338,17 +338,31 @@
       .endheroes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; }
       .endhero { display: flex; gap: 8px; padding: 8px; border-radius: 6px; background: #1d2433; }
       .endhero .portrait { flex: none; width: 34px; height: 34px; font-size: 18px; }
-      .endbattles { margin: 0; padding: 0; list-style: none; columns: 2 260px; font-size: 14px; }
-      .summary .tally { margin: 0; width: 100%; }
-      .tally .portrait { width: 26px; height: 26px; font-size: 14px; }
-      .tally .total td { border-top: 1px solid #3a465c; font-weight: bold; }
       .statpage { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-      .tally { margin: 0 auto 14px; font-size: 14px; }
-      .tally th { padding: 2px 14px; color: #9aa6bd; font-weight: normal; }
-      .tally td { padding: 3px 14px; text-align: center; }
-      .tally td:first-child { display: flex; align-items: center; gap: 8px; text-align: left; white-space: nowrap; }
-      .debrief .tally .portrait { width: 26px; height: 26px; font-size: 14px; border-width: 2px; }
-      .tally td.best { color: #ffd166; font-weight: bold; }
+      .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 10px; width: min(900px, 86vw); text-align: left; }
+      .summary .charts { width: 100%; }
+      .chart { padding: 10px 12px; border-radius: 8px; background: #1d2433; }
+      .chart h4 { display: flex; justify-content: space-between; margin: 0 0 6px; font-size: 13px; font-weight: normal; text-transform: uppercase; letter-spacing: 1px; color: #9aa6bd; }
+      .chart h4 b { color: #e8ecf4; font-size: 15px; }
+      .strip-share { display: flex; height: 8px; margin-bottom: 8px; border-radius: 4px; overflow: hidden; background: #10141c; }
+      .strip-share i { height: 100%; }
+      .hbar { display: grid; grid-template-columns: minmax(0, 8em) 1fr 3em; align-items: center; gap: 8px; padding: 3px 2px; font-size: 14px; border-radius: 4px; }
+      .hbar span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .hbar .track { height: 14px; border-radius: 3px; background: #10141c; }
+      .hbar .track i { display: block; height: 100%; border-radius: 3px; }
+      .hbar b { text-align: right; }
+      [data-tip] { cursor: help; outline: none; }
+      [data-tip]:hover, [data-tip]:focus { box-shadow: 0 0 0 2px #ffd166; }
+      .charttip { position: fixed; z-index: 60; max-width: min(320px, 90vw); padding: 8px 10px; border-radius: 6px; background: #0a0d13; border: 1px solid #ffd166; font-size: 13px; line-height: 1.4; white-space: pre-line; text-align: left; pointer-events: none; }
+      .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: #9aa6bd; }
+      .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; border-radius: 2px; }
+      .columns { display: flex; gap: 3px; height: 200px; overflow-x: auto; padding: 4px 2px; }
+      .columns .col { flex: 1 0 18px; display: flex; flex-direction: column; border-radius: 3px; }
+      .columns .up, .columns .down { display: flex; flex-direction: column; min-height: 0; }
+      .columns .up { flex-direction: column-reverse; border-bottom: 1px solid #3a465c; }
+      .columns .up i, .columns .down i { flex: none; width: 100%; }
+      .columns small { text-align: center; font-size: 11px; color: #9aa6bd; }
+      .columns .lost small { color: #e04848; font-weight: bold; }
       .debrief .who { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
       .debrief .portrait { width: 96px; height: 96px; font-size: 50px; border-width: 3px; }
       .debrief .soldier .bar { height: 12px; margin-top: 10px; }

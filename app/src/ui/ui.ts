@@ -6,6 +6,7 @@ import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { skillOffers } from '../core/squad'
 import { battlePage, runSummary } from './summary'
+import { installTips } from './tip'
 import { acquired, choice, joined, loot, modal, skillChoice, spareChoice, stopReport } from './aftermath'
 import { ALIENS } from '../core/aliens'
 import { TWISTS } from '../core/twists'
@@ -100,6 +101,7 @@ function foes(battle: Battle, armed: string | null): string {
 export function createUi(act: (action: Action) => void): Ui {
   const statusLine = document.getElementById('status')!
   const overlay = document.getElementById('panel')!
+  installTips(overlay)
   const dropPanel = document.getElementById('drop')!
   let choosing: Battle | null = null
   /** On the deploy screen, the rigged tank held at this index awaiting its tank. */
@@ -160,7 +162,7 @@ export function createUi(act: (action: Action) => void): Ui {
       const find = crate !== null && run.finds[crate] ? crate : null
       // A pop-up opened over it leaves the debrief at rest behind: nothing in it plays again.
       if (learner || find !== null) opened.still = true
-      if (statsOpen && run.log.length > 0) return stopReport(run, report, true) + modal(battlePage(run.log.at(-1)!))
+      if (statsOpen && run.log.length > 0) return stopReport(run, report, true) + modal(battlePage(run, run.log.at(-1)!))
       const debrief = stopReport(run, report, opened.still)
       return learner ? debrief + modal(skillChoice(run, learner, armed)) : find !== null ? debrief + loot(run, find, armed) : debrief
     }
