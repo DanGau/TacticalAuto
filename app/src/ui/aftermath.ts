@@ -17,7 +17,7 @@ import { level } from '../core/squad'
 import { xpFor } from '../core/squad'
 import { CAPSTONE_PICKS, SKILLS, TREES, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
-import { gearPicks, pickCard, pickDetail, sellPick, utilityPick, type Pick } from './cards'
+import { findPicks, pickCard, pickDetail, utilityPick, type Pick } from './cards'
 import { heroSheet, skillState, treeGrid } from './sheet'
 import { badge, button, describe, gearCard, gearText, gearType, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
@@ -75,11 +75,11 @@ export function acquired(run: Run, gain: Gain): string {
 /** A pop-up over the debrief, `html` inside it. */
 export const modal = (html: string) => `<div class="modal"><div class="sheet">${html}</div></div>`
 
-/** Who takes the find at `index`, or sell it: fixed cards, tapped once to compare and again to confirm. */
+/** Who takes the find at `index`, or sell it: a hero tapped sets what they hold beside it, to keep one and sell the other. */
 function takers(run: Run, index: number, armed: string | null): string {
-  const gear = run.finds[index]
-  const picks = [...gearPicks(run, gear, (soldier) => ({ type: 'equip', find: index, soldier: soldier.id }), 'give it to'), sellPick(gear, index)]
-  return `<div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a hero to compare; tap again to confirm.')}`
+  const picks = findPicks(run, index, armed)
+  const hero = armed?.split('~')[0] ?? null
+  return `<div class="picks">${picks.map((p) => pickCard(p, hero)).join('')}</div>${pickDetail(picks, hero, 'Tap a hero to choose what they keep.')}`
 }
 
 /** A crate opened, in a pop-up: it shakes, bursts in its gear's rarity, and the gear rises out of it; then the player picks who takes it. */

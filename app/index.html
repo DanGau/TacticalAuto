@@ -279,23 +279,20 @@
       .node.answered { outline: 2px solid #6fd08c; }
       button.pick.armed { outline: 3px solid #fff; outline-offset: 1px; background: #33405a; }
       button.pick.compare { width: min(190px, calc((100vw - 40px) / 2)); height: 172px; }
-      button.pick.compare .was .tier { opacity: 0.65; text-decoration: line-through; }
       button.pick.compare .arrow { color: #9aa6bd; line-height: 1; }
-      button.pick.compare .deltas { display: flex; flex-wrap: wrap; gap: 3px; margin-top: auto; }
-      .delta { padding: 1px 5px; border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap; background: #2a3346; }
-      .delta.better { color: #6fe08c; }
-      .delta.worse { color: #ff7b7b; }
       .swap { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-height: 96px; }
-      .swap .side { display: flex; flex-direction: column; gap: 2px; padding: 8px; border-radius: 6px; border: 2px solid; font-size: 13px; line-height: 1.25; }
-      .swap .keep { border-color: #6fe08c; }
-      .swap .toss { border-color: #ff7b7b; opacity: 0.85; }
+      .swap .side { display: flex; flex-direction: column; gap: 2px; padding: 8px; border-radius: 6px; border: 2px solid #4a5468; font: inherit; font-size: 13px; line-height: 1.25; text-align: left; color: inherit; background: #161c28; }
+      .swap .keep { border: 3px solid #6fe08c; background: #1f3326; }
+      .swap .sell { opacity: 0.8; }
       .swap .defs { display: none; }
       .swap .verb { font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
       .swap .keep .verb { color: #6fe08c; }
-      .swap .toss .verb { color: #ff7b7b; }
+      .swap .sell .verb { color: #ffd166; }
+      .swap .label { color: #9aa6bd; }
+      .detail .confirm { align-self: center; margin-top: 6px; }
+      @media (max-width: 600px) { .swap { grid-template-columns: 1fr; } }
       button.pick.compare .who { display: flex; align-items: center; gap: 6px; }
       button.pick.compare .portrait { width: 28px; height: 28px; font-size: 16px; }
-      button.pick.compare .stats { font-size: 12px; margin-top: 2px; }
       button.pick.compare.sell { justify-content: center; align-items: center; text-align: center; }
       .tier { font-weight: bold; text-transform: capitalize; color: #9aa6bd; }
       .tier.rare { color: #4da3ff; }

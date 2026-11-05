@@ -1,13 +1,10 @@
 // Fixed-size picks: a card tapped once is armed and tells its details; tapped again, it goes through.
 import type { Action } from '../core/apply'
-import type { Stats } from '../core/battle'
 import type { Gear } from '../core/gear'
 import { SELL } from '../core/rewards'
-import { type Run, type Soldier } from '../core/run-state'
-import { soldierStats, weaponOf } from '../core/squad'
-import { WEAPONS, type Weapon } from '../core/weapons'
+import type { Run, Soldier } from '../core/run-state'
 import { UTILITIES, type UtilityId } from '../core/utilities'
-import { badge, describeGear, gearType, STAT_NAMES } from './html'
+import { badge, describeGear, gearType } from './html'
 
 export interface Pick {
   /** Which card this is among those on screen. */
@@ -41,51 +38,74 @@ export function pickDetail(picks: Pick[], armed: string | null, idle: string): s
   return `<div class="detail">${pick ? `${pick.detail}<small class="${pick.block ? 'up' : 'supplies'}">${pick.block ?? pick.go}</small>` : `<small>${idle}</small>`}</div>`
 }
 
-/** What a weapon's attack does in a turn, all its hits summed. */
-const blow = ({ attack: { shots, power } }: Weapon, damage: number) => shots * power * damage
-
-/** A change in a stat as a chip: green if better, red if worse. */
-const chip = (name: string, change: number, percent = false) => `<span class="delta ${change > 0 ? 'better' : 'worse'}">${name} ${change > 0 ? '+' : '−'}${percent ? `${Math.round(100 * Math.abs(change))}%` : Math.round(10 * Math.abs(change)) / 10}</span>`
-
 /** A piece of gear on a card: its rarity and name, in its rarity's colour; or empty hands. */
 const named = (gear: Gear | null) => (gear ? `<span class="tier ${gear.rarity}">${gear.rarity} ${gear.name}</span>` : '<span class="tier">Empty hands</span>')
 
-/** A piece of gear in full, under what happens to it. */
-const side = (verb: 'keep' | 'toss', gear: Gear | null, extra = '') =>
-  `<div class="side ${verb}"><small class="verb">${verb === 'keep' ? 'Keep' : 'Toss'}${extra}</small>${gear ? `<b class="tier ${gear.rarity}">${gear.rarity} ${gear.name}</b><small>${gearType(gear)}</small><span>${describeGear(gear)}</span>` : '<small>Nothing</small>'}</div>`
+/** A piece of gear in full: name, type, rarity and effect. */
+const full = (gear: Gear | null) => (gear ? `<b class="tier ${gear.rarity}">${gear.rarity} ${gear.name}</b><small>${gearType(gear)}</small><span>${describeGear(gear)}</span>` : '<small>Empty hands</small>')
 
-/** What a choice keeps and what it tosses, side by side. */
-const swap = (keep: Gear | null, toss: Gear | null, extra = '') => `<div class="swap">${side('keep', keep)}${side('toss', toss, extra)}</div>`
+/** A hero's card: who, what they hold, and what they would. */
+const heroBody = (soldier: Soldier, gear: Gear) => `<span class="who"><span class="portrait">${badge(soldier.cls)}</span><b>${soldier.name}</b></span>
+  <small class="was">${named(soldier.gear)}</small>
+  <small class="arrow">↓</small>
+  <small class="will">${named(gear)}</small>`
+
+/** A side of the swap with what happens to it. */
+const side = (verb: 'keep' | 'sell', gear: Gear | null, extra = '') => `<div class="side ${verb}"><small class="verb">${verb}${extra}</small>${full(gear)}</div>`
+
+/** A card per soldier who could take `gear`, tapped again to `verb` them; armed, the strip keeps the new and sells the old. */
+export function gearPicks(run: Run, gear: Gear, action: (soldier: Soldier) => Action, verb: string, block: string | null = null): Pick[] {
+  return run.soldiers.map((soldier) => ({
+    key: `s${soldier.id}`,
+    action: action(soldier),
+    look: 'compare',
+    body: heroBody(soldier, gear),
+    detail: `<div class="swap">${side('keep', gear)}${side('sell', soldier.gear, soldier.gear ? ` · +${SELL[soldier.gear.rarity]}` : '')}</div>`,
+    go: `Tap again to ${verb} ${soldier.name}`,
+    block,
+  }))
+}
+
+/** Which of a hero's two weapons stays: the one held, or the one found. */
+export type Keep = 'old' | 'new'
+
+/** A swap's arm key: the hero's card, and which weapon is kept. */
+export const swapKey = (soldier: Soldier, keep: Keep) => `s${soldier.id}~${keep}`
+
+/** Which weapon `armed` keeps for `soldier`: as chosen, else the one held, so a hasty confirm changes no loadout. */
+export function kept(soldier: Soldier, armed: string | null): Keep {
+  const chosen = armed?.split('~')
+  if (chosen?.[0] === `s${soldier.id}` && (chosen[1] === 'old' || chosen[1] === 'new')) return chosen[1]
+  return soldier.gear ? 'old' : 'new'
+}
+
+/** What confirming does: keeping the find equips it, selling the held; keeping the held sells the find. */
+export const swapAction = (find: number, soldier: Soldier, keep: Keep): Action => (keep === 'new' ? { type: 'equip', find, soldier: soldier.id } : { type: 'sell', find })
 
 /**
- * A card per soldier who could take `gear`: what it tosses and keeps, in their rarities, and only what changes. Armed,
- * the strip below sets the two side by side.
+ * A card per soldier who could take the find at `index`, and one to sell it. Armed, a hero's card sets their weapon
+ * beside the find: one tapped is kept, the other sold, and Confirm does it.
  */
-export function gearPicks(run: Run, gear: Gear, action: (soldier: Soldier) => Action, verb: string, block: string | null = null): Pick[] {
-  return run.soldiers.map((soldier) => {
-    const old = soldier.gear
-    const now = soldierStats(run, soldier)
-    const then = soldierStats(run, { ...soldier, gear })
-    const was = weaponOf(soldier)
-    const hit = blow(WEAPONS[gear.weapon], then.damage) - (was ? blow(was, now.damage) : 0)
-    const changes = [
-      ...(Math.abs(hit) >= 0.05 ? [chip('Dmg', hit)] : []),
-      ...(Object.keys(now) as (keyof Stats)[]).filter((key) => key !== 'damage' && now[key] !== then[key]).map((key) => chip(STAT_NAMES[key], then[key] - now[key], key === 'crit')),
-    ]
+export function findPicks(run: Run, index: number, armed: string | null): Pick[] {
+  const gear = run.finds[index]
+  const heroes = run.soldiers.map((soldier): Pick => {
+    const keep = kept(soldier, armed)
+    const option = (which: Keep, item: Gear | null) => {
+      const on = which === keep
+      const extra = !on && item ? ` · +${SELL[item.rarity]}` : ''
+      return `<button class="side ${on ? 'keep' : 'sell'}" role="radio" aria-checked="${on}" data-arm="${swapKey(soldier, which)}"><small class="verb">${on ? 'keep' : 'sell'}${extra}</small><small class="label">${which === 'new' ? 'Found' : 'Held'}</small>${full(item)}</button>`
+    }
+    const sold = keep === 'new' ? soldier.gear : gear
     return {
       key: `s${soldier.id}`,
-      action: action(soldier),
       look: 'compare',
-      body: `<span class="who"><span class="portrait">${badge(soldier.cls)}</span><b>${soldier.name}</b></span>
-        <small class="was">${named(old)}</small>
-        <small class="arrow">↓</small>
-        <small class="will">${named(gear)}</small>
-        <span class="deltas">${changes.join('')}</span>`,
-      detail: swap(gear, old, old ? ` · +${SELL[old.rarity]} supplies` : ''),
-      go: `Tap again to ${verb} ${soldier.name}`,
-      block,
+      body: heroBody(soldier, gear),
+      detail: `<div class="swap" role="radiogroup" aria-label="Keep which weapon">${option('old', soldier.gear)}${option('new', gear)}</div>
+        <button class="decide confirm" data-action='${JSON.stringify(swapAction(index, soldier, keep))}'>Confirm</button>`,
+      go: sold ? `Sells ${sold.name} for ${SELL[sold.rarity]} supplies` : `${soldier.name} takes ${gear.name}`,
     }
   })
+  return [...heroes, sellPick(gear, index)]
 }
 
 /** A utility as a card: `top` says what tapping it means, `go` what the second tap does. */
@@ -100,6 +120,6 @@ export const sellPick = (gear: Gear, find: number): Pick => ({
   action: { type: 'sell', find },
   look: 'compare sell',
   body: `<b>Sell it</b><small class="was">${named(gear)}</small><b class="supplies">+${SELL[gear.rarity]}</b>`,
-  detail: swap(null, gear, ` · +${SELL[gear.rarity]} supplies`),
+  detail: `<div class="swap">${side('sell', gear, ` · +${SELL[gear.rarity]}`)}</div>`,
   go: `Tap again to sell for ${SELL[gear.rarity]} supplies`,
 })

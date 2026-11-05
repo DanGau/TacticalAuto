@@ -289,12 +289,23 @@ export function createUi(act: (action: Action) => void): Ui {
       land()
     }, FLIGHT_MS)
   }
+  // Arrow keys move a radio group's choice, as a radio group's do.
+  overlay.addEventListener('keydown', (e) => {
+    const radio = (e.target as HTMLElement).closest<HTMLElement>('[role=radio]')
+    if (!radio || !e.key.startsWith('Arrow')) return
+    const options = [...radio.closest('[role=radiogroup]')!.querySelectorAll<HTMLElement>('[role=radio]')]
+    const step = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1
+    e.preventDefault()
+    options[(options.indexOf(radio) + step + options.length) % options.length].click()
+  })
   overlay.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (!target || target.disabled || flying) return
     if (target.dataset.arm && armed !== target.dataset.arm) {
       armed = target.dataset.arm
-      return render(shown!)
+      render(shown!)
+      if (target.role === 'radio') overlay.querySelector<HTMLElement>(`[data-arm="${armed}"]`)?.focus()
+      return
     }
     if (target.id === 'again') location.href = location.pathname
     else if (target.id === 'start') started = true
