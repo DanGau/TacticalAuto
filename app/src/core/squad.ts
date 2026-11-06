@@ -41,8 +41,8 @@ export function total(run: Run, effect: (source: Lasting) => number | undefined)
   return sources.reduce((sum, source) => sum + (effect(source) ?? 0), 0)
 }
 
-/** The levels at which a soldier earns a power: stats grow every level, powers only at these. Tier 3 needs CAPSTONE_PICKS, so five picks reach a tier 4 only by giving the branch all but one. */
-export const PICK_LEVELS = [3, 4, 5, 7, 11]
+/** The levels at which a soldier earns a power: stats grow every level, powers only at these. Tier 3 needs CAPSTONE_PICKS, so four picks reach a tier 4 only by giving the branch all of them. */
+export const PICK_LEVELS = [3, 5, 7, 11]
 
 /** Skills a soldier knows at most: its class power and a pick per pick level. */
 export const MAX_SKILLS = PICK_LEVELS.length + 1
