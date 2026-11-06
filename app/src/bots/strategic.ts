@@ -178,7 +178,7 @@ function shop(run: Run): Action {
 }
 
 /**
- * The branch each class climbs, and the power outside it, if any, that it opens with: of what five picks allow, what
+ * The branch each class climbs, and the power outside it, if any, that it opens with: of what four picks allow, what
  * wins most on the same seeds. Early battles kill a hero without picks, so the one free pick goes on staying alive.
  */
 export const PLANS: Record<ClassId, { branch: string; opener?: SkillId }> = {
