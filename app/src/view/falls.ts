@@ -6,6 +6,7 @@ import { distance } from '../core/grid'
 import { PACE } from '../core/pace'
 import { drawTerrain } from './board'
 import { ballistic } from './ballistic'
+import { blast } from './blast'
 import { spot } from './camera'
 import { callout, float, shake } from './effects'
 import { burst, KO_MS, scrap } from './ko'
@@ -147,6 +148,7 @@ export async function playThrow(s: Stage, battle: Battle, e: Extract<GameEvent, 
     place(s, held, e.to)
     land(s, held, b, ALIEN_JOLT)
   }
+  if (look) blast(s, e.to, 1, COLOR.crit, e.hits.flatMap((hit) => s.sprites.get(hit.target) ?? []))
   for (const hit of e.hits) {
     const sprite = s.sprites.get(hit.target)
     if (!sprite || hit.damage === 0) continue

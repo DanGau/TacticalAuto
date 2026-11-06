@@ -1,16 +1,18 @@
 // Attacks and their aftermath on screen: shots, lunges, rockets, sparks, camera shake, and callouts over units.
 import { BLAST_RADIUS, type Battle, type Tile } from '../core/battle'
+import { distance } from '../core/grid'
 import type { GameEvent } from '../core/combat-event'
 import { effectName } from '../core/effects'
 import { PACE } from '../core/pace'
 import { SECONDARIES } from '../core/secondaries'
 import type { Attack } from './attacks'
 import { along, lerp } from './camera'
+import { blast } from './blast'
 import { drawFog } from './marks'
 import { drawTerrain } from './board'
 import { COLOR } from './palette'
 import { Sketch } from './shapes'
-import { TILE_H, TILE_W } from './space'
+import { TILE_W } from './space'
 import { place, shift, squash, vitals } from './sprites'
 import type { Label, Sprite, Stage } from './stage'
 
@@ -293,8 +295,10 @@ export async function fireRocket(s: Stage, fx: Sketch, battle: Battle, from: Spr
     sprite.drawHp(...vitals(battle, hit.target))
     float(s, callout(s, `${e.label ?? (e.fire ? 'FIREBALL' : 'BLAST')} -${hit.damage}`, color, sprite))
   }
+  const caught = e.hits.flatMap((hit) => s.sprites.get(hit.target) ?? [])
+  blast(s, e, Math.max(BLAST_RADIUS, ...caught.map((c) => distance(c.tile, e))), color, caught)
   await s.tween(PACE.blast, (t) => {
-    fx.clear().ellipse(b.x, b.y, (BLAST_RADIUS + 0.7) * TILE_W * t, (BLAST_RADIUS + 0.7) * TILE_H * t).fill({ color, alpha: 0.8 * (1 - t) })
+    fx.clear().circle(b.x, b.y, 4 + 18 * Math.sqrt(t)).fill({ color: 0xffffff, alpha: 0.9 * (1 - t) ** 2 })
   })
   fx.clear()
 }
