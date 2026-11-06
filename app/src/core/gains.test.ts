@@ -13,6 +13,7 @@ import type { Run } from './run-state'
 function atEvent(event: EventId): Run {
   const run = createRun(1)
   apply(run, { type: 'recruit', index: 0 })
+  apply(run, { type: 'boons', picks: [0, 1] })
   gainRelic(run, 'plasma', true)
   go(run, ways(run)[0])
   run.phase = 'event'

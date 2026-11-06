@@ -11,8 +11,9 @@ import { drawStops, passStop } from './run'
 import { type Run } from './run-state'
 import { earn, soldierStats, join, MAX_SQUAD, squadKeywords } from './squad'
 
-/** Chance an ambush won turns up a utility. */
-const AMBUSH_BOON = 0.25
+/** Chance an ambush or a key mission won turns up a utility. */
+const AMBUSH_BOON = 0.06
+const KEY_BOON = 0.25
 
 /**
  * Settles a finished battle: experience, threat, rewards, and where the squad stands on the road. Every soldier earns
@@ -59,8 +60,8 @@ export function endBattle(run: Run): void {
   const byGoal = { exterminate: risk.gear, assassinate: 1, hold: 0, rescue: 0, vip: 0, raid: 0, ambush: 0, recover: 0 }[mission.goal]
   const chance = mission.kind === 'key' ? 1 : mission.kind === 'battle' ? byGoal : 0
   if (won && chance > 0 && random(run) < chance) dropGear(run, risk.rareGear || mission.kind === 'key' || held.some((relic) => relic.rareGear))
-  // A key mission and a win with none held always turn up a utility; an ambush a time in four; a battle by its risk.
-  const find = run.utilities.length === 0 || mission.kind === 'key' ? 1 : mission.kind === 'ambush' ? AMBUSH_BOON : mission.kind === 'battle' ? risk.utility : 0
+  // A win with none held always turns up a utility; a key mission, an ambush or a battle by chance.
+  const find = run.utilities.length === 0 ? 1 : mission.kind === 'key' ? KEY_BOON : mission.kind === 'ambush' ? AMBUSH_BOON : mission.kind === 'battle' ? risk.utility : 0
   if (won && mission.kind !== 'final' && random(run) < find) findUtility(run)
   const key = won && mission.kind === 'key'
   // A hero extracted joins the squad, if it has room.

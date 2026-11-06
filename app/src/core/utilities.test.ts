@@ -1,14 +1,16 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { isSoldier } from './battle'
-import { endBattle } from './debrief'
 import { fuelTanks } from './objects'
-import { stockShop } from './rewards'
+import { drawUtility, findUtility, settle, stockShop } from './rewards'
 import { begun, road } from './roads'
+import { createRun } from './run'
 import { type Run } from './run-state'
 import { drawBattle } from './missions'
 import { stepBattle } from './combat'
-import { FARSIGHT, KEEN, MEND, OVERCHARGE, RIG, SMOKE_REACH, STUN_TURNS, THRUST, UTILITIES, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
+import { tickBoons } from './boons'
+import type { GameEvent } from './combat-event'
+import { BOON_WEIGHT, FARSIGHT, KEEN, MEND, MINOR, START_PICKS, OVERCHARGE, RIG, SMOKE_REACH, STUN_TURNS, THRUST, UTILITIES, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
 
 /** A run at a battle's deploy screen, holding `held`. */
 function landing(held: UtilityId[], seed = 1): Run {
@@ -151,10 +153,8 @@ test('a rigged tank is picked, stands until aliens crowd it, then blows on them'
 test('a utility found with three held forces a choice of which to drop', () => {
   const run = landing(['hover', 'smoke', 'crack'])
   expect(run.utilities).toHaveLength(UTILITY_SLOTS)
-  apply(run, { type: 'enter' })
-  run.battle!.winner = 'human'
-  run.mission = { ...run.mission!, kind: 'key' }
-  endBattle(run)
+  findUtility(run)
+  settle(run)
   const found = run.spare!
   expect(['hover', 'smoke', 'crack']).not.toContain(found)
   expect(run.phase).toBe('reward')
@@ -176,4 +176,53 @@ test('a boon bought with no room and put back returns to the shelf, its price re
   expect(run.spare).toBeNull()
   expect(run.supplies).toBe(UTILITY_PRICE)
   expect(run.shop.utilities[0].sold).toBe(false)
+})
+
+test('boons are drawn by rarity: a common six times as often as an epic; only combos are epic or carry a minor part', () => {
+  const rng = { rng: 7 }
+  const drawn = { common: 0, rare: 0, epic: 0 }
+  for (let i = 0; i < 20000; i++) drawn[UTILITIES[drawUtility(rng, [...UTILITY_IDS])].rarity]++
+  const each = (rarity: keyof typeof drawn) => drawn[rarity] / UTILITY_IDS.filter((id) => UTILITIES[id].rarity === rarity).length
+  expect(each('common') / each('epic')).toBeCloseTo(BOON_WEIGHT.common / BOON_WEIGHT.epic, 0)
+  expect(each('rare') / each('epic')).toBeCloseTo(BOON_WEIGHT.rare / BOON_WEIGHT.epic, 0)
+  for (const id of UTILITY_IDS) {
+    const { parts, rarity } = UTILITIES[id]
+    expect(parts.slice(1).every((p) => p.minor)).toBe(true)
+    if (parts.length > 2) expect(rarity).toBe('epic')
+    if (parts.length === 2) expect(rarity).toBe('rare')
+  }
+})
+
+test("a combo's effects take hold together, the minor at its lesser strength, and end together", () => {
+  const run = landing(['warpath'], 3)
+  const { damage, move } = run.battle!.reserve[0].stats
+  apply(run, { type: 'enter', utility: 0 })
+  const battle = run.battle!
+  const hero = squad(run)[0]
+  expect(hero.stats.damage).toBe(damage + OVERCHARGE)
+  expect(hero.stats.move).toBe(move + MINOR.thrusters)
+  const events: GameEvent[] = []
+  battle.round += UTILITIES.warpath.rounds - 1
+  tickBoons(battle, events)
+  expect(battle.boons).toHaveLength(1)
+  battle.round++
+  tickBoons(battle, events)
+  expect(events.filter((e) => e.type === 'used' && e.ended)).toEqual([expect.objectContaining({ utility: 'warpath' })])
+  expect(battle.boons).toHaveLength(0)
+  expect([hero.stats.damage, hero.stats.move]).toEqual([damage, move])
+})
+
+test('a run starts with three commons offered, exactly two picked before anything else', () => {
+  const run = createRun(5)
+  apply(run, { type: 'recruit', index: 0 })
+  expect(run.boonOffers).toHaveLength(3)
+  expect(run.boonOffers.every((id) => UTILITIES[id].rarity === 'common')).toBe(true)
+  expect(apply(run, { type: 'go', index: 0 }).ok).toBe(false)
+  expect(apply(run, { type: 'boons', picks: [1] }).ok).toBe(false)
+  expect(apply(run, { type: 'boons', picks: [1, 1] }).ok).toBe(false)
+  const offered = [...run.boonOffers]
+  expect(apply(run, { type: 'boons', picks: [2, 0] })).toEqual({ ok: true })
+  expect(run.utilities).toEqual([offered[2], offered[0]])
+  expect(run.utilities).toHaveLength(START_PICKS)
+  expect(run.phase).toBe('overworld')
 })

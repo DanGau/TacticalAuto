@@ -3,16 +3,16 @@ import type { AlienKind } from './aliens'
 import type { Stats } from './battle'
 import type { Goal } from './goals'
 import { randomInt } from './rng'
-import { THRUST, type UtilityId } from './utilities'
+import { THRUST, type EffectId } from './utilities'
 
 /** What a battle tests. It shapes the ground and the aliens, and shows on the Flight map and the deploy screen. */
 export type ChallengeId = 'slog' | 'firingLine' | 'ironWall' | 'swarm' | 'scattered' | 'bigOne' | 'killBox'
 
 /**
- * `answers`: the utilities that meet it, best first. `volley`: every alien fires from the start, across the ground it holds.
+ * `answers`: the effects that meet it, best first. `volley`: every alien fires from the start, across the ground it holds.
  * `grim`: the alien force, by party size less one and then by rung, each rung harder.
  */
-export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test: string; answers: UtilityId[]; volley?: true; grim: number[][] }> = {
+export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test: string; answers: EffectId[]; volley?: true; grim: number[][] }> = {
   slog: { name: 'Slog', icon: '🌿', test: 'Small groups of shooters scattered across a swamp, firing from the start; its mire takes three times the move to cross', answers: ['hover', 'rangedShield', 'thrusters', 'farsight'], volley: true, grim: [[2, 3, 4], [3, 4, 6], [5, 7, 8]] },
   firingLine: { name: 'Firing line', icon: '🎯', test: 'Long-range shooters along a ridge, firing from the moment the party lands', answers: ['smoke', 'rangedShield', 'dampener', 'farsight'], volley: true, grim: [[2, 3, 4], [3, 5, 6], [6, 7, 9]] },
   ironWall: { name: 'Iron wall', icon: '🧱', test: 'Heavily armored aliens that shrug off small hits', answers: ['crack', 'overcharge', 'blaze'], grim: [[2, 3, 4], [4, 6, 8], [7, 9, 11]] },

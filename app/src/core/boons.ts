@@ -5,30 +5,33 @@ import { nearest } from './fighters'
 import { distance } from './grid'
 import { fuelTanks } from './objects'
 import { chillUnit, kindle } from './stacks'
-import { BLAZE_REACH, DAMPEN, FARSIGHT, GRAVITY, IRON_SKIN, KEEN, MEND, OVERCHARGE, SMOKE_REACH, STUN_TURNS, THRUST, UTILITIES, type UtilityId } from './utilities'
+import { BLAZE_REACH, effectsOf, MINOR, SMOKE_REACH, STRENGTH, STUN_TURNS, UTILITIES, type EffectId, type MinorId, type Part, type UtilityId } from './utilities'
 
-/** A boon under way: the round it ends, and what it added to each unit's stats, taken back then. */
+/** A boon under way: the round all its parts end, and what they added to each unit's stats, taken back then. */
 export interface Boon {
   id: UtilityId
   until: number
   deltas: Record<number, Partial<Stats>>
 }
 
-/** The effect a boon lends each hero while it lasts. */
-const LENT: Partial<Record<UtilityId, Effect>> = { crack: 'piercing', hover: 'hover', rangedShield: 'rangedShield', meleeShield: 'meleeShield' }
+/** The effect each part lends each hero while it lasts. */
+const LENT: Partial<Record<EffectId, Effect>> = { crack: 'piercing', hover: 'hover', rangedShield: 'rangedShield', meleeShield: 'meleeShield' }
 
-/** What a boon adds to a hero's stats, or to an alien's. */
-const HERO: Partial<Record<UtilityId, (s: Stats) => Partial<Stats>>> = {
-  thrusters: () => ({ move: THRUST }),
-  overcharge: () => ({ damage: OVERCHARGE }),
-  ironSkin: () => ({ armor: IRON_SKIN }),
-  farsight: () => ({ range: FARSIGHT }),
-  keen: () => ({ crit: KEEN }),
+/** How much a part gives: as minor, MINOR; else STRENGTH. */
+const amount = (part: Part) => (part.minor ? MINOR : STRENGTH)[part.id as MinorId]
+
+/** What a part adds to a hero's stats, or to an alien's, at `n`. */
+const HERO: Partial<Record<EffectId, (s: Stats, n: number) => Partial<Stats>>> = {
+  thrusters: (_, n) => ({ move: n }),
+  overcharge: (_, n) => ({ damage: n }),
+  ironSkin: (_, n) => ({ armor: n }),
+  farsight: (_, n) => ({ range: n }),
+  keen: (_, n) => ({ crit: n }),
 }
-const ALIEN: Partial<Record<UtilityId, (s: Stats) => Partial<Stats>>> = {
+const ALIEN: Partial<Record<EffectId, (s: Stats, n: number) => Partial<Stats>>> = {
   smoke: (s) => ({ range: Math.min(0, SMOKE_REACH - s.range) }),
-  gravity: (s) => ({ move: -Math.min(GRAVITY, s.move - 1) }),
-  dampener: (s) => ({ damage: -Math.min(DAMPEN, s.damage - 1) }),
+  gravity: (s, n) => ({ move: -Math.min(n, s.move - 1) }),
+  dampener: (s, n) => ({ damage: -Math.min(n, s.damage - 1) }),
 }
 
 const shift = (unit: Unit, delta: Partial<Stats>, sign: number) => {
@@ -37,29 +40,27 @@ const shift = (unit: Unit, delta: Partial<Stats>, sign: number) => {
   unit.stats = stats
 }
 
-/** Rounds `id` has left, if under way. */
-export const roundsLeft = (battle: Battle, id: UtilityId) => {
-  const boon = battle.boons.find((b) => b.id === id)
-  return boon ? boon.until - battle.round : 0
-}
-
-/** The utility the player picked takes hold as the squad comes in. */
+/** The utility the player picked takes hold as the squad comes in, each of its parts on the units it acts on. */
 export function takeBoon(battle: Battle, id: UtilityId | null, tank: number): void {
   if (!id) return
   const boon: Boon = { id, until: battle.round + UTILITIES[id].rounds, deltas: {} }
   battle.boons.push(boon)
-  const add = HERO[id] ?? ALIEN[id]
-  for (const u of battle.units.filter((u) => u.hp > 0 && (ALIEN[id] ? u.side === 'alien' : isSoldier(u)))) {
-    if (LENT[id]) u.effects = [...u.effects, LENT[id]]
-    if (!add) continue
-    boon.deltas[u.id] = add(u.stats)
-    shift(u, boon.deltas[u.id], 1)
-    if (id === 'ironSkin') u.armor += IRON_SKIN
-  }
-  if (id === 'tank') battle.rigged = fuelTanks(battle)[tank] ?? null
-  if (id === 'flashbang') {
-    const first = nearest(battle.units.filter((u) => u.side === 'alien' && u.engaged), battle.entry!)
-    for (const u of battle.units.filter((a) => a.side === 'alien' && first && a.cluster === first.cluster)) u.surprised = u.boss ? STUN_TURNS - 1 : STUN_TURNS
+  for (const part of UTILITIES[id].parts) {
+    const add = HERO[part.id] ?? ALIEN[part.id]
+    for (const u of battle.units.filter((u) => u.hp > 0 && (ALIEN[part.id] ? u.side === 'alien' : isSoldier(u)))) {
+      if (LENT[part.id]) u.effects = [...u.effects, LENT[part.id]!]
+      if (!add) continue
+      const delta = add(u.stats, amount(part))
+      shift(u, delta, 1)
+      if (delta.armor) u.armor += delta.armor
+      const sum = (boon.deltas[u.id] ??= {})
+      for (const [key, value] of Object.entries(delta) as [keyof Stats, number][]) sum[key] = (sum[key] ?? 0) + value
+    }
+    if (part.id === 'tank') battle.rigged = fuelTanks(battle)[tank] ?? null
+    if (part.id === 'flashbang') {
+      const first = nearest(battle.units.filter((u) => u.side === 'alien' && u.engaged), battle.entry!)
+      for (const u of battle.units.filter((a) => a.side === 'alien' && first && a.cluster === first.cluster)) u.surprised = u.boss ? STUN_TURNS - 1 : STUN_TURNS
+    }
   }
 }
 
@@ -72,14 +73,16 @@ export function tickBoons(battle: Battle, events: GameEvent[]): void {
       end(battle, boon, events)
       continue
     }
-    if (boon.id === 'mending') for (const u of heroes.filter((u) => u.hp < u.stats.hp)) {
-      const amount = Math.min(MEND, u.stats.hp - u.hp)
-      u.hp += amount
-      events.push({ type: 'effect', id: u.id, effect: 'regen', amount })
+    const mend = UTILITIES[boon.id].parts.find((p) => p.id === 'mending')
+    const has = (id: EffectId) => effectsOf(boon.id).includes(id)
+    if (mend) for (const u of heroes.filter((u) => u.hp < u.stats.hp)) {
+      const healed = Math.min(amount(mend), u.stats.hp - u.hp)
+      u.hp += healed
+      events.push({ type: 'effect', id: u.id, effect: 'regen', amount: healed })
     }
-    if (boon.id === 'coldSnap') for (const u of aliens.filter((u) => u.engaged)) chillUnit(battle, u, 1, events)
-    if (boon.id === 'blaze' && battle.entry) for (const u of aliens.filter((u) => distance(u, battle.entry!) <= BLAZE_REACH)) kindle(battle, u, 1)
-    if (boon.id === 'hunted') {
+    if (has('coldSnap')) for (const u of aliens.filter((u) => u.engaged)) chillUnit(battle, u, 1, events)
+    if (has('blaze') && battle.entry) for (const u of aliens.filter((u) => distance(u, battle.entry!) <= BLAZE_REACH)) kindle(battle, u, 1)
+    if (has('hunted')) {
       const prey = aliens.reduce<Unit | null>((a, b) => (!a || b.stats.hp > a.stats.hp ? b : a), null)
       if (prey) prey.exposed = Math.max(prey.exposed, 1)
     }
@@ -89,7 +92,7 @@ export function tickBoons(battle: Battle, events: GameEvent[]): void {
 
 /** A boon's bonus is taken back from every unit it held. */
 function end(battle: Battle, boon: Boon, events: GameEvent[]): void {
-  const lent = LENT[boon.id]
+  const lent = effectsOf(boon.id).flatMap((id) => LENT[id] ?? [])
   const on: number[] = []
   for (const u of battle.units.filter((u) => u.hp > 0)) {
     const delta = boon.deltas[u.id]
@@ -98,13 +101,14 @@ function end(battle: Battle, boon: Boon, events: GameEvent[]): void {
       if (delta.armor) u.armor = Math.min(u.armor, u.stats.armor)
       on.push(u.id)
     }
-    const at = lent ? u.effects.indexOf(lent) : -1
-    if (at >= 0) {
+    for (const effect of lent) {
+      const at = u.effects.indexOf(effect)
+      if (at < 0) continue
       u.effects = u.effects.filter((_, i) => i !== at)
-      on.push(u.id)
+      if (!on.includes(u.id)) on.push(u.id)
     }
   }
-  if (boon.id === 'tank') battle.rigged = null
+  if (effectsOf(boon.id).includes('tank')) battle.rigged = null
   if (on.length === 0 && boon.id !== 'flashbang') on.push(...battle.units.filter((u) => isSoldier(u) && u.hp > 0).map((u) => u.id))
   events.push({ type: 'used', utility: boon.id, on, ended: true })
 }

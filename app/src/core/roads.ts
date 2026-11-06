@@ -25,12 +25,14 @@ export function enterAt(run: Run): Result {
   return apply(run, { type: 'enter' })
 }
 
-/** For tests: a run of `seed` under way, its first soldier the first recruit, a Deadeye with a plain rifle. */
+/** For tests: a run of `seed` under way, its first soldier the first recruit, a Deadeye with a plain rifle, holding no boons. */
 export function begun(seed: number): Run {
   const run = createRun(seed)
   run.recruits[0].cls = 'sniper'
   run.recruits[0].skills = [roots('sniper')[0]]
   run.recruits[0].gear = { id: 0, rarity: 'common', name: 'Assault Rifle', weapon: 'rifle', stats: {}, effect: null }
   apply(run, { type: 'recruit', index: 0 })
+  apply(run, { type: 'boons', picks: [0, 1] })
+  run.utilities = []
   return run
 }

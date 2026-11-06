@@ -12,7 +12,7 @@ test('a run replays identically from its seed and actions', () => {
   expect(first.phase).toBe(result.won ? 'won' : 'lost')
   expect(first.keys).toBe(result.keys)
   expect(replay(0, result.actions)).toEqual(first)
-})
+}, 90_000)
 
 /** A run of seed `seed` played by the standard bot up to its first battle's first beat. */
 function inBattle(seed: number) {

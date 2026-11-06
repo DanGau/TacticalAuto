@@ -1,6 +1,6 @@
 // Gear and relic rewards, the shop, and settling the reward phase.
 import { RARITY_CHANCE, type Rarity } from './base'
-import { SHOP_UTILITIES, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
+import { BOON_WEIGHT, SHOP_UTILITIES, START_OFFERS, START_PICKS, UTILITIES, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
 import { generateGear, type Gear } from './gear'
 import { random, randomInt } from './rng'
 import { drawRelic, offerable, type RelicId } from './relics'
@@ -51,7 +51,7 @@ export function stockShop(run: Run): Shop {
   const stocked: RelicId[] = []
   while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(drawRelic(run, relics))
   const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
-  const utilities = Array.from({ length: Math.min(SHOP_UTILITIES, kinds.length) }, () => ({ id: kinds.splice(randomInt(run, kinds.length), 1)[0], sold: false }))
+  const utilities = Array.from({ length: Math.min(SHOP_UTILITIES, kinds.length) }, () => ({ id: drawUtility(run, kinds), sold: false }))
   return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, bribed: false }
 }
 
@@ -84,11 +84,33 @@ export function loseRelic(run: Run, index: number): RelicId {
   return id
 }
 
+/** Takes a utility out of `pool`, the commoner the likelier. */
+export function drawUtility(rng: { rng: number }, pool: UtilityId[]): UtilityId {
+  const weight = (id: UtilityId) => BOON_WEIGHT[UTILITIES[id].rarity]
+  let roll = random(rng) * pool.reduce((sum, id) => sum + weight(id), 0)
+  const i = Math.max(0, pool.findIndex((id) => (roll -= weight(id)) < 0))
+  return pool.splice(i, 1)[0]
+}
+
+/** At the run's start, the commons the party picks its first utilities from: drawn from the seed apart from the run's own stream, so they shift no later draw. */
+export function offerStart(run: Run): void {
+  const commons = UTILITY_IDS.filter((id) => UTILITIES[id].rarity === 'common')
+  const rng = { rng: ~run.seed }
+  run.boonOffers = Array.from({ length: START_OFFERS }, () => commons.splice(randomInt(rng, commons.length), 1)[0])
+}
+
+/** Takes the START_PICKS offers at `picks`. The caller checks they are distinct offers. */
+export function takeStart(run: Run, picks: number[]): void {
+  run.utilities = picks.slice(0, START_PICKS).map((i) => run.boonOffers[i])
+  run.boonOffers = []
+  settle(run)
+}
+
 /** A utility the party lacks, found at a stop; none if it holds them all. With no room the choice of what to drop tells of it; else the player is told. */
 export function findUtility(run: Run): UtilityId | null {
   const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
   if (kinds.length === 0) return null
-  const id = kinds[randomInt(run, kinds.length)]
+  const id = drawUtility(run, kinds)
   gainUtility(run, id)
   if (run.spare !== id) run.gains.push({ kind: 'boon', id })
   return id
@@ -120,9 +142,9 @@ export function sellFind(run: Run, index: number): void {
   settle(run)
 }
 
-/** Ends the reward phase once no choice is left: no relic, find, spare utility or skill. */
+/** Ends the reward phase once no choice is left: no starting utilities, relic, find, spare utility or skill. */
 export function settle(run: Run): void {
-  const owed = run.relicOffers.length > 0 || run.duoOffer !== null || run.finds.length > 0 || run.spare !== null || run.soldiers.some((s) => skillOffers(s).length > 0)
+  const owed = run.boonOffers.length > 0 || run.relicOffers.length > 0 || run.duoOffer !== null || run.finds.length > 0 || run.spare !== null || run.soldiers.some((s) => skillOffers(s).length > 0)
   run.phase = owed ? 'reward' : 'overworld'
 }
 

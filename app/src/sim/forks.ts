@@ -6,7 +6,7 @@ import { fuelTanks } from '../core/objects'
 import { type Run } from '../core/run-state'
 import { health } from '../core/squad'
 import { step } from '../core/step'
-import { UTILITY_IDS, type UtilityId } from '../core/utilities'
+import { carries, UTILITY_IDS, type UtilityId } from '../core/utilities'
 
 /** One battle played on from a deploy screen: the utility taken, whether it won, and the share of the party's most health lost. */
 export interface Fork {
@@ -42,7 +42,7 @@ export function formatForks(forks: Fork[]): string {
       if (of.length === 0) continue
       const { answers } = CHALLENGES[challenge]
       const shown = answers.map((id) => `${id} ${cell(of.filter((f) => f.utility === id))}`).join(' ').padEnd(46)
-      lines.push(`${challenge.padEnd(14)}${party}  ${String(of.filter((f) => f.utility === null).length).padStart(8)}  ${cell(of.filter((f) => f.utility === null))}${shown}${cell(of.filter((f) => f.utility && !answers.includes(f.utility)))}`)
+      lines.push(`${challenge.padEnd(14)}${party}  ${String(of.filter((f) => f.utility === null).length).padStart(8)}  ${cell(of.filter((f) => f.utility === null))}${shown}${cell(of.filter((f) => f.utility && !carries(f.utility, answers)))}`)
     }
   }
   return lines.join('\n')

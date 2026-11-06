@@ -14,6 +14,7 @@ function battles(): Map<ArenaKind, Battle> {
   for (let seed = 0; seed < 60 && out.size < 6; seed++) {
     const run = createRun(seed)
     apply(run, { type: 'recruit', index: 0 })
+    apply(run, { type: 'boons', picks: [0, 1] })
     for (let i = 0; i < 8 && !run.battle; i++) {
       apply(run, { type: 'go', index: 0 })
       if (!run.battle) apply(run, { type: 'advance' })

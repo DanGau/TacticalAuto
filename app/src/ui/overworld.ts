@@ -4,7 +4,7 @@ import { GOALS } from '../core/goals'
 import { DOCTRINES } from '../core/doctrines'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
-import { boonText, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
+import { boonText, carries, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
 import { current, legOf, KEYS, ways, nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Soldier } from '../core/run-state'
@@ -59,7 +59,7 @@ function stopIcon(run: Run, stop: Stop, state = ''): string {
   const goal = GOALS[stop.goal]
   const aliens = census(run, stop.aliens) + (stop.goal === 'assassinate' ? ', a Commander' : '')
   const challenge = stop.challenge && CHALLENGES[stop.challenge]
-  const answered = challenge && challenge.answers.some((id) => run.utilities.includes(id)) ? ' answered' : ''
+  const answered = challenge && run.utilities.some((id) => carries(id, challenge.answers)) ? ' answered' : ''
   return `<span class="node ${stop.risk} ${state}${answered}" title="${challenge?.name} · ${goal.name} · ${risk.name} · ${aliens.replace(/<[^>]*>/g, '')}">${challenge?.icon ?? STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}</span>`
 }
 
@@ -152,7 +152,7 @@ function travelLabel(run: Run, stop: Stop, next: 'battle' | 'key' | 'final'): st
 function readChallenge(run: Run, stop: Stop): string {
   if (!stop.challenge) return ''
   const challenge = CHALLENGES[stop.challenge]
-  const held = challenge.answers.filter((id) => run.utilities.includes(id))
+  const held = run.utilities.filter((id) => carries(id, challenge.answers))
   return `<span title="${challenge.name}: ${challenge.test}">${challenge.icon} ${THREATS[stop.challenge]}</span> <small class="${held.length > 0 ? 'down' : 'up'}">${held.length > 0 ? `Held: ${held.map((id) => UTILITIES[id].name).join(', ')}` : 'No answer held'}</small>`
 }
 

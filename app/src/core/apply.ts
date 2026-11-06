@@ -2,14 +2,14 @@
 import { land } from './landing'
 import { fuelTanks } from './objects'
 import { BOON_CHARGES } from './relics'
-import { UTILITY_PRICE } from './utilities'
+import { START_PICKS, UTILITY_PRICE } from './utilities'
 import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
 import { advance, current, go, nextStop, recruit, ways } from './run'
 import { type Run } from './run-state'
 import { gainRelic, takeDuo, takeRelic } from './rewards'
 import { sellFind } from './rewards'
 import { buyWare } from './rewards'
-import { buyUtility, keepUtility } from './rewards'
+import { buyUtility, keepUtility, takeStart } from './rewards'
 import { GEAR_PRICE } from './rewards'
 import { equipFind } from './rewards'
 import { takeSkill } from './rewards'
@@ -20,6 +20,8 @@ import { skillOffers } from './squad'
 export type Action =
   /** At the run's start: take the recruit at `index` of run.recruits as the first soldier. */
   | { type: 'recruit'; index: number }
+  /** Run start: take the offers at `picks` of run.boonOffers, START_PICKS of them. */
+  | { type: 'boons'; picks: number[] }
   /** Shop: buy the gear at `index` of shop.wares for the soldier with id `soldier` to wear, selling what it replaces. */
   | { type: 'gear'; index: number; soldier: number }
   /** Shop: buy the relic at `index` of shop.relics. */
@@ -72,6 +74,14 @@ export function apply(run: Run, action: Action): Result {
     return ok
   }
   if (run.phase === 'recruit') return no('choose a recruit first')
+  if (action.type === 'boons') {
+    const { picks } = action
+    if (run.boonOffers.length === 0) return no('no boons on offer')
+    if (picks.length !== Math.min(START_PICKS, run.boonOffers.length) || new Set(picks).size !== picks.length || picks.some((i) => !run.boonOffers[i])) return no(`pick ${START_PICKS} offers`)
+    takeStart(run, picks)
+    return ok
+  }
+  if (run.boonOffers.length > 0) return no('pick the starting boons first')
   if (run.spare !== null && action.type !== 'keep') return no('choose what to drop first')
   if (action.type === 'enter') {
     const battle = run.battle

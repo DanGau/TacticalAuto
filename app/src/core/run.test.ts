@@ -609,12 +609,14 @@ test('a shop stocks one-of-a-kind gear for the soldier the player picks, relics 
   expect(apply(run, { type: 'utility', index: 0 })).toEqual({ ok: true })
   expect(run.utilities.at(-1)).toBe(shop.utilities[0].id)
   expect(run.spare).toBeNull()
-  expect(apply(run, { type: 'utility', index: 1 })).toEqual({ ok: true })
-  expect(run.spare).toBe(shop.utilities[1].id)
+  run.utilities = Array(UTILITY_SLOTS).fill('mending')
+  shop.utilities[0].sold = false
+  expect(apply(run, { type: 'utility', index: 0 })).toEqual({ ok: true })
+  expect(run.spare).toBe(shop.utilities[0].id)
   expect(apply(run, { type: 'bribe' }).ok).toBe(false)
   const held = [...run.utilities]
   expect(apply(run, { type: 'keep', drop: 0 })).toEqual({ ok: true })
-  expect(run.utilities).toEqual([shop.utilities[1].id, ...held.slice(1)])
+  expect(run.utilities).toEqual([shop.utilities[0].id, ...held.slice(1)])
   expect(apply(run, { type: 'bribe' })).toEqual({ ok: true })
   expect(run.threat).toBe(0)
   expect(apply(run, { type: 'bribe' }).ok).toBe(false)

@@ -24,6 +24,8 @@ export interface Report {
   attrition: { lost: number; hp: number; points: number; downed: number; worn: number; legs: number[] }
   /** Heroes' hits on aliens: the hardest, and the hardest but one in a hundred battles; and rounds a boss from leg LATE_LEG on takes to fell, by median and least. */
   hits: { max: number; p99: number; bossRounds: number; leastBossRounds: number }
+  /** Boons found or bought a run, by leg. */
+  found: number[]
   /** Battles past MAX_BATTLE_SECONDS, which the report warns of without failing. */
   warnings: string[]
   /** What fails the batch: battles stuck at the beat limit. */
@@ -90,6 +92,7 @@ export function report(results: RunResult[]): Report {
       legs: Array.from({ length: KEYS + 1 }, (_, leg) => share(tolls.filter((t) => t.leg === leg), (t) => t.after)),
     },
     hits: { max: hardest.at(-1) ?? 0, p99: hardest[Math.floor(0.99 * hardest.length)] ?? 0, bossRounds: felled[Math.floor(felled.length / 2)] ?? 0, leastBossRounds: felled[0] ?? 0 },
+    found: Array.from({ length: KEYS + 1 }, (_, leg) => mean((r) => r.found[leg])),
     warnings,
     failures,
   }
@@ -113,6 +116,7 @@ export function formatReport(r: Report): string {
     `squad health        loses ${r.attrition.lost}% (${r.attrition.points}) a battle, ends at ${r.attrition.hp}%; ${r.attrition.worn}% of battles end under 75%; ${r.attrition.downed} downed a battle`,
     `ends at, by leg     ${r.attrition.legs.map((n) => `${n}%`).join(', ')}`,
     `hero hits           hardest ${r.hits.max}, p99 battle ${r.hits.p99}; a late boss falls in ${r.hits.bossRounds} rounds by median, ${r.hits.leastBossRounds} at least`,
+    `boons found a run   ${Math.round(10 * r.found.reduce((a, b) => a + b, 0)) / 10}, by leg ${r.found.join(', ')}`,
     ...r.warnings.map((w) => `WARN                ${w}`),
     ...r.failures.map((f) => `FAIL                ${f}`),
   ].join('\n')

@@ -17,7 +17,7 @@ import { level } from '../core/squad'
 import { xpFor } from '../core/squad'
 import { CAPSTONE_PICKS, SKILLS, TREES, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
-import { findSwap, pickCard, pickDetail, utilityPick, type Pick } from './cards'
+import { findSwap, pickCard, pickDetail, startChoice, utilityPick, type Pick } from './cards'
 import { heroSheet, skillState, treeGrid } from './sheet'
 import { badge, button, describe, gearText, gearType, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
@@ -68,7 +68,7 @@ export function acquired(run: Run, gain: Gain): string {
     const hero = run.soldiers.find((s) => s.id === id)!
     return shown('Hero joined', hero.gear?.rarity ?? '', `${badge(hero.cls)} ${hero.name}`, heroSheet(run, hero))
   }
-  const body = gain.kind === 'relic' ? relicBody('Relic gained', 'relic', gain.id, squadKeywords(run)) : gain.kind === 'relicLost' ? relicBody('Relic lost', 'relic lost', gain.id) : gain.kind === 'boon' ? shown('Boon gained', '', `${UTILITIES[gain.id].icon} ${UTILITIES[gain.id].name}`, boonText(gain.id)) : heroBody(gain.soldier)
+  const body = gain.kind === 'relic' ? relicBody('Relic gained', 'relic', gain.id, squadKeywords(run)) : gain.kind === 'relicLost' ? relicBody('Relic lost', 'relic lost', gain.id) : gain.kind === 'boon' ? shown(`${UTILITIES[gain.id].rarity} boon gained`, UTILITIES[gain.id].rarity, `${UTILITIES[gain.id].icon} ${UTILITIES[gain.id].name}`, boonText(gain.id)) : heroBody(gain.soldier)
   return modal(`<div class="acquired">${body}<button class="decide" data-action='${JSON.stringify({ type: 'ack' })}'>Got it</button></div>`)
 }
 
@@ -113,8 +113,9 @@ export function spareChoice(run: Run, armed: string | null): string {
   return modal(`<h2>${spare.icon} ${spare.name}: ${spare.text}. The party holds three: drop which?</h2><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a card for its details; tap it again to choose it.')}`)
 }
 
-/** The next choice of the reward phase, alone on its screen: a relic, then each find and who takes it, then each skill owed. */
+/** The next choice of the reward phase, alone on its screen: the starting boons, a relic, then each find and who takes it, then each skill owed. */
 export function choice(run: Run, armed: string | null = null): string {
+  if (run.boonOffers.length > 0) return startChoice(run, armed)
   const held = squadKeywords(run)
   const relic = (id: RelicId, index: number) => button({ type: 'relic', index }, `<small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic')
   const duo = run.duoOffer && DUOS[run.duoOffer]

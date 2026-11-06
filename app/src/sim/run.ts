@@ -1,7 +1,7 @@
 // Plays one run with a bot, and replays a recorded one.
 import type { Bot } from '../bots/bots'
 import { apply, type Action } from '../core/apply'
-import { createRun } from '../core/run'
+import { createRun, KEYS } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Mission } from '../core/run-state'
 import { health } from '../core/squad'
@@ -11,7 +11,7 @@ import type { DoctrineId } from '../core/doctrines'
 import { CHALLENGES, type ChallengeId } from '../core/challenges'
 import type { Goal } from '../core/goals'
 import type { ArenaKind } from '../core/arena-kinds'
-import type { UtilityId } from '../core/utilities'
+import { carries, type UtilityId } from '../core/utilities'
 import { forksOf, type Fork } from './forks'
 
 /** Whether a party met a challenge with an answer it picked, with one it held and left behind, or with none. */
@@ -59,13 +59,15 @@ export interface RunResult {
   forks: Fork[]
   /** With the seed, enough to replay the run. */
   actions: Action[]
+  /** Boons found or bought, by leg; the starting pick not counted. */
+  found: number[]
 }
 
 /** How the party met the battle's challenge, given the utilities it held going in. */
 function answerOf(battle: NonNullable<Run['battle']>, held: UtilityId[]): Answer {
-  const answers: UtilityId[] = battle.challenge ? CHALLENGES[battle.challenge].answers : []
-  if (battle.utility && answers.includes(battle.utility)) return 'picked'
-  return answers.some((id) => held.includes(id)) ? 'held' : 'none'
+  const answers = battle.challenge ? CHALLENGES[battle.challenge].answers : []
+  if (battle.utility && carries(battle.utility, answers)) return 'picked'
+  return held.some((id) => carries(id, answers)) ? 'held' : 'none'
 }
 
 /** More player actions than any run takes: a run past it is stuck, and fails instead of hanging. */
@@ -77,14 +79,18 @@ const MAX_ACTIONS = 10000
 function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = [], forks = false): { run: Run; result: RunResult } {
   const run = createRun(seed)
   run.doctrines.push(...doctrines)
-  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], actions: [] }
+  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], actions: [], found: Array<number>(KEYS + 1).fill(0) }
   let clock = { next: 0, done: 0 }
   let leaps = 0
   /** This battle's hardest hero hit, its boss, and the round the boss was first wounded. */
   let hits = { max: 0, boss: -1, from: -1, rounds: null as number | null }
   /** The battle under way, its leg, the squad's health as it began, and the utilities it held. */
   let begun: [Run['battle'], number, number, UtilityId[]] = [null, 0, 0, []]
+  let had: { leg: number; held: (UtilityId | null)[] } = { leg: 0, held: [] }
   while (run.phase !== 'won' && run.phase !== 'lost') {
+    const held = [...run.utilities, run.spare]
+    result.found[had.leg] += held.filter((id) => id && !had.held.includes(id)).length
+    had = { leg: run.keys, held }
     const battle = run.battle
     if (run.phase === 'battle' && begun[0] !== battle) {
       begun = [battle, run.keys, run.soldiers.reduce((sum, s) => sum + health(run, s), 0), [...run.utilities]]
@@ -122,6 +128,7 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
     if (forks && run.phase === 'battle' && run.battle!.phase === 'deploy') result.forks.push(...forksOf(run))
     const action = next(run)
     const applied = apply(run, action)
+    if (action.type === 'boons') had.held = [...run.utilities]
     if (!applied.ok) throw new Error(`action rejected: ${applied.reason}`)
     result.actions.push(action)
   }

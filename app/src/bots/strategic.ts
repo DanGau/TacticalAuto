@@ -14,19 +14,32 @@ import { SKILLS, TREES, type SkillId } from '../core/skills'
 import { health, MAX_SQUAD, skillOffers, soldierStats, squadKeywords } from '../core/squad'
 import { BOON_CHARGES, RELICS, type RelicId } from '../core/relics'
 import type { Keyword } from '../core/keywords'
-import { RIG, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from '../core/utilities'
+import { carries, RIG, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS, type EffectId, type UtilityId } from '../core/utilities'
 import { WEAPONS, type WeaponId } from '../core/weapons'
 import type { Bot } from './bots'
 
 /** What to take into a fight no utility held answers, best first. */
-const FALLBACK: UtilityId[] = ['overcharge', 'ironSkin', 'mending', 'keen', 'crack', 'rangedShield', 'dampener', 'thrusters', 'meleeShield', 'smoke', 'coldSnap', 'gravity', 'farsight', 'hunted', 'blaze', 'flashbang', 'hover']
+const FALLBACK: EffectId[] = ['overcharge', 'ironSkin', 'mending', 'keen', 'crack', 'rangedShield', 'dampener', 'thrusters', 'meleeShield', 'smoke', 'coldSnap', 'gravity', 'farsight', 'hunted', 'blaze', 'flashbang', 'hover']
 
-/** The utility held best for `challenge`: its answers run best first in CHALLENGES. */
+/**
+ * What a utility is worth against `challenge`: each answer it carries by its place, as CHALLENGES runs them best
+ * first, then each effect by its place in FALLBACK, far less. A minor part counts half.
+ */
+function fit(id: UtilityId, challenge: ChallengeId | null): number {
+  const answers = challenge ? CHALLENGES[challenge].answers : []
+  return UTILITIES[id].parts.reduce((sum, { id: e, minor }) => {
+    const answer = answers.includes(e) ? 10 - answers.indexOf(e) : 0
+    const fallback = FALLBACK.includes(e) ? 1 - FALLBACK.indexOf(e) / FALLBACK.length : 0
+    return sum + (answer + fallback) * (minor ? 0.5 : 1)
+  }, 0)
+}
+
+/** The utility held best for `challenge`, if any is worth taking. */
 export function answerFor(run: Run, challenge: ChallengeId | null): number {
   const usable = (id: UtilityId) => id !== 'tank' || fuelTanks(run.battle!).length > 0
-  const order = [...(challenge ? CHALLENGES[challenge].answers : []), ...FALLBACK]
-  const best = order.find((id) => run.utilities.includes(id) && usable(id))
-  return best ? run.utilities.indexOf(best) : -1
+  const scores = run.utilities.map((id) => (usable(id) ? fit(id, challenge) : 0))
+  const best = scores.indexOf(Math.max(0, ...scores))
+  return scores[best] > 0 ? best : -1
 }
 
 /** Against a swarm, which comes to the squad, the tank nearest the way in clear of its blast; else the farthest. */
@@ -74,10 +87,11 @@ function coverage(run: Run, held: UtilityId[]): number {
   const tier = Math.min(run.soldiers.length, MAX_SQUAD) - 1
   const rung = rungOf(run.stop)
   const coming = [...TIERS[tier][rung], ...TIERS[Math.min(tier + 1, TIERS.length - 1)][Math.min(rung + 1, 2)], 'bigOne' as const]
-  const answered = (id: ChallengeId) => CHALLENGES[id].answers.some((u) => held.includes(u))
-  // A challenge's first answer is its best.
-  const best = (id: ChallengeId) => (held.includes(CHALLENGES[id].answers[0]) ? 0.25 : 0)
-  return seen.reduce((sum, id) => sum + (answered(id) ? 2 + best(id) : 0), 0) + coming.reduce((sum, id) => sum + (answered(id) ? 1 + best(id) : 0), 0)
+  const answered = (id: ChallengeId) => held.some((u) => carries(u, CHALLENGES[id].answers))
+  // A challenge's first answer is its best; a combo does more beside it.
+  const best = (id: ChallengeId) => (held.some((u) => UTILITIES[u].parts[0].id === CHALLENGES[id].answers[0]) ? 0.25 : 0)
+  const breadth = held.reduce((sum, u) => sum + 0.2 * (UTILITIES[u].parts.length - 1), 0)
+  return breadth + seen.reduce((sum, id) => sum + (answered(id) ? 2 + best(id) : 0), 0) + coming.reduce((sum, id) => sum + (answered(id) ? 1 + best(id) : 0), 0)
 }
 
 /** With a utility to spare, keeps the three that answer the most. */
@@ -98,7 +112,7 @@ function worth(run: Run, stop: Stop): number {
   if (stop.kind === 'cache') return 2
   if (stop.kind === 'unknown') return 1
   if (!stop.challenge) return 0
-  const answered = CHALLENGES[stop.challenge].answers.some((id) => run.utilities.includes(id))
+  const answered = run.utilities.some((id) => carries(id, CHALLENGES[stop.challenge!].answers))
   const risk = { safe: 0, standard: 1, dangerous: 2 }[stop.risk]
   return (answered ? 3 : -3 - 2 * (hale < 0.6 ? 1 : 0)) + (hale >= 0.7 && answered ? risk : -risk)
 }
@@ -114,7 +128,7 @@ function route(run: Run): Action {
 /** The challenges in sight or in the party's tier that no utility held answers. */
 const unanswered = (run: Run): ChallengeId[] => {
   const seen = ahead(run).flatMap((stop) => (stop.challenge ? [stop.challenge] : []))
-  return [...new Set([...seen, ...TIERS[Math.min(run.soldiers.length, MAX_SQUAD) - 1][rungOf(run.stop)]])].filter((id) => !CHALLENGES[id].answers.some((u) => run.utilities.includes(u)))
+  return [...new Set([...seen, ...TIERS[Math.min(run.soldiers.length, MAX_SQUAD) - 1][rungOf(run.stop)]])].filter((id) => !run.utilities.some((u) => carries(u, CHALLENGES[id].answers)))
 }
 
 /** Which weapons make up for a challenge with no utility to answer it. */
@@ -153,7 +167,7 @@ function shop(run: Run): Action {
   const relic = relics.findIndex((r) => !r.sold && RELIC_PRICE <= run.supplies)
   if (relic >= 0) return { type: 'buy', index: relic }
   const gaps = unanswered(run)
-  const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && gaps.some((c) => CHALLENGES[c].answers.includes(id)) && (run.utilities.length < UTILITY_SLOTS || keep({ ...run, spare: id }).drop !== -1))
+  const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && gaps.some((c) => carries(id, CHALLENGES[c].answers)) && (run.utilities.length < UTILITY_SLOTS || keep({ ...run, spare: id }).drop !== -1))
   if (answer >= 0) return { type: 'utility', index: answer }
   for (const [index, { gear, sold }] of wares.entries()) {
     const holder = sold || GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] > run.supplies ? null : holderFor(run, gear)
@@ -234,7 +248,15 @@ function recruit(run: Run): Action {
   return { type: 'recruit', index: run.recruits.reduce((best, s, i) => (rank(s) < rank(run.recruits[best]) ? i : best), 0) }
 }
 
+/** Of the starting offers, the pair that answers the most. */
+function starting(run: Run): Action {
+  const pairs = run.boonOffers.flatMap((_, i) => run.boonOffers.flatMap((_, j) => (i < j ? [[i, j]] : [])))
+  const score = (pair: number[]) => coverage(run, pair.map((i) => run.boonOffers[i]))
+  return { type: 'boons', picks: pairs.reduce((best, pair) => (score(pair) > score(best) ? pair : best)) }
+}
+
 export const strategic: Bot = (run) => {
+  if (run.boonOffers.length > 0) return starting(run)
   if (run.spare) return keep(run)
   if (run.phase === 'reward') return reward(run)
   if (run.phase === 'recruit') return recruit(run)

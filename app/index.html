@@ -255,6 +255,11 @@
       button.pick .rounds { margin-top: auto; color: #9fb3c8; }
       button.pick.bribe { border-color: #6fd08c; }
       button.pick.utility { border-color: #6fc3d0; }
+      button.pick.utility.rare, .boons .side.rare { border-color: #4da3ff; }
+      button.pick.utility.epic, .boons .side.epic { border-color: #c77dff; }
+      .boons .swap { width: min(900px, 100%); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      @media (max-width: 600px) { .boons .swap { grid-template-columns: 1fr; } }
+      .gearswap .confirm:disabled { color: #9aa6bd; background: #1d2433; border-color: #3a465c; }
       button.pick.blocked .price { color: #ff6b6b; }
       .tree { display: grid; grid-template-columns: repeat(var(--branches), minmax(0, 1fr)); gap: 8px; max-width: 720px; margin: 8px auto; text-align: left; }
       .branch { display: flex; flex-direction: column; gap: 4px; min-width: 0; }

@@ -15,7 +15,7 @@ import { createRun, legOf } from '../core/run'
 import { type Run } from '../core/run-state'
 import { hire, skillOffers, soldierStats, xpFor } from '../core/squad'
 import { timedFlow } from '../core/step'
-import { UTILITY_IDS, type UtilityId } from '../core/utilities'
+import { carries, UTILITY_IDS, type UtilityId } from '../core/utilities'
 
 const { values } = parseArgs({ options: { runs: { type: 'string', default: '30' }, challenge: { type: 'string', default: '' }, party: { type: 'string', default: '1,2,3' }, rung: { type: 'string', default: '0,1,2' }, goal: { type: 'string', default: 'exterminate' }, cls: { type: 'string', default: '' }, none: { type: 'boolean', default: false } } })
 
@@ -26,6 +26,7 @@ const levelAt = (party: number, rung: number) => party * 2 - 1 + rung
 function battle(seed: number, party: number, rung: number, challenge: ChallengeId, utility: UtilityId | null, goal: Goal): { won: boolean; hurt: number; seconds: number } {
   const run = createRun(seed)
   apply(run, { type: 'recruit', index: seed % run.recruits.length })
+  apply(run, { type: 'boons', picks: [0, 1] })
   if (values.cls) {
     run.soldiers[0].cls = values.cls as ClassId
     run.soldiers[0].skills = [roots(values.cls as ClassId)[0]]
@@ -63,7 +64,7 @@ for (const challenge of challenges) {
   for (const party of values.party.split(',').map(Number)) {
     for (const rung of values.rung.split(',').map(Number)) {
       const answers = CHALLENGES[challenge].answers
-      const others = UTILITY_IDS.filter((id) => !answers.includes(id))
+      const others = UTILITY_IDS.filter((id) => !carries(id, answers))
       for (const utility of (values.none ? [null] : [null, ...answers, 'other']) as (UtilityId | 'other' | null)[]) {
         const results = Array.from({ length: runs }, (_, i) => battle(1000 + i, party, rung, challenge, utility === 'other' ? others[i % others.length] : utility, values.goal as Goal))
         const mean = (value: (r: (typeof results)[number]) => number) => results.reduce((sum, r) => sum + value(r), 0) / runs

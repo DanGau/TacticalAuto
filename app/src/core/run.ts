@@ -16,7 +16,7 @@ import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
 import { LEG_STOPS, OPENING, STOP_THREAT, THREAT_MAX } from './progress'
 import { abilityOf, charges, draft, health, join, MAX_SQUAD, offerRecruits, soldierStats, weaponOf, xpFor } from './squad'
-import { dropGear, settle } from './rewards'
+import { dropGear, offerStart, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
 import { forceOf, type ChallengeId } from './challenges'
 import { type Leg, type MapNode, type Risk, type Run, type Stage, type Stop, type StopKind } from './run-state'
@@ -38,6 +38,7 @@ export function recruit(run: Run, index: number): void {
   run.route.forEach((stage, l) => placeLeg(run, run.legs[l], stage))
   drawStops(run)
   join(run, soldier)
+  offerStart(run)
   settle(run)
 }
 
@@ -353,6 +354,7 @@ export function createRun(seed: number): Run {
     boons: 0,
     streak: 0,
     spare: null,
+    boonOffers: [],
     relicOffers: [],
     duos: [],
     duoOffer: null,

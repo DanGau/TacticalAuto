@@ -136,6 +136,7 @@ function shop(run: Run): Action {
 const play =
   ({ risk, pick, build, events }: Strategy): Bot =>
   (run, rng) => {
+    if (run.boonOffers.length > 0) return { type: 'boons', picks: [0, 1] }
     if (run.spare) return { type: 'keep', drop: -1 }
     if (run.phase === 'reward') return reward(run, rng, PICKS[pick])
     if (run.phase === 'recruit') return { type: 'recruit', index: 0 }
@@ -156,6 +157,10 @@ const play =
 
 /** Chooses every option at random; in a shop, builds or leaves at a coin flip. Decides finds as decideFind says. */
 const randomBot: Bot = (run, rng) => {
+  if (run.boonOffers.length > 0) {
+    const first = randomInt(rng, run.boonOffers.length)
+    return { type: 'boons', picks: [first, (first + 1 + randomInt(rng, run.boonOffers.length - 1)) % run.boonOffers.length] }
+  }
   if (run.spare) return { type: 'keep', drop: randomInt(rng, run.utilities.length + 1) - 1 }
   if (run.phase === 'reward') return reward(run, rng, PICKS.random)
   if (run.phase === 'recruit') return { type: 'recruit', index: randomInt(rng, run.recruits.length) }
