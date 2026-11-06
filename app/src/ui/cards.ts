@@ -41,6 +41,9 @@ export function pickDetail(picks: Pick[], armed: string | null, idle: string): s
 /** A piece of gear in full: name, type, rarity and effect. */
 const full = (gear: Gear) => `<b class="tier ${gear.rarity}">${gear.rarity} ${gear.name}</b><small>${gearType(gear)}</small><span>${describeGear(gear)}</span>`
 
+/** A held weapon's name, its card shown beside it on hover, focus or tap. */
+const heldCard = (gear: Gear) => `<span class="held" tabindex="0" data-card><span class="tier ${gear.rarity}">${gear.name}</span><span class="gearpop ${gear.rarity}" hidden>${full(gear)}</span></span>`
+
 /** A gear choice's arm key: a hero to equip, or the last option. */
 const choiceKey = (soldier: Soldier | null) => (soldier ? `g${soldier.id}` : 'g-')
 
@@ -56,7 +59,7 @@ function gearChoice(run: Run, gear: Gear, armed: string | null, heading: string,
     const on = chosen === soldier
     return `<button class="taker${on ? ' chosen' : ''}" role="radio" aria-checked="${on}" data-arm="${choiceKey(soldier)}">${body}</button>`
   }
-  const drop = (s: Soldier) => (s.gear ? `drops <span class="tier ${s.gear.rarity}">${s.gear.name}</span> · <span class="value">+${SELL[s.gear.rarity]} supplies</span>` : 'Empty hands')
+  const drop = (s: Soldier) => (s.gear ? `drops ${heldCard(s.gear)} · <span class="value">+${SELL[s.gear.rarity]} supplies</span>` : 'Empty hands')
   const hero = (s: Soldier) => option(s, `<span class="portrait">${badge(s.cls)}</span><span class="text"><b>Equip on ${s.name}</b><small class="drop">${drop(s)}</small></span>`)
   const fate = chosen === undefined ? 'Choose who takes it' : chosen ? `Equip on ${chosen.name}` : last.fate
   return `<div class="gearswap"><h1>New gear</h1><h2>${heading}</h2>

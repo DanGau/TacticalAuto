@@ -4,6 +4,7 @@ import { apply, type Action } from '../core/apply'
 import { dropGear, GEAR_PRICE, SELL } from '../core/rewards'
 import type { Run } from '../core/run-state'
 import { findSwap, shopSwap } from './cards'
+import { gearType, describeGear } from './html'
 
 /** Each option's arm key and label, as the player reads them. */
 const options = (html: string) => [...html.matchAll(/role="radio" aria-checked="(\w+)" data-arm="([^"]+)">.*?<b>(.*?)<\/b>/g)].map(([, on, key, label]) => ({ on: on === 'true', key, label: label.replace(/<[^>]*>/g, '') }))
@@ -35,7 +36,7 @@ test.each([0, 1, 2])('Equip on hero %i gives them the find and sells the weapon 
   const gear = run.finds[0]
   const html = findSwap(run, 0, `g${hero.id}`)
   expect(options(html).filter((o) => o.on).map((o) => o.label)).toEqual([`Equip on ${hero.name}`])
-  expect(html).toContain(`drops <span class="tier ${held.rarity}">${held.name}</span>`)
+  expect(html).toContain(`drops <span class="held" tabindex="0" data-card><span class="tier ${held.rarity}">${held.name}</span>`)
   const others = run.soldiers.filter((s) => s !== hero).map((s) => s.gear)
   const supplies = run.supplies
   apply(run, JSON.parse(confirm(html)[2]) as Action)
@@ -75,4 +76,17 @@ test('a shop ware is bought for the hero chosen, selling theirs, or left', () =>
   apply(run, JSON.parse(confirm(shopSwap(run, 0, price, `g${hero.id}`))[2]) as Action)
   expect(hero.gear).toBe(gear)
   expect(run.supplies).toBe(99 - price + SELL[held.rarity])
+})
+
+test("each hero's held weapon card shows that weapon in full", () => {
+  const run = found()
+  const html = findSwap(run, 0, null)
+  const cards = [...html.matchAll(/<span class="gearpop (\w+)" hidden>(.*?)<\/span><\/span> ·/gs)]
+  expect(cards.map(([, rarity]) => rarity)).toEqual(run.soldiers.map((s) => s.gear!.rarity))
+  run.soldiers.forEach((s, i) => {
+    const card = cards[i][2]
+    expect(card).toContain(`<b class="tier ${s.gear!.rarity}">${s.gear!.rarity} ${s.gear!.name}</b>`)
+    expect(card).toContain(gearType(s.gear!))
+    expect(card).toContain(describeGear(s.gear!))
+  })
 })

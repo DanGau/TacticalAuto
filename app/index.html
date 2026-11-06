@@ -306,8 +306,12 @@
       .gearswap .sell .verb { color: #9aa6bd; }
       .gearswap .value { white-space: nowrap; color: #ffd166; }
       .gearswap .found { box-sizing: border-box; position: relative; overflow: hidden; display: flex; flex-direction: column; text-align: left; border: 2px solid; background: #161c28; width: min(420px, 100%); min-height: 0; padding-right: 56px; border-color: var(--glow); box-shadow: 0 0 18px color-mix(in srgb, var(--glow) 35%, transparent); --glow: #9aa6bd; }
-      .gearswap .found.rare { --glow: #4da3ff; }
-      .gearswap .found.epic { --glow: #c77dff; }
+      .gearswap .found.rare, .gearswap .gearpop.rare { --glow: #4da3ff; }
+      .gearswap .found.epic, .gearswap .gearpop.epic { --glow: #c77dff; }
+      .gearswap .held { text-decoration: underline dotted; cursor: help; }
+      .gearswap .gearpop { position: fixed; z-index: 20; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; width: min(300px, calc(100vw - 16px)); padding: 10px 12px; border: 2px solid var(--glow); border-radius: 8px; font-size: 13px; line-height: 1.35; text-align: left; color: #e6ebf5; background: #161c28; box-shadow: 0 6px 24px #000a; cursor: auto; --glow: #9aa6bd; }
+      .gearswap .gearpop[hidden] { display: none; }
+      .gearswap .gearpop .defs { display: none; }
       .gearswap .found .new { position: absolute; top: 0; right: 0; padding: 3px 8px; border-bottom-left-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 1px; color: #10141c; background: var(--glow); }
       .gearswap .found .defs { display: none; }
       .gearswap .fate { margin-top: 4px; font-weight: bold; color: #6fe08c; }
