@@ -104,7 +104,7 @@ test("Target Painter marks who hits the Gadgeteer's mech; Napalm Payload bursts 
 
 test('Firefall sets burning each alien a Meteor Strike hits', () => {
   const { battle, hero, aliens } = duo('firefall', { x: 2, y: 2 }, [{ x: 12, y: 10 }])
-  const events = firefall(battle, hero, [{ type: 'rocket', id: hero.id, x: 12, y: 10, hits: [{ target: aliens[0].id, damage: 4 }] }])
+  const events = firefall(battle, hero, [{ type: 'rocket', src: { kind: 'class', id: 'rocket' }, id: hero.id, x: 12, y: 10, hits: [{ target: aliens[0].id, damage: 4 }] }])
   expect(fired(events, 'firefall') && aliens[0].burn > 0).toBe(true)
 })
 

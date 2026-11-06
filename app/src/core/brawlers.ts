@@ -1,4 +1,5 @@
 // The rules of aliens that fight up close: a brute's charge, a leaper's pounce, a vise's hold, a dreadhorn's ram, an aegis's shield, a kinhound's pack and a zealot's fury.
+import { fx } from './sources'
 import { GRID, isSoldier, type Battle, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { blocked, distance, freeTilesNear, walkingDistances } from './grid'
@@ -44,5 +45,5 @@ export function fury(battle: Battle, unit: Unit, enemy: Unit): number {
 export function hold(unit: Unit, enemy: Unit, events: GameEvent[]): void {
   if (unit.kind !== 'vise' || enemy.hp <= 0 || enemy.side !== 'human') return
   enemy.rooted = Math.max(enemy.rooted, HOLD_TURNS)
-  events.push({ type: 'effect', id: enemy.id, effect: 'snare', amount: 0 })
+  events.push(fx(enemy.id, 'snare', 0))
 }

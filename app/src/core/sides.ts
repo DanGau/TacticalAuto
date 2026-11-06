@@ -1,4 +1,5 @@
 // A side's simultaneous move: sighting aliens, walking, sentries, overwatch, burrowers.
+import { alienSrc, BASIC_MOVE, fx } from './sources'
 import type { Secondary } from './secondaries'
 import { aiming } from './fighters'
 import { weaponAttack } from './attack'
@@ -31,14 +32,14 @@ export function moveSide(battle: Battle): GameEvent[] {
     if (unit.side !== battle.turn || unit.hp <= 0) continue
     const path = unit.civilian ? fleePath(battle, unit) : unit.engaged ? fightPath(battle, unit) : []
     if (path.length === 0 && unit.civilian === 'vip') events.push(...squeezePast(battle, unit))
-    if (path.length === 0 && unit.order) events.push({ type: 'order', id: unit.id, order: unit.order })
+    if (path.length === 0 && unit.order) events.push({ type: 'order', src: { kind: 'basic', id: 'order' }, id: unit.id, order: unit.order })
     if (path.length === 0) continue
     // A sentry fires as the alien turns to go.
     if (unit.side === 'alien') events.push(...sentries(battle, unit, watched))
     if (unit.hp <= 0) continue
     walk(battle, unit, path, events)
     moved(battle, unit, path, events)
-    if (unit.order) events.push({ type: 'order', id: unit.id, order: unit.order })
+    if (unit.order) events.push({ type: 'order', src: { kind: 'basic', id: 'order' }, id: unit.id, order: unit.order })
   }
   if (battle.turn === 'alien') events.push(...blowRigged(battle))
   // Acid burns each unit of the side still standing in it once the side has moved, so a unit free to move can step out.
@@ -49,7 +50,7 @@ export function moveSide(battle: Battle): GameEvent[] {
   }
   for (const unit of battle.units.filter((u) => u.side === battle.turn && onTile(battle.fire, u) && !fireproof(battle, u))) {
     unit.burn = Math.max(unit.burn, BURN_STACKS)
-    events.push({ type: 'effect', id: unit.id, effect: foeHas(battle, unit, 'pyre') ? 'pyre' : 'napalm', amount: 0 })
+    events.push(fx(unit.id, foeHas(battle, unit, 'pyre') ? 'pyre' : 'napalm', 0))
   }
   const sighted = sight(battle)
   // Soldiers on overwatch fire once the aliens have moved and any alien sighted has taken its place.
@@ -142,7 +143,7 @@ export function escortVip(battle: Battle): GameEvent[] {
     wreck(battle, at)
     const guards = battle.units.filter((u) => u.side === 'alien' && distance(u, vip) <= BREACH_REACH + 2)
     for (const guard of guards) Object.assign(guard, { revealed: true, engaged: true, surprised: 1 })
-    events.push({ type: 'rocket', id: breacher.id, x: at.x, y: at.y, hits: [] })
+    events.push({ type: 'rocket', src: { kind: 'basic', id: 'attack' }, id: breacher.id, x: at.x, y: at.y, hits: [] })
   }
   const guarded = pursuers(battle, vip).some((u) => u.engaged && distance(u, vip) <= FREE_REACH)
   if (battle.vip === 'breached' && !guarded && squad.some((s) => distance(s, vip) <= BREACH_REACH)) {
@@ -190,7 +191,7 @@ function squeezePast(battle: Battle, vip: Unit): GameEvent[] {
   const [was, to] = [{ x: vip.x, y: vip.y }, { x: soldier.x, y: soldier.y }]
   Object.assign(vip, to)
   Object.assign(soldier, was)
-  return [{ type: 'move', id: vip.id, path: [to] }, { type: 'move', id: soldier.id, path: [was] }]
+  return [{ type: 'move', src: BASIC_MOVE, id: vip.id, path: [to] }, { type: 'move', src: BASIC_MOVE, id: soldier.id, path: [was] }]
 }
 
 /**
@@ -237,7 +238,7 @@ export function dash(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[]
   const events: GameEvent[] = []
   walk(battle, unit, path, events)
   moved(battle, unit, path, events)
-  return [...events.map((e) => (e.type === 'move' ? { ...e, with: 'dash' as const } : e)), ...sight(battle)]
+  return [...events.map((e) => (e.type === 'move' ? { ...e, with: 'dash' as const, src: { kind: 'basic' as const, id: 'dash' } } : e)), ...sight(battle)]
 }
 
 /** Overwatch: each prepared soldier shoots at the first alien that moved this turn and that it can now shoot. */
@@ -275,7 +276,7 @@ export function surface(battle: Battle): GameEvent[] {
   freeTilesNear(battle, alone, rising.length).forEach((tile, i) => Object.assign(rising[i], tile, { revealed: true, surprised: 0 }))
   events.push({ type: 'reveal', units: rising.map(({ id, x, y }) => ({ id, x, y })) })
   // Surfacing is a move, so overwatch answers it.
-  for (const m of rising) events.push({ type: 'move', id: m.id, path: [{ x: m.x, y: m.y }] })
+  for (const m of rising) events.push({ type: 'move', src: alienSrc(m), id: m.id, path: [{ x: m.x, y: m.y }] })
   return events
 }
 

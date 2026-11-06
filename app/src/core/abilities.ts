@@ -1,4 +1,5 @@
 // Actions in place of a shot: alien powers, and soldier skills and gear.
+import { alienSrc, fx, srcOf } from './sources'
 import { type Battle, type Effect, type Unit, BLAST_RADIUS, CLOAK_TURNS, isSoldier, FORCE_FIELD_REACH, FORCE_FIELD_ARMOR, SLAM_HIT, SLAM_TILES, STUN_REACH, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN, SURGEON_HEAL, MEDIC_REACH, MEDIC_HEAL, SECOND_WIND_HEAL, DRONE_REACH, DRONE_DAMAGE, SKIRMISH_MOVE, TITAN_HEALTH, PLATING_ARMOR, MECH_STATS, DRONE_STATS, type Stats, type SkillEffect } from './battle'
 import { mechUnit } from './spawn'
 import { freeTilesNear } from './grid'
@@ -20,7 +21,7 @@ export function slam(battle: Battle, unit: Unit): GameEvent[] {
   const beside = foes(battle, unit).filter((u) => distance(u, unit) <= 1)
   if (beside.length < 2) return []
   unit.spent.push('slam')
-  const events: GameEvent[] = [{ type: 'rocket', id: unit.id, x: unit.x, y: unit.y, hits: beside.map((u) => ({ target: u.id, damage: SLAM_HIT })) }]
+  const events: GameEvent[] = [{ type: 'rocket', src: srcOf('slam'), id: unit.id, x: unit.x, y: unit.y, hits: beside.map((u) => ({ target: u.id, damage: SLAM_HIT })) }]
   for (const foe of beside) {
     wound(battle, foe, SLAM_HIT, events)
     if (foe.hp > 0) knockback(battle, unit, foe, events, 1, SLAM_TILES, SLAM_DAMAGE, 'slam')
@@ -34,7 +35,7 @@ export function stun(caught: Unit[], effect: Effect): GameEvent[] {
     .filter((u) => !u.boss)
     .map((u) => {
       u.panicked = true
-      return { type: 'effect', id: u.id, effect, amount: 0 }
+      return fx(u.id, effect, 0)
     })
 }
 
@@ -71,7 +72,7 @@ export function forceField(battle: Battle, unit: Unit): GameEvent[] {
   if (!mate) return []
   unit.spent.push('forceField')
   mate.armor += FORCE_FIELD_ARMOR
-  return [{ type: 'effect', id: mate.id, effect: 'forceField', amount: 0 }]
+  return [fx(mate.id, 'forceField', 0)]
 }
 
 /** Spit: the nearest unit but a hostage the spitter can shoot is hit, and acid is left on its tile. */
@@ -81,7 +82,7 @@ export function spit(battle: Battle, unit: Unit): GameEvent[] {
     unit,
   )
   if (!target) return []
-  const events: GameEvent[] = [{ type: 'spit', id: unit.id, target: target.id, damage: SPIT_DAMAGE }]
+  const events: GameEvent[] = [{ type: 'spit', src: alienSrc(unit), id: unit.id, target: target.id, damage: SPIT_DAMAGE }]
   battle.acid = [...battle.acid.filter((pool) => pool.x !== target.x || pool.y !== target.y), { x: target.x, y: target.y, turns: ACID_TURNS }]
   wound(battle, target, SPIT_DAMAGE, events, unit.resists.includes('ward'))
   return events
@@ -95,7 +96,7 @@ export function panic(battle: Battle, unit: Unit): GameEvent[] {
   if (!target) return []
   target.panicked = true
   unit.cooldown = PSI_COOLDOWN
-  return [{ type: 'panic', id: unit.id, target: target.id }]
+  return [{ type: 'panic', src: alienSrc(unit), id: unit.id, target: target.id }]
 }
 
 /** What an alien does in place of a shot, by its kind; empty if it shoots, or has nothing to do. */
@@ -123,7 +124,7 @@ export function heal(battle: Battle, unit: Unit): GameEvent[] {
     return hurt.map((u) => {
       const amount = Math.min(MEDIC_HEAL + boost, u.stats.hp - u.hp)
       u.hp += amount
-      return { type: 'heal', id: unit.id, target: u.id, amount }
+      return { type: 'heal', src: srcOf('medic'), id: unit.id, target: u.id, amount }
     })
   }
   const wounded =
@@ -132,7 +133,7 @@ export function heal(battle: Battle, unit: Unit): GameEvent[] {
   if (!wounded) return []
   const amount = Math.min(MEDIC_HEAL + boost, wounded.stats.hp - wounded.hp)
   wounded.hp += amount
-  const events: GameEvent[] = [{ type: 'heal', id: unit.id, target: wounded.id, amount }]
+  const events: GameEvent[] = [{ type: 'heal', src: srcOf('medic'), id: unit.id, target: wounded.id, amount }]
   duoHeal(battle, unit, wounded, MEDIC_HEAL + boost, amount, events)
   return events
 }
@@ -142,7 +143,7 @@ export function secondWind(unit: Unit): GameEvent[] {
   if (unit.hp > unit.stats.hp / 2 || !spend(unit, 'secondWind')) return []
   const amount = Math.min(SECOND_WIND_HEAL, unit.stats.hp - unit.hp)
   unit.hp += amount
-  return [{ type: 'effect', id: unit.id, effect: 'secondWind', amount }]
+  return [fx(unit.id, 'secondWind', amount)]
 }
 
 /** A combat drone hits the nearest revealed alien its soldier has in sight within reach. */
@@ -153,7 +154,7 @@ export function drone(battle: Battle, unit: Unit): GameEvent[] {
     unit,
   )
   if (!target) return []
-  const events: GameEvent[] = [{ type: 'shot', id: unit.id, target: target.id, crit: false, damage: DRONE_DAMAGE, with: ['drone'] }]
+  const events: GameEvent[] = [{ type: 'shot', src: srcOf('drone'), id: unit.id, target: target.id, crit: false, damage: DRONE_DAMAGE, with: ['drone'] }]
   wound(battle, target, DRONE_DAMAGE, events)
   return events
 }
@@ -176,7 +177,7 @@ export function feed(battle: Battle, unit: Unit, events: GameEvent[]): GameEvent
     .filter((u) => u.kind === 'feeder' && u.revealed)
     .map((u) => {
       u.might++
-      return { type: 'feed', id: u.id, damage: u.might }
+      return { type: 'feed', src: alienSrc(u), id: u.id, damage: u.might }
     })
 }
 
@@ -212,7 +213,7 @@ function build(battle: Battle, unit: Unit, count: number): GameEvent[] {
   return freeTilesNear(battle, unit, count).map((tile) => {
     const mech = mechUnit(battle, unit, { ...stats }, effects, tile)
     battle.units.push(mech)
-    return { type: 'spawn', id: unit.id, unit: { id: mech.id, x: mech.x, y: mech.y } }
+    return { type: 'spawn', src: srcOf('mech'), id: unit.id, unit: { id: mech.id, x: mech.x, y: mech.y } }
   })
 }
 
@@ -231,7 +232,7 @@ export function strew(battle: Battle, unit: Unit): GameEvent[] {
     if (!onGrid(tile.x, tile.y)) continue
     if (!onTile(battle.caltrops, tile)) battle.caltrops.push(tile)
   }
-  return [{ type: 'effect', id: unit.id, effect: 'caltrops', amount: 0 }]
+  return [fx(unit.id, 'caltrops', 0)]
 }
 
 /** How near an alien closing in must come before caltrops are strewn in its path, and how near is too late. */

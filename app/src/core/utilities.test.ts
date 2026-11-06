@@ -145,7 +145,7 @@ test('a rigged tank is picked, stands until aliens crowd it, then blows on them'
   battle.turn = 'alien'
   battle.stage = 'move'
   const events = stepBattle(battle)
-  expect(events).toContainEqual(expect.objectContaining({ type: 'rocket', label: 'RIGGED' }))
+  expect(events).toContainEqual(expect.objectContaining({ type: 'rocket', src: { kind: 'object', id: 'rig' } }))
   expect(battle.rigged).toBeNull()
   expect(foe.hp).toBeLessThanOrEqual(99 - RIG.damage)
 })

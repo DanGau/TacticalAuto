@@ -3,6 +3,7 @@ import { BLAST_RADIUS, type Battle, type Tile } from '../core/battle'
 import { distance } from '../core/grid'
 import type { GameEvent } from '../core/combat-event'
 import { effectName } from '../core/effects'
+import { sourceName } from '../core/sources'
 import { PACE } from '../core/pace'
 import { SECONDARIES } from '../core/secondaries'
 import type { Attack } from './attacks'
@@ -293,7 +294,7 @@ export async function fireRocket(s: Stage, fx: Sketch, battle: Battle, from: Spr
     const sprite = s.sprites.get(hit.target)
     if (!sprite) continue
     sprite.drawHp(...vitals(battle, hit.target))
-    float(s, callout(s, `${e.label ?? (e.fire ? 'FIREBALL' : 'BLAST')} -${hit.damage}`, color, sprite))
+    float(s, callout(s, `${sourceName(e.src, s.kit()).toUpperCase()} -${hit.damage}`, color, sprite))
   }
   const caught = e.hits.flatMap((hit) => s.sprites.get(hit.target) ?? [])
   blast(s, e, Math.max(BLAST_RADIUS, ...caught.map((c) => distance(c.tile, e))), color, caught)

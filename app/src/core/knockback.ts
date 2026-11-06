@@ -1,4 +1,5 @@
 // Driving a unit back, and what it hits or falls from: a ledge, a window, or the edge of the world.
+import { fx, srcOf } from './sources'
 import { GRID, type Battle, type Effect, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { blocked, CLIFF, edgeBetween, freeTilesNear, heightAt, onGrid, openNear, unitAt, unwalled, walks } from './grid'
@@ -85,7 +86,7 @@ export function fall(battle: Battle, unit: Unit, from: Tile, to: Tile, events: G
   const beyond = fallBeyond(battle, from, to)
   if (beyond === 0) return
   shatter(battle, from, to)
-  if (has(unit, 'hover')) return void events.push({ type: 'effect', id: unit.id, effect: 'hover', amount: 0 })
+  if (has(unit, 'hover')) return void events.push(fx(unit.id, 'hover', 0))
   if (beyond === 'drop') {
     const caught = unit.side === 'human' || unit.boss
     const event: Extract<GameEvent, { type: 'fall' }> = { type: 'fall', id: unit.id, to, drop: 'edge', damage: caught ? EDGE_DAMAGE : unit.hp }
@@ -141,7 +142,7 @@ export function drive(battle: Battle, target: Unit, step: Tile, tiles: number, e
   if (end) {
     target.x = end.x
     target.y = end.y
-    events.push({ type: 'move', id: target.id, path, with: effect })
+    events.push({ type: 'move', src: srcOf(effect), id: target.id, path, with: effect })
   }
   if (over) {
     fall(battle, target, end ?? start, over, events)
@@ -149,11 +150,11 @@ export function drive(battle: Battle, target: Unit, step: Tile, tiles: number, e
   }
   if (!stopped || slam === 0) return false
   const into = unitAt(battle, target.x + step.x, target.y + step.y)
-  events.push({ type: 'effect', id: target.id, effect, amount: -slam })
+  events.push(fx(target.id, effect, -slam))
   wound(battle, target, slam, events)
   slammed(battle, target, events)
   if (into && into.side === target.side) {
-    events.push({ type: 'effect', id: into.id, effect, amount: -slam })
+    events.push(fx(into.id, effect, -slam))
     wound(battle, into, slam, events)
   }
   return false
@@ -164,5 +165,5 @@ export function settle(battle: Battle, unit: Unit): GameEvent[] {
   if (has(unit, 'hover') || !isDrop(battle, unit)) return []
   const to = openNear(battle, unit)
   Object.assign(unit, to)
-  return [{ type: 'move', id: unit.id, path: [to], with: 'hover' }]
+  return [{ type: 'move', src: srcOf('hover'), id: unit.id, path: [to], with: 'hover' }]
 }

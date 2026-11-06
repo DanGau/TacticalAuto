@@ -1,13 +1,14 @@
 import { expect, test } from 'vitest'
 import type { GameEvent } from './combat-event'
+import { BASIC_MOVE } from './sources'
 import { beatMs, PACE, tick, walkMs } from './pace'
 
-const move = (id: number, tiles: number): GameEvent => ({ type: 'move', id, path: Array.from({ length: tiles }, (_, i) => ({ x: i, y: 0 })) })
+const move = (id: number, tiles: number): GameEvent => ({ type: 'move', src: BASIC_MOVE, id, path: Array.from({ length: tiles }, (_, i) => ({ x: i, y: 0 })) })
 const pace = new Map([1, 2, 3].map((id) => [id, PACE.tile]))
 const shown = new Set([1, 2, 3])
 
 test('moves in a row walk together, words among them do not hold them up, and a long walk takes no longer than a march', () => {
-  expect(beatMs([move(1, 2), { type: 'order', id: 1, order: 'prepare' }, move(2, 3)], pace, shown)).toBe(3 * PACE.tile)
+  expect(beatMs([move(1, 2), { type: 'order', src: BASIC_MOVE, id: 1, order: 'prepare' }, move(2, 3)], pace, shown)).toBe(3 * PACE.tile)
   expect(beatMs([move(1, 40)], pace, shown)).toBe(PACE.march)
 })
 
@@ -17,7 +18,7 @@ test('a soldier going a short way takes the cool walk; a long way, it runs', () 
 })
 
 test('a shot waits for the walk before it, and an alien appearing out of sight takes no time', () => {
-  const shot: GameEvent = { type: 'shot', id: 1, target: 2, crit: false, damage: 3, with: [] }
+  const shot: GameEvent = { type: 'shot', src: BASIC_MOVE, id: 1, target: 2, crit: false, damage: 3, with: [] }
   expect(beatMs([move(1, 2), shot], pace, shown)).toBe(2 * PACE.tile + PACE.attack)
   expect(beatMs([{ type: 'reveal', units: [{ id: 9, x: 0, y: 0 }] }], pace, shown)).toBe(0)
 })

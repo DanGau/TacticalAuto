@@ -1,4 +1,5 @@
 // Damage landing on a unit, what it sets off, and the tally it adds to.
+import { alienSrc, fx, srcOf } from './sources'
 import { REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_STACKS, BLAST_RADIUS, type Battle, type Unit, type Tile } from './battle'
 import { wreck } from './grid'
 import { distance } from './grid'
@@ -54,7 +55,7 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
   if (target.burn > 0 && (wildfire || (killer && has(killer, 'backdraft')))) {
     for (const other of beside.filter((u) => !fireproof(battle, u))) {
       kindle(battle, other, BURN_STACKS)
-      events.push({ type: 'effect', id: other.id, effect: wildfire ? 'wildfire' : 'backdraft', amount: 0 })
+      events.push(fx(other.id, wildfire ? 'wildfire' : 'backdraft', 0))
     }
   }
   // A soldier who would fall may be got back up: by a squadmate's revive, or once by the squad's phoenix protocol.
@@ -64,16 +65,16 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
     if (reviver) reviver.spent.push('revive')
     else battle.used.push('phoenix')
     target.hp = rises === 'revive' ? REVIVE_HEALTH : PHOENIX_HEALTH
-    events.push({ type: 'effect', id: target.id, effect: rises, amount: target.hp })
+    events.push(fx(target.id, rises, target.hp))
     return
   }
   if (has(target, 'phoenixRising') && !target.spent.includes('phoenixRising')) {
     target.spent.push('phoenixRising')
     target.hp = target.stats.hp
-    events.push({ type: 'ultimate', id: target.id, effect: 'phoenixRising', x: target.x, y: target.y, radius: PHOENIX_RISING.radius })
+    events.push({ type: 'ultimate', src: srcOf('phoenixRising'), id: target.id, effect: 'phoenixRising', x: target.x, y: target.y, radius: PHOENIX_RISING.radius })
     for (const foe of battle.units.filter((u) => u.side !== target.side && !u.civilian && distance(u, target) <= PHOENIX_RISING.radius)) {
       kindle(battle, foe, BURN_STACKS)
-      events.push({ type: 'effect', id: foe.id, effect: 'phoenixRising', amount: -PHOENIX_RISING.damage })
+      events.push(fx(foe.id, 'phoenixRising', -PHOENIX_RISING.damage))
       wound(battle, foe, PHOENIX_RISING.damage, events)
     }
     return
@@ -89,7 +90,7 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
   if (target.civilian && killer?.kind === 'harvester') battle.husks.push({ x: target.x, y: target.y })
   if (has(target, 'detonate')) {
     const caught = battle.units.filter((u) => u.side !== target.side && distance(u, target) <= 1)
-    events.push({ type: 'rocket', id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: DETONATE_DAMAGE })) })
+    events.push({ type: 'rocket', src: srcOf('detonate'), id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: DETONATE_DAMAGE })) })
     for (const u of caught) wound(battle, u, DETONATE_DAMAGE, events)
   }
   if (tally) {
@@ -102,11 +103,11 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
   const heir = target.marked && foeHas(battle, target, 'hex') ? nearest(battle.units.filter((u) => u.side === target.side && !u.marked && !u.resists.includes('mark')), target) : undefined
   if (heir) {
     heir.marked = true
-    events.push({ type: 'effect', id: heir.id, effect: 'hex', amount: 0 })
+    events.push(fx(heir.id, 'hex', 0))
   }
   if (target.kind === 'burster') {
     const caught = battle.units.filter((u) => distance(target, u) <= BLAST_RADIUS && !immune(battle, u, 'blast'))
-    events.push({ type: 'rocket', id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: burstOn(u) })) })
+    events.push({ type: 'rocket', src: alienSrc(target), id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: burstOn(u) })) })
     wreck(battle, target)
     for (const unit of caught) wound(battle, unit, burstOn(unit), events)
   }
@@ -131,12 +132,12 @@ const burstOn = (unit: Unit) => (has(unit, 'meleeShield') ? Math.ceil(BURST_DAMA
 export function moved(battle: Battle, unit: Unit, path: Tile[], events: GameEvent[]): void {
   const spikes = unit.side === 'alien' ? path.filter((t) => onTile(battle.caltrops, t)).length : 0
   if (spikes > 0) {
-    events.push({ type: 'effect', id: unit.id, effect: 'caltrops', amount: -spikes })
+    events.push(fx(unit.id, 'caltrops', -spikes))
     wound(battle, unit, spikes, events)
   }
   if (unit.booming > 0 && unit.hp > 0) {
     unit.booming = 0
-    events.push({ type: 'effect', id: unit.id, effect: 'booming', amount: -BOOM_DAMAGE })
+    events.push(fx(unit.id, 'booming', -BOOM_DAMAGE))
     wound(battle, unit, BOOM_DAMAGE, events)
   }
 }

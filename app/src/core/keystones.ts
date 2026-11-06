@@ -1,4 +1,5 @@
 // Tier 3 powers: what each keystone adds to a hit, and the reactions and numbers they share.
+import { fx, srcOf } from './sources'
 import { type Unit, type Battle, MIGHT_MAX } from './battle'
 import { chillUnit } from './stacks'
 import type { GameEvent } from './combat-event'
@@ -29,26 +30,26 @@ export function afterHit(battle: Battle, unit: Unit, enemy: Unit, damage: number
     unit.might = Math.min(MIGHT_MAX, unit.might + 1)
     const healed = Math.min(BLOODBATH_HEAL, unit.stats.hp - unit.hp)
     unit.hp += healed
-    events.push({ type: 'effect', id: unit.id, effect: 'bloodbath', amount: healed })
+    events.push(fx(unit.id, 'bloodbath', healed))
   }
   if (damage > 0 && (has(unit, 'aftershock') || has(unit, 'shardstorm'))) {
     const effect = has(unit, 'aftershock') ? 'aftershock' : 'shardstorm'
     for (const other of beside.filter((u) => u.hp > 0)) {
       if (effect === 'shardstorm') chillUnit(battle, other, 1, events)
       const amount = effect === 'aftershock' ? AFTERSHOCK_DAMAGE : SHARD_DAMAGE
-      events.push({ type: 'effect', id: other.id, effect, amount: -amount })
+      events.push(fx(other.id, effect, -amount))
       wound(battle, other, amount, events)
     }
   }
   if (enemy.hp > 0 && damage > 0 && !enemy.boss && enemy.chill > 0 && has(unit, 'frozenHeart')) {
     enemy.panicked = true
-    events.push({ type: 'effect', id: enemy.id, effect: 'frozenHeart', amount: 0 })
+    events.push(fx(enemy.id, 'frozenHeart', 0))
   }
   if (enemy.hp > 0 && has(enemy, 'riposte') && unit.hp > 0) {
     // The blow back is the hero's own, and so is the credit.
     const actor = battle.actor
     battle.actor = enemy.id
-    events.push({ type: 'effect', id: unit.id, effect: 'riposte', amount: -enemy.stats.damage })
+    events.push(fx(unit.id, 'riposte', -enemy.stats.damage))
     wound(battle, unit, enemy.stats.damage, events)
     battle.actor = actor
   }
@@ -63,7 +64,7 @@ export function tesla(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[
   for (let i = 0; i < TESLA.bolts; i++) {
     const target = nearest(inReach.filter((u) => u.hp > 0 && !events.some((e) => e.type === 'shot' && e.target === u.id)), unit)
     if (!target) break
-    events.push({ type: 'shot', id: unit.id, target: target.id, crit: false, damage: TESLA.damage, with: ['tesla'] })
+    events.push({ type: 'shot', src: srcOf('tesla'), id: unit.id, target: target.id, crit: false, damage: TESLA.damage, with: ['tesla'] })
     wound(battle, target, TESLA.damage, events)
   }
   return events

@@ -111,8 +111,8 @@ test('what grants an extra attack grants the weapon, not the secondary', () => {
 })
 
 test("a combo's blows are closer together than two heroes' attacks", () => {
-  const opens: GameEvent = { type: 'shot', id: 1, target: 2, crit: false, damage: 3, with: [], opens: true }
-  const lone: GameEvent = { type: 'shot', id: 1, target: 2, crit: false, damage: 3, with: [] }
+  const opens: GameEvent = { type: 'shot', src: { kind: 'basic', id: 'attack' }, id: 1, target: 2, crit: false, damage: 3, with: [], opens: true }
+  const lone: GameEvent = { type: 'shot', src: { kind: 'basic', id: 'attack' }, id: 1, target: 2, crit: false, damage: 3, with: [] }
   expect(staggerOf([opens])).toBeLessThan(staggerOf([lone]))
   expect(tick({ next: 0, done: 0 }, PACE.attack, true, staggerOf([opens])).next).toBe(PACE.combo)
 })

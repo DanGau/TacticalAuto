@@ -1,4 +1,5 @@
 // Tier 4 powers: once a battle, each hero's moment. Each says when it is worth spending and what it does.
+import { fx, srcOf } from './sources'
 import { cloakOn } from './abilities'
 import { chillUnit, kindle } from './stacks'
 import { BURN_STACKS, CRIT_BONUS, isSoldier, type Battle, type Tile, type Unit } from './battle'
@@ -50,7 +51,7 @@ const moment = (battle: Battle, unit: Unit) => {
 /** Hurts each of `caught`, past armor if `pierce`, saying so over each. */
 function strike(battle: Battle, caught: Unit[], amount: number, effect: UltimateEffect, events: GameEvent[], pierce = false): void {
   for (const foe of caught.filter((u) => u.hp > 0)) {
-    events.push({ type: 'effect', id: foe.id, effect, amount: -amount })
+    events.push(fx(foe.id, effect, -amount))
     wound(battle, foe, amount, events, pierce, true)
   }
 }
@@ -61,7 +62,7 @@ function barrage(battle: Battle, unit: Unit, count: number, amount: number, effe
     const left = foes(battle, unit).filter((u) => u.hp > 0)
     if (left.length === 0) return
     const target = left[randomInt(battle, left.length)]
-    events.push({ type: 'shot', id: unit.id, target: target.id, crit: true, damage: amount, with: [effect], nth: 1 + (i % 3), lasts: 90 })
+    events.push({ type: 'shot', src: srcOf(effect), id: unit.id, target: target.id, crit: true, damage: amount, with: [effect], nth: 1 + (i % 3), lasts: 90 })
     if (chill) chillUnit(battle, target, 1, events)
     wound(battle, target, amount, events, pierce, true)
   }
@@ -91,10 +92,10 @@ const ultimates = {
         const [tile] = freeTilesNear(battle, target, 1)
         if (tile) {
           Object.assign(unit, { ...tile, moved: true })
-          events.push({ type: 'move', id: unit.id, path: [tile], with: 'killingSpree' })
+          events.push({ type: 'move', src: srcOf('killingSpree'), id: unit.id, path: [tile], with: 'killingSpree' })
         }
         const damage = unit.stats.damage + SPREE.damage
-        events.push({ type: 'shot', id: unit.id, target: target.id, crit: true, damage, with: ['killingSpree'], nth: 1, lasts: 120 })
+        events.push({ type: 'shot', src: srcOf('killingSpree'), id: unit.id, target: target.id, crit: true, damage, with: ['killingSpree'], nth: 1, lasts: 120 })
         wound(battle, target, damage, events, false, true)
       }
     },
@@ -124,7 +125,7 @@ const ultimates = {
         const caught = left.filter((o) => distance(o, at) <= EXTINCTION.radius)
         const { x, y } = at
         wreck(battle, { x, y }, EXTINCTION.radius)
-        events.push({ type: 'rocket', id: -1, x, y, hits: caught.map((u) => ({ target: u.id, damage: EXTINCTION.damage })), label: 'METEOR' })
+        events.push({ type: 'rocket', src: srcOf('extinction'), id: -1, x, y, hits: caught.map((u) => ({ target: u.id, damage: EXTINCTION.damage })) })
         for (const u of caught) wound(battle, u, EXTINCTION.damage, events)
       }
     },
@@ -152,7 +153,7 @@ const ultimates = {
     go(battle, unit, events, seen) {
       const damage = unit.stats.damage + CRIT_BONUS + BULLET_TIME.damage
       for (const target of foes(battle, unit).filter((u) => seen.has(u.id)).slice(0, BULLET_TIME.targets)) {
-        events.push({ type: 'shot', id: unit.id, target: target.id, crit: true, damage, with: ['bulletTime'], nth: 1, lasts: 150 })
+        events.push({ type: 'shot', src: srcOf('bulletTime'), id: unit.id, target: target.id, crit: true, damage, with: ['bulletTime'], nth: 1, lasts: 150 })
         wound(battle, target, damage, events, false, true)
       }
     },
@@ -163,7 +164,7 @@ const ultimates = {
       const target = foes(battle, unit).reduce((best, u) => (u.hp + u.armor > best.hp + best.armor ? u : best))
       const to = { x: target.x, y: target.y }
       const damage = Math.ceil(target.hp / 2) + SENTENCE
-      events.push({ type: 'shot', id: unit.id, target: target.id, crit: true, damage, with: ['deathSentence'] })
+      events.push({ type: 'shot', src: srcOf('deathSentence'), id: unit.id, target: target.id, crit: true, damage, with: ['deathSentence'] })
       wound(battle, target, damage, events, true, true)
       return { to }
     },
@@ -174,7 +175,7 @@ const ultimates = {
       for (const tile of freeTilesNear(battle, unit, MIRRORS.images)) {
         const image = mechUnit(battle, unit, { ...unit.stats, hp: MIRRORS.hp, armor: 0, damage: Math.max(1, Math.ceil(unit.stats.damage / 2)) }, ['taunt'], tile)
         battle.units.push(image)
-        events.push({ type: 'spawn', id: unit.id, unit: { id: image.id, x: image.x, y: image.y } })
+        events.push({ type: 'spawn', src: srcOf('hallOfMirrors'), id: unit.id, unit: { id: image.id, x: image.x, y: image.y } })
       }
     },
   },
@@ -186,7 +187,7 @@ const ultimates = {
       const giant = mechUnit(battle, unit, { hp: COLOSSUS.hp, armor: COLOSSUS.armor, damage: COLOSSUS.damage, range: COLOSSUS.range, move: COLOSSUS.move, crit: COLOSSUS.crit, strength: 6, jump: 1 }, ['taunt'], tile)
       giant.giant = true
       battle.units.push(giant)
-      events.push({ type: 'spawn', id: unit.id, unit: { id: giant.id, x: giant.x, y: giant.y } })
+      events.push({ type: 'spawn', src: srcOf('colossus'), id: unit.id, unit: { id: giant.id, x: giant.x, y: giant.y } })
     },
   },
   droneStorm: {
@@ -221,7 +222,7 @@ const ultimates = {
       for (const mate of soldiers(battle).filter((u) => u.hp < u.stats.hp)) {
         const amount = mate.stats.hp - mate.hp
         mate.hp += amount
-        events.push({ type: 'heal', id: unit.id, target: mate.id, amount })
+        events.push({ type: 'heal', src: srcOf('resurrection'), id: unit.id, target: mate.id, amount })
       }
     },
   },
@@ -319,7 +320,7 @@ export function ultimate(battle: Battle, unit: Unit, seen: Set<number>): GameEve
     const events: GameEvent[] = []
     const at = { x: unit.x, y: unit.y }
     const landing = power.go(battle, unit, events, seen) ?? {}
-    return [{ type: 'ultimate', id: unit.id, effect, ...at, radius: landing.radius ?? 0, ...(landing.to ? { to: landing.to } : {}) }, ...events]
+    return [{ type: 'ultimate', src: srcOf(effect), id: unit.id, effect, ...at, radius: landing.radius ?? 0, ...(landing.to ? { to: landing.to } : {}) }, ...events]
   }
   return []
 }

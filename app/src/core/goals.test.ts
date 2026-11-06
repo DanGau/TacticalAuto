@@ -282,7 +282,7 @@ test('no one shot kills a commander from full health; brought low, it blinks awa
   const events: GameEvent[] = []
   while (battle.phase === 'battle' && !events.some((e) => e.type === 'shot' && e.target === commander.id)) events.push(...stepBattle(battle))
   expect(commander.hp).toBe(1)
-  expect(events).toContainEqual({ type: 'effect', id: commander.id, effect: 'lastStand', amount: 0 })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: commander.id, effect: 'lastStand', amount: 0 }))
   expect(events).toContainEqual(expect.objectContaining({ type: 'move', id: commander.id, with: 'blink' }))
 })
 

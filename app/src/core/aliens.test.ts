@@ -80,7 +80,7 @@ test("a spitter's spit always lands and leaves acid that burns a unit that stays
   // Hold the soldier still, so it is in the acid after its side moves.
   soldier.stats = { ...soldier.stats, move: 0, range: 0 }
   const events = until(has('hurt'))
-  expect(events).toContainEqual({ type: 'spit', id: aliens[0].id, target: soldier.id, damage: SPIT_DAMAGE })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'spit', id: aliens[0].id, target: soldier.id, damage: SPIT_DAMAGE }))
   expect(events).toContainEqual({ type: 'hurt', id: soldier.id, amount: ACID_DAMAGE, cause: 'acid' })
   expect(battle.acid).toMatchObject([{ x: 10, y: 10 }])
 })
@@ -105,7 +105,7 @@ test('a burster explodes where it dies, hurting everything beside it', () => {
   aliens[0].stats = { ...aliens[0].stats, move: 0 }
   aliens[1].stats = { ...aliens[1].stats, move: 0, damage: 0 }
   const events = until(has('rocket'))
-  expect(events).toContainEqual({ type: 'rocket', id: aliens[0].id, x: 10, y: 13, hits: [{ target: aliens[1].id, damage: BURST_DAMAGE }] })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'rocket', id: aliens[0].id, x: 10, y: 13, hits: [{ target: aliens[1].id, damage: BURST_DAMAGE }] }))
   expect(aliens[1].hp).toBeLessThanOrEqual(5)
 })
 
@@ -137,7 +137,7 @@ test('a psion panics a soldier, who loses its next action, and hurts the aliens 
   // The soldier shoots first and would kill the psion, so make the psion outlast a turn of shots.
   aliens[0].hp = 150
   const events = until(has('frozen'))
-  expect(events).toContainEqual({ type: 'panic', id: aliens[0].id, target: soldier.id })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'panic', id: aliens[0].id, target: soldier.id }))
   expect(events.at(-1)).toEqual({ type: 'frozen', id: soldier.id })
   const after = until(has('death'))
   expect(after).toContainEqual({ type: 'hurt', id: aliens[1].id, amount: PSI_BACKLASH, cause: 'backlash' })
@@ -198,7 +198,7 @@ test('revive gets a fallen squadmate back up, once', () => {
   medic.stats = { ...medic.stats, hp: 99999 }
   aliens[0].stats = { ...aliens[0].stats, move: 0, crit: 0 }
   const events = until((all) => all.some((e) => e.type === 'effect' && e.effect === 'revive'))
-  expect(events).toContainEqual({ type: 'effect', id: soldier.id, effect: 'revive', amount: REVIVE_HEALTH })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: soldier.id, effect: 'revive', amount: REVIVE_HEALTH }))
   expect(battle.units).toContain(soldier)
   until((all) => all.some((e) => e.type === 'death' && e.id === soldier.id))
   expect(battle.units).not.toContain(soldier)
@@ -257,7 +257,7 @@ test('cleave hurts the aliens beside a kill; a skirmisher steps away after its l
   aliens[1].stats = { ...aliens[1].stats, move: 0, range: 5 }
   aliens[1].hp = aliens[1].stats.hp = 99
   const events = until((all) => all.some((e) => e.type === 'death'))
-  expect(events).toContainEqual({ type: 'effect', id: aliens[1].id, effect: 'cleave', amount: -2 })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: aliens[1].id, effect: 'cleave', amount: -2 }))
   expect(aliens[1].hp).toBe(97)
   expect(events.some((e) => e.type === 'move')).toBe(false)
   const second = until((all) => all.some((e) => e.type === 'move'))
@@ -280,7 +280,7 @@ test("a blademaster charges in and strikes from the next tile; a parry deflects 
   duel.soldier.stats = { ...duel.soldier.stats, range: 1, move: 0, hp: 999 }
   duel.soldier.hp = 999
   duel.aliens[0].stats = { ...duel.aliens[0].stats, move: 0 }
-  expect(duel.until((all) => all.some((e) => e.type === 'effect' && e.effect === 'parry'))).toContainEqual({ type: 'effect', id: duel.soldier.id, effect: 'parry', amount: 0 })
+  expect(duel.until((all) => all.some((e) => e.type === 'effect' && e.effect === 'parry'))).toContainEqual(expect.objectContaining({ type: 'effect', id: duel.soldier.id, effect: 'parry', amount: 0 }))
 })
 
 test('a psionic attack passes through a wall; a demolishing hit wrecks the objects around its target; twin guns add a third shot', () => {
@@ -298,7 +298,7 @@ test('a psionic attack passes through a wall; a demolishing hit wrecks the objec
   demo.soldier.stats = { ...demo.soldier.stats, move: 0 }
   demo.aliens[0].stats = { ...demo.aliens[0].stats, move: 0, range: 0 }
   demo.aliens[0].hp = demo.aliens[0].stats.hp = 99
-  expect(demo.until(has('shot'))).toContainEqual({ type: 'effect', id: demo.aliens[0].id, effect: 'demolish', amount: 0 })
+  expect(demo.until(has('shot'))).toContainEqual(expect.objectContaining({ type: 'effect', id: demo.aliens[0].id, effect: 'demolish', amount: 0 }))
   expect(demo.battle.bulk[14 * GRID + 10]).toBe(0)
 
   const twin = arena([{ kind: 'trooper', x: 10, y: 13 }])
@@ -404,7 +404,7 @@ test('a feeder in sight grows on each trick the squad uses; a mirror hits as har
   battle.units.push(alienUnit(battle, { kind: 'trooper', stats: alienStats('trooper', 0, 0), stance: 'balanced', boss: false, spawns: false, target: false, resists: [] }, { x: 11, y: 13 }, true))
   aliens[0].hp = aliens[0].stats.hp = 99
   aliens[0].stats = { ...aliens[0].stats, move: 0, range: 0 }
-  expect(until(has('feed'))).toContainEqual({ type: 'feed', id: aliens[0].id, damage: 1 })
+  expect(until(has('feed'))).toContainEqual(expect.objectContaining({ type: 'feed', id: aliens[0].id, damage: 1 }))
 
   const glass = arena([{ kind: 'mirror', x: 10, y: 13 }])
   glass.soldier.stats = { ...glass.soldier.stats, move: 0, range: 0, damage: 9 }
@@ -466,7 +466,7 @@ test('a soldier with no shot and an enemy that could reach it prepares, and shoo
   soldier.secondary = undefined
   soldier.stats = { ...soldier.stats, move: 0, range: 3 }
   aliens[0].hp = aliens[0].stats.hp = 99
-  expect(until((all) => all.some((e) => e.type === 'order'))).toContainEqual({ type: 'order', id: soldier.id, order: 'prepare' })
+  expect(until((all) => all.some((e) => e.type === 'order'))).toContainEqual(expect.objectContaining({ type: 'order', id: soldier.id, order: 'prepare' }))
   const events = until((all) => all.some((e) => e.type === 'shot' && e.id === soldier.id))
   expect(events).toContainEqual(expect.objectContaining({ type: 'shot', id: soldier.id, with: expect.arrayContaining(['overwatch']) }))
   expect(battle.turn).toBe('alien')
@@ -475,7 +475,7 @@ test('a soldier with no shot and an enemy that could reach it prepares, and shoo
 test('a soldier with nothing in reach sprints, moving again in place of attacking, in a straight line', () => {
   const { battle, soldier, until } = arena([{ kind: 'trooper', x: 10, y: 45 }])
   const events = until((all) => all.some((e) => e.type === 'order')).slice(-2)
-  expect(events).toContainEqual({ type: 'order', id: soldier.id, order: 'sprint' })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'order', id: soldier.id, order: 'sprint' }))
   const walked = events.find((e) => e.type === 'move' && e.id === soldier.id)
   expect(walked?.type === 'move' && walked.path.length).toBeGreaterThan(soldier.stats.move)
   // On open ground it walks straight, not weaving.

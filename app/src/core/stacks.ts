@@ -1,4 +1,5 @@
 // Stacks a fight builds on a unit and what they set off: burn, chill and freezing, Might, combos, exposure, every-Nth hits.
+import { fx } from './sources'
 import { BURN_MAX, BURN_STACKS, CADENCE, CHILL_FREEZE, COMBO_MAX, EXPOSED, FAULT, FRACTURE_DAMAGE, HIGH_CRIT, HIGH_LEVELS, MIGHT_MAX, GRID, isSoldier, LINGER_STACKS, type Battle, type Effect, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { fireproof, foeHas, has, nearest } from './fighters'
@@ -22,7 +23,7 @@ export function chillUnit(_battle: Battle, target: Unit, stacks: number, events:
   if (target.chill < CHILL_FREEZE || target.frozen) return
   target.frozen = true
   target.panicked = true
-  events.push({ type: 'effect', id: target.id, effect: 'frozen', amount: 0 })
+  events.push(fx(target.id, 'frozen', 0))
 }
 
 /** A frozen unit's lost action: it thaws with no chill left. */
@@ -37,7 +38,7 @@ export function empower(unit: Unit, amount: number, effect: Effect, events: Game
   const gain = Math.min(amount, MIGHT_MAX - unit.might)
   if (gain <= 0 || unit.hp <= 0) return
   unit.might += gain
-  events.push({ type: 'effect', id: unit.id, effect, amount: 0 })
+  events.push(fx(unit.id, effect, 0))
 }
 
 /** The hero whose action is under way, if a hero's. */
@@ -50,7 +51,7 @@ export function fell(battle: Battle, unit: Unit, levels: number, events: GameEve
   if (has(by, 'impetus')) empower(by, 1, 'impetus', events)
   if (!has(by, 'topple')) return 0
   unit.exposed = EXPOSED.turns
-  events.push({ type: 'effect', id: unit.id, effect: 'topple', amount: 0 })
+  events.push(fx(unit.id, 'topple', 0))
   return levels
 }
 
@@ -90,7 +91,7 @@ export function struck(battle: Battle, unit: Unit, enemy: Unit, crit: boolean, e
   else Object.assign(unit, { comboOn: enemy.id, combo: 1 })
   if (crit && enemy.hp > 0 && has(unit, 'catalyst') && enemy.burn + enemy.chill > 0) {
     kindle(battle, enemy, enemy.burn)
-    events.push({ type: 'effect', id: enemy.id, effect: 'catalyst', amount: 0 })
+    events.push(fx(enemy.id, 'catalyst', 0))
     chillUnit(battle, enemy, enemy.chill, events)
   }
   if (has(unit, 'faultLine') && distance(unit, enemy) <= 1 && unit.hits % FAULT.every === 0) fault(battle, unit, enemy, events)
@@ -100,7 +101,7 @@ export function struck(battle: Battle, unit: Unit, enemy: Unit, crit: boolean, e
 function fault(battle: Battle, unit: Unit, at: Unit, events: GameEvent[]): void {
   for (let y = at.y - 1; y <= at.y + 1; y++) for (let x = at.x - 1; x <= at.x + 1; x++) if (x >= 0 && y >= 0 && x < GRID && y < GRID && battle.ground[y * GRID + x] !== 'void') battle.height[y * GRID + x] = Math.max(0, battle.height[y * GRID + x] - FAULT.levels)
   walks.delete(battle)
-  events.push({ type: 'effect', id: at.id, effect: 'faultLine', amount: 0 })
+  events.push(fx(at.id, 'faultLine', 0))
   for (const alien of battle.units.filter((u) => u.side !== unit.side && distance(u, at) <= 1)) {
     events.push({ type: 'hurt', id: alien.id, amount: FAULT.damage, cause: 'impact' })
     wound(battle, alien, FAULT.damage, events, true)
@@ -114,23 +115,23 @@ export function chrono(battle: Battle, events: GameEvent[]): void {
   if ((battle.round + 1) % 3 !== 0 || !heroes.some((u) => has(u, 'chrono'))) return
   const pick = heroes.reduce((a, b) => (b.stats.damage > a.stats.damage ? b : a))
   pick.twice = true
-  events.push({ type: 'effect', id: pick.id, effect: 'chrono', amount: 0 })
+  events.push(fx(pick.id, 'chrono', 0))
 }
 
 /** What a death sets off by the stacks: a frozen alien shatters, a marked one's fire spreads, and the oath counts the kill. */
 export function died(battle: Battle, target: Unit, killer: Unit | null, events: GameEvent[]): void {
   const kin = battle.units.filter((u) => u.side === target.side && u !== target && u.hp > 0)
   if (target.frozen && target.chill > 0 && foeHas(battle, target, 'fracture')) {
-    events.push({ type: 'effect', id: target.id, effect: 'fracture', amount: 0 })
+    events.push(fx(target.id, 'fracture', 0))
     for (const other of kin.filter((u) => distance(u, target) <= 1)) {
-      events.push({ type: 'effect', id: other.id, effect: 'fracture', amount: -FRACTURE_DAMAGE * target.chill })
+      events.push(fx(other.id, 'fracture', -FRACTURE_DAMAGE * target.chill))
       wound(battle, other, FRACTURE_DAMAGE * target.chill, events)
     }
   }
   const heir = target.marked && target.burn > 0 && foeHas(battle, target, 'embers') ? nearest(kin.filter((u) => !fireproof(battle, u)), target) : undefined
   if (heir) {
     kindle(battle, heir, target.burn)
-    events.push({ type: 'effect', id: heir.id, effect: 'embers', amount: 0 })
+    events.push(fx(heir.id, 'embers', 0))
   }
   if (!killer || killer.side !== 'human' || target.side !== 'alien' || !battle.rules.includes('reckoning')) return
   battle.kills++

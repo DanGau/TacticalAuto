@@ -1,4 +1,5 @@
 // What heroes do with the objects about them: the strong throw what stands beside them, or an alien, and anyone sets off fuel tanks among the aliens.
+import { fx } from './sources'
 import { ALIENS } from './aliens'
 import { GRID, isSoldier, type Battle, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
@@ -66,7 +67,7 @@ export function blowRigged(battle: Battle): GameEvent[] {
   if (aliens.filter((a) => distance(a, tank) <= RIG.near).length < RIG.crowd) return []
   battle.rigged = null
   const caught = battle.units.filter((u) => distance(u, tank) <= (u.side === 'alien' ? RIG.radius : RIG.close))
-  const events: GameEvent[] = [{ type: 'rocket', id: aliens[0].id, x: tank.x, y: tank.y, hits: caught.map((u) => ({ target: u.id, damage: RIG.damage })), label: 'RIGGED' }]
+  const events: GameEvent[] = [{ type: 'rocket', src: { kind: 'object', id: 'rig' }, id: aliens[0].id, x: tank.x, y: tank.y, hits: caught.map((u) => ({ target: u.id, damage: RIG.damage })) }]
   wreck(battle, tank, 1)
   for (let y = tank.y - RIG.fireReach; y <= tank.y + RIG.fireReach; y++) for (let x = tank.x - RIG.fireReach; x <= tank.x + RIG.fireReach; x++) if (onGrid(x, y) && !['void', 'water'].includes(battle.ground[y * GRID + x])) battle.fire.push({ x, y, turns: RIG.fireTurns })
   for (const unit of caught) wound(battle, unit, RIG.damage, events)
@@ -91,7 +92,7 @@ function objectThrow(battle: Battle, unit: Unit, from: Tile, target: Unit, alien
       battle.props[from.y * GRID + from.x] = 'none'
       battle.bulk[from.y * GRID + from.x] = 0
       walks.delete(battle)
-      events.push({ type: 'throw', id: unit.id, from, to: { x: target.x, y: target.y }, object: prop, hits: struck.map((a) => ({ target: a.id, damage: THROW_DAMAGE })) })
+      events.push({ type: 'throw', src: { kind: 'object', id: prop }, id: unit.id, from, to: { x: target.x, y: target.y }, object: prop, hits: struck.map((a) => ({ target: a.id, damage: THROW_DAMAGE })) })
       for (const alien of struck) {
         wound(battle, alien, THROW_DAMAGE, events)
         if (alien.hp > 0) drive(battle, alien, push(alien), 1, events, SLAM_DAMAGE, 'hurl')
@@ -130,13 +131,13 @@ function alienThrow(battle: Battle, unit: Unit, held: Unit, to: Tile, aliens: Un
       const edge = way[Math.max(0, over - 1)]
       const lands = drop ? edge : onto ? (NEIGHBORS.map(([dx, dy]) => ({ x: to.x + dx, y: to.y + dy })).find((t) => !blocked(battle, t.x, t.y) && !isDrop(battle, t) && distance(t, held) <= distance(to, held)) ?? { x: unit.x, y: unit.y }) : to
       const damage = THROW_DAMAGE + (below >= CLIFF ? FALL_DAMAGE * below : 0)
-      events.push({ type: 'throw', id: unit.id, from: { x: held.x, y: held.y }, to: lands, object: 'alien', thrown: held.id, hits: drop ? [] : [held, ...(onto ? [onto] : [])].map((a) => ({ target: a.id, damage: a === held ? damage : THROW_DAMAGE })) })
+      events.push({ type: 'throw', src: { kind: 'object', id: 'alien' }, id: unit.id, from: { x: held.x, y: held.y }, to: lands, object: 'alien', thrown: held.id, hits: drop ? [] : [held, ...(onto ? [onto] : [])].map((a) => ({ target: a.id, damage: a === held ? damage : THROW_DAMAGE })) })
       Object.assign(held, lands)
       if (drop) return fall(battle, held, edge, way[over], events)
       // A living projectile hits as hard as it has health.
       const projectile = onto && has(unit, 'projectile') ? held.hp : 0
       wound(battle, held, damage, events)
-      if (projectile > 0) events.push({ type: 'effect', id: onto!.id, effect: 'projectile', amount: -projectile })
+      if (projectile > 0) events.push(fx(onto!.id, 'projectile', -projectile))
       if (onto) wound(battle, onto, THROW_DAMAGE + projectile, events)
     },
   }
@@ -176,7 +177,7 @@ export function leverage(battle: Battle, unit: Unit): GameEvent[] {
     if (battle.units.some((u) => u.side === 'human' && distance(u, tank) <= 1)) continue
     unit.spent.push('throw')
     const caught = beside(tank, 1)
-    events.push({ type: 'rocket', id: unit.id, x: tank.x, y: tank.y, hits: caught.map((u) => ({ target: u.id, damage: FUEL_DAMAGE })), label: 'TANK' })
+    events.push({ type: 'rocket', src: { kind: 'object', id: 'fuel' }, id: unit.id, x: tank.x, y: tank.y, hits: caught.map((u) => ({ target: u.id, damage: FUEL_DAMAGE })) })
     for (const alien of caught) wound(battle, alien, FUEL_DAMAGE, events)
     wreck(battle, tank, 0)
     return events

@@ -104,7 +104,7 @@ test('nothing thrown flies farther than HURL_MAX, however strong the thrower, no
 test('a hero sets off a fuel tank beside an alien, but not one beside a human', () => {
   const { battle, soldier, alien } = duel()
   battle.props[13 * GRID + 11] = 'fuel'
-  expect(leverage(battle, soldier)).toContainEqual(expect.objectContaining({ label: 'TANK', x: 11, y: 13 }))
+  expect(leverage(battle, soldier)).toContainEqual(expect.objectContaining({ src: { kind: 'object', id: 'fuel' }, x: 11, y: 13 }))
   expect(alien.hp).toBe(99 - FUEL_DAMAGE)
   battle.props[13 * GRID + 11] = 'fuel'
   Object.assign(soldier, { x: 12, y: 13 })

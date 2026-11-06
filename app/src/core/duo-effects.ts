@@ -1,4 +1,5 @@
 // What each duo does in battle, at the moments combat hands it.
+import { fx, srcOf } from './sources'
 import { isSoldier, type Battle, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { CROSSFIRE_DAMAGE, PAYLOAD_DAMAGE, SHATTER_HIT, SHATTER_SPLASH, SPOTTER_REACH, type DuoId } from './duos'
@@ -30,7 +31,7 @@ function heroes(battle: Battle, id: DuoId): [Unit, Unit] | null {
 }
 
 /** The duo's moment: both heroes linked, on `target` if any. */
-const moment = (duo: DuoId, [a, b]: [Unit, Unit], target?: Unit): GameEvent => ({ type: 'duo', duo, ids: [a.id, b.id], ...(target ? { target: target.id } : {}) })
+const moment = (duo: DuoId, [a, b]: [Unit, Unit], target?: Unit): GameEvent => ({ type: 'duo', src: srcOf(duo), duo, ids: [a.id, b.id], ...(target ? { target: target.id } : {}) })
 
 /** Whether `unit` is one of duo `id`'s heroes, at `role` if given; then the pair. */
 function as(battle: Battle, id: DuoId, unit: Unit, role?: 0 | 1): [Unit, Unit] | null {
@@ -73,22 +74,22 @@ export function duoHit(battle: Battle, unit: Unit, enemy: Unit, damage: number, 
   if (thermal && enemy.hp > 0 && enemy.burn > 0 && enemy.chill > 0) {
     enemy.burn = 0
     enemy.chill = 0
-    events.push(moment('thermalShock', thermal, enemy), { type: 'effect', id: enemy.id, effect: 'thermalShock', amount: -SHATTER_HIT })
+    events.push(moment('thermalShock', thermal, enemy), fx(enemy.id, 'thermalShock', -SHATTER_HIT))
     wound(battle, enemy, SHATTER_HIT, events)
     for (const other of beside.filter((u) => u.hp > 0)) {
-      events.push({ type: 'effect', id: other.id, effect: 'thermalShock', amount: -SHATTER_SPLASH })
+      events.push(fx(other.id, 'thermalShock', -SHATTER_SPLASH))
       wound(battle, other, SHATTER_SPLASH, events)
     }
   }
   const anvil = as(battle, 'anvil', unit, 0)
   if (anvil && enemy.hp > 0 && damage > 0 && !enemy.boss && !enemy.panicked && distance(anvil[1], enemy) <= 1) {
     enemy.panicked = true
-    events.push(moment('anvil', anvil, enemy), { type: 'effect', id: enemy.id, effect: 'stun', amount: 0 })
+    events.push(moment('anvil', anvil, enemy), fx(enemy.id, 'stun', 0))
   }
   const frozen = as(battle, 'flashFreeze', unit, 0)
   if (frozen && crit && enemy.hp > 0 && enemy.chill > 0 && !enemy.panicked) {
     enemy.panicked = true
-    events.push(moment('flashFreeze', frozen, enemy), { type: 'effect', id: enemy.id, effect: 'flashFreeze', amount: 0 })
+    events.push(moment('flashFreeze', frozen, enemy), fx(enemy.id, 'flashFreeze', 0))
   }
   const glow = as(battle, 'afterglow', unit, 1)
   if (glow && unseen && enemy.hp <= 0 && glow[0].ability === 'medic') {
@@ -103,7 +104,7 @@ function summonHit(battle: Battle, alien: Unit, machine: Unit, events: GameEvent
   const painter = heroes(battle, 'painter')
   if (painter && painter[0].soldier === machine.summoner && alien.hp > 0 && !alien.marked && !alien.resists.includes('mark')) {
     alien.marked = true
-    events.push(moment('painter', painter, alien), { type: 'effect', id: alien.id, effect: 'painter', amount: 0 })
+    events.push(moment('painter', painter, alien), fx(alien.id, 'painter', 0))
   }
   const payload = heroes(battle, 'payload')
   if (!payload || payload[0].soldier !== machine.summoner || machine.hp > 0) return
@@ -111,7 +112,7 @@ function summonHit(battle: Battle, alien: Unit, machine: Unit, events: GameEvent
   const actor = battle.actor
   battle.actor = payload[0].id
   for (const other of battle.units.filter((u) => u.side === 'alien' && u.hp > 0 && distance(u, machine) <= 1)) {
-    events.push({ type: 'effect', id: other.id, effect: 'payload', amount: -PAYLOAD_DAMAGE })
+    events.push(fx(other.id, 'payload', -PAYLOAD_DAMAGE))
     wound(battle, other, PAYLOAD_DAMAGE, events)
     kindle(battle, other, burnFrom(payload[1]))
   }
@@ -129,14 +130,14 @@ export function duoHeal(battle: Battle, medic: Unit, target: Unit, amount: numbe
   const life = as(battle, 'lifeline', medic, 0)
   if (life && target === life[1] && amount > healed) {
     target.armor += amount - healed
-    events.push(moment('lifeline', life, target), { type: 'effect', id: target.id, effect: 'lifeline', amount: 0 })
+    events.push(moment('lifeline', life, target), fx(target.id, 'lifeline', 0))
   }
   const cold = as(battle, 'coldComfort', medic, 0)
   const near = battle.units.filter((u) => u.side === 'alien' && u.hp > 0 && distance(u, target) <= 1 && !u.resists.includes('frost'))
   if (!cold || near.length === 0) return
   events.push(moment('coldComfort', cold, target))
   for (const alien of near) {
-    events.push({ type: 'effect', id: alien.id, effect: 'coldComfort', amount: 0 })
+    events.push(fx(alien.id, 'coldComfort', 0))
     chillUnit(battle, alien, 1, events)
   }
 }
@@ -148,7 +149,7 @@ export function firefall(battle: Battle, unit: Unit, fired: GameEvent[]): GameEv
   const burnt = hit.filter((u): u is Unit => !!u && u.side === 'alien' && u.hp > 0 && !fireproof(battle, u))
   if (!pair || burnt.length === 0) return []
   for (const alien of burnt) kindle(battle, alien, burnFrom(pair[1]))
-  return [moment('firefall', pair), ...burnt.map((u): GameEvent => ({ type: 'effect', id: u.id, effect: 'firefall', amount: 0 }))]
+  return [moment('firefall', pair), ...burnt.map((u): GameEvent => fx(u.id, 'firefall', 0))]
 }
 
 /** Pincer: once a round, after the Vanguard's attacks, the alien it last hit, for the Phantom to strike; then the pair. */

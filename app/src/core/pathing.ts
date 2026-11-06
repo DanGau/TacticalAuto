@@ -434,7 +434,7 @@ export function walk(battle: Battle, unit: Unit, path: Tile[], events: GameEvent
   unit.y = end.y
   unit.moved = true
   const leaps = path.filter((tile, i) => jumps(battle, path[i - 1] ?? start, tile)).length
-  events.push({ type: 'move', id: unit.id, path, leaps: leaps || undefined })
+  events.push({ type: 'move', src: { kind: 'basic', id: leaps ? 'jump' : 'move' }, id: unit.id, path, leaps: leaps || undefined })
 }
 
 /** Tiles further a soldier may dash in the fight to reach a shot. */

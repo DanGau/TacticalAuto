@@ -1,4 +1,5 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
+import { attackSrc, fx, srcOf } from './sources'
 import { type Battle, type Unit, BASE_STATS, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_STACKS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
 import { cloakOn } from './abilities'
 import { duoCrit, duoDamage, duoHit } from './duo-effects'
@@ -106,7 +107,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     return worth
   }
   const events: GameEvent[] = []
-  if (taunting.length > 0 && taunting.length < inReach.length) events.push({ type: 'effect', id: enemy.id, effect: 'taunt', amount: 0 })
+  if (taunting.length > 0 && taunting.length < inReach.length) events.push(fx(enemy.id, 'taunt', 0))
   const baned = battle.units.some((u) => u.side !== unit.side && has(u, 'bane') && distance(u, unit) <= BANE_REACH)
   // An attack out of cloak strikes past armor and harder, and breaks the cloak.
   const unseen = !!unit.cloaked || !!blow?.unseen
@@ -117,10 +118,10 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   }
   const gain = odds(battle, unit, enemy)
   const parried = has(enemy, 'parry') && distance(unit, enemy) > 1
-  if (has(enemy, 'dodge')) events.push({ type: 'effect', id: enemy.id, effect: 'dodge', amount: 0 })
-  if (parried) events.push({ type: 'effect', id: enemy.id, effect: 'parry', amount: 0 })
+  if (has(enemy, 'dodge')) events.push(fx(enemy.id, 'dodge', 0))
+  if (parried) events.push(fx(enemy.id, 'parry', 0))
   const shielded = has(enemy, 'block') && distance(unit, enemy) > 1
-  if (shielded) events.push({ type: 'effect', id: enemy.id, effect: 'block', amount: 0 })
+  if (shielded) events.push(fx(enemy.id, 'block', 0))
   const blunted =
     (unit.chill > 0 ? CHILL_DAMAGE : 0) +
     (inAura(battle, enemy, 'bulwark') ? BULWARK_SOAK : 0) +
@@ -168,13 +169,13 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const warded = has(enemy, distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield')
   if (warded) {
     damage = Math.ceil(damage / 2)
-    events.push({ type: 'effect', id: enemy.id, effect: distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield', amount: 0 })
+    events.push(fx(enemy.id, distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield', 0))
   }
   if (has(enemy, 'fortress') || hallowed(battle, enemy) || turned(unit, enemy)) damage = Math.ceil(damage / 2)
   if (enemy.invulnerable) damage = 0
   if (has(enemy, 'intangible') && random(battle) < INTANGIBLE_CHANCE) {
     damage = 0
-    events.push({ type: 'effect', id: enemy.id, effect: 'intangible', amount: 0 })
+    events.push(fx(enemy.id, 'intangible', 0))
   }
   const deflect = guard(enemy, distance(unit, enemy) > 1, damage)
   if (deflect) damage = Math.floor(damage * deflect.lands)
@@ -184,21 +185,21 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (has(enemy, 'mirror') && enemy.spent.filter((e) => e === 'mirror').length < MIRROR_IMAGES) {
     damage = 0
     enemy.spent.push('mirror')
-    events.push({ type: 'effect', id: enemy.id, effect: 'mirror', amount: 0 })
+    events.push(fx(enemy.id, 'mirror', 0))
   } else if (spend(enemy, 'shield')) {
     damage = 0
-    events.push({ type: 'effect', id: enemy.id, effect: 'shield', amount: 0 })
+    events.push(fx(enemy.id, 'shield', 0))
     // No one shot kills a commander from full health.
   } else if (damage >= left && ((enemy.target && enemy.hp === enemy.stats.hp) || spend(enemy, 'lastStand'))) {
     damage = left - 1
-    events.push({ type: 'effect', id: enemy.id, effect: 'lastStand', amount: 0 })
+    events.push(fx(enemy.id, 'lastStand', 0))
   }
   // Those beside the target, for a volley or a cleave, as they stand before the hit.
   const beside = battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1)
   // The weapon's attack of a turn with a secondary still to come opens a combo.
   const opens = !secondary && !granted && isSoldier(unit) && battle.actor === unit.id && battle.attacks < attacksOf(unit)
   const shock = first && !secondary && unit.weapon ? WEAPONS[unit.weapon].stun : undefined
-  events.unshift({ type: 'shot', id: unit.id, target: enemy.id, crit, damage, with: used, ...(deflect ? { deflect: deflect.word } : {}), ...(shock ? { ring: shock.reach } : {}), ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}), ...(blow ? { nth: blow.nth, ...(blow.kit.ms ? { lasts: blow.kit.ms } : {}), ...(blow.form ? { form: blow.form } : {}) } : {}) })
+  events.unshift({ type: 'shot', src: used[0] ? srcOf(used[0]) : attackSrc(unit, secondary ? unit.secondary : undefined), id: unit.id, target: enemy.id, crit, damage, with: used, ...(deflect ? { deflect: deflect.word } : {}), ...(shock ? { ring: shock.reach } : {}), ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}), ...(blow ? { nth: blow.nth, ...(blow.kit.ms ? { lasts: blow.kit.ms } : {}), ...(blow.form ? { form: blow.form } : {}) } : {}) })
   if (battle.twist === 'crumbling' && damage > 0) crumble(battle, enemy, unit)
   const alive = enemy.hp > 0
   wound(battle, enemy, damage, events, pierced, crit)
@@ -210,18 +211,18 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const bounce = damage > 0 ? nearest(inReach.filter((u) => u !== enemy && u.hp > 0 && distance(u, enemy!) <= RICOCHET_REACH), enemy) : undefined
   if (bounce && when(true, 'ricochet', 1)) {
     const half = Math.max(MIN_DAMAGE, Math.floor(damage / 2))
-    events.push({ type: 'effect', id: bounce.id, effect: 'ricochet', amount: -half })
+    events.push(fx(bounce.id, 'ricochet', -half))
     wound(battle, bounce, half, events)
   }
   const spare = enemy.hp <= 0 ? when(damage > left, 'overkill', damage - left) : 0
   const next = spare > 0 ? nearest(battle.units.filter((u) => u.side === enemy.side && u.hp > 0), enemy) : undefined
   if (next) {
-    events.push({ type: 'effect', id: next.id, effect: 'overkill', amount: -spare })
+    events.push(fx(next.id, 'overkill', -spare))
     wound(battle, next, spare, events)
   }
   const splash = when(damage > 0, 'volley', Math.ceil(damage / 2)) || when(enemy.hp <= 0, 'cleave', CLEAVE_DAMAGE)
   for (const other of splash > 0 ? beside : []) {
-    events.push({ type: 'effect', id: other.id, effect: has(unit, 'volley') ? 'volley' : 'cleave', amount: -splash })
+    events.push(fx(other.id, has(unit, 'volley') ? 'volley' : 'cleave', -splash))
     wound(battle, other, splash, events)
   }
   if (blow?.kit.wide && damage > 0) {
@@ -239,31 +240,31 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
       const next = nearest(battle.units.filter((u) => u.side === enemy.side && !struck.has(u.id) && distance(u, from) <= ARC_REACH), from)
       if (!next) break
       struck.add(next.id)
-      events.push({ type: 'effect', id: next.id, effect: 'arc', amount: -Math.ceil(damage / 2) })
+      events.push(fx(next.id, 'arc', -Math.ceil(damage / 2)))
       wound(battle, next, Math.ceil(damage / 2), events)
       from = next
     }
   }
   if (enemy.hp <= 0 && when(true, 'volatile', 1)) {
     for (const other of beside.filter((u) => u.hp > 0)) {
-      events.push({ type: 'effect', id: other.id, effect: 'volatile', amount: -VOLATILE_DAMAGE })
+      events.push(fx(other.id, 'volatile', -VOLATILE_DAMAGE))
       wound(battle, other, VOLATILE_DAMAGE, events)
     }
   }
   if (enemy.hp > 0 && !enemy.resists.includes('mark') && (when(true, 'mark', 1) || when(true, 'apex', 1) || when(true, 'tracer', 1) || when(crit, 'exploit', 1))) enemy.marked = true
   const cryo = damage > 0 && unit.ability === 'cryo'
   if (enemy.hp > 0 && !enemy.resists.includes('frost') && (when(first && damage > 0, 'frostbite', 1) || (first && cryo) || when(crit, 'freeze', 1))) {
-    events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'frostbite') ? 'frostbite' : cryo ? 'cryo' : 'freeze', amount: 0 })
+    events.push(fx(enemy.id, has(unit, 'frostbite') ? 'frostbite' : cryo ? 'cryo' : 'freeze', 0))
     chillUnit(battle, enemy, chillFrom(unit), events)
     if (when(true, 'glacial', 1) + when(true, 'rimeLock', 1) > 0) enemy.rooted = CHILL_TURNS
     for (const other of enemy.marked && has(unit, 'conductor') ? battle.units.filter((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1) : []) {
-      events.push({ type: 'effect', id: other.id, effect: 'conductor', amount: 0 })
+      events.push(fx(other.id, 'conductor', 0))
       chillUnit(battle, other, 1, events)
     }
   }
   if (enemy.hp > 0 && crit && enemy.chill > 0 && when(true, 'stasis', 1) + when(true, 'deepFreeze', 1) > 0) {
     enemy.panicked = true
-    events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'stasis') ? 'stasis' : 'deepFreeze', amount: 0 })
+    events.push(fx(enemy.id, has(unit, 'stasis') ? 'stasis' : 'deepFreeze', 0))
   }
   if (shock) for (const other of battle.units.filter((u) => u.side === enemy.side && distance(u, enemy) <= shock.reach)) stun(other, shock.chance, battle, events)
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
@@ -275,15 +276,15 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'tether', 1)) knockback(battle, unit, enemy, events, -1)
   if (enemy.hp > 0 && when(true, 'snare', 1)) {
     enemy.rooted = CHILL_TURNS
-    events.push({ type: 'effect', id: enemy.id, effect: 'snare', amount: 0 })
+    events.push(fx(enemy.id, 'snare', 0))
   }
   if (enemy.hp > 0 && when(true, 'booming', 1)) {
     enemy.booming = CHILL_TURNS
-    events.push({ type: 'effect', id: enemy.id, effect: 'booming', amount: 0 })
+    events.push(fx(enemy.id, 'booming', 0))
   }
   if (enemy.hp > 0 && unseen && !enemy.boss && when(true, 'daze', 1)) {
     enemy.panicked = true
-    events.push({ type: 'effect', id: enemy.id, effect: 'daze', amount: 0 })
+    events.push(fx(enemy.id, 'daze', 0))
   }
   if (enemy.hp <= 0 && unseen && when(true, 'afterimage', 1)) events.push(cloakOn(unit))
   if (enemy.hp > 0 && enemy.hp <= enemy.stats.hp / 2 && spend(enemy, 'blink')) blink(battle, enemy, events)
@@ -293,33 +294,33 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (enemy.hp > 0 && when(true, 'suppress', 1)) enemy.suppressed = 2
   if (enemy.hp > 0 && crit && has(unit, 'concussion')) {
     enemy.panicked = true
-    events.push({ type: 'effect', id: enemy.id, effect: 'concussion', amount: 0 })
+    events.push(fx(enemy.id, 'concussion', 0))
   }
   if (enemy.hp > 0 && !fireproof(battle, enemy) && ((first && damage > 0 && (has(unit, 'incendiary') || has(unit, 'tinder'))) || when(crit, 'ignite', 1))) {
     kindle(battle, enemy, burnFrom(unit))
-    events.push({ type: 'effect', id: enemy.id, effect: has(unit, 'incendiary') ? 'incendiary' : has(unit, 'tinder') ? 'tinder' : 'ignite', amount: 0 })
+    events.push(fx(enemy.id, has(unit, 'incendiary') ? 'incendiary' : has(unit, 'tinder') ? 'tinder' : 'ignite', 0))
   }
   const healing = (first && damage > 0 && has(unit, 'vampiric') ? 1 : 0) + (enemy.hp <= 0 && has(unit, 'feast') ? FEAST_HEAL : 0)
   const healed = Math.min(healing, unit.stats.hp - unit.hp)
   if (healed > 0) {
     unit.hp += healed
-    events.push({ type: 'effect', id: unit.id, effect: enemy.hp <= 0 && has(unit, 'feast') ? 'feast' : 'vampiric', amount: healed })
+    events.push(fx(unit.id, enemy.hp <= 0 && has(unit, 'feast') ? 'feast' : 'vampiric', healed))
   }
   if (has(enemy, 'kindling') && enemy.armor > 0 && !fireproof(battle, unit)) {
     kindle(battle, unit, BURN_STACKS)
-    events.push({ type: 'effect', id: unit.id, effect: 'kindling', amount: 0 })
+    events.push(fx(unit.id, 'kindling', 0))
   }
   if (has(enemy, 'rime')) {
-    events.push({ type: 'effect', id: unit.id, effect: 'rime', amount: 0 })
+    events.push(fx(unit.id, 'rime', 0))
     chillUnit(battle, unit, 1, events)
   }
   if (has(enemy, 'thorns')) {
-    events.push({ type: 'effect', id: unit.id, effect: 'thorns', amount: -1 })
+    events.push(fx(unit.id, 'thorns', -1))
     wound(battle, unit, 1, events)
   }
   if (first && when(true, 'demolish', 1)) {
     wreck(battle, enemy)
-    events.push({ type: 'effect', id: enemy.id, effect: 'demolish', amount: 0 })
+    events.push(fx(enemy.id, 'demolish', 0))
   }
   if (secondary && damage > 0) secondaryHit(battle, unit, enemy, beside, secondary, events)
   afterHit(battle, unit, enemy, damage, beside, events)
@@ -389,7 +390,7 @@ export function ignite(battle: Battle, target: Unit): GameEvent[] {
   const tank = NEIGHBORS.map(([dx, dy]) => ({ x: target.x + dx, y: target.y + dy })).find((t) => onGrid(t.x, t.y) && battle.props[t.y * GRID + t.x] === 'fuel')
   if (!tank) return []
   const caught = battle.units.filter((u) => distance(u, tank) <= 1 && !immune(battle, u, 'blast'))
-  const events: GameEvent[] = [{ type: 'rocket', id: target.id, x: tank.x, y: tank.y, hits: caught.map((u) => ({ target: u.id, damage: FUEL_DAMAGE })) }]
+  const events: GameEvent[] = [{ type: 'rocket', src: { kind: 'object', id: 'fuel' }, id: target.id, x: tank.x, y: tank.y, hits: caught.map((u) => ({ target: u.id, damage: FUEL_DAMAGE })) }]
   wreck(battle, tank, 0)
   for (const unit of caught) {
     wound(battle, unit, FUEL_DAMAGE, events)
@@ -415,7 +416,7 @@ export function blast(battle: Battle, unit: Unit, seen: Set<number>, damage: num
     }
   }
   if (!centre) return []
-  const events: GameEvent[] = [{ type: 'rocket', id: unit.id, x: centre.x, y: centre.y, hits: best.map((u) => ({ target: u.id, damage })) }]
+  const events: GameEvent[] = [{ type: 'rocket', src: srcOf(unit.ability ?? 'rocket'), id: unit.id, x: centre.x, y: centre.y, hits: best.map((u) => ({ target: u.id, damage })) }]
   for (const target of best) wound(battle, target, damage, events)
   wreck(battle, centre, radius)
   return events
@@ -453,10 +454,10 @@ export function leap(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[]
   if (!has(unit, 'earthshaker')) unit.spent.push('leap')
   const hurt = LEAP_DAMAGE + (has(unit, 'earthshaker') ? EARTHSHAKER_DAMAGE : 0)
   Object.assign(unit, { x: jump.to.x, y: jump.to.y, moved: true })
-  const events: GameEvent[] = [{ type: 'move', id: unit.id, path: [jump.to], with: 'leap' }]
+  const events: GameEvent[] = [{ type: 'move', src: srcOf('leap'), id: unit.id, path: [jump.to], with: 'leap' }]
   for (const foe of jump.caught) {
     foe.rooted = CHILL_TURNS
-    events.push({ type: 'effect', id: foe.id, effect: 'leap', amount: -hurt })
+    events.push(fx(foe.id, 'leap', -hurt))
     wound(battle, foe, hurt, events)
   }
   return events
@@ -471,7 +472,7 @@ export function blink(battle: Battle, unit: Unit, events: GameEvent[]): void {
   if (!to) return
   unit.x = to.x
   unit.y = to.y
-  events.push({ type: 'move', id: unit.id, path: [to], with: 'blink' })
+  events.push({ type: 'move', src: srcOf('blink'), id: unit.id, path: [to], with: 'blink' })
 }
 
 /** The target's weapon guard, if it saves this hit, spending it for the turn. */
@@ -487,7 +488,7 @@ function guard(target: Unit, far: boolean, damage: number): Guard | undefined {
 function stun(target: Unit, chance: number, battle: Battle, events: GameEvent[]): void {
   if (target.hp <= 0 || target.boss || target.panicked || random(battle) >= chance) return
   target.panicked = true
-  events.push({ type: 'effect', id: target.id, effect: 'stun', amount: 0 })
+  events.push(fx(target.id, 'stun', 0))
 }
 
 /** Its wielder gains its weapon's surge of temp HP, to the surge's cap. */
@@ -495,5 +496,5 @@ function surge(unit: Unit, { gain, cap }: NonNullable<Weapon['surge']>, events: 
   const temp = Math.min(cap, (unit.temp ?? 0) + gain)
   if (temp <= (unit.temp ?? 0)) return
   unit.temp = temp
-  events.push({ type: 'effect', id: unit.id, effect: 'surge', amount: 0 })
+  events.push(fx(unit.id, 'surge', 0))
 }

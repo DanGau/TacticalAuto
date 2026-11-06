@@ -207,7 +207,7 @@ test('Living Projectile: an alien thrown onto another hits it for its own HP', (
   battle.actor = hero.id
   const events = leverage(battle, hero)
   expect(events.some((e) => e.type === 'throw' && e.thrown === aliens[0].id)).toBe(true)
-  expect(events).toContainEqual({ type: 'effect', id: aliens[1].id, effect: 'projectile', amount: -7 })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: aliens[1].id, effect: 'projectile', amount: -7 }))
 })
 
 test('Lofty gear: crit for each level above the target', () => {
@@ -222,7 +222,7 @@ test('Fault Line: every FAULT.every-th hit up close drops the ground around the 
   hero.stats = { ...hero.stats, damage: 1, crit: 0 }
   hero.hits = FAULT.every - 1
   const events = beats(1)
-  expect(events).toContainEqual({ type: 'effect', id: aliens[0].id, effect: 'faultLine', amount: 0 })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: aliens[0].id, effect: 'faultLine', amount: 0 }))
   expect(battle.height[10 * GRID + 11]).toBe(4 - FAULT.levels)
   expect(aliens[1].hp).toBe(40 - FAULT.damage)
 })

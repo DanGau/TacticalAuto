@@ -1,4 +1,5 @@
 // What happens as a side's turn begins: burns, acid, mending, cooldowns, spawns, goals that tick.
+import { alienSrc, fx } from './sources'
 import { REGEN_HEAL, alienStats, ALIENS, NODE_EVERY } from './aliens'
 import { replenish } from './abilities'
 import { type Battle, AURA_REACH, BURN_STACKS, isSoldier, SPAWN_EVERY, type Unit } from './battle'
@@ -48,26 +49,26 @@ export function upkeep(battle: Battle): GameEvent[] {
     if (has(unit, 'vitality')) {
       for (const mate of battle.units.filter((u) => u.side === unit.side && u !== unit && u.hp < u.stats.hp && distance(u, unit) <= AURA_REACH)) {
         mate.hp++
-        events.push({ type: 'effect', id: mate.id, effect: 'vitality', amount: 1 })
+        events.push(fx(mate.id, 'vitality', 1))
       }
     }
     events.push(...replenish(battle, unit))
     if (has(unit, 'glacialArmor') && unit.armor < unit.stats.armor) {
       unit.armor = unit.stats.armor
-      events.push({ type: 'effect', id: unit.id, effect: 'glacialArmor', amount: 0 })
+      events.push(fx(unit.id, 'glacialArmor', 0))
     }
     if (has(unit, 'rearm') && unit.armor < unit.stats.armor) {
       unit.armor++
-      events.push({ type: 'effect', id: unit.id, effect: 'rearm', amount: 0 })
+      events.push(fx(unit.id, 'rearm', 0))
     }
     if (unit.kind === 'regenerator' && unit.burn === 0 && unit.hp < unit.stats.hp) {
       const amount = Math.min(REGEN_HEAL, unit.stats.hp - unit.hp)
       unit.hp += amount
-      events.push({ type: 'effect', id: unit.id, effect: 'regen', amount })
+      events.push(fx(unit.id, 'regen', amount))
     }
     if (battle.units.some((u) => u.side !== unit.side && has(u, 'hellfire') && distance(u, unit) <= HELLFIRE_REACH) && !fireproof(battle, unit)) {
       kindle(battle, unit, 1)
-      events.push({ type: 'effect', id: unit.id, effect: 'hellfire', amount: 0 })
+      events.push(fx(unit.id, 'hellfire', 0))
     }
     if (unit.burn > 0) {
       const raging = foeHas(battle, unit, 'conflagration')
@@ -77,12 +78,12 @@ export function upkeep(battle: Battle): GameEvent[] {
       if (foeHas(battle, unit, 'pyre') && !onTile(battle.fire, unit)) battle.fire.push({ x: unit.x, y: unit.y, turns: FIRE_TURNS })
       const damage = unit.burn + (raging ? CONFLAGRATION_DAMAGE : 0)
       unit.burn--
-      events.push({ type: 'effect', id: unit.id, effect: 'incendiary', amount: -damage })
+      events.push(fx(unit.id, 'incendiary', -damage))
       wound(battle, unit, damage, events)
     }
     if (unit.hp > 0 && unit.hp < unit.stats.hp && has(unit, 'regen')) {
       unit.hp++
-      events.push({ type: 'effect', id: unit.id, effect: 'regen', amount: 1 })
+      events.push(fx(unit.id, 'regen', 1))
     }
   }
   if (battle.turn !== 'alien') return events
@@ -132,7 +133,7 @@ export function upkeep(battle: Battle): GameEvent[] {
     unit.cooldown = unit.kind === 'hiveNode' ? NODE_EVERY : SPAWN_EVERY
     const spawn = alienUnit(battle, { kind: 'swarmling', stats: alienStats('swarmling', 0, 0), stance: ALIENS.swarmling.stance, boss: false, spawns: false, target: false, resists: [] }, tile, true)
     battle.units.push(spawn)
-    events.push({ type: 'spawn', id: unit.id, unit: { id: spawn.id, x: spawn.x, y: spawn.y } })
+    events.push({ type: 'spawn', src: alienSrc(unit), id: unit.id, unit: { id: spawn.id, x: spawn.x, y: spawn.y } })
   }
   return events
 }
@@ -159,7 +160,7 @@ export function hatch(battle: Battle, unit: Unit): GameEvent[] {
   for (const tile of freeTilesNear(battle, unit, 2)) {
     const brute = alienUnit(battle, { kind: 'brute', stats: alienStats('brute', unit.stats.armor, 0), stance: ALIENS.brute.stance, boss: false, spawns: false, target: false, resists: ALIENS.brute.resists }, tile, true)
     battle.units.push(brute)
-    events.push({ type: 'spawn', id: unit.id, unit: { id: brute.id, x: brute.x, y: brute.y } })
+    events.push({ type: 'spawn', src: alienSrc(unit), id: unit.id, unit: { id: brute.id, x: brute.x, y: brute.y } })
   }
   return events
 }

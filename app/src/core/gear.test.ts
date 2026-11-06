@@ -1,3 +1,4 @@
+import { fx } from './sources'
 import { roots } from './skills'
 import { expect, test } from 'vitest'
 import { enterAt, begun } from './roads'
@@ -93,9 +94,9 @@ test('a scorching weapon burns its target at the start of the target\'s turns', 
   const d = duel({ weapon: 'rifle', rarity: 'rare', name: 'Scorching Steady Carbine', stats: {}, effect: 'incendiary' })
   d.soldier.stats = { ...d.soldier.stats, damage: 1, crit: 0 }
   const events = untilAlienShoots(d)
-  expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'incendiary', amount: 0 })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: d.alien.id, effect: 'incendiary', amount: 0 }))
   // Each attack adds its stacks; the alien takes them all at the start of its turn.
-  expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'incendiary', amount: -SOLDIER_ATTACKS * BURN_STACKS })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: d.alien.id, effect: 'incendiary', amount: -SOLDIER_ATTACKS * BURN_STACKS }))
   expect(d.alien.hp).toBe(99 - SOLDIER_ATTACKS - SOLDIER_ATTACKS * BURN_STACKS)
 })
 
@@ -137,7 +138,7 @@ test('overkill coils carry damage beyond a kill to the nearest other alien', () 
   while (d.alien.hp > 0) events.push(...d.step())
   const shot = events.find((e) => e.type === 'shot' && e.target === d.alien.id)
   expect(shot).toBeDefined()
-  expect(events).toContainEqual({ type: 'effect', id: other.id, effect: 'overkill', amount: -(shot!.type === 'shot' ? shot!.damage - 4 : 0) })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: other.id, effect: 'overkill', amount: -(shot!.type === 'shot' ? shot!.damage - 4 : 0) }))
 })
 
 /** Another alien in the duel, at `dx`, `dy` from the first, too tough to die. */
@@ -180,15 +181,15 @@ test('a volatile kill bursts on the aliens beside it', () => {
   const other = another(d, 1, 0)
   const events = []
   for (let beats = 0; d.alien.hp > 0 && beats < 200; beats++) events.push(...d.step())
-  expect(events).toContainEqual({ type: 'effect', id: other.id, effect: 'volatile', amount: -2 })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: other.id, effect: 'volatile', amount: -2 }))
 })
 
 test('a thundering hit knocks the target back, or slams it into what stops it, an alien it slams into taking as much', () => {
   const d = armed(['thunder'])
   const events = untilAlienShoots(d)
-  expect(events).toContainEqual({ type: 'move', id: d.alien.id, path: [{ x: 10, y: 12 }], with: 'thunder' })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'move', id: d.alien.id, path: [{ x: 10, y: 12 }], with: 'thunder' }))
   const behind = another(d, 0, 1)
-  const slam = [{ type: 'effect', id: d.alien.id, effect: 'thunder', amount: -1 }, { type: 'effect', id: behind.id, effect: 'thunder', amount: -1 }]
+  const slam = [fx(d.alien.id, 'thunder', -1), fx(behind.id, 'thunder', -1)]
   expect(effectsOf(untilAlienShoots(d), 'thunder')).toEqual(Array(SOLDIER_ATTACKS).fill(slam).flat())
 })
 
@@ -220,7 +221,7 @@ test('a stasis field freezes a chilled alien a crit lands on', () => {
   const d = armed(['stasis'], { crit: 1 })
   d.alien.chill = 5
   const events = untilAlienShoots(d)
-  expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'stasis', amount: 0 })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: d.alien.id, effect: 'stasis', amount: 0 }))
   expect(events).toContainEqual({ type: 'frozen', id: d.alien.id })
 })
 
@@ -255,14 +256,14 @@ test('a booming charge hurts a target that moves on its next turn', () => {
   Object.assign(d.alien, { x: 10, y: 14 })
   d.alien.stats = { ...d.alien.stats, range: 1 }
   const events = untilAlienShoots(d)
-  expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'booming', amount: -3 })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: d.alien.id, effect: 'booming', amount: -3 }))
 })
 
 test('a tethered hit pulls its target a tile toward the shooter', () => {
   const d = armed(['tether'])
   Object.assign(d.alien, { x: 10, y: 13 })
   d.alien.stats = { ...d.alien.stats, move: 0 }
-  expect(untilAlienShoots(d)).toContainEqual({ type: 'move', id: d.alien.id, path: [{ x: 10, y: 12 }], with: 'tether' })
+  expect(untilAlienShoots(d)).toContainEqual(expect.objectContaining({ type: 'move', id: d.alien.id, path: [{ x: 10, y: 12 }], with: 'tether' }))
 })
 
 test('caltrops are strewn in the path of an alien closing in', () => {
@@ -284,7 +285,7 @@ test('caltrops slow an alien that must cross them, and hurt it', () => {
   const events = untilAlienShoots(d)
   const steps = events.find((e) => e.type === 'move' && e.id === d.alien.id)
   expect(steps?.type === 'move' && steps.path.length).toBeLessThan(4)
-  expect(effectsOf(events, 'caltrops')).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'caltrops', amount: -1 })
+  expect(effectsOf(events, 'caltrops')).toContainEqual(expect.objectContaining({ type: 'effect', id: d.alien.id, effect: 'caltrops', amount: -1 }))
 })
 
 test('the sentinel protocol shoots an alien that walks away from beside a soldier', () => {
@@ -320,7 +321,7 @@ test('cryo rounds chill the target, an icebreaker hits a chilled one harder, and
   expect(shots[0]).toMatchObject({ damage: 1 })
   expect(shots[1]).toMatchObject({ damage: 1 + SEARING_DAMAGE })
   // Two attacks of two stacks each: past CHILL_FREEZE it freezes, loses its action, and thaws with no chill.
-  expect(events).toContainEqual({ type: 'effect', id: d.alien.id, effect: 'frozen', amount: 0 })
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: d.alien.id, effect: 'frozen', amount: 0 }))
   expect(events).toContainEqual({ type: 'frozen', id: d.alien.id })
   expect(d.alien).toMatchObject({ frozen: false, chill: 0 })
 })
@@ -358,5 +359,5 @@ test('a kill on a burning alien spreads the fire to those beside it, with backdr
   const other = another(d, 1, 0)
   const events = []
   while (d.alien.hp > 0) events.push(...d.step())
-  expect(effectsOf(events, 'backdraft')).toContainEqual({ type: 'effect', id: other.id, effect: 'backdraft', amount: 0 })
+  expect(effectsOf(events, 'backdraft')).toContainEqual(expect.objectContaining({ type: 'effect', id: other.id, effect: 'backdraft', amount: 0 }))
 })

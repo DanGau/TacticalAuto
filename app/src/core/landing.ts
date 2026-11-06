@@ -126,7 +126,7 @@ export function opening(battle: Battle): GameEvent[] {
   battle.opening = false
   const events: GameEvent[] = []
   const soldiers = battle.units.filter(isSoldier)
-  for (const utility of [battle.utility, battle.second]) if (utility) events.push({ type: 'used', utility, on: utility === 'flashbang' ? battle.units.filter((u) => u.surprised > 0).map((u) => u.id) : soldiers.map((u) => u.id) })
+  for (const utility of [battle.utility, battle.second]) if (utility) events.push({ type: 'used', src: { kind: 'boon', id: utility }, utility, on: utility === 'flashbang' ? battle.units.filter((u) => u.surprised > 0).map((u) => u.id) : soldiers.map((u) => u.id) })
   const held = (effect: Effect) => soldiers.some((s) => has(s, effect))
   const at = battle.entry
   if (at && (held('entryBlast') || held('entryShred') || held('entryFrost'))) {

@@ -1,4 +1,5 @@
 // Boons in a battle: what each picked utility does as the squad lands, each turn it lasts, and as it ends.
+import { fx } from './sources'
 import { isSoldier, type Battle, type Effect, type Stats, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { nearest } from './fighters'
@@ -78,7 +79,7 @@ export function tickBoons(battle: Battle, events: GameEvent[]): void {
     if (mend) for (const u of heroes.filter((u) => u.hp < u.stats.hp)) {
       const healed = Math.min(amount(mend), u.stats.hp - u.hp)
       u.hp += healed
-      events.push({ type: 'effect', id: u.id, effect: 'regen', amount: healed })
+      events.push(fx(u.id, 'regen', healed))
     }
     if (has('coldSnap')) for (const u of aliens.filter((u) => u.engaged)) chillUnit(battle, u, 1, events)
     if (has('blaze') && battle.entry) for (const u of aliens.filter((u) => distance(u, battle.entry!) <= BLAZE_REACH)) kindle(battle, u, 1)
@@ -110,5 +111,5 @@ function end(battle: Battle, boon: Boon, events: GameEvent[]): void {
   }
   if (effectsOf(boon.id).includes('tank')) battle.rigged = null
   if (on.length === 0 && boon.id !== 'flashbang') on.push(...battle.units.filter((u) => isSoldier(u) && u.hp > 0).map((u) => u.id))
-  events.push({ type: 'used', utility: boon.id, on, ended: true })
+  events.push({ type: 'used', src: { kind: 'boon', id: boon.id }, utility: boon.id, on, ended: true })
 }
