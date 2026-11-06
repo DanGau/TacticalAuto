@@ -39,13 +39,13 @@ const GROUND_ORDERS: Record<TerrainKind, string> = {
 
 /** What a challenge throws at the squad, and how to meet it. */
 export const THREATS: Record<ChallengeId, string> = {
-  slog: 'Swamp, foes scattered. Levitate or shield.',
-  firingLine: 'Snipers. Mist or ranged shield.',
-  ironWall: 'Heavy armor. Sunder or overcharge.',
-  swarm: 'Swarm. Melee shield or tank.',
-  scattered: 'Scattered sentries, on a clock. Swiftness.',
-  bigOne: 'Armored giant. Overcharge or sunder.',
-  killBox: 'Hot landing. Flash, mist or shield.',
+  slog: 'Swamp, foes scattered. Levitate, shield or reach.',
+  firingLine: 'Snipers. Mist, shield or dampener.',
+  ironWall: 'Heavy armor. Sunder, overcharge or fire.',
+  swarm: 'Swarm. Shield, tank, cold or gravity.',
+  scattered: 'Scattered sentries, on a clock. Swiftness or reach.',
+  bigOne: 'Armored giant. Overcharge, sunder or mark.',
+  killBox: 'Hot landing. Flash, mist, shield or dampener.',
 }
 
 /** The squad's order at a battle: a key frees its hero or storms the stronghold, the final takes the hub. */

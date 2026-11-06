@@ -56,6 +56,6 @@ export type GameEvent =
   /** A duo's two heroes, `ids`, act together, on the unit `target` if any. */
   | { type: 'duo'; duo: DuoId; ids: number[]; target?: number }
   | { type: 'death'; id: number }
-  /** A utility takes hold, acting on the units `on`. */
-  | { type: 'used'; utility: UtilityId; on: number[] }
+  /** A utility takes hold on the units `on`, or with `ended`, its rounds run out. */
+  | { type: 'used'; utility: UtilityId; on: number[]; ended?: true }
   | { type: 'end'; winner: Side | null } 

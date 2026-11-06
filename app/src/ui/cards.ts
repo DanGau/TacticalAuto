@@ -3,7 +3,7 @@ import type { Action } from '../core/apply'
 import type { Gear } from '../core/gear'
 import { SELL } from '../core/rewards'
 import type { Run, Soldier } from '../core/run-state'
-import { UTILITIES, type UtilityId } from '../core/utilities'
+import { boonText, UTILITIES, type UtilityId } from '../core/utilities'
 import { badge, describeGear, gearType } from './html'
 
 export interface Pick {
@@ -103,6 +103,6 @@ export function findSwap(run: Run, index: number, armed: string | null, note = '
 
 /** A utility as a card: `top` says what tapping it means, `go` what the second tap does. */
 export function utilityPick(key: string, action: Action | undefined, id: UtilityId, top: string, go: string, extra: Partial<Pick> = {}): Pick {
-  const { icon, name, text } = UTILITIES[id]
-  return { key, action, look: 'utility', body: `<small>${top}</small><b>${icon} ${name}</b>`, detail: `<p><b>${name}.</b> ${text}.</p>`, go, ...extra }
+  const { icon, name, rounds } = UTILITIES[id]
+  return { key, action, look: 'utility', body: `<small>${top}</small><b>${icon} ${name}</b><small class="rounds">⏳ ${rounds} rounds</small>`, detail: `<p><b>${name}.</b> ${boonText(id)}.</p>`, go, ...extra }
 }

@@ -243,12 +243,12 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const on = sprites.get(e.id)
       if (on) float(s, callout(s, `FED +${e.damage}`, COLOR.crit, on))
     } else if (e.type === 'used') {
-      const word = UTILITIES[e.utility].name.toUpperCase()
+      const word = `${UTILITIES[e.utility].name.toUpperCase()}${e.ended ? ' ENDS' : ''}`
       for (const id of e.on) {
         const on = sprites.get(id)
         if (!on) continue
         on.drawHp(...vitals(battle, id))
-        float(s, callout(s, word, COLOR.heal, on))
+        float(s, callout(s, word, e.ended ? COLOR.crit : COLOR.heal, on))
       }
       await s.tween(PACE.reveal, () => {})
     } else if (e.type === 'heal') {

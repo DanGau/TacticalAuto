@@ -148,7 +148,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     second: null,
     kills: 0,
     rigged: null,
-    smoked: {},
+    boons: [],
     acid: [],
     fire: [],
     caltrops: [],

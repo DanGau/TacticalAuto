@@ -14,7 +14,7 @@ import type { GameEvent } from './combat-event'
 import { engageNearest, walkersFighting, has, fireproof, foeHas, onTile, FIRE_TURNS, uplinkReach, extractionFrom, silenced, centreOf } from './fighters'
 import { HOLD_ROUNDS, WAVE_EVERY } from './goals'
 import { randomInt } from './rng'
-import { SMOKE } from './utilities'
+import { tickBoons } from './boons'
 import { wound } from './wound'
 
 /**
@@ -25,7 +25,10 @@ export function upkeep(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
   // Chill wears off a stack once its side's turn is over.
   for (const unit of battle.units.filter((u) => u.side !== battle.turn && u.chill > 0 && !u.frozen)) unit.chill--
-  if (battle.turn === 'human') chrono(battle, events)
+  if (battle.turn === 'human') {
+    chrono(battle, events)
+    tickBoons(battle, events)
+  }
   for (const unit of battle.units.filter((u) => u.side === battle.turn)) {
     // An explosion earlier in this upkeep may have killed it.
     if (unit.hp <= 0) continue
@@ -99,7 +102,6 @@ export function upkeep(battle: Battle): GameEvent[] {
     events.push({ type: 'wave', units: [{ id: unit.id, x: unit.x, y: unit.y }] })
   }
   rally(battle)
-  if (battle.round === SMOKE.rounds) clearSmoke(battle)
   // Waves come in a pack at a time, at one of the encounter's two gates nearest the squad yet clear of it; a hold's without end until it is held.
   const soldiers = battle.units.filter(isSoldier)
   if (battle.waves.length > 0 && soldiers.length > 0 && (battle.deadline === null ? battle.challenge === 'swarm' || battle.round % WAVE_EVERY === 0 : battle.round >= battle.deadline)) {
@@ -133,12 +135,6 @@ export function upkeep(battle: Battle): GameEvent[] {
     events.push({ type: 'spawn', id: unit.id, unit: { id: spawn.id, x: spawn.x, y: spawn.y } })
   }
   return events
-}
-
-/** The smoke clears: every alien it held back shoots as far as it did. */
-function clearSmoke(battle: Battle): void {
-  for (const u of battle.units) if (battle.smoked[u.id] !== undefined) u.stats = { ...u.stats, range: battle.smoked[u.id] }
-  battle.smoked = {}
 }
 
 /** The nearest to the squad a wave comes in. */

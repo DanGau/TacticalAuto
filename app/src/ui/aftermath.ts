@@ -5,7 +5,7 @@ import type { Keyword } from '../core/keywords'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { DUOS } from '../core/duos'
-import { UTILITIES } from '../core/utilities'
+import { boonText, UTILITIES } from '../core/utilities'
 import { type Gain, type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { type Soldier } from '../core/run-state'
@@ -68,7 +68,7 @@ export function acquired(run: Run, gain: Gain): string {
     const hero = run.soldiers.find((s) => s.id === id)!
     return shown('Hero joined', hero.gear?.rarity ?? '', `${badge(hero.cls)} ${hero.name}`, heroSheet(run, hero))
   }
-  const body = gain.kind === 'relic' ? relicBody('Relic gained', 'relic', gain.id, squadKeywords(run)) : gain.kind === 'relicLost' ? relicBody('Relic lost', 'relic lost', gain.id) : gain.kind === 'boon' ? shown('Boon gained', '', `${UTILITIES[gain.id].icon} ${UTILITIES[gain.id].name}`, UTILITIES[gain.id].text) : heroBody(gain.soldier)
+  const body = gain.kind === 'relic' ? relicBody('Relic gained', 'relic', gain.id, squadKeywords(run)) : gain.kind === 'relicLost' ? relicBody('Relic lost', 'relic lost', gain.id) : gain.kind === 'boon' ? shown('Boon gained', '', `${UTILITIES[gain.id].icon} ${UTILITIES[gain.id].name}`, boonText(gain.id)) : heroBody(gain.soldier)
   return modal(`<div class="acquired">${body}<button class="decide" data-action='${JSON.stringify({ type: 'ack' })}'>Got it</button></div>`)
 }
 

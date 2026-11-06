@@ -4,7 +4,7 @@ import { GOALS } from '../core/goals'
 import { DOCTRINES } from '../core/doctrines'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
-import { UTILITIES, UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
+import { boonText, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
 import { current, legOf, KEYS, ways, nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Soldier } from '../core/run-state'
@@ -237,7 +237,7 @@ function mapView(run: Run, picked: number | null, armed: string | null, ware: nu
 function baseView(run: Run): string {
   const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags)}</div>`)
   const doctrines = run.doctrines.map((id) => `<div class="gear doctrine"><small>oath</small><br><b>${DOCTRINES[id].name}</b><br>${DOCTRINES[id].text}</div>`)
-  const utilities = run.utilities.map((id) => `<div class="gear"><small>boon</small><br><b>${UTILITIES[id].icon} ${UTILITIES[id].name}</b><br>${UTILITIES[id].text}</div>`)
+  const utilities = run.utilities.map((id) => `<div class="gear"><small>boon</small><br><b>${UTILITIES[id].icon} ${UTILITIES[id].name}</b><br>${boonText(id)}</div>`)
   const held = squadKeywords(run)
   return `${relics.length + doctrines.length + held.length + utilities.length === 0 ? '<h2>Relics, oaths and boons the party gains show here.</h2>' : ''}
     ${utilities.length > 0 ? `<h2>Boons ${utilities.length}/${UTILITY_SLOTS}</h2><div class="stash">${utilities.join('')}</div>` : ''}

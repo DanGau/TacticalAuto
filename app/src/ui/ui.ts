@@ -40,7 +40,8 @@ function status(run: Run): string {
   const rounds = battle.extract ? ` · ${battle.escaped.length} lifted off` : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
   const clock = battle.deadline !== null && battle.round < battle.deadline ? ` · reinforcements in ${battle.deadline - battle.round} rounds` : ''
   const vip = battle.vip ? ` · the VIP ${{ held: 'held', breached: 'held', freed: 'with the party', out: 'lifted off' }[battle.vip]}` : ''
-  return `${title}${vip}${rounds}${clock}${counts(run, battle)}`
+  const boons = battle.boons.filter((b) => b.until > battle.round).map((b) => ` · ${UTILITIES[b.id].icon} ${UTILITIES[b.id].name} ⏳${b.until - battle.round}`).join('')
+  return `${title}${vip}${rounds}${clock}${boons}${counts(run, battle)}`
 }
 
 /** The squad's counts toward its every-Nth triggers. */

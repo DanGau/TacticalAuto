@@ -19,7 +19,7 @@ import { WEAPONS, type WeaponId } from '../core/weapons'
 import type { Bot } from './bots'
 
 /** What to take into a fight no utility held answers, best first. */
-const FALLBACK: UtilityId[] = ['overcharge', 'crack', 'rangedShield', 'thrusters', 'meleeShield', 'smoke', 'flashbang', 'hover']
+const FALLBACK: UtilityId[] = ['overcharge', 'ironSkin', 'mending', 'keen', 'crack', 'rangedShield', 'dampener', 'thrusters', 'meleeShield', 'smoke', 'coldSnap', 'gravity', 'farsight', 'hunted', 'blaze', 'flashbang', 'hover']
 
 /** The utility held best for `challenge`: its answers run best first in CHALLENGES. */
 export function answerFor(run: Run, challenge: ChallengeId | null): number {

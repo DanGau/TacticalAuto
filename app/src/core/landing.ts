@@ -5,11 +5,11 @@ import { CHALLENGES, type ChallengeId } from './challenges'
 import type { GameEvent } from './combat-event'
 import { engageNearest, has, nearest } from './fighters'
 import { blocked, distance, edgeDepths, freeTilesNear, NEIGHBORS, onGrid, openNear, reachableFrom, walkingDistances, walks } from './grid'
-import { fuelTanks } from './objects'
 import { dropUnit, soldierUnit, TURRET } from './spawn'
 import { PROP_BULK } from './terrain'
 import { TUNING } from './tuning'
-import { OVERCHARGE, SMOKE, STUN_TURNS, THRUST, type UtilityId } from './utilities'
+import type { UtilityId } from './utilities'
+import { takeBoon } from './boons'
 import { wound } from './wound'
 
 /** How near the landing Breaching Charges reach aliens, the damage they add, and how near the aliens stand that Encore catches. */
@@ -84,30 +84,8 @@ export function land(battle: Battle, utility: UtilityId | null = null, tank = 0,
   if (held('entryWall')) for (const soldier of squad) barricade(battle, soldier)
   battle.utility = utility
   battle.second = second
-  takeUtility(battle, utility, tank)
-  takeUtility(battle, second, tank)
-}
-
-/** The utility the player picked takes hold as the squad comes in. */
-function takeUtility(battle: Battle, utility: UtilityId | null, tank: number): void {
-  const squad = battle.units.filter(isSoldier)
-  const effect = utility === 'crack' ? 'piercing' : utility === 'hover' || utility === 'rangedShield' || utility === 'meleeShield' ? utility : null
-  for (const u of squad) {
-    if (effect) u.effects = [...u.effects, effect]
-    if (utility === 'thrusters') u.stats = { ...u.stats, move: u.stats.move + THRUST }
-    if (utility === 'overcharge') u.stats = { ...u.stats, damage: u.stats.damage + OVERCHARGE }
-  }
-  if (utility === 'tank') battle.rigged = fuelTanks(battle)[tank] ?? null
-  if (utility === 'smoke') {
-    for (const u of battle.units.filter((a) => a.side === 'alien')) {
-      battle.smoked[u.id] = u.stats.range
-      u.stats = { ...u.stats, range: Math.min(u.stats.range, SMOKE.reach) }
-    }
-  }
-  if (utility === 'flashbang') {
-    const first = nearest(battle.units.filter((u) => u.side === 'alien' && u.engaged), battle.entry!)
-    for (const u of battle.units.filter((a) => a.side === 'alien' && first && a.cluster === first.cluster)) u.surprised = u.boss ? STUN_TURNS - 1 : STUN_TURNS
-  }
+  takeBoon(battle, utility, tank)
+  takeBoon(battle, second, tank)
 }
 
 /** Puts the whole squad down on the free tiles nearest `at` and begins the battle, the cluster nearest engaging. */

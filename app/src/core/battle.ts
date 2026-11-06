@@ -10,6 +10,7 @@ import type { Resist } from './keywords'
 import { type Flow, Goal } from './goals'
 import type { Twist } from './twists'
 import type { UtilityId } from './utilities'
+import type { Boon } from './boons'
 import type { ChallengeId } from './challenges'
 import type { DuoId } from './duos'
 import type { DuoState } from './duo-effects'
@@ -367,8 +368,8 @@ export interface Battle {
   second: UtilityId | null
   /** A fuel tank rigged to blow; null once it has. */
   rigged: Tile | null
-  /** The range each alien had before a smoke bomb, by unit id, until the smoke clears. */
-  smoked: Record<number, number>
+  /** The boons under way. */
+  boons: Boon[]
   /** Set by the landing until what it sets off lands, as the battle's first beat. */
   opening: boolean
   /** Tiles of acid, each with the alien turns it has left. */

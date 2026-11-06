@@ -8,7 +8,7 @@ import { begun, road } from './roads'
 import { type Run } from './run-state'
 import { drawBattle } from './missions'
 import { stepBattle } from './combat'
-import { OVERCHARGE, RIG, SMOKE, STUN_TURNS, THRUST, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
+import { FARSIGHT, KEEN, MEND, OVERCHARGE, RIG, SMOKE_REACH, STUN_TURNS, THRUST, UTILITIES, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
 
 /** A run at a battle's deploy screen, holding `held`. */
 function landing(held: UtilityId[], seed = 1): Run {
@@ -51,7 +51,7 @@ test('thrusters add move; armor crack ignores armor; hover flattens steep ground
   }
 })
 
-test('a flashbang stuns the first cluster, a smoke bomb shortens every alien shot until it clears', () => {
+test('a flashbang stuns the first cluster, a smoke bomb shortens every alien shot', () => {
   const flash = landing(['flashbang'])
   apply(flash, { type: 'enter', utility: 0 })
   const stunned = aliens(flash).filter((u) => u.surprised > 0)
@@ -60,12 +60,47 @@ test('a flashbang stuns the first cluster, a smoke bomb shortens every alien sho
   expect(stunned.every((u) => u.surprised === (u.boss ? STUN_TURNS - 1 : STUN_TURNS))).toBe(true)
 
   const smoke = landing(['smoke'], 2)
+  const far = smoke.battle!.units.filter((u) => u.side === 'alien' && u.stats.range > SMOKE_REACH).map((u) => [u, u.stats.range] as const)
   apply(smoke, { type: 'enter', utility: 0 })
-  const shooter = aliens(smoke).find((u) => smoke.battle!.smoked[u.id] > SMOKE.reach)!
-  const range = smoke.battle!.smoked[shooter.id]
-  expect(shooter.stats.range).toBe(SMOKE.reach)
-  while (smoke.battle!.round < SMOKE.rounds && smoke.battle!.phase === 'battle') stepBattle(smoke.battle!)
-  if (shooter.hp > 0) expect(shooter.stats.range).toBe(range)
+  expect(far.every(([u]) => u.stats.range === SMOKE_REACH)).toBe(true)
+})
+
+test('every boon lasts its rounds, then ends on the units it held and gives back what it added', () => {
+  for (const id of ['thrusters', 'overcharge', 'ironSkin', 'farsight', 'keen', 'hover', 'crack', 'gravity', 'dampener', 'smoke'] as const) {
+    const run = landing([id], 3)
+    apply(run, { type: 'enter', utility: 0 })
+    const battle = run.battle!
+    const before = new Map(battle.units.map((u) => [u.id, { ...u.stats, effects: u.effects.length }]))
+    const events = []
+    while (battle.round < UTILITIES[id].rounds && battle.phase === 'battle') events.push(...stepBattle(battle))
+    while (battle.turn !== 'human' && battle.phase === 'battle') events.push(...stepBattle(battle))
+    if (battle.phase !== 'battle') continue
+    events.push(...stepBattle(battle))
+    expect(events).toContainEqual(expect.objectContaining({ type: 'used', utility: id, ended: true }))
+    expect(battle.boons).toHaveLength(0)
+    for (const u of battle.units.filter((u) => u.hp > 0 && before.has(u.id) && (isSoldier(u) || u.side === 'alien'))) {
+      const was = before.get(u.id)!
+      if (['thrusters', 'gravity'].includes(id)) expect(u.stats.move).toBeLessThanOrEqual(was.move)
+      if (id === 'overcharge' && isSoldier(u)) expect(u.stats.damage).toBe(was.damage - OVERCHARGE)
+      if (id === 'dampener' && u.side === 'alien' && was.damage > 1) expect(u.stats.damage).toBeGreaterThan(was.damage)
+      if (id === 'farsight' && isSoldier(u)) expect(u.stats.range).toBe(was.range - FARSIGHT)
+      if (id === 'keen' && isSoldier(u)) expect(u.stats.crit).toBeCloseTo(was.crit - KEEN)
+      if ((id === 'hover' || id === 'crack') && isSoldier(u)) expect(u.effects).not.toContain(id === 'crack' ? 'piercing' : 'hover')
+    }
+  }
+})
+
+test('mending heals the squad each turn it lasts', () => {
+  const run = landing(['mending'])
+  apply(run, { type: 'enter', utility: 0 })
+  const battle = run.battle!
+  const [hero] = squad(run)
+  hero.hp = hero.stats.hp - 5
+  while (battle.turn === 'human' && battle.phase === 'battle') stepBattle(battle)
+  const events = []
+  while (battle.turn !== 'human' && battle.phase === 'battle') events.push(...stepBattle(battle))
+  events.push(...stepBattle(battle))
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: hero.id, effect: 'regen', amount: MEND }))
 })
 
 test('a shield halves hits of its own kind and leaves the other kind alone', () => {
@@ -118,7 +153,7 @@ test('a utility found with three held forces a choice of which to drop', () => {
   expect(run.utilities).toHaveLength(UTILITY_SLOTS)
   apply(run, { type: 'enter' })
   run.battle!.winner = 'human'
-  run.mission = { ...run.mission!, kind: 'ambush' }
+  run.mission = { ...run.mission!, kind: 'key' }
   endBattle(run)
   const found = run.spare!
   expect(['hover', 'smoke', 'crack']).not.toContain(found)
