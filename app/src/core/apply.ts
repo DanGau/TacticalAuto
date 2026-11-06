@@ -22,7 +22,7 @@ export type Action =
   | { type: 'recruit'; index: number }
   /** Run start: take the offers at `picks` of run.boonOffers, START_PICKS of them. */
   | { type: 'boons'; picks: number[] }
-  /** Shop: buy the gear at `index` of shop.wares for the soldier with id `soldier` to wear, selling what it replaces. */
+  /** Shop: buy the gear at `index` of shop.wares for the soldier with id `soldier` to wear, discarding what it replaces. */
   | { type: 'gear'; index: number; soldier: number }
   /** Shop: buy the relic at `index` of shop.relics. */
   | { type: 'buy'; index: number }
@@ -46,7 +46,7 @@ export type Action =
   | { type: 'relic'; index: number }
   /** Reward phase: take the offered duo in place of a relic. */
   | { type: 'duo' }
-  /** Reward phase: put the find at `find` of run.finds on the soldier with id `soldier`, selling what it replaces. */
+  /** Reward phase: put the find at `find` of run.finds on the soldier with id `soldier`, discarding what it replaces. */
   | { type: 'equip'; find: number; soldier: number }
   /** Reward phase: sell the find at `find` of run.finds. */
   | { type: 'sell'; find: number }

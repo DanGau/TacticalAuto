@@ -59,7 +59,7 @@ function gearChoice(run: Run, gear: Gear, armed: string | null, heading: string,
     const on = chosen === soldier
     return `<button class="taker${on ? ' chosen' : ''}" role="radio" aria-checked="${on}" data-arm="${choiceKey(soldier)}">${body}</button>`
   }
-  const drop = (s: Soldier) => (s.gear ? `drops ${heldCard(s.gear)} · <span class="value">+${SELL[s.gear.rarity]} supplies</span>` : 'Empty hands')
+  const drop = (s: Soldier) => (s.gear ? `drops ${heldCard(s.gear)}` : 'Empty hands')
   const hero = (s: Soldier) => option(s, `<span class="portrait">${badge(s.cls)}</span><span class="text"><b>Equip on ${s.name}</b><small class="drop">${drop(s)}</small></span>`)
   const fate = chosen === undefined ? 'Choose who takes it' : chosen ? `Equip on ${chosen.name}` : last.fate
   return `<div class="gearswap"><h1>New gear</h1><h2>${heading}</h2>
@@ -68,14 +68,14 @@ function gearChoice(run: Run, gear: Gear, armed: string | null, heading: string,
     <button class="decide confirm"${chosen === undefined ? ' disabled' : ` ${go(chosen)}`}>Confirm</button></div>`
 }
 
-/** The find at `index`, with `note` after its heading: equipped on a hero, selling theirs, or sold. */
+/** The find at `index`, with `note` after its heading: equipped on a hero, dropping theirs, or sold. */
 export function findSwap(run: Run, index: number, armed: string | null, note = ''): string {
   const { rarity } = run.finds[index]
   const go = (s: Soldier | null) => act(s ? { type: 'equip', find: index, soldier: s.id } : { type: 'sell', find: index })
   return gearChoice(run, run.finds[index], armed, `Equip it or sell it${note}`, go, { label: `Sell · <span class="value">+${SELL[rarity]} supplies</span>`, fate: `Sold for ${SELL[rarity]} supplies` })
 }
 
-/** The shop's ware at `index`, at `price`: bought for a hero, selling theirs, or left. */
+/** The shop's ware at `index`, at `price`: bought for a hero, dropping theirs, or left. */
 export function shopSwap(run: Run, index: number, price: number, armed: string | null): string {
   const { gear } = run.shop!.wares[index]
   const go = (s: Soldier | null) => (s ? act({ type: 'gear', index, soldier: s.id }) : 'data-ware=""')

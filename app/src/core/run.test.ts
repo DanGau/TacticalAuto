@@ -165,7 +165,7 @@ test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone
   expect(run.phase).toBe('overworld')
 })
 
-test('a find goes to the soldier the player picks, replacing and selling what it held, or is sold; nothing is taken off', () => {
+test('a find goes to the soldier the player picks, replacing and discarding what it held, or is sold; nothing is taken off', () => {
   const run = started()
   hire(run)
   const [first, second] = run.soldiers
@@ -173,16 +173,15 @@ test('a find goes to the soldier the player picks, replacing and selling what it
   dropGear(run, false)
   dropGear(run, false)
   const [gear] = run.finds
-  const old = second.gear
   const supplies = run.supplies
   run.phase = 'reward'
   expect(apply(run, { type: 'equip', find: 0, soldier: 99 }).ok).toBe(false)
   expect(apply(run, { type: 'equip', find: 0, soldier: second.id })).toEqual({ ok: true })
   expect(second.gear).toBe(gear)
-  expect(run.supplies).toBe(supplies + (old ? SELL[old.rarity] : 0))
+  expect(run.supplies).toBe(supplies)
   const [other] = run.finds
   expect(apply(run, { type: 'sell', find: 0 })).toEqual({ ok: true })
-  expect(run.supplies).toBe(supplies + (old ? SELL[old.rarity] : 0) + SELL[other.rarity])
+  expect(run.supplies).toBe(supplies + SELL[other.rarity])
   expect(run).toMatchObject({ finds: [] })
 })
 
@@ -591,10 +590,9 @@ test('a shop stocks one-of-a-kind gear for the soldier the player picks, relics 
   expect(shop.relics).toHaveLength(SHOP_RELICS)
   run.supplies = 100
   const { gear } = shop.wares[0]
-  const old = run.soldiers[0].gear
   expect(apply(run, { type: 'gear', index: 0, soldier: buyer })).toEqual({ ok: true })
   expect(run.soldiers[0].gear).toBe(gear)
-  expect(run.supplies).toBe(100 - GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] + (old ? SELL[old.rarity] : 0))
+  expect(run.supplies).toBe(100 - GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE])
   expect(shop.wares).toHaveLength(SHOP_WARES)
   expect(shop.wares[0]).toEqual({ gear, sold: true })
   expect(apply(run, { type: 'gear', index: 0, soldier: buyer }).ok).toBe(false)

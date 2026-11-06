@@ -15,15 +15,14 @@ export function takeSkill(run: Run, soldier: Soldier, index: number): void {
   settle(run)
 }
 
-/** Hands `gear` to `soldier`, selling what it held: gear is never taken off, only replaced. */
-export function wear(run: Run, soldier: Soldier, gear: Gear): void {
-  if (soldier.gear) run.supplies += SELL[soldier.gear.rarity]
+/** Hands `gear` to `soldier`, discarding what it held: gear is never taken off, only replaced. */
+export function wear(soldier: Soldier, gear: Gear): void {
   soldier.gear = gear
 }
 
 /** Equips the find at `index` on `soldier`. */
 export function equipFind(run: Run, index: number, soldier: Soldier): void {
-  wear(run, soldier, run.finds.splice(index, 1)[0])
+  wear(soldier, run.finds.splice(index, 1)[0])
   settle(run)
 }
 
@@ -61,7 +60,7 @@ export function buyWare(run: Run, index: number, soldier: Soldier): void {
   ware.sold = true
   const { gear } = ware
   run.supplies -= GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
-  wear(run, soldier, gear)
+  wear(soldier, gear)
 }
 
 /** The party gains a utility; with no room, the player must choose what to drop. */
@@ -149,7 +148,7 @@ export function settle(run: Run): void {
 }
 
 /** Supplies a piece of gear sells for, by rarity. */
-export const SELL: Record<Rarity, number> = { common: 2, rare: 3, epic: 5 }
+export const SELL: Record<Rarity, number> = { common: 1, rare: 2, epic: 3 }
 
 /** A random rarity; `lucky` rules out common. */
 export function rollRarity(run: Run, lucky: boolean): Rarity {

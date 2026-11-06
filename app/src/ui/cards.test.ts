@@ -29,7 +29,7 @@ test('a find offers Equip on each hero, then Sell; Confirm waits for a choice', 
   expect(html).toContain('class="side found arrive')
 })
 
-test.each([0, 1, 2])('Equip on hero %i gives them the find and sells the weapon they held', (i) => {
+test.each([0, 1, 2])('Equip on hero %i gives them the find and drops the weapon they held for nothing', (i) => {
   const run = found()
   const hero = run.soldiers[i]
   const held = hero.gear!
@@ -42,7 +42,7 @@ test.each([0, 1, 2])('Equip on hero %i gives them the find and sells the weapon 
   apply(run, JSON.parse(confirm(html)[2]) as Action)
   expect(hero.gear).toBe(gear)
   expect(run.soldiers.filter((s) => s !== hero).map((s) => s.gear)).toEqual(others)
-  expect(run.supplies).toBe(supplies + SELL[held.rarity])
+  expect(run.supplies).toBe(supplies)
   expect(run.finds).toEqual([])
 })
 
@@ -62,7 +62,7 @@ test('a hero with empty hands drops nothing', () => {
   expect(findSwap(run, 0, null)).toContain('<small class="drop">Empty hands</small>')
 })
 
-test('a shop ware is bought for the hero chosen, selling theirs, or left', () => {
+test('a shop ware is bought for the hero chosen, dropping theirs, or left', () => {
   const run = found()
   const gear = run.finds.pop()!
   run.phase = 'shop'
@@ -70,18 +70,17 @@ test('a shop ware is bought for the hero chosen, selling theirs, or left', () =>
   run.supplies = 99
   const price = GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
   const hero = run.soldiers[2]
-  const held = hero.gear!
   expect(options(shopSwap(run, 0, price, null)).at(-1)!.label).toBe('Leave it')
   expect(shopSwap(run, 0, price, 'g-')).toContain('class="decide confirm" data-ware=""')
   apply(run, JSON.parse(confirm(shopSwap(run, 0, price, `g${hero.id}`))[2]) as Action)
   expect(hero.gear).toBe(gear)
-  expect(run.supplies).toBe(99 - price + SELL[held.rarity])
+  expect(run.supplies).toBe(99 - price)
 })
 
 test("each hero's held weapon card shows that weapon in full", () => {
   const run = found()
   const html = findSwap(run, 0, null)
-  const cards = [...html.matchAll(/<span class="gearpop (\w+)" hidden>(.*?)<\/span><\/span> ·/gs)]
+  const cards = [...html.matchAll(/<span class="gearpop (\w+)" hidden>(.*?)<\/span><\/span><\/small>/gs)]
   expect(cards.map(([, rarity]) => rarity)).toEqual(run.soldiers.map((s) => s.gear!.rarity))
   run.soldiers.forEach((s, i) => {
     const card = cards[i][2]
