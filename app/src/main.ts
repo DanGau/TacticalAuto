@@ -9,6 +9,8 @@ import { PACE } from './core/pace'
 import { brief } from './ui/briefing'
 import { introduce, newcomers } from './ui/intro'
 import { createUi } from './ui/ui'
+import { createLog } from './ui/log'
+import { installKit } from './ui/kit'
 import { createView } from './view/view'
 import { HEIGHT, WIDTH } from './view/camera'
 
@@ -69,6 +71,7 @@ document.body.prepend(view.canvas)
 let briefed: Run['battle'] = null
 
 async function show(events: GameEvent[], animate: boolean): Promise<void> {
+  log.add(state, events)
   await view.show(state, events, animate)
   ui.update(state)
   if (state.battle?.phase === 'deploy' && state.battle !== briefed && !params.has('manual')) {
@@ -89,6 +92,8 @@ function act(action: Action): Result {
 }
 
 const ui = createUi(act)
+const log = createLog()
+installKit(view, state)
 
 window.debug = {
   snapshot: () => structuredClone(state),

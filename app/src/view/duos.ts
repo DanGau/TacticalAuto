@@ -1,8 +1,7 @@
 // A duo's moment on screen: its two heroes linked by a beam, both ringed, the duo's name over what it acted on.
 import type { GameEvent } from '../core/combat-event'
-import { DUOS } from '../core/duos'
 import { PACE } from '../core/pace'
-import { callout, chest, drawing, float } from './effects'
+import { chest, drawing, float, sourceCallout } from './effects'
 import { COLOR } from './palette'
 import type { Stage } from './stage'
 
@@ -10,7 +9,7 @@ export async function playDuo(s: Stage, e: Extract<GameEvent, { type: 'duo' }>):
   const [a, b] = e.ids.map((id) => s.sprites.get(id))
   if (!a || !b) return
   const on = e.target === undefined ? undefined : s.sprites.get(e.target)
-  float(s, callout(s, `✦ ${DUOS[e.duo].name.toUpperCase()}`, COLOR.duo, on ?? a, 18, 18))
+  float(s, sourceCallout(s, e.src, on ?? a, '', 18, 18))
   await drawing(s, (fx) =>
     s.tween(PACE.duo, (t) => {
       const [p, q] = [chest(a), chest(b)]

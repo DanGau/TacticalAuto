@@ -38,6 +38,16 @@
       .vignette { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: radial-gradient(ellipse at 58% 42%, transparent 45%, rgba(0, 0, 0, 0.55) 100%); opacity: 0; transition: opacity 1.2s ease-in-out; }
       body.cinema .vignette { opacity: 1; }
       #hud { transition: opacity 0.6s; }
+      .src { white-space: nowrap; font-weight: bold; }
+      #log { position: fixed; left: 60px; bottom: 12px; z-index: 2; max-width: min(460px, calc(100vw - 24px)); background: rgba(10, 13, 19, 0.85); border-radius: 6px; font-size: 12px; }
+      #log[hidden], #kit[hidden] { display: none; }
+      #log summary { cursor: pointer; padding: 4px 10px; color: #aab; }
+      #log ol { list-style: none; margin: 0; padding: 0 10px 6px; max-height: 30vh; overflow-y: auto; }
+      #log li { padding: 1px 0; border-top: 1px solid #ffffff10; }
+      #kit { position: fixed; z-index: 6; max-width: 280px; padding: 8px 10px; border-radius: 6px; background: rgba(10, 13, 19, 0.92); box-shadow: 0 2px 10px #0009; font-size: 12px; pointer-events: none; }
+      #kit .kit-row { display: flex; flex-wrap: wrap; gap: 2px 8px; margin-top: 4px; }
+      #kit .kit-row small { width: 100%; color: #889; text-transform: uppercase; font-size: 9px; letter-spacing: 1px; }
+      body.cinema #log { opacity: 0; }
       body.cinema #hud { opacity: 0; }
       .brief { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5; width: min(560px, calc(100vw - 32px)); box-sizing: border-box; padding: 10px 16px; border-radius: 8px; background: rgba(10, 13, 19, 0.85); color: #e8e2c8; font-size: 16px; line-height: 1.5; pointer-events: none; animation: fade 0.4s; }
       .brief p { margin: 0; animation: fade 0.6s; }

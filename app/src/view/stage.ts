@@ -53,6 +53,8 @@ export interface Label {
 export const CAMERA_MS = 350
 /** World units a unit's picture stands toward the camera from its feet, so the ground it stands on never cuts it. */
 const STANDOFF = 0.6
+/** Picture pixels a sprite's body stands above its feet. */
+const BODY_LIFT = 18
 /** How long a roof or wall takes to fade out of the way or back. */
 const FADE_MS = 220
 /** How solid a wall stays while a unit stands just behind it. */
@@ -295,6 +297,19 @@ export class Stage {
     this.fx.draw(ctx)
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     for (const label of [...this.marks, ...this.labels]) this.write(label, k, middle)
+  }
+
+  /** The unit whose sprite's body is nearest a point of the window, within reach of it. */
+  unitAt(x: number, y: number): number | null {
+    const k = this.scale()
+    const middle = picture(this.camera, this.camera.yaw)
+    const reach = Math.max(22, 26 * k)
+    let best: { id: number; d: number } | null = null
+    for (const [id, sprite] of this.sprites) {
+      const d = Math.hypot(innerWidth / 2 + (sprite.at.x - middle.x) * k - x, innerHeight / 2 + (sprite.at.y - BODY_LIFT - middle.y) * k - y)
+      if (d < reach && (!best || d < best.d)) best = { id, d }
+    }
+    return best?.id ?? null
   }
 
   /** Writes a label on the screen, its size scaled by `k`, a point in the picture placed as the picture's `middle` is centred. */

@@ -3,7 +3,6 @@ import type { Object3D } from 'three'
 import { type Battle, type Order, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { UTILITIES } from '../core/utilities'
-import { effectName } from '../core/effects'
 import { instant, PACE, strolls, tilePace, walkMs } from '../core/pace'
 import { attackOf, finisher, opener, secondaryAttack } from './attacks'
 import { drawTerrain } from './board'
@@ -11,7 +10,7 @@ import { along, leaping, lerp, spot, strideOf } from './camera'
 import { dust, ground as grounded, land, pose } from './leaps'
 import { momentum, timeline, type Moment } from './timing'
 import { CLIFF } from '../core/grid'
-import { callout, chest, dashTo, daze, drawing, effectCallout, fireRocket, float, playShot, shockwave } from './effects'
+import { callout, chest, dashTo, daze, drawing, effectCallout, fireRocket, float, playShot, shockwave, sourceCallout } from './effects'
 import { drawAcid, drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
 import { cloakLook, create, fade, letter, place, remove, squash, vitals } from './sprites'
@@ -105,7 +104,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
     if (e.type === 'move' && e.with === 'dash') {
       const sprite = sprites.get(e.id)
       if (!sprite) continue
-      float(s, callout(s, 'DASH', 0xffffff, sprite, 15))
+      float(s, sourceCallout(s, e.src, sprite, '', 15))
       await drawing(s, (fx) => dashTo(s, fx, sprite, e.path))
       drawFog(s, battle)
     } else if (e.type === 'move') {
@@ -120,7 +119,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const pace = (id: number) => tilePace(!!sprites.get(id)?.ally)
       const ms = walkMs([...paths].map(([id, path]) => ({ path, pace: pace(id), leaps: group.reduce((sum, m) => sum + (m.type === 'move' && m.id === id ? (m.leaps ?? 0) : 0), 0) })))
       const walks = [...paths].map(([id, path]) => (sprites.has(id) ? walk(s, sprites.get(id)!, path, ms, leapers.has(id) ? (battle.units.find((u) => u.id === id)?.stats.strength ?? 2) : undefined) : glide(s, glows.get(id)!, path, ms)))
-      for (const m of group) if (m.type === 'move' && m.with && m.with !== 'dash' && sprites.has(m.id)) float(s, callout(s, effectName(m.with, s.kit()).toUpperCase(), 0xffffff, sprites.get(m.id)!))
+      for (const m of group) if (m.type === 'move' && m.with && m.with !== 'dash' && sprites.has(m.id)) float(s, sourceCallout(s, m.src, sprites.get(m.id)!))
       // The camera takes in where each jump leaves from as well as where it lands, rather than chasing the jumper.
       const takeoffs = [...leapers].flatMap((id) => (sprites.has(id) ? [sprites.get(id)!.tile] : []))
       await Promise.all([s.follow([...squad(battle), ...takeoffs], Math.max(ms, CAMERA_MS)), ...walks])
@@ -255,7 +254,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const to = sprites.get(e.target)
       if (!to) continue
       to.drawHp(...vitals(battle, e.target))
-      float(s, callout(s, `HEAL +${e.amount}`, COLOR.heal, to))
+      float(s, sourceCallout(s, e.src, to, ` +${e.amount}`))
     } else if (e.type === 'death') {
       const sprite = sprites.get(e.id)
       if (!sprite) continue

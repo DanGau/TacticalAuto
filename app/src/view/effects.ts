@@ -2,16 +2,15 @@
 import { BLAST_RADIUS, type Battle, type Tile } from '../core/battle'
 import { distance } from '../core/grid'
 import type { GameEvent } from '../core/combat-event'
-import { effectName } from '../core/effects'
-import { sourceName } from '../core/sources'
+import { sourceName } from '../core/source-names'
+import { srcOf, type Src } from '../core/sources'
 import { PACE } from '../core/pace'
-import { SECONDARIES } from '../core/secondaries'
 import type { Attack } from './attacks'
 import { along, lerp } from './camera'
 import { blast } from './blast'
 import { drawFog } from './marks'
 import { drawTerrain } from './board'
-import { COLOR } from './palette'
+import { COLOR, SOURCE } from './palette'
 import { Sketch } from './shapes'
 import { TILE_W } from './space'
 import { place, shift, squash, vitals } from './sprites'
@@ -36,6 +35,12 @@ export function callout(s: Stage, text: string, color: number, over: Sprite, siz
   return mark
 }
 
+/** A source as a callout tags it: its kind's glyph and its name. */
+export const tagText = (s: Stage, src: Src) => `${SOURCE[src.kind].glyph} ${sourceName(src, s.kit()).toUpperCase()}`
+
+/** A callout naming a source in its kind's colour, `after` its name. */
+export const sourceCallout = (s: Stage, src: Src, over: Sprite, after = '', size = 13, lift = 0) => callout(s, `${tagText(s, src)}${after}`, SOURCE[src.kind].color, over, size, lift)
+
 /** A shot's result: a hit or crit with its damage. */
 export function shotCallout(s: Stage, e: Extract<GameEvent, { type: 'shot' }>, over: Sprite): Label {
   // A combo's second blow reads over the first, and bigger, so both can be counted.
@@ -46,8 +51,7 @@ export function shotCallout(s: Stage, e: Extract<GameEvent, { type: 'shot' }>, o
 
 /** What a gear effect did to a unit, in a word: the effect's name, and the health it gave or took. */
 export function effectCallout(s: Stage, e: Extract<GameEvent, { type: 'effect' }>, over: Sprite): Label {
-  const word = effectName(e.effect, s.kit()).toUpperCase()
-  return callout(s, e.amount === 0 ? word : `${word} ${e.amount > 0 ? '+' : ''}${e.amount}`, e.amount > 0 ? COLOR.heal : e.amount < 0 ? COLOR.crit : COLOR.hit, over)
+  return sourceCallout(s, e.src, over, e.amount === 0 ? '' : ` ${e.amount > 0 ? '+' : ''}${e.amount}`)
 }
 
 /** A stunning blow's shockwave spreads over the ground about `at`, as far as `tiles` reach; a trigger's, in its colour. */
@@ -244,8 +248,8 @@ export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e
   fx.clear()
   float(s, shotCallout(s, e, to))
   // What of the shooter's shaped the shot, named over the shooter.
-  if (e.secondary) float(s, callout(s, SECONDARIES[e.secondary].name.toUpperCase(), COLOR.crit, from, 15, FINISH_LIFT))
-  if (e.with.length > 0 && !nth) float(s, callout(s, e.with.map((effect) => effectName(effect, s.kit()).toUpperCase()).join(' · '), 0xffffff, from))
+  if (e.secondary) float(s, sourceCallout(s, { kind: 'class', id: e.secondary }, from, '', 15, FINISH_LIFT))
+  if (e.with.length > 0 && !nth) float(s, callout(s, e.with.map((effect) => tagText(s, srcOf(effect))).join(' · '), SOURCE[e.src.kind].color, from))
   to.drawHp(...after)
   const power = crit ? 2 : 1
   const home = s.toWorld(to.tile.x, to.tile.y)
@@ -294,7 +298,7 @@ export async function fireRocket(s: Stage, fx: Sketch, battle: Battle, from: Spr
     const sprite = s.sprites.get(hit.target)
     if (!sprite) continue
     sprite.drawHp(...vitals(battle, hit.target))
-    float(s, callout(s, `${sourceName(e.src, s.kit()).toUpperCase()} -${hit.damage}`, color, sprite))
+    float(s, sourceCallout(s, e.src, sprite, ` -${hit.damage}`))
   }
   const caught = e.hits.flatMap((hit) => s.sprites.get(hit.target) ?? [])
   blast(s, e, Math.max(BLAST_RADIUS, ...caught.map((c) => distance(c.tile, e))), color, caught)

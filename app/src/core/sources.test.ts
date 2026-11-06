@@ -3,7 +3,7 @@ import { bots } from '../bots/bots'
 import { apply } from './apply'
 import { createRun } from './run'
 import { step } from './step'
-import { sourceName } from './sources'
+import { sourceName } from './source-names'
 
 test('every acting event of a batch of runs names its source', () => {
   const unnamed = new Set<string>()

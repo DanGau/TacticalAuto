@@ -8,7 +8,7 @@ import { drawTerrain } from './board'
 import { ballistic } from './ballistic'
 import { blast } from './blast'
 import { spot } from './camera'
-import { callout, float, shake } from './effects'
+import { callout, float, shake, sourceCallout } from './effects'
 import { burst, KO_MS, scrap } from './ko'
 import { crouch, dust, land } from './leaps'
 import { drawFog } from './marks'
@@ -99,7 +99,7 @@ export async function playThrow(s: Stage, battle: Battle, e: Extract<GameEvent, 
   const top = { x: feet.x, y: feet.y + LEVEL * OVERHEAD, z: feet.z }
   const held = e.thrown !== undefined ? s.sprites.get(e.thrown) : undefined
   void s.follow([...battle.units.filter((u) => u.side === 'human' && !u.civilian), e.from, off?.to ?? e.to], CAMERA_MS)
-  if (thrower) float(s, callout(s, e.object === 'alien' ? 'THROW' : `THROWS A ${e.object === 'wreck' ? 'WRECK' : e.object.toUpperCase()}`, 0xffffff, thrower, 15))
+  if (thrower) float(s, sourceCallout(s, e.src, thrower, '', 15))
   const look = e.object === 'alien' ? undefined : (THROWN[e.object] ?? CRATE)
   let mesh: Mesh | null = null
   if (look) {

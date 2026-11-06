@@ -2,14 +2,14 @@
 import { AdditiveBlending, BoxGeometry, CircleGeometry, Mesh, MeshBasicMaterial } from 'three'
 import { BLAST_RADIUS, type Battle, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
-import { effectName } from '../core/effects'
+import { srcOf } from '../core/sources'
 import { overlaps, staggerOf } from '../core/pace'
 import type { Run } from '../core/run-state'
 import { drawTerrain } from './board'
 import { axes, bestTurn, clamped, DECAL_LIFT, framing, panned, setHeights, setRinged, spot, still, STILL_FOV, WIDTH, type Camera, type Shot } from './camera'
-import { callout, chest, effectCallout, shotCallout } from './effects'
+import { callout, chest, effectCallout, shotCallout, sourceCallout, tagText } from './effects'
 import { drawFog, drawMarks } from './marks'
-import { COLOR } from './palette'
+import { COLOR, SOURCE } from './palette'
 import { play, squad } from './play'
 import { ACROSS, PITCH, TILE_H, TILE_W, YAW } from './space'
 import { remove, sync } from './sprites'
@@ -48,6 +48,8 @@ export interface View {
   frame(tiles: Tile[] | null, ms?: number, shot?: Shot): Promise<void>
   /** Lights a beam over the tile the briefing is on, so it stands out from the night; null puts it out. */
   spotlight(tile: Tile | null): void
+  /** The unit drawn under a point of the window, if any. */
+  unitAt(x: number, y: number): number | null
 }
 
 export async function createView(): Promise<View> {
@@ -140,6 +142,7 @@ export async function createView(): Promise<View> {
   s.resize()
   return {
     canvas,
+    unitAt: (x, y) => s.unitAt(x, y),
     frame(tiles, ms = FOCUS_MS, shot = {}) {
       return s.follow(above(tiles, shot), ms)
     },
@@ -201,7 +204,7 @@ export async function createView(): Promise<View> {
         s.labels.clear()
         for (const e of events) {
           if (e.type === 'effect' && sprites.has(e.id)) effectCallout(s, e, sprites.get(e.id)!)
-          if (e.type === 'heal' && sprites.has(e.target)) callout(s, `HEAL +${e.amount}`, COLOR.heal, sprites.get(e.target)!)
+          if (e.type === 'heal' && sprites.has(e.target)) sourceCallout(s, e.src, sprites.get(e.target)!, ` +${e.amount}`)
           if (e.type === 'rocket') {
             const c = s.toWorld(e.x, e.y)
             fx.ellipse(c.x, c.y, (BLAST_RADIUS + 0.7) * TILE_W, (BLAST_RADIUS + 0.7) * TILE_H).fill({ color: COLOR.crit, alpha: 0.4 })
@@ -215,7 +218,7 @@ export async function createView(): Promise<View> {
           const b = chest(to)
           fx.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: e.crit ? COLOR.crit : COLOR.hit, width: 3 })
           shotCallout(s, e, to)
-          if (e.with.length > 0) callout(s, e.with.map((effect) => effectName(effect, s.kit()).toUpperCase()).join(' · '), 0xffffff, from)
+          if (e.with.length > 0) callout(s, e.with.map((effect) => tagText(s, srcOf(effect))).join(' · '), SOURCE[e.src.kind].color, from)
         }
       }
       s.render()

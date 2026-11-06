@@ -1,6 +1,21 @@
 // The battle's colours: of units and marks, of the ground, and of how height and fog tint them.
 import type { AlienKind } from '../core/aliens'
 import type { Ground } from '../core/terrain'
+import type { SrcKind } from '../core/sources'
+
+/** How each kind of source is tagged wherever an action is named: its colour and glyph. */
+export const SOURCE: Record<SrcKind, { color: number; glyph: string }> = {
+  class: { color: 0xffc94d, glyph: '◆' },
+  skill: { color: 0x5aa9ff, glyph: '✦' },
+  weapon: { color: 0xffffff, glyph: '⚔' },
+  gear: { color: 0x6fdc6f, glyph: '⚙' },
+  relic: { color: 0xb98cff, glyph: '❖' },
+  boon: { color: 0x4fe3e3, glyph: '✚' },
+  doctrine: { color: 0xff9a3d, glyph: '⚑' },
+  object: { color: 0xa0a7b4, glyph: '▣' },
+  basic: { color: 0xc9ced8, glyph: '•' },
+  alien: { color: 0xff6b5e, glyph: '☠' },
+}
 
 /** The night the world sits in: the background, and what the distance fades into. */
 export const NIGHT = 0x10141c

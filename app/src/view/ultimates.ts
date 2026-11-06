@@ -1,11 +1,10 @@
 // A tier 4's moment on screen: the name over the hero, the colour over the arena, and its shape on the ground.
 import { type Battle } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
-import { effectName } from '../core/effects'
 import { PACE } from '../core/pace'
 import type { UltimateEffect } from '../core/ultimates'
 import { lerp } from './camera'
-import { callout, chest, float, shake } from './effects'
+import { chest, float, shake, sourceCallout } from './effects'
 import { drawFog } from './marks'
 import { drawTerrain } from './board'
 import { Sketch } from './shapes'
@@ -52,7 +51,7 @@ export async function playUltimate(s: Stage, battle: Battle, e: Extract<GameEven
   const from = s.sprites.get(e.id)
   const look = LOOKS[e.effect as UltimateEffect]
   const at = s.toWorld(e.x, e.y)
-  if (from) float(s, callout(s, effectName(e.effect, s.kit()).toUpperCase(), look.color, from, 30, 34))
+  if (from) float(s, sourceCallout(s, e.src, from, '', 30, 34))
   if (from && battle.units.find((u) => u.id === e.id)?.giant) grow(from)
   drawTerrain(s, battle)
   drawFog(s, battle)
