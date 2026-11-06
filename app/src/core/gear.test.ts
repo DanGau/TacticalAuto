@@ -1,5 +1,5 @@
 import { fx } from './sources'
-import { roots } from './skills'
+import { powerOf } from './skills'
 import { expect, test } from 'vitest'
 import { enterAt, begun } from './roads'
 import { apply } from './apply'
@@ -46,7 +46,7 @@ test('any soldier wields any weapon: a melee one reaches the next tile and charg
 /** A run whose soldier has learned its first skill and found `gear`. */
 function withFind(gear: Omit<Gear, 'id'>): Run {
   const run = begun(1)
-  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
+  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
   run.finds.push({ id: 1, ...gear })
   run.phase = 'reward'
   return run

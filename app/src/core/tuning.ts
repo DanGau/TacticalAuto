@@ -16,6 +16,12 @@ export const TUNING = {
   thermalDamage: 3,
   /** Damage landing charges deal each alien they reach, before Breaching Charges add theirs. */
   impactDamage: 2,
+  /** Damage Rime Grip adds to hits on a target beside its cryo. */
+  gripDamage: 2,
+  /** Damage Opportunist adds to hits on a target rooted or stunned. */
+  opportunistDamage: 2,
+  /** Burn stacks Fan the Flames adds to a burning target hit. */
+  fanStacks: 1,
   /** Supplies an overrun zone pays. */
   dangerSupplies: 4,
   /** The share of its own force the hunt adds to a battle at full threat. */

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { roots } from './skills'
+import { powerOf } from './skills'
 import { apply } from './apply'
 import { enterAt, begun } from './roads'
 import { isSoldier, type Battle, type Unit } from './battle'
@@ -12,7 +12,7 @@ import { harm, threat } from './threat'
 
 function arena(aliens: { kind: AlienKind; x: number; y: number }[]): { battle: Battle; hero: Unit; aliens: Unit[] } {
   const run = begun(1)
-  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
+  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   enterAt(run)

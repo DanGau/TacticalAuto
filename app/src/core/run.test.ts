@@ -52,7 +52,7 @@ import { LOSS_THREAT } from './progress'
 import { STOP_THREAT } from './progress'
 import { THREAT_MAX } from './progress'
 import { LEG_STOPS } from './progress'
-import { powerOf, roots, SKILLS, unlocked } from './skills'
+import { powerOf, SKILLS, unlocked } from './skills'
 import { atKey, road, enterAt, begun } from './roads'
 import { RELICS } from './relics'
 import { SHOP_UTILITIES, UTILITY_SLOTS } from './utilities'
@@ -60,7 +60,7 @@ import { SHOP_UTILITIES, UTILITY_SLOTS } from './utilities'
 /** A run whose first soldier has learned its first skill, so the overworld waits. */
 function started(): Run {
   const run = begun(1)
-  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
+  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
   return run
 }
 
@@ -112,7 +112,7 @@ test('a run begins with one level 1 recruit on a path of its class, choosing whe
   const run = begun(1)
   expect(run.soldiers).toHaveLength(1)
   expect(level(run.soldiers[0])).toBe(1)
-  expect(roots(run.soldiers[0].cls!)).toContain(run.soldiers[0].skills[0])
+  expect(run.soldiers[0].skills[0]).toBe(powerOf(run.soldiers[0].cls!))
   expect(run).toMatchObject({ phase: 'overworld', soldiers: [{ skills: [expect.anything()] }] })
   const leg = legOf(run)
   expect(leg.columns).toHaveLength(LEG_STOPS + 1)
@@ -630,7 +630,7 @@ test('an unknown stop turns out a battle, a shop, or an event met once a run, wh
   const kinds = new Set<string>()
   for (let seed = 0; seed < 40; seed++) {
     const run = begun(seed)
-    run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
+    run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
     enter(run, 'standard', ['unknown', 'battle'])
     apply(run, { type: 'advance' })
     kinds.add(run.phase)

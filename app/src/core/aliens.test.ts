@@ -1,4 +1,4 @@
-import { roots } from './skills'
+import { powerOf } from './skills'
 import { TUNING } from './tuning'
 
 // These duels stage exact hits and survivals, whatever the balance numbers are.
@@ -35,7 +35,7 @@ test('a mission musters packs its depth allows, for exactly its force, and a lon
  */
 function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }[]): { battle: Battle; soldier: Unit; aliens: Unit[]; until: (done: (events: GameEvent[]) => boolean) => GameEvent[] } {
   const run = begun(1)
-  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
+  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   enterAt(run)

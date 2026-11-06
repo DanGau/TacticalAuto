@@ -28,10 +28,10 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `brawlers.ts` | Rules of aliens that fight up close: charge, pounce, hold, ram, shield, pack, fury |
 | `threat.ts` | What a hero gains by shooting an alien: harm stopped over hits to kill |
 | `abilities.ts` | Actions in place of a shot: alien powers, soldier skills and gear |
-| `keystones.ts` | Tier 3 powers: what a hit sets off, their numbers |
+| `keystones.ts` | Deep path powers: what a hit sets off, their numbers |
 | `follow-ups.ts` | Command's ally attack, Blade Dance's extra strikes |
 | `duo-effects.ts` | What each duo does in battle |
-| `ultimates.ts` | Tier 4 powers: when each fires and what it does |
+| `ultimates.ts` | Capstones: when each fires and what it does |
 | `wound.ts` | Damage landing, what it sets off, the battle tally |
 | `stacks.ts` | Stacks a fight builds and what they set off: burn, chill and freezing, Might, combos, exposure, every-Nth hits |
 | `upkeep.ts` | What happens as a side's turn begins: more aliens engaging, waves |
@@ -69,7 +69,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `camera.ts` | World and picture points, cameras that frame tiles |
 | `play.ts` | Plays a beat's events in order |
 | `effects.ts` | Shots, lunges, rockets, sparks, shake, callouts |
-| `ultimates.ts` | A tier 4 on screen: its name, colour and shape |
+| `ultimates.ts` | A capstone on screen: its name, colour and shape |
 | `duos.ts` | A duo's moment on screen |
 | `sprites.ts` | Unit pictures and moving them |
 | `badges.ts` | The stacks and counts over a unit's head, the same size on any screen |

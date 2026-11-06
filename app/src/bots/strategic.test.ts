@@ -8,7 +8,7 @@ import { rows, verdicts } from '../sim/report'
 import { runWith, type RunResult, type Toll } from '../sim/run'
 import { PLANS, plannedSkill, strategic } from './strategic'
 import { CLASSES, type ClassId } from '../core/classes'
-import { powerOf, TREES, type SkillId } from '../core/skills'
+import { pathOf, powerOf, TREES, type SkillId } from '../core/skills'
 import { skillOffers, xpFor } from '../core/squad'
 
 function deploying(challenge: ChallengeId, held: Run['utilities']): Run {
@@ -26,17 +26,18 @@ test.each(Object.keys(CHALLENGES) as ChallengeId[])('the strategic bot takes the
   expect(strategic(run, { rng: 1 })).toMatchObject({ type: 'enter', utility: 2 })
 })
 
-test('the plan: every class names a real branch and an opener outside it, and its hero takes a skill of the branch whenever one is offered', () => {
+test('the plan: every class names a real path, and its hero takes a skill of the path whenever one is offered, reaching its capstone', () => {
   for (const cls of Object.keys(CLASSES) as ClassId[]) {
-    const branch = TREES[cls].find((b) => b.name === PLANS[cls].branch)!.tiers.flat()
-    for (let seed = 0; seed < 10; seed++) {
+    const path = TREES[cls].paths.find((p) => p.name === PLANS[cls])!
+    for (let seed = 0; seed < 20; seed++) {
       const hero = { ...begun(3).soldiers[0], cls, skills: [powerOf(cls)], lost: [] as SkillId[], seed, xp: xpFor(20) }
       for (let offers = skillOffers(hero); offers.length > 0; offers = skillOffers(hero)) {
         const pick = offers[plannedSkill(hero)]
-        if (offers.some((id) => branch.includes(id)) && !(PLANS[cls].opener && offers.includes(PLANS[cls].opener!))) expect(branch).toContain(pick)
+        if (offers.some((id) => pathOf(cls, id) === path)) expect(pathOf(cls, pick)).toBe(path)
         hero.lost.push(...offers.filter((id) => id !== pick))
         hero.skills.push(pick)
       }
+      expect(hero.skills).toContain(path.capstone)
     }
   }
 })

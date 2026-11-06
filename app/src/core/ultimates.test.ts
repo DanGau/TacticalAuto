@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { arena } from './arena'
 import type { Effect, Unit } from './battle'
 import { CLASSES, type ClassId } from './classes'
-import { SKILLS, TREES } from './skills'
+import { capstones, SKILLS } from './skills'
 import { SKILL_EFFECTS } from './skill-effects'
 import { TIME_STOP } from './ultimates'
 import { upkeep } from './upkeep'
@@ -10,10 +10,10 @@ import { upkeep } from './upkeep'
 const crowd = [{ x: 12, y: 10 }, { x: 13, y: 10 }, { x: 12, y: 11 }, { x: 13, y: 11 }]
 const hurtAll = (aliens: Unit[]) => aliens.every((a) => a.hp < 40)
 
-/** Every tier 4, in a crowd with its owner hurt: it fires once, and says so with an ultimate event. */
-const tier4s = (Object.keys(CLASSES) as ClassId[]).flatMap((cls) => TREES[cls].map((b) => SKILLS[b.tiers[3][0]].effect! as Effect))
+/** Every capstone, in a crowd with its owner hurt: it fires once, and says so with an ultimate event. */
+const capstoneEffects = (Object.keys(CLASSES) as ClassId[]).flatMap((cls) => capstones(cls).map((id) => SKILLS[id].effect! as Effect))
 
-test.each(tier4s.filter((e) => e !== 'phoenixRising'))('%s fires once in its moment, and only once', (effect) => {
+test.each(capstoneEffects.filter((e) => e !== 'phoenixRising'))('%s fires once in its moment, and only once', (effect) => {
   const { battle, hero, beats } = arena([effect], crowd)
   hero.hp = Math.floor(hero.stats.hp / 3)
   const first = beats(1)
@@ -25,7 +25,7 @@ test.each(tier4s.filter((e) => e !== 'phoenixRising'))('%s fires once in its mom
 })
 
 test('every tier 4 is once a battle and names an effect', () => {
-  for (const effect of tier4s) {
+  for (const effect of capstoneEffects) {
     expect(Object.values(SKILLS).find((s) => s.effect === effect)!.use).toBe('1/battle')
     expect(SKILL_EFFECTS as readonly string[]).toContain(effect)
   }

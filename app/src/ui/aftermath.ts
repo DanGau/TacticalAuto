@@ -15,11 +15,11 @@ import { health } from '../core/squad'
 import { skillOffers } from '../core/squad'
 import { level } from '../core/squad'
 import { xpFor } from '../core/squad'
-import { CAPSTONE_PICKS, SKILLS, TREES, type SkillId } from '../core/skills'
+import { SKILLS, treeOf, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
 import { findSwap, pickCard, pickDetail, startChoice, utilityPick, type Pick } from './cards'
 import { heroSheet } from './sheet'
-import { skillState, treeMap } from './tree'
+import { rule, skillState, treeMap } from './tree'
 import { badge, button, describe, gearText, gearType, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
 /**
@@ -99,9 +99,9 @@ export function skillChoice(run: Run, soldier: Soldier, armed: string | null = n
   const pick = (id: SkillId): Pick => {
     const skill = SKILLS[id]
     const state = skillState(soldier, id)
-    return { key: id, action: state === 'offered' ? { type: 'skill', soldier: soldier.id, index: offers.indexOf(id) } : undefined, look: `skillnode ${state}`, body: `<b>${skill.name}</b>`, detail: `<p><b>${skill.name}</b> <small class="use">${usage(skill)}</small></p><div>${describe(skill.text, skill.tags, held)}</div>`, go: `Tap again to learn ${skill.name}`, block: state === 'taken' ? 'Learned' : state === 'lost' ? 'Lost: turned down for this run' : state === 'open' ? 'Not offered this pick' : state === 'locked' ? 'Locked: take a power of the tier below' + (soldier.skills.length < CAPSTONE_PICKS ? `; tier 3 needs ${CAPSTONE_PICKS} powers learned, tier 4 its tier 3` : '') : null }
+    return { key: id, action: state === 'offered' ? { type: 'skill', soldier: soldier.id, index: offers.indexOf(id) } : undefined, look: `skillnode ${state}`, body: `<b>${skill.name}</b>`, detail: `<p><b>${skill.name}</b> <small class="use">${usage(skill)}</small></p><div>${describe(skill.text, skill.tags, held)}</div>`, go: `Tap again to learn ${skill.name}`, block: state === 'taken' ? 'Learned' : state === 'lost' ? 'Lost: turned down for this run' : state === 'open' ? 'Not offered this pick' : state === 'locked' ? `Locked. ${rule(soldier, id)}` : null }
   }
-  const picks = TREES[soldier.cls!].flatMap((branch) => branch.tiers.flat()).map(pick)
+  const picks = treeOf(soldier.cls!).map(pick)
   return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name} level ${level(soldier)}. Choose one of the powers offered; those turned down are lost for the run.</h2>
     ${treeMap(soldier, (id) => pickCard(pick(id), armed), held)}
     ${pickDetail(picks, armed, 'Tap a power for its details; tap it again to learn it.')}`

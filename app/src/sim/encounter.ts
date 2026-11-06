@@ -5,7 +5,7 @@ import { apply } from '../core/apply'
 import { CHALLENGES, forceOf, type ChallengeId } from '../core/challenges'
 import type { ClassId } from '../core/classes'
 import { generateGear } from '../core/gear'
-import { roots } from '../core/skills'
+import { powerOf } from '../core/skills'
 import { GOALS, type Goal } from '../core/goals'
 import { fuelTanks } from '../core/objects'
 import { offerable } from '../core/relics'
@@ -29,7 +29,7 @@ function battle(seed: number, party: number, rung: number, challenge: ChallengeI
   apply(run, { type: 'boons', picks: [0, 1] })
   if (values.cls) {
     run.soldiers[0].cls = values.cls as ClassId
-    run.soldiers[0].skills = [roots(values.cls as ClassId)[0]]
+    run.soldiers[0].skills = [powerOf(values.cls as ClassId)]
   }
   while (run.soldiers.length < party) hire(run)
   run.keys = party - 1

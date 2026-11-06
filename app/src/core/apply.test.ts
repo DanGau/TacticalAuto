@@ -1,4 +1,4 @@
-import { roots } from './skills'
+import { powerOf } from './skills'
 import { expect, test } from 'vitest'
 import { enterAt, begun } from './roads'
 import { apply } from './apply'
@@ -10,7 +10,7 @@ import { type Run } from './run-state'
 /** A run about to make its landing for its first battle. */
 function entering(seed = 1): Run & { battle: Battle } {
   const run = begun(seed)
-  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
+  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })
@@ -29,7 +29,7 @@ test('entering puts the whole squad on open tiles and begins the battle', () => 
 
 test('actions outside their phase are rejected and change nothing', () => {
   const run = begun(1)
-  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
+  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
   const before = structuredClone(run)
   expect(apply(run, { type: 'recruit', index: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 }).ok).toBe(false)

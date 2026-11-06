@@ -1,6 +1,6 @@
 // Every effect a skill can have.
 
-/** Tier 4 effects: each hero's moment, once a battle. */
+/** Capstone effects: each hero's moment, once a battle. */
 export const ULTIMATE_EFFECTS = [
   'killingSpree', 'indestructible', 'levelBlock', 'extinction', 'titanForm', 'earthquake', 'bulletTime',
   'deathSentence', 'hallOfMirrors', 'colossus', 'droneStorm', 'orbital', 'resurrection', 'divineShield', 'timeStop',
@@ -20,6 +20,6 @@ export const SKILL_EFFECTS = [
   'riposte', 'earthshaker', 'impact', 'fortress', 'aftershock', 'sureShot', 'apex', 'warMachine', 'endlessSwarm',
   'tesla', 'fontOfLife', 'sacredGround', 'command', 'firestorm', 'conflagration', 'hellfire', 'frozenHeart',
   'glacialArmor', 'shardstorm', 'repulse', 'gale', 'livingShadow', 'intangible', 'bladeDance',
-  'lasting', 'shieldSlam', 'combo', 'projectile', 'faultLine',
+  'lasting', 'shieldSlam', 'combo', 'projectile', 'faultLine', 'fanFlames', 'rimeGrip', 'opportunist',
   ...ULTIMATE_EFFECTS,
 ] as const

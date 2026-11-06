@@ -5,6 +5,7 @@ import type { GameEvent } from './combat-event'
 import { fireproof, foeHas, has, nearest } from './fighters'
 import { distance, walks } from './grid'
 import { RECKONING_KILLS } from './doctrines'
+import { TUNING } from './tuning'
 import { wound } from './wound'
 
 /** Burn stacks a target `unit` sets burning takes on, and chill stacks one it chills. */
@@ -64,13 +65,17 @@ export function slammed(battle: Battle, unit: Unit, events: GameEvent[]): void {
   if (has(by, 'impetus')) empower(by, 1, 'impetus', events)
 }
 
-/** Damage a shot does more by the stacks: Might, a combo on the same target, a shield's armor; exposure is in `exposedDamage`. */
+/** Damage a shot does more by the stacks and its place: Might, a combo on the same target, a shield's armor, Rime Grip, Opportunist; exposure is in `exposedDamage`. */
 export function stackDamage(unit: Unit, enemy: Unit, used: Effect[]): number {
   const combo = has(unit, 'combo') && unit.comboOn === enemy.id ? Math.min(COMBO_MAX, unit.combo) : 0
   const slam = has(unit, 'shieldSlam') && unit.weapon === 'shield' ? unit.armor : 0
+  const grip = has(unit, 'rimeGrip') && distance(unit, enemy) <= 1 ? TUNING.gripDamage : 0
+  const opportune = has(unit, 'opportunist') && (enemy.rooted > 0 || enemy.panicked) ? TUNING.opportunistDamage : 0
   if (combo > 0) used.push('combo')
   if (slam > 0) used.push('shieldSlam')
-  return unit.might + combo + slam
+  if (grip > 0) used.push('rimeGrip')
+  if (opportune > 0) used.push('opportunist')
+  return unit.might + combo + slam + grip + opportune
 }
 
 /** A hit on an exposed target does half again; the every-Nth hit of Cadenced gear twice. */
@@ -85,7 +90,7 @@ export function scaledDamage(unit: Unit, enemy: Unit, damage: number, used: Effe
 /** Crit chance more Lofty gear gives for standing above the target. */
 export const highCrit = (battle: Battle, unit: Unit, enemy: Unit) => (has(unit, 'lofty') ? HIGH_CRIT * Math.min(HIGH_LEVELS, Math.max(0, battle.height[unit.y * GRID + unit.x] - battle.height[enemy.y * GRID + enemy.x])) : 0)
 
-/** What a shot that struck adds up: the combo, a catalysing crit, and Fault Line's every-Nth melee hit. */
+/** What a shot that struck adds up: the combo, a catalysing crit, a fanned burn, and Fault Line's every-Nth melee hit. */
 export function struck(battle: Battle, unit: Unit, enemy: Unit, crit: boolean, events: GameEvent[]): void {
   if (unit.comboOn === enemy.id) unit.combo++
   else Object.assign(unit, { comboOn: enemy.id, combo: 1 })
@@ -93,6 +98,10 @@ export function struck(battle: Battle, unit: Unit, enemy: Unit, crit: boolean, e
     kindle(battle, enemy, enemy.burn)
     events.push(fx(enemy.id, 'catalyst', 0))
     chillUnit(battle, enemy, enemy.chill, events)
+  }
+  if (enemy.hp > 0 && enemy.burn > 0 && has(unit, 'fanFlames')) {
+    kindle(battle, enemy, TUNING.fanStacks)
+    events.push(fx(enemy.id, 'fanFlames', 0))
   }
   if (has(unit, 'faultLine') && distance(unit, enemy) <= 1 && unit.hits % FAULT.every === 0) fault(battle, unit, enemy, events)
 }

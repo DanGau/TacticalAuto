@@ -1,4 +1,4 @@
-import { roots } from './skills'
+import { powerOf } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { stepBattle } from './combat'
@@ -31,7 +31,7 @@ import { THREAT_MAX } from './progress'
 /** A run about to fight a battle of `goal`, with six aliens. */
 function before(goal: Goal): Run {
   const run = begun(1)
-  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
+  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
   apply(run, { type: 'go', index: 1 })
   road(run, [{ kind: 'battle', risk: 'standard', goal, terrain: 'town', challenge: null, twist: null, aliens: Array.from({ length: 6 }, () => 'trooper' as const) }])
   apply(run, { type: 'advance' })

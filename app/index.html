@@ -270,24 +270,28 @@
       @media (max-width: 600px) { .boons .swap { grid-template-columns: 1fr; } }
       .gearswap .confirm:disabled { color: #9aa6bd; background: #1d2433; border-color: #3a465c; }
       button.pick.blocked .price { color: #ff6b6b; }
-      .treemap { position: relative; width: 100%; max-width: 440px; margin: 10px auto; padding: 0; box-sizing: border-box; background: radial-gradient(ellipse at 50% 0%, #22304a 0%, #141a26 70%); border: 1px solid #2b3550; border-radius: 10px; text-align: center; --gold: #ffd166; --blue: #5aa9ff; }
+      .treemap { position: relative; width: 100%; max-width: 520px; margin: 10px auto; padding: 0; box-sizing: border-box; background: radial-gradient(ellipse at 50% 0%, #22304a 0%, #141a26 70%); border: 1px solid #2b3550; border-radius: 10px; text-align: center; --gold: #ffd166; --blue: #5aa9ff; }
       .treemap svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
       .treemap .link { fill: none; stroke: #3a4560; stroke-width: 2; vector-effect: non-scaling-stroke; }
       .treemap .link.lit { stroke: var(--gold); stroke-width: 3; filter: drop-shadow(0 0 3px #ffd166aa); }
       .treemap .link.live { stroke: var(--blue); stroke-width: 2.5; stroke-dasharray: 5 4; animation: flow 1s linear infinite; }
       .treemap .link.locked { stroke-dasharray: 3 4; opacity: 0.6; }
       .treemap .link.dead { stroke: #4a2a2e; opacity: 0.5; }
-      .treemap .spine { stroke: #2b3550; stroke-width: 1; vector-effect: non-scaling-stroke; }
-      .treemap .head { fill: #c9d2e6; font: bold 11px sans-serif; letter-spacing: 1px; text-anchor: middle; text-transform: uppercase; }
+      .treemap .head { fill: #c9d2e6; font: bold 11px sans-serif; letter-spacing: 1px; text-anchor: middle; text-transform: uppercase; paint-order: stroke; stroke: #1a2233; stroke-width: 4px; }
       .treemap .basics-head { position: absolute; left: 6px; top: 4px; color: #7f8aa3; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; }
       @keyframes flow { to { stroke-dashoffset: -18; } }
       @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 #5aa9ff99; } 50% { box-shadow: 0 0 0 5px #5aa9ff00; } }
       .tree-node { position: absolute; width: var(--nw); height: var(--nh); margin-left: calc(var(--nw) / -2); }
       .tree-node.basic { height: var(--bh); }
-      .tree-node > button.pick.skillnode, .tree-node > .node-name { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 2px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #3a4560; background: #1b2232; color: #c9d2e6; font-size: 10px; line-height: 1.1; text-align: center; overflow-wrap: anywhere; cursor: pointer; }
+      .tree-node > button.pick.skillnode, .tree-node > .node-name { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 2px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #3a4560; background: #1b2232; color: #c9d2e6; font-size: 10px; line-height: 1.1; text-align: center; overflow-wrap: break-word; hyphens: auto; cursor: pointer; }
       .tree-node > button.pick.skillnode b { font-weight: 600; }
       .tree-node.basic > .node-name { border-color: #4a5470; background: #222a3a; cursor: default; }
-      .tree-node.t4 > button, .tree-node.t4 > .node-name { border-radius: 16px; border-width: 2px; }
+      .tree-node.cap > button, .tree-node.cap > .node-name { border-radius: 16px; border-width: 2px; box-shadow: inset 0 0 0 1px #ffd16633; }
+      .tree-node.cap::before { content: '★'; position: absolute; z-index: 1; top: -8px; left: 50%; transform: translateX(-50%); color: var(--gold); font-size: 12px; line-height: 1; text-shadow: 0 0 4px #000; }
+      .tree-node.root > .node-name, .tree-node.root > button { border-radius: 50% / 40%; }
+      .treemap .twin line { stroke: #b0605a; stroke-width: 2; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
+      .treemap .twin text { fill: #ff9a8a; font: bold 14px sans-serif; text-anchor: middle; paint-order: stroke; stroke: #141a26; stroke-width: 3px; }
+      .treemap .twin.shut { opacity: 0.45; }
       .treemap .tree-node.taken > button.pick, .treemap .tree-node.taken > .node-name { border-color: var(--gold); background: linear-gradient(#5a4a1c, #3a3014); color: #ffe7a3; box-shadow: 0 0 8px #ffd16666; font-weight: bold; }
       .treemap .tree-node.offered > button.pick, .treemap .tree-node.offered > .node-name { border-color: var(--blue); border-width: 2px; background: #1d3352; color: #e6f1ff; animation: pulse 1.4s ease-in-out infinite; }
       .treemap .tree-node.offered > button.pick.armed { background: #2b4e7e; border-color: #9fd0ff; }
@@ -299,7 +303,7 @@
       .tree-card b.offered { color: var(--blue); } .tree-card b.taken { color: var(--gold); } .tree-card b.lost { color: #ff6b5e; } .tree-card b.locked { color: #8a93a8; }
       .tree-node:hover .tree-card, .tree-node:focus-within .tree-card { display: block; }
       .tree-node:hover, .tree-node:focus-within { z-index: 9; }
-      @media (max-width: 600px) { .treemap { max-width: none; } .tree-node > button.pick.skillnode, .tree-node > .node-name { font-size: 12px; } .treemap .head { font-size: 13px; } }
+      @media (max-width: 600px) { .treemap { max-width: none; } .tree-node > button.pick.skillnode, .tree-node > .node-name { font-size: 11px; } .treemap .head { font-size: 10px; letter-spacing: 0.5px; } }
       @media (max-width: 600px) { .tree-node:hover .tree-card, .tree-node:focus-within .tree-card { position: fixed; left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; transform: none; } }
       .shelf { margin-bottom: 6px; text-align: center; }
       .shelf > small { display: block; color: #9aa6bd; }

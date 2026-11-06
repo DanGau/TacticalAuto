@@ -41,10 +41,19 @@ export interface Skill extends Power {
   teaches?: true
 }
 
-/** A way a class can grow: giving up the others is the choice. */
-export interface Branch {
+/** A way a class can grow, ending in its capstone: each skill of it and the skills taking that one opens. */
+export interface Path {
   name: string
-  tiers: SkillId[][]
+  nodes: Partial<Record<SkillId, SkillId[]>>
+  capstone: SkillId
+}
+
+/** A class's tree: its power, free on recruit, and what that opens; its paths; pairs of twins, of which a hero takes one at most. A hero takes one capstone at most. */
+export interface Tree {
+  power: SkillId
+  opens: SkillId[]
+  paths: Path[]
+  twins: [SkillId, SkillId][]
 }
 
 /** What a stunned alien loses. */
@@ -128,6 +137,7 @@ const skills = {
   emp: { name: 'EMP Pulse', use: '1/battle', range: `${STUN_REACH} of it or machines`, target: '2+ aliens', text: `Each ${stun}; a boss stands firm`, effect: 'emp' },
   warMachine: { name: 'War Machine', use: 'Passive', text: `Its mech has +${WAR_MACHINE.hp} HP, +${WAR_MACHINE.damage} damage and +${WAR_MACHINE.range} range`, effect: 'warMachine' },
   endlessSwarm: { name: 'Endless Swarm', use: 'Passive', text: `With aliens in sight, a new drone each turn, up to ${SWARM_LIMIT} at once and ${SWARM_BUILDS} a battle`, effect: 'endlessSwarm' },
+  shockRounds: { name: 'Shock Rounds', use: 'Reaction', target: 'Creature crit', tags: ['crit'], text: `Stunned: it ${stun}`, effect: 'concussion' },
   tesla: { name: 'Tesla Coil', use: 'Reaction', range: `${TESLA.reach}`, target: `${TESLA.bolts} nearest aliens`, text: `After it acts, ${TESLA.damage} damage to each`, effect: 'tesla' },
   // Support
   healingLight: taught('support'),
@@ -152,6 +162,7 @@ const skills = {
   fireball: taught('pyro'),
   tanks: { name: 'Deep Flame', use: 'Passive', tags: ['burn'], text: 'One more Fireball each battle', charges: 1 },
   tinder: { name: 'Flame Blade', use: 'At will', target: 'Creature hit', tags: ['burn'], text: 'Set burning', effect: 'tinder' },
+  fanFlames: { name: 'Fan the Flames', use: 'At will', target: 'Burning creature hit', tags: ['burn'], text: `${TUNING.fanStacks} more burn stack`, effect: 'fanFlames' },
   fireSuit: { name: 'Flameborn', use: 'Passive', text: 'It cannot burn', effect: 'fireSuit' },
   inferno: { name: 'Inferno', use: 'Passive', tags: ['burn'], text: 'Fireball spreads 2 tiles around where it lands', effect: 'inferno' },
   backdraft: { name: 'Backdraft', use: 'Reaction', target: 'Beside its burning kill', tags: ['burn', 'kill'], text: 'Set burning', effect: 'backdraft' },
@@ -179,6 +190,7 @@ const skills = {
   cryostasis: { name: 'Cryostasis', use: '1/battle', target: 'Self', text: 'Survives a killing hit at 1 HP', effect: 'lastStand' },
   frozenHeart: { name: 'Frozen Heart', use: 'At will', target: 'Chilled alien hit', tags: ['frost'], text: `Frozen solid: it ${stun}; a boss stands firm`, effect: 'frozenHeart' },
   glacialArmor: { name: 'Glacial Armor', use: 'Passive', tags: ['ward'], text: 'Its armor returns in full at the start of each of its turns', effect: 'glacialArmor' },
+  rimeGrip: { name: 'Rime Grip', use: 'Passive', text: `+${TUNING.gripDamage} damage to a target beside it`, effect: 'rimeGrip' },
   shardstorm: { name: 'Shardstorm', use: 'At will', target: 'Beside creature hit', tags: ['frost'], text: `${SHARD_DAMAGE} damage to each, and chilled`, effect: 'shardstorm' },
   // Phantom
   cloak: taught('phantom'),
@@ -195,8 +207,9 @@ const skills = {
   smokeBomb: { name: 'Darkness', use: '1/battle', range: 'Attack range', target: '2+ aliens together', text: `Each ${stun}; a boss stands firm`, effect: 'flashbang' },
   livingShadow: { name: 'Living Shadow', use: 'Passive', text: 'Attacking does not break its Cloak: every attack in it strikes from the dark', effect: 'livingShadow' },
   intangible: { name: 'Intangible', use: 'Passive', text: 'Half of the hits on it pass through', effect: 'intangible' },
+  opportunist: { name: 'Opportunist', use: 'Passive', text: `+${TUNING.opportunistDamage} damage to a target rooted or stunned`, effect: 'opportunist' },
   bladeDance: { name: 'Blade Dance', use: 'At will', text: `Its bonus attack also strikes ${FAN_TARGETS} more aliens in reach`, effect: 'bladeDance' },
-  // Tier 4s, each once a battle
+  // Capstones, each once a battle
   killingSpree: { name: 'Killing Spree', use: '1/battle', range: `${SPREE.reach}`, target: `Up to ${SPREE.strikes} aliens in turn`, text: `Flashes to each and strikes for its damage +${SPREE.damage}`, effect: 'killingSpree' },
   indestructible: { name: 'Indestructible', use: '1/battle', target: 'Self at half HP', text: `Nothing can hurt it for ${INDESTRUCTIBLE.turns} turns; +${INDESTRUCTIBLE.damage} damage for the battle`, effect: 'indestructible' },
   levelBlock: { name: 'Level the Block', use: '1/battle', range: `${LEVEL_BLOCK.radius}`, target: '2+ aliens', text: `Everything standing in reach comes down; ${LEVEL_BLOCK.damage} damage to each alien`, effect: 'levelBlock' },
@@ -226,67 +239,79 @@ const skills = {
 export type SkillId = keyof typeof skills
 export const SKILLS: Record<SkillId, Skill> = skills
 
-/** Each class's tree: its branches, each with its name and its skills by tier, lowest first. The first branch holds the class's ability. */
-export const TREES: Record<ClassId, Branch[]> = {
-  assault: [
-    { name: 'Rampage', tiers: [['mightyBound', 'bloodlust'], ['rage', 'cleave', 'surge'], ['bloodbath'], ['killingSpree']] },
-    { name: 'Ironhide', tiers: [['reflexes'], ['secondWind', 'skirmish', 'unbreakable'], ['riposte'], ['indestructible']] },
-    { name: 'Juggernaut', tiers: [['leap'], ['hamstring', 'hurl', 'sprinter'], ['earthshaker', 'projectile'], ['levelBlock']] },
-  ],
-  heavy: [
-    { name: 'Cataclysm', tiers: [['meteorStrike'], ['arsenal', 'shredder', 'bigBlast'], ['impact'], ['extinction']] },
-    { name: 'Bastion', tiers: [['bulwark'], ['taunt', 'steadfast', 'reactive', 'lasting'], ['fortress', 'shieldSlam'], ['titanForm']] },
-    { name: 'Shockwave', tiers: [['suppression'], ['slam', 'repulse', 'concussion', 'intimidate'], ['aftershock', 'faultLine'], ['earthquake']] },
-  ],
-  sniper: [
-    { name: 'Marksman', tiers: [['farSight', 'steady'], ['headshot', 'doubleTap', 'assassinate'], ['sureShot'], ['bulletTime']] },
-    { name: 'Hunter', tiers: [['mark', 'kneecap'], ['slayer', 'hollowPoint', 'volley', 'combo'], ['apex'], ['deathSentence']] },
-    { name: 'Ghost', tiers: [['elusive'], ['decoy', 'blink', 'relocate'], ['ghostShot'], ['hallOfMirrors']] },
-  ],
-  engineer: [
-    { name: 'Mech Bay', tiers: [['deployMech'], ['titan', 'plating', 'rebuild', 'detonate'], ['warMachine'], ['colossus']] },
-    { name: 'Drone Hive', tiers: [['swarm'], ['spotter', 'linked', 'servos', 'hive'], ['endlessSwarm'], ['droneStorm']] },
-    { name: 'Tinker', tiers: [['launcher'], ['hardlight', 'emp'], ['tesla'], ['orbital']] },
-  ],
-  support: [
-    { name: 'Mending', tiers: [['healingLight'], ['fieldKit', 'surgeon', 'vitality', 'revive'], ['fontOfLife'], ['resurrection']] },
-    { name: 'Aegis', tiers: [['barrier'], ['ward', 'bane', 'forceField'], ['sacredGround'], ['divineShield']] },
-    { name: 'Zeal', tiers: [['inspire', 'flashbang'], ['haste', 'drone', 'gravBeam', 'nullifier'], ['command'], ['timeStop']] },
-  ],
-  pyro: [
-    { name: 'Inferno', tiers: [['fireball'], ['tanks', 'searing', 'inferno'], ['firestorm'], ['supernova']] },
-    { name: 'Immolation', tiers: [['tinder'], ['flashpoint', 'smolder', 'backdraft'], ['conflagration'], ['worldAblaze']] },
-    { name: 'Ember Hide', tiers: [['fireSuit'], ['burningAura', 'asbestos', 'phoenixHeart'], ['hellfire'], ['phoenixRising']] },
-  ],
-  cryo: [
-    { name: 'Hoarfrost', tiers: [['chillTouch'], ['icebreak', 'permafrost', 'rimeLock', 'deepFreeze'], ['frozenHeart'], ['absoluteZero']] },
-    { name: 'Glacier', tiers: [['iceArmor'], ['frostAura', 'glide', 'gale', 'cryostasis'], ['glacialArmor'], ['blizzard']] },
-    { name: 'Icicle', tiers: [['coldSteel'], ['coldEye', 'longRange'], ['shardstorm'], ['hailOfIcicles']] },
-  ],
-  phantom: [
-    { name: 'Shade', tiers: [['cloak'], ['shadowStrike', 'daze', 'deepCloak', 'afterimage'], ['livingShadow'], ['eclipse']] },
-    { name: 'Wraith', tiers: [['vanish'], ['phaseShift', 'fadeOut', 'shadowStep'], ['intangible'], ['reap']] },
-    { name: 'Knives', tiers: [['knifeWork'], ['garrote', 'smokeBomb'], ['bladeDance'], ['phantomLegion']] },
-  ],
+const tree = (power: SkillId, opens: SkillId[], twins: [SkillId, SkillId][], ...paths: Path[]): Tree => ({ power, opens, paths, twins })
+const path = (name: string, capstone: SkillId, nodes: Path['nodes']): Path => ({ name, capstone, nodes })
+
+export const TREES: Record<ClassId, Tree> = {
+  assault: tree('mightyBound', ['rage', 'reflexes', 'leap'], [['bloodlust', 'cleave'], ['secondWind', 'unbreakable'], ['hurl', 'hamstring'], ['projectile', 'earthshaker']],
+    path('Rampage', 'killingSpree', { rage: ['bloodlust', 'cleave'], bloodlust: ['surge', 'bloodbath'], cleave: ['surge', 'bloodbath'], surge: ['killingSpree'], bloodbath: ['killingSpree'] }),
+    path('Ironhide', 'indestructible', { reflexes: ['secondWind', 'unbreakable', 'skirmish'], secondWind: ['riposte'], unbreakable: ['riposte'], skirmish: ['riposte'], riposte: ['indestructible'] }),
+    path('Juggernaut', 'levelBlock', { leap: ['hurl', 'hamstring', 'sprinter'], hurl: ['projectile', 'earthshaker'], hamstring: ['earthshaker'], sprinter: ['earthshaker'], projectile: ['levelBlock'], earthshaker: ['levelBlock'] })),
+  heavy: tree('meteorStrike', ['arsenal', 'bigBlast', 'bulwark', 'suppression'], [['arsenal', 'bigBlast'], ['reactive', 'lasting'], ['fortress', 'shieldSlam'], ['slam', 'intimidate'], ['aftershock', 'faultLine']],
+    path('Cataclysm', 'extinction', { arsenal: ['shredder', 'impact'], bigBlast: ['shredder', 'impact'], shredder: ['extinction'], impact: ['extinction'] }),
+    path('Bastion', 'titanForm', { bulwark: ['taunt', 'reactive', 'lasting'], taunt: ['steadfast', 'fortress'], reactive: ['fortress', 'shieldSlam'], lasting: ['fortress', 'shieldSlam'], steadfast: ['titanForm'], fortress: ['titanForm'], shieldSlam: ['titanForm'] }),
+    path('Shockwave', 'earthquake', { suppression: ['slam', 'intimidate', 'repulse', 'concussion'], slam: ['aftershock', 'faultLine'], intimidate: ['aftershock', 'faultLine'], repulse: ['aftershock', 'faultLine'], concussion: ['aftershock', 'faultLine'], aftershock: ['earthquake'], faultLine: ['earthquake'] })),
+  sniper: tree('farSight', ['steady', 'mark', 'kneecap', 'elusive'], [['doubleTap', 'sureShot'], ['mark', 'kneecap'], ['slayer', 'combo'], ['hollowPoint', 'volley'], ['decoy', 'blink']],
+    path('Marksman', 'bulletTime', { steady: ['doubleTap', 'sureShot', 'headshot'], doubleTap: ['assassinate'], sureShot: ['assassinate'], headshot: ['assassinate', 'bulletTime'], assassinate: ['bulletTime'] }),
+    path('Hunter', 'deathSentence', { mark: ['slayer', 'combo', 'hollowPoint'], kneecap: ['hollowPoint', 'volley', 'slayer'], slayer: ['apex', 'deathSentence'], combo: ['apex'], hollowPoint: ['apex'], volley: ['apex'], apex: ['deathSentence'] }),
+    path('Ghost', 'hallOfMirrors', { elusive: ['decoy', 'blink', 'relocate'], decoy: ['ghostShot', 'hallOfMirrors'], blink: ['ghostShot'], relocate: ['ghostShot'], ghostShot: ['hallOfMirrors'] })),
+  engineer: tree('deployMech', ['titan', 'plating', 'swarm', 'launcher'], [['titan', 'plating'], ['rebuild', 'detonate'], ['spotter', 'linked'], ['emp', 'shockRounds']],
+    path('Mech Bay', 'colossus', { titan: ['rebuild', 'detonate'], plating: ['rebuild', 'detonate'], rebuild: ['warMachine'], detonate: ['warMachine'], warMachine: ['colossus'] }),
+    path('Drone Hive', 'droneStorm', { swarm: ['spotter', 'linked', 'servos', 'hive'], spotter: ['endlessSwarm'], linked: ['endlessSwarm'], servos: ['endlessSwarm', 'droneStorm'], hive: ['endlessSwarm'], endlessSwarm: ['droneStorm'] }),
+    path('Tinker', 'orbital', { launcher: ['hardlight', 'emp', 'shockRounds'], hardlight: ['tesla'], emp: ['tesla'], shockRounds: ['tesla'], tesla: ['orbital'] })),
+  support: tree('healingLight', ['fieldKit', 'surgeon', 'barrier', 'inspire', 'haste'], [['fieldKit', 'surgeon'], ['vitality', 'revive'], ['ward', 'bane'], ['inspire', 'haste'], ['flashbang', 'nullifier']],
+    path('Mending', 'resurrection', { fieldKit: ['vitality', 'revive'], surgeon: ['vitality', 'revive'], vitality: ['fontOfLife'], revive: ['fontOfLife', 'resurrection'], fontOfLife: ['resurrection'] }),
+    path('Aegis', 'divineShield', { barrier: ['ward', 'bane', 'forceField'], ward: ['sacredGround'], bane: ['sacredGround'], forceField: ['sacredGround', 'divineShield'], sacredGround: ['divineShield'] }),
+    path('Zeal', 'timeStop', { inspire: ['flashbang', 'nullifier', 'drone'], haste: ['gravBeam', 'drone', 'flashbang'], flashbang: ['command'], nullifier: ['command'], drone: ['command'], gravBeam: ['command'], command: ['timeStop'] })),
+  pyro: tree('fireball', ['tanks', 'inferno', 'tinder', 'fireSuit'], [['tanks', 'inferno'], ['searing', 'fanFlames'], ['smolder', 'backdraft'], ['burningAura', 'phoenixHeart']],
+    path('Inferno', 'supernova', { tanks: ['searing', 'fanFlames'], inferno: ['searing', 'fanFlames'], searing: ['firestorm'], fanFlames: ['firestorm'], firestorm: ['supernova'] }),
+    path('Immolation', 'worldAblaze', { tinder: ['smolder', 'backdraft', 'flashpoint'], smolder: ['conflagration'], backdraft: ['conflagration'], flashpoint: ['conflagration'], conflagration: ['worldAblaze'] }),
+    path('Ember Hide', 'phoenixRising', { fireSuit: ['burningAura', 'phoenixHeart', 'asbestos'], burningAura: ['hellfire'], phoenixHeart: ['hellfire'], asbestos: ['hellfire', 'phoenixRising'], hellfire: ['phoenixRising'] })),
+  cryo: tree('chillTouch', ['icebreak', 'iceArmor', 'coldSteel', 'coldEye'], [['permafrost', 'rimeLock'], ['glide', 'gale'], ['cryostasis', 'glacialArmor'], ['coldSteel', 'coldEye'], ['longRange', 'rimeGrip']],
+    path('Hoarfrost', 'absoluteZero', { icebreak: ['permafrost', 'rimeLock', 'deepFreeze'], permafrost: ['frozenHeart'], rimeLock: ['frozenHeart'], deepFreeze: ['frozenHeart', 'absoluteZero'], frozenHeart: ['absoluteZero'] }),
+    path('Glacier', 'blizzard', { iceArmor: ['frostAura', 'glide', 'gale'], frostAura: ['cryostasis', 'glacialArmor'], glide: ['cryostasis', 'glacialArmor'], gale: ['cryostasis', 'glacialArmor'], cryostasis: ['blizzard'], glacialArmor: ['blizzard'] }),
+    path('Icicle', 'hailOfIcicles', { coldSteel: ['longRange', 'rimeGrip'], coldEye: ['longRange', 'rimeGrip'], longRange: ['shardstorm'], rimeGrip: ['shardstorm'], shardstorm: ['hailOfIcicles'] })),
+  phantom: tree('cloak', ['shadowStrike', 'daze', 'vanish', 'knifeWork'], [['shadowStrike', 'daze'], ['deepCloak', 'afterimage'], ['fadeOut', 'shadowStep'], ['garrote', 'smokeBomb']],
+    path('Shade', 'eclipse', { shadowStrike: ['deepCloak', 'afterimage'], daze: ['deepCloak', 'afterimage'], deepCloak: ['livingShadow'], afterimage: ['livingShadow'], livingShadow: ['eclipse'] }),
+    path('Wraith', 'reap', { vanish: ['phaseShift', 'fadeOut', 'shadowStep'], phaseShift: ['intangible'], fadeOut: ['intangible'], shadowStep: ['intangible', 'bladeDance'], intangible: ['reap'] }),
+    path('Knives', 'phantomLegion', { knifeWork: ['garrote', 'smokeBomb', 'opportunist'], garrote: ['bladeDance'], smokeBomb: ['bladeDance'], opportunist: ['bladeDance', 'phantomLegion'], bladeDance: ['phantomLegion'] })),
 }
 
-/** Picks a hero must have made before a tier 3 skill opens; a tier 4 needs its tier 3. */
-export const CAPSTONE_PICKS = 3
-
-/** A skill of `tiers` is open at tier 1; above, once the hero knows one of the tier below in its branch, and from tier 3, has made CAPSTONE_PICKS. */
-const opens = (tiers: SkillId[][], tier: number, known: SkillId[]) => tier === 0 || (tiers[tier - 1].some((id) => known.includes(id)) && (tier < 2 || known.length >= CAPSTONE_PICKS))
-
-/** The skills of `cls` a hero knowing `known` can learn now, in tree order. */
-export const unlocked = (cls: ClassId, known: SkillId[]): SkillId[] => TREES[cls].flatMap(({ tiers }) => tiers.flatMap((skills, tier) => (opens(tiers, tier, known) ? skills.filter((id) => !known.includes(id)) : [])))
-
-/** The tier of a skill in its class's tree, counted from 0. */
-export const tierOf = (cls: ClassId, id: SkillId) => Math.max(...TREES[cls].map(({ tiers }) => tiers.findIndex((skills) => skills.includes(id))))
-
-/** A class's roots: the skills open from the first pick, its ability first. */
-export const roots = (cls: ClassId) => TREES[cls].flatMap((branch) => branch.tiers[0])
-
-/** Every skill of a class's tree, in tree order. */
-export const treeOf = (cls: ClassId): SkillId[] => TREES[cls].flatMap(({ tiers }) => tiers.flat())
+/** Every skill of a class's tree: its power, then each path's in order, capstone last. */
+export const treeOf = (cls: ClassId): SkillId[] => [TREES[cls].power, ...TREES[cls].paths.flatMap((p) => [...(Object.keys(p.nodes) as SkillId[]), p.capstone])]
 
 /** The skill that teaches a class its power, which every hero of the class starts with. */
-export const powerOf = (cls: ClassId): SkillId => treeOf(cls).find((id) => SKILLS[id].teaches)!
+export const powerOf = (cls: ClassId): SkillId => TREES[cls].power
+
+/** The skills taking `id` opens. */
+export const opensOf = (cls: ClassId, id: SkillId): SkillId[] => (id === TREES[cls].power ? TREES[cls].opens : (TREES[cls].paths.map((p) => p.nodes[id]).find(Boolean) ?? []))
+
+export const capstones = (cls: ClassId): SkillId[] => TREES[cls].paths.map((p) => p.capstone)
+
+/** The skill taking `id` locks for the run, if it has a twin. */
+export const twinOf = (cls: ClassId, id: SkillId): SkillId | undefined => TREES[cls].twins.flatMap(([a, b]) => (a === id ? [b] : b === id ? [a] : []))[0]
+
+/** The path a skill stands in; the power stands in none. */
+export const pathOf = (cls: ClassId, id: SkillId): Path | undefined => TREES[cls].paths.find((p) => p.capstone === id || id in p.nodes)
+
+/** Skills a hero knowing `known` can never take: the twins of those it took, and every capstone once it took one. */
+export function locked(cls: ClassId, known: SkillId[]): SkillId[] {
+  const capped = known.some((id) => capstones(cls).includes(id))
+  return treeOf(cls).filter((id) => !known.includes(id) && (known.some((k) => twinOf(cls, k) === id) || (capped && capstones(cls).includes(id))))
+}
+
+/** The skills of `cls` a hero knowing `known` can learn now, opened by one it knows and not locked, in tree order. */
+export function unlocked(cls: ClassId, known: SkillId[]): SkillId[] {
+  const shut = locked(cls, known)
+  return treeOf(cls).filter((id) => !known.includes(id) && !shut.includes(id) && known.some((k) => opensOf(cls, k).includes(id)))
+}
+
+/** The fewest picks from the power to a skill: the power is 0, what it opens 1. */
+export function depthOf(cls: ClassId, id: SkillId): number {
+  let ring = [TREES[cls].power]
+  for (let depth = 0; ring.length > 0; depth++) {
+    if (ring.includes(id)) return depth
+    ring = ring.flatMap((k) => opensOf(cls, k))
+  }
+  return Infinity
+}

@@ -1,4 +1,4 @@
-import { roots } from './skills'
+import { powerOf } from './skills'
 import { current } from './run'
 import { expect, test } from 'vitest'
 import { enterAt, begun } from './roads'
@@ -13,7 +13,7 @@ import { blocked, distance, walkingDistances } from './grid'
 
 function battle(seed: number): Battle {
   const run = begun(seed)
-  run.soldiers[0].skills = [roots(run.soldiers[0].cls!)[0]]
+  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })

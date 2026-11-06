@@ -10,7 +10,7 @@ import { randomInt } from './rng'
 import { type Run } from './run-state'
 import { type Earned } from './run-state'
 import { type Soldier } from './run-state'
-import { powerOf, SKILLS, type SkillId, tierOf, treeOf, unlocked } from './skills'
+import { capstones, depthOf, locked, opensOf, pathOf, powerOf, SKILLS, type SkillId, TREES, treeOf, unlocked } from './skills'
 import { MELEE_RANGE, WEAPONS } from './weapons'
 import { CONTINENT_IDS, type City, CONTINENTS } from './world'
 import type { Keyword } from './keywords'
@@ -41,7 +41,7 @@ export function total(run: Run, effect: (source: Lasting) => number | undefined)
   return sources.reduce((sum, source) => sum + (effect(source) ?? 0), 0)
 }
 
-/** The levels at which a soldier earns a power: stats grow every level, powers only at these. Tier 3 needs CAPSTONE_PICKS, so four picks reach a tier 4 only by giving the branch all of them. */
+/** The levels at which a soldier earns a power: stats grow every level, powers only at these. A capstone is at most this many picks deep. */
 export const PICK_LEVELS = [3, 5, 7, 11]
 
 /** Skills a soldier knows at most: its class power and a pick per pick level. */
@@ -57,24 +57,34 @@ export const OFFERS = { min: 3, max: 4 }
 export const picksMade = (soldier: Soldier) => soldier.skills.filter((id) => !soldier.cls || id !== powerOf(soldier.cls)).length
 
 /**
- * The skills a soldier chooses the next from, drawn by its seed, or none if no choice is owed: those its tree has
- * unlocked, topped up from the rest of its tree below tier 4 so gating never leaves it short. Known and lost skills never come.
+ * The skills a soldier chooses the next from, drawn by its seed, or none if no choice is owed: first those its latest
+ * pick opened, one of each path among them before the rest, then the rest its tree has open, topped up from the shallowest of the rest so it is never short. Known,
+ * lost and locked skills never come, nor a capstone its path has not opened while anything else is left.
  */
 export function skillOffers(soldier: Soldier): SkillId[] {
-  if (!soldier.cls || picksMade(soldier) >= picksEarned(soldier)) return []
-  const left = (ids: SkillId[]) => ids.filter((id) => !soldier.skills.includes(id) && !soldier.lost.includes(id))
-  const open = left(unlocked(soldier.cls, soldier.skills))
-  const rest = left(treeOf(soldier.cls)).filter((id) => !open.includes(id) && tierOf(soldier.cls!, id) < 3)
-  // With nothing else left, an ungated tier 4, but never a second: two stacked break the ceiling on a hit.
-  const top = soldier.skills.some((id) => tierOf(soldier.cls!, id) === 3) ? [] : left(treeOf(soldier.cls)).filter((id) => !open.includes(id) && tierOf(soldier.cls!, id) === 3)
+  const cls = soldier.cls
+  if (!cls || picksMade(soldier) >= picksEarned(soldier)) return []
+  const shut = locked(cls, soldier.skills)
+  const left = (ids: SkillId[]) => ids.filter((id) => !soldier.skills.includes(id) && !soldier.lost.includes(id) && !shut.includes(id))
+  const open = left(unlocked(cls, soldier.skills))
+  const fresh = open.filter((id) => opensOf(cls, soldier.skills.at(-1)!).includes(id))
+  const rest = left(treeOf(cls)).filter((id) => !open.includes(id) && !capstones(cls).includes(id))
+  const depths = [...new Set(rest.map((id) => depthOf(cls, id)))].sort((a, b) => a - b)
+  // One of each path the latest pick opens into comes first, so no path is shut before it is offered.
+  const leads = TREES[cls].paths.map((p) => fresh.filter((id) => pathOf(cls, id) === p)).filter((ids) => ids.length > 0)
+  const decks = [...leads, fresh, open.filter((id) => !fresh.includes(id)), ...depths.map((d) => rest.filter((id) => depthOf(cls, id) === d))]
+  if (open.length + rest.length === 0) decks.push(left(capstones(cls)))
   const rng = { rng: soldier.seed ^ Math.imul(soldier.skills.length + 1, 0x9e3779b1) }
   // A fourth offer only while it leaves enough for the picks still to come.
   const later = PICK_LEVELS.length - picksMade(soldier) - 1
   const roomy = open.length + rest.length - OFFERS.max >= OFFERS.min * later
   const size = OFFERS.min + (roomy ? randomInt(rng, OFFERS.max - OFFERS.min + 1) : 0)
   const offers: SkillId[] = []
-  for (const deck of [open, rest, open.length + rest.length > 0 ? [] : top]) while (offers.length < size && deck.length > 0) offers.push(deck.splice(randomInt(rng, deck.length), 1)[0])
-  return treeOf(soldier.cls).filter((id) => offers.includes(id))
+  for (const [i, deck] of decks.entries()) {
+    const pool = deck.filter((id) => !offers.includes(id))
+    for (let n = i < leads.length ? 1 : size; n > 0 && offers.length < size && pool.length > 0; n--) offers.push(pool.splice(randomInt(rng, pool.length), 1)[0])
+  }
+  return treeOf(cls).filter((id) => offers.includes(id))
 }
 
 /** The class ability a soldier has learned, if any. */

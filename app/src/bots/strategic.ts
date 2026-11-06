@@ -10,7 +10,7 @@ import { THREAT_MAX } from '../core/progress'
 import { GEAR_PRICE } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
-import { SKILLS, TREES, type SkillId } from '../core/skills'
+import { capstones, depthOf, locked, pathOf, type Path, SKILLS, type SkillId, TREES } from '../core/skills'
 import { health, MAX_SQUAD, skillOffers, soldierStats, squadKeywords } from '../core/squad'
 import { BOON_CHARGES, RELICS, type RelicId } from '../core/relics'
 import type { Keyword } from '../core/keywords'
@@ -177,37 +177,33 @@ function shop(run: Run): Action {
   return { type: 'leave' }
 }
 
-/**
- * The branch each class climbs, and the power outside it, if any, that it opens with: of what four picks allow, what
- * wins most on the same seeds. Early battles kill a hero without picks, so the one free pick goes on staying alive.
- */
-export const PLANS: Record<ClassId, { branch: string; opener?: SkillId }> = {
-  assault: { branch: 'Rampage', opener: 'reflexes' },
-  heavy: { branch: 'Bastion' },
-  sniper: { branch: 'Ghost' },
-  engineer: { branch: 'Drone Hive' },
-  support: { branch: 'Aegis', opener: 'healingLight' },
-  pyro: { branch: 'Ember Hide' },
-  cryo: { branch: 'Glacier' },
-  phantom: { branch: 'Shade' },
+/** The path each class climbs to its capstone: of the paths, what wins most on the same seeds. */
+export const PLANS: Record<ClassId, string> = {
+  assault: 'Rampage',
+  heavy: 'Bastion',
+  sniper: 'Ghost',
+  engineer: 'Drone Hive',
+  support: 'Aegis',
+  pyro: 'Ember Hide',
+  cryo: 'Glacier',
+  phantom: 'Shade',
 }
 
 /** Whether a skill pays for this hero: Shield Slam only with a Star Shield, Fault Line only up close, Living Projectile only for the strong. */
 const pays = (soldier: Soldier, id: SkillId) =>
   id === 'shieldSlam' ? soldier.gear?.weapon === 'shield' : id === 'faultLine' ? !!soldier.gear && !!WEAPONS[soldier.gear.weapon].melee : id === 'projectile' ? (soldier.gear?.weapon === 'hammer' || soldier.gear?.weapon === 'fists') : true
 
-/** The skill a hero plans on: its opener, then up its class's planned branch, highest tier open first, one that pays; that branch done, up the next. */
+/** The skill a hero plans on, of those that pay: the capstone, else the deepest, of its planned path while that capstone is still to be had, else of any path whose capstone is. */
 export function plannedSkill(soldier: Soldier): number {
-  const offers = skillOffers(soldier).filter((id, _, all) => pays(soldier, id) || all.every((other) => !pays(soldier, other)))
+  const cls = soldier.cls!
   const all = skillOffers(soldier)
-  const branches = TREES[soldier.cls!]
-  const { branch, opener } = PLANS[soldier.cls!]
-  if (opener && offers.includes(opener)) return all.indexOf(opener)
-  for (const { tiers } of [...branches.filter((b) => b.name === branch), ...branches]) {
-    const open = tiers.flat().filter((id) => offers.includes(id))
-    if (open.length > 0) return all.indexOf(open.at(-1)!)
-  }
-  return 0
+  const offers = all.filter((id) => pays(soldier, id) || all.every((other) => !pays(soldier, other)))
+  const live = (path?: Path) => !!path && !soldier.lost.includes(path.capstone) && !locked(cls, soldier.skills).includes(path.capstone)
+  const plan = TREES[cls].paths.find((p) => p.name === PLANS[cls])!
+  const aim = live(plan) ? [plan] : TREES[cls].paths.filter(live)
+  // A capstone outside the aim would lock the aim's.
+  const score = (id: SkillId) => (capstones(cls).includes(id) ? (aim.includes(pathOf(cls, id)!) ? 200 : -1) : (aim.includes(pathOf(cls, id)!) ? 100 : 0) + depthOf(cls, id))
+  return all.indexOf(offers.reduce((best, id) => (score(id) > score(best) ? id : best)))
 }
 
 /** What a relic is worth beside what the squad holds: a bridge or engine pays only with its pieces, and is dead without them. */

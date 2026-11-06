@@ -1,24 +1,28 @@
 // The battle log: a line per action, collapsed by default, each naming who acted, with what, and to whom.
 import { ALIENS } from '../core/aliens'
 import type { Battle } from '../core/battle'
-import { CLASSES } from '../core/classes'
+import { CLASSES, type ClassId } from '../core/classes'
 import type { GameEvent } from '../core/combat-event'
 import type { Run } from '../core/run-state'
 import { sourceName } from '../core/source-names'
 import type { Src } from '../core/sources'
-import { SKILLS, TREES } from '../core/skills'
+import { pathOf, SKILLS, TREES, treeOf } from '../core/skills'
 import { WEAPONS } from '../core/weapons'
 import { tag } from './kit'
 
 /** Who each unit is, by id: a hero's name, else its kind's; kept past its death. */
 export type Names = Map<number, string>
 
-/** What a source belongs to, in brackets after its name: a skill's branch, a class power's class, a weapon's type. */
+/** What a source belongs to, in brackets after its name: a skill's path, a class power's class, a weapon's type. */
 function context(run: Run, src: Src, actor: number | undefined, battle: Battle): string {
   const soldier = run.soldiers.find((s) => s.id === battle.units.find((u) => u.id === actor)?.soldier)
   if (src.kind === 'skill') {
-    const trees = soldier?.cls ? [TREES[soldier.cls], ...Object.values(TREES)] : Object.values(TREES)
-    return trees.flat().find((b) => b.tiers.flat().some((id) => SKILLS[id].effect === src.id || id === src.id))?.name ?? ''
+    for (const cls of [...(soldier?.cls ? [soldier.cls] : []), ...(Object.keys(TREES) as ClassId[])]) {
+      const id = treeOf(cls).find((id) => SKILLS[id].effect === src.id || id === src.id)
+      const path = id && pathOf(cls, id)
+      if (path) return path.name
+    }
+    return ''
   }
   if (src.kind === 'class') return soldier?.cls ? CLASSES[soldier.cls].name : ''
   if (src.kind === 'weapon') return WEAPONS[soldier?.gear?.weapon ?? (src.id as keyof typeof WEAPONS)]?.type ?? ''
