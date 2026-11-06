@@ -18,7 +18,8 @@ import { xpFor } from '../core/squad'
 import { CAPSTONE_PICKS, SKILLS, TREES, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
 import { findSwap, pickCard, pickDetail, startChoice, utilityPick, type Pick } from './cards'
-import { heroSheet, skillState, treeGrid } from './sheet'
+import { heroSheet } from './sheet'
+import { skillState, treeMap } from './tree'
 import { badge, button, describe, gearText, gearType, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
 /**
@@ -102,7 +103,7 @@ export function skillChoice(run: Run, soldier: Soldier, armed: string | null = n
   }
   const picks = TREES[soldier.cls!].flatMap((branch) => branch.tiers.flat()).map(pick)
   return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name} level ${level(soldier)}. Choose one of the powers offered; those turned down are lost for the run.</h2>
-    ${treeGrid(soldier, (id) => pickCard(pick(id), armed))}
+    ${treeMap(soldier, (id) => pickCard(pick(id), armed), held)}
     ${pickDetail(picks, armed, 'Tap a power for its details; tap it again to learn it.')}`
 }
 
