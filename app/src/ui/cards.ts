@@ -38,67 +38,45 @@ export function pickDetail(picks: Pick[], armed: string | null, idle: string): s
   return `<div class="detail">${pick ? `${pick.detail}<small class="${pick.block ? 'up' : 'supplies'}">${pick.block ?? pick.go}</small>` : `<small>${idle}</small>`}</div>`
 }
 
-/** A piece of gear on a card: its rarity and name, in its rarity's colour; or empty hands. */
-const named = (gear: Gear | null) => (gear ? `<span class="tier ${gear.rarity}">${gear.rarity} ${gear.name}</span>` : '<span class="tier">Empty hands</span>')
-
 /** A piece of gear in full: name, type, rarity and effect. */
-const full = (gear: Gear | null) => (gear ? `<b class="tier ${gear.rarity}">${gear.rarity} ${gear.name}</b><small>${gearType(gear)}</small><span>${describeGear(gear)}</span>` : '<small>Empty hands</small>')
+const full = (gear: Gear) => `<b class="tier ${gear.rarity}">${gear.rarity} ${gear.name}</b><small>${gearType(gear)}</small><span>${describeGear(gear)}</span>`
 
-/** A hero's card: who, what they hold, and what they would. */
-const heroBody = (soldier: Soldier, gear: Gear) => `<span class="who"><span class="portrait">${badge(soldier.cls)}</span><b>${soldier.name}</b></span>
-  <small class="was">${named(soldier.gear)}</small>
-  <small class="arrow">↓</small>
-  <small class="will">${named(gear)}</small>`
+/** A gear choice's arm key: a hero to equip, or the last option. */
+const choiceKey = (soldier: Soldier | null) => (soldier ? `g${soldier.id}` : 'g-')
 
-/** A side of the swap with what happens to it. */
-const side = (verb: 'keep' | 'sell', gear: Gear | null, extra = '') => `<div class="side ${verb}"><small class="verb">${verb}${extra}</small>${full(gear)}</div>`
+const act = (action: Action) => `data-action='${JSON.stringify(action)}'`
 
-/** A card per soldier who could take `gear`, tapped again to `verb` them; armed, the strip keeps the new and sells the old. */
-export function gearPicks(run: Run, gear: Gear, action: (soldier: Soldier) => Action, verb: string, block: string | null = null): Pick[] {
-  return run.soldiers.map((soldier) => ({
-    key: `s${soldier.id}`,
-    action: action(soldier),
-    look: 'compare',
-    body: heroBody(soldier, gear),
-    detail: `<div class="swap">${side('keep', gear)}${side('sell', soldier.gear, soldier.gear ? ` · +${SELL[soldier.gear.rarity]}` : '')}</div>`,
-    go: `Tap again to ${verb} ${soldier.name}`,
-    block,
-  }))
-}
-
-/** Which of a hero's two weapons stays: the one held, or the one found. */
-export type Keep = 'old' | 'new'
-
-/** A swap's arm key: the hero's card, and which weapon is kept. */
-export const swapKey = (soldier: Soldier, keep: Keep) => `s${soldier.id}~${keep}`
-
-/** Which weapon `armed` keeps for `soldier`: as chosen, else the one held, so a hasty confirm changes no loadout. */
-export function kept(soldier: Soldier, armed: string | null): Keep {
-  const chosen = armed?.split('~')
-  if (chosen?.[0] === `s${soldier.id}` && (chosen[1] === 'old' || chosen[1] === 'new')) return chosen[1]
-  return soldier.gear ? 'old' : 'new'
-}
-
-/** What confirming does: keeping the find equips it, selling the held; keeping the held sells the find. */
-export const swapAction = (find: number, soldier: Soldier, keep: Keep): Action => (keep === 'new' ? { type: 'equip', find, soldier: soldier.id } : { type: 'sell', find })
-
-/** The swap for the find at `index`: a title, with `note` after it; whose weapon it sets against; the two, one kept and one sold; and Confirm. Unarmed, the swap has just opened and the find arrives. */
-export function findSwap(run: Run, index: number, armed: string | null, note = ''): string {
-  const gear = run.finds[index]
-  const chosen = armed?.split('~')[0]
-  const soldier = run.soldiers.find((s) => `s${s.id}` === chosen) ?? run.soldiers[0]
-  const keep = kept(soldier, armed)
-  const option = (which: Keep, item: Gear | null) => {
-    const on = which === keep
-    const extra = !on && item ? `<span class="value">+${SELL[item.rarity]} supplies</span>` : ''
-    const found = which === 'new' ? ` found${armed ? '' : ' arrive'} ${gear.rarity}` : ''
-    const tag = which === 'new' ? '<span class="new">NEW</span>' : ''
-    return `<button class="side ${on ? 'keep' : 'sell'}${found}" role="radio" aria-checked="${on}" data-arm="${swapKey(soldier, which)}">${tag}<small class="verb">${on ? 'keep' : 'sell'}${extra}</small><small class="label">${which === 'new' ? 'Found' : `${soldier.name} holds`}</small>${full(item)}</button>`
+/**
+ * Who takes `gear`: the gear, an option per hero to equip it (their held weapon sold), the `last` option, and Confirm,
+ * live once an option is chosen. `go` gives Confirm's attributes for an option. Unarmed, the gear arrives.
+ */
+function gearChoice(run: Run, gear: Gear, armed: string | null, heading: string, go: (soldier: Soldier | null) => string, last: { label: string; fate: string }): string {
+  const chosen = armed === choiceKey(null) ? null : run.soldiers.find((s) => choiceKey(s) === armed)
+  const option = (soldier: Soldier | null, body: string) => {
+    const on = chosen === soldier
+    return `<button class="taker${on ? ' chosen' : ''}" role="radio" aria-checked="${on}" data-arm="${choiceKey(soldier)}">${body}</button>`
   }
-  const heroes = run.soldiers.length > 1 ? `<div class="takers">${run.soldiers.map((s) => `<button class="who${s === soldier ? ' chosen' : ''}" data-arm="${swapKey(s, kept(s, null))}"><span class="portrait">${badge(s.cls)}</span>${s.name}</button>`).join('')}</div>` : ''
-  const title = `<h1>New gear</h1><h2>${run.soldiers.length > 1 ? 'Who takes it?' : `For ${soldier.name}`}${note}</h2>`
-  return `<div class="gearswap">${title}${heroes}<div class="swap" role="radiogroup" aria-label="Keep which weapon">${option('old', soldier.gear)}${option('new', gear)}</div>
-    <button class="decide confirm" data-action='${JSON.stringify(swapAction(index, soldier, keep))}'>Confirm</button></div>`
+  const drop = (s: Soldier) => (s.gear ? `drops <span class="tier ${s.gear.rarity}">${s.gear.name}</span> · <span class="value">+${SELL[s.gear.rarity]} supplies</span>` : 'Empty hands')
+  const hero = (s: Soldier) => option(s, `<span class="portrait">${badge(s.cls)}</span><span class="text"><b>Equip on ${s.name}</b><small class="drop">${drop(s)}</small></span>`)
+  const fate = chosen === undefined ? 'Choose who takes it' : chosen ? `Equip on ${chosen.name}` : last.fate
+  return `<div class="gearswap"><h1>New gear</h1><h2>${heading}</h2>
+    <div class="side found${armed ? '' : ' arrive'} ${gear.rarity}"><span class="new">NEW</span>${full(gear)}<small class="fate">${fate}</small></div>
+    <div class="options" role="radiogroup" aria-label="Who takes it">${run.soldiers.map(hero).join('')}${option(null, `<span class="text"><b>${last.label}</b></span>`)}</div>
+    <button class="decide confirm"${chosen === undefined ? ' disabled' : ` ${go(chosen)}`}>Confirm</button></div>`
+}
+
+/** The find at `index`, with `note` after its heading: equipped on a hero, selling theirs, or sold. */
+export function findSwap(run: Run, index: number, armed: string | null, note = ''): string {
+  const { rarity } = run.finds[index]
+  const go = (s: Soldier | null) => act(s ? { type: 'equip', find: index, soldier: s.id } : { type: 'sell', find: index })
+  return gearChoice(run, run.finds[index], armed, `Equip it or sell it${note}`, go, { label: `Sell · <span class="value">+${SELL[rarity]} supplies</span>`, fate: `Sold for ${SELL[rarity]} supplies` })
+}
+
+/** The shop's ware at `index`, at `price`: bought for a hero, selling theirs, or left. */
+export function shopSwap(run: Run, index: number, price: number, armed: string | null): string {
+  const { gear } = run.shop!.wares[index]
+  const go = (s: Soldier | null) => (s ? act({ type: 'gear', index, soldier: s.id }) : 'data-ware=""')
+  return gearChoice(run, gear, armed, `For sale · <span class="value">${price} supplies</span>`, go, { label: 'Leave it', fate: 'Left on the shelf' })
 }
 
 /** A utility as a card: `top` says what tapping it means, `go` what the second tap does. */

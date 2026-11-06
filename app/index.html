@@ -219,7 +219,6 @@
       .slot { display: block; margin-top: 6px; padding: 5px 10px; border: 1px solid; border-radius: 4px; background: #1d2433; }
       .stash { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
       .who { display: block; width: 100%; padding: 4px 8px; text-align: left; background: none; border-color: transparent; line-height: 1.4; }
-      .who.chosen { background: #35496b; outline: 2px solid #ffd84d; }
       .details { display: flex; gap: 24px; align-items: flex-start; }
       .details .stats { width: 260px; flex: none; }
       .details > div { flex: 1; }
@@ -284,8 +283,6 @@
       #drop .challenge { margin: 0; font-size: 20px; color: #ffd166; }
       .node.answered { outline: 2px solid #6fd08c; }
       button.pick.armed { outline: 3px solid #fff; outline-offset: 1px; background: #33405a; }
-      button.pick.compare { width: min(190px, calc((100vw - 40px) / 2)); height: 172px; }
-      button.pick.compare .arrow { color: #9aa6bd; line-height: 1; }
       .swap { display: grid; width: min(720px, 100%); grid-template-columns: 1fr 1fr; gap: 10px; min-height: 96px; }
       .swap .side { display: flex; flex-direction: column; gap: 2px; padding: 8px; border-radius: 6px; border: 2px solid #4a5468; font: inherit; font-size: 13px; line-height: 1.25; text-align: left; color: inherit; background: #161c28; }
       .swap .keep { border-color: #6fe08c; background: #1f3326; }
@@ -293,7 +290,6 @@
       .swap .verb { font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
       .swap .keep .verb { color: #6fe08c; }
       .swap .sell .verb { color: #ffd166; }
-      .swap .label { color: #9aa6bd; }
       .gearswap { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; text-align: center; }
       #panel > .gearswap { min-height: calc(100% - 2em); justify-content: center; }
       .gearswap h1, .gearswap h2 { margin: 0; }
@@ -305,34 +301,44 @@
       .gearswap .keep { box-shadow: 0 0 0 1px #6fe08c, 0 4px 18px #6fe08c33; }
       .gearswap .keep .verb::before { content: '✓'; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: #10141c; background: #6fe08c; }
       .gearswap .sell { border-style: dashed; background: #131822; }
-      .gearswap .sell > :not(.verb):not(.new) { opacity: 0.6; }
+      .gearswap .sell > :not(.verb) { opacity: 0.6; }
       .gearswap .sell:hover { border-color: #9aa6bd; }
       .gearswap .sell .verb { color: #9aa6bd; }
-      .gearswap .value { margin-left: auto; white-space: nowrap; color: #ffd166; letter-spacing: 0; text-transform: none; }
-      .gearswap .found .value { margin-right: 44px; }
-      .swap .found { position: relative; overflow: hidden; --glow: #9aa6bd; }
-      .swap .found.rare { --glow: #4da3ff; }
-      .swap .found.epic { --glow: #c77dff; }
-      .swap .found .new { position: absolute; top: 0; right: 0; padding: 3px 8px; border-bottom-left-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 1px; color: #10141c; background: var(--glow); }
-      .swap .arrive { animation: arrive 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both, arriveglow 0.6s ease-out both; }
-      .swap .arrive::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, color-mix(in srgb, var(--glow) 55%, transparent) 50%, transparent 65%); transform: translateX(-100%); animation: shine 0.55s 0.15s ease-out forwards; pointer-events: none; }
-      .loot .swap .arrive, .loot .swap .arrive::after { animation-delay: 1.5s; }
+      .gearswap .value { white-space: nowrap; color: #ffd166; }
+      .gearswap .found { box-sizing: border-box; position: relative; overflow: hidden; display: flex; flex-direction: column; text-align: left; border: 2px solid; background: #161c28; width: min(420px, 100%); min-height: 0; padding-right: 56px; border-color: var(--glow); box-shadow: 0 0 18px color-mix(in srgb, var(--glow) 35%, transparent); --glow: #9aa6bd; }
+      .gearswap .found.rare { --glow: #4da3ff; }
+      .gearswap .found.epic { --glow: #c77dff; }
+      .gearswap .found .new { position: absolute; top: 0; right: 0; padding: 3px 8px; border-bottom-left-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 1px; color: #10141c; background: var(--glow); }
+      .gearswap .found .defs { display: none; }
+      .gearswap .fate { margin-top: 4px; font-weight: bold; color: #6fe08c; }
+      .gearswap .options { display: grid; width: min(560px, 100%); grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; }
+      .gearswap .taker { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 12px; border: 2px solid #4a5468; border-radius: 8px; font: inherit; text-align: left; color: inherit; background: #161c28; transition: border-color 0.15s, background 0.15s; }
+      .gearswap .taker:hover { border-color: #9aa6bd; }
+      .gearswap .taker .text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .gearswap .taker .drop { color: #9aa6bd; }
+      .gearswap .taker .portrait { width: 34px; height: 34px; font-size: 18px; }
+      .gearswap .taker.chosen { border-color: #6fe08c; background: #1f3326; box-shadow: 0 0 0 1px #6fe08c, 0 4px 18px #6fe08c33; }
+      .gearswap .taker.chosen .drop .tier { text-decoration: line-through; text-decoration-color: #e04848; }
+      .gearswap .taker.chosen .drop { color: #c9d2e3; }
+      .gearswap .arrive { animation: arrive 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both, arriveglow 0.6s ease-out both; }
+      .gearswap .arrive::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, color-mix(in srgb, var(--glow) 55%, transparent) 50%, transparent 65%); transform: translateX(-100%); animation: shine 0.55s 0.15s ease-out forwards; pointer-events: none; }
+      .loot .gearswap .arrive, .loot .gearswap .arrive::after { animation-delay: 1.5s; }
       .loot .gearswap .side { opacity: 1; }
       .loot .gearswap .side:not(.arrive) { animation: none; }
       @keyframes arrive { from { opacity: 0; transform: translateY(-28px) scale(0.85); } }
       @keyframes arriveglow { 50% { box-shadow: 0 0 22px var(--glow); } }
       @keyframes shine { to { transform: translateX(100%); } }
-      @media (prefers-reduced-motion: reduce) { .swap .arrive { animation: fadein 0.4s both; } .swap .arrive::after { display: none; } }
+      @media (prefers-reduced-motion: reduce) { .gearswap .arrive { animation: fadein 0.4s both; } .gearswap .arrive::after { display: none; } }
       @keyframes fadein { from { opacity: 0; } }
       .gearswap .confirm { min-width: 200px; padding: 14px 28px; font-weight: bold; color: #10141c; background: #6fe08c; border-color: #6fe08c; }
       .gearswap .confirm:hover { background: #8ff0a8; }
-      .takers { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-      .takers .who { display: flex; align-items: center; gap: 6px; width: auto; min-height: 44px; padding: 4px 14px 4px 6px; border: 1px solid #4a5a78; border-radius: 22px; }
-      .takers .who.chosen { outline: none; border-color: #ffd84d; box-shadow: 0 0 0 1px #ffd84d; }
-      .takers .portrait { width: 32px; height: 32px; font-size: 18px; }
       @media (max-width: 600px) { .swap { grid-template-columns: 1fr; } .gearswap .side { min-height: 0; } }
-      button.pick.compare .who { display: flex; align-items: center; gap: 6px; }
-      button.pick.compare .portrait { width: 28px; height: 28px; font-size: 16px; }
+      @media (max-height: 520px) and (min-width: 640px) {
+        .gearswap:has(.options) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'h1 h1' 'h2 h2' 'found options' 'found confirm'; align-items: center; justify-items: center; gap: 10px 16px; max-width: 760px; margin: 0 auto; }
+        .gearswap h1 { grid-area: h1; } .gearswap h2 { grid-area: h2; margin-top: -6px; }
+        .gearswap .found { grid-area: found; width: 100%; } .gearswap .options { grid-area: options; width: 100%; grid-template-columns: 1fr; gap: 6px; }
+        .gearswap .confirm { grid-area: confirm; padding: 10px 28px; } .gearswap .taker { min-height: 46px; padding: 4px 10px; }
+      }
       .tier { font-weight: bold; text-transform: capitalize; color: #9aa6bd; }
       .tier.rare { color: #4da3ff; }
       .tier.epic { color: #c77dff; }

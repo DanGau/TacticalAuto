@@ -25,7 +25,7 @@ import { objective, THREATS } from '../core/objectives'
 import { CHALLENGES } from '../core/challenges'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
-import { gearPicks, pickCard, pickDetail, utilityPick, type Pick } from './cards'
+import { pickCard, shopSwap, pickDetail, utilityPick, type Pick } from './cards'
 import { heroSheet } from './sheet'
 import { alienName, badge, button, describe, describeGear, gearCard, gearType, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
 
@@ -201,11 +201,7 @@ function shopView(run: Run, armed: string | null, ware: number | null): string {
     ${pickDetail(picks, ware === null ? armed : null, 'Tap a card for its details; tap it again to buy.')}`
   if (ware === null || run.shop!.wares[ware].sold) return screen
   const { gear } = run.shop!.wares[ware]
-  const wearers = gearPicks(run, gear, (s) => ({ type: 'gear', index: ware, soldier: s.id }), 'buy it for')
-  return `${screen}<div class="modal"><div class="sheet"><h2>Who takes ${gear.name}? · ${GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]} supplies</h2>
-    <div class="picks">${wearers.map((p) => pickCard(p, armed)).join('')}</div>
-    ${pickDetail(wearers, armed, 'Tap a hero to compare; tap again to buy.')}
-    <button data-ware="">Back</button></div></div>`
+  return `${screen}<div class="modal"><div class="sheet">${shopSwap(run, ware, GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE], armed)}</div></div>`
 }
 
 /** An event: its scene, and the ways to meet it. */
