@@ -83,15 +83,21 @@ export function endBattle(run: Run): void {
   if (mission.kind === 'battle') passStop(run)
   // A satellite, an ambush, a hold, a VIP rescue or an Overrun battle won offers relics.
   if (won && (mission.kind === 'key' || mission.kind === 'ambush' || (mission.kind === 'battle' && (mission.goal === 'hold' || mission.goal === 'vip' || mission.risk === 'dangerous')))) {
-    const pool = offerable(run.relics)
-    // The first offer builds on a keyword the squad already has, when one can.
-    const held = squadKeywords(run)
-    const fits = pool.filter((id) => RELICS[id].tags?.some((tag) => held.includes(tag)))
-    if (fits.length > 0) run.relicOffers.push(...pool.splice(pool.indexOf(fits[randomInt(run, fits.length)]), 1))
-    while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(drawRelic(run, pool))
+    offerRelics(run)
     // A duo the squad's classes form stands beside them, taken in place of a relic.
     const duos = openDuos(run)
     if (duos.length > 0) run.duoOffer = duos[randomInt(run, duos.length)]
   }
   settle(run)
+}
+
+/** Offers RELIC_OFFERS relics, the first building on a keyword the squad has when one can; those turned down come back only once every other is spent. */
+export function offerRelics(run: Run): void {
+  const all = offerable(run.relics)
+  const unpassed = all.filter((id) => !run.passed.relics.includes(id))
+  const pool = unpassed.length > 0 ? unpassed : all
+  const held = squadKeywords(run)
+  const fits = pool.filter((id) => RELICS[id].tags?.some((tag) => held.includes(tag)))
+  if (fits.length > 0) run.relicOffers.push(...pool.splice(pool.indexOf(fits[randomInt(run, fits.length)]), 1))
+  while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(drawRelic(run, pool))
 }

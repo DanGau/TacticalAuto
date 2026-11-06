@@ -34,7 +34,8 @@ test('every battle of a run starts with no stacks, counts or battle bonuses', ()
       const battle = run.battle!
       expect(battle.kills).toBe(0)
       for (const u of battle.units) {
-        expect(u).toMatchObject(FRESH)
+        // Cryo Charges chill the aliens as the squad lands.
+        expect(u).toMatchObject(run.relics.includes('cryo') ? { ...FRESH, chill: u.chill } : FRESH)
         expect(u.twice ?? false).toBe(false)
         if (isSoldier(u)) expect(u.armor).toBeLessThanOrEqual(u.stats.armor + 2)
       }

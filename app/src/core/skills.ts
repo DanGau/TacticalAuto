@@ -284,3 +284,9 @@ export const tierOf = (cls: ClassId, id: SkillId) => Math.max(...TREES[cls].map(
 
 /** A class's roots: the skills open from the first pick, its ability first. */
 export const roots = (cls: ClassId) => TREES[cls].flatMap((branch) => branch.tiers[0])
+
+/** Every skill of a class's tree, in tree order. */
+export const treeOf = (cls: ClassId): SkillId[] => TREES[cls].flatMap(({ tiers }) => tiers.flat())
+
+/** The skill that teaches a class its power, which every hero of the class starts with. */
+export const powerOf = (cls: ClassId): SkillId => treeOf(cls).find((id) => SKILLS[id].teaches)!

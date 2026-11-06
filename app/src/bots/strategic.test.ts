@@ -6,10 +6,10 @@ import { apply } from '../core/apply'
 import { type Run } from '../core/run-state'
 import { rows, verdicts } from '../sim/report'
 import { runWith, type RunResult, type Toll } from '../sim/run'
-import { plannedSkill, strategic } from './strategic'
+import { PLANS, plannedSkill, strategic } from './strategic'
 import { CLASSES, type ClassId } from '../core/classes'
-import { TREES, type SkillId } from '../core/skills'
-import { MAX_SKILLS, skillOffers, xpFor } from '../core/squad'
+import { powerOf, TREES, type SkillId } from '../core/skills'
+import { skillOffers, xpFor } from '../core/squad'
 
 function deploying(challenge: ChallengeId, held: Run['utilities']): Run {
   const run = begun(3)
@@ -26,11 +26,18 @@ test.each(Object.keys(CHALLENGES) as ChallengeId[])('the strategic bot takes the
   expect(strategic(run, { rng: 1 })).toMatchObject({ type: 'enter', utility: 2 })
 })
 
-test('the plan: every class names a real branch and an opener outside it, reaches tier 4 in the picks it has', () => {
+test('the plan: every class names a real branch and an opener outside it, and its hero takes a skill of the branch whenever one is offered', () => {
   for (const cls of Object.keys(CLASSES) as ClassId[]) {
-    const hero = { ...begun(3).soldiers[0], cls, skills: [] as SkillId[], xp: xpFor(20) }
-    for (let i = 0; i < MAX_SKILLS; i++) hero.skills.push(skillOffers(hero)[plannedSkill(hero)])
-    expect(TREES[cls].some(({ tiers }) => tiers[3].some((id) => hero.skills.includes(id)))).toBe(true)
+    const branch = TREES[cls].find((b) => b.name === PLANS[cls].branch)!.tiers.flat()
+    for (let seed = 0; seed < 10; seed++) {
+      const hero = { ...begun(3).soldiers[0], cls, skills: [powerOf(cls)], lost: [] as SkillId[], seed, xp: xpFor(20) }
+      for (let offers = skillOffers(hero); offers.length > 0; offers = skillOffers(hero)) {
+        const pick = offers[plannedSkill(hero)]
+        if (offers.some((id) => branch.includes(id)) && !(PLANS[cls].opener && offers.includes(PLANS[cls].opener!))) expect(branch).toContain(pick)
+        hero.lost.push(...offers.filter((id) => id !== pick))
+        hero.skills.push(pick)
+      }
+    }
   }
 })
 

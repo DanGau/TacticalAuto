@@ -11,7 +11,9 @@ import { skillOffers } from './squad'
 
 /** Learns the offered skill at `index`. */
 export function takeSkill(run: Run, soldier: Soldier, index: number): void {
-  soldier.skills.push(skillOffers(soldier)[index])
+  const offers = skillOffers(soldier)
+  soldier.lost.push(...offers.filter((_, i) => i !== index))
+  soldier.skills.push(offers[index])
   settle(run)
 }
 
@@ -165,6 +167,7 @@ export function dropGear(run: Run, lucky: boolean): void {
 /** Takes an offered relic. */
 export function takeRelic(run: Run, id: RelicId): void {
   gainRelic(run, id, true)
+  run.passed.relics.push(...run.relicOffers.filter((other) => other !== id))
   run.relicOffers = []
   run.duoOffer = null
   settle(run)
@@ -173,6 +176,7 @@ export function takeRelic(run: Run, id: RelicId): void {
 /** Takes the offered duo in place of a relic. */
 export function takeDuo(run: Run): void {
   run.duos = [...run.duos, run.duoOffer!]
+  run.passed.relics.push(...run.relicOffers)
   run.relicOffers = []
   run.duoOffer = null
   settle(run)

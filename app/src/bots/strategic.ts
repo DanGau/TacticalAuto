@@ -181,7 +181,7 @@ function shop(run: Run): Action {
  * The branch each class climbs, and the power outside it, if any, that it opens with: of what five picks allow, what
  * wins most on the same seeds. Early battles kill a hero without picks, so the one free pick goes on staying alive.
  */
-const PLANS: Record<ClassId, { branch: string; opener?: SkillId }> = {
+export const PLANS: Record<ClassId, { branch: string; opener?: SkillId }> = {
   assault: { branch: 'Rampage', opener: 'reflexes' },
   heavy: { branch: 'Bastion' },
   sniper: { branch: 'Ghost' },

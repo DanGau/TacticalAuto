@@ -33,6 +33,7 @@ export const DROP_SUPPLIES = 4
 /** Takes the recruit at `index` as the run's first soldier, and sets out from its home. */
 export function recruit(run: Run, index: number): void {
   const soldier = run.recruits[index]
+  run.passed.classes.push(...run.recruits.filter((r) => r !== soldier).map((r) => r.cls!))
   run.recruits = []
   run.route = plotRoute(run, soldier.home!)
   run.route.forEach((stage, l) => placeLeg(run, run.legs[l], stage))
@@ -356,6 +357,7 @@ export function createRun(seed: number): Run {
     spare: null,
     boonOffers: [],
     relicOffers: [],
+    passed: { relics: [], classes: [] },
     duos: [],
     duoOffer: null,
     recruits: [],

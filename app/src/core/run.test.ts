@@ -44,7 +44,7 @@ import { soldierStats } from './squad'
 import { health } from './squad'
 import { TRAVEL_HEAL } from './squad'
 import { skillOffers } from './squad'
-import { MAX_SKILLS, PICK_LEVELS, picksEarned } from './squad'
+import { MAX_SKILLS, OFFERS, PICK_LEVELS, picksEarned } from './squad'
 import { XP } from './squad'
 import { level } from './squad'
 import { xpFor } from './squad'
@@ -52,7 +52,7 @@ import { LOSS_THREAT } from './progress'
 import { STOP_THREAT } from './progress'
 import { THREAT_MAX } from './progress'
 import { LEG_STOPS } from './progress'
-import { roots, SKILLS, unlocked } from './skills'
+import { powerOf, roots, SKILLS, unlocked } from './skills'
 import { atKey, road, enterAt, begun } from './roads'
 import { RELICS } from './relics'
 import { SHOP_UTILITIES, UTILITY_SLOTS } from './utilities'
@@ -394,7 +394,7 @@ test("each leg crosses a continent to a hero in one of its cities, who joins sea
   fight(run, 'human')
   expect(run.soldiers[1]).toBe(hero)
   expect(level(hero)).toBeGreaterThan(1)
-  expect(hero.skills).toEqual([])
+  expect(hero.skills).toEqual([powerOf(hero.cls!)])
   expect(skillOffers(hero).length).toBeGreaterThan(0)
   expect(run.phase).toBe('reward')
 })
@@ -511,7 +511,7 @@ test('a key mission has one boss, with an escort for each key already won', () =
   }
 })
 
-const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: null, home: null, wounds: 0, seed: 0, ...extra })
+const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: null, home: null, wounds: 0, seed: 0, lost: [], ...extra })
 
 test('stats add class, level, skills and relics to the base', () => {
   const run = begun(1)
@@ -534,14 +534,16 @@ test('levels never stop: each takes more experience than the last', () => {
   }
 })
 
-test('each pick owed offers what the tree has unlocked; past the last, levels add stats only', () => {
+test('each pick owed offers some of what the tree has unlocked; past the last, levels add stats only', () => {
   const run = begun(1)
   const [soldier] = run.soldiers
   expect(skillOffers(soldier)).toEqual([])
   soldier.xp = xpFor(PICK_LEVELS.at(-1)! + 3)
   run.phase = 'reward'
   while (soldier.skills.length < MAX_SKILLS) {
-    expect(skillOffers(soldier)).toEqual(unlocked(soldier.cls!, soldier.skills))
+    const open = unlocked(soldier.cls!, soldier.skills).filter((id) => !soldier.lost.includes(id))
+    const offers = skillOffers(soldier)
+    if (open.length >= OFFERS.max) expect(offers.every((id) => open.includes(id))).toBe(true)
     apply(run, { type: 'skill', soldier: soldier.id, index: 0 })
   }
   expect(skillOffers(soldier)).toEqual([])
@@ -555,7 +557,7 @@ test('a power comes only at its level: none at level 2, one at the first, none p
   hero.xp = xpFor(PICK_LEVELS[0])
   expect(skillOffers(hero).length).toBeGreaterThan(0)
   hero.xp = xpFor(PICK_LEVELS.at(-1)! + 9)
-  expect(picksEarned(hero)).toBe(MAX_SKILLS)
+  expect(picksEarned(hero)).toBe(PICK_LEVELS.length)
 })
 
 test('a satellite won offers three relics; a relic held changes the run', () => {
@@ -743,7 +745,7 @@ test('a run begins with a choice of recruits of different classes, each with a c
     expect(run.soldiers).toHaveLength(0)
     expect(new Set(run.recruits.map((r) => r.cls)).size).toBe(RECRUITS)
     for (const r of run.recruits) {
-      expect(r.skills).toEqual([])
+      expect(r.skills).toEqual([powerOf(r.cls!)])
       expect(r.gear!.stats).toEqual({})
       expect(r.gear).toMatchObject({ rarity: 'common' })
     }

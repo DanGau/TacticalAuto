@@ -10,7 +10,7 @@ import { randomInt } from './rng'
 import { type Run } from './run-state'
 import { type Earned } from './run-state'
 import { type Soldier } from './run-state'
-import { SKILLS, type SkillId, unlocked } from './skills'
+import { powerOf, SKILLS, type SkillId, tierOf, treeOf, unlocked } from './skills'
 import { MELEE_RANGE, WEAPONS } from './weapons'
 import { CONTINENT_IDS, type City, CONTINENTS } from './world'
 import type { Keyword } from './keywords'
@@ -44,15 +44,37 @@ export function total(run: Run, effect: (source: Lasting) => number | undefined)
 /** The levels at which a soldier earns a power: stats grow every level, powers only at these. Tier 3 needs CAPSTONE_PICKS, so five picks reach a tier 4 only by giving the branch all but one. */
 export const PICK_LEVELS = [3, 4, 5, 7, 11]
 
-/** Skills a soldier knows at most. */
-export const MAX_SKILLS = PICK_LEVELS.length
+/** Skills a soldier knows at most: its class power and a pick per pick level. */
+export const MAX_SKILLS = PICK_LEVELS.length + 1
 
 /** Powers a soldier has earned by its level. */
 export const picksEarned = (soldier: { xp: number }) => PICK_LEVELS.filter((at) => at <= level(soldier)).length
 
-/** The skills a soldier chooses the next from, or none if no choice is owed: all its class's tree has unlocked. */
+/** Skills offered at a pick, fewer only when fewer are left. */
+export const OFFERS = { min: 3, max: 4 }
+
+/** Skills a soldier chose, leaving out the class power it came with. */
+export const picksMade = (soldier: Soldier) => soldier.skills.filter((id) => !soldier.cls || id !== powerOf(soldier.cls)).length
+
+/**
+ * The skills a soldier chooses the next from, drawn by its seed, or none if no choice is owed: those its tree has
+ * unlocked, topped up from the rest of its tree below tier 4 so gating never leaves it short. Known and lost skills never come.
+ */
 export function skillOffers(soldier: Soldier): SkillId[] {
-  return !soldier.cls || soldier.skills.length >= picksEarned(soldier) ? [] : unlocked(soldier.cls, soldier.skills)
+  if (!soldier.cls || picksMade(soldier) >= picksEarned(soldier)) return []
+  const left = (ids: SkillId[]) => ids.filter((id) => !soldier.skills.includes(id) && !soldier.lost.includes(id))
+  const open = left(unlocked(soldier.cls, soldier.skills))
+  const rest = left(treeOf(soldier.cls)).filter((id) => !open.includes(id) && tierOf(soldier.cls!, id) < 3)
+  // With nothing else left, an ungated tier 4, but never a second: two stacked break the ceiling on a hit.
+  const top = soldier.skills.some((id) => tierOf(soldier.cls!, id) === 3) ? [] : left(treeOf(soldier.cls)).filter((id) => !open.includes(id) && tierOf(soldier.cls!, id) === 3)
+  const rng = { rng: soldier.seed ^ Math.imul(soldier.skills.length + 1, 0x9e3779b1) }
+  // A fourth offer only while it leaves enough for the picks still to come.
+  const later = PICK_LEVELS.length - picksMade(soldier) - 1
+  const roomy = open.length + rest.length - OFFERS.max >= OFFERS.min * later
+  const size = OFFERS.min + (roomy ? randomInt(rng, OFFERS.max - OFFERS.min + 1) : 0)
+  const offers: SkillId[] = []
+  for (const deck of [open, rest, open.length + rest.length > 0 ? [] : top]) while (offers.length < size && deck.length > 0) offers.push(deck.splice(randomInt(rng, deck.length), 1)[0])
+  return treeOf(soldier.cls).filter((id) => offers.includes(id))
 }
 
 /** The class ability a soldier has learned, if any. */
@@ -131,7 +153,8 @@ export function draft(run: Run, taken: ClassId[]): Soldier {
   const unused = (Object.keys(CLASSES) as ClassId[]).filter((id) => !run.soldiers.some((s) => s.cls === id))
   const unique = run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).uniqueClasses) && unused.length > 0
   const all = (unique ? unused : (Object.keys(CLASSES) as ClassId[])).filter((id) => !taken.includes(id))
-  const classes = all.length > 0 ? all : (Object.keys(CLASSES) as ClassId[])
+  const fresh = all.filter((id) => !run.passed.classes.includes(id))
+  const classes = fresh.length > 0 ? fresh : all.length > 0 ? all : (Object.keys(CLASSES) as ClassId[])
   const gear = plainGear(run, run.nextGear++)
   const free = NAMES.filter((name) => ![...run.soldiers, ...run.recruits].some((s) => s.name === name))
   const name = free[randomInt(run, free.length)]
@@ -141,7 +164,8 @@ export function draft(run: Run, taken: ClassId[]): Soldier {
     name,
     xp: xpFor(1),
     cls,
-    skills: [],
+    skills: [powerOf(cls)],
+    lost: [],
     // Read, not drawn: the seed costs the run no draw.
     seed: run.rng,
     feats: [],

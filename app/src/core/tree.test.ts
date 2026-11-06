@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest'
 import { CLASSES, type ClassId } from './classes'
 import { begun } from './roads'
-import { MAX_SKILLS, PICK_LEVELS, skillOffers, xpFor } from './squad'
+import { MAX_SKILLS, OFFERS, PICK_LEVELS, skillOffers, xpFor } from './squad'
 import { SKILL_EFFECTS } from './skill-effects'
-import { CAPSTONE_PICKS, roots, SKILLS, TREES, unlocked, type SkillId } from './skills'
+import { CAPSTONE_PICKS, powerOf, roots, SKILLS, tierOf, TREES, treeOf, unlocked, type SkillId } from './skills'
 
 const classes = Object.keys(CLASSES) as ClassId[]
 const veteran = (cls: ClassId, skills: SkillId[]) => ({ ...begun(1).soldiers[0], cls, skills, xp: xpFor(PICK_LEVELS.at(-1)!) })
@@ -17,7 +17,7 @@ test('every skill stands in one tree, every class has 2 or 3 branches of tiers 1
     expect(TREES[cls].length).toBeLessThanOrEqual(3)
     for (const { tiers } of TREES[cls]) expect(tiers.map((t) => t.length > 0)).toEqual([true, true, true, true])
     expect(unlocked(cls, [])).toEqual(roots(cls))
-    expect(SKILLS[roots(cls)[0]].name).toBe(CLASSES[cls].abilityName)
+    expect(powerOf(cls)).toBe(roots(cls)[0])
   }
 })
 
@@ -43,18 +43,53 @@ test('tier locks hold: tier 2 needs a tier 1 of its branch, tier 3 a tier 2 and 
   }
 })
 
-test("every skill of every class's tree can be reached, offers stay in the unlocked, and no level completes a tree", () => {
+test("every skill of every class's tree can be reached, and no level completes a tree", () => {
   for (const cls of classes) {
     for (const { tiers } of TREES[cls]) {
       const known: SkillId[] = [roots(cls).find((id) => !tiers[0].includes(id))!]
       for (const id of tiers.flat()) {
-        expect(skillOffers(veteran(cls, known.slice(0, MAX_SKILLS - 1)))).toEqual(unlocked(cls, known.slice(0, MAX_SKILLS - 1)))
         expect(unlocked(cls, known)).toContain(id)
         known.push(id)
       }
     }
-    expect(TREES[cls].flatMap((b) => b.tiers.flat()).length).toBeGreaterThan(MAX_SKILLS)
+    expect(treeOf(cls).length).toBeGreaterThan(MAX_SKILLS)
   }
+})
+
+/** Plays every pick of a hero of `cls` on `seed`, taking offer `choose` picks; returns each pick's offers. */
+function build(cls: ClassId, seed: number, choose: (offers: SkillId[]) => number) {
+  const hero = { ...veteran(cls, [powerOf(cls)]), seed }
+  const picks: { offers: SkillId[]; left: number }[] = []
+  for (let offers = skillOffers(hero); offers.length > 0; offers = skillOffers(hero)) {
+    picks.push({ offers, left: treeOf(cls).filter((id) => !hero.skills.includes(id) && !hero.lost.includes(id) && (tierOf(cls, id) < 3 || unlocked(cls, hero.skills).includes(id))).length })
+    const i = choose(offers)
+    hero.lost.push(...offers.filter((_, j) => j !== i))
+    hero.skills.push(offers[i])
+  }
+  return { hero, picks }
+}
+
+test('a hero starts with its class power free, and each of its picks offers 3 or 4 skills while that many are left, none known or lost, never one turned down', () => {
+  for (const cls of classes) {
+    for (let seed = 0; seed < 80; seed++) {
+      const { hero, picks } = build(cls, seed * 7919, (offers) => seed % offers.length)
+      expect(SKILLS[hero.skills[0]].teaches).toBe(true)
+      expect(picks).toHaveLength(PICK_LEVELS.length)
+      const seen = new Set<SkillId>()
+      for (const { offers, left } of picks) {
+        expect(offers.length).toBeGreaterThanOrEqual(Math.min(OFFERS.min, left))
+        expect(offers.length).toBeLessThanOrEqual(OFFERS.max)
+        for (const id of offers) {
+          expect(seen.has(id)).toBe(false)
+          seen.add(id)
+        }
+      }
+    }
+  }
+})
+
+test('builds differ from seed to seed', () => {
+  for (const cls of classes) expect(new Set(Array.from({ length: 20 }, (_, seed) => build(cls, seed * 104729, () => 0).hero.skills.join())).size).toBeGreaterThan(5)
 })
 
 test('a hero with nothing left to learn is owed nothing, so the reward phase cannot stall', () => {

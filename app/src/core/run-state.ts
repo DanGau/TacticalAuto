@@ -108,6 +108,8 @@ export interface Soldier {
   wounds: number
   /** Draws the skills it is offered at each level. */
   seed: number
+  /** Skills offered and turned down: gone for the run. */
+  lost: SkillId[]
 }
 
 /** What the last stop changed, for the player to review. */
@@ -211,6 +213,8 @@ export interface Run {
   spare: UtilityId | null
   /** Relics to choose from in the reward phase. */
   relicOffers: RelicId[]
+  /** Relics and recruit classes offered and turned down, not offered again until every other is spent. */
+  passed: { relics: RelicId[]; classes: ClassId[] }
   /** Duos taken, kept for the run. */
   duos: DuoId[]
   /** A duo offered beside the relics, taken in place of one. */
