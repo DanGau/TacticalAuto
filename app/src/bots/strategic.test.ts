@@ -42,7 +42,7 @@ test('with a utility to spare, it keeps what answers the most, and plays a run t
   expect(['won', 'lost']).toContain(runWith(5, strategic).won ? 'won' : 'lost')
 })
 
-const toll = (challenge: ChallengeId, answer: Toll['answer'], won: boolean, lost: number): Toll => ({ nth: 1, leg: 0, party: 1, won, goal: 'exterminate', challenge, answer, most: 100, before: 100, after: 100 - lost, downed: 0 })
+const toll = (challenge: ChallengeId, answer: Toll['answer'], won: boolean, lost: number): Toll => ({ nth: 1, leg: 0, party: 1, won, goal: 'exterminate', challenge, answer, most: 100, before: 100, after: 100 - lost, downed: 0, maxHit: 0, bossRounds: null })
 const of = (tolls: Toll[]) => rows([{ tolls } as RunResult])
 
 test('the diagnosis tells the game from the bot', () => {

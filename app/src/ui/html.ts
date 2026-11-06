@@ -4,7 +4,7 @@ import { EFFECTS, type Gear } from '../core/gear'
 import { WEAPONS, type Kit } from '../core/weapons'
 import { tip as markTip } from './charts'
 import { ALIENS, type AlienKind } from '../core/aliens'
-import type { Stats } from '../core/battle'
+import { BASE_STATS, type Stats } from '../core/battle'
 import { KEYWORDS, RESISTS, type Keyword, type Resist } from '../core/keywords'
 import { TUNING } from '../core/tuning'
 import type { ClassId } from '../core/classes'
@@ -75,7 +75,7 @@ export function gearText(gear: Gear): string {
   return [...new Set(said.filter(Boolean))].map((line) => `${line}.`).join(' ')
 }
 
-const kitText = (kit: Kit) => `${kit.shots} × ${Math.round(100 * kit.power)}% damage${kit.wide ? `, ${Math.round(100 * kit.wide)}% splash beside` : ''}${kit.range ? `, range ${kit.range}` : ''}`
+const kitText = (kit: Kit) => `${kit.shots} × ${Math.round(100 * kit.power)}% damage${kit.power > 1 ? ` of the first ${BASE_STATS.damage}, +1 per point past` : ''}${kit.wide ? `, ${Math.round(100 * kit.wide)}% splash beside` : ''}${kit.range ? `, range ${kit.range}` : ''}`
 
 /** A piece of gear's numbers: its weapon's attacks and stat changes, then its mod's. */
 export function gearStats(gear: Gear): string[] {

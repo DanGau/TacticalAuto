@@ -90,7 +90,7 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], cha
 export const HARVESTERS_MORE_FROM = 2
 
 /** What an ambush's Hunter multiplies the strongest soldier's health and damage by. */
-export const HUNTER = { hp: 1.3, damage: 1.2 }
+export const HUNTER = { hp: 2, damage: 1.2 }
 
 /** A goal drawn by GOALS' weights, among those the leg of `when` has. */
 export function drawGoal(run: Run, when: Run): Goal {

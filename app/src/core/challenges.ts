@@ -77,7 +77,7 @@ export const STIFFEN: Partial<Record<ChallengeId, { range?: number; armor?: numb
 /** A big one's boss: its health over a soldier's base, its armor and its damage, by party size less one and rung. */
 export function bigOneStats(party: number, rung: number, base: Stats): Stats {
   const size = Math.min(party, 3) - 1
-  return { ...base, hp: [7, 35, 60][size] + [2, 7, 10][size] * rung, armor: [7, 14, 28][size] + [1, 3, 4][size] * rung, damage: base.damage - (size === 0 ? 1 : 0) + 2 * size + Math.floor(rung / 2) }
+  return { ...base, hp: [12, 60, 105][size] + [3, 12, 17][size] * rung, armor: [7, 14, 28][size] + [1, 3, 4][size] * rung, damage: base.damage - (size === 0 ? 1 : 0) + 2 * size + Math.floor(rung / 2) }
 }
 
 /** Of a Scattered's force of `count`, the sentries posted; the rest are the reinforcements. */

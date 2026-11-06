@@ -29,7 +29,7 @@ import { type Stop } from './run-state'
 import { type StopKind } from './run-state'
 import { type Risk } from './run-state'
 import { endBattle } from './debrief'
-import { missionAt } from './missions'
+import { HUNTER, missionAt } from './missions'
 import { RISKS } from './missions'
 import { dropGear } from './rewards'
 import { SELL } from './rewards'
@@ -434,7 +434,7 @@ test('experience follows what a soldier did: kills and damage its own, feats onl
   expect(soldier.feats).toEqual(['hatTrick'])
 })
 
-test('an ambush has no landing: the squad is down at once, every posted alien in the fight, more coming, the Hunter half again as strong as its best soldier', () => {
+test('an ambush has no landing: the squad is down at once, every posted alien in the fight, more coming, the Hunter stronger than its best soldier by HUNTER', () => {
   const run = travelling(['battle', 'battle'])
   run.threat = THREAT_MAX
   apply(run, { type: 'advance' })
@@ -444,8 +444,8 @@ test('an ambush has no landing: the squad is down at once, every posted alien in
   for (const u of battle.units.filter((a) => a.side === 'alien')) expect(u.engaged).toBe(true)
   const hunter = battle.units.find((u) => u.boss)!.stats
   const best = soldierStats(run, run.soldiers[0])
-  expect(hunter.hp * hunter.damage).toBeGreaterThanOrEqual(1.4 * best.hp * best.damage)
-  expect(hunter.hp * hunter.damage).toBeLessThanOrEqual(1.8 * best.hp * best.damage)
+  expect(hunter.hp * hunter.damage).toBeGreaterThanOrEqual(0.9 * HUNTER.hp * HUNTER.damage * best.hp * best.damage)
+  expect(hunter.hp * hunter.damage).toBeLessThanOrEqual(1.15 * HUNTER.hp * HUNTER.damage * best.hp * best.damage)
 })
 
 test.each(['human', 'alien'] as const)('full threat puts an ambush before the next stop; %s win', (winner) => {

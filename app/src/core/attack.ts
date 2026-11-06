@@ -1,5 +1,5 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
-import { type Battle, type Unit, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_STACKS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
+import { type Battle, type Unit, BASE_STATS, SUPPRESS_DAMAGE, SPOTTER_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_STACKS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
 import { cloakOn } from './abilities'
 import { duoCrit, duoDamage, duoHit } from './duo-effects'
 import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './keystones'
@@ -20,6 +20,9 @@ import { charge, fury, hold, turned } from './brawlers'
 import { threat } from './threat'
 import { FUEL_DAMAGE } from './twists'
 import { BLOCK_SOAK, WEAPONS, type Guard, type Kit, type Weapon } from './weapons'
+
+/** What a shot of `power` makes of `damage`: a light shot its share; a heavy blow multiplies the first BASE_STATS.damage and adds the rest once. */
+export const wielded = (damage: number, power: number) => (power > 1 ? Math.min(damage, BASE_STATS.damage) * power + Math.max(0, damage - BASE_STATS.damage) : damage * power)
 
 /** One shot of a weapon's attack, and what the attack's shots share: one crit roll, and an attack out of cloak. */
 interface Blow {
@@ -158,8 +161,9 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     stackDamage(unit, enemy, used) +
     fury(battle, unit, enemy) +
     duoDamage(battle, unit, enemy, events)
-  // A fraction is a chance of one point more, so small shots add up to their share.
-  const scaled = blow && blow.kit.power !== 1 ? Math.floor(dealt * blow.kit.power + random(battle)) : dealt
+  // Light shots split bonuses by power too; a heavy blow adds them once. A fraction is a chance of one point more, so small shots add up to their share.
+  const power = blow?.kit.power ?? 1
+  const scaled = power !== 1 ? Math.floor(wielded(base, power) + (dealt - base) * Math.min(1, power) + random(battle)) : dealt
   let damage = scaledDamage(unit, enemy, base > 0 ? Math.max(MIN_DAMAGE, scaled) : Math.max(0, scaled), used)
   const warded = has(enemy, distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield')
   if (warded) {

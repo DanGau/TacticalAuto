@@ -17,6 +17,10 @@ import type { Sprite, Stage } from './stage'
 const PIP = 5
 const PIP_STEP = 6
 const PIP_ROW = 10 * PIP_STEP - 1
+/** Most health and armor shown as pips; more shows as a bar with the health left on it. */
+const PIP_MAX = 20
+/** A health bar's height, and an armor strip's above it. */
+const BAR = { hp: 8, armor: 3 }
 /** A unit's picture, in screen pixels about its feet, and the pixels per one drawn, for a crisp edge. */
 const BODY = { left: 36, up: 100, down: 4 }
 const BODY_RES = 2
@@ -35,6 +39,29 @@ export function grow(sprite: Sprite): void {
   sprite.marks.board.position.y = (BADGE_UP * GIANT) / ACROSS
   sprite.shadow.scale.setScalar(GIANT)
   squash(sprite, 1, 1)
+}
+
+/** A health bar above a unit's feet: health left of `maxHp` with temp HP after it, armor left of `maxArmor` a strip above, and the health left written on it. */
+function drawBar(g: CanvasRenderingContext2D, ally: boolean, hp: number, maxHp: number, armor: number, maxArmor: number, temp: number): void {
+  const left = -PIP_ROW / 2
+  const top = -38 + PIP - BAR.hp
+  const fill = (color: number, x: number, y: number, w: number, h: number) => {
+    g.fillStyle = css(color)
+    g.fillRect(x, y, w, h)
+  }
+  fill(ally ? COLOR.allyLost : COLOR.enemyLost, left, top, PIP_ROW, BAR.hp)
+  const shown = Math.min(1, hp / maxHp) * PIP_ROW
+  fill(ally ? COLOR.allyHp : COLOR.enemyHp, left, top, shown, BAR.hp)
+  if (temp > 0) fill(COLOR.temp, left + shown, top, Math.min(PIP_ROW - shown, (temp / maxHp) * PIP_ROW), BAR.hp)
+  if (armor > 0) fill(COLOR.hit, left, top - BAR.armor - 1, (armor / Math.max(armor, maxArmor)) * PIP_ROW, BAR.armor)
+  g.font = 'bold 8px sans-serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.lineWidth = 2
+  g.strokeStyle = css(0x10141c)
+  g.strokeText(String(hp), 0, top + BAR.hp / 2 + 0.5)
+  g.fillStyle = '#fff'
+  g.fillText(String(hp), 0, top + BAR.hp / 2 + 0.5)
 }
 
 /** Stands a sprite on a tile. */
@@ -109,7 +136,8 @@ export const vitals = (battle: Battle, id: number): [number, number, number, Bad
 /**
  * `pips` marks a soldier's level above its health; `letter` is the initial of its class. Its health and armor show as
  * pips, one each, ten to a row, rows stacking upward: health left in green on an ally and red on an enemy, health
- * lost in a dark shade of it, then armor in yellow, then temp HP in pale blue. Above them its badges: the stacks and counts it has built.
+ * lost in a dark shade of it, then armor in yellow, then temp HP in pale blue. Past PIP_MAX they show as a bar in
+ * those colors, health left written on it, armor a strip above. Above them its badges: the stacks and counts it has built.
  */
 export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite {
   const picture = document.createElement('canvas')
@@ -129,7 +157,8 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
   const node = new Group()
   node.add(shadow, body)
   const color = unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR[unit.civilian] : unit.summoner !== null ? COLOR.mech : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human
-  const rows = Math.ceil((unit.stats.hp + unit.stats.armor) / 10)
+  const barred = unit.stats.hp + unit.stats.armor > PIP_MAX
+  const rows = barred ? 2 : Math.ceil((unit.stats.hp + unit.stats.armor) / 10)
   const maxHp = unit.stats.hp
   const ally = unit.side === 'human'
   const marks = badgeBoard()
@@ -177,9 +206,10 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
         g.textBaseline = 'middle'
         g.fillText(letter, 0, -17)
       }
+      if (barred) drawBar(g, ally, Math.max(hp, 0), maxHp, armor, unit.stats.armor, temp)
       const lost = maxHp - Math.max(hp, 0)
       const colors = [...Array(Math.max(hp, 0)).fill(ally ? COLOR.allyHp : COLOR.enemyHp), ...Array(Math.max(lost, 0)).fill(ally ? COLOR.allyLost : COLOR.enemyLost), ...Array(armor).fill(COLOR.hit), ...Array(temp).fill(COLOR.temp)]
-      colors.forEach((c, i) => {
+      if (!barred) colors.forEach((c, i) => {
         g.fillStyle = css(c)
         g.fillRect(-PIP_ROW / 2 + (i % 10) * PIP_STEP, -38 - Math.floor(i / 10) * PIP_STEP, PIP, PIP)
       })

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { isSoldier, type Battle, type Unit } from './battle'
 import { stepBattle } from './combat'
-import { shoot, weaponAttack } from './attack'
+import { shoot, weaponAttack, wielded } from './attack'
 import type { GameEvent } from './combat-event'
 import { spotted } from './fighters'
 import { wound } from './wound'
@@ -49,7 +49,7 @@ test.each(Object.entries(WEAPONS).filter(([, w]) => !w.melee) as [WeaponId, (typ
   const { b, hero } = field(id, [[12, 10]])
   const fired = shots(weaponAttack(b, hero, spotted(b)))
   expect(fired).toHaveLength(w.attack.shots)
-  for (const shot of fired) expect(Math.abs(shot.damage - 10 * w.attack.power)).toBeLessThanOrEqual(1)
+  for (const shot of fired) expect(Math.abs(shot.damage - wielded(10, w.attack.power))).toBeLessThanOrEqual(1)
 })
 
 test('guns differ in shots and in damage a shot', () => {
@@ -88,7 +88,7 @@ test.each(['hammer', 'shield'] as const)('a %s hits hard up close, and thrown on
   const near = field(id, [[11, 10]])
   const up = heroTurn(near.b, near.hero)
   expect(up[0].form).toBeUndefined()
-  expect(up[0].damage).toBe(Math.round(10 * WEAPONS[id].attack.power))
+  expect(up[0].damage).toBe(Math.round(wielded(10, WEAPONS[id].attack.power)))
   expect(up.at(-1)!.secondary).toBe('frag')
   const far = field(id, [[13, 10]])
   const thrown = heroTurn(far.b, far.hero)

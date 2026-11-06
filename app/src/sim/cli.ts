@@ -4,7 +4,7 @@ import { bots } from '../bots/bots'
 import { DOCTRINES, type DoctrineId } from '../core/doctrines'
 import { formatForks, formatMatrix } from './forks'
 import { playAll } from './pool'
-import { byBattle, byGoal, formatDiagnosis, formatReport, ranked, report, rows, OPENING_FLOOR, STRATEGIC_FLOOR } from './report'
+import { byBattle, byGoal, formatDiagnosis, formatReport, ranked, report, rows, OPENING_FLOOR, STRATEGIC_FLOOR, BOSS_ROUNDS_FLOOR, HIT_CEILING } from './report'
 import { OPENING } from '../core/progress'
 
 const { values } = parseArgs({
@@ -18,7 +18,7 @@ const { values } = parseArgs({
     diagnose: { type: 'boolean', default: false },
     /** Print the clean comparison: each deploy screen played on with every utility and with none. */
     clean: { type: 'boolean', default: false },
-    /** Fail if the strategic bot wins fewer runs than STRATEGIC_FLOOR, or fewer opening battles than OPENING_FLOOR. */
+    /** Fail if the strategic bot wins fewer runs than STRATEGIC_FLOOR or fewer opening battles than OPENING_FLOOR, a late boss falls faster than BOSS_ROUNDS_FLOOR, or a hit passes HIT_CEILING. */
     floor: { type: 'boolean', default: false },
     json: { type: 'boolean', default: false },
   },
@@ -43,6 +43,8 @@ if (values.bot === 'all') {
   const opening = results.flatMap((r) => r.tolls.filter((t) => t.nth <= OPENING))
   const openingWon = opening.filter((t) => t.won).length / opening.length
   if (values.floor && openingWon < OPENING_FLOOR) summary.failures.push(`the strategic bot won ${Math.round(100 * openingWon)}% of the first ${OPENING} battles, under their floor of ${Math.round(100 * OPENING_FLOOR)}%: the opening is too hard`)
+  if (values.floor && summary.hits.bossRounds < BOSS_ROUNDS_FLOOR) summary.failures.push(`a late boss falls in ${summary.hits.bossRounds} rounds by median, under the floor of ${BOSS_ROUNDS_FLOOR}: heroes hit too hard for bosses`)
+  if (values.floor && summary.hits.max > HIT_CEILING) summary.failures.push(`a hero hit for ${summary.hits.max}, over the ceiling of ${HIT_CEILING}: bonuses stack too high`)
   console.log(values.json ? JSON.stringify(summary) : formatReport(summary))
   if (values.diagnose) console.log(`\nby battle:\n${byBattle(results)}\nby goal: ${byGoal(results)}\n${formatDiagnosis(values.bot, rows(results))}`)
   if (values.clean) console.log(`\n${formatForks(results.flatMap((r) => r.forks))}\n\n${formatMatrix(results.flatMap((r) => r.forks))}`)

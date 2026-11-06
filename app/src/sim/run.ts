@@ -31,6 +31,10 @@ export interface Toll {
   before: number
   after: number
   downed: number
+  /** The hardest single hit a hero landed on an alien. */
+  maxHit: number
+  /** Rounds from the boss's first wound to its fall, counting both; null with no boss felled. */
+  bossRounds: number | null
 }
 
 export interface RunResult {
@@ -76,11 +80,16 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
   const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], actions: [] }
   let clock = { next: 0, done: 0 }
   let leaps = 0
+  /** This battle's hardest hero hit, its boss, and the round the boss was first wounded. */
+  let hits = { max: 0, boss: -1, from: -1, rounds: null as number | null }
   /** The battle under way, its leg, the squad's health as it began, and the utilities it held. */
   let begun: [Run['battle'], number, number, UtilityId[]] = [null, 0, 0, []]
   while (run.phase !== 'won' && run.phase !== 'lost') {
     const battle = run.battle
-    if (run.phase === 'battle' && begun[0] !== battle) begun = [battle, run.keys, run.soldiers.reduce((sum, s) => sum + health(run, s), 0), [...run.utilities]]
+    if (run.phase === 'battle' && begun[0] !== battle) {
+      begun = [battle, run.keys, run.soldiers.reduce((sum, s) => sum + health(run, s), 0), [...run.utilities]]
+      hits = { max: 0, boss: battle!.units.find((u) => u.boss)?.id ?? -1, from: -1, rounds: null }
+    }
     if (run.phase === 'battle' && battle!.phase === 'battle') {
       const played = timedFlow(run, clock)
       clock = played.clock
@@ -90,6 +99,11 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
         if (event.type === 'throw') result.moments.throws++
         if (event.type === 'throw') result.moments.farthest = Math.max(result.moments.farthest, distance(event.from, event.to))
         if (event.type === 'move') leaps += event.leaps ?? 0
+        if (event.type === 'shot' && event.damage > 0 && battle!.units.find((u) => u.id === event.id)?.side === 'human') {
+          hits.max = Math.max(hits.max, event.damage)
+          if (event.target === hits.boss && hits.from < 0) hits.from = battle!.round
+        }
+        if (event.type === 'death' && event.id === hits.boss && hits.from >= 0) hits.rounds = battle!.round - hits.from + 1
         if (event.type !== 'end') continue
         result.battles++
         const arena = (result.jumps[battle!.arenaKind] ??= { battles: 0, jumps: 0 })
@@ -99,7 +113,7 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
         const fought = run.report!.soldiers
-        result.tolls.push({ nth: result.battles, leg: begun[1], party: fought.length, won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3]), most: fought.reduce((sum, s) => sum + s.maxHp, 0), before: begun[2], after: fought.reduce((sum, s) => sum + s.hp, 0), downed: battle!.downed.length })
+        result.tolls.push({ nth: result.battles, leg: begun[1], party: fought.length, won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3]), most: fought.reduce((sum, s) => sum + s.maxHp, 0), before: begun[2], after: fought.reduce((sum, s) => sum + s.hp, 0), downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds })
         clock = { next: 0, done: 0 }
       }
       continue
