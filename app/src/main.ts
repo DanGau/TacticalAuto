@@ -135,3 +135,6 @@ if (!params.has('manual')) {
     } else await new Promise(requestAnimationFrame)
   }
 }
+
+// The built game caches itself so it plays offline.
+if (location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js')
