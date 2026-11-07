@@ -1,4 +1,5 @@
 // A hero's kit grouped by where each part comes from, each tagged as battle callouts tag it; shown on hovering or tapping a hero.
+import { PERKS } from '../core/perks'
 import type { Battle } from '../core/battle'
 import { CLASSES } from '../core/classes'
 import { DOCTRINES } from '../core/doctrines'
@@ -18,12 +19,16 @@ import type { View } from '../view/view'
 /** A name tagged with its source's glyph and colour, `title` on hover. */
 export const tag = (kind: SrcKind, name: string, title = '') => `<span class="src" style="color:${css(SOURCE[kind].color)}"${title ? ` title="${title}"` : ''}>${SOURCE[kind].glyph} ${name}</span>`
 
+/** The basic actions a hero has: Throw only with Heave. */
+export const basicsOf = (hero: Soldier) => [BASICS.attack, BASICS.jump, ...(hero.perks.includes('heave') ? [BASICS.throw] : [])]
+
 /** What a hero has in a battle, by source: each part's name and what it does. */
 export function kitOf(run: Run, hero: Soldier, battle: Battle | null): [SrcKind, { name: string; text: string }[]][] {
   const weapon = hero.gear ? WEAPONS[hero.gear.weapon] : null
   const ability = abilityOf(hero)
   const groups: [SrcKind, { name: string; text: string }[]][] = [
-    ['basic', [BASICS.attack, BASICS.throw, BASICS.jump].map((name) => ({ name, text: '' }))],
+    ['basic', basicsOf(hero).map((name) => ({ name, text: '' }))],
+    ['perk', hero.perks.map((id) => PERKS[id])],
     ['class', [...(ability ? [{ name: CLASSES[hero.cls!].abilityName, text: CLASSES[hero.cls!].abilityText }] : []), { name: SECONDARIES[secondaryOf(hero)].name, text: SECONDARIES[secondaryOf(hero)].text }]],
     ['skill', hero.skills.filter((id) => !SKILLS[id].teaches).map((id) => SKILLS[id])],
     ['weapon', weapon ? [{ name: weapon.name, text: weapon.special ?? '' }] : []],

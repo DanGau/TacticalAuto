@@ -7,9 +7,10 @@ import { DUOS } from './duos'
 import { EFFECTS } from './gear'
 import type { SecondaryId } from './secondaries'
 import { SKILL_EFFECTS } from './skill-effects'
+import { PERK_EFFECTS } from './perks'
 import { WEAPONS } from './weapons'
 
-export type SrcKind = 'class' | 'skill' | 'weapon' | 'gear' | 'relic' | 'boon' | 'doctrine' | 'object' | 'basic' | 'alien'
+export type SrcKind = 'class' | 'skill' | 'weapon' | 'gear' | 'relic' | 'boon' | 'doctrine' | 'object' | 'basic' | 'perk' | 'alien'
 
 /** `id` is an effect or ability for class, skill, gear, relic and doctrine; a weapon's id or effect; a boon's id; an object's prop; an alien's kind or ability; a basic action. */
 export interface Src {
@@ -22,13 +23,14 @@ export const BASICS = { attack: 'Attack', throw: 'Throw', jump: 'Jump', move: 'M
 
 export const has = <T extends object>(table: T, id: string): id is Extract<keyof T, string> => Object.hasOwn(table, id)
 
-/** The kind an effect comes from: a class ability or duo, a weapon's own, a doctrine's, a skill's, a gear mod's, a basic; any other is a relic's. */
+/** The kind an effect comes from: a class ability or duo, a weapon's own, a doctrine's, a skill's, a perk's, a gear mod's, a basic; any other is a relic's. */
 export function srcOf(effect: Effect | Ability): Src {
   const kind = ((): SrcKind => {
     if (Object.values(CLASSES).some((c) => c.ability === effect) || has(DUOS, effect)) return 'class'
     if (Object.values(WEAPONS).some((w) => w.effect === effect)) return 'weapon'
     if (effect === 'reckoning' || Object.values(DOCTRINES).some((d) => d.effect === effect)) return 'doctrine'
     if ((SKILL_EFFECTS as readonly string[]).includes(effect)) return 'skill'
+    if ((PERK_EFFECTS as readonly string[]).includes(effect)) return 'perk'
     if (has(EFFECTS, effect)) return 'gear'
     return has(BASICS, effect) ? 'basic' : 'relic'
   })()

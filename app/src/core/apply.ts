@@ -12,10 +12,10 @@ import { buyWare } from './rewards'
 import { buyUtility, keepUtility, takeStart } from './rewards'
 import { GEAR_PRICE } from './rewards'
 import { equipFind } from './rewards'
-import { takeSkill } from './rewards'
+import { takePerk, takeSkill } from './rewards'
 import { mend } from './squad'
 import { TRAVEL_HEAL } from './squad'
-import { skillOffers } from './squad'
+import { minorOffers, skillOffers } from './squad'
 
 export type Action =
   /** At the run's start: take the recruit at `index` of run.recruits as the first soldier. */
@@ -54,6 +54,7 @@ export type Action =
   | { type: 'ack' }
   /** Reward phase: the soldier with id `soldier` learns the skill at `index` of its offers. */
   | { type: 'skill'; soldier: number; index: number }
+  | { type: 'perk'; soldier: number; index: number }
 
 export type Result = { ok: true } | { ok: false; reason: string }
 
@@ -106,7 +107,7 @@ export function apply(run: Run, action: Action): Result {
     takeDuo(run)
     return ok
   }
-  if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill') {
+  if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill' || action.type === 'perk') {
     if (run.phase !== 'reward') return no('nothing to choose')
     if (action.type === 'relic') {
       const id = run.relicOffers[action.index]
@@ -116,6 +117,10 @@ export function apply(run: Run, action: Action): Result {
       const soldier = run.soldiers.find((s) => s.id === action.soldier)
       if (!soldier || !skillOffers(soldier)[action.index]) return no('no such skill on offer')
       takeSkill(run, soldier, action.index)
+    } else if (action.type === 'perk') {
+      const soldier = run.soldiers.find((s) => s.id === action.soldier)
+      if (!soldier || !minorOffers(soldier)[action.index]) return no('no such perk on offer')
+      takePerk(run, soldier, action.index)
     } else {
       if (!run.finds[action.find]) return no('no such find')
       if (action.type === 'sell') sellFind(run, action.find)

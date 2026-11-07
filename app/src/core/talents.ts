@@ -8,6 +8,7 @@ import { distance } from './grid'
 import { chillFrom, chillUnit, empower, kindle, burnFrom } from './stacks'
 import { wound } from './wound'
 import { TALENT } from './tuning'
+import { PERK } from './perks'
 
 
 const hurt = (u: Unit) => u.hp <= u.stats.hp / 2
@@ -58,6 +59,8 @@ export function talentDamage(battle: Battle, unit: Unit, enemy: Unit, used: Effe
     ['whiteHeat', enemy.burn > 0, TALENT.kill],
     ['firebrand', enemy.burn > 0, enemy.burn],
     ['brittle', enemy.chill > 0, TALENT.kill],
+    ['firstStrike', unit.hits === 1, PERK.firstStrike],
+    ['finisher', hurt(enemy), PERK.finisher],
     ['thousandCuts', unit.hits > 2, Math.min(4, Math.floor((unit.hits - 1) / 2))],
   ]
   let more = 0
@@ -170,6 +173,7 @@ export function talentKill(battle: Battle, target: Unit, killer: Unit, events: G
   if (has(killer, 'shroud') && distance(killer, target) >= TALENT.far && !killer.cloaked) events.push(cloakOn(killer))
   if (has(killer, 'cauterize') && target.burn > 0) heal(killer, TALENT.heal, 'cauterize', events)
   if (has(killer, 'shadowFeed')) heal(killer, TALENT.heal, 'shadowFeed', events)
+  if (has(killer, 'scavenger')) heal(killer, PERK.scavenge, 'scavenger', events)
   if (has(killer, 'carnage') && killer.spent.filter((e) => e === 'carnage').length < TALENT.moveMax) {
     killer.spent.push('carnage')
     killer.stats = { ...killer.stats, move: killer.stats.move + 1 }
@@ -183,6 +187,10 @@ export function talentTurn(battle: Battle, unit: Unit, events: GameEvent[]): voi
   if (foes(battle, unit).length === 0) return
   const owner = ownerOf(battle, unit)
   if (owner && has(owner, 'mechanic')) heal(unit, TALENT.heal, 'mechanic', events)
+  if (has(unit, 'secondBreath') && hurt(unit) && !unit.spent.includes('secondBreath')) {
+    unit.spent.push('secondBreath')
+    heal(unit, PERK.breath, 'secondBreath', events)
+  }
   if (has(unit, 'bedrock') && unit.armor < unit.stats.armor + TALENT.armorMax) {
     unit.armor = Math.min(unit.stats.armor + TALENT.armorMax, unit.armor + TALENT.armor)
     events.push(fx(unit.id, 'bedrock', 0))

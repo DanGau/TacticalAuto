@@ -11,7 +11,8 @@ import { GEAR_PRICE } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
 import { committed, pathOf, SKILLS, type SkillId } from '../core/skills'
-import { health, MAX_SQUAD, skillOffers, soldierStats, squadKeywords } from '../core/squad'
+import { health, MAX_SQUAD, minorOffers, skillOffers, soldierStats, squadKeywords, weaponOf } from '../core/squad'
+import type { PerkId } from '../core/perks'
 import { BOON_CHARGES, RELICS, type RelicId } from '../core/relics'
 import type { Keyword } from '../core/keywords'
 import { carries, RIG, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS, type EffectId, type UtilityId } from '../core/utilities'
@@ -221,6 +222,24 @@ export function plannedSkill(soldier: Soldier): number {
   return offers.reduce((best, id, i) => (score(id) > score(offers[best]) ? i : best), 0)
 }
 
+/** What a perk is worth to a hero: its class's and survival first, then what suits its weapon; throws pay once it heaves. */
+function perkWorth(soldier: Soldier, id: PerkId): number {
+  const melee = !!weaponOf(soldier)?.melee
+  const worth: Record<PerkId, number> = {
+    heave: 3, extraThrow: 2, longThrow: 1, crushingThrow: 3, strongman: 2,
+    springLegs: 1, crashLanding: melee ? 3 : 1, freerunner: melee ? 2 : 1, fleetFoot: melee ? 3 : 2, firemansCarry: 1,
+    toughness: 4, ironGut: 4, padding: 4, keenEye: 2, longSight: melee ? 0 : 3, firstStrike: 2, finisher: 3, scavenger: 2, secondBreath: 3,
+    hardCharger: 3, heavyFrame: 3, scope: 4, extraKit: 5, toolkit: 3, extraFuel: 5, frostLining: 3, deepShadow: 4,
+  }
+  return worth[id]
+}
+
+/** The perk a hero takes: the offer worth most to it. */
+export function plannedPerk(soldier: Soldier): number {
+  const offers = minorOffers(soldier)
+  return offers.reduce((best, id, i) => (perkWorth(soldier, id) > perkWorth(soldier, offers[best]) ? i : best), 0)
+}
+
 /** What a relic is worth beside what the squad holds: a bridge or engine pays only with its pieces, and is dead without them. */
 function relicWorth(run: Run, id: RelicId): number {
   const held = squadKeywords(run)
@@ -247,8 +266,10 @@ function reward(run: Run): Action {
     const holder = holderFor(run, run.finds[0])
     return holder === null ? { type: 'sell', find: 0 } : { type: 'equip', find: 0, soldier: holder }
   }
-  const learner = run.soldiers.find((s) => skillOffers(s).length > 0)!
-  return { type: 'skill', soldier: learner.id, index: plannedSkill(learner) }
+  const learner = run.soldiers.find((s) => skillOffers(s).length > 0)
+  if (learner) return { type: 'skill', soldier: learner.id, index: plannedSkill(learner) }
+  const picker = run.soldiers.find((s) => minorOffers(s).length > 0)!
+  return { type: 'perk', soldier: picker.id, index: plannedPerk(picker) }
 }
 
 /** Classes by how many runs a lone hero of each wins, on the same seeds. */

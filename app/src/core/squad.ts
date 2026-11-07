@@ -7,6 +7,7 @@ import { type Doctrine, DOCTRINES } from './doctrines'
 import { EFFECTS, plainGear } from './gear'
 import { type Relic, RELICS } from './relics'
 import { randomInt } from './rng'
+import { PERK_LEVELS, perkOffers, PERKS } from './perks'
 import { type Run } from './run-state'
 import { type Earned } from './run-state'
 import { type Soldier } from './run-state'
@@ -62,14 +63,20 @@ export function skillOffers(soldier: Soldier): SkillId[] {
   return path ? path.rows[made] : TREES[cls].paths.map((p) => p.rows[0][0])
 }
 
+/** The perks a soldier chooses from now, or none if no perk is owed. */
+export const minorOffers = (soldier: Soldier) => (PERK_LEVELS.filter((at) => at <= level(soldier)).length > soldier.perks.length ? perkOffers(soldier) : [])
+
+/** Whether a soldier owes a choice: a power or a perk. */
+export const owesPick = (soldier: Soldier) => skillOffers(soldier).length > 0 || minorOffers(soldier).length > 0
+
 /** The class ability a soldier has learned, if any. */
 export const abilityOf = (soldier: Soldier) => (soldier.cls && soldier.skills.some((id) => SKILLS[id].teaches) ? CLASSES[soldier.cls].ability : null)
 
-/** Uses of a soldier's class ability each battle: the class's once learned, plus what skills and relics add to an ability that has uses. */
+/** Uses of a soldier's class ability each battle: the class's once learned, plus what skills, perks and relics add to an ability that has uses. */
 export function charges(run: Run, soldier: Soldier): number {
   const base = abilityOf(soldier) ? CLASSES[soldier.cls!].charges : 0
   if (base === 0) return 0
-  return base + soldier.skills.reduce((sum, id) => sum + (SKILLS[id].charges ?? 0), 0) + run.relics.reduce((sum, id) => sum + ((RELICS[id] as Relic).charges ?? 0), 0)
+  return base + [...soldier.skills.map((id) => SKILLS[id]), ...soldier.perks.map((id) => PERKS[id])].reduce((sum, p) => sum + (p.charges ?? 0), 0) + run.relics.reduce((sum, id) => sum + ((RELICS[id] as Relic).charges ?? 0), 0)
 }
 
 /** Health every soldier heals for each stop travelled to. */
@@ -86,14 +93,14 @@ export function mend(run: Run, amount: number): void {
 /** Whether any soldier is below full health. */
 export const wounded = (run: Run) => run.soldiers.some((s) => health(run, s) < soldierStats(run, s).hp)
 
-/** A soldier's stats in battle: base, plus class, level, skills, gear and its weapon, plus relics. A melee weapon reaches the next tile. */
+/** A soldier's stats in battle: base, plus class, level, skills, perks, gear and its weapon, plus relics. A melee weapon reaches the next tile. */
 export function soldierStats(run: Run, soldier: Soldier): Stats {
   const stats = { ...BASE_STATS }
   const weapon = weaponOf(soldier)
   for (const key of Object.keys(stats) as (keyof Stats)[]) {
     const fromClass = soldier.cls ? (CLASSES[soldier.cls].stats[key] ?? 0) : 0
     const fromGear = (soldier.gear?.stats[key] ?? 0) + (weapon?.stats[key] ?? 0)
-    const fromSkills = soldier.skills.reduce((sum, id) => sum + (SKILLS[id].stats?.[key] ?? 0), 0)
+    const fromSkills = [...soldier.skills.map((id) => SKILLS[id]), ...soldier.perks.map((id) => PERKS[id])].reduce((sum, p) => sum + (p.stats?.[key] ?? 0), 0)
     stats[key] += fromClass + fromGear + fromSkills + level(soldier) * (LEVEL_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
   }
   if (weapon?.melee) stats.range = MELEE_RANGE
@@ -151,6 +158,7 @@ export function draft(run: Run, taken: ClassId[]): Soldier {
     cls,
     skills: [powerOf(cls)],
     lost: [],
+    perks: [],
     // Read, not drawn: the seed costs the run no draw.
     seed: run.rng,
     feats: [],

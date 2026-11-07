@@ -14,6 +14,7 @@ export const SOURCE: Record<SrcKind, { color: number; glyph: string }> = {
   doctrine: { color: 0xff9a3d, glyph: '⚑' },
   object: { color: 0xa0a7b4, glyph: '▣' },
   basic: { color: 0xc9ced8, glyph: '•' },
+  perk: { color: 0xe6d3a3, glyph: '▴' },
   alien: { color: 0xff6b5e, glyph: '☠' },
 }
 

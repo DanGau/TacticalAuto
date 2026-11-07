@@ -76,7 +76,7 @@ const skills = {
   sprinter: { name: 'Super Speed', use: 'Passive', text: '+2 move', stats: { move: 2 } },
   bloodbath: { name: 'Bloodbath', use: 'Reaction', tags: ['kill'], text: `Each kill heals ${BLOODBATH_HEAL} and adds +1 damage for the rest of the battle`, effect: 'bloodbath' },
   riposte: { name: 'Riposte', use: 'Reaction', target: 'Whoever hits it', text: 'Takes its damage back, each hit, at any range', effect: 'riposte' },
-  projectile: { name: 'Living Projectile', use: 'At will', target: 'Alien a thrown one lands on', tags: ['force'], text: "Takes the thrown alien's HP in damage", effect: 'projectile' },
+  projectile: { name: 'Living Projectile', use: 'At will', target: 'Alien a thrown one lands on', tags: ['force'], text: "Takes the thrown alien's HP in damage; the hero can throw without Heave", effect: 'projectile' },
   earthshaker: { name: 'Earthshaker', use: 'Passive', text: `Heroic Leap is at will and does ${EARTHSHAKER_DAMAGE} more damage`, effect: 'earthshaker' },
   battleJoy: { name: 'Battle Joy', use: 'Passive', text: `+${T.bonus} damage above half HP`, effect: 'battleJoy' },
   grit: { name: 'Grit', use: 'Passive', text: `Takes ${T.soak} less damage from each hit up close`, effect: 'grit' },

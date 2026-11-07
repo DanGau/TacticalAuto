@@ -9,6 +9,7 @@ import type { ClassId } from './classes'
 import type { FeatId, Tally } from './feats'
 import type { Gear } from './gear'
 import type { SkillId } from './skills'
+import type { PerkId } from './perks'
 import type { UtilityId } from './utilities'
 import type { ChallengeId } from './challenges'
 import type { RelicId } from './relics'
@@ -110,6 +111,8 @@ export interface Soldier {
   seed: number
   /** Skills offered and turned down: gone for the run. */
   lost: SkillId[]
+  /** Minor perks, in the order picked. */
+  perks: PerkId[]
 }
 
 /** What the last stop changed, for the player to review. */

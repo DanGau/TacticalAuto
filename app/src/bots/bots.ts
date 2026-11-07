@@ -1,6 +1,6 @@
 // Bots: each chooses the next action whenever the run waits for the player.
 import type { Action } from '../core/apply'
-import { strategic } from './strategic'
+import { plannedPerk, strategic } from './strategic'
 import { fuelTanks } from '../core/objects'
 import { UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
 import type { Keyword } from '../core/keywords'
@@ -20,7 +20,7 @@ import { GEAR_PRICE } from '../core/rewards'
 import { squadKeywords } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { health } from '../core/squad'
-import { skillOffers } from '../core/squad'
+import { minorOffers, skillOffers } from '../core/squad'
 import { level } from '../core/squad'
 import { THREAT_MAX } from '../core/progress'
 
@@ -78,7 +78,11 @@ function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
     return who === run.soldiers.length ? { type: 'sell', find: 0 } : { type: 'equip', find: 0, soldier: run.soldiers[who].id }
   }
   if (run.finds.length > 0) return decideFind(run, pick === PICKS.synergy)
-  const learner = run.soldiers.find((s) => skillOffers(s).length > 0)!
+  const learner = run.soldiers.find((s) => skillOffers(s).length > 0)
+  if (!learner) {
+    const picker = run.soldiers.find((s) => minorOffers(s).length > 0)!
+    return { type: 'perk', soldier: picker.id, index: pick === PICKS.random ? randomInt(rng, minorOffers(picker).length) : plannedPerk(picker) }
+  }
   const offers = skillOffers(learner)
   return { type: 'skill', soldier: learner.id, index: pick(run, rng, offers.map((id) => SKILLS[id].tags ?? [])) }
 }

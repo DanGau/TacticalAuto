@@ -4,10 +4,10 @@ import type { Action } from '../core/apply'
 import { nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
-import { skillOffers } from '../core/squad'
+import { owesPick } from '../core/squad'
 import { battlePage, runSummary } from './summary'
 import { installTips } from './tip'
-import { acquired, choice, joined, loot, modal, skillChoice, spareChoice, stopReport } from './aftermath'
+import { acquired, choice, joined, loot, modal, pickChoice, spareChoice, stopReport } from './aftermath'
 import { ALIENS } from '../core/aliens'
 import { TWISTS } from '../core/twists'
 import { CHALLENGES } from '../core/challenges'
@@ -155,17 +155,17 @@ export function createUi(act: (action: Action) => void): Ui {
     if (run.phase === 'recruit') return !started ? title() : !told ? story() : recruits(run, recruit)
     if (run.phase === 'battle') return ''
     if (run.phase === 'won' || run.phase === 'lost') return runSummary(run)
-    // After a fight: a hero joining, then the debrief, where each soldier owed a skill chooses it, then the rewards.
+    // After a fight: a hero joining, then the debrief, where each soldier owed a skill or perk chooses it, then the rewards.
     if (report && seen !== report && report.soldiers.length > 0) {
       if (report.hired && met !== report) return joined(run, report.hired)
       if (opened.report !== report) opened = { report, still: false }
-      const learner = run.soldiers.find((s) => s.id === ability && skillOffers(s).length > 0)
+      const learner = run.soldiers.find((s) => s.id === ability && owesPick(s))
       const find = crate !== null && run.finds[crate] ? crate : null
       // A pop-up opened over it leaves the debrief at rest behind: nothing in it plays again.
       if (learner || find !== null) opened.still = true
       if (statsOpen && run.log.length > 0) return stopReport(run, report, true) + modal(battlePage(run, run.log.at(-1)!))
       const debrief = stopReport(run, report, opened.still)
-      return learner ? debrief + modal(skillChoice(run, learner, armed)) : find !== null ? debrief + loot(run, find, armed) : debrief
+      return learner ? debrief + modal(pickChoice(run, learner, armed)) : find !== null ? debrief + loot(run, find, armed) : debrief
     }
     if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run, armed)}`
     if (run.phase === 'shop' || run.phase === 'event') {

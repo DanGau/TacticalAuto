@@ -1,12 +1,12 @@
-// A class's skill tree as a map: Basics and the class power on top, a column per path, its rows downward, links from each row to the next, capstones along the bottom.
+// A class's skill tree as a map: Basics and perks, then the class power on top, a column per path, its rows downward, links from each row to the next, capstones along the bottom.
 import type { ClassId } from '../core/classes'
 import { usage } from '../core/powers'
 import type { Soldier } from '../core/run-state'
-import { BASICS } from '../core/sources'
+import { PERKS } from '../core/perks'
 import { capstones, committed, pathOf, powerOf, SKILLS, TREES, type SkillId } from '../core/skills'
 import { skillOffers } from '../core/squad'
 import { describe } from './html'
-import { tag } from './kit'
+import { basicsOf, tag } from './kit'
 
 /** Whether a hero knows a skill, is offered it now, turned it down for good, could be offered it later, or stands in a path it did not take. */
 export type SkillState = 'taken' | 'offered' | 'lost' | 'open' | 'locked'
@@ -31,7 +31,7 @@ export interface MapNode {
 }
 
 /** Each row of a path placed in its column, two abreast and the third under them; a link from each node to each of the next row. */
-export function treeLayout(cls: ClassId): { nodes: MapNode[]; links: { from: SkillId; to: SkillId }[]; basics: { x: number; y: number }[]; heads: { name: string; x: number }[]; height: number } {
+export function treeLayout(cls: ClassId): { nodes: MapNode[]; links: { from: SkillId; to: SkillId }[]; heads: { name: string; x: number }[]; height: number } {
   const { paths, power } = TREES[cls]
   const col = MAP.width / paths.length
   const nodes: MapNode[] = [{ id: power, path: -1, layer: 0, x: MAP.width / 2, y: MAP.root }]
@@ -48,8 +48,7 @@ export function treeLayout(cls: ClassId): { nodes: MapNode[]; links: { from: Ski
     y += lines * MAP.row + MAP.gap
   }
   const links = paths.flatMap((p) => [...p.rows[0].map((to) => ({ from: power, to })), ...p.rows.slice(1).flatMap((row, r) => p.rows[r].flatMap((from) => row.map((to) => ({ from, to }))))])
-  const basics = [1, 3, 5].map((k) => ({ x: (MAP.width * k) / 6, y: 22 }))
-  return { nodes, links, basics, heads: paths.map((p, i) => ({ name: p.name, x: col * (i + 0.5) })), height: y }
+  return { nodes, links, heads: paths.map((p, i) => ({ name: p.name, x: col * (i + 0.5) })), height: y }
 }
 
 /** Where a skill stands in the tree and what taking it does, in words. */
@@ -76,7 +75,7 @@ function card(hero: Soldier, id: SkillId, held?: Parameters<typeof describe>[2])
 /** A hero's tree as a map; `cell` draws each skill's node, by default its name. */
 export function treeMap(hero: Soldier, cell: (id: SkillId, state: SkillState) => string = (id, state) => `<span class="node-name ${state}" tabindex="0">${SKILLS[id].name}</span>`, held?: Parameters<typeof describe>[2]): string {
   const cls = hero.cls!
-  const { nodes, links, basics, heads, height } = treeLayout(cls)
+  const { nodes, links, heads, height } = treeLayout(cls)
   const at = new Map(nodes.map((n) => [n.id, n]))
   const caps = capstones(cls)
   const took = committed(cls, hero.skills)
@@ -93,8 +92,8 @@ export function treeMap(hero: Soldier, cell: (id: SkillId, state: SkillState) =>
   const order = (l: { from: SkillId; to: SkillId }) => ['taken', 'offered'].filter((s) => s === skillState(hero, l.to) || s === skillState(hero, l.from)).length
   const head = (h: { name: string; x: number }, i: number) => `<text class="head${took && TREES[cls].paths[i] !== took ? ' shut' : ''}" x="${h.x}" y="${MAP.heads}">${h.name}</text>`
   const svg = `<svg viewBox="0 0 ${MAP.width} ${height}" preserveAspectRatio="none" aria-hidden="true">${[...links].sort((a, b) => order(a) - order(b)).map(line).join('')}${heads.map(head).join('')}</svg>`
-  const basic = basics.map((p, i) => `<div class="tree-node basic" style="${pct(p.x, p.y - 13)}"><span class="node-name taken">${tag('basic', [BASICS.attack, BASICS.throw, BASICS.jump][i])}</span></div>`).join('')
+  const basic = `<div class="basics-row" style="top:${(100 * 14) / height}%;height:var(--bh)">${[...basicsOf(hero).map((name) => tag('basic', name)), ...hero.perks.map((id) => tag('perk', PERKS[id].name, PERKS[id].text))].map((t) => `<span class="basic-chip">${t}</span>`).join('')}</div>`
   const look = (n: MapNode) => [n.path < 0 ? 'root' : '', caps.includes(n.id) ? 'cap' : '', skillState(hero, n.id)].filter(Boolean).join(' ')
   const skills = nodes.map((n) => `<div class="tree-node ${look(n)}" style="${pct(n.x, n.y - MAP.node.h / 2)}">${cell(n.id, skillState(hero, n.id))}${card(hero, n.id, held)}</div>`).join('')
-  return `<div class="treemap" style="aspect-ratio:${MAP.width}/${height};--nw:${(100 * MAP.node.w) / MAP.width}%;--nh:${(100 * MAP.node.h) / height}%;--bh:${(100 * 26) / height}%"><small class="basics-head">Basics</small>${svg}${basic}${skills}</div>`
+  return `<div class="treemap" style="aspect-ratio:${MAP.width}/${height};--nw:${(100 * MAP.node.w) / MAP.width}%;--nh:${(100 * MAP.node.h) / height}%;--bh:${(100 * 30) / height}%"><small class="basics-head">Basics</small>${svg}${basic}${skills}</div>`
 }

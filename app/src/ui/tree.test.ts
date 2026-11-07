@@ -38,7 +38,7 @@ test('each node shows its state: the power taken, the offers pickable, the turne
   expect(skillState(hero, TREES[cls].paths[1].rows[2][0])).toBe('locked')
   expect(rule(hero, TREES[cls].paths[1].rows[2][0])).toMatch(/^Locked/)
   const html = treeMap(hero)
-  expect(html.match(/class="tree-node /g)).toHaveLength(treeOf(cls).length + 3)
+  expect(html.match(/class="tree-node /g)).toHaveLength(treeOf(cls).length)
   expect(html.match(/tree-node [^"]*offered"/g)).toHaveLength(3)
   expect(html.match(/tree-node cap /g)).toHaveLength(capstones(cls).length)
   expect(html.match(/class="head shut"/g)).toHaveLength(2)

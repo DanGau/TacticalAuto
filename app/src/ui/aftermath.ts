@@ -12,7 +12,8 @@ import { type Soldier } from '../core/run-state'
 import { squadKeywords } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { health } from '../core/squad'
-import { skillOffers } from '../core/squad'
+import { minorOffers, owesPick, skillOffers } from '../core/squad'
+import { PERKS, type PerkId } from '../core/perks'
 import { level } from '../core/squad'
 import { xpFor } from '../core/squad'
 import { SKILLS, treeOf, type SkillId } from '../core/skills'
@@ -37,7 +38,7 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
   const feats = soldier.feats.map((id) => `<li class="feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</li>`)
   const live = run.soldiers.find((s) => s.name === soldier.name)
   const weapon = live?.gear
-  const choose = live && skillOffers(live).length > 0 ? `<button class="decide" data-ability="${live.id}">Choose power</button>` : ''
+  const choose = live && owesPick(live) ? `<button class="decide" data-ability="${live.id}">Choose ${skillOffers(live).length > 0 ? 'power' : 'perk'}</button>` : ''
   return `<div class="soldier ${soldier.taken ? 'died' : ''} ${up ? 'levelled' : ''}">
     <div class="who"><span class="portrait">${badge(soldier.cls)}</span><span><b>${soldier.name}</b><br><small>Level ${before}${cls ? ` · ${cls}` : ''}</small></span></div>
     <div class="bar"><div class="fill" style="--from: ${filled(soldier.xpBefore)}%; --to: ${filled(soldier.xpAfter)}%"></div></div>
@@ -107,6 +108,16 @@ export function skillChoice(run: Run, soldier: Soldier, armed: string | null = n
     ${pickDetail(picks, armed, 'Tap a power for its details; tap it again to learn it.')}`
 }
 
+/** A soldier's perk pick: three small cards, one tap to take; those passed over may come again. */
+export function perkChoice(soldier: Soldier): string {
+  const card = (id: PerkId, index: number) => button({ type: 'perk', soldier: soldier.id, index }, `<b>${PERKS[id].name}</b><small>${PERKS[id].text}</small>`, 'perk')
+  const held = soldier.perks.length > 0 ? `<small class="held">Has: ${soldier.perks.map((id) => PERKS[id].name).join(', ')}</small>` : ''
+  return `<div class="perkpick"><h2><b class="supplies">${soldier.name}</b>, level ${level(soldier)}: pick a perk. The others may come again.</h2><div class="perks">${minorOffers(soldier).map(card).join('')}</div>${held}</div>`
+}
+
+/** A soldier's next pick: its power first, then its perk. */
+export const pickChoice = (run: Run, soldier: Soldier, armed: string | null) => (skillOffers(soldier).length > 0 ? skillChoice(run, soldier, armed) : perkChoice(soldier))
+
 /** With a utility found and no room: fixed cards, each held one to drop for it, or the new one left behind. */
 export function spareChoice(run: Run, armed: string | null): string {
   const spare = UTILITIES[run.spare!]
@@ -114,7 +125,7 @@ export function spareChoice(run: Run, armed: string | null): string {
   return modal(`<h2>${spare.icon} ${spare.name}: ${spare.text}. The party holds three: drop which?</h2><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a card for its details; tap it again to choose it.')}`)
 }
 
-/** The next choice of the reward phase, alone on its screen: the starting boons, a relic, then each find and who takes it, then each skill owed. */
+/** The next choice of the reward phase, alone on its screen: the starting boons, a relic, then each find and who takes it, then each skill and perk owed. */
 export function choice(run: Run, armed: string | null = null): string {
   if (run.boonOffers.length > 0) return startChoice(run, armed)
   const held = squadKeywords(run)
@@ -126,8 +137,8 @@ export function choice(run: Run, armed: string | null = null): string {
     const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
     return findSwap(run, 0, armed, more)
   }
-  const learner = run.soldiers.find((s) => skillOffers(s).length > 0)
-  return learner ? skillChoice(run, learner, armed) : ''
+  const learner = run.soldiers.find(owesPick)
+  return learner ? pickChoice(run, learner, armed) : ''
 }
 
 /**
@@ -142,7 +153,7 @@ export function stopReport(run: Run, report: Report, still = false): string {
   const all = [...report.soldiers, ...(hero ? [{ id: hero.id, name: hero.name, cls: hero.cls, xpBefore: hero.xp, xpAfter: hero.xp, taken: false, earned: [], feats: [], hp: health(run, hero), maxHp: soldierStats(run, hero).hp, tally: emptyTally() }] : [])]
   const crates = run.finds.map((_, i) => `<button class="crate" data-crate="${i}" title="Open">🎁</button>`)
   const squad = report.soldiers.length > 0 ? `<div class="stage second"><div class="squad">${all.map((s) => soldierCard(run, s)).join('')}</div>${crates.length > 0 ? `<div class="crates">${crates.join('')}</div>` : ''}</div>` : ''
-  const owed = squad !== '' && (run.finds.length > 0 || run.spare !== null || run.soldiers.some((s) => skillOffers(s).length > 0))
+  const owed = squad !== '' && (run.finds.length > 0 || run.spare !== null || run.soldiers.some(owesPick))
   return `<div class="debrief${still ? ' still' : ''}">
     ${title(report)}
     <div class="stage">

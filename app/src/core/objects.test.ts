@@ -2,7 +2,8 @@ import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { GRID, isSoldier } from './battle'
 import { distance, reshaped } from './grid'
-import { HURL_MAX, leverage, THROW_DAMAGE } from './objects'
+import { HURL_MAX, hurlRange, leverage, OBJECT_USES, THROW_DAMAGE } from './objects'
+import { PERK } from './perks'
 import { begun, enterAt } from './roads'
 import { current } from './run'
 import { ARENA_REACH } from './encounter'
@@ -26,6 +27,7 @@ function duel() {
   battle.west.fill('none')
   battle.height.fill(0)
   alien.engaged = true
+  soldier.effects.push('heave')
   Object.assign(soldier, { x: 10, y: 10 })
   Object.assign(alien, { x: 10, y: 13, hp: 99, armor: 0 })
   return { battle, soldier, alien, walled }
@@ -109,4 +111,38 @@ test('a hero sets off a fuel tank beside an alien, but not one beside a human', 
   battle.props[13 * GRID + 11] = 'fuel'
   Object.assign(soldier, { x: 12, y: 13 })
   expect(leverage(battle, soldier)).toEqual([])
+})
+
+/** A duel with a car beside the hero and two aliens together within its throw. */
+function carDuel() {
+  const d = duel()
+  d.battle.props[10 * GRID + 11] = 'car'
+  d.battle.bulk[10 * GRID + 11] = 1
+  d.soldier.stats.strength = 4
+  d.battle.units.push({ ...d.alien, id: 900, x: 11, y: 13, hp: 99 })
+  return d
+}
+
+test('only a hero with Heave throws', () => {
+  const { battle, soldier } = carDuel()
+  soldier.effects = soldier.effects.filter((e) => e !== 'heave')
+  expect(leverage(battle, soldier)).toEqual([])
+})
+
+test('Crushing Throw adds its damage and says so; Long Throw reaches further; Extra Throw adds a use', () => {
+  const { battle, soldier, alien } = carDuel()
+  soldier.effects.push('crushingThrow')
+  const events = leverage(battle, soldier)
+  expect(alien.hp).toBeLessThanOrEqual(99 - THROW_DAMAGE - PERK.throwDamage)
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', effect: 'crushingThrow', src: { kind: 'perk', id: 'crushingThrow' } }))
+  soldier.stats.strength = 2
+  const near = hurlRange(soldier)
+  soldier.effects.push('longThrow')
+  expect(hurlRange(soldier)).toBe(near + PERK.throwRange)
+  const again = carDuel()
+  again.soldier.effects.push('crushingThrow')
+  again.soldier.spent = Array<'throw'>(OBJECT_USES).fill('throw')
+  expect(leverage(again.battle, again.soldier)).toEqual([])
+  again.soldier.effects.push('extraThrow')
+  expect(leverage(again.battle, again.soldier)).not.toEqual([])
 })

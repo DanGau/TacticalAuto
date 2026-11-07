@@ -13,7 +13,7 @@ import { randomInt } from '../core/rng'
 import { road } from '../core/roads'
 import { createRun, legOf } from '../core/run'
 import { type Run } from '../core/run-state'
-import { hire, skillOffers, soldierStats, xpFor } from '../core/squad'
+import { hire, minorOffers, skillOffers, soldierStats, xpFor } from '../core/squad'
 import { timedFlow } from '../core/step'
 import { carries, UTILITY_IDS, type UtilityId } from '../core/utilities'
 
@@ -37,6 +37,7 @@ function battle(seed: number, party: number, rung: number, challenge: ChallengeI
   for (const soldier of run.soldiers) {
     soldier.xp = xpFor(levelAt(party, rung))
     while (skillOffers(soldier).length > 0) soldier.skills.push(skillOffers(soldier)[randomInt(run, skillOffers(soldier).length)])
+    while (minorOffers(soldier).length > 0) soldier.perks.push(minorOffers(soldier)[randomInt(run, minorOffers(soldier).length)])
     soldier.gear = generateGear(run, run.nextGear++, party === 1 ? 'common' : 'rare')
   }
   for (let i = 0; i < party - 1; i++) gainRelic(run, offerable(run.relics)[randomInt(run, offerable(run.relics).length)], true)

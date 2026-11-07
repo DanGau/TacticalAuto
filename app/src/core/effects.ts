@@ -6,6 +6,7 @@ import { DUOS, type DuoId } from './duos'
 import { EFFECTS } from './gear'
 import { UTILITIES } from './utilities'
 import { RELICS } from './relics'
+import { PERKS } from './perks'
 import { SKILLS, type SkillId } from './skills'
 import { WEAPONS, type WeaponId } from './weapons'
 
@@ -26,6 +27,8 @@ export function effectName(effect: Effect | Ability, squad: { skills: SkillId[];
   const own = [...squad.skills.map((id) => SKILLS[id]), ...squad.weapons.map((id) => WEAPONS[id]), ...Object.values(RELICS), ...Object.values(DOCTRINES)].find((source) => source.effect === effect)
   if (own) return own.name
   if (effect in UTILITIES) return UTILITIES[effect as keyof typeof UTILITIES].name
+  const perk = Object.values(PERKS).find((p) => p.effect === effect)
+  if (perk) return perk.name
   if (effect in EFFECTS) return EFFECTS[effect as keyof typeof EFFECTS].prefix
   return Object.values(SKILLS).find((skill) => skill.effect === effect)!.name
 }

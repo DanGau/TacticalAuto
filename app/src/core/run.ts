@@ -9,6 +9,7 @@ import { DOCTRINES, KILL_REWARDS, type Doctrine, type Rule } from './doctrines'
 import { RESISTS, type Resist } from './keywords'
 import { RELICS, ZENITH_EVERY, type Relic } from './relics'
 import { SKILLS } from './skills'
+import { PERKS } from './perks'
 import { type TerrainKind } from './terrain'
 import { random, randomInt } from './rng'
 import { TOWNS } from './towns'
@@ -423,7 +424,7 @@ export function advance(run: Run): void {
     secondary: secondaryOf(s),
     weapon: doctrines.find((d) => d.fights)?.fights ?? s.gear?.weapon,
     stance: doctrines.find((d) => d.stance)?.stance ?? (s.cls === 'support' && run.soldiers.length > 1 ? CLASSES.support.stance : weaponOf(s)?.stance) ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
-    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])].filter(
+    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...s.perks.flatMap((id) => PERKS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])].filter(
       // Zenith Chronometer works every ZENITH_EVERY battles; under Executioner's Oath a kill pays a hero nothing.
       (effect) => (effect !== 'zenith' || (run.log.length + 1) % ZENITH_EVERY === 0) && !(rules.includes('reckoning') && KILL_REWARDS.includes(effect)),
     ),

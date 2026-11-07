@@ -10,6 +10,9 @@ import { bite, canShoot, sees } from './sight'
 import { WEAPONS } from './weapons'
 import { pounce, turned } from './brawlers'
 import { threat } from './threat'
+import { PERK } from './perks'
+import { fx } from './sources'
+import { wound } from './wound'
 
 /**
  * The cheapest path to each tile the unit can reach with `move`, climbing costing more and jumping as its jump allows, cheapest first,
@@ -32,7 +35,7 @@ export function paths(battle: Battle, unit: Unit, move: number): Tile[][] {
       const back = path.at(-2) ?? (path.length > 0 ? unit : null)
       for (const { x, y } of strides(battle, from, leap(unit))) {
         if (barred(battle, x, y, has(unit, 'hover'))) continue
-        const next = cost + stepCost(battle, from, { x, y }, has(unit, 'hover'))
+        const next = cost + stepCost(battle, from, { x, y }, has(unit, 'hover') || has(unit, 'freerunner'))
         const heading = (a: Tile, b: Tile) => `${Math.sign(b.x - a.x)},${Math.sign(b.y - a.y)}`
         const bent = bends + (back && heading(back, from) !== heading(from, { x, y }) ? 1 : 0)
         const known = best.get(y * GRID + x) ?? Infinity
@@ -337,8 +340,7 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || unit.frozen || (unit.kind === 'sprinter' && unit.chill > 0)) return []
   const pounced = pounce(battle, unit)
   if (pounced.length > 0) return pounced
-  // A carrier walks at half its move.
-  const move = Math.ceil(Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chill > 0 ? CHILL_MOVE : 0)) / (carrying(battle, unit) ? 2 : 1))
+  const move = moveOf(battle, unit)
   const path = choose(move)
   if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
   const end = path.at(-1) ?? unit
@@ -422,10 +424,13 @@ export function escapePath(battle: Battle, unit: Unit): Tile[] {
 
 /** The move a path costs, climbing costing more. */
 export function costOf(battle: Battle, unit: Unit, path: Tile[]): number {
-  return path.reduce((sum, tile, i) => sum + stepCost(battle, path[i - 1] ?? unit, tile, has(unit, 'hover')), 0)
+  return path.reduce((sum, tile, i) => sum + stepCost(battle, path[i - 1] ?? unit, tile, has(unit, 'hover') || has(unit, 'freerunner')), 0)
 }
 
-/** Moves `unit` along `path`, saying how many of its strides are jumps. */
+/** The move a unit has this turn: haste adds, chill takes, and a carrier without Fireman's Carry walks at half. */
+export const moveOf = (battle: Battle, unit: Unit) => Math.ceil(Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chill > 0 ? CHILL_MOVE : 0)) / (carrying(battle, unit) && !has(unit, 'firemansCarry') ? 2 : 1))
+
+/** Moves `unit` along `path`, saying how many of its strides are jumps; a jump with Crash Landing hurts each alien beside where it lands. */
 export function walk(battle: Battle, unit: Unit, path: Tile[], events: GameEvent[]): void {
   const start = { x: unit.x, y: unit.y }
   const end = path.at(-1)
@@ -435,6 +440,11 @@ export function walk(battle: Battle, unit: Unit, path: Tile[], events: GameEvent
   unit.moved = true
   const leaps = path.filter((tile, i) => jumps(battle, path[i - 1] ?? start, tile)).length
   events.push({ type: 'move', src: { kind: 'basic', id: leaps ? 'jump' : 'move' }, id: unit.id, path, leaps: leaps || undefined })
+  if (!leaps || !has(unit, 'crashLanding')) return
+  for (const alien of foes(battle, unit).filter((a) => distance(a, unit) <= 1)) {
+    events.push(fx(alien.id, 'crashLanding', -PERK.landing))
+    wound(battle, alien, PERK.landing, events)
+  }
 }
 
 /** Tiles further a soldier may dash in the fight to reach a shot. */

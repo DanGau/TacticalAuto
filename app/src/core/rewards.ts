@@ -7,13 +7,19 @@ import { drawRelic, offerable, type RelicId } from './relics'
 import { type Run } from './run-state'
 import { type Shop } from './run-state'
 import { type Soldier } from './run-state'
-import { skillOffers } from './squad'
+import { minorOffers, owesPick, skillOffers } from './squad'
 
 /** Learns the offered skill at `index`. */
 export function takeSkill(run: Run, soldier: Soldier, index: number): void {
   const offers = skillOffers(soldier)
   soldier.lost.push(...offers.filter((_, i) => i !== index))
   soldier.skills.push(offers[index])
+  settle(run)
+}
+
+/** Takes the offered perk at `index`; those passed over stay in the pool. */
+export function takePerk(run: Run, soldier: Soldier, index: number): void {
+  soldier.perks.push(minorOffers(soldier)[index])
   settle(run)
 }
 
@@ -143,9 +149,9 @@ export function sellFind(run: Run, index: number): void {
   settle(run)
 }
 
-/** Ends the reward phase once no choice is left: no starting utilities, relic, find, spare utility or skill. */
+/** Ends the reward phase once no choice is left: no starting utilities, relic, find, spare utility, skill or perk. */
 export function settle(run: Run): void {
-  const owed = run.boonOffers.length > 0 || run.relicOffers.length > 0 || run.duoOffer !== null || run.finds.length > 0 || run.spare !== null || run.soldiers.some((s) => skillOffers(s).length > 0)
+  const owed = run.boonOffers.length > 0 || run.relicOffers.length > 0 || run.duoOffer !== null || run.finds.length > 0 || run.spare !== null || run.soldiers.some(owesPick)
   run.phase = owed ? 'reward' : 'overworld'
 }
 

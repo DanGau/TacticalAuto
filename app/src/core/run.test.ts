@@ -44,7 +44,7 @@ import { soldierStats } from './squad'
 import { health } from './squad'
 import { TRAVEL_HEAL } from './squad'
 import { skillOffers } from './squad'
-import { MAX_SKILLS, PICK_LEVELS, picksEarned } from './squad'
+import { MAX_SKILLS, minorOffers, PICK_LEVELS, picksEarned } from './squad'
 import { XP } from './squad'
 import { level } from './squad'
 import { xpFor } from './squad'
@@ -369,6 +369,7 @@ test('after the stops of a leg comes its satellite: winning it wins a key, a her
   for (let i = 0; i < 2; i++) {
     fight(run, 'human')
     while (skillOffers(run.soldiers[0]).length > 0) apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
+    while (minorOffers(run.soldiers[0]).length > 0) apply(run, { type: 'perk', soldier: run.soldiers[0].id, index: 0 })
   }
   onward(run)
   expect(current(run)!.stop).toMatchObject({ kind: 'key', terrain: 'compound' })
@@ -467,6 +468,7 @@ test.each(['human', 'alien'] as const)('with every key won the squad is three, o
     apply(run, { type: 'relic', index: 0 })
     while (run.finds.length > 0) apply(run, { type: 'equip', find: 0, soldier: run.soldiers[0].id })
     for (const s of run.soldiers) while (skillOffers(s).length > 0) apply(run, { type: 'skill', soldier: s.id, index: 0 })
+    for (const s of run.soldiers) while (minorOffers(s).length > 0) apply(run, { type: 'perk', soldier: s.id, index: 0 })
     expect(run.phase).toBe('overworld')
   }
   expect(run.soldiers).toHaveLength(MAX_SQUAD)
@@ -511,7 +513,7 @@ test('a key mission has one boss, with an escort for each key already won', () =
   }
 })
 
-const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: null, home: null, wounds: 0, seed: 0, lost: [], ...extra })
+const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: null, home: null, wounds: 0, seed: 0, lost: [], perks: [], ...extra })
 
 test('stats add class, level, skills and relics to the base', () => {
   const run = begun(1)
