@@ -17,6 +17,7 @@ import { HOLD_ROUNDS, WAVE_EVERY } from './goals'
 import { randomInt } from './rng'
 import { tickBoons } from './boons'
 import { wound } from './wound'
+import { talentTurn } from './talents'
 
 /**
  * What happens as a side's turn begins: burning hurts and mending armor heals. On the aliens' turn more aliens may
@@ -57,6 +58,7 @@ export function upkeep(battle: Battle): GameEvent[] {
       unit.armor = unit.stats.armor
       events.push(fx(unit.id, 'glacialArmor', 0))
     }
+    talentTurn(battle, unit, events)
     if (has(unit, 'rearm') && unit.armor < unit.stats.armor) {
       unit.armor++
       events.push(fx(unit.id, 'rearm', 0))

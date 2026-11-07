@@ -34,6 +34,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `ultimates.ts` | Capstones: when each fires and what it does |
 | `wound.ts` | Damage landing, what it sets off, the battle tally |
 | `stacks.ts` | Stacks a fight builds and what they set off: burn, chill and freezing, Might, combos, exposure, every-Nth hits |
+| `talents.ts` | Talents: skills shaping a hit by where it lands, or answering a hit, a kill or a turn's start |
 | `upkeep.ts` | What happens as a side's turn begins: more aliens engaging, waves |
 | `fighters.ts` | Unit queries every combat module asks |
 | `sight.ts` | Line of sight, what height does to a shot, noticing |

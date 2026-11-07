@@ -21,5 +21,10 @@ export const SKILL_EFFECTS = [
   'tesla', 'fontOfLife', 'sacredGround', 'command', 'firestorm', 'conflagration', 'hellfire', 'frozenHeart',
   'glacialArmor', 'shardstorm', 'repulse', 'gale', 'livingShadow', 'intangible', 'bladeDance',
   'lasting', 'shieldSlam', 'combo', 'projectile', 'faultLine', 'fanFlames', 'rimeGrip', 'opportunist',
+  'battleJoy', 'grit', 'charge', 'vengeance', 'carnage', 'thunderclap', 'standAlone', 'cracking', 'demolisher', 'bedrock',
+  'resonance', 'artillery', 'snapShot', 'deadeye', 'bigGame', 'camouflage', 'shroud', 'killshot', 'mechanic', 'bodyguard',
+  'pilotLink', 'targetLink', 'staticCharge', 'arcWelder', 'lifeLink', 'transfusion', 'rally', 'retribution', 'battleHymn',
+  'smite', 'pyromania', 'cauterize', 'combust', 'meltdown', 'heatShield', 'cinderSkin', 'flashFreeze', 'shatterpoint',
+  'coldSnap', 'frostShell', 'splinter', 'iceSpear', 'ambush', 'shadowFeed', 'wraithForm', 'soulDrain', 'venom', 'bloodScent',
   ...ULTIMATE_EFFECTS,
 ] as const

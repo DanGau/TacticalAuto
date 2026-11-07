@@ -189,9 +189,18 @@ export const PLANS: Record<ClassId, string> = {
   phantom: 'Shade',
 }
 
-/** Whether a skill pays for this hero: Shield Slam only with a Star Shield, Fault Line only up close, Living Projectile only for the strong. */
-const pays = (soldier: Soldier, id: SkillId) =>
-  id === 'shieldSlam' ? soldier.gear?.weapon === 'shield' : id === 'faultLine' ? !!soldier.gear && !!WEAPONS[soldier.gear.weapon].melee : id === 'projectile' ? (soldier.gear?.weapon === 'hammer' || soldier.gear?.weapon === 'fists') : true
+/** Whether a skill pays for this hero: Shield Slam only with a Star Shield, Living Projectile only for the strong, Fault Line and Rime Grip only in melee, Artillery only at range. */
+function pays(soldier: Soldier, id: SkillId): boolean {
+  const melee = !!soldier.gear && !!WEAPONS[soldier.gear.weapon].melee
+  const needs: Partial<Record<SkillId, boolean>> = {
+    shieldSlam: soldier.gear?.weapon === 'shield',
+    projectile: soldier.gear?.weapon === 'hammer' || soldier.gear?.weapon === 'fists',
+    faultLine: melee,
+    rimeGrip: melee,
+    artillery: !melee,
+  }
+  return needs[id] ?? true
+}
 
 /** The skill a hero plans on, of those that pay: the capstone, else the deepest, of its planned path while that capstone is still to be had, else of any path whose capstone is. */
 export function plannedSkill(soldier: Soldier): number {

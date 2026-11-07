@@ -8,14 +8,14 @@ import { capstones, depthOf, locked, opensOf, pathOf, powerOf, SKILLS, TREES, tr
 const classes = Object.keys(CLASSES) as ClassId[]
 const veteran = (cls: ClassId, skills: SkillId[]) => ({ ...begun(1).soldiers[0], cls, skills, lost: [] as SkillId[], xp: xpFor(PICK_LEVELS.at(-1)!) })
 
-test('every skill stands in one tree; each tree roots in its power, which teaches, and holds 3 paths and 17 to 20 skills', () => {
+test('every skill stands in one tree; each tree roots in its power, which teaches, and holds 3 paths and 23 to 27 skills', () => {
   const all = classes.flatMap(treeOf)
   expect(new Set(all).size).toBe(all.length)
   expect(new Set(all)).toEqual(new Set(Object.keys(SKILLS)))
   for (const cls of classes) {
     expect(TREES[cls].paths).toHaveLength(3)
-    expect(treeOf(cls).length - 1).toBeGreaterThanOrEqual(17)
-    expect(treeOf(cls).length - 1).toBeLessThanOrEqual(21)
+    expect(treeOf(cls).length - 1).toBeGreaterThanOrEqual(23)
+    expect(treeOf(cls).length - 1).toBeLessThanOrEqual(27)
     expect(SKILLS[powerOf(cls)].teaches).toBe(true)
     expect(unlocked(cls, [powerOf(cls)])).toEqual(treeOf(cls).filter((id) => TREES[cls].opens.includes(id)))
     for (const id of treeOf(cls)) for (const to of opensOf(cls, id)) expect(treeOf(cls)).toContain(to)
@@ -69,10 +69,10 @@ test('a hero takes one capstone: the first locks the rest', () => {
 /** Plays every pick of a hero of `cls` on `seed`, taking offer `choose` picks; returns each pick's offers. */
 function build(cls: ClassId, seed: number, choose: (offers: SkillId[]) => number) {
   const hero = { ...veteran(cls, [powerOf(cls)]), seed }
-  const picks: { offers: SkillId[]; left: number }[] = []
+  const picks: { offers: SkillId[]; left: number; onward: SkillId[] }[] = []
   for (let offers = skillOffers(hero); offers.length > 0; offers = skillOffers(hero)) {
     const shut = locked(cls, hero.skills)
-    picks.push({ offers, left: treeOf(cls).filter((id) => !hero.skills.includes(id) && !hero.lost.includes(id) && !shut.includes(id) && (!capstones(cls).includes(id) || unlocked(cls, hero.skills).includes(id))).length })
+    picks.push({ offers, left: treeOf(cls).filter((id) => !hero.skills.includes(id) && !hero.lost.includes(id) && !shut.includes(id) && (!capstones(cls).includes(id) || unlocked(cls, hero.skills).includes(id))).length, onward: unlocked(cls, hero.skills).filter((id) => !hero.lost.includes(id) && opensOf(cls, hero.skills.at(-1)!).includes(id)) })
     const i = choose(offers)
     hero.lost.push(...offers.filter((_, j) => j !== i))
     hero.skills.push(offers[i])
@@ -118,6 +118,14 @@ test('on any seed, a hero climbing a path reaches its capstone by the last pick'
 
 test('offers differ from seed to seed', () => {
   for (const cls of classes) expect(new Set(Array.from({ length: 20 }, (_, seed) => build(cls, seed * 104729, () => 0).picks.map((p) => p.offers.join()).join())).size).toBeGreaterThan(5)
+})
+
+test('a hero choosing by one taste builds differently from seed to seed, and each pick offers one its latest opened while one is left', () => {
+  for (const cls of classes) {
+    const builds = Array.from({ length: 20 }, (_, seed) => build(cls, seed * 104729, (offers) => offers.indexOf([...offers].sort()[0])))
+    expect(new Set(builds.map(({ hero }) => hero.skills.join())).size).toBeGreaterThanOrEqual(5)
+    for (const { offers, onward } of builds.flatMap((b) => b.picks)) if (onward.length > 0) expect(offers.some((id) => onward.includes(id))).toBe(true)
+  }
 })
 
 test('a hero with nothing left to learn is owed nothing, so the reward phase cannot stall', () => {

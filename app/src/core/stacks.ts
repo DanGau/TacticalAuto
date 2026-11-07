@@ -6,6 +6,7 @@ import { fireproof, foeHas, has, nearest } from './fighters'
 import { distance, walks } from './grid'
 import { RECKONING_KILLS } from './doctrines'
 import { TUNING } from './tuning'
+import { talentDamage, talentHit, talentKill } from './talents'
 import { wound } from './wound'
 
 /** Burn stacks a target `unit` sets burning takes on, and chill stacks one it chills. */
@@ -65,8 +66,8 @@ export function slammed(battle: Battle, unit: Unit, events: GameEvent[]): void {
   if (has(by, 'impetus')) empower(by, 1, 'impetus', events)
 }
 
-/** Damage a shot does more by the stacks and its place: Might, a combo on the same target, a shield's armor, Rime Grip, Opportunist; exposure is in `exposedDamage`. */
-export function stackDamage(unit: Unit, enemy: Unit, used: Effect[]): number {
+/** Damage a shot does more by the stacks and its place: Might, a combo on the same target, a shield's armor, Rime Grip, Opportunist, talents; exposure is in `exposedDamage`. */
+export function stackDamage(battle: Battle, unit: Unit, enemy: Unit, used: Effect[], events: GameEvent[]): number {
   const combo = has(unit, 'combo') && unit.comboOn === enemy.id ? Math.min(COMBO_MAX, unit.combo) : 0
   const slam = has(unit, 'shieldSlam') && unit.weapon === 'shield' ? unit.armor : 0
   const grip = has(unit, 'rimeGrip') && distance(unit, enemy) <= 1 ? TUNING.gripDamage : 0
@@ -75,7 +76,7 @@ export function stackDamage(unit: Unit, enemy: Unit, used: Effect[]): number {
   if (slam > 0) used.push('shieldSlam')
   if (grip > 0) used.push('rimeGrip')
   if (opportune > 0) used.push('opportunist')
-  return unit.might + combo + slam + grip + opportune
+  return unit.might + combo + slam + grip + opportune + talentDamage(battle, unit, enemy, used, events)
 }
 
 /** A hit on an exposed target does half again; the every-Nth hit of Cadenced gear twice. */
@@ -90,8 +91,9 @@ export function scaledDamage(unit: Unit, enemy: Unit, damage: number, used: Effe
 /** Crit chance more Lofty gear gives for standing above the target. */
 export const highCrit = (battle: Battle, unit: Unit, enemy: Unit) => (has(unit, 'lofty') ? HIGH_CRIT * Math.min(HIGH_LEVELS, Math.max(0, battle.height[unit.y * GRID + unit.x] - battle.height[enemy.y * GRID + enemy.x])) : 0)
 
-/** What a shot that struck adds up: the combo, a catalysing crit, a fanned burn, and Fault Line's every-Nth melee hit. */
+/** What a shot that struck adds up: the combo, a catalysing crit, a fanned burn, Fault Line's every-Nth melee hit, and talents. */
 export function struck(battle: Battle, unit: Unit, enemy: Unit, crit: boolean, events: GameEvent[]): void {
+  talentHit(battle, unit, enemy, crit, events)
   if (unit.comboOn === enemy.id) unit.combo++
   else Object.assign(unit, { comboOn: enemy.id, combo: 1 })
   if (crit && enemy.hp > 0 && has(unit, 'catalyst') && enemy.burn + enemy.chill > 0) {
@@ -142,6 +144,7 @@ export function died(battle: Battle, target: Unit, killer: Unit | null, events: 
     kindle(battle, heir, target.burn)
     events.push(fx(heir.id, 'embers', 0))
   }
+  if (killer && killer.side !== target.side) talentKill(battle, target, killer, events)
   if (!killer || killer.side !== 'human' || target.side !== 'alien' || !battle.rules.includes('reckoning')) return
   battle.kills++
   if (battle.kills % RECKONING_KILLS === 0) for (const hero of battle.units.filter(isSoldier)) empower(hero, 1, 'reckoning', events)

@@ -131,7 +131,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     (parried ? PARRY_SOAK : 0) +
     (shielded ? BLOCK_SOAK : 0)
 
-  const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.marked, 'apex', 1) > 0 || duoCrit(battle, unit, enemy, events)
+  const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.marked, 'apex', 1) + when(enemy.hp <= enemy.stats.hp / 2, 'deadeye', 1) > 0 || duoCrit(battle, unit, enemy, events)
   const crit = !enemy.resists.includes('crit') && (sure || (blow ? (blow.crit ??= random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)) : random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)))
   unit.hits++
   // A mirror hits as hard as the squad's hardest hitter; a feeder as hard as it has grown.
@@ -159,7 +159,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(unit.armor > 0, 'armored', 1) +
     when(enemy.rooted > 0, 'net', 2) +
     when(enemy.boss, 'bounty', BOUNTY_DAMAGE) +
-    stackDamage(unit, enemy, used) +
+    stackDamage(battle, unit, enemy, used, events) +
     fury(battle, unit, enemy) +
     duoDamage(battle, unit, enemy, events)
   // Light shots split bonuses by power too; a heavy blow adds them once. A fraction is a chance of one point more, so small shots add up to their share.
@@ -180,7 +180,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const deflect = guard(enemy, distance(unit, enemy) > 1, damage)
   if (deflect) damage = Math.floor(damage * deflect.lands)
   if (when(enemy.armor > 0, 'shred', 1)) enemy.armor = 0
-  const pierced = unseen || secondary?.effect === 'pierce' || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chill > 0, 'brittle', 1) > 0
+  const pierced = unseen || secondary?.effect === 'pierce' || has(unit, 'piercing') || has(unit, 'pierce') || has(unit, 'psionic') || unit.resists.includes('ward') || when(enemy.chill > 0, 'brittle', 1) + when(enemy.chill > 0, 'iceSpear', 1) > 0
   const left = enemy.hp + (pierced ? 0 : enemy.armor)
   if (has(enemy, 'mirror') && enemy.spent.filter((e) => e === 'mirror').length < MIRROR_IMAGES) {
     damage = 0

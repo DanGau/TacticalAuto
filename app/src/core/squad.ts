@@ -57,8 +57,8 @@ export const OFFERS = { min: 3, max: 4 }
 export const picksMade = (soldier: Soldier) => soldier.skills.filter((id) => !soldier.cls || id !== powerOf(soldier.cls)).length
 
 /**
- * The skills a soldier chooses the next from, drawn by its seed, or none if no choice is owed: first those its latest
- * pick opened, one of each path among them before the rest, then the rest its tree has open, topped up from the shallowest of the rest so it is never short. Known,
+ * The skills a soldier chooses the next from, drawn by its seed, or none if no choice is owed: two carrying on its latest
+ * pick's path (at the first pick, one of each path), then any its tree has open, topped up from the shallowest of the rest so it is never short. Known,
  * lost and locked skills never come, nor a capstone its path has not opened while anything else is left.
  */
 export function skillOffers(soldier: Soldier): SkillId[] {
@@ -67,12 +67,14 @@ export function skillOffers(soldier: Soldier): SkillId[] {
   const shut = locked(cls, soldier.skills)
   const left = (ids: SkillId[]) => ids.filter((id) => !soldier.skills.includes(id) && !soldier.lost.includes(id) && !shut.includes(id))
   const open = left(unlocked(cls, soldier.skills))
-  const fresh = open.filter((id) => opensOf(cls, soldier.skills.at(-1)!).includes(id))
+  const latest = soldier.skills.at(-1)!
+  const fresh = open.filter((id) => opensOf(cls, latest).includes(id))
   const rest = left(treeOf(cls)).filter((id) => !open.includes(id) && !capstones(cls).includes(id))
   const depths = [...new Set(rest.map((id) => depthOf(cls, id)))].sort((a, b) => a - b)
-  // One of each path the latest pick opens into comes first, so no path is shut before it is offered.
-  const leads = TREES[cls].paths.map((p) => fresh.filter((id) => pathOf(cls, id) === p)).filter((ids) => ids.length > 0)
-  const decks = [...leads, fresh, open.filter((id) => !fresh.includes(id)), ...depths.map((d) => rest.filter((id) => depthOf(cls, id) === d))]
+  // Two that carry on the latest pick's path come first; the first pick gets one of each path, so none is shut unoffered.
+  const onward = fresh.length > 0 ? fresh : open.filter((id) => pathOf(cls, id) === pathOf(cls, latest))
+  const leads = latest === powerOf(cls) ? TREES[cls].paths.map((p) => fresh.filter((id) => pathOf(cls, id) === p)).filter((ids) => ids.length > 0) : [onward, onward]
+  const decks = [...leads, open, ...depths.map((d) => rest.filter((id) => depthOf(cls, id) === d))]
   if (open.length + rest.length === 0) decks.push(left(capstones(cls)))
   const rng = { rng: soldier.seed ^ Math.imul(soldier.skills.length + 1, 0x9e3779b1) }
   // A fourth offer only while it leaves enough for the picks still to come.

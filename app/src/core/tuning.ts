@@ -27,3 +27,30 @@ export const TUNING = {
   /** The share of its own force the hunt adds to a battle at full threat. */
   hunt: 0.5,
 }
+
+/** How much each talent gives or takes, and how far it reaches. */
+export const TALENT = {
+  /** Damage more a hit does by Battle Joy, Charge, Demolisher, Artillery, Big Game, Pilot Link, Target Link and Blood Scent. */
+  bonus: 2,
+  /** Damage more by Ambush, Shatterpoint, Smite; by Killshot. */
+  big: 3,
+  kill: 4,
+  /** Damage less a hit does by Grit, Stand Alone, Camouflage, Bodyguard, Frost Shell and Wraith Form. */
+  soak: 2,
+  /** Tiles at which Artillery and Shroud count a target far. */
+  far: 4,
+  /** Armor Cracking Blow and Meltdown break. */
+  crack: 2,
+  /** Every how many hits Static Charge stuns. */
+  every: 3,
+  /** Damage Arc Welder, Retribution and Resonance deal, and the reach of Arc Welder, Life Link and Retribution. */
+  zap: 2,
+  reach: 3,
+  /** HP Cauterize, Shadow Feed, Mechanic and Transfusion give; Life Link and Soul Drain give 1. */
+  heal: 3,
+  /** Armor Bedrock and Rally give a turn, and the most above its own they build to. */
+  armor: 2,
+  armorMax: 4,
+  /** Move Carnage gives a kill, to at most this much. */
+  moveMax: 3,
+}
