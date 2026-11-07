@@ -57,7 +57,7 @@ export type PerkId = keyof typeof perks
 export const PERKS: Record<PerkId, Perk> = perks as Record<PerkId, Perk>
 
 /** The levels at which a hero picks a perk: those between its power picks. */
-export const PERK_LEVELS = [8, 9, 10]
+export const PERK_LEVELS = [2, 4, 6, 8, 9, 10]
 
 /** Perks on offer at each pick. */
 export const PERK_OFFERS = 3
