@@ -41,19 +41,16 @@ export interface Skill extends Power {
   teaches?: true
 }
 
-/** A way a class can grow, ending in its capstone: each skill of it and the skills taking that one opens. */
+/** A way a class can grow: its entry, then a row of three for each pick after, the last its capstones. Any of a row opens the next. */
 export interface Path {
   name: string
-  nodes: Partial<Record<SkillId, SkillId[]>>
-  capstone: SkillId
+  rows: SkillId[][]
 }
 
-/** A class's tree: its power, free on recruit, and what that opens; its paths; pairs of twins, of which a hero takes one at most. A hero takes one capstone at most. */
+/** A class's tree: its power, free on recruit, then three paths; the first pick commits a hero to one for the run. */
 export interface Tree {
   power: SkillId
-  opens: SkillId[]
   paths: Path[]
-  twins: [SkillId, SkillId][]
 }
 
 /** What a stunned alien loses. */
@@ -87,6 +84,11 @@ const skills = {
   vengeance: { name: 'Vengeance', use: 'Reaction', target: 'Self, when hit', text: '+1 damage for the rest of the battle', effect: 'vengeance' },
   carnage: { name: 'Carnage', use: 'Reaction', tags: ['kill'], text: `Each kill gives +1 move for the battle, to +${T.moveMax}`, effect: 'carnage' },
   thunderclap: { name: 'Thunderclap', use: 'Reaction', target: 'Beside its kill up close', tags: ['kill'], text: `Each ${stun}; a boss stands firm`, effect: 'thunderclap' },
+  berserk: { name: 'Berserker', use: 'Passive', tags: ['crit'], text: 'Every hit is a crit at half HP or less', effect: 'berserk' },
+  hunker: { name: 'Hunker Down', use: 'Passive', text: `Takes ${T.soak} less damage from each hit from 2+ tiles away`, effect: 'hunker' },
+  hardened: { name: 'Hardened', use: 'Reaction', target: 'Self, when hit', tags: ['ward'], text: `+1 armor for the battle, to +${T.hardMax}`, effect: 'hardened' },
+  bully: { name: 'Bully', use: 'Passive', text: `+${T.bonus} damage to a target with less HP than its own`, effect: 'bully' },
+  tremor: { name: 'Tremor', use: 'Passive', range: '1', target: 'Aliens', text: `${T.zap} damage to each at the start of its turn`, effect: 'tremor' },
   // Heavy
   meteorStrike: taught('heavy'),
   arsenal: { name: 'Second Meteor', use: 'Passive', text: 'One more Meteor Strike each battle', charges: 1 },
@@ -114,6 +116,9 @@ const skills = {
   bedrock: { name: 'Bedrock', use: 'Passive', tags: ['ward'], text: `+${T.armor} armor each turn, to ${T.armorMax} above its own`, effect: 'bedrock' },
   resonance: { name: 'Resonance', use: 'Reaction', target: 'Beside creature crit', tags: ['crit'], text: `${T.zap} damage to each`, effect: 'resonance' },
   artillery: { name: 'Artillery', use: 'Passive', text: `+${T.bonus} damage to a target ${T.far}+ tiles away`, effect: 'artillery' },
+  barrage: { name: 'Meteor Barrage', use: 'Passive', text: 'One more Meteor Strike each battle', charges: 1 },
+  wrecker: { name: 'Wrecker', use: 'Passive', text: `+${T.kill} damage to a target with 2+ aliens beside it`, effect: 'wrecker' },
+  concussiveForce: { name: 'Concussive Force', use: 'Reaction', target: 'Its every 2nd creature hit up close', text: `Stunned: it ${stun}; a boss stands firm`, effect: 'concussiveForce' },
   // Sniper
   farSight: taught('sniper'),
   steady: { name: 'Steady Hands', use: 'Passive', text: '+1 damage if it did not move this turn', effect: 'steady' },
@@ -139,6 +144,10 @@ const skills = {
   camouflage: { name: 'Camouflage', use: 'Passive', text: `Takes ${T.soak} less damage from each hit if it did not move this turn`, effect: 'camouflage' },
   shroud: { name: 'Shroud', use: 'Reaction', target: 'Self', tags: ['kill'], text: `A kill ${T.far}+ tiles away cloaks it`, effect: 'shroud' },
   killshot: { name: 'Killshot', use: 'Passive', text: `+${T.kill} damage to a target at a quarter HP or less`, effect: 'killshot' },
+  keenEye: { name: 'Keen Eye', use: 'Passive', tags: ['crit'], text: '+15% crit', stats: { crit: 0.15 } },
+  perfectShot: { name: 'Perfect Shot', use: 'Passive', tags: ['crit'], text: `Crits do ${T.kill} more damage`, effect: 'perfectShot' },
+  evasion: { name: 'Evasion', use: 'Passive', text: 'Takes 1 less damage from each hit', effect: 'dodge' },
+  untouchable: { name: 'Untouchable', use: 'Passive', text: `Takes ${T.kill} less damage from each hit if it did not move this turn`, effect: 'untouchable' },
   // Engineer
   deployMech: taught('engineer'),
   titan: { name: 'Titan Frame', use: 'Passive', text: `Its mech has +${TITAN_HEALTH} HP and +1 damage`, effect: 'titan' },
@@ -163,6 +172,11 @@ const skills = {
   targetLink: { name: 'Target Link', use: 'Passive', text: `Its machines do +${T.bonus} damage to the alien it last hit`, effect: 'targetLink' },
   staticCharge: { name: 'Static Charge', use: 'Reaction', target: `Its every ${T.every}rd creature hit`, text: `Stunned: it ${stun}; a boss stands firm`, effect: 'staticCharge' },
   arcWelder: { name: 'Arc Welder', use: 'At will', range: `${T.reach} of creature hit`, target: 'Nearest other alien', text: `${T.zap} damage`, effect: 'arcWelder' },
+  overdrive: { name: 'Overdrive', use: 'Passive', text: `Its machines do +${T.big} damage`, effect: 'overdrive' },
+  armoredDrones: { name: 'Armored Drones', use: 'Passive', tags: ['ward'], text: `Its machines take ${T.soak} less damage from each hit`, effect: 'armoredDrones' },
+  hiveQueen: { name: 'Hive Queen', use: 'Reaction', tags: ['kill'], text: `A kill by its machine heals that machine and it ${T.heal}`, effect: 'hiveQueen' },
+  exploitFault: { name: 'Exploit Fault', use: 'Passive', text: `+${TUNING.opportunistDamage} damage to a target rooted or stunned`, effect: 'opportunist' },
+  staticField: { name: 'Static Field', use: 'Passive', range: '2', target: 'Aliens', text: `${T.zap} damage to each at the start of its turn`, effect: 'staticField' },
   // Support
   healingLight: taught('support'),
   fieldKit: { name: 'Deep Wellspring', use: 'Passive', text: 'Two more Healing Lights each battle', charges: 2 },
@@ -188,6 +202,10 @@ const skills = {
   retribution: { name: 'Retribution', use: 'Aura', range: `${T.reach}`, target: 'Aliens that hit an ally', text: `Take ${T.zap} damage`, effect: 'retribution' },
   battleHymn: { name: 'Battle Hymn', use: 'Aura', range: '2', target: 'It and allies', tags: ['kill'], text: 'Each kill gives +1 damage for the battle', effect: 'battleHymn' },
   smite: { name: 'Smite', use: 'Passive', text: `+${T.big} damage to an alien beside an ally`, effect: 'smite' },
+  renewal: { name: 'Renewal', use: 'Passive', text: 'Heals 1 at the start of each turn', effect: 'regen' },
+  wellspring: { name: 'Wellspring', use: 'Aura', range: '2', target: 'Wounded allies', text: `Heal ${T.mend} at the start of its turn`, effect: 'wellspring' },
+  guardian: { name: 'Guardian Angel', use: 'Aura', range: '2', target: 'Allies', tags: ['ward'], text: `Take ${T.soak} less damage from each hit`, effect: 'guardian' },
+  warSong: { name: 'War Song', use: 'Aura', range: '2', target: 'It and allies', text: `+${T.bonus} damage`, effect: 'warSong' },
   // Pyro
   fireball: taught('pyro'),
   tanks: { name: 'Deep Flame', use: 'Passive', tags: ['burn'], text: 'One more Fireball each battle', charges: 1 },
@@ -211,6 +229,12 @@ const skills = {
   meltdown: { name: 'Meltdown', use: 'At will', target: 'Burning creature hit', tags: ['burn', 'ward'], text: `Breaks ${T.crack} of its armor`, effect: 'meltdown' },
   heatShield: { name: 'Heat Shield', use: 'Passive', tags: ['burn'], text: 'Takes 1 less damage from each hit per alien burning within 2, to 3', effect: 'heatShield' },
   cinderSkin: { name: 'Cinder Skin', use: 'Reaction', target: 'Whoever hits it up close', tags: ['burn'], text: 'Set burning', effect: 'cinderSkin' },
+  kindling: { name: 'Kindling', use: 'Passive', text: `+${T.bonus} damage to a target not burning`, effect: 'kindling' },
+  whiteHeat: { name: 'White Heat', use: 'Passive', tags: ['burn'], text: `+${T.kill} damage to a burning target`, effect: 'whiteHeat' },
+  spread: { name: 'Spreading Flames', use: 'At will', target: 'Alien beside burning creature hit', tags: ['burn'], text: 'Set burning', effect: 'spread' },
+  firebrand: { name: 'Firebrand', use: 'Passive', tags: ['burn'], text: '+1 damage for each burn stack on its target', effect: 'firebrand' },
+  emberWard: { name: 'Ember Ward', use: 'Passive', tags: ['burn'], text: `Takes ${T.soak} less damage from each hit by a burning alien`, effect: 'emberWard' },
+  emberHeart: { name: 'Ember Heart', use: 'Passive', tags: ['burn'], text: `Heals ${T.heal} at the start of each turn while an alien within 2 burns`, effect: 'emberHeart' },
   // Cryo
   chillTouch: taught('cryo'),
   icebreak: { name: 'Icebreaker', use: 'Passive', tags: ['frost'], text: `+${SEARING_DAMAGE} damage to a chilled target`, effect: 'icebreak' },
@@ -234,6 +258,11 @@ const skills = {
   frostShell: { name: 'Frost Shell', use: 'Passive', tags: ['frost'], text: `Takes ${T.soak} less damage from each hit by a chilled alien`, effect: 'frostShell' },
   splinter: { name: 'Splinter', use: 'Reaction', target: 'Beside creature crit', tags: ['crit', 'frost'], text: 'Chilled', effect: 'splinter' },
   iceSpear: { name: 'Ice Spear', use: 'Passive', tags: ['frost'], text: 'Its hits on a chilled target ignore armor', effect: 'iceSpear' },
+  brittle: { name: 'Brittle', use: 'Passive', tags: ['frost'], text: `+${T.kill} damage to a chilled target`, effect: 'brittle' },
+  iceAge: { name: 'Ice Age', use: 'Reaction', target: 'Beside its chilled kill', tags: ['frost', 'kill'], text: `Each ${stun}; a boss stands firm`, effect: 'iceAge' },
+  polarVortex: { name: 'Polar Vortex', use: 'Aura', range: '2', target: 'Aliens', tags: ['frost'], text: 'Chilled at the start of each of its turns', effect: 'polarVortex' },
+  iceLance: { name: 'Ice Lance', use: 'Passive', text: `+${T.bonus} damage to a target ${T.far}+ tiles away`, effect: 'artillery' },
+  glacialSpike: { name: 'Glacial Spike', use: 'Passive', tags: ['crit'], text: `Crits do ${T.kill} more damage`, effect: 'perfectShot' },
   // Phantom
   cloak: taught('phantom'),
   shadowStrike: { name: 'Shadow Strike', use: 'Passive', text: `Its attack out of Cloak does ${SHADOW_DAMAGE} more damage`, effect: 'shadowStrike' },
@@ -257,7 +286,13 @@ const skills = {
   soulDrain: { name: 'Soul Drain', use: 'At will', target: 'Self', text: 'Each hit it lands heals it 1', effect: 'soulDrain' },
   venom: { name: 'Venom', use: 'At will', target: 'Creature hit', text: 'It does 1 less damage on its next turn', effect: 'venom' },
   bloodScent: { name: 'Blood Scent', use: 'Passive', text: `+${T.bonus} damage to a target at half HP or less`, effect: 'bloodScent' },
-  // Capstones, each once a battle
+  killerInstinct: { name: 'Killer Instinct', use: 'Passive', tags: ['crit'], text: '+15% crit', stats: { crit: 0.15 } },
+  nightmare: { name: 'Nightmare', use: 'Reaction', range: '2', target: 'Aliens around its kill', tags: ['kill'], text: `Each ${stun}; a boss stands firm`, effect: 'nightmare' },
+  deathless: { name: 'Deathless', use: '1/battle', target: 'Self', text: 'Survives a killing hit at 1 HP', effect: 'lastStand' },
+  soulHarvest: { name: 'Soul Harvest', use: 'Reaction', tags: ['kill'], text: `Each kill heals it ${T.heal} and gives +1 damage for the battle`, effect: 'soulHarvest' },
+  cutthroat: { name: 'Cutthroat', use: 'Passive', text: `+${TUNING.gripDamage} damage to a target beside it`, effect: 'rimeGrip' },
+  thousandCuts: { name: 'Thousand Cuts', use: 'Passive', text: '+1 damage for each 2 hits it landed earlier this battle, to +4', effect: 'thousandCuts' },
+  // Ultimates, each once a battle
   killingSpree: { name: 'Killing Spree', use: '1/battle', range: `${SPREE.reach}`, target: `Up to ${SPREE.strikes} aliens in turn`, text: `Flashes to each and strikes for its damage +${SPREE.damage}`, effect: 'killingSpree' },
   indestructible: { name: 'Indestructible', use: '1/battle', target: 'Self at half HP', text: `Nothing can hurt it for ${INDESTRUCTIBLE.turns} turns; +${INDESTRUCTIBLE.damage} damage for the battle`, effect: 'indestructible' },
   levelBlock: { name: 'Level the Block', use: '1/battle', range: `${LEVEL_BLOCK.radius}`, target: '2+ aliens', text: `Everything standing in reach comes down; ${LEVEL_BLOCK.damage} damage to each alien`, effect: 'levelBlock' },
@@ -287,79 +322,55 @@ const skills = {
 export type SkillId = keyof typeof skills
 export const SKILLS: Record<SkillId, Skill> = skills
 
-const tree = (power: SkillId, opens: SkillId[], twins: [SkillId, SkillId][], ...paths: Path[]): Tree => ({ power, opens, paths, twins })
-const path = (name: string, capstone: SkillId, nodes: Path['nodes']): Path => ({ name, capstone, nodes })
+const tree = (power: SkillId, ...paths: Path[]): Tree => ({ power, paths })
+const path = (name: string, ...rows: SkillId[][]): Path => ({ name, rows })
 
 export const TREES: Record<ClassId, Tree> = {
-  assault: tree('mightyBound', ['rage', 'battleJoy', 'reflexes', 'grit', 'leap'], [['rage', 'battleJoy'], ['bloodlust', 'cleave'], ['reflexes', 'grit'], ['secondWind', 'unbreakable'], ['riposte', 'vengeance'], ['hurl', 'hamstring'], ['sprinter', 'charge'], ['projectile', 'earthshaker']],
-    path('Rampage', 'killingSpree', { rage: ['bloodlust', 'cleave'], battleJoy: ['bloodlust', 'cleave'], bloodlust: ['surge', 'bloodbath', 'carnage'], cleave: ['surge', 'bloodbath', 'carnage'], surge: ['killingSpree'], bloodbath: ['killingSpree'], carnage: ['killingSpree'] }),
-    path('Ironhide', 'indestructible', { reflexes: ['secondWind', 'unbreakable', 'skirmish'], grit: ['secondWind', 'unbreakable', 'skirmish'], secondWind: ['riposte', 'vengeance'], unbreakable: ['riposte', 'vengeance'], skirmish: ['riposte', 'vengeance'], riposte: ['indestructible'], vengeance: ['indestructible'] }),
-    path('Juggernaut', 'levelBlock', { leap: ['hurl', 'hamstring', 'sprinter', 'charge', 'thunderclap'], hurl: ['projectile', 'earthshaker'], hamstring: ['projectile', 'earthshaker'], sprinter: ['projectile', 'earthshaker'], charge: ['projectile', 'earthshaker'], thunderclap: ['projectile', 'earthshaker'], projectile: ['levelBlock'], earthshaker: ['levelBlock'] })),
-  heavy: tree('meteorStrike', ['arsenal', 'bigBlast', 'artillery', 'bulwark', 'standAlone', 'suppression', 'cracking'], [['arsenal', 'bigBlast'], ['shredder', 'demolisher'], ['bulwark', 'standAlone'], ['reactive', 'lasting'], ['fortress', 'shieldSlam'], ['suppression', 'cracking'], ['slam', 'intimidate'], ['aftershock', 'faultLine']],
-    path('Cataclysm', 'extinction', { arsenal: ['shredder', 'demolisher', 'impact'], bigBlast: ['shredder', 'demolisher', 'impact'], artillery: ['shredder', 'demolisher', 'impact'], shredder: ['extinction'], demolisher: ['extinction'], impact: ['extinction'] }),
-    path('Bastion', 'titanForm', { bulwark: ['taunt', 'reactive', 'lasting', 'bedrock'], standAlone: ['taunt', 'reactive', 'lasting', 'bedrock'], taunt: ['steadfast', 'fortress'], reactive: ['fortress', 'shieldSlam'], lasting: ['fortress', 'shieldSlam'], bedrock: ['steadfast', 'fortress', 'shieldSlam'], steadfast: ['titanForm'], fortress: ['titanForm'], shieldSlam: ['titanForm'] }),
-    path('Shockwave', 'earthquake', { suppression: ['slam', 'intimidate', 'repulse', 'concussion'], cracking: ['slam', 'intimidate', 'repulse', 'concussion'], slam: ['aftershock', 'faultLine', 'resonance'], intimidate: ['aftershock', 'faultLine', 'resonance'], repulse: ['aftershock', 'faultLine', 'resonance'], concussion: ['aftershock', 'faultLine', 'resonance'], aftershock: ['earthquake'], faultLine: ['earthquake'], resonance: ['earthquake'] })),
-  sniper: tree('farSight', ['steady', 'snapShot', 'mark', 'kneecap', 'bigGame', 'elusive', 'camouflage'], [['steady', 'snapShot'], ['doubleTap', 'sureShot'], ['assassinate', 'deadeye'], ['mark', 'kneecap'], ['slayer', 'combo'], ['hollowPoint', 'volley'], ['elusive', 'camouflage'], ['decoy', 'blink'], ['ghostShot', 'shroud']],
-    path('Marksman', 'bulletTime', { steady: ['doubleTap', 'sureShot', 'headshot'], snapShot: ['doubleTap', 'sureShot', 'headshot'], doubleTap: ['assassinate', 'deadeye'], sureShot: ['assassinate', 'deadeye'], headshot: ['assassinate', 'deadeye', 'bulletTime'], assassinate: ['bulletTime'], deadeye: ['bulletTime'] }),
-    path('Hunter', 'deathSentence', { mark: ['slayer', 'combo', 'hollowPoint'], kneecap: ['hollowPoint', 'volley', 'slayer'], bigGame: ['slayer', 'combo', 'volley'], slayer: ['apex', 'killshot', 'deathSentence'], combo: ['apex', 'killshot'], hollowPoint: ['apex', 'killshot'], volley: ['apex', 'killshot'], apex: ['deathSentence'], killshot: ['deathSentence'] }),
-    path('Ghost', 'hallOfMirrors', { elusive: ['decoy', 'blink', 'relocate'], camouflage: ['decoy', 'blink', 'relocate'], decoy: ['ghostShot', 'shroud', 'hallOfMirrors'], blink: ['ghostShot', 'shroud'], relocate: ['ghostShot', 'shroud'], ghostShot: ['hallOfMirrors'], shroud: ['hallOfMirrors'] })),
-  engineer: tree('deployMech', ['titan', 'plating', 'mechanic', 'swarm', 'launcher', 'staticCharge'], [['titan', 'plating'], ['rebuild', 'detonate'], ['warMachine', 'pilotLink'], ['spotter', 'linked'], ['endlessSwarm', 'targetLink'], ['emp', 'shockRounds'], ['tesla', 'arcWelder']],
-    path('Mech Bay', 'colossus', { titan: ['rebuild', 'detonate', 'bodyguard'], plating: ['rebuild', 'detonate', 'bodyguard'], mechanic: ['rebuild', 'detonate', 'bodyguard'], rebuild: ['warMachine', 'pilotLink'], detonate: ['warMachine', 'pilotLink'], bodyguard: ['warMachine', 'pilotLink'], warMachine: ['colossus'], pilotLink: ['colossus'] }),
-    path('Drone Hive', 'droneStorm', { swarm: ['spotter', 'linked', 'servos', 'hive'], spotter: ['endlessSwarm', 'targetLink'], linked: ['endlessSwarm', 'targetLink'], servos: ['endlessSwarm', 'targetLink', 'droneStorm'], hive: ['endlessSwarm', 'targetLink'], endlessSwarm: ['droneStorm'], targetLink: ['droneStorm'] }),
-    path('Tinker', 'orbital', { launcher: ['hardlight', 'emp', 'shockRounds'], staticCharge: ['hardlight', 'emp', 'shockRounds'], hardlight: ['tesla', 'arcWelder'], emp: ['tesla', 'arcWelder'], shockRounds: ['tesla', 'arcWelder'], tesla: ['orbital'], arcWelder: ['orbital'] })),
-  support: tree('healingLight', ['fieldKit', 'surgeon', 'lifeLink', 'barrier', 'rally', 'inspire', 'haste', 'battleHymn'], [['fieldKit', 'surgeon'], ['vitality', 'revive'], ['fontOfLife', 'transfusion'], ['barrier', 'rally'], ['ward', 'bane'], ['sacredGround', 'retribution'], ['inspire', 'haste'], ['flashbang', 'nullifier']],
-    path('Mending', 'resurrection', { fieldKit: ['vitality', 'revive'], surgeon: ['vitality', 'revive'], lifeLink: ['vitality', 'revive'], vitality: ['fontOfLife', 'transfusion'], revive: ['fontOfLife', 'transfusion', 'resurrection'], fontOfLife: ['resurrection'], transfusion: ['resurrection'] }),
-    path('Aegis', 'divineShield', { barrier: ['ward', 'bane', 'forceField'], rally: ['ward', 'bane', 'forceField'], ward: ['sacredGround', 'retribution'], bane: ['sacredGround', 'retribution'], forceField: ['sacredGround', 'retribution', 'divineShield'], sacredGround: ['divineShield'], retribution: ['divineShield'] }),
-    path('Zeal', 'timeStop', { inspire: ['flashbang', 'nullifier', 'drone'], haste: ['gravBeam', 'drone', 'flashbang'], battleHymn: ['flashbang', 'nullifier', 'gravBeam'], flashbang: ['command', 'smite'], nullifier: ['command', 'smite'], drone: ['command', 'smite'], gravBeam: ['command', 'smite'], command: ['timeStop'], smite: ['timeStop'] })),
-  pyro: tree('fireball', ['tanks', 'inferno', 'pyromania', 'tinder', 'meltdown', 'fireSuit', 'cinderSkin'], [['tanks', 'inferno'], ['searing', 'fanFlames'], ['firestorm', 'cauterize'], ['smolder', 'backdraft'], ['conflagration', 'combust'], ['burningAura', 'phoenixHeart'], ['hellfire', 'heatShield']],
-    path('Inferno', 'supernova', { tanks: ['searing', 'fanFlames'], inferno: ['searing', 'fanFlames'], pyromania: ['searing', 'fanFlames'], searing: ['firestorm', 'cauterize'], fanFlames: ['firestorm', 'cauterize'], firestorm: ['supernova'], cauterize: ['supernova'] }),
-    path('Immolation', 'worldAblaze', { tinder: ['smolder', 'backdraft', 'flashpoint'], meltdown: ['smolder', 'backdraft', 'flashpoint'], smolder: ['conflagration', 'combust'], backdraft: ['conflagration', 'combust'], flashpoint: ['conflagration', 'combust'], conflagration: ['worldAblaze'], combust: ['worldAblaze'] }),
-    path('Ember Hide', 'phoenixRising', { fireSuit: ['burningAura', 'phoenixHeart', 'asbestos'], cinderSkin: ['burningAura', 'phoenixHeart', 'asbestos'], burningAura: ['hellfire', 'heatShield'], phoenixHeart: ['hellfire', 'heatShield'], asbestos: ['hellfire', 'heatShield', 'phoenixRising'], hellfire: ['phoenixRising'], heatShield: ['phoenixRising'] })),
-  cryo: tree('chillTouch', ['icebreak', 'flashFreeze', 'iceArmor', 'coldSnap', 'coldSteel', 'coldEye', 'splinter'], [['icebreak', 'flashFreeze'], ['permafrost', 'rimeLock'], ['frozenHeart', 'shatterpoint'], ['glide', 'gale'], ['cryostasis', 'glacialArmor'], ['coldSteel', 'coldEye'], ['longRange', 'rimeGrip'], ['shardstorm', 'iceSpear']],
-    path('Hoarfrost', 'absoluteZero', { icebreak: ['permafrost', 'rimeLock', 'deepFreeze'], flashFreeze: ['permafrost', 'rimeLock', 'deepFreeze'], permafrost: ['frozenHeart', 'shatterpoint'], rimeLock: ['frozenHeart', 'shatterpoint'], deepFreeze: ['frozenHeart', 'shatterpoint', 'absoluteZero'], frozenHeart: ['absoluteZero'], shatterpoint: ['absoluteZero'] }),
-    path('Glacier', 'blizzard', { iceArmor: ['frostAura', 'glide', 'gale'], coldSnap: ['frostAura', 'glide', 'gale'], frostAura: ['cryostasis', 'glacialArmor', 'frostShell'], glide: ['cryostasis', 'glacialArmor', 'frostShell'], gale: ['cryostasis', 'glacialArmor', 'frostShell'], cryostasis: ['blizzard'], glacialArmor: ['blizzard'], frostShell: ['blizzard'] }),
-    path('Icicle', 'hailOfIcicles', { coldSteel: ['longRange', 'rimeGrip'], coldEye: ['longRange', 'rimeGrip'], splinter: ['longRange', 'rimeGrip'], longRange: ['shardstorm', 'iceSpear'], rimeGrip: ['shardstorm', 'iceSpear'], shardstorm: ['hailOfIcicles'], iceSpear: ['hailOfIcicles'] })),
-  phantom: tree('cloak', ['shadowStrike', 'daze', 'ambush', 'vanish', 'wraithForm', 'knifeWork', 'venom'], [['shadowStrike', 'daze'], ['deepCloak', 'afterimage'], ['livingShadow', 'shadowFeed'], ['vanish', 'wraithForm'], ['fadeOut', 'shadowStep'], ['intangible', 'soulDrain'], ['garrote', 'smokeBomb'], ['bladeDance', 'bloodScent']],
-    path('Shade', 'eclipse', { shadowStrike: ['deepCloak', 'afterimage'], daze: ['deepCloak', 'afterimage'], ambush: ['deepCloak', 'afterimage'], deepCloak: ['livingShadow', 'shadowFeed'], afterimage: ['livingShadow', 'shadowFeed'], livingShadow: ['eclipse'], shadowFeed: ['eclipse'] }),
-    path('Wraith', 'reap', { vanish: ['phaseShift', 'fadeOut', 'shadowStep'], wraithForm: ['phaseShift', 'fadeOut', 'shadowStep'], phaseShift: ['intangible', 'soulDrain'], fadeOut: ['intangible', 'soulDrain'], shadowStep: ['intangible', 'soulDrain', 'bladeDance'], intangible: ['reap'], soulDrain: ['reap'] }),
-    path('Knives', 'phantomLegion', { knifeWork: ['garrote', 'smokeBomb', 'opportunist'], venom: ['garrote', 'smokeBomb', 'opportunist'], garrote: ['bladeDance', 'bloodScent'], smokeBomb: ['bladeDance', 'bloodScent'], opportunist: ['bladeDance', 'bloodScent', 'phantomLegion'], bladeDance: ['phantomLegion'], bloodScent: ['phantomLegion'] })),
+  assault: tree('mightyBound',
+    path('Rampage', ['rage'], ['cleave', 'bloodlust', 'battleJoy'], ['bloodbath', 'surge', 'thunderclap'], ['killingSpree', 'carnage', 'berserk']),
+    path('Ironhide', ['reflexes'], ['secondWind', 'grit', 'vengeance'], ['riposte', 'unbreakable', 'hunker'], ['indestructible', 'skirmish', 'hardened']),
+    path('Juggernaut', ['leap'], ['sprinter', 'charge', 'hamstring'], ['earthshaker', 'projectile', 'bully'], ['levelBlock', 'hurl', 'tremor'])),
+  heavy: tree('meteorStrike',
+    path('Cataclysm', ['arsenal'], ['artillery', 'bigBlast', 'cracking'], ['impact', 'shredder', 'barrage'], ['extinction', 'demolisher', 'wrecker']),
+    path('Bastion', ['bulwark'], ['reactive', 'standAlone', 'taunt'], ['fortress', 'lasting', 'steadfast'], ['titanForm', 'bedrock', 'shieldSlam']),
+    path('Shockwave', ['suppression'], ['repulse', 'concussion', 'intimidate'], ['faultLine', 'aftershock', 'resonance'], ['earthquake', 'slam', 'concussiveForce'])),
+  sniper: tree('farSight',
+    path('Marksman', ['steady'], ['headshot', 'snapShot', 'doubleTap'], ['sureShot', 'assassinate', 'keenEye'], ['bulletTime', 'deadeye', 'perfectShot']),
+    path('Hunter', ['mark'], ['bigGame', 'kneecap', 'combo'], ['apex', 'slayer', 'volley'], ['deathSentence', 'hollowPoint', 'killshot']),
+    path('Ghost', ['elusive'], ['camouflage', 'decoy', 'relocate'], ['ghostShot', 'shroud', 'evasion'], ['hallOfMirrors', 'blink', 'untouchable'])),
+  engineer: tree('deployMech',
+    path('Mech Bay', ['titan'], ['mechanic', 'plating', 'rebuild'], ['warMachine', 'detonate', 'pilotLink'], ['colossus', 'bodyguard', 'overdrive']),
+    path('Drone Hive', ['swarm'], ['linked', 'spotter', 'servos'], ['endlessSwarm', 'hive', 'armoredDrones'], ['droneStorm', 'targetLink', 'hiveQueen']),
+    path('Tinker', ['launcher'], ['hardlight', 'staticCharge', 'shockRounds'], ['tesla', 'arcWelder', 'exploitFault'], ['orbital', 'emp', 'staticField'])),
+  support: tree('healingLight',
+    path('Mending', ['fieldKit'], ['vitality', 'surgeon', 'lifeLink'], ['fontOfLife', 'revive', 'renewal'], ['resurrection', 'transfusion', 'wellspring']),
+    path('Aegis', ['barrier'], ['ward', 'rally', 'bane'], ['sacredGround', 'forceField', 'nullifier'], ['divineShield', 'retribution', 'guardian']),
+    path('Zeal', ['inspire'], ['haste', 'battleHymn', 'gravBeam'], ['command', 'drone', 'smite'], ['timeStop', 'flashbang', 'warSong'])),
+  pyro: tree('fireball',
+    path('Inferno', ['tanks'], ['pyromania', 'inferno', 'searing'], ['firestorm', 'fanFlames', 'kindling'], ['supernova', 'cauterize', 'whiteHeat']),
+    path('Immolation', ['tinder'], ['smolder', 'meltdown', 'flashpoint'], ['conflagration', 'backdraft', 'spread'], ['worldAblaze', 'combust', 'firebrand']),
+    path('Ember Hide', ['fireSuit'], ['cinderSkin', 'asbestos', 'burningAura'], ['hellfire', 'heatShield', 'emberWard'], ['phoenixRising', 'phoenixHeart', 'emberHeart'])),
+  cryo: tree('chillTouch',
+    path('Hoarfrost', ['icebreak'], ['permafrost', 'flashFreeze', 'rimeLock'], ['brittle', 'deepFreeze', 'shatterpoint'], ['absoluteZero', 'frozenHeart', 'iceAge']),
+    path('Glacier', ['iceArmor'], ['frostAura', 'coldSnap', 'glide'], ['glacialArmor', 'cryostasis', 'gale'], ['blizzard', 'frostShell', 'polarVortex']),
+    path('Icicle', ['coldSteel'], ['coldEye', 'splinter', 'longRange'], ['shardstorm', 'iceSpear', 'iceLance'], ['hailOfIcicles', 'rimeGrip', 'glacialSpike'])),
+  phantom: tree('cloak',
+    path('Shade', ['shadowStrike'], ['ambush', 'daze', 'deepCloak'], ['livingShadow', 'afterimage', 'killerInstinct'], ['eclipse', 'shadowFeed', 'nightmare']),
+    path('Wraith', ['vanish'], ['phaseShift', 'wraithForm', 'shadowStep'], ['intangible', 'fadeOut', 'deathless'], ['reap', 'soulDrain', 'soulHarvest']),
+    path('Knives', ['knifeWork'], ['venom', 'garrote', 'opportunist'], ['bladeDance', 'bloodScent', 'cutthroat'], ['phantomLegion', 'smokeBomb', 'thousandCuts'])),
 }
 
-/** Every skill of a class's tree: its power, then each path's in order, capstone last. */
-export const treeOf = (cls: ClassId): SkillId[] => [TREES[cls].power, ...TREES[cls].paths.flatMap((p) => [...(Object.keys(p.nodes) as SkillId[]), p.capstone])]
+/** Every skill of a class's tree: its power, then each path's, row by row. */
+export const treeOf = (cls: ClassId): SkillId[] => [TREES[cls].power, ...TREES[cls].paths.flatMap((p) => p.rows.flat())]
 
 /** The skill that teaches a class its power, which every hero of the class starts with. */
 export const powerOf = (cls: ClassId): SkillId => TREES[cls].power
 
-/** The skills taking `id` opens. */
-export const opensOf = (cls: ClassId, id: SkillId): SkillId[] => (id === TREES[cls].power ? TREES[cls].opens : (TREES[cls].paths.map((p) => p.nodes[id]).find(Boolean) ?? []))
-
-export const capstones = (cls: ClassId): SkillId[] => TREES[cls].paths.map((p) => p.capstone)
-
-/** The skill taking `id` locks for the run, if it has a twin. */
-export const twinOf = (cls: ClassId, id: SkillId): SkillId | undefined => TREES[cls].twins.flatMap(([a, b]) => (a === id ? [b] : b === id ? [a] : []))[0]
+/** Each path's last row. */
+export const capstones = (cls: ClassId): SkillId[] => TREES[cls].paths.flatMap((p) => p.rows.at(-1)!)
 
 /** The path a skill stands in; the power stands in none. */
-export const pathOf = (cls: ClassId, id: SkillId): Path | undefined => TREES[cls].paths.find((p) => p.capstone === id || id in p.nodes)
+export const pathOf = (cls: ClassId, id: SkillId): Path | undefined => TREES[cls].paths.find((p) => p.rows.some((row) => row.includes(id)))
 
-/** Skills a hero knowing `known` can never take: the twins of those it took, and every capstone once it took one. */
-export function locked(cls: ClassId, known: SkillId[]): SkillId[] {
-  const capped = known.some((id) => capstones(cls).includes(id))
-  return treeOf(cls).filter((id) => !known.includes(id) && (known.some((k) => twinOf(cls, k) === id) || (capped && capstones(cls).includes(id))))
-}
-
-/** The skills of `cls` a hero knowing `known` can learn now, opened by one it knows and not locked, in tree order. */
-export function unlocked(cls: ClassId, known: SkillId[]): SkillId[] {
-  const shut = locked(cls, known)
-  return treeOf(cls).filter((id) => !known.includes(id) && !shut.includes(id) && known.some((k) => opensOf(cls, k).includes(id)))
-}
-
-/** The fewest picks from the power to a skill: the power is 0, what it opens 1. */
-export function depthOf(cls: ClassId, id: SkillId): number {
-  let ring = [TREES[cls].power]
-  for (let depth = 0; ring.length > 0; depth++) {
-    if (ring.includes(id)) return depth
-    ring = ring.flatMap((k) => opensOf(cls, k))
-  }
-  return Infinity
-}
+/** The path a hero knowing `known` took at its first pick, if it has. */
+export const committed = (cls: ClassId, known: SkillId[]): Path | undefined => known.map((id) => pathOf(cls, id)).find(Boolean)

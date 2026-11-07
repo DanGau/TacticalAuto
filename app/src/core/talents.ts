@@ -52,6 +52,13 @@ export function talentDamage(battle: Battle, unit: Unit, enemy: Unit, used: Effe
     ['pilotLink', machines(battle, unit).length > 0, TALENT.bonus],
     ['pyromania', burning >= 2, Math.min(3, Math.floor(burning / 2))],
     ['combust', enemy.burn > 0, enemy.burn],
+    ['bully', enemy.hp < unit.hp, TALENT.bonus],
+    ['wrecker', battle.units.filter((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && distance(u, enemy) <= 1).length >= 2, TALENT.kill],
+    ['kindling', enemy.burn === 0, TALENT.bonus],
+    ['whiteHeat', enemy.burn > 0, TALENT.kill],
+    ['firebrand', enemy.burn > 0, enemy.burn],
+    ['brittle', enemy.chill > 0, TALENT.kill],
+    ['thousandCuts', unit.hits > 2, Math.min(4, Math.floor((unit.hits - 1) / 2))],
   ]
   let more = 0
   for (const [effect, applies, worth] of gives) {
@@ -63,6 +70,14 @@ export function talentDamage(battle: Battle, unit: Unit, enemy: Unit, used: Effe
     used.push('targetLink')
     more += TALENT.bonus
   }
+  if (owner && has(owner, 'overdrive')) {
+    used.push('overdrive')
+    more += TALENT.big
+  }
+  if (battle.units.some((u) => u.side === unit.side && u.hp > 0 && has(u, 'warSong') && distance(u, unit) <= 2)) {
+    used.push('warSong')
+    more += TALENT.bonus
+  }
   const heat = battle.units.filter((u) => u.side !== enemy.side && u.hp > 0 && u.burn > 0 && distance(u, enemy) <= 2).length
   const takes: [Effect, boolean, number][] = [
     ['grit', distance(unit, enemy) <= 1, TALENT.soak],
@@ -72,11 +87,19 @@ export function talentDamage(battle: Battle, unit: Unit, enemy: Unit, used: Effe
     ['frostShell', unit.chill > 0, TALENT.soak],
     ['wraithForm', hurt(enemy), TALENT.soak],
     ['heatShield', heat > 0, Math.min(3, heat)],
+    ['hunker', distance(unit, enemy) > 1, TALENT.soak],
+    ['untouchable', !enemy.moved, TALENT.kill],
+    ['emberWard', unit.burn > 0, TALENT.soak],
   ]
   for (const [effect, applies, worth] of takes) {
     if (!applies || !has(enemy, effect)) continue
     events.push(fx(enemy.id, effect, 0))
     more -= worth
+  }
+  const guard = ownerOf(battle, enemy) && has(ownerOf(battle, enemy)!, 'armoredDrones') ? 'armoredDrones' : allies(battle, enemy).find((a) => has(a, 'guardian') && distance(a, enemy) <= 2) ? 'guardian' : undefined
+  if (guard) {
+    events.push(fx(enemy.id, guard, 0))
+    more -= TALENT.soak
   }
   return more
 }
@@ -97,10 +120,22 @@ export function talentHit(battle: Battle, unit: Unit, enemy: Unit, crit: boolean
       events.push(fx(enemy.id, 'venom', 0))
     }
     if (has(unit, 'staticCharge') && unit.hits % TALENT.every === 0) stun(enemy, 'staticCharge', events)
+    if (has(unit, 'concussiveForce') && distance(unit, enemy) <= 1 && unit.hits % 2 === 0) stun(enemy, 'concussiveForce', events)
+    if (has(enemy, 'hardened') && enemy.spent.filter((e) => e === 'hardened').length < TALENT.hardMax) {
+      enemy.spent.push('hardened')
+      enemy.stats = { ...enemy.stats, armor: enemy.stats.armor + 1 }
+      enemy.armor++
+      events.push(fx(enemy.id, 'hardened', 0))
+    }
     if (has(unit, 'flashFreeze') && enemy.chill > 0) {
       events.push(fx(enemy.id, 'flashFreeze', 0))
       chillUnit(battle, enemy, 1, events)
     }
+  }
+  const tinder = has(unit, 'spread') && enemy.burn > 0 ? beside.find((u) => u.burn === 0) : undefined
+  if (tinder) {
+    kindle(battle, tinder, burnFrom(unit))
+    events.push(fx(tinder.id, 'spread', 0))
   }
   if (crit && has(unit, 'splinter')) for (const u of beside) chillUnit(battle, u, chillFrom(unit), events)
   if (crit && has(unit, 'resonance')) for (const u of beside) zap(battle, u, TALENT.zap, 'resonance', events)
@@ -124,6 +159,14 @@ export function talentHit(battle: Battle, unit: Unit, enemy: Unit, crit: boolean
 export function talentKill(battle: Battle, target: Unit, killer: Unit, events: GameEvent[]): void {
   const kin = battle.units.filter((u) => u.side === target.side && u.hp > 0)
   if (has(killer, 'thunderclap') && distance(killer, target) <= 1) for (const u of kin.filter((u) => distance(u, target) <= 1)) stun(u, 'thunderclap', events)
+  if (has(killer, 'iceAge') && target.chill > 0) for (const u of kin.filter((u) => distance(u, target) <= 1)) stun(u, 'iceAge', events)
+  if (has(killer, 'nightmare')) for (const u of kin.filter((u) => distance(u, target) <= 2)) stun(u, 'nightmare', events)
+  if (has(killer, 'soulHarvest')) {
+    heal(killer, TALENT.heal, 'soulHarvest', events)
+    empower(killer, 1, 'soulHarvest', events)
+  }
+  const queen = ownerOf(battle, killer)
+  if (queen && has(queen, 'hiveQueen')) for (const u of [killer, queen]) heal(u, TALENT.heal, 'hiveQueen', events)
   if (has(killer, 'shroud') && distance(killer, target) >= TALENT.far && !killer.cloaked) events.push(cloakOn(killer))
   if (has(killer, 'cauterize') && target.burn > 0) heal(killer, TALENT.heal, 'cauterize', events)
   if (has(killer, 'shadowFeed')) heal(killer, TALENT.heal, 'shadowFeed', events)
@@ -156,10 +199,15 @@ export function talentTurn(battle: Battle, unit: Unit, events: GameEvent[]): voi
     events.push(fx(unit.id, 'transfusion', -TALENT.heal))
     heal(faint, TALENT.heal, 'transfusion', events)
   }
-  if (has(unit, 'coldSnap')) {
-    for (const u of battle.units.filter((u) => u.side !== unit.side && u.hp > 0 && distance(u, unit) <= 1)) {
-      events.push(fx(u.id, 'coldSnap', 0))
+  const around = (reach: number) => battle.units.filter((u) => u.side !== unit.side && u.hp > 0 && distance(u, unit) <= reach)
+  for (const [effect, reach] of [['coldSnap', 1], ['polarVortex', 2]] as const) {
+    if (!has(unit, effect)) continue
+    for (const u of around(reach)) {
+      events.push(fx(u.id, effect, 0))
       chillUnit(battle, u, chillFrom(unit), events)
     }
   }
+  for (const [effect, reach] of [['tremor', 1], ['staticField', 2]] as const) if (has(unit, effect)) for (const u of around(reach)) zap(battle, u, TALENT.zap, effect, events)
+  if (has(unit, 'emberHeart') && around(2).some((u) => u.burn > 0)) heal(unit, TALENT.heal, 'emberHeart', events)
+  if (has(unit, 'wellspring')) for (const a of near.filter((a) => a.hp < a.stats.hp)) heal(a, TALENT.mend, 'wellspring', events)
 }

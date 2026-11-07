@@ -44,7 +44,7 @@ import { soldierStats } from './squad'
 import { health } from './squad'
 import { TRAVEL_HEAL } from './squad'
 import { skillOffers } from './squad'
-import { MAX_SKILLS, OFFERS, PICK_LEVELS, picksEarned } from './squad'
+import { MAX_SKILLS, PICK_LEVELS, picksEarned } from './squad'
 import { XP } from './squad'
 import { level } from './squad'
 import { xpFor } from './squad'
@@ -52,7 +52,7 @@ import { LOSS_THREAT } from './progress'
 import { STOP_THREAT } from './progress'
 import { THREAT_MAX } from './progress'
 import { LEG_STOPS } from './progress'
-import { powerOf, SKILLS, unlocked } from './skills'
+import { powerOf, SKILLS } from './skills'
 import { atKey, road, enterAt, begun } from './roads'
 import { RELICS } from './relics'
 import { SHOP_UTILITIES, UTILITY_SLOTS } from './utilities'
@@ -534,17 +534,18 @@ test('levels never stop: each takes more experience than the last', () => {
   }
 })
 
-test('each pick owed offers some of what the tree has unlocked; past the last, levels add stats only', () => {
+test('each pick owed offers its row, and the rest of it is lost; past the last, levels add stats only', () => {
   const run = begun(1)
   const [soldier] = run.soldiers
   expect(skillOffers(soldier)).toEqual([])
   soldier.xp = xpFor(PICK_LEVELS.at(-1)! + 3)
   run.phase = 'reward'
   while (soldier.skills.length < MAX_SKILLS) {
-    const open = unlocked(soldier.cls!, soldier.skills).filter((id) => !soldier.lost.includes(id))
     const offers = skillOffers(soldier)
-    if (open.length >= OFFERS.max) expect(offers.every((id) => open.includes(id))).toBe(true)
-    apply(run, { type: 'skill', soldier: soldier.id, index: 0 })
+    expect(offers).toHaveLength(3)
+    apply(run, { type: 'skill', soldier: soldier.id, index: 1 })
+    expect(soldier.skills.at(-1)).toBe(offers[1])
+    expect(soldier.lost).toEqual(expect.arrayContaining([offers[0], offers[2]]))
   }
   expect(skillOffers(soldier)).toEqual([])
 })

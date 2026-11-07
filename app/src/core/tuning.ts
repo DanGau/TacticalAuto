@@ -30,27 +30,29 @@ export const TUNING = {
 
 /** How much each talent gives or takes, and how far it reaches. */
 export const TALENT = {
-  /** Damage more a hit does by Battle Joy, Charge, Demolisher, Artillery, Big Game, Pilot Link, Target Link and Blood Scent. */
+  /** Damage more a hit does by a talent: most, the bigger, the biggest. */
   bonus: 2,
-  /** Damage more by Ambush, Shatterpoint, Smite; by Killshot. */
   big: 3,
   kill: 4,
-  /** Damage less a hit does by Grit, Stand Alone, Camouflage, Bodyguard, Frost Shell and Wraith Form. */
+  /** Damage less a hit does by a guard talent. */
   soak: 2,
-  /** Tiles at which Artillery and Shroud count a target far. */
+  /** Tiles at which a talent counts a target far. */
   far: 4,
   /** Armor Cracking Blow and Meltdown break. */
   crack: 2,
   /** Every how many hits Static Charge stuns. */
   every: 3,
-  /** Damage Arc Welder, Retribution and Resonance deal, and the reach of Arc Welder, Life Link and Retribution. */
+  /** Damage a zapping talent deals, and how far a reaching one reaches. */
   zap: 2,
   reach: 3,
-  /** HP Cauterize, Shadow Feed, Mechanic and Transfusion give; Life Link and Soul Drain give 1. */
+  /** HP a healing talent gives. */
   heal: 3,
   /** Armor Bedrock and Rally give a turn, and the most above its own they build to. */
   armor: 2,
   armorMax: 4,
+  /** Armor Hardened builds to above its own; HP Wellspring heals a turn. */
+  hardMax: 6,
+  mend: 2,
   /** Move Carnage gives a kill, to at most this much. */
   moveMax: 3,
 }

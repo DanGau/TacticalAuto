@@ -10,7 +10,7 @@ import { THREAT_MAX } from '../core/progress'
 import { GEAR_PRICE } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
-import { capstones, depthOf, locked, pathOf, type Path, SKILLS, type SkillId, TREES } from '../core/skills'
+import { committed, pathOf, SKILLS, type SkillId } from '../core/skills'
 import { health, MAX_SQUAD, skillOffers, soldierStats, squadKeywords } from '../core/squad'
 import { BOON_CHARGES, RELICS, type RelicId } from '../core/relics'
 import type { Keyword } from '../core/keywords'
@@ -177,7 +177,7 @@ function shop(run: Run): Action {
   return { type: 'leave' }
 }
 
-/** The path each class climbs to its capstone: of the paths, what wins most on the same seeds. */
+/** The path each class takes when its weapon favors none: of the paths, what wins most on the same seeds. */
 export const PLANS: Record<ClassId, string> = {
   assault: 'Rampage',
   heavy: 'Bastion',
@@ -189,30 +189,36 @@ export const PLANS: Record<ClassId, string> = {
   phantom: 'Shade',
 }
 
-/** Whether a skill pays for this hero: Shield Slam only with a Star Shield, Living Projectile only for the strong, Fault Line and Rime Grip only in melee, Artillery only at range. */
+/** Whether a skill pays for this hero's weapon. */
 function pays(soldier: Soldier, id: SkillId): boolean {
-  const melee = !!soldier.gear && !!WEAPONS[soldier.gear.weapon].melee
-  const needs: Partial<Record<SkillId, boolean>> = {
-    shieldSlam: soldier.gear?.weapon === 'shield',
-    projectile: soldier.gear?.weapon === 'hammer' || soldier.gear?.weapon === 'fists',
-    faultLine: melee,
-    rimeGrip: melee,
-    artillery: !melee,
-  }
-  return needs[id] ?? true
+  return NEEDS[id]?.(soldier.gear?.weapon, !!soldier.gear && !!WEAPONS[soldier.gear.weapon].melee) ?? true
 }
 
-/** The skill a hero plans on, of those that pay: the capstone, else the deepest, of its planned path while that capstone is still to be had, else of any path whose capstone is. */
+/** Skills that pay only with some weapon, or in melee or at range. */
+const NEEDS: Partial<Record<SkillId, (weapon: WeaponId | undefined, melee: boolean) => boolean>> = {
+  shieldSlam: (w) => w === 'shield',
+  projectile: (w) => w === 'hammer' || w === 'fists',
+  faultLine: (_, melee) => melee,
+  rimeGrip: (_, melee) => melee,
+  cutthroat: (_, melee) => melee,
+  tremor: (_, melee) => melee,
+  concussiveForce: (_, melee) => melee,
+  artillery: (_, melee) => !melee,
+  iceLance: (_, melee) => !melee,
+  hunker: (_, melee) => !melee,
+}
+
+/** The skill a hero plans on. At the first pick, the path with the most that pays it and the least that does not, its class's plan on a tie; then the row's first that pays. */
 export function plannedSkill(soldier: Soldier): number {
   const cls = soldier.cls!
-  const all = skillOffers(soldier)
-  const offers = all.filter((id) => pays(soldier, id) || all.every((other) => !pays(soldier, other)))
-  const live = (path?: Path) => !!path && !soldier.lost.includes(path.capstone) && !locked(cls, soldier.skills).includes(path.capstone)
-  const plan = TREES[cls].paths.find((p) => p.name === PLANS[cls])!
-  const aim = live(plan) ? [plan] : TREES[cls].paths.filter(live)
-  // A capstone outside the aim would lock the aim's.
-  const score = (id: SkillId) => (capstones(cls).includes(id) ? (aim.includes(pathOf(cls, id)!) ? 200 : -1) : (aim.includes(pathOf(cls, id)!) ? 100 : 0) + depthOf(cls, id))
-  return all.indexOf(offers.reduce((best, id) => (score(id) > score(best) ? id : best)))
+  const offers = skillOffers(soldier)
+  const worth = (id: SkillId) => (pays(soldier, id) ? 0 : -10)
+  const fit = (id: SkillId) => {
+    const path = pathOf(cls, id)!
+    return (path.name === PLANS[cls] ? 2 : 0) + path.rows.flat().reduce((sum, k) => sum + (k in NEEDS ? (pays(soldier, k) ? 1 : -1) : 0), 0)
+  }
+  const score = committed(cls, soldier.skills) ? worth : fit
+  return offers.reduce((best, id, i) => (score(id) > score(offers[best]) ? i : best), 0)
 }
 
 /** What a relic is worth beside what the squad holds: a bridge or engine pays only with its pieces, and is dead without them. */

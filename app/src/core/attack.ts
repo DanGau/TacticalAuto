@@ -13,7 +13,7 @@ import { burnFrom, chillFrom, chillUnit, empower, highCrit, kindle, scaledDamage
 import { wound } from './wound'
 import { shoveOff, drive, knockback, pushesOff } from './knockback'
 import { SLAM_DAMAGE } from './wound'
-import { TUNING } from './tuning'
+import { TALENT, TUNING } from './tuning'
 import { bite, MIN_DAMAGE, odds } from './sight'
 import { random } from './rng'
 import { preyed, leapTo } from './pathing'
@@ -131,7 +131,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     (parried ? PARRY_SOAK : 0) +
     (shielded ? BLOCK_SOAK : 0)
 
-  const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.marked, 'apex', 1) + when(enemy.hp <= enemy.stats.hp / 2, 'deadeye', 1) > 0 || duoCrit(battle, unit, enemy, events)
+  const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.marked, 'apex', 1) + when(enemy.hp <= enemy.stats.hp / 2, 'deadeye', 1) + when(unit.hp <= unit.stats.hp / 2, 'berserk', 1) > 0 || duoCrit(battle, unit, enemy, events)
   const crit = !enemy.resists.includes('crit') && (sure || (blow ? (blow.crit ??= random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)) : random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)))
   unit.hits++
   // A mirror hits as hard as the squad's hardest hitter; a feeder as hard as it has grown.
@@ -145,7 +145,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(enemy.marked, 'spotter', SPOTTER_DAMAGE) +
     when(!unit.moved, 'steady', 1) +
     (unseen ? CLOAK_DAMAGE + when(true, 'shadowStrike', SHADOW_DAMAGE) : 0) +
-    (crit ? CRIT_BONUS + when(true, 'headshot', HEADSHOT_DAMAGE) : 0) +
+    (crit ? CRIT_BONUS + when(true, 'headshot', HEADSHOT_DAMAGE) + when(true, 'perfectShot', TALENT.kill) : 0) +
     when(enemy.hp <= enemy.stats.hp / 2, 'executioner', EXECUTE_BONUS) +
     when(!battle.units.some((u) => u.side === enemy.side && u !== enemy && distance(u, enemy) <= 1), 'backstab', BACKSTAB_DAMAGE) +
     when(unit.hp <= unit.stats.hp / 2, 'rage', RAGE_DAMAGE) +

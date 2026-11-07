@@ -31,7 +31,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `keystones.ts` | Deep path powers: what a hit sets off, their numbers |
 | `follow-ups.ts` | Command's ally attack, Blade Dance's extra strikes |
 | `duo-effects.ts` | What each duo does in battle |
-| `ultimates.ts` | Capstones: when each fires and what it does |
+| `ultimates.ts` | Ultimates, once-a-battle capstones: when each fires and what it does |
 | `wound.ts` | Damage landing, what it sets off, the battle tally |
 | `stacks.ts` | Stacks a fight builds and what they set off: burn, chill and freezing, Might, combos, exposure, every-Nth hits |
 | `talents.ts` | Talents: skills shaping a hit by where it lands, or answering a hit, a kill or a turn's start |
@@ -70,7 +70,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `camera.ts` | World and picture points, cameras that frame tiles |
 | `play.ts` | Plays a beat's events in order |
 | `effects.ts` | Shots, lunges, rockets, sparks, shake, callouts |
-| `ultimates.ts` | A capstone on screen: its name, colour and shape |
+| `ultimates.ts` | An ultimate on screen: its name, colour and shape |
 | `duos.ts` | A duo's moment on screen |
 | `sprites.ts` | Unit pictures and moving them |
 | `badges.ts` | The stacks and counts over a unit's head, the same size on any screen |

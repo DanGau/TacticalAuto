@@ -26,5 +26,8 @@ export const SKILL_EFFECTS = [
   'pilotLink', 'targetLink', 'staticCharge', 'arcWelder', 'lifeLink', 'transfusion', 'rally', 'retribution', 'battleHymn',
   'smite', 'pyromania', 'cauterize', 'combust', 'meltdown', 'heatShield', 'cinderSkin', 'flashFreeze', 'shatterpoint',
   'coldSnap', 'frostShell', 'splinter', 'iceSpear', 'ambush', 'shadowFeed', 'wraithForm', 'soulDrain', 'venom', 'bloodScent',
+  'berserk', 'hunker', 'hardened', 'bully', 'tremor', 'wrecker', 'concussiveForce', 'perfectShot', 'untouchable', 'overdrive',
+  'armoredDrones', 'hiveQueen', 'staticField', 'wellspring', 'guardian', 'warSong', 'kindling', 'whiteHeat', 'spread', 'firebrand',
+  'emberWard', 'emberHeart', 'brittle', 'iceAge', 'polarVortex', 'nightmare', 'soulHarvest', 'thousandCuts',
   ...ULTIMATE_EFFECTS,
 ] as const

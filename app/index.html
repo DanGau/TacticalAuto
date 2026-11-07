@@ -289,14 +289,12 @@
       .tree-node.cap > button, .tree-node.cap > .node-name { border-radius: 16px; border-width: 2px; box-shadow: inset 0 0 0 1px #ffd16633; }
       .tree-node.cap::before { content: '★'; position: absolute; z-index: 1; top: -8px; left: 50%; transform: translateX(-50%); color: var(--gold); font-size: 12px; line-height: 1; text-shadow: 0 0 4px #000; }
       .tree-node.root > .node-name, .tree-node.root > button { border-radius: 50% / 40%; }
-      .treemap .twin line { stroke: #b0605a; stroke-width: 2; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
-      .treemap .twin text { fill: #ff9a8a; font: bold 14px sans-serif; text-anchor: middle; paint-order: stroke; stroke: #141a26; stroke-width: 3px; }
-      .treemap .twin.shut { opacity: 0.45; }
       .treemap .tree-node.taken > button.pick, .treemap .tree-node.taken > .node-name { border-color: var(--gold); background: linear-gradient(#5a4a1c, #3a3014); color: #ffe7a3; box-shadow: 0 0 8px #ffd16666; font-weight: bold; }
       .treemap .tree-node.offered > button.pick, .treemap .tree-node.offered > .node-name { border-color: var(--blue); border-width: 2px; background: #1d3352; color: #e6f1ff; animation: pulse 1.4s ease-in-out infinite; }
       .treemap .tree-node.offered > button.pick.armed { background: #2b4e7e; border-color: #9fd0ff; }
       .treemap .tree-node.open > button.pick, .treemap .tree-node.open > .node-name { border-color: #56637f; color: #c9d2e6; }
       .treemap .tree-node.locked > button.pick, .treemap .tree-node.locked > .node-name { border-style: dashed; color: #6b7488; background: #151b27; }
+      .treemap .tree-node.locked { opacity: 0.45; } .treemap .head.shut { opacity: 0.4; }
       .treemap .tree-node.lost > button.pick, .treemap .tree-node.lost > .node-name { color: #6b5a5e; background: repeating-linear-gradient(135deg, #1a1416 0 4px, #221a1c 4px 8px); border-color: #4a2a2e; text-decoration: line-through; opacity: 0.7; }
       .tree-card { display: none; position: absolute; z-index: 8; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); width: 200px; padding: 8px 10px; border-radius: 8px; background: rgba(10, 13, 19, 0.96); border: 1px solid #3a4560; box-shadow: 0 4px 14px #000a; text-align: left; font-size: 12px; line-height: 1.35; pointer-events: none; }
       .tree-card > * { display: block; margin-top: 3px; }
