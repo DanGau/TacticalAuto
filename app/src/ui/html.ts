@@ -1,59 +1,83 @@
 // Shared HTML pieces: buttons, bars, chips, gear cards and descriptions.
-import type { Action } from '../core/apply'
-import { EFFECTS, type Gear } from '../core/gear'
-import { WEAPONS, type Kit } from '../core/weapons'
-import { tip as markTip } from './charts'
-import { ALIENS, type AlienKind } from '../core/aliens'
-import { BASE_STATS, type Stats } from '../core/battle'
-import { KEYWORDS, RESISTS, type Keyword, type Resist } from '../core/keywords'
-import { TUNING } from '../core/tuning'
-import type { ClassId } from '../core/classes'
-import { type Mission } from '../core/run-state'
-import { type StopKind } from '../core/run-state'
-import { THREAT_MAX } from '../core/progress'
+import type { Action } from "../core/apply";
+import { EFFECTS, type Gear } from "../core/gear";
+import { WEAPONS, type Kit } from "../core/weapons";
+import { tip as markTip } from "./charts";
+import { ALIENS, type AlienKind } from "../core/aliens";
+import { BASE_STATS, type Stats } from "../core/battle";
+import { KEYWORDS, RESISTS, type Keyword, type Resist } from "../core/keywords";
+import { TUNING } from "../core/tuning";
+import type { ClassId } from "../core/classes";
+import { type Mission } from "../core/run-state";
+import { type StopKind } from "../core/run-state";
+import { THREAT_MAX } from "../core/progress";
 
 /** A button that performs `action` when clicked. */
-export const button = (action: Action, label: string, cls = '', enabled = true, title = '') =>
-  `<button class="${cls}" data-action='${JSON.stringify(action)}' ${title ? `title="${title}"` : ''} ${enabled ? '' : 'disabled'}>${label}</button>`
+export const button = (
+  action: Action,
+  label: string,
+  cls = "",
+  enabled = true,
+  title = "",
+) =>
+  `<button class="${cls}" data-action='${JSON.stringify(action)}' ${title ? `title="${title}"` : ""} ${enabled ? "" : "disabled"}>${label}</button>`;
 
 /** What each skill role is called on a card. */
 
-export const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`
+export const signed = (n: number) => `${n > 0 ? "+" : ""}${n}`;
 
 /** What each kind of stop is called. */
-export const STOP_NAMES: Record<StopKind | Mission['kind'], string> = {
-  battle: 'Battle',
-  supply: 'Supply drop',
-  cache: 'Gear cache',
-  shop: 'Shop',
-  medic: 'Healer',
-  unknown: '❓ Unknown',
-  key: 'Guardian',
-  final: 'The alien source',
-  ambush: 'Ambush',
-  recovery: 'Recovery',
-}
+export const STOP_NAMES: Record<StopKind | Mission["kind"], string> = {
+  battle: "Battle",
+  supply: "Supply drop",
+  cache: "Gear cache",
+  shop: "Shop",
+  medic: "Healer",
+  unknown: "❓ Unknown",
+  key: "Guardian",
+  final: "The alien source",
+  ambush: "Ambush",
+  recovery: "Recovery",
+};
 
 /** A soldier's health as a red bar and a count, and the armor it starts each fight with as a yellow bar after it. */
 export const healthBar = (hp: number, max: number, armor = 0) =>
-  `<div class="health" title="HP ${hp} of ${max}${armor > 0 ? `, and ${armor} armor, which takes damage first and is whole again each fight` : ''}">♥ ${hp}/${max}${armor > 0 ? ` <span class="armor">⛨ ${armor}</span>` : ''}<div class="bar"><div style="width: ${(100 * hp) / (max + armor)}%"></div><div class="armor" style="left: ${(100 * max) / (max + armor)}%; width: ${(100 * armor) / (max + armor)}%"></div></div></div>`
+  `<div class="health" title="HP ${hp} of ${max}${armor > 0 ? `, and ${armor} armor, which takes damage first and is whole again each fight` : ""}">♥ ${hp}/${max}${armor > 0 ? ` <span class="armor">⛨ ${armor}</span>` : ""}<div class="bar"><div style="width: ${(100 * hp) / (max + armor)}%"></div><div class="armor" style="left: ${(100 * max) / (max + armor)}%; width: ${(100 * armor) / (max + armor)}%"></div></div></div>`;
 
-const BADGES: Record<ClassId, string> = { assault: '⚔️', heavy: '💪', sniper: '🎯', support: '✨', engineer: '🔧', pyro: '🔥', cryo: '❄️', phantom: '👻' }
+const BADGES: Record<ClassId, string> = {
+  assault: "⚔️",
+  heavy: "💪",
+  sniper: "🎯",
+  support: "✨",
+  engineer: "🔧",
+  pyro: "🔥",
+  cryo: "❄️",
+  phantom: "👻",
+};
 
 /** A class's badge; a hero with no class yet wears a cape. */
-export const badge = (cls?: ClassId | null) => (cls ? BADGES[cls] : '🦸')
+export const badge = (cls?: ClassId | null) => (cls ? BADGES[cls] : "🦸");
 
 /** The threat bar. `landed` is how much of the newest threat animates in. */
 export function threatBar(threat: number, landed = 0): string {
-  const pct = (n: number) => `${(100 * n) / THREAT_MAX}%`
-  const meter = `<span class="threat" title="The hunt: the fuller the bar, the more aliens every battle has, up to ${Math.round(100 * TUNING.hunt)}% more. Full, it ambushes the party"><i style="width:${pct(threat - landed)}"></i><i class="landed" style="width:${pct(landed)}"></i></span>`
-  return `${meter}${threat === THREAT_MAX ? '<b class="up">ambush next</b>' : ''}`
+  const pct = (n: number) => `${(100 * n) / THREAT_MAX}%`;
+  const meter = `<span class="threat" title="The hunt: the fuller the bar, the more aliens every battle has, up to ${Math.round(100 * TUNING.hunt)}% more. Full, it ambushes the party"><i style="width:${pct(threat - landed)}"></i><i class="landed" style="width:${pct(landed)}"></i></span>`;
+  return `${meter}${threat === THREAT_MAX ? '<b class="up">ambush next</b>' : ""}`;
 }
 
 /** What each stat is called. */
-export const STAT_NAMES: Record<keyof Stats, string> = { hp: 'HP', armor: 'Armor', damage: 'Damage', range: 'Range', move: 'Move', crit: 'Crit', strength: 'Strength', jump: 'Jump' }
+export const STAT_NAMES: Record<keyof Stats, string> = {
+  hp: "HP",
+  armor: "Armor",
+  damage: "Damage",
+  range: "Range",
+  move: "Move",
+  crit: "Crit",
+  strength: "Strength",
+  jump: "Jump",
+};
 
-const percent = (n: number) => `${signed(Math.round(100 * n))}%`
+const percent = (n: number) => `${signed(Math.round(100 * n))}%`;
 
 /** How each stat change reads on a piece of gear. */
 const STAT_TEXT: Record<keyof Stats, (n: number) => string> = {
@@ -65,83 +89,137 @@ const STAT_TEXT: Record<keyof Stats, (n: number) => string> = {
   crit: (n) => `${percent(n)} crit`,
   strength: (n) => `${signed(n)} strength`,
   jump: (n) => `${signed(n)} jump`,
-}
+};
 
-const statText = (stats: Partial<Stats>) => (Object.keys(stats) as (keyof Stats)[]).map((key) => STAT_TEXT[key](stats[key]!)).join(', ')
+const statText = (stats: Partial<Stats>) =>
+  (Object.keys(stats) as (keyof Stats)[])
+    .map((key) => STAT_TEXT[key](stats[key]!))
+    .join(", ");
 
 /** A piece of gear's special, as plain text: its weapon's special and its effect. Its numbers are its type's tip. */
 export function gearText(gear: Gear): string {
-  const said = [WEAPONS[gear.weapon].special, gear.effect ? EFFECTS[gear.effect].text : '']
-  return [...new Set(said.filter(Boolean))].map((line) => `${line}.`).join(' ')
+  const said = [
+    WEAPONS[gear.weapon].special,
+    gear.effect ? EFFECTS[gear.effect].text : "",
+  ];
+  return [...new Set(said.filter(Boolean))].map((line) => `${line}.`).join(" ");
 }
 
-const kitText = (kit: Kit) => `${kit.shots} × ${Math.round(100 * kit.power)}% damage${kit.power > 1 ? ` of the first ${BASE_STATS.damage}, +1 per point past` : ''}${kit.wide ? `, ${Math.round(100 * kit.wide)}% splash beside` : ''}${kit.range ? `, range ${kit.range}` : ''}`
+const kitText = (kit: Kit) =>
+  `${kit.shots} × ${Math.round(100 * kit.power)}% damage${kit.power > 1 ? ` of the first ${BASE_STATS.damage}, +1 per point past` : ""}${kit.wide ? `, ${Math.round(100 * kit.wide)}% splash beside` : ""}${kit.range ? `, range ${kit.range}` : ""}`;
 
 /** A piece of gear's numbers: its weapon's attacks and stat changes, then its mod's. */
 export function gearStats(gear: Gear): string[] {
-  const w = WEAPONS[gear.weapon]
+  const w = WEAPONS[gear.weapon];
   return [
     `Attack: ${kitText(w.attack)}`,
     w.thrown && `Thrown: ${kitText(w.thrown)}`,
     w.rocket && `Rocket: ${kitText(w.rocket)}`,
     w.dash && `Dashes ${w.dash} tiles to strike`,
     statText(w.stats),
-    Object.keys(gear.stats).length > 0 && `${gear.name.split(' ')[0]}: ${statText(gear.stats)}`,
-  ].filter((line): line is string => Boolean(line))
+    Object.keys(gear.stats).length > 0 &&
+      `${gear.name.split(" ")[0]}: ${statText(gear.stats)}`,
+  ].filter((line): line is string => Boolean(line));
+}
+
+/** How a weapon attacks, in plain words. */
+export function weaponDoes(gear: Gear): string {
+  const w = WEAPONS[gear.weapon];
+  const { shots, power, wide } = w.attack;
+  const blow = w.melee ? "blow" : "shot";
+  const hits =
+    shots === 1
+      ? `One ${power >= 1.5 ? "heavy " : ""}${blow}`
+      : `${shots} quick ${blow}s`;
+  const range = w.stats.range ?? 0;
+  const reach = w.melee
+    ? w.dash
+      ? ", dashing in to strike"
+      : " at arm's reach"
+    : range > 0
+      ? " from far off"
+      : range < 0
+        ? " at short range"
+        : "";
+  const extra = [
+    wide && "splashing the aliens beside",
+    (w.thrown || w.rocket) && "thrown when nothing is in reach",
+  ].filter(Boolean);
+  return `${hits} a turn${reach}${extra.map((e) => `, ${e}`).join("")}.`;
 }
 
 /** What a piece of gear plainly is, its numbers shown on hover, focus or tap. */
-export const gearType = (gear: Gear) => `<span class="tip" ${markTip([WEAPONS[gear.weapon].type, ...gearStats(gear)])}>${WEAPONS[gear.weapon].type}</span>`
+export const gearType = (gear: Gear) =>
+  `<span class="tip" ${markTip([WEAPONS[gear.weapon].type, ...gearStats(gear)])}>${WEAPONS[gear.weapon].type}</span>`;
 
 /** Words that explain themselves on hover. */
-const tip = (label: string, text: string) => `<span class="tip" title="${text}">${label}</span>`
+const tip = (label: string, text: string) =>
+  `<span class="tip" title="${text}">${label}</span>`;
 
 /** A keyword's chip: its icon and name, lit if the squad has it, explained on hover. */
-const keywordChip = (tag: Keyword, held = false) => `<span class="kw ${tag} ${held ? 'held' : ''}" title="${KEYWORDS[tag].name}: ${KEYWORDS[tag].text}">${KEYWORDS[tag].icon} ${KEYWORDS[tag].name}</span>`
+const keywordChip = (tag: Keyword, held = false) =>
+  `<span class="kw ${tag} ${held ? "held" : ""}" title="${KEYWORDS[tag].name}: ${KEYWORDS[tag].text}">${KEYWORDS[tag].icon} ${KEYWORDS[tag].name}</span>`;
 
 /** A keyword something shrugs off: its icon struck through, explained on hover. */
-export const resistChip = (tag: Resist) => `<span class="kw ${tag} resist" title="Resists ${KEYWORDS[tag].name}: ${RESISTS[tag]}">${KEYWORDS[tag].icon}</span>`
+export const resistChip = (tag: Resist) =>
+  `<span class="kw ${tag} resist" title="Resists ${KEYWORDS[tag].name}: ${RESISTS[tag]}">${KEYWORDS[tag].icon}</span>`;
 
 /** The words in a description that name a keyword, and which. */
 const KEYWORD_WORDS: [RegExp, Keyword][] = [
-  [/burning|burns?/, 'burn'],
-  [/chilled|chills?/, 'frost'],
-  [/marked|marks?/, 'mark'],
-  [/crits?/, 'crit'],
-  [/kills?/, 'kill'],
-  [/armor/, 'ward'],
-]
-const KEYWORD_PATTERN = new RegExp(`\\b(${KEYWORD_WORDS.map(([re]) => re.source).join('|')})\\b`, 'gi')
-const keywordOf = (word: string) => KEYWORD_WORDS.find(([re]) => new RegExp(`^(${re.source})$`, 'i').test(word))![1]
+  [/burning|burns?/, "burn"],
+  [/chilled|chills?/, "frost"],
+  [/marked|marks?/, "mark"],
+  [/crits?/, "crit"],
+  [/kills?/, "kill"],
+  [/armor/, "ward"],
+];
+const KEYWORD_PATTERN = new RegExp(
+  `\\b(${KEYWORD_WORDS.map(([re]) => re.source).join("|")})\\b`,
+  "gi",
+);
+const keywordOf = (word: string) =>
+  KEYWORD_WORDS.find(([re]) =>
+    new RegExp(`^(${re.source})$`, "i").test(word),
+  )![1];
 
 /**
  * A description as Slay the Spire writes a card: each keyword in it coloured in place, lit if the squad has it,
  * and on hover a box beside it defining every keyword it names or carries.
  */
-export function describe(text: string, tags: Keyword[] = [], held: Keyword[] = []): string {
-  const named = new Set<Keyword>(tags)
+export function describe(
+  text: string,
+  tags: Keyword[] = [],
+  held: Keyword[] = [],
+): string {
+  const named = new Set<Keyword>(tags);
   const rich = text.replace(KEYWORD_PATTERN, (word) => {
-    const tag = keywordOf(word)
-    named.add(tag)
-    return `<span class="kwi ${tag} ${held.includes(tag) ? 'held' : ''}">${KEYWORDS[tag].icon}${word}</span>`
-  })
-  const defs = [...named].map((tag) => `<span class="def"><b class="kwi ${tag}">${KEYWORDS[tag].icon} ${KEYWORDS[tag].name}</b>${KEYWORDS[tag].text}.</span>`)
+    const tag = keywordOf(word);
+    named.add(tag);
+    return `<span class="kwi ${tag} ${held.includes(tag) ? "held" : ""}">${KEYWORDS[tag].icon}${word}</span>`;
+  });
+  const defs = [...named].map(
+    (tag) =>
+      `<span class="def"><b class="kwi ${tag}">${KEYWORDS[tag].icon} ${KEYWORDS[tag].name}</b>${KEYWORDS[tag].text}.</span>`,
+  );
   // One span, so a flex card keeps the sentence on one line.
-  return `<span>${rich}</span>${defs.length > 0 ? `<span class="defs">${defs.join('')}</span>` : ''}`
+  return `<span>${rich}</span>${defs.length > 0 ? `<span class="defs">${defs.join("")}</span>` : ""}`;
 }
 
 /** Keyword chips; one the squad already has, in `held`, is lit. */
 export const keywordChips = (tags: Keyword[] = [], held: Keyword[] = []) =>
-  tags.length === 0 ? '' : `<span class="keywords">${tags.map((tag) => keywordChip(tag, held.includes(tag))).join('')}</span>`
+  tags.length === 0
+    ? ""
+    : `<span class="keywords">${tags.map((tag) => keywordChip(tag, held.includes(tag))).join("")}</span>`;
 
 /** An alien kind's name, its rules on hover, and what it resists. */
-export const alienName = (kind: AlienKind, label = ALIENS[kind].name) => `${tip(label, ALIENS[kind].text)}${ALIENS[kind].resists.map(resistChip).join('')}`
-
+export const alienName = (kind: AlienKind, label = ALIENS[kind].name) =>
+  `${tip(label, ALIENS[kind].text)}${ALIENS[kind].resists.map(resistChip).join("")}`;
 
 /** What a piece of gear does, its keywords coloured and defined. */
-export const describeGear = (gear: Gear, held: Keyword[] = []) => describe(gearText(gear), gear.effect ? EFFECTS[gear.effect].tags : [], held)
+export const describeGear = (gear: Gear, held: Keyword[] = []) =>
+  describe(gearText(gear), gear.effect ? EFFECTS[gear.effect].tags : [], held);
 
 /** A piece of gear as a card's contents: rarity, name, type and special. */
 export function gearCard(gear: Gear, held: Keyword[] = []): string {
-  return `<small>${gear.rarity} · ${gearType(gear)}</small><br><b>${gear.name}</b><br>${describeGear(gear, held)}`
+  return `<small>${gear.rarity} · ${gearType(gear)}</small><br><b>${gear.name}</b><br>${describeGear(gear, held)}`;
 }
