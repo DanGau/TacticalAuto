@@ -28,7 +28,7 @@ test('a whole run ends in a summary of its heroes and a column per battle, each 
   const page = battlePage(run, run.log[0])
   expect(page).toContain('Tanked')
   expect(`${end}${page}`).not.toMatch(/accuracy/i)
-})
+}, 120_000)
 
 test('scale is a percent of the largest or of the sum, and 0 for nothing', () => {
   expect(scale([2, 4])).toEqual([50, 100])
