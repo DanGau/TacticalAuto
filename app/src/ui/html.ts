@@ -127,30 +127,18 @@ export function weaponDoes(gear: Gear): string {
   const w = WEAPONS[gear.weapon];
   const { shots, power, wide } = w.attack;
   const blow = w.melee ? "blow" : "shot";
-  const hits =
-    shots === 1
-      ? `One ${power >= 1.5 ? "heavy " : ""}${blow}`
-      : `${shots} quick ${blow}s`;
   const range = w.stats.range ?? 0;
-  const reach = w.melee
-    ? w.dash
-      ? ", dashing in to strike"
-      : " at arm's reach"
-    : range > 0
-      ? " from far off"
-      : range < 0
-        ? " at short range"
-        : "";
-  const extra = [
-    wide && "splashing the aliens beside",
-    (w.thrown || w.rocket) && "thrown when nothing is in reach",
-  ].filter(Boolean);
-  return `${hits} a turn${reach}${extra.map((e) => `, ${e}`).join("")}.`;
+  return [
+    shots === 1 ? `1 ${power >= 1.5 ? "heavy " : ""}${blow}` : `${shots} ${blow}s`,
+    w.melee ? (w.dash ? "dashes in" : "melee") : range > 0 ? "long range" : range < 0 ? "short range" : "",
+    wide && "splash",
+    (w.thrown || w.rocket) && "throws when out of reach",
+  ].filter(Boolean).join(" · ");
 }
 
-/** What a piece of gear plainly is, its numbers shown on hover, focus or tap. */
-export const gearType = (gear: Gear) =>
-  `<span class="tip" ${markTip([WEAPONS[gear.weapon].type, ...gearStats(gear)])}>${WEAPONS[gear.weapon].type}</span>`;
+/** A piece of gear's name, its numbers shown on hover, focus or tap. */
+export const gearName = (gear: Gear) =>
+  `<span class="tip" ${markTip([gear.name, ...gearStats(gear)])}>${gear.name}</span>`;
 
 /** Words that explain themselves on hover. */
 const tip = (label: string, text: string) =>
@@ -219,7 +207,7 @@ export const alienName = (kind: AlienKind, label = ALIENS[kind].name) =>
 export const describeGear = (gear: Gear, held: Keyword[] = []) =>
   describe(gearText(gear), gear.effect ? EFFECTS[gear.effect].tags : [], held);
 
-/** A piece of gear as a card's contents: rarity, name, type and special. */
+/** A piece of gear as a card's contents: rarity, name and special. */
 export function gearCard(gear: Gear, held: Keyword[] = []): string {
-  return `<small>${gear.rarity} · ${gearType(gear)}</small><br><b>${gear.name}</b><br>${describeGear(gear, held)}`;
+  return `<small>${gear.rarity}</small><br><b>${gearName(gear)}</b><br>${describeGear(gear, held)}`;
 }

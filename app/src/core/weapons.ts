@@ -19,8 +19,6 @@ export interface Kit {
  */
 export interface Weapon {
   name: string
-  /** What it plainly is, as a card says. */
-  type: string
   stats: Partial<Stats>
   attack: Kit
   melee?: true
@@ -57,16 +55,16 @@ export const BLOCK_SOAK = 2
 const HAMMER_SURGE = { gain: 3, cap: 4 }
 
 const weapons = {
-  rifle: { name: 'Arc Caster', type: 'Rifle', stats: {}, attack: { shots: 3, power: 0.6, ms: 150 } },
-  sniper: { name: 'Star Lance', type: 'Sniper Rifle', stats: { range: 3, crit: 0.1, move: -1 }, attack: { shots: 1, power: 1.6, ms: 520 }, stance: 'standoff' },
-  shotgun: { name: 'Blast Gauntlet', type: 'Shotgun', stats: { range: -1 }, attack: { shots: 1, power: 1.8, wide: 0.6 }, stance: 'rush', effect: 'thunder', special: 'Hits knock the target a tile back; if something stops it, it slams into that for 1 damage' },
-  smg: { name: 'Storm Darts', type: 'SMG', stats: { range: -1, move: 1 }, attack: { shots: 4, power: 0.4, ms: 90 } },
-  lmg: { name: 'Storm Engine', type: 'Machine Gun', stats: { range: 1, move: -1 }, attack: { shots: 5, power: 0.35, ms: 110 }, effect: 'suppress', special: 'A target it hits does 1 less damage on its next turn' },
-  pistols: { name: 'Twin Blasters', type: 'Twin Pistols', stats: { move: 1 }, attack: { shots: 2, power: 0.7, ms: 220 } },
-  hammer: { name: 'Thunder Hammer', type: 'Hammer', stats: { move: 2, strength: 2 }, attack: { shots: 1, power: 3, wide: 0.6 }, thrown: { shots: 1, power: 1.3, ms: 700, range: 5 }, melee: true, stance: 'rush', effect: 'thunder', stun: { chance: 1, reach: 2 }, surge: HAMMER_SURGE, special: `Each kill gives ${HAMMER_SURGE.gain} temp HP for the battle, to at most ${HAMMER_SURGE.cap}. Each hit stuns every alien within 2 tiles of where it lands, the target too if it lives: each loses its next action; never a boss or one already stunned. Hits knock the target a tile back; if something stops it, it slams into that for 1 damage` },
-  sword: { name: 'Sunblade', type: 'Sword', stats: { crit: 0.1, move: 2 }, attack: { shots: 1, power: 2.7 }, dash: 4, melee: true, stance: 'rush', effect: 'cleave', guard: { word: 'Parry', lands: 0 }, special: 'Parries the first hit each turn. A kill does 2 damage to every alien beside the one killed' },
-  shield: { name: 'Star Shield', type: 'Shield', stats: { armor: 2, move: 1 }, attack: { shots: 1, power: 1.7 }, thrown: { shots: 1, power: 0.8, ms: 700, range: 4 }, melee: true, stance: 'rush', effect: 'block', guard: { word: 'Block', lands: 0 }, special: `Blocks the first hit each turn; any other from beyond arm's reach does ${BLOCK_SOAK} less damage` },
-  fists: { name: 'Power Fists', type: 'Fists', stats: { move: 2, strength: 2 }, attack: { shots: 2, power: 1, ms: 300 }, rocket: { shots: 2, power: 0.6, ms: 480, range: 5 }, dash: 3, melee: true, stance: 'rush', effect: 'thunder', guard: { word: 'Slip', lands: 0, each: true }, special: 'Slips the first hit each turn from beside it, and the first from afar. Hits knock the target a tile back; if something stops it, it slams into that for 1 damage' },
+  rifle: { name: 'Rifle', stats: {}, attack: { shots: 3, power: 0.6, ms: 150 } },
+  sniper: { name: 'Sniper Rifle', stats: { range: 3, crit: 0.1, move: -1 }, attack: { shots: 1, power: 1.6, ms: 520 }, stance: 'standoff' },
+  shotgun: { name: 'Shotgun', stats: { range: -1 }, attack: { shots: 1, power: 1.8, wide: 0.6 }, stance: 'rush', effect: 'thunder', special: 'Knocks back 1 tile; 1 damage if it hits something' },
+  smg: { name: 'SMG', stats: { range: -1, move: 1 }, attack: { shots: 4, power: 0.4, ms: 90 } },
+  lmg: { name: 'Machine Gun', stats: { range: 1, move: -1 }, attack: { shots: 5, power: 0.35, ms: 110 }, effect: 'suppress', special: 'Targets hit do 1 less damage next turn' },
+  pistols: { name: 'Twin Pistols', stats: { move: 1 }, attack: { shots: 2, power: 0.7, ms: 220 } },
+  hammer: { name: 'Hammer', stats: { move: 2, strength: 2 }, attack: { shots: 1, power: 3, wide: 0.6 }, thrown: { shots: 1, power: 1.3, ms: 700, range: 5 }, melee: true, stance: 'rush', effect: 'thunder', stun: { chance: 1, reach: 2 }, surge: HAMMER_SURGE, special: `Stuns aliens within 2 tiles. Knocks back 1 tile. Kills give ${HAMMER_SURGE.gain} temp HP, max ${HAMMER_SURGE.cap}` },
+  sword: { name: 'Sword', stats: { crit: 0.1, move: 2 }, attack: { shots: 1, power: 2.7 }, dash: 4, melee: true, stance: 'rush', effect: 'cleave', guard: { word: 'Parry', lands: 0 }, special: 'Parries the first hit each turn. Kills deal 2 to adjacent aliens' },
+  shield: { name: 'Shield', stats: { armor: 2, move: 1 }, attack: { shots: 1, power: 1.7 }, thrown: { shots: 1, power: 0.8, ms: 700, range: 4 }, melee: true, stance: 'rush', effect: 'block', guard: { word: 'Block', lands: 0 }, special: `Blocks the first hit each turn; ranged hits do ${BLOCK_SOAK} less` },
+  fists: { name: 'Fists', stats: { move: 2, strength: 2 }, attack: { shots: 2, power: 1, ms: 300 }, rocket: { shots: 2, power: 0.6, ms: 480, range: 5 }, dash: 3, melee: true, stance: 'rush', effect: 'thunder', guard: { word: 'Slip', lands: 0, each: true }, special: 'Slips the first melee and first ranged hit each turn. Knocks back 1 tile' },
 } satisfies Record<string, Weapon>
 
 export type WeaponId = keyof typeof weapons

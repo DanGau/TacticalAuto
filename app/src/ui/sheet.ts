@@ -20,11 +20,10 @@ import {
   describe,
   gearStats,
   gearText,
-  gearType,
+  gearName,
   resistChip,
   weaponDoes,
 } from "./html";
-import { WEAPONS } from "../core/weapons";
 import { tip as markTip } from "./charts";
 import { DUOS, duosFor } from "../core/duos";
 
@@ -63,9 +62,9 @@ const heroStats = (run: Run, hero: Soldier) => {
   ]);
 };
 
-/** A hero's weapon: its type and special. */
+/** A hero's weapon: its name and special. */
 const kit = ({ gear }: Soldier) =>
-  gear ? `${gearType(gear)}. ${gearText(gear)}` : "";
+  gear ? `${gearName(gear)}. ${gearText(gear)}` : "";
 
 /** A hero's powers: its bonus attack, then those it learned, its class's ability with its uses worked out. */
 const powers = (run: Run, hero: Soldier): (Power & { tags?: Keyword[] })[] => [
@@ -98,7 +97,7 @@ export function heroCard(run: Run, hero: Soldier): string {
     `Jump ${stats.jump}`,
   ];
   const weapon = hero.gear
-    ? `<b class="tip" ${markTip([`${hero.gear.name}: ${WEAPONS[hero.gear.weapon].type}`, ...gearStats(hero.gear)])}>${hero.gear.name}</b><span>${weaponDoes(hero.gear)} ${gearText(hero.gear)}</span>`
+    ? `<b class="tip" ${markTip([hero.gear.name, ...gearStats(hero.gear)])}>${hero.gear.name}</b><span>${[weaponDoes(hero.gear), gearText(hero.gear)].filter(Boolean).join(". ")}</span>`
     : "<b>Empty hands</b>";
   return `<small class="cls">${cls.name}</small>
   <b class="name">${hero.name}</b>
