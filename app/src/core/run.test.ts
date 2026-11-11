@@ -45,7 +45,7 @@ import { soldierStats } from './squad'
 import { health } from './squad'
 import { TRAVEL_HEAL } from './squad'
 import { skillOffers } from './squad'
-import { MAX_SKILLS, minorOffers, PICK_LEVELS, picksEarned } from './squad'
+import { MAX_SKILLS, minorOffers, owesPick, PICK_LEVELS, picksEarned } from './squad'
 import { XP } from './squad'
 import { level } from './squad'
 import { xpFor } from './squad'
@@ -386,7 +386,7 @@ test('after the stops of a leg comes its satellite: winning it wins a key, a her
   expect(legOf(run).columns.flat().every((node) => node.stop !== null)).toBe(true)
 })
 
-test("each leg crosses a continent to a hero in one of its cities, who joins seasoned once extracted, its powers to choose; the last leads to the hub", () => {
+test("each leg crosses a continent to a hero in one of its cities, who joins seasoned once extracted, its picks made; the last leads to the hub", () => {
   const run = started()
   expect(run.route).toHaveLength(KEYS + 1)
   expect(new Set(run.route.slice(0, KEYS).map((stage) => stage.continent)).size).toBe(KEYS)
@@ -396,8 +396,8 @@ test("each leg crosses a continent to a hero in one of its cities, who joins sea
   fight(run, 'human')
   expect(run.soldiers[1]).toBe(hero)
   expect(level(hero)).toBeGreaterThan(1)
-  expect(hero.skills).toEqual([powerOf(hero.cls!)])
-  expect(skillOffers(hero).length).toBeGreaterThan(0)
+  expect(hero.skills.length).toBe(1 + picksEarned(hero))
+  expect(owesPick(hero)).toBe(false)
   expect(run.phase).toBe('reward')
 })
 

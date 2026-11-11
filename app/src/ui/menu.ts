@@ -41,6 +41,9 @@ export const recruitCard = (run: Run, recruit: Soldier, index: number) =>
     <span class="line"><i aria-hidden="true">✦</i> ${classPower(CLASSES[recruit.cls!], charges(run, recruit)).name}</span>
   </button>`;
 
+/** Recruit `index` in full, with the way back or to deploy with them. */
+export const recruitDossier = (run: Run, index: number) => heroDossier(run, run.recruits[index], `<button data-back>Back</button><button class="decide" data-deploy="${index}">Deploy</button>`);
+
 /** The run's first choice: which recruit leads the squad, three cards over a turning globe with their homes pinned. `open` shows one hero in full, the globe turned to their city. */
 export function recruits(run: Run, open: number | null): string {
   const homes = run.recruits.map((r, i) => ({
@@ -57,6 +60,6 @@ export function recruits(run: Run, open: number | null): string {
     <div class="map flight">${places(size, homes, open === null)}</div>
     <h2>Who leads the party?</h2>
     <div class="choices"${open === null ? "" : " inert"}>${run.recruits.map((r, i) => recruitCard(run, r, i)).join("")}</div>
-    ${open === null ? "" : heroDossier(run, run.recruits[open], open)}
+    ${open === null ? "" : recruitDossier(run, open)}
   </div>`;
 }

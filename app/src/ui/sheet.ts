@@ -15,6 +15,7 @@ import {
 } from "../core/squad";
 import { secondaryPower, SECONDARIES } from "../core/secondaries";
 import { powerOf, SKILLS } from "../core/skills";
+import { PERKS } from "../core/perks";
 import { treeMap } from "./tree";
 import { css } from "../view/shapes";
 import { COLOR } from "../view/palette";
@@ -83,11 +84,17 @@ const powers = (run: Run, hero: Soldier): (Power & { tags?: Keyword[] })[] => [
 const heading = (hero: Soldier) =>
   `Level ${level(hero)}${hero.cls ? ` ${CLASSES[hero.cls].name}` : ""}`;
 
+/** A hero's picks made: skills learned past its class power, then perks. */
+function picksTaken(hero: Soldier): string {
+  const names = [...hero.skills.filter((id) => id !== powerOf(hero.cls!)).map((id) => SKILLS[id].name), ...hero.perks.map((id) => PERKS[id].name)];
+  return names.length > 0 ? `<div class="key"><small class="label">Picks taken</small><span>${names.join(" · ")}</span></div>` : "";
+}
+
 /**
- * A recruit in full, as a dialog over the globe: their battle figure on a turning pedestal before their class badge;
- * then name, class and home, weapon, ability, numbers, bonus attack and duos; and the way back or to deploy with them.
+ * A hero in full, as a dialog: their battle figure on a turning pedestal before their class badge; then name, level,
+ * class and home, weapon, ability, picks taken, numbers, bonus attack and duos; and `actions`, its buttons.
  */
-export function heroDossier(run: Run, hero: Soldier, index: number): string {
+export function heroDossier(run: Run, hero: Soldier, actions: string): string {
   const cls = CLASSES[hero.cls!];
   const ability = classPower(cls, charges(run, hero));
   const bonus = secondaryPower(SECONDARIES[secondaryOf(hero)]);
@@ -101,15 +108,16 @@ export function heroDossier(run: Run, hero: Soldier, index: number): string {
       <div class="figure" style="background:${css(COLOR.human)}">${cls.name[0]}</div>
     </div>
     <div class="about">
-      <div class="who"><small class="cls">${cls.name}</small>
+      <div class="who"><small class="cls">${heading(hero)}</small>
       <h2 id="dossier-name">${hero.name}</h2>
       <small class="home">🌍 ${hero.home!.name}, ${hero.home!.country}</small></div>
       <div class="key"><small class="label">Weapon</small>${weapon}</div>
       <div class="key"><small class="label">Ability · ${usage(ability)}</small><b>${ability.name}</b><span>${ability.text}.</span></div>
+      ${picksTaken(hero)}
       ${heroStats(run, hero)}
       <div class="key"><small class="label">Bonus attack · ${usage(bonus)}</small><b>${bonus.name}</b><span>${bonus.text}.</span></div>
       ${duoHint(run, hero)}
-      <div class="actions"><button data-back>Back</button><button class="decide" data-deploy="${index}">Deploy</button></div>
+      <div class="actions">${actions}</div>
     </div>
   </div>`;
 }

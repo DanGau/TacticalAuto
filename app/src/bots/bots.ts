@@ -1,6 +1,7 @@
 // Bots: each chooses the next action whenever the run waits for the player.
 import type { Action } from '../core/apply'
-import { plannedPerk, strategic } from './strategic'
+import { strategic } from './strategic'
+import { plannedPerk } from '../core/plans'
 import { fuelTanks } from '../core/objects'
 import { UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
 import type { Keyword } from '../core/keywords'

@@ -16,6 +16,7 @@ import { TOWNS } from './towns'
 import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
 import { LEG_STOPS, OPENING, STOP_THREAT, THREAT_MAX } from './progress'
+import { kitOut } from './plans'
 import { abilityOf, charges, draft, health, join, MAX_SQUAD, offerRecruits, soldierStats, weaponOf, xpFor } from './squad'
 import { dropGear, offerStart, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
@@ -78,6 +79,7 @@ function plotRoute(run: Run, home: City): Stage[] {
     if (hero) {
       hero.home = to
       hero.xp = xpFor(HERO_LEVEL + HERO_LEVEL_LEG * leg)
+      kitOut(hero)
     }
     route.push({ continent, from: from.at, to, hero })
     from = to

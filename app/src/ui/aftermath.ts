@@ -19,7 +19,7 @@ import { xpFor } from '../core/squad'
 import { SKILLS, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
 import { findSwap, pickCard, pickDetail, startChoice, utilityPick, type Pick } from './cards'
-import { heroSheet } from './sheet'
+import { heroDossier, heroSheet } from './sheet'
 import { treeMap } from './tree'
 import { badge, button, describe, gearText, gearName, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
@@ -53,13 +53,7 @@ function soldierCard(run: Run, soldier: Report['soldiers'][number]): string {
 /** A hero joining the squad, alone on its screen: who they are, where from, and what they bring. */
 export function joined(run: Run, name: string): string {
   const hero = run.soldiers.find((s) => s.name === name)!
-  return `<div class="debrief joined">
-    <span class="portrait">${badge(hero.cls)}</span>
-    <h1 class="down">${hero.name} joins</h1>
-    <p>🌍 ${hero.home?.name ?? ''}</p>
-    ${heroSheet(run, hero)}
-    <button class="decide" data-met="report">Continue</button>
-  </div>`
+  return `<div class="joined">${heroDossier(run, hero, `<button class="decide" data-met="report">${hero.name} joins the party</button>`)}</div>`
 }
 
 /** What the squad gained or lost unchosen, alone in a pop-up: what it is, what it does, and a button to go on. */
