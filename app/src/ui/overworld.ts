@@ -27,7 +27,7 @@ import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
 import { pickCard, shopSwap, pickDetail, utilityPick, type Pick } from './cards'
 import { heroSheet } from './sheet'
-import { alienName, badge, button, describe, describeGear, gearCard, gearType, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
+import { alienName, badge, button, describe, describeGear, gearCard, gearName, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
 const TABS = ['Map', 'Team', 'Heroes'] as const
@@ -176,7 +176,7 @@ function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
   const card = (top: string, name: string, foot: string, sold: boolean) => `<small>${top}</small><b>${name}</b>${sold ? PURCHASED : `<small class="price">${foot}</small>`}`
   const gear = shop.wares.map(({ gear, sold }, index): Pick => {
     const price = GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
-    return { key: `g${index}`, attrs: `data-ware="${index}"`, look: `gear ${gear.rarity}`, body: card(`${gear.rarity} · ${gearType(gear)}`, gear.name, `${price} supplies`, sold), detail: `<p><b>${gear.name}</b>, ${gearType(gear)}. ${describeGear(gear, held)}</p>`, go: `Tap again to choose who takes it, for ${price} supplies`, block: poor(price), spent: sold }
+    return { key: `g${index}`, attrs: `data-ware="${index}"`, look: `gear ${gear.rarity}`, body: card(gear.rarity, gearName(gear), `${price} supplies`, sold), detail: `<p><b>${gear.name}</b>. ${describeGear(gear, held)}</p>`, go: `Tap again to choose who takes it, for ${price} supplies`, block: poor(price), spent: sold }
   })
   const relics = shop.relics.map(({ id, sold }, index): Pick => ({ key: `r${index}`, action: { type: 'buy', index }, look: 'relic', body: card('relic', RELICS[id].name, `${RELIC_PRICE} supplies`, sold), detail: `<p><b>${RELICS[id].name}.</b> ${describe(RELICS[id].text, RELICS[id].tags, held)}</p>`, go: `Tap again to buy for ${RELIC_PRICE} supplies`, block: poor(RELIC_PRICE), spent: sold }))
   const utilities = shop.utilities.map(({ id, sold }, index): Pick =>
@@ -252,7 +252,7 @@ function soldierCard(run: Run, soldier: Soldier, open: number | null): string {
     <small>Level ${r}${cls ? ` · ${cls.name}` : ''}</small><br><b>${soldier.name}</b>
     <div class="bar"><div style="width: ${filled}%"></div></div>
     ${healthBar(health(run, soldier), soldierStats(run, soldier).hp, soldierStats(run, soldier).armor)}
-    <div class="slot gear ${gear?.rarity ?? ''}" title="${gear ? gearText(gear) : ''}">${gear ? `<b>${gear.name}</b> <small>${gearType(gear)}</small>` : '<small>Empty hands</small>'}</div>
+    <div class="slot gear ${gear?.rarity ?? ''}" title="${gear ? gearText(gear) : ''}">${gear ? `<b>${gear.name}</b> <small>${gearName(gear)}</small>` : '<small>Empty hands</small>'}</div>
   </button>`
 }
 

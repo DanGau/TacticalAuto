@@ -25,7 +25,7 @@ function context(run: Run, src: Src, actor: number | undefined, battle: Battle):
     return ''
   }
   if (src.kind === 'class') return soldier?.cls ? CLASSES[soldier.cls].name : ''
-  if (src.kind === 'weapon') return WEAPONS[soldier?.gear?.weapon ?? (src.id as keyof typeof WEAPONS)]?.type ?? ''
+  if (src.kind === 'weapon') return WEAPONS[soldier?.gear?.weapon ?? (src.id as keyof typeof WEAPONS)]?.name ?? ''
   return ''
 }
 

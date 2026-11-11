@@ -30,7 +30,7 @@ export function begun(seed: number): Run {
   const run = createRun(seed)
   run.recruits[0].cls = 'sniper'
   run.recruits[0].skills = [powerOf('sniper')]
-  run.recruits[0].gear = { id: 0, rarity: 'common', name: 'Assault Rifle', weapon: 'rifle', stats: {}, effect: null }
+  run.recruits[0].gear = { id: 0, rarity: 'common', name: 'Rifle', weapon: 'rifle', stats: {}, effect: null }
   apply(run, { type: 'recruit', index: 0 })
   apply(run, { type: 'boons', picks: [0, 1] })
   run.utilities = []

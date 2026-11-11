@@ -185,7 +185,7 @@ test("a weapon card's face says its type and special; its numbers are the type's
     const gear = { id: 1, rarity: 'common' as const, name: `Heavy ${w.name}`, weapon: id as WeaponId, stats: { damage: 1, move: -1 }, effect: null }
     const card = gearCard(gear)
     const face = card.replace(/<[^>]*>/g, '')
-    expect(face).toContain(w.type)
+    expect(face).toContain(w.name)
     expect(face).not.toMatch(/×|%|[+-]\d|\b(range|move|crit|armor|strength|thrown|dash)\b/i)
     if (w.special) expect(gearText(gear)).toContain(w.special)
     const tip = card.match(/data-tip="([^"]*)"/)![1]

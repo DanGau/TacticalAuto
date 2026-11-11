@@ -4,7 +4,7 @@ import { apply, type Action } from '../core/apply'
 import { dropGear, GEAR_PRICE, SELL } from '../core/rewards'
 import type { Run } from '../core/run-state'
 import { findSwap, shopSwap } from './cards'
-import { gearType, describeGear } from './html'
+import { gearName, describeGear } from './html'
 
 /** Each option's arm key and label, as the player reads them. */
 const options = (html: string) => [...html.matchAll(/role="radio" aria-checked="(\w+)" data-arm="([^"]+)">.*?<b>(.*?)<\/b>/g)].map(([, on, key, label]) => ({ on: on === 'true', key, label: label.replace(/<[^>]*>/g, '') }))
@@ -84,8 +84,7 @@ test("each hero's held weapon card shows that weapon in full", () => {
   expect(cards.map(([, rarity]) => rarity)).toEqual(run.soldiers.map((s) => s.gear!.rarity))
   run.soldiers.forEach((s, i) => {
     const card = cards[i][2]
-    expect(card).toContain(`<b class="tier ${s.gear!.rarity}">${s.gear!.rarity} ${s.gear!.name}</b>`)
-    expect(card).toContain(gearType(s.gear!))
+    expect(card).toContain(`<b class="tier ${s.gear!.rarity}">${s.gear!.rarity} ${gearName(s.gear!)}</b>`)
     expect(card).toContain(describeGear(s.gear!))
   })
 })

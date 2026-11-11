@@ -4,7 +4,7 @@ import type { Gear } from '../core/gear'
 import { SELL } from '../core/rewards'
 import type { Run, Soldier } from '../core/run-state'
 import { boonText, START_PICKS, UTILITIES, type UtilityId } from '../core/utilities'
-import { badge, describeGear, gearType } from './html'
+import { badge, describeGear, gearName } from './html'
 
 export interface Pick {
   /** Which card this is among those on screen. */
@@ -39,7 +39,7 @@ export function pickDetail(picks: Pick[], armed: string | null, idle: string): s
 }
 
 /** A piece of gear in full: name, type, rarity and effect. */
-const full = (gear: Gear) => `<b class="tier ${gear.rarity}">${gear.rarity} ${gear.name}</b><small>${gearType(gear)}</small><span>${describeGear(gear)}</span>`
+const full = (gear: Gear) => `<b class="tier ${gear.rarity}">${gear.rarity} ${gearName(gear)}</b><span>${describeGear(gear)}</span>`
 
 /** A held weapon's name, its card shown beside it on hover, focus or tap. */
 const heldCard = (gear: Gear) => `<span class="held" tabindex="0" data-card><span class="tier ${gear.rarity}">${gear.name}</span><span class="gearpop ${gear.rarity}" hidden>${full(gear)}</span></span>`

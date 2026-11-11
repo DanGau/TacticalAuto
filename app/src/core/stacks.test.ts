@@ -117,7 +117,7 @@ test('Lasting Guard: armor is whole again each turn, and half of what was kept c
   expect(hero.armor).toBe(4)
 })
 
-test('Shield Slam: a Star Shield hit does its armor in more damage', () => {
+test('Shield Slam: a shield hit does its armor in more damage', () => {
   const { hero, aliens, beats } = arena(['shieldSlam'], [{ x: 11, y: 10 }])
   hero.stats = { ...hero.stats, damage: 2, crit: 0 }
   hero.armor = 5

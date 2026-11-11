@@ -51,7 +51,7 @@ const doctrines = {
   scatterguns: { name: 'Brawlers', text: 'Every hero has +2 damage and 2 less range', stats: { damage: 2, range: -2 }, weapon: true },
   blades: {
     name: 'Blademasters',
-    text: "Every hero fights with a Sunblade and charges in: range 1, +2 move, a dash to strike. An attack from beyond arm's reach does a hero 1 less damage",
+    text: "Every hero fights with a sword and charges in: range 1, +2 move, a dash to strike. An attack from beyond arm's reach does a hero 1 less damage",
     stats: { move: 2 },
     set: { range: 1 },
     fights: 'sword',

@@ -106,7 +106,7 @@ const skills = {
   intimidate: { name: 'Terrifying Roar', use: '1/battle', range: `${STUN_REACH}`, target: '2+ aliens', text: `Each ${stun}; a boss stands firm`, effect: 'warcry' },
   impact: { name: 'Impact', use: 'Passive', text: `Meteor Strike does ${IMPACT_DAMAGE} more damage and falls on a lone alien too`, effect: 'impact' },
   lasting: { name: 'Lasting Guard', use: 'Passive', tags: ['ward'], text: 'Its armor is whole again each turn, and half of what it kept carries on top, to double', effect: 'lasting' },
-  shieldSlam: { name: 'Shield Slam', use: 'At will', target: 'Creature hit with a Star Shield', tags: ['ward'], text: 'Takes its armor in more damage', effect: 'shieldSlam' },
+  shieldSlam: { name: 'Shield Slam', use: 'At will', target: 'Creature hit with a shield', tags: ['ward'], text: 'Takes its armor in more damage', effect: 'shieldSlam' },
   fortress: { name: 'Fortress', use: 'Passive', tags: ['ward'], text: 'Takes half damage from every hit', effect: 'fortress' },
   faultLine: { name: 'Fault Line', use: 'Reaction', range: '1', target: `Ground around its every ${FAULT.every}th creature hit up close`, tags: ['force'], text: `Drops ${FAULT.levels} levels; ${FAULT.damage} damage to each alien on it`, effect: 'faultLine' },
   aftershock: { name: 'Aftershock', use: 'At will', target: 'Beside creature hit', text: `${AFTERSHOCK_DAMAGE} damage to each`, effect: 'aftershock' },

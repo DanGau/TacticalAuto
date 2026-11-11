@@ -9,7 +9,7 @@ import { SKILLS } from '../core/skills'
 import { level, MAX_SQUAD } from '../core/squad'
 import { UTILITIES } from '../core/utilities'
 import { barCard, columns, heroColour, scale, type Column, type Mark } from './charts'
-import { badge, gearType, STOP_NAMES } from './html'
+import { badge, gearName, STOP_NAMES } from './html'
 
 const TANKED = '#9aa6bd'
 
@@ -83,7 +83,7 @@ export function runSummary(run: Run): string {
   const ended = won ? 'The source is destroyed. Earth is saved.' : 'Earth has fallen'
   const cause = won || !last ? '' : `<p>Ended by: ${foughtName(last)}, round ${last.rounds}, with ${run.soldiers.length} of ${MAX_SQUAD} heroes.</p>`
   const heroes = run.soldiers.map((hero) => `<div class="endhero"><span class="portrait">${badge(hero.cls)}</span><div><b>${hero.name}</b> <small>Level ${level(hero)}${hero.cls ? ` ${CLASSES[hero.cls].name}` : ''}</small><br>
-    <small class="tier ${hero.gear?.rarity ?? ''}">${hero.gear ? `${hero.gear.name} · ${gearType(hero.gear)}` : 'Empty hands'}</small><br>
+    <small class="tier ${hero.gear?.rarity ?? ''}">${hero.gear ? `${gearName(hero.gear)}` : 'Empty hands'}</small><br>
     <small>${hero.skills.map((id) => SKILLS[id].name).join(' · ') || 'No powers'}</small></div></div>`)
   const colour = colours(run)
   return `<div class="summary">
