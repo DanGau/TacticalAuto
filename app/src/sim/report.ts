@@ -20,8 +20,8 @@ export interface Report {
   moments: { falls: number; fallKills: number; throws: number; farthest: number }
   /** Jumps a battle, by arena kind. */
   jumps: Record<string, number>
-  /** What battles cost the squad, as shares of its most health in percent: lost and left, each by mean, and left by leg; points lost; soldiers downed a battle; battles ended under 75%. */
-  attrition: { lost: number; hp: number; points: number; downed: number; worn: number; legs: number[] }
+  /** What battles cost the squad, as shares of its most health in percent: lost and left, each by mean, and left by leg; points lost; soldiers downed a battle; battles ended under 75%; runs lost whose last battle began above 75%. */
+  attrition: { lost: number; hp: number; points: number; downed: number; worn: number; legs: number[]; sudden: number }
   /** Heroes' hits on aliens: the hardest, and the hardest but one in a hundred battles; and rounds a boss from leg LATE_LEG on takes to fell, by median and least. */
   hits: { max: number; p99: number; bossRounds: number; leastBossRounds: number }
   /** Boons found or bought a run, by leg. */
@@ -68,6 +68,7 @@ export function report(results: RunResult[]): Report {
   const per = (of: (m: RunResult['moments']) => number) => Math.round((100 * results.reduce((sum, r) => sum + of(r.moments), 0)) / battles) / 100
   const share = (of: Toll[], value: (t: Toll) => number) => Math.round((100 * of.reduce((sum, t) => sum + value(t) / t.most, 0)) / Math.max(1, of.length))
   const each = (value: (t: Toll) => number) => tolls.reduce((sum, t) => sum + value(t), 0) / Math.max(1, tolls.length)
+  const fatal = results.filter((r) => !r.won && r.tolls.length > 0).map((r) => r.tolls.at(-1)!)
   const hardest = tolls.map((t) => t.maxHit).sort((a, b) => a - b)
   const felled = tolls.filter((t) => t.leg >= LATE_LEG && t.bossRounds !== null).map((t) => t.bossRounds!).sort((a, b) => a - b)
   return {
@@ -90,6 +91,7 @@ export function report(results: RunResult[]): Report {
       downed: Math.round(100 * each((t) => t.downed)) / 100,
       worn: Math.round(100 * each((t) => (t.after < 0.75 * t.most ? 1 : 0))),
       legs: Array.from({ length: KEYS + 1 }, (_, leg) => share(tolls.filter((t) => t.leg === leg), (t) => t.after)),
+      sudden: Math.round((100 * fatal.filter((t) => t.before > 0.75 * t.most).length) / Math.max(1, fatal.length)),
     },
     hits: { max: hardest.at(-1) ?? 0, p99: hardest[Math.floor(0.99 * hardest.length)] ?? 0, bossRounds: felled[Math.floor(felled.length / 2)] ?? 0, leastBossRounds: felled[0] ?? 0 },
     found: Array.from({ length: KEYS + 1 }, (_, leg) => mean((r) => r.found[leg])),
@@ -115,6 +117,7 @@ export function formatReport(r: Report): string {
     `jumps a battle      ${Object.entries(r.jumps).map(([kind, n]) => `${kind} ${n}`).join(', ')}`,
     `squad health        loses ${r.attrition.lost}% (${r.attrition.points}) a battle, ends at ${r.attrition.hp}%; ${r.attrition.worn}% of battles end under 75%; ${r.attrition.downed} downed a battle`,
     `ends at, by leg     ${r.attrition.legs.map((n) => `${n}%`).join(', ')}`,
+    `sudden losses       ${r.attrition.sudden}% of runs lost began their last battle above 75%`,
     `hero hits           hardest ${r.hits.max}, p99 battle ${r.hits.p99}; a late boss falls in ${r.hits.bossRounds} rounds by median, ${r.hits.leastBossRounds} at least`,
     `boons found a run   ${Math.round(10 * r.found.reduce((a, b) => a + b, 0)) / 10}, by leg ${r.found.join(', ')}`,
     ...r.warnings.map((w) => `WARN                ${w}`),

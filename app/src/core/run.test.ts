@@ -1,3 +1,4 @@
+import { GOALS } from './goals'
 import { WEAPONS } from './weapons'
 import { expect, test } from 'vitest'
 import { TUNING } from './tuning'
@@ -483,7 +484,8 @@ test.each(['human', 'alien'] as const)('with every key won the squad is three, o
 test('alien force follows the leg; an alien\'s health never grows, but deeper aliens wear armor', () => {
   const run = started()
   enter(run, 'standard')
-  expect(missionAt(run, 'battle', 'standard').force).toBe(TUNING.legForce[0])
+  const m0 = missionAt(run, 'battle', 'standard')
+  expect(m0.force).toBe(TUNING.legForce[0] + GOALS[m0.goal].force)
   apply(run, { type: 'advance' })
   const early = run.battle!.units.filter((u) => u.side === 'alien')
   expect(early.filter((u) => !u.target).every((u) => u.stats.armor === 0)).toBe(true)
@@ -491,7 +493,8 @@ test('alien force follows the leg; an alien\'s health never grows, but deeper al
   const late = started()
   late.keys = 2
   enter(late, 'standard')
-  expect(missionAt(late, 'battle', 'standard').force).toBe(TUNING.legForce[2])
+  const m2 = missionAt(late, 'battle', 'standard')
+  expect(m2.force).toBe(TUNING.legForce[2] + GOALS[m2.goal].force)
   apply(late, { type: 'advance' })
   const troopers = (units: typeof early) => units.filter((u) => u.kind === 'trooper' && !u.boss && !u.target)
   for (const trooper of troopers(late.battle!.units)) expect(trooper.stats.armor).toBe(4)

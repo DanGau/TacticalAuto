@@ -39,14 +39,14 @@ export const ESCORT_REACH = 2
 
 /** `from` is the leg a goal is first drawn on: a lone first hero meets no hold or assassination. */
 export const GOALS: Record<Goal, { name: string; text: string; reward: string; force: number; weight: number; from: number }> = {
-  exterminate: { name: 'Clear them out', text: 'Kill every alien', reward: 'supplies and gear', force: 0, weight: 3, from: 0 },
+  exterminate: { name: 'Clear them out', text: 'Kill every alien', reward: 'supplies and gear', force: 2, weight: 3, from: 0 },
   assassinate: { name: 'Takedown', text: 'Kill the commander, armored and guarded, which blinks away when wounded; the rest flee', reward: 'supplies and rare gear', force: -3, weight: 1, from: 1 },
-  hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as aliens pour in, then get every hero left to the extraction zone`, reward: 'a relic, no gear', force: -4, weight: 1, from: 1 },
+  hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as aliens pour in, then get every hero left to the extraction zone`, reward: 'a relic, no gear', force: -6, weight: 1, from: 1 },
   rescue: {
     name: 'Rescue',
     text: `A terror site: aliens are killing ${CIVILIANS} civilians. Hiders, squat and amber, huddle and stay put; runners, tall and pale, flee the aliens; and harvesters raise the dead as husks. The party bursts in among them: aliens shoot civilians when they have no good shot at a hero, so push in. A hero who reaches a civilian gets them out. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and every hero 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
     reward: 'supplies and experience, no gear',
-    force: 3,
+    force: 1,
     weight: 1,
     from: 0,
   },
@@ -58,7 +58,7 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
     weight: 1,
     from: 1,
   },
-  raid: { name: 'Smash and grab', text: 'Guarded supply caches. Grab them all; each pays supplies', reward: 'supplies by the cache, no gear', force: -1, weight: 1, from: 0 },
+  raid: { name: 'Smash and grab', text: 'Guarded supply caches. Grab them all; each pays supplies', reward: 'supplies by the cache, no gear', force: 1, weight: 1, from: 0 },
   // Never drawn: a full threat turns the next stop into an ambush.
   // Never drawn: soldiers left behind turn the next stop into a recovery.
   recover: { name: 'Bring them back', text: 'The aliens hold your downed heroes among them. Reach each to get them up, and kill every alien. Lose and the run is over', reward: 'your heroes back', force: 0, weight: 0, from: 0 },

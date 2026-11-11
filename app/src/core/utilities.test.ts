@@ -69,7 +69,7 @@ test('a flashbang stuns the first cluster, a smoke bomb shortens every alien sho
 
 test('every boon lasts its rounds, then ends on the units it held and gives back what it added', () => {
   for (const id of ['thrusters', 'overcharge', 'ironSkin', 'farsight', 'keen', 'hover', 'crack', 'gravity', 'dampener', 'smoke'] as const) {
-    const run = landing([id], 3)
+    const run = landing([id], 5)
     apply(run, { type: 'enter', utility: 0 })
     const battle = run.battle!
     const before = new Map(battle.units.map((u) => [u.id, { ...u.stats, effects: u.effects.length }]))
@@ -93,7 +93,7 @@ test('every boon lasts its rounds, then ends on the units it held and gives back
 })
 
 test('mending heals the squad each turn it lasts', () => {
-  const run = landing(['mending'])
+  const run = landing(['mending'], 2)
   apply(run, { type: 'enter', utility: 0 })
   const battle = run.battle!
   const [hero] = squad(run)
