@@ -16,11 +16,11 @@ import { minorOffers, owesPick, skillOffers } from '../core/squad'
 import { PERKS, type PerkId } from '../core/perks'
 import { level } from '../core/squad'
 import { xpFor } from '../core/squad'
-import { SKILLS, treeOf, type SkillId } from '../core/skills'
+import { SKILLS, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
 import { findSwap, pickCard, pickDetail, startChoice, utilityPick, type Pick } from './cards'
 import { heroSheet } from './sheet'
-import { rule, skillState, treeMap } from './tree'
+import { treeMap } from './tree'
 import { badge, button, describe, gearText, gearName, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
 /**
@@ -93,19 +93,17 @@ function title(report: Report): string {
   return `<h1 class="${report.won ? 'down' : 'up'}">${name} ${report.won ? 'won' : 'lost'}</h1>`
 }
 
-/** The class's tree, for a soldier owed a power: taken, open and locked at a glance; an open one tapped tells what it does, and tapped again is learned. */
+/** The class's tree as far as the soldier can see, its offers as cards: one tapped is armed, and tapped again is learned. */
 export function skillChoice(run: Run, soldier: Soldier, armed: string | null = null): string {
   const held = squadKeywords(run)
-  const offers = skillOffers(soldier)
-  const pick = (id: SkillId): Pick => {
+  const pick = (id: SkillId, index: number): Pick => {
     const skill = SKILLS[id]
-    const state = skillState(soldier, id)
-    return { key: id, action: state === 'offered' ? { type: 'skill', soldier: soldier.id, index: offers.indexOf(id) } : undefined, look: `skillnode ${state}`, body: `<b>${skill.name}</b>`, detail: `<p><b>${skill.name}</b> <small class="use">${usage(skill)}</small></p><div>${describe(skill.text, skill.tags, held)}</div>`, go: `Tap again to learn ${skill.name}`, block: state === 'taken' ? 'Learned' : state === 'lost' ? 'Lost: turned down for this run' : state === 'open' ? 'Not offered this pick' : state === 'locked' ? `Locked. ${rule(soldier, id)}` : null }
+    return { key: id, action: { type: 'skill', soldier: soldier.id, index }, look: 'skillnode offered', body: `<b>${skill.name}</b><small class="use">${usage(skill)}</small><span>${describe(skill.text, skill.tags, held)}</span>`, detail: `<p><b>${skill.name}</b></p>`, go: `Tap again to learn ${skill.name}` }
   }
-  const picks = treeOf(soldier.cls!).map(pick)
+  const picks = skillOffers(soldier).map(pick)
   return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name} level ${level(soldier)}. Choose one of the powers offered; those turned down are lost for the run.</h2>
-    ${treeMap(soldier, (id) => pickCard(pick(id), armed), held)}
-    ${pickDetail(picks, armed, 'Tap a power for its details; tap it again to learn it.')}`
+    ${treeMap(soldier, (id) => pickCard(picks.find((p) => p.key === id)!, armed), held)}
+    ${pickDetail(picks, armed, 'Tap a power, then tap it again to learn it.')}`
 }
 
 /** A soldier's perk pick: three small cards, one tap to take; those passed over may come again. */

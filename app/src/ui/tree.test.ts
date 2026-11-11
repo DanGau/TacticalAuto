@@ -1,32 +1,13 @@
 import { expect, test } from 'vitest'
-import { CLASSES, type ClassId } from '../core/classes'
 import { begun } from '../core/roads'
 import { skillOffers, xpFor, PICK_LEVELS } from '../core/squad'
-import { capstones, powerOf, TREES, treeOf } from '../core/skills'
-import { MAP, rule, skillState, treeLayout, treeMap } from './tree'
+import { powerOf, SKILLS, TREES } from '../core/skills'
+import { rule, skillState, treeMap, treeView } from './tree'
 
-const classes = Object.keys(CLASSES) as ClassId[]
+const recruit = () => ({ ...begun(1).soldiers[0], xp: xpFor(PICK_LEVELS[1]) })
 
-test('the map places every skill once in its path column, links each row to the whole next, downward, capstones on the last row, and no two nodes overlap', () => {
-  for (const cls of classes) {
-    const { nodes, links, height } = treeLayout(cls)
-    const at = new Map(nodes.map((n) => [n.id, n]))
-    expect(nodes.map((n) => n.id).sort()).toEqual([...treeOf(cls)].sort())
-    expect(links).toHaveLength(TREES[cls].paths.length * (1 + 3 + 9 * (PICK_LEVELS.length - 2)))
-    for (const { from, to } of links) expect(at.get(to)!.y).toBeGreaterThan(at.get(from)!.y)
-    const bottom = Math.max(...nodes.map((n) => n.y))
-    for (const id of capstones(cls)) expect(at.get(id)!.y).toBeGreaterThan(bottom - MAP.row * 2)
-    for (const a of nodes) {
-      expect(a.x - MAP.node.w / 2).toBeGreaterThanOrEqual(0)
-      expect(a.x + MAP.node.w / 2).toBeLessThanOrEqual(MAP.width)
-      expect(a.y + MAP.node.h / 2).toBeLessThanOrEqual(height)
-      for (const b of nodes) if (a !== b) expect(Math.abs(a.x - b.x) >= MAP.node.w || Math.abs(a.y - b.y) >= MAP.node.h).toBe(true)
-    }
-  }
-})
-
-test('each node shows its state: the power taken, the offers pickable, the turned down lost, the paths not taken locked', () => {
-  const hero = { ...begun(1).soldiers[0], xp: xpFor(PICK_LEVELS[1]) }
+test('each skill shows its state: the power taken, the offers pickable, the turned down lost, the paths not taken locked', () => {
+  const hero = recruit()
   const cls = hero.cls!
   expect(skillState(hero, powerOf(cls))).toBe('taken')
   const entries = skillOffers(hero)
@@ -37,9 +18,29 @@ test('each node shows its state: the power taken, the offers pickable, the turne
   expect(skillState(hero, entries[1])).toBe('lost')
   expect(skillState(hero, TREES[cls].paths[1].rows[2][0])).toBe('locked')
   expect(rule(hero, TREES[cls].paths[1].rows[2][0])).toMatch(/^Locked/)
-  const html = treeMap(hero)
-  expect(html.match(/class="tree-node /g)).toHaveLength(treeOf(cls).length)
-  expect(html.match(/tree-node [^"]*offered"/g)).toHaveLength(3)
-  expect(html.match(/tree-node cap /g)).toHaveLength(capstones(cls).length)
-  expect(html.match(/class="head shut"/g)).toHaveLength(2)
+})
+
+test('before the first pick, the tree shows each path by its entry and capstones, its rows between unnamed', () => {
+  const hero = recruit()
+  const { paths } = TREES[hero.cls!]
+  expect(treeView(hero).kind).toBe('choose')
+  const shown = treeMap(hero).split('<details')[0]
+  for (const p of paths) {
+    expect(shown).toContain(SKILLS[p.rows[0][0]].name)
+    for (const id of p.rows.at(-1)!) expect(shown).toContain(SKILLS[id].name)
+    for (const row of p.rows.slice(1, -1)) for (const id of row) expect(shown).not.toContain(`>${SKILLS[id].name}<`)
+  }
+  expect(shown.match(/class="toffer"/g)).toHaveLength(paths.length)
+})
+
+test('once committed, the tree shows the taken path, the offer in full, the next row by name, and the other paths closed', () => {
+  const hero = { ...recruit(), xp: xpFor(PICK_LEVELS[2]) }
+  const [path, ...others] = TREES[hero.cls!].paths
+  hero.skills = [...hero.skills, path.rows[0][0]]
+  expect(treeView(hero)).toMatchObject({ kind: 'path', path, offer: path.rows[1], next: path.rows[2], closed: others.map((p) => p.name) })
+  const shown = treeMap(hero).split('<details')[0]
+  expect(shown.match(/class="toffer"/g)).toHaveLength(3)
+  for (const id of path.rows[3]) expect(shown).not.toContain(SKILLS[id].name)
+  expect(shown).toContain(`${others.map((p) => p.name).join(', ')}: closed`)
+  expect(treeMap(hero)).toContain(SKILLS[path.rows[3][0]].name)
 })

@@ -272,42 +272,43 @@
       @media (max-width: 600px) { .boons .swap { grid-template-columns: 1fr; } }
       .gearswap .confirm:disabled { color: #9aa6bd; background: #1d2433; border-color: #3a465c; }
       button.pick.blocked .price { color: #ff6b6b; }
-      .treemap { position: relative; width: 100%; max-width: 520px; margin: 10px auto; padding: 0; box-sizing: border-box; background: radial-gradient(ellipse at 50% 0%, #22304a 0%, #141a26 70%); border: 1px solid #2b3550; border-radius: 10px; text-align: center; --gold: #ffd166; --blue: #5aa9ff; }
-      .treemap svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-      .treemap .link { fill: none; stroke: #3a4560; stroke-width: 2; vector-effect: non-scaling-stroke; }
-      .treemap .link.lit { stroke: var(--gold); stroke-width: 3; filter: drop-shadow(0 0 3px #ffd166aa); }
-      .treemap .link.live { stroke: var(--blue); stroke-width: 2.5; stroke-dasharray: 5 4; animation: flow 1s linear infinite; }
-      .treemap .link.locked { stroke-dasharray: 3 4; opacity: 0.6; }
-      .treemap .link.dead { stroke: #4a2a2e; opacity: 0.5; }
-      .treemap .head { fill: #c9d2e6; font: bold 11px sans-serif; letter-spacing: 1px; text-anchor: middle; text-transform: uppercase; paint-order: stroke; stroke: #1a2233; stroke-width: 4px; }
-      .treemap .basics-head { position: absolute; left: 6px; top: 4px; color: #7f8aa3; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; }
-      @keyframes flow { to { stroke-dashoffset: -18; } }
       @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 #5aa9ff99; } 50% { box-shadow: 0 0 0 5px #5aa9ff00; } }
-      .tree-node { position: absolute; width: var(--nw); height: var(--nh); margin-left: calc(var(--nw) / -2); }
-      .treemap .basics-row { position: absolute; left: 4px; right: 4px; display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: 3px; }
+      .tree { max-width: 560px; margin: 10px auto; padding: 10px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 8px; background: radial-gradient(ellipse at 50% 0%, #22304a 0%, #141a26 70%); border: 1px solid #2b3550; border-radius: 10px; text-align: center; --gold: #ffd166; --blue: #5aa9ff; }
+      .tree small { color: #8a93a8; font-size: 11px; }
+      .tbasics { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; }
+      .tbasics > small { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: #7f8aa3; }
+      .thead { display: block; color: #c9d2e6; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+      .tchip { display: inline-block; margin: 2px; padding: 3px 8px; border: 1.5px solid #56637f; border-radius: 8px; background: #1b2232; color: #c9d2e6; font-size: 11px; line-height: 1.2; cursor: help; }
+      .tchip.taken { border-color: var(--gold); background: linear-gradient(#5a4a1c, #3a3014); color: #ffe7a3; font-weight: bold; }
+      .tchip.offered { border-color: var(--blue); color: #e6f1ff; }
+      .tchip.lost { color: #6b5a5e; border-color: #4a2a2e; text-decoration: line-through; }
+      .tchip.locked { color: #6b7488; border-style: dashed; }
+      .tpower .tchip { padding: 4px 14px; border-radius: 14px; }
+      .tcols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+      .tcol { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+      .tleads { line-height: 1.3; overflow-wrap: anywhere; }
+      .tticks { display: flex; flex-direction: column; align-items: center; gap: 3px; margin: 2px 0; }
+      .tticks i { width: 2px; height: 6px; border-radius: 1px; background: #3a4560; }
+      .tpath { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
+      .tdone { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px 6px; }
+      .tdone s { color: #5e6678; font-size: 10px; }
+      .toffers { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: 100%; }
+      .tnext { opacity: 0.45; }
+      .tnext .tchip { border-style: dashed; }
+      .tclosed { opacity: 0.6; }
+      .tree button.pick.skillnode, .toffer { flex: 1 1 0; width: auto; min-width: 0; max-width: 170px; height: auto; min-height: 92px; display: flex; flex-direction: column; gap: 3px; padding: 8px; box-sizing: border-box; border: 2px solid var(--blue); border-radius: 8px; background: #1d3352; color: #e6f1ff; text-align: left; font-size: 12px; line-height: 1.3; overflow-wrap: break-word; animation: pulse 1.4s ease-in-out infinite; }
+      .tcol button.pick.skillnode, .tcol .toffer { width: 100%; max-width: none; }
+      .tree button.pick.skillnode.armed { background: #2b4e7e; border-color: #9fd0ff; }
+      .tree .use { color: #9fb3c8; }
+      .tfull { width: 100%; }
+      .tfull summary { cursor: pointer; color: #7f8aa3; font-size: 11px; }
+      .tfull .tcols { margin-top: 6px; }
+      .tfull .trow { padding: 2px 0; border-top: 1px solid #222b3d; }
+      @media (max-width: 600px) { .tree { max-width: none; padding: 8px 6px; } .tcols { gap: 4px; } .tree button.pick.skillnode, .toffer { padding: 6px; font-size: 11px; } }
       .basic-chip { padding: 1px 5px; border: 1px solid #4a5470; border-radius: 6px; background: #222a3a; font-size: 9px; line-height: 1.3; white-space: nowrap; }
       .perkpick .perks { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
       .perkpick button.perk { flex: 1 1 96px; max-width: 160px; min-height: 64px; display: flex; flex-direction: column; gap: 4px; padding: 8px; text-align: left; line-height: 1.25; border: 2px solid #8a7a4a; }
       .perkpick .held { display: block; margin-top: 10px; color: #9aa6bd; text-align: center; }
-      .tree-node > button.pick.skillnode, .tree-node > .node-name { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 2px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #3a4560; background: #1b2232; color: #c9d2e6; font-size: 10px; line-height: 1.1; text-align: center; overflow-wrap: break-word; hyphens: auto; cursor: pointer; }
-      .tree-node > button.pick.skillnode b { font-weight: 600; }
-      .tree-node.cap > button, .tree-node.cap > .node-name { border-radius: 16px; border-width: 2px; box-shadow: inset 0 0 0 1px #ffd16633; }
-      .tree-node.cap::before { content: '★'; position: absolute; z-index: 1; top: -8px; left: 50%; transform: translateX(-50%); color: var(--gold); font-size: 12px; line-height: 1; text-shadow: 0 0 4px #000; }
-      .tree-node.root > .node-name, .tree-node.root > button { border-radius: 50% / 40%; }
-      .treemap .tree-node.taken > button.pick, .treemap .tree-node.taken > .node-name { border-color: var(--gold); background: linear-gradient(#5a4a1c, #3a3014); color: #ffe7a3; box-shadow: 0 0 8px #ffd16666; font-weight: bold; }
-      .treemap .tree-node.offered > button.pick, .treemap .tree-node.offered > .node-name { border-color: var(--blue); border-width: 2px; background: #1d3352; color: #e6f1ff; animation: pulse 1.4s ease-in-out infinite; }
-      .treemap .tree-node.offered > button.pick.armed { background: #2b4e7e; border-color: #9fd0ff; }
-      .treemap .tree-node.open > button.pick, .treemap .tree-node.open > .node-name { border-color: #56637f; color: #c9d2e6; }
-      .treemap .tree-node.locked > button.pick, .treemap .tree-node.locked > .node-name { border-style: dashed; color: #6b7488; background: #151b27; }
-      .treemap .tree-node.locked { opacity: 0.45; } .treemap .head.shut { opacity: 0.4; }
-      .treemap .tree-node.lost > button.pick, .treemap .tree-node.lost > .node-name { color: #6b5a5e; background: repeating-linear-gradient(135deg, #1a1416 0 4px, #221a1c 4px 8px); border-color: #4a2a2e; text-decoration: line-through; opacity: 0.7; }
-      .tree-card { display: none; position: absolute; z-index: 8; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); width: 200px; padding: 8px 10px; border-radius: 8px; background: rgba(10, 13, 19, 0.96); border: 1px solid #3a4560; box-shadow: 0 4px 14px #000a; text-align: left; font-size: 12px; line-height: 1.35; pointer-events: none; }
-      .tree-card > * { display: block; margin-top: 3px; }
-      .tree-card b.offered { color: var(--blue); } .tree-card b.taken { color: var(--gold); } .tree-card b.lost { color: #ff6b5e; } .tree-card b.locked { color: #8a93a8; }
-      .tree-node:hover .tree-card, .tree-node:focus-within .tree-card { display: block; }
-      .tree-node:hover, .tree-node:focus-within { z-index: 9; }
-      @media (max-width: 600px) { .treemap { max-width: none; } .tree-node > button.pick.skillnode, .tree-node > .node-name { font-size: 11px; } .treemap .head { font-size: 10px; letter-spacing: 0.5px; } }
-      @media (max-width: 600px) { .tree-node:hover .tree-card, .tree-node:focus-within .tree-card { position: fixed; left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; transform: none; } }
       .shelf { margin-bottom: 6px; text-align: center; }
       .shelf > small { display: block; color: #9aa6bd; }
       .shopfoot { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 8px 0; }
