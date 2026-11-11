@@ -85,8 +85,8 @@ function projection({ centre, r, turn }: View, size: Size) {
     .scale(r)
     .translate([size.w / 2, open(size).middle])
     .clipAngle(90)
-    // Cut at the window's edge too, so a close view draws only what shows.
-    .clipExtent([[-40, -40], [size.w + 40, size.h + 40]])
+    // Cut half a window beyond its edge too, so a close view draws only what shows, even with the globe slid aside.
+    .clipExtent([[-size.w / 2, -size.h / 2], [1.5 * size.w, 1.5 * size.h]])
     .precision(1)
   const project = (at: LonLat) => {
     const [x, y] = lens(at)!
@@ -168,9 +168,9 @@ const GAP = 90
 let drawn: { target: View; now: View; draw: (view: View) => string } | null = null
 
 /** A globe a window `size`, drawn from `draw` framed on `target`, kept to glide later. */
-function keep(size: Size, target: View, draw: (view: View) => string): string {
+function keep(size: Size, target: View, draw: (view: View) => string, drifts = false): string {
   drawn = { target, now: target, draw }
-  return `<div class="globe" style="width:${size.w}px;height:${size.h}px">${draw(target)}</div>`
+  return `<div class="globe${drifts ? ' drifts' : ''}" style="width:${size.w}px;height:${size.h}px">${draw(target)}</div>`
 }
 
 /** The view the globe on screen shows, if any. */
@@ -217,8 +217,8 @@ export function glide(root: HTMLElement, from: View | null): void {
 /** The globe's insides: air, sea, graticule and coasts, under `over`, with `pins` laid on top. */
 function sphere(view: View, size: Size, over: string, pins: string): string {
   const project = projection(view, size)
-  // Only the shapes reaching into the view are drawn: the part of the globe a window `size` across can show.
-  const seen = Math.asin(Math.min(1, Math.hypot(size.w, size.h) / 2 / view.r))
+  // Only the shapes reaching into the view are drawn: the part of the globe the clip extent, twice `size` across, can show.
+  const seen = Math.asin(Math.min(1, Math.hypot(size.w, size.h) / view.r))
   const land = moving || view.r <= DETAIL ? COARSE : { type: 'GeometryCollection' as const, geometries: PARTS.filter((part) => geoDistance(part.middle, view.centre) - part.reach < seen).map((part) => part.shape) }
   const coasts = `<path class="land" d="${project.path(land) ?? ''}"/>`
   const graticule = [
@@ -350,8 +350,8 @@ const spot = (p: { x: number; y: number }) => `left:${p.x.toFixed(1)}px;top:${p.
 /** The squad's helicopter, over where it stands; it flies to the stop the player sets out for. */
 const chopper = (p: { x: number; y: number }) => `<div class="chopper" style="${spot(p)}"><span>🚁</span></div>`
 
-/** Places on the whole globe, each with its markup; the globe turns to the one chosen. */
-export function places(size: Size, all: { at: LonLat; html: string; chosen: boolean }[]): string {
+/** Places on the whole globe, each with its markup; the globe turns to the one chosen, or with `drifts`, slowly round. */
+export function places(size: Size, all: { at: LonLat; html: string; chosen: boolean }[], drifts = false): string {
   const chosen = all.find((p) => p.chosen)
   const whole = framed(all.map((p) => p.at), size)
   return keep(size, chosen ? { ...whole, centre: chosen.at, r: whole.r * 1.3 } : whole, (view) => {
@@ -361,7 +361,28 @@ export function places(size: Size, all: { at: LonLat; html: string; chosen: bool
       return p.front ? [`<div class="cell${place.chosen ? ' chosen' : ''}" style="${spot(p)}">${place.html}</div>`] : []
     })
     return sphere(view, size, '', pins.join(''))
-  })
+  }, drifts)
+}
+
+/** How far a drifting globe sways either side of its view, in degrees, and how long one sway takes, in milliseconds. */
+const SWAY = { reach: 30, ms: 40000 }
+
+/** Sways the drifting globe in `root` slowly east and west of its view, while nothing glides it, until it leaves the page. */
+export function drift(root: HTMLElement): void {
+  const kept = drawn
+  const globe = root.querySelector<HTMLElement>('.globe.drifts')
+  if (!kept || !globe || matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  let start: number | null = null
+  const frame = (time: number) => {
+    if (drawn !== kept || !globe.isConnected) return
+    requestAnimationFrame(frame)
+    if (moving) return
+    start ??= time
+    const { centre } = kept.target
+    kept.now = { ...kept.target, centre: [centre[0] + SWAY.reach * Math.sin((2 * Math.PI * (time - start)) / SWAY.ms), centre[1]] }
+    globe.innerHTML = kept.draw(kept.now)
+  }
+  requestAnimationFrame(frame)
 }
 
 /**

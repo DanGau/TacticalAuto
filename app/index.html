@@ -111,16 +111,81 @@
       .story { max-width: 640px; margin: 8vh auto 0; animation: none; }
       .story p, .story button { font-size: 19px; line-height: 1.6; color: #e8e2c8; animation: rise 1.1s backwards; }
       .story p { margin: 0 0 18px; }
-      .recruit { position: relative; display: flex; flex-direction: column; gap: 10px; width: 280px; padding: 16px; border-radius: 10px; background: #35496b; text-align: left; }
-      .recruit.chosen { outline: 2px solid #ffd84d; }
-      .recruit .cls { color: #ffd84d; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
-      .choices .recruit .name { font-size: 22px; margin-top: -8px; }
-      .recruit .key { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 6px; background: #2a3a57; }
-      .recruit .key .label { color: #9aa6bd; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-      .recruit .key b { font-size: 15px; }
-      .recruit .key span { font-size: 13px; line-height: 1.4; }
-      .recruit .more, .recruit .duos, .recruit .home { font-size: 12px; color: #9aa6bd; }
-      .choices .recruit .home { margin-top: auto; color: #9ad7ff; }
+      /* The recruit choice: three small cards over a swaying globe; one opens into a dossier, the globe sliding behind the hero. */
+      .picking { position: relative; z-index: 1; min-height: calc(100vh / var(--ui, 1) - 40px); display: flex; flex-direction: column; justify-content: flex-end; padding: 0; }
+      .picking > h2 { position: fixed; top: 18px; left: 0; right: 0; margin: 0; font-size: 22px; letter-spacing: 2px; text-transform: uppercase; color: #e8e2c8; text-shadow: 0 2px 8px #0a1626; pointer-events: none; }
+      #panel:has(.picking) { overflow: hidden; }
+      .picking .globe, .picking .globe svg { overflow: visible; }
+      .picking .globe { transition: transform 0.7s cubic-bezier(0.3, 0.7, 0.2, 1), opacity 0.7s; }
+      /* The hero stands on their city. */
+      .picking.opened .globe { transform: translate(-18%, 24%); }
+      .picking.opened .cell.chosen { opacity: 0; }
+      /* A glow is cut off at the edge of the window the globe slid from. */
+      .picking.opened .land { filter: none; }
+      .deploying .dossier { background: transparent; transition: background 0.4s; }
+      .picking.opened > h2, .picking.opened .choices { opacity: 0; transition: opacity 0.3s; }
+      .picking .cell { transform: none; }
+      .picking .cell .home { display: block; transform: translate(-50%, -50%); width: 10px; height: 10px; border-radius: 50%; background: #c77dff; box-shadow: 0 0 8px #c77dff; text-indent: 16px; line-height: 10px; white-space: nowrap; font-size: 12px; color: #e8e2c8; text-shadow: 0 0 4px #0a1626, 0 0 4px #0a1626; }
+      .picking .cell .home.chosen { background: #ffd166; box-shadow: 0 0 0 6px #ffd16633, 0 0 16px #ffd166; color: #ffd166; font-weight: bold; font-size: 15px; }
+      .menu.picking .choices { position: relative; margin: 0 0 12px; gap: 20px; text-align: left; }
+      .choices .recruit { flex: 0 1 260px; display: grid; grid-template-columns: 52px 1fr; grid-template-rows: auto auto auto auto; column-gap: 14px; row-gap: 2px; align-items: center; padding: 16px 18px; border-radius: 14px; border: 1px solid #4a5a7880; background: linear-gradient(160deg, #263553e6, #141b29f0); backdrop-filter: blur(6px); box-shadow: 0 10px 30px #0008; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; animation: rise 0.6s backwards; }
+      .choices .recruit:nth-child(2) { animation-delay: 0.1s; }
+      .choices .recruit:nth-child(3) { animation-delay: 0.2s; }
+      .choices .recruit:hover, .choices .recruit:focus-visible { transform: translateY(-4px); border-color: #ffd84d; box-shadow: 0 14px 34px #000a, 0 0 0 1px #ffd84d55; background: linear-gradient(160deg, #2e4066f0, #171f30f5); }
+      .recruit .emblem { grid-row: 1 / span 2; width: 52px; height: 52px; display: grid; place-items: center; font-size: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #4da3ff55, #10141c); border: 1px solid #4da3ff88; }
+      .recruit .cls, .dossier .cls { color: #ffd84d; text-transform: uppercase; letter-spacing: 1.5px; font-size: 11px; }
+      .recruit .cls { align-self: end; }
+      .recruit .name { font-size: 20px; align-self: start; line-height: 1.2; }
+      .recruit .line { grid-column: 1 / -1; font-size: 13px; color: #c9d2e3; margin-top: 4px; }
+      .recruit .line + .line { margin-top: 0; }
+      .recruit .line i { display: inline-block; width: 18px; font-style: normal; color: #9ad7ff; }
+      .dossier { position: fixed; inset: 0; z-index: 3; display: grid; grid-template-columns: 1fr minmax(360px, 440px); gap: 24px; align-items: center; padding: 32px max(32px, calc(50% - 600px)); background: linear-gradient(90deg, #0a162600 30%, #0a1626cc 62%, #0a1626f2); text-align: left; }
+      .dossier .stage { --unit: 1; position: relative; height: min(70vh, 520px); perspective: 700px; }
+      .dossier .stage > * { position: absolute; left: 50%; }
+      .dossier .emblem { top: 50%; width: calc(320px * var(--unit)); height: calc(320px * var(--unit)); margin: calc(-280px * var(--unit)) 0 0 calc(-160px * var(--unit)); display: grid; place-items: center; font-size: calc(140px * var(--unit)); border-radius: 50%; background: radial-gradient(circle, #0a1626cc 30%, #0a162600 70%); border: 2px solid #4da3ff40; box-shadow: 0 0 60px #4da3ff30, inset 0 0 60px #4da3ff30; }
+      .dossier .emblem::after { content: ""; position: absolute; inset: calc(16px * var(--unit)); border-radius: 50%; border: 1px dashed #ffd84d66; animation: turn 30s linear infinite; }
+      .dossier .pedestal { top: 50%; width: calc(200px * var(--unit)); height: calc(200px * var(--unit)); margin: calc(-10px * var(--unit)) 0 0 calc(-100px * var(--unit)); border-radius: 50%; background: radial-gradient(circle, #0a1626 0 18%, #0a162600 19%), repeating-conic-gradient(#4da3ff66 0 3deg, #1d3a5e 3deg 30deg); border: 3px solid #4da3ff; box-shadow: 0 0 40px #4da3ff88, inset 0 0 30px #000; transform: rotateX(72deg); animation: pedestal 14s linear infinite; }
+      .dossier .figure { top: 50%; width: calc(72px * var(--unit)); height: calc(120px * var(--unit)); margin: calc(-30px * var(--unit)) 0 0 calc(-36px * var(--unit)); border-radius: calc(24px * var(--unit)); display: grid; place-items: center; font: bold calc(52px * var(--unit)) sans-serif; color: #10141c; box-shadow: 0 0 30px #4da3ff99, inset -10px -10px 20px #0004, inset 8px 8px 16px #fff3; animation: idle 3s ease-in-out infinite; }
+      .dossier .about { display: flex; flex-direction: column; gap: 10px; max-height: 100%; }
+      .dossier h2 { font-size: 34px; margin: -6px 0 0; line-height: 1.1; color: #fff; font-weight: bold; }
+      .dossier .actions .decide { background: #ffd84d; border-color: #ffd84d; color: #10141c; font-weight: bold; }
+      .dossier .actions .decide:hover { background: #ffe680; }
+      .dossier .home { color: #9ad7ff; font-size: 13px; }
+      .dossier .key { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 8px; background: #1d2840d9; border: 1px solid #ffffff10; }
+      .dossier .key .label { color: #9aa6bd; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+      .dossier .key b { font-size: 16px; }
+      .dossier .key span { font-size: 13px; line-height: 1.4; color: #c9d2e3; }
+      .dossier .statblock { margin: 0; }
+      .dossier .duos { font-size: 12px; color: #9aa6bd; }
+      .dossier .actions { display: flex; gap: 12px; margin-top: 6px; }
+      .dossier .actions button { flex: 1; padding: 12px; font-size: 16px; }
+      .dossier .actions .decide { flex: 2; }
+      @keyframes turn { to { transform: rotate(360deg); } }
+      @keyframes pedestal { to { transform: rotateX(74deg) rotateZ(360deg); } }
+      @keyframes idle { 50% { transform: translateY(-6px); } }
+      @media (max-width: 700px) {
+        .menu.picking .choices { flex-direction: column; align-items: stretch; gap: 10px; margin: 0 4px 8px; }
+        .choices .recruit { flex: none; max-width: none; padding: 12px 14px; }
+        .picking.opened .globe { transform: translateY(-11%); }
+        .picking > h2 { font-size: 26px; }
+        .recruit .emblem { width: 64px; height: 64px; font-size: 32px; }
+        .choices .recruit { grid-template-columns: 64px 1fr; }
+        .recruit .cls { font-size: 15px; }
+        .recruit .name { font-size: 28px; }
+        .recruit .line { font-size: 19px; }
+        .dossier h2 { font-size: 40px; }
+        .dossier .cls, .dossier .home, .dossier .key .label, .dossier .duos { font-size: 15px; }
+        .dossier .key b { font-size: 21px; }
+        .dossier .key span { font-size: 18px; }
+        .dossier .statblock small { font-size: 13px; }
+        .dossier .statblock b { font-size: 18px; }
+        .dossier .actions button { font-size: 21px; padding: 14px; }
+        .dossier { grid-template-columns: 1fr; grid-template-rows: calc(36vh / var(--ui, 1)) auto; gap: 8px; padding: 12px 16px 16px; align-items: start; overflow-y: auto; background: linear-gradient(180deg, #0a162600 20%, #0a1626e6 42%, #0a1626f7); }
+        .dossier .stage { --unit: 0.85; height: calc(36vh / var(--ui, 1)); }
+        .dossier h2 { font-size: 26px; }
+        .dossier .key { padding: 8px 10px; }
+      }
+      @media (prefers-reduced-motion: reduce) { .dossier .pedestal, .dossier .figure, .dossier .emblem::after { animation: none; } .picking .globe { transition: none; } }
       .note { font-size: 12px; color: #9aa6bd; white-space: nowrap; }
       .chip { padding: 4px 10px; border: 1px solid #4a5a78; border-radius: 12px; white-space: nowrap; }
       .chip.feat { border-color: #ffd84d; color: #ffd84d; cursor: help; }
@@ -128,10 +193,6 @@
       .map { display: flex; justify-content: center; padding: 4px 0 8px; }
       .globe { position: relative; flex: none; overflow: hidden; }
       .globe .sea { position: absolute; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #1d3a5e, #0a1626 75%); box-shadow: 0 0 40px 8px #4da3ff40; }
-      .homes { display: flex; justify-content: center; opacity: 0.85; }
-      .homes .home { display: block; transform: translate(-50%, -50%); width: 10px; height: 10px; border-radius: 50%; background: #c77dff; text-indent: 16px; line-height: 10px; white-space: nowrap; font-size: 12px; color: #e8e2c8; text-shadow: 0 0 4px #0a1626; }
-      .homes .home.chosen { background: #ffd166; box-shadow: 0 0 10px #ffd166; color: #ffd166; font-weight: bold; }
-      .homes .cell { transform: none; }
       .globe svg { position: absolute; inset: 0; }
       .globe .land { fill: #23402f; stroke: #7fe7c4; stroke-width: 1.2; stroke-opacity: 0.55; filter: drop-shadow(0 0 4px #4fe0a088); }
       .globe .graticule { fill: none; stroke: #4da3ff; stroke-opacity: 0.12; stroke-width: 0.8; }
@@ -494,7 +555,6 @@
       .foes { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: 4px 0; }
       #drop .picks button.pick.foe, button.pick.foe { width: auto; height: auto; padding: 3px 8px; font-size: 12px; border-color: #a33; }
       @media (max-width: 900px) {
-        .choices .recruit { flex: 1 1 100%; max-width: 420px; padding: 12px; gap: 8px; }
         .powers { grid-template-columns: 1fr; }
         .statblock b { font-size: 11px; }
         body { font-size: 12px; }

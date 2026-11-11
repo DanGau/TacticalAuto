@@ -22,7 +22,8 @@ import { RECKONING_KILLS } from '../core/doctrines'
 import { pickCard, pickDetail, utilityPick, type Pick } from './cards'
 import { alienBlock } from './sheet'
 import { overworld, type Tab } from './overworld'
-import { glide, viewNow } from './globe'
+import { drift, glide, viewNow } from './globe'
+import { collapse, deploy, expand } from './select'
 
 /** How long the helicopter takes to fly between stops, in milliseconds. */
 const FLIGHT_MS = 1100
@@ -186,6 +187,7 @@ export function createUi(act: (action: Action) => void): Ui {
     if (next !== html) {
       overlay.innerHTML = html = next
       glide(overlay, from)
+      drift(overlay)
       overlay.hidden = run.phase === 'battle'
       shrink()
     }
@@ -290,6 +292,21 @@ export function createUi(act: (action: Action) => void): Ui {
       land()
     }, FLIGHT_MS)
   }
+  /** Closes the open hero's dossier back into their card, and focuses it. */
+  function closeDossier(): void {
+    const index = recruit
+    const card = () => overlay.querySelector<HTMLElement>(`[data-recruit="${index}"]`)
+    flying = true
+    collapse(overlay, card()?.getBoundingClientRect(), () => {
+      flying = false
+      recruit = null
+      render(shown!)
+      card()?.focus()
+    })
+  }
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && recruit !== null && !flying && shown?.phase === 'recruit') closeDossier()
+  })
   // Arrow keys move a radio group's choice, as a radio group's do.
   overlay.addEventListener('keydown', (e) => {
     const radio = (e.target as HTMLElement).closest<HTMLElement>('[role=radio]')
@@ -312,10 +329,20 @@ export function createUi(act: (action: Action) => void): Ui {
     else if (target.id === 'start') started = true
     else if (target.id === 'begin' || target.dataset.begin !== undefined) told = true
     else if (target.dataset.recruit) {
-      // A city tapped once shows who waits there; tapped again, the run begins there.
-      const index = Number(target.dataset.recruit)
-      if (recruit !== index) recruit = index
-      else return act({ type: 'recruit', index })
+      recruit = Number(target.dataset.recruit)
+      const card = target.getBoundingClientRect()
+      render(shown!)
+      return expand(overlay, card)
+    }
+    else if (target.dataset.back !== undefined) return closeDossier()
+    else if (target.dataset.deploy) {
+      flying = true
+      const index = Number(target.dataset.deploy)
+      return deploy(overlay, () => {
+        flying = false
+        recruit = null
+        act({ type: 'recruit', index })
+      })
     }
     else if (target.dataset.stats !== undefined) statsOpen = target.dataset.stats === 'open'
     else if (target.dataset.seen) seen = shown!.report

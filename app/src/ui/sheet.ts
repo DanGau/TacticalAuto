@@ -16,7 +16,10 @@ import {
 import { secondaryPower, SECONDARIES } from "../core/secondaries";
 import { powerOf, SKILLS } from "../core/skills";
 import { treeMap } from "./tree";
+import { css } from "../view/shapes";
+import { COLOR } from "../view/palette";
 import {
+  badge,
   describe,
   gearStats,
   gearText,
@@ -80,31 +83,35 @@ const powers = (run: Run, hero: Soldier): (Power & { tags?: Keyword[] })[] => [
 const heading = (hero: Soldier) =>
   `Level ${level(hero)}${hero.cls ? ` ${CLASSES[hero.cls].name}` : ""}`;
 
-/** A recruit as a card: name and class, then its weapon and class ability in plain words; its numbers and bonus attack in brief, in full on hover or tap. */
-export function heroCard(run: Run, hero: Soldier): string {
-  const stats = soldierStats(run, hero);
+/**
+ * A recruit in full, as a dialog over the globe: their battle figure on a turning pedestal before their class badge;
+ * then name, class and home, weapon, ability, numbers, bonus attack and duos; and the way back or to deploy with them.
+ */
+export function heroDossier(run: Run, hero: Soldier, index: number): string {
   const cls = CLASSES[hero.cls!];
   const ability = classPower(cls, charges(run, hero));
   const bonus = secondaryPower(SECONDARIES[secondaryOf(hero)]);
-  const numbers = [
-    `HP ${stats.hp}`,
-    `Armor ${stats.armor}`,
-    `Move ${stats.move}`,
-    `Damage ${stats.damage}`,
-    `Range ${stats.range}`,
-    `Crit ${Math.round(100 * stats.crit)}%`,
-    `Strength ${stats.strength}`,
-    `Jump ${stats.jump}`,
-  ];
   const weapon = hero.gear
-    ? `<b class="tip" ${markTip([hero.gear.name, ...gearStats(hero.gear)])}>${hero.gear.name}</b><span>${[weaponDoes(hero.gear), gearText(hero.gear)].filter(Boolean).join(". ")}</span>`
+    ? `<b class="tip" ${markTip([hero.gear.name, ...gearStats(hero.gear)])}>${hero.gear.name}</b><span>${weaponDoes(hero.gear)}</span>${gearText(hero.gear) ? `<span>${gearText(hero.gear)}</span>` : ""}`
     : "<b>Empty hands</b>";
-  return `<small class="cls">${cls.name}</small>
-  <b class="name">${hero.name}</b>
-  <div class="key"><small class="label">Weapon</small>${weapon}</div>
-  <div class="key"><small class="label">Ability · ${usage(ability)}</small><b>${ability.name}</b><span>${ability.text}.</span></div>
-  <small class="more"><span class="tip" ${markTip(numbers)}>${stats.hp} HP · ${stats.move} move</span> · <span class="tip" ${markTip([`${bonus.name}: ${usage(bonus)}`, `${bonus.text}.`])}>Bonus attack: ${bonus.name}</span></small>
-  ${duoHint(run, hero)}`;
+  return `<div class="dossier" role="dialog" aria-modal="true" aria-labelledby="dossier-name">
+    <div class="stage" aria-hidden="true">
+      <span class="emblem">${badge(hero.cls)}</span>
+      <div class="pedestal"></div>
+      <div class="figure" style="background:${css(COLOR.human)}">${cls.name[0]}</div>
+    </div>
+    <div class="about">
+      <small class="cls">${cls.name}</small>
+      <h2 id="dossier-name">${hero.name}</h2>
+      <small class="home">🌍 ${hero.home!.name}, ${hero.home!.country}</small>
+      <div class="key"><small class="label">Weapon</small>${weapon}</div>
+      <div class="key"><small class="label">Ability · ${usage(ability)}</small><b>${ability.name}</b><span>${ability.text}.</span></div>
+      ${heroStats(run, hero)}
+      <div class="key"><small class="label">Bonus attack · ${usage(bonus)}</small><b>${bonus.name}</b><span>${bonus.text}.</span></div>
+      ${duoHint(run, hero)}
+      <div class="actions"><button data-back>Back</button><button class="decide" data-deploy="${index}">Deploy</button></div>
+    </div>
+  </div>`;
 }
 
 /** A hero's powers in full. */

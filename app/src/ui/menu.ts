@@ -1,8 +1,10 @@
 // The title screen, story and recruit choice.
-import type { Run } from "../core/run-state";
-import type { Soldier } from "../core/run-state";
+import { classPower, CLASSES } from "../core/classes";
+import type { Run, Soldier } from "../core/run-state";
+import { charges } from "../core/squad";
 import { places } from "./globe";
-import { heroCard } from "./sheet";
+import { badge } from "./html";
+import { heroDossier } from "./sheet";
 
 /** The title screen, before a run begins. */
 export function title(): string {
@@ -29,29 +31,32 @@ export function story(): string {
   </div>`;
 }
 
-/** A recruit as a card to pick, and where it waits. */
-function card(
-  run: Run,
-  recruit: Soldier,
-  index: number,
-  chosen: number | null,
-): string {
-  return `<button data-recruit="${index}" class="card recruit${index === chosen ? " chosen" : ""}">
-    ${heroCard(run, recruit)}
-    <small class="home">🌍 ${recruit.home!.name}, ${recruit.home!.country}</small>
+/** A recruit as a small card to open: badge, class, name, weapon and ability by name. */
+export const recruitCard = (run: Run, recruit: Soldier, index: number) =>
+  `<button data-recruit="${index}" class="recruit" aria-haspopup="dialog">
+    <span class="emblem" aria-hidden="true">${badge(recruit.cls)}</span>
+    <small class="cls">${CLASSES[recruit.cls!].name}</small>
+    <b class="name">${recruit.name}</b>
+    <span class="line"><i aria-hidden="true">⚔</i> ${recruit.gear?.name ?? "Empty hands"}</span>
+    <span class="line"><i aria-hidden="true">✦</i> ${classPower(CLASSES[recruit.cls!], charges(run, recruit)).name}</span>
   </button>`;
-}
 
-/** The run's first choice: which recruit leads the squad, under a globe turned to the city they wait in. Tap a card to pick, again to begin. */
-export function recruits(run: Run, chosen: number | null): string {
+/** The run's first choice: which recruit leads the squad, three cards over a turning globe with their homes pinned. `open` shows one hero in full, the globe turned to their city. */
+export function recruits(run: Run, open: number | null): string {
   const homes = run.recruits.map((r, i) => ({
     at: r.home!.at,
-    chosen: i === chosen,
-    html: `<span class="home${i === chosen ? " chosen" : ""}">${r.home!.name}</span>`,
+    chosen: i === open,
+    html: `<span class="home${i === open ? " chosen" : ""}">${r.home!.name}</span>`,
   }));
-  return `<div class="menu picking">
-    <h2>${chosen === null ? "Who leads the party? Tap a hero, then tap again to begin." : `Tap ${run.recruits[chosen].name} again to begin in ${run.recruits[chosen].home!.name}.`}</h2>
-    <div class="homes">${places({ w: 560, h: 220 }, homes)}</div>
-    <div class="choices">${run.recruits.map((r, i) => card(run, r, i, chosen)).join("")}</div>
+  // The panel is zoomed by --ui, so the window in its own pixels is that much larger.
+  const ui = Number(getComputedStyle(document.documentElement).getPropertyValue("--ui")) || 1;
+  const [w, h] = [innerWidth / ui, innerHeight / ui];
+  // The globe stands clear of the cards below it; a dossier slides it behind the hero.
+  const size = { w, h, top: 60, bottom: w < 700 ? h * 0.32 : 230 };
+  return `<div class="menu picking${open === null ? "" : " opened"}">
+    <div class="map flight">${places(size, homes, open === null)}</div>
+    <h2>Who leads the party?</h2>
+    <div class="choices"${open === null ? "" : " inert"}>${run.recruits.map((r, i) => recruitCard(run, r, i)).join("")}</div>
+    ${open === null ? "" : heroDossier(run, run.recruits[open], open)}
   </div>`;
 }
