@@ -101,9 +101,9 @@ export function heroDossier(run: Run, hero: Soldier, index: number): string {
       <div class="figure" style="background:${css(COLOR.human)}">${cls.name[0]}</div>
     </div>
     <div class="about">
-      <small class="cls">${cls.name}</small>
+      <div class="who"><small class="cls">${cls.name}</small>
       <h2 id="dossier-name">${hero.name}</h2>
-      <small class="home">🌍 ${hero.home!.name}, ${hero.home!.country}</small>
+      <small class="home">🌍 ${hero.home!.name}, ${hero.home!.country}</small></div>
       <div class="key"><small class="label">Weapon</small>${weapon}</div>
       <div class="key"><small class="label">Ability · ${usage(ability)}</small><b>${ability.name}</b><span>${ability.text}.</span></div>
       ${heroStats(run, hero)}
