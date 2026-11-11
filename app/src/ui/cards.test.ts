@@ -4,11 +4,10 @@ import { apply, type Action } from '../core/apply'
 import { dropGear, GEAR_PRICE, SELL } from '../core/rewards'
 import type { Run } from '../core/run-state'
 import { findSwap, shopSwap } from './cards'
-import { gearName, describeGear } from './html'
+import { gearName } from './html'
 
-/** Each option's arm key and label, as the player reads them. */
-const options = (html: string) => [...html.matchAll(/role="radio" aria-checked="(\w+)" data-arm="([^"]+)">.*?<b>(.*?)<\/b>/g)].map(([, on, key, label]) => ({ on: on === 'true', key, label: label.replace(/<[^>]*>/g, '') }))
-const confirm = (html: string) => html.match(/class="decide confirm"( disabled)?(?: data-action='([^']+)')?/)!
+/** Each button's label and action, as the player reads them. */
+const buttons = (html: string) => [...html.matchAll(/<button class="[^"]*confirm" ([^>]*)>(.*?)<\/button>/g)].map(([, attrs, label]) => ({ label: label.replace(/<[^>]*>/g, ''), action: attrs.match(/data-action='([^']+)'/)?.[1] }))
 
 /** A run of three heroes with one weapon found, in the reward phase. */
 function found(): Run {
@@ -20,28 +19,27 @@ function found(): Run {
   return run
 }
 
-test('a find offers Equip on each hero, then Sell; Confirm waits for a choice', () => {
+const ownerOf = (run: Run) => run.soldiers.find((s) => s.id === run.finds[0].owner)!
+
+test("a find sets its owner's weapon now beside the new one, and offers Equip on them or Sell", () => {
   const run = found()
+  const owner = ownerOf(run)
   const html = findSwap(run, 0, null)
-  expect(options(html).map((o) => o.label)).toEqual([...run.soldiers.map((s) => `Equip on ${s.name}`), `Sell · +${SELL[run.finds[0].rarity]} supplies`])
-  expect(options(html).every((o) => !o.on)).toBe(true)
-  expect(confirm(html)[1]).toBe(' disabled')
+  expect(html).toContain(`for ${owner.name}`)
+  expect(html).toContain(`<span class="tag">NOW</span><b class="tier ${owner.gear!.rarity}">${owner.gear!.rarity} ${gearName(owner.gear!)}</b>`)
   expect(html).toContain('class="side found arrive')
+  expect(buttons(html).map((b) => b.label)).toEqual([`Equip on ${owner.name}`, `Sell · +${SELL[run.finds[0].rarity]} supplies`])
 })
 
-test.each([0, 1, 2])('Equip on hero %i gives them the find and drops the weapon they held for nothing', (i) => {
+test('Equip puts the find on its owner alone, their weapon dropped for nothing', () => {
   const run = found()
-  const hero = run.soldiers[i]
-  const held = hero.gear!
+  const owner = ownerOf(run)
   const gear = run.finds[0]
-  const html = findSwap(run, 0, `g${hero.id}`)
-  expect(options(html).filter((o) => o.on).map((o) => o.label)).toEqual([`Equip on ${hero.name}`])
-  expect(html).toContain(`drops <span class="held" tabindex="0" data-card><span class="tier ${held.rarity}">${held.name}</span>`)
-  const others = run.soldiers.filter((s) => s !== hero).map((s) => s.gear)
+  const others = run.soldiers.filter((s) => s !== owner).map((s) => s.gear)
   const supplies = run.supplies
-  apply(run, JSON.parse(confirm(html)[2]) as Action)
-  expect(hero.gear).toBe(gear)
-  expect(run.soldiers.filter((s) => s !== hero).map((s) => s.gear)).toEqual(others)
+  apply(run, JSON.parse(buttons(findSwap(run, 0, null))[0].action!) as Action)
+  expect(owner.gear).toBe(gear)
+  expect(run.soldiers.filter((s) => s !== owner).map((s) => s.gear)).toEqual(others)
   expect(run.supplies).toBe(supplies)
   expect(run.finds).toEqual([])
 })
@@ -51,40 +49,37 @@ test('Sell keeps every weapon and pays for the find', () => {
   const gear = run.finds[0]
   const held = run.soldiers.map((s) => s.gear)
   const supplies = run.supplies
-  apply(run, JSON.parse(confirm(findSwap(run, 0, 'g-'))[2]) as Action)
+  apply(run, JSON.parse(buttons(findSwap(run, 0, null))[1].action!) as Action)
   expect(run.soldiers.map((s) => s.gear)).toEqual(held)
   expect(run.supplies).toBe(supplies + SELL[gear.rarity])
 })
 
-test('a hero with empty hands drops nothing', () => {
+test('the new weapon lists what it changes from the one held', () => {
   const run = found()
-  run.soldiers[1].gear = null
-  expect(findSwap(run, 0, null)).toContain('<small class="drop">Empty hands</small>')
+  const owner = ownerOf(run)
+  owner.gear = { ...owner.gear!, stats: {}, effect: null }
+  run.finds[0] = { ...run.finds[0], stats: { damage: 1, move: -1 }, effect: 'ricochet' }
+  const html = findSwap(run, 0, null)
+  expect(html).toContain('<li class="up">+1 damage</li><li class="down">-1 move</li><li class="up">gains')
 })
 
-test('a shop ware is bought for the hero chosen, dropping theirs, or left', () => {
+test('a shop ware is bought for its owner, or left', () => {
   const run = found()
   const gear = run.finds.pop()!
+  const owner = run.soldiers.find((s) => s.id === gear.owner)!
   run.phase = 'shop'
   run.shop = { wares: [{ gear, sold: false }] } as typeof run.shop
   run.supplies = 99
   const price = GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
-  const hero = run.soldiers[2]
-  expect(options(shopSwap(run, 0, price, null)).at(-1)!.label).toBe('Leave it')
-  expect(shopSwap(run, 0, price, 'g-')).toContain('class="decide confirm" data-ware=""')
-  apply(run, JSON.parse(confirm(shopSwap(run, 0, price, `g${hero.id}`))[2]) as Action)
-  expect(hero.gear).toBe(gear)
+  const html = shopSwap(run, 0, price, null)
+  expect(html).toContain('<button class="confirm" data-ware="">Leave it</button>')
+  apply(run, JSON.parse(buttons(html)[0].action!) as Action)
+  expect(owner.gear).toBe(gear)
   expect(run.supplies).toBe(99 - price)
 })
 
-test("each hero's held weapon card shows that weapon in full", () => {
+test('a find whose owner is gone can only be sold', () => {
   const run = found()
-  const html = findSwap(run, 0, null)
-  const cards = [...html.matchAll(/<span class="gearpop (\w+)" hidden>(.*?)<\/span><\/span><\/small>/gs)]
-  expect(cards.map(([, rarity]) => rarity)).toEqual(run.soldiers.map((s) => s.gear!.rarity))
-  run.soldiers.forEach((s, i) => {
-    const card = cards[i][2]
-    expect(card).toContain(`<b class="tier ${s.gear!.rarity}">${s.gear!.rarity} ${gearName(s.gear!)}</b>`)
-    expect(card).toContain(describeGear(s.gear!))
-  })
+  run.finds[0].owner = -1
+  expect(buttons(findSwap(run, 0, null)).map((b) => b.label)).toEqual([`Sell · +${SELL[run.finds[0].rarity]} supplies`])
 })

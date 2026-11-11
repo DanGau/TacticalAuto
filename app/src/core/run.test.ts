@@ -166,19 +166,22 @@ test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone
   expect(run.phase).toBe('overworld')
 })
 
-test('a find goes to the soldier the player picks, replacing and discarding what it held, or is sold; nothing is taken off', () => {
+test("a find is a piece of one hero's weapon: equipped on them, replacing and discarding what they held, or sold; nothing is taken off", () => {
   const run = started()
   hire(run)
-  const [first, second] = run.soldiers
+  const [first] = run.soldiers
   expect(first.gear).toMatchObject({ rarity: 'common' })
   dropGear(run, false)
   dropGear(run, false)
   const [gear] = run.finds
   const supplies = run.supplies
   run.phase = 'reward'
-  expect(apply(run, { type: 'equip', find: 0, soldier: 99 }).ok).toBe(false)
-  expect(apply(run, { type: 'equip', find: 0, soldier: second.id })).toEqual({ ok: true })
-  expect(second.gear).toBe(gear)
+  const owner = run.soldiers.find((s) => s.id === gear.owner)!
+  expect(gear.weapon).toBe(owner.gear!.weapon)
+  const others = run.soldiers.filter((s) => s !== owner).map((s) => s.gear)
+  expect(apply(run, { type: 'equip', find: 0 })).toEqual({ ok: true })
+  expect(owner.gear).toBe(gear)
+  expect(run.soldiers.filter((s) => s !== owner).map((s) => s.gear)).toEqual(others)
   expect(run.supplies).toBe(supplies)
   const [other] = run.finds
   expect(apply(run, { type: 'sell', find: 0 })).toEqual({ ok: true })
@@ -467,7 +470,7 @@ test.each(['human', 'alien'] as const)('with every key won the squad is three, o
     run.threat = 0
     fight(run, 'human')
     apply(run, { type: 'relic', index: 0 })
-    while (run.finds.length > 0) apply(run, { type: 'equip', find: 0, soldier: run.soldiers[0].id })
+    while (run.finds.length > 0) apply(run, { type: 'equip', find: 0 })
     for (const s of run.soldiers) while (skillOffers(s).length > 0) apply(run, { type: 'skill', soldier: s.id, index: 0 })
     for (const s of run.soldiers) while (minorOffers(s).length > 0) apply(run, { type: 'perk', soldier: s.id, index: 0 })
     expect(run.phase).toBe('overworld')
@@ -585,10 +588,9 @@ test('a satellite won offers three relics; a relic held changes the run', () => 
   expect(paid(['contact']).finds.every((find) => find.rarity !== 'common')).toBe(true)
 })
 
-test('a shop stocks one-of-a-kind gear for the soldier the player picks, relics the squad lacks, utilities, and a bribe, each sold once and kept in its place; and is left for the road', () => {
+test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the squad lacks, utilities, and a bribe, each sold once and kept in its place; and is left for the road", () => {
   const run = travelling(['shop', 'battle'])
-  const buyer = run.soldiers[0].id
-  expect(apply(run, { type: 'gear', index: 0, soldier: buyer })).toEqual({ ok: false, reason: 'not in a shop' })
+  expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: false, reason: 'not in a shop' })
   apply(run, { type: 'advance' })
   expect(run).toMatchObject({ phase: 'shop', threat: STOP_THREAT })
   const shop = run.shop!
@@ -598,12 +600,13 @@ test('a shop stocks one-of-a-kind gear for the soldier the player picks, relics 
   expect(shop.relics).toHaveLength(SHOP_RELICS)
   run.supplies = 100
   const { gear } = shop.wares[0]
-  expect(apply(run, { type: 'gear', index: 0, soldier: buyer })).toEqual({ ok: true })
-  expect(run.soldiers[0].gear).toBe(gear)
+  expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: true })
+  expect(shop.wares.every((w) => run.soldiers.find((s) => s.id === w.gear.owner)?.gear?.weapon === w.gear.weapon)).toBe(true)
+  expect(run.soldiers.find((s) => s.id === gear.owner)!.gear).toBe(gear)
   expect(run.supplies).toBe(100 - GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE])
   expect(shop.wares).toHaveLength(SHOP_WARES)
   expect(shop.wares[0]).toEqual({ gear, sold: true })
-  expect(apply(run, { type: 'gear', index: 0, soldier: buyer }).ok).toBe(false)
+  expect(apply(run, { type: 'gear', index: 0 }).ok).toBe(false)
   const last = SHOP_RELICS - 1
   const relic = shop.relics[last].id
   expect(apply(run, { type: 'buy', index: last })).toEqual({ ok: true })
@@ -627,7 +630,7 @@ test('a shop stocks one-of-a-kind gear for the soldier the player picks, relics 
   expect(run.threat).toBe(0)
   expect(apply(run, { type: 'bribe' }).ok).toBe(false)
   run.supplies = 0
-  expect(apply(run, { type: 'gear', index: 1, soldier: buyer })).toEqual({ ok: false, reason: 'not enough supplies' })
+  expect(apply(run, { type: 'gear', index: 1 })).toEqual({ ok: false, reason: 'not enough supplies' })
   apply(run, { type: 'leave' })
   expect(run).toMatchObject({ phase: 'overworld', shop: null, stop: 1 })
 })

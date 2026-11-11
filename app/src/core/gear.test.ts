@@ -47,7 +47,7 @@ test('any soldier wields any weapon: a melee one reaches the next tile and charg
 function withFind(gear: Omit<Gear, 'id'>): Run {
   const run = begun(1)
   run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
-  run.finds.push({ id: 1, ...gear })
+  run.finds.push({ id: 1, owner: run.soldiers[0].id, ...gear })
   run.phase = 'reward'
   return run
 }
@@ -55,7 +55,7 @@ function withFind(gear: Omit<Gear, 'id'>): Run {
 /** A duel on open ground: one soldier wearing `gear`, one alien beside it, and the soldier too weak to win quickly. */
 function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: Unit; step: () => ReturnType<typeof stepBattle> } {
   const run = withFind(gear)
-  apply(run, { type: 'equip', find: 0, soldier: run.soldiers[0].id })
+  apply(run, { type: 'equip', find: 0 })
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   // War drums pay off only on a kill, so they leave a duel as it is.

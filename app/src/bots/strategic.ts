@@ -1,7 +1,7 @@
 // The strategic bot: reads each stop's challenge, and chooses utilities, route, recruits and weapons to answer them.
 import type { Action } from '../core/apply'
 import { CHALLENGES, rungOf, TIERS, type ChallengeId } from '../core/challenges'
-import { CLASSES, type ClassId } from '../core/classes'
+import type { ClassId } from '../core/classes'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { EFFECTS, type Gear } from '../core/gear'
 import { distance } from '../core/grid'
@@ -16,7 +16,6 @@ import { health, MAX_SQUAD, minorOffers, skillOffers, soldierStats, squadKeyword
 import { BOON_CHARGES, RELICS, type RelicId } from '../core/relics'
 import type { Keyword } from '../core/keywords'
 import { carries, RIG, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS, type EffectId, type UtilityId } from '../core/utilities'
-import { WEAPONS, type WeaponId } from '../core/weapons'
 import type { Bot } from './bots'
 
 /** What to take into a fight no utility held answers, best first. */
@@ -132,34 +131,20 @@ const unanswered = (run: Run): ChallengeId[] => {
   return [...new Set([...seen, ...TIERS[Math.min(run.soldiers.length, MAX_SQUAD) - 1][rungOf(run.stop)]])].filter((id) => !run.utilities.some((u) => carries(u, CHALLENGES[id].answers)))
 }
 
-/** Which weapons make up for a challenge with no utility to answer it. */
-const COVERS: Record<ChallengeId, WeaponId[]> = {
-  slog: ['sniper', 'lmg'],
-  firingLine: ['sniper', 'lmg'],
-  ironWall: ['sniper', 'shotgun', 'hammer'],
-  swarm: ['shotgun', 'hammer', 'sword'],
-  scattered: ['sword', 'fists', 'smg'],
-  bigOne: ['sniper', 'shotgun', 'hammer'],
-  killBox: ['shotgun', 'hammer', 'shield'],
-}
-
 const RARITY = { common: 0, rare: 2, epic: 4 }
 
-/** What a weapon is worth now: its rarity, and what it covers that no utility does. */
+/** What a weapon is worth to `soldier`: its rarity, and the keywords its effect shares with their skills and the relics. */
 function gearWorth(run: Run, gear: Gear | null, soldier: Soldier): number {
   if (!gear) return -1
   const own = [...soldier.skills.flatMap((id) => SKILLS[id].tags ?? []), ...run.relics.flatMap((id) => RELICS[id].tags ?? [])]
   const shared = gear.effect ? (EFFECTS[gear.effect].tags ?? []).filter((tag) => own.includes(tag)).length : 0
-  // A weapon against its class's way fights badly.
-  const clash = WEAPONS[gear.weapon]?.stance && soldier.cls && WEAPONS[gear.weapon].stance !== CLASSES[soldier.cls].stance ? 1.5 : 0
-  return -clash + RARITY[gear.rarity] + shared + unanswered(run).filter((id) => COVERS[id].includes(gear.weapon)).length
+  return RARITY[gear.rarity] + shared
 }
 
-/** The soldier `gear` does the most for, if it improves on what that soldier holds by more than a sale is worth. */
-function holderFor(run: Run, gear: Gear): number | null {
-  const gain = (s: Soldier) => gearWorth(run, gear, s) - gearWorth(run, s.gear, s)
-  const best = run.soldiers.reduce((a, b) => (gain(b) > gain(a) ? b : a))
-  return gain(best) > 0 ? best.id : null
+/** Whether `gear` improves on what its owner holds. */
+function improves(run: Run, gear: Gear): boolean {
+  const owner = run.soldiers.find((s) => s.id === gear.owner)
+  return !!owner && gearWorth(run, gear, owner) > gearWorth(run, owner.gear, owner)
 }
 
 /** A shop: a relic, then an answer it lacks, then gear, then a bribe once threat builds. */
@@ -171,8 +156,7 @@ function shop(run: Run): Action {
   const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && gaps.some((c) => carries(id, CHALLENGES[c].answers)) && (run.utilities.length < UTILITY_SLOTS || keep({ ...run, spare: id }).drop !== -1))
   if (answer >= 0) return { type: 'utility', index: answer }
   for (const [index, { gear, sold }] of wares.entries()) {
-    const holder = sold || GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] > run.supplies ? null : holderFor(run, gear)
-    if (holder !== null) return { type: 'gear', index, soldier: holder }
+    if (!sold && GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] <= run.supplies && improves(run, gear)) return { type: 'gear', index }
   }
   if (!bribed && BRIBE.price <= run.supplies && run.threat >= THREAT_MAX / 2) return { type: 'bribe' }
   return { type: 'leave' }
@@ -201,10 +185,7 @@ function reward(run: Run): Action {
     const score = (id: RelicId, i: number) => relicWorth(run, id) + (i === 0 ? 1 : 0)
     return { type: 'relic', index: run.relicOffers.reduce((best, id, i) => (score(id, i) > score(run.relicOffers[best], best) ? i : best), 0) }
   }
-  if (run.finds.length > 0) {
-    const holder = holderFor(run, run.finds[0])
-    return holder === null ? { type: 'sell', find: 0 } : { type: 'equip', find: 0, soldier: holder }
-  }
+  if (run.finds.length > 0) return improves(run, run.finds[0]) ? { type: 'equip', find: 0 } : { type: 'sell', find: 0 }
   const learner = run.soldiers.find((s) => skillOffers(s).length > 0)
   if (learner) return { type: 'skill', soldier: learner.id, index: plannedSkill(learner) }
   const picker = run.soldiers.find((s) => minorOffers(s).length > 0)!

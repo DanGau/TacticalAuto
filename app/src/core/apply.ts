@@ -22,8 +22,8 @@ export type Action =
   | { type: 'recruit'; index: number }
   /** Run start: take the offers at `picks` of run.boonOffers, START_PICKS of them. */
   | { type: 'boons'; picks: number[] }
-  /** Shop: buy the gear at `index` of shop.wares for the soldier with id `soldier` to wear, discarding what it replaces. */
-  | { type: 'gear'; index: number; soldier: number }
+  /** Shop: buy the gear at `index` of shop.wares for its owner to wear, discarding what it replaces. */
+  | { type: 'gear'; index: number }
   /** Shop: buy the relic at `index` of shop.relics. */
   | { type: 'buy'; index: number }
   /** Shop: buy the utility at `index` of shop.utilities. */
@@ -46,8 +46,8 @@ export type Action =
   | { type: 'relic'; index: number }
   /** Reward phase: take the offered duo in place of a relic. */
   | { type: 'duo' }
-  /** Reward phase: put the find at `find` of run.finds on the soldier with id `soldier`, discarding what it replaces. */
-  | { type: 'equip'; find: number; soldier: number }
+  /** Reward phase: put the find at `find` of run.finds on its owner, discarding what it replaces. */
+  | { type: 'equip'; find: number }
   /** Reward phase: sell the find at `find` of run.finds. */
   | { type: 'sell'; find: number }
   /** Any time: the player has read the first of run.gains. */
@@ -125,8 +125,8 @@ export function apply(run: Run, action: Action): Result {
       if (!run.finds[action.find]) return no('no such find')
       if (action.type === 'sell') sellFind(run, action.find)
       else {
-        const soldier = run.soldiers.find((s) => s.id === action.soldier)
-        if (!soldier) return no('no such soldier')
+        const soldier = run.soldiers.find((s) => s.id === run.finds[action.find].owner)
+        if (!soldier) return no('its hero is gone')
         equipFind(run, action.find, soldier)
       }
     }
@@ -138,8 +138,8 @@ export function apply(run: Run, action: Action): Result {
     if (action.type === 'gear') {
       const ware = shop.wares[action.index]
       if (!ware || ware.sold) return no('no such gear for sale')
-      const soldier = run.soldiers.find((s) => s.id === action.soldier)
-      if (!soldier) return no('no such soldier')
+      const soldier = run.soldiers.find((s) => s.id === ware.gear.owner)
+      if (!soldier) return no('its hero is gone')
       if (GEAR_PRICE[ware.gear.rarity as keyof typeof GEAR_PRICE] > run.supplies) return no('not enough supplies')
       buyWare(run, action.index, soldier)
     } else if (action.type === 'buy') {

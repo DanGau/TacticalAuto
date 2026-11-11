@@ -48,8 +48,9 @@ export const SHOP_EPIC = 0.3
 /** Stocks a shop: gear, each piece with an effect no other piece there has; relics the squad lacks; and a bribe. */
 export function stockShop(run: Run): Shop {
   const wares: Gear[] = []
+  const first = randomInt(run, run.soldiers.length)
   for (let tries = 0; wares.length < SHOP_WARES && tries < 50; tries++) {
-    const gear = generateGear(run, run.nextGear, random(run) < SHOP_EPIC ? 'epic' : 'rare')
+    const gear = gearFor(run, run.soldiers[(first + wares.length) % run.soldiers.length], random(run) < SHOP_EPIC ? 'epic' : 'rare')
     if (wares.some((w) => w.effect === gear.effect)) continue
     run.nextGear++
     wares.push(gear)
@@ -62,7 +63,10 @@ export function stockShop(run: Run): Shop {
   return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, bribed: false }
 }
 
-/** Buys the ware at `index` for `soldier` to wear. The caller checks it is affordable. */
+/** A new piece of `hero`'s weapon, made for them. */
+const gearFor = (run: Run, hero: Soldier, rarity: Rarity): Gear => ({ ...generateGear(run, run.nextGear, rarity, hero.gear?.weapon), owner: hero.id })
+
+/** Buys the ware at `index` for `soldier`, its owner, to wear. The caller checks it is affordable. */
 export function buyWare(run: Run, index: number, soldier: Soldier): void {
   const ware = run.shop!.wares[index]
   ware.sold = true
@@ -167,7 +171,9 @@ export function rollRarity(run: Run, lucky: boolean): Rarity {
 
 /** A piece of gear found, for the player to put on a soldier or sell. */
 export function dropGear(run: Run, lucky: boolean): void {
-  run.finds.push(generateGear(run, run.nextGear++, rollRarity(run, lucky)))
+  const heroes = run.soldiers.filter((s) => !run.captives.includes(s.id))
+  run.finds.push(gearFor(run, heroes[randomInt(run, heroes.length)], rollRarity(run, lucky)))
+  run.nextGear++
 }
 
 /** Takes an offered relic. */

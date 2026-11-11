@@ -33,7 +33,7 @@ test('actions outside their phase are rejected and change nothing', () => {
   const before = structuredClone(run)
   expect(apply(run, { type: 'recruit', index: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 }).ok).toBe(false)
-  expect(apply(run, { type: 'equip', find: 0, soldier: run.soldiers[0].id }).ok).toBe(false)
+  expect(apply(run, { type: 'equip', find: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'enter' }).ok).toBe(false)
   expect(apply(run, { type: 'go', index: 9 }).ok).toBe(false)
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
@@ -42,7 +42,7 @@ test('actions outside their phase are rejected and change nothing', () => {
   current(run)!.stop!.goal = 'rescue'
   apply(run, { type: 'advance' })
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
-  expect(apply(run, { type: 'gear', index: 0, soldier: run.soldiers[0].id }).ok).toBe(false)
+  expect(apply(run, { type: 'gear', index: 0 }).ok).toBe(false)
   apply(run, { type: 'enter' })
   expect(apply(run, { type: 'enter' }).ok).toBe(false)
 })

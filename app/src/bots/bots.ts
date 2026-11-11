@@ -8,13 +8,10 @@ import type { Keyword } from '../core/keywords'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { SKILLS } from '../core/skills'
-import { CLASSES } from '../core/classes'
 import { EFFECTS, type Gear } from '../core/gear'
-import { WEAPONS } from '../core/weapons'
 import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
 import { current, legOf, ways } from '../core/run'
 import { type Run } from '../core/run-state'
-import { type Soldier } from '../core/run-state'
 import { type Risk } from '../core/run-state'
 import { danger } from '../core/missions'
 import { GEAR_PRICE } from '../core/rewards'
@@ -33,28 +30,17 @@ const RARITY_ORDER = ['common', 'rare', 'epic']
 /** What a piece of gear is worth on its own: rarer is better, a plain one, such as the starting rifle, least; an empty slot nothing. */
 const value = (gear: Gear | null) => (gear ? 2 * RARITY_ORDER.indexOf(gear.rarity) + (gear.effect || Object.keys(gear.stats).length > 0 ? 1 : 0) : -1)
 
-/**
- * The soldier a piece of gear does the most for, or null if it does nothing for anyone: the most it raises its
- * holder's worth, less where a weapon would make its wielder fight against its class's way; a `keen` bot also counts the
- * keywords it shares with the soldier's skills.
- */
-function fitFor(run: Run, gear: Gear, keen: boolean): number | null {
-  const gain = (s: Soldier) => {
-    const stance = gear.weapon && WEAPONS[gear.weapon].stance
-    const clash = stance && s.cls && stance !== CLASSES[s.cls].stance ? 1.5 : 0
-    const own = s.skills.flatMap((id) => SKILLS[id].tags ?? [])
-    const shared = keen && gear.effect ? (EFFECTS[gear.effect].tags ?? []).filter((tag) => own.includes(tag)).length : 0
-    return value(gear) - value(s.gear) - clash + shared
-  }
-  const best = run.soldiers.reduce((a, b) => (gain(b) > gain(a) ? b : a))
-  return gain(best) > 0 ? best.id : null
+/** Whether a piece of gear raises its owner's worth over what they hold; a `keen` bot also counts the keywords it shares with their skills. */
+function fits(run: Run, gear: Gear, keen: boolean): boolean {
+  const owner = run.soldiers.find((s) => s.id === gear.owner)
+  if (!owner) return false
+  const own = owner.skills.flatMap((id) => SKILLS[id].tags ?? [])
+  const shared = keen && gear.effect ? (EFFECTS[gear.effect].tags ?? []).filter((tag) => own.includes(tag)).length : 0
+  return value(gear) - value(owner.gear) + shared > 0
 }
 
-/** Puts the first find on the soldier it does the most for, or sells it; a `keen` bot weighs keywords too. */
-function decideFind(run: Run, keen: boolean): Action {
-  const soldier = fitFor(run, run.finds[0], keen)
-  return soldier === null ? { type: 'sell', find: 0 } : { type: 'equip', find: 0, soldier }
-}
+/** Puts the first find on its owner if it fits them, else sells it; a `keen` bot weighs keywords too. */
+const decideFind = (run: Run, keen: boolean): Action => (fits(run, run.finds[0], keen) ? { type: 'equip', find: 0 } : { type: 'sell', find: 0 })
 
 /** Chooses among `count` offers, given each offer's keywords. */
 type Pick = (run: Run, rng: { rng: number }, tags: Keyword[][]) => number
@@ -70,13 +56,12 @@ const PICKS = {
   },
 } satisfies Record<string, Pick>
 
-/** The reward phase's next choice: a relic, or a duo with none, then finds, then skills. A random bot puts a find on anyone, or sells it. */
+/** The reward phase's next choice: a relic, or a duo with none, then finds, then skills. A random bot equips a find or sells it at random. */
 function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
   if (run.duoOffer && run.relicOffers.length === 0) return { type: 'duo' }
   if (run.relicOffers.length > 0) return { type: 'relic', index: pick(run, rng, run.relicOffers.map((id) => RELICS[id].tags ?? [])) }
   if (run.finds.length > 0 && pick === PICKS.random) {
-    const who = randomInt(rng, run.soldiers.length + 1)
-    return who === run.soldiers.length ? { type: 'sell', find: 0 } : { type: 'equip', find: 0, soldier: run.soldiers[who].id }
+    return randomInt(rng, 2) === 0 ? { type: 'sell', find: 0 } : { type: 'equip', find: 0 }
   }
   if (run.finds.length > 0) return decideFind(run, pick === PICKS.synergy)
   const learner = run.soldiers.find((s) => skillOffers(s).length > 0)
@@ -88,11 +73,10 @@ function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
   return { type: 'skill', soldier: learner.id, index: pick(run, rng, offers.map((id) => SKILLS[id].tags ?? [])) }
 }
 
-/** Purchases the run can pay for now: gear, each for the soldier it does the most for, then relics. */
+/** Purchases the run can pay for now: gear that fits its owner, then relics. */
 const affordable = (run: Run): Action[] => [
   ...run.shop!.wares.flatMap(({ gear, sold }, index): Action[] => {
-    const soldier = sold ? null : fitFor(run, gear, false)
-    return GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] <= run.supplies && soldier !== null ? [{ type: 'gear', index, soldier }] : []
+    return !sold && GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] <= run.supplies && fits(run, gear, false) ? [{ type: 'gear', index }] : []
   }),
   ...run.shop!.relics.flatMap((relic, index): Action[] => (!relic.sold && RELIC_PRICE <= run.supplies ? [{ type: 'buy', index }] : [])),
   ...run.shop!.utilities.flatMap((item, index): Action[] => (!item.sold && !run.utilities.includes(item.id) && run.utilities.length < UTILITY_SLOTS && UTILITY_PRICE <= run.supplies ? [{ type: 'utility', index }] : [])),

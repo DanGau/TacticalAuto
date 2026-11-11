@@ -18,6 +18,8 @@ export interface Gear {
   /** Added to the stats of the hero who wields it. */
   stats: Partial<Stats>
   effect: GearEffect | null
+  /** The hero a find or ware is made for: only they may equip it. */
+  owner?: number
 }
 
 /** A stat mod and the word it adds to a name. Some trade one stat for another. */
@@ -59,10 +61,10 @@ export function plainGear(rng: { rng: number }, id: number): Gear {
   return { id, rarity: 'common', name: WEAPONS[weapon].name, weapon, stats: {}, effect: null }
 }
 
-/** A new piece of gear of the given rarity: any weapon. */
-export function generateGear(rng: { rng: number }, id: number, rarity: Rarity): Gear {
+/** A new piece of gear of the given rarity: `weapon`, or any. */
+export function generateGear(rng: { rng: number }, id: number, rarity: Rarity, weapon?: WeaponId): Gear {
   const pick = <T>(options: T[]): T => options[randomInt(rng, options.length)]
-  const weapon = pick(Object.keys(WEAPONS) as WeaponId[])
+  weapon ??= pick(Object.keys(WEAPONS) as WeaponId[])
   const base = WEAPONS[weapon].name
   const effects = (Object.keys(EFFECTS) as GearEffect[]).filter((e) => (EFFECTS[e].rarity ?? 'rare') === rarity)
   // Half of commons feed a build; the rest have a stat mod.

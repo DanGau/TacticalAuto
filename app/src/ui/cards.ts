@@ -1,10 +1,11 @@
 // Fixed-size picks: a card tapped once is armed and tells its details; tapped again, it goes through.
 import type { Action } from '../core/apply'
-import type { Gear } from '../core/gear'
+import { EFFECTS, type Gear } from '../core/gear'
+import { WEAPONS } from '../core/weapons'
 import { SELL } from '../core/rewards'
-import type { Run, Soldier } from '../core/run-state'
+import type { Run } from '../core/run-state'
 import { boonText, START_PICKS, UTILITIES, type UtilityId } from '../core/utilities'
-import { badge, describeGear, gearName } from './html'
+import { badge, describeGear, gearName, weaponDoes } from './html'
 
 export interface Pick {
   /** Which card this is among those on screen. */
@@ -41,45 +42,46 @@ export function pickDetail(picks: Pick[], armed: string | null, idle: string): s
 /** A piece of gear in full: name, type, rarity and effect. */
 const full = (gear: Gear) => `<b class="tier ${gear.rarity}">${gear.rarity} ${gearName(gear)}</b><span>${describeGear(gear)}</span>`
 
-/** A held weapon's name, its card shown beside it on hover, focus or tap. */
-const heldCard = (gear: Gear) => `<span class="held" tabindex="0" data-card><span class="tier ${gear.rarity}">${gear.name}</span><span class="gearpop ${gear.rarity}" hidden>${full(gear)}</span></span>`
-
-/** A gear choice's arm key: a hero to equip, or the last option. */
-const choiceKey = (soldier: Soldier | null) => (soldier ? `g${soldier.id}` : 'g-')
-
 const act = (action: Action) => `data-action='${JSON.stringify(action)}'`
 
-/**
- * Who takes `gear`: the gear, an option per hero to equip it (their held weapon sold), the `last` option, and Confirm,
- * live once an option is chosen. `go` gives Confirm's attributes for an option. Unarmed, the gear arrives.
- */
-function gearChoice(run: Run, gear: Gear, armed: string | null, heading: string, go: (soldier: Soldier | null) => string, last: { label: string; fate: string }): string {
-  const chosen = armed === choiceKey(null) ? null : run.soldiers.find((s) => choiceKey(s) === armed)
-  const option = (soldier: Soldier | null, body: string) => {
-    const on = chosen === soldier
-    return `<button class="taker${on ? ' chosen' : ''}" role="radio" aria-checked="${on}" data-arm="${choiceKey(soldier)}">${body}</button>`
+/** What `next` changes from `held`, stat by stat, then the special each brings. */
+function changes(held: Gear | null, next: Gear): string[] {
+  const keys = [...new Set([...Object.keys(held?.stats ?? {}), ...Object.keys(next.stats)])] as (keyof Gear['stats'])[]
+  const stat = (key: keyof Gear['stats']) => {
+    const by = (next.stats[key] ?? 0) - (held?.stats[key] ?? 0)
+    const shown = key === 'crit' ? `${Math.round(100 * by)}%` : `${by}`
+    return by === 0 ? '' : `<li class="${by > 0 ? 'up' : 'down'}">${by > 0 ? '+' : ''}${shown} ${key}</li>`
   }
-  const drop = (s: Soldier) => (s.gear ? `drops ${heldCard(s.gear)}` : 'Empty hands')
-  const hero = (s: Soldier) => option(s, `<span class="portrait">${badge(s.cls)}</span><span class="text"><b>Equip on ${s.name}</b><small class="drop">${drop(s)}</small></span>`)
-  const fate = chosen === undefined ? 'Choose who takes it' : chosen ? `Equip on ${chosen.name}` : last.fate
-  return `<div class="gearswap"><h1>New gear</h1><h2>${heading}</h2>
-    <div class="side found${armed ? '' : ' arrive'} ${gear.rarity}"><span class="new">NEW</span>${full(gear)}<small class="fate">${fate}</small></div>
-    <div class="options" role="radiogroup" aria-label="Who takes it">${run.soldiers.map(hero).join('')}${option(null, `<span class="text"><b>${last.label}</b></span>`)}</div>
-    <button class="decide confirm"${chosen === undefined ? ' disabled' : ` ${go(chosen)}`}>Confirm</button></div>`
+  const effect = held?.effect === next.effect ? [] : [next.effect && `<li class="up">gains ${EFFECTS[next.effect].prefix}</li>`, held?.effect && `<li class="down">loses ${EFFECTS[held.effect].prefix}</li>`]
+  return [...keys.map(stat), ...effect].filter((line): line is string => Boolean(line))
 }
 
-/** The find at `index`, with `note` after its heading: equipped on a hero, dropping theirs, or sold. */
+/**
+ * `gear` beside the weapon its owner holds now, what it changes, and two buttons: Equip, and `last`, selling or leaving it.
+ * Unarmed, the gear arrives.
+ */
+function gearChoice(run: Run, gear: Gear, armed: string | null, heading: string, equip: string, last: { label: string; attrs: string }): string {
+  const owner = run.soldiers.find((s) => s.id === gear.owner)
+  const held = owner?.gear ?? null
+  const diff = changes(held, gear)
+  return `<div class="gearswap"><h1>${owner ? `<span class="portrait">${badge(owner.cls)}</span> New ${WEAPONS[gear.weapon].name.toLowerCase()} for ${owner.name}` : 'New gear'}</h1><h2>${heading}</h2>
+    <div class="compare">
+      <div class="side now ${held?.rarity ?? ''}"><span class="tag">NOW</span>${held ? `${full(held)}<small>${weaponDoes(held)}</small>` : '<b>Empty hands</b>'}</div>
+      <div class="side found${armed ? '' : ' arrive'} ${gear.rarity}"><span class="new">NEW</span>${full(gear)}<small>${weaponDoes(gear)}</small>${diff.length > 0 ? `<ul class="changes">${diff.join('')}</ul>` : ''}</div>
+    </div>
+    <div class="actions">${owner ? `<button class="decide confirm" ${equip}>Equip on ${owner.name}</button>` : ''}<button class="confirm" ${last.attrs}>${last.label}</button></div></div>`
+}
+
+/** The find at `index`, with `note` after its heading: equipped on its owner, dropping theirs, or sold. */
 export function findSwap(run: Run, index: number, armed: string | null, note = ''): string {
   const { rarity } = run.finds[index]
-  const go = (s: Soldier | null) => act(s ? { type: 'equip', find: index, soldier: s.id } : { type: 'sell', find: index })
-  return gearChoice(run, run.finds[index], armed, `Equip it or sell it${note}`, go, { label: `Sell · <span class="value">+${SELL[rarity]} supplies</span>`, fate: `Sold for ${SELL[rarity]} supplies` })
+  return gearChoice(run, run.finds[index], armed, `Equip it or sell it${note}`, act({ type: 'equip', find: index }), { label: `Sell · <span class="value">+${SELL[rarity]} supplies</span>`, attrs: act({ type: 'sell', find: index }) })
 }
 
-/** The shop's ware at `index`, at `price`: bought for a hero, dropping theirs, or left. */
+/** The shop's ware at `index`, at `price`: bought for its owner, dropping theirs, or left. */
 export function shopSwap(run: Run, index: number, price: number, armed: string | null): string {
   const { gear } = run.shop!.wares[index]
-  const go = (s: Soldier | null) => (s ? act({ type: 'gear', index, soldier: s.id }) : 'data-ware=""')
-  return gearChoice(run, gear, armed, `For sale · <span class="value">${price} supplies</span>`, go, { label: 'Leave it', fate: 'Left on the shelf' })
+  return gearChoice(run, gear, armed, `For sale · <span class="value">${price} supplies</span>`, act({ type: 'gear', index }), { label: 'Leave it', attrs: 'data-ware=""' })
 }
 
 /** A utility as a card: `top` says what tapping it means, `go` what the second tap does. */

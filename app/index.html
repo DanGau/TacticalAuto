@@ -346,7 +346,6 @@
       button.pick.utility.epic, .boons .side.epic { border-color: #c77dff; }
       .boons .swap { width: min(900px, 100%); grid-template-columns: repeat(3, minmax(0, 1fr)); }
       @media (max-width: 600px) { .boons .swap { grid-template-columns: 1fr; } }
-      .gearswap .confirm:disabled { color: #9aa6bd; background: #1d2433; border-color: #3a465c; }
       button.pick.blocked .price { color: #ff6b6b; }
       @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 #5aa9ff99; } 50% { box-shadow: 0 0 0 5px #5aa9ff00; } }
       .tree { max-width: 560px; margin: 10px auto; padding: 10px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 8px; background: radial-gradient(ellipse at 50% 0%, #22304a 0%, #141a26 70%); border: 1px solid #2b3550; border-radius: 10px; text-align: center; --gold: #ffd166; --blue: #5aa9ff; }
@@ -419,24 +418,21 @@
       .gearswap .sell .verb { color: #9aa6bd; }
       .gearswap .value { white-space: nowrap; color: #ffd166; }
       .gearswap .found { box-sizing: border-box; position: relative; overflow: hidden; display: flex; flex-direction: column; text-align: left; border: 2px solid; background: #161c28; width: min(420px, 100%); min-height: 0; padding-right: 56px; border-color: var(--glow); box-shadow: 0 0 18px color-mix(in srgb, var(--glow) 35%, transparent); --glow: #9aa6bd; }
-      .gearswap .found.rare, .gearswap .gearpop.rare { --glow: #4da3ff; }
-      .gearswap .found.epic, .gearswap .gearpop.epic { --glow: #c77dff; }
-      .gearswap .held { text-decoration: underline dotted; cursor: help; }
-      .gearswap .gearpop { position: fixed; z-index: 20; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; width: min(300px, calc(100vw - 16px)); padding: 10px 12px; border: 2px solid var(--glow); border-radius: 8px; font-size: 13px; line-height: 1.35; text-align: left; color: #e6ebf5; background: #161c28; box-shadow: 0 6px 24px #000a; cursor: auto; --glow: #9aa6bd; }
-      .gearswap .gearpop[hidden] { display: none; }
-      .gearswap .gearpop .defs { display: none; }
+      .gearswap .side.rare { --glow: #4da3ff; }
+      .gearswap .side.epic { --glow: #c77dff; }
       .gearswap .found .new { position: absolute; top: 0; right: 0; padding: 3px 8px; border-bottom-left-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 1px; color: #10141c; background: var(--glow); }
-      .gearswap .found .defs { display: none; }
-      .gearswap .fate { margin-top: 4px; font-weight: bold; color: #6fe08c; }
-      .gearswap .options { display: grid; width: min(560px, 100%); grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; }
-      .gearswap .taker { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 12px; border: 2px solid #4a5468; border-radius: 8px; font: inherit; text-align: left; color: inherit; background: #161c28; transition: border-color 0.15s, background 0.15s; }
-      .gearswap .taker:hover { border-color: #9aa6bd; }
-      .gearswap .taker .text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-      .gearswap .taker .drop { color: #9aa6bd; }
-      .gearswap .taker .portrait { width: 34px; height: 34px; font-size: 18px; }
-      .gearswap .taker.chosen { border-color: #6fe08c; background: #1f3326; box-shadow: 0 0 0 1px #6fe08c, 0 4px 18px #6fe08c33; }
-      .gearswap .taker.chosen .drop .tier { text-decoration: line-through; text-decoration-color: #e04848; }
-      .gearswap .taker.chosen .drop { color: #c9d2e3; }
+      .gearswap .found .defs, .gearswap .now .defs { display: none; }
+      .gearswap h1 .portrait { display: inline-grid; width: 40px; height: 40px; font-size: 22px; vertical-align: middle; }
+      .gearswap .compare { display: grid; width: min(720px, 100%); grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .gearswap .compare .side { width: 100%; }
+      .gearswap .now { box-sizing: border-box; position: relative; display: flex; flex-direction: column; text-align: left; border: 2px dashed var(--glow); background: #131822; padding-right: 56px; --glow: #9aa6bd; }
+      .gearswap .now .tag { position: absolute; top: 0; right: 0; padding: 3px 8px; border-bottom-left-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 1px; color: #10141c; background: #9aa6bd; }
+      .gearswap .changes { margin: 6px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; font-weight: bold; }
+      .gearswap .changes .up { color: #6fe08c; } .gearswap .changes .down { color: #ff6b6b; }
+      .gearswap .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+      .gearswap .actions .confirm:not(.decide) { color: inherit; background: #1d2433; border-color: #4a5468; }
+      @media (max-width: 600px) { .gearswap .compare { grid-template-columns: 1fr; } }
+      @media (max-height: 520px) { .gearswap { gap: 8px; } .gearswap .side { min-height: 0; padding: 8px 10px; } .gearswap .confirm { padding: 10px 20px; } }
       .gearswap .arrive { animation: arrive 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both, arriveglow 0.6s ease-out both; }
       .gearswap .arrive::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, color-mix(in srgb, var(--glow) 55%, transparent) 50%, transparent 65%); transform: translateX(-100%); animation: shine 0.55s 0.15s ease-out forwards; pointer-events: none; }
       .loot .gearswap .arrive, .loot .gearswap .arrive::after { animation-delay: 1.5s; }
@@ -450,12 +446,6 @@
       .gearswap .confirm { min-width: 200px; padding: 14px 28px; font-weight: bold; color: #10141c; background: #6fe08c; border-color: #6fe08c; }
       .gearswap .confirm:hover { background: #8ff0a8; }
       @media (max-width: 600px) { .swap { grid-template-columns: 1fr; } .gearswap .side { min-height: 0; } }
-      @media (max-height: 520px) and (min-width: 640px) {
-        .gearswap:has(.options) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'h1 h1' 'h2 h2' 'found options' 'found confirm'; align-items: center; justify-items: center; gap: 10px 16px; max-width: 760px; margin: 0 auto; }
-        .gearswap h1 { grid-area: h1; } .gearswap h2 { grid-area: h2; margin-top: -6px; }
-        .gearswap .found { grid-area: found; width: 100%; } .gearswap .options { grid-area: options; width: 100%; grid-template-columns: 1fr; gap: 6px; }
-        .gearswap .confirm { grid-area: confirm; padding: 10px 28px; } .gearswap .taker { min-height: 46px; padding: 4px 10px; }
-      }
       .tier { font-weight: bold; text-transform: capitalize; color: #9aa6bd; }
       .tier.rare { color: #4da3ff; }
       .tier.epic { color: #c77dff; }
