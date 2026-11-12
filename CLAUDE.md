@@ -25,6 +25,7 @@ Run in `app/`.
 - `npm run -s sim -- --runs=100 --bot=strategic --diagnose` — battles by challenge and answer, saying of what is off whether the game or the bot is at fault.
 - `npm run -s tsx -- src/sim/encounter.ts --runs=30` — the challenge lab: each challenge by party, rung and utility.
 - `npm run -s sim -- --runs=150 --bot=strategic --clean` — each deploy screen played on with every utility and with none: what an answer pays, unconfounded.
+- `npm run -s sim -- --runs=100 --rest` — each safehouse and medkit on offer played on both ways, by health and leg, and fixed rest policies on the same seeds.
 - `npm run test -- <files>`, `npm run tsx -- <script>` — run tests or a script under a deadline that kills it if it hangs. A hook blocks running `vitest` or `tsx` directly.
 - `npm run -s eye -- <command>` — play and screenshot the game in a headless browser. Commands: `app/eye/eye.ts`. One server and browser serve all worktrees; `eye -- stop` ends them.
 - `npm run -s eye -- play eye/gear-swap.json` — fails unless the gear swap sits centred, its cards equal, at five screen sizes.

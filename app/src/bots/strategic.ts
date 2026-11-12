@@ -100,11 +100,12 @@ function keep(run: Run): { type: 'keep'; drop: number } {
   return { type: 'keep', drop: options.reduce((best, d) => (coverage(run, after(d)) > coverage(run, after(best)) ? d : best), -1) }
 }
 
-const squadHealth = (run: Run) => run.soldiers.reduce((sum, s) => sum + health(run, s), 0) / run.soldiers.reduce((sum, s) => sum + soldierStats(run, s).hp, 0)
+export const squadHealth = (run: Run) => run.soldiers.reduce((sum, s) => sum + health(run, s), 0) / run.soldiers.reduce((sum, s) => sum + soldierStats(run, s).hp, 0)
 
 /** What a stop is worth to go to: an answered fight beats a fight it has no answer for; a safehouse, more the more the squad is hurt. */
-function worth(run: Run, stop: Stop): number {
+function worth(run: Run, stop: Stop, rest?: number): number {
   const hale = squadHealth(run)
+  if (stop.kind === 'safehouse' && rest !== undefined) return 0
   if (stop.kind === 'safehouse') return hale < 0.6 ? 8 : hale < 0.8 ? 5 : hale < 0.95 ? 1 : -1
   if (stop.kind === 'shop') return run.supplies >= UTILITY_PRICE ? 3 : 0.5
   if (stop.kind === 'supply') return 1.5
@@ -117,11 +118,13 @@ function worth(run: Run, stop: Stop): number {
 }
 
 /** The way on worth the most, counting half of the best stop after it. */
-function route(run: Run): Action {
+function route(run: Run, rest?: number): Action {
   const column = legOf(run).columns[run.stop]
   const next = legOf(run).columns[run.stop + 1]
-  const score = (i: number) => worth(run, column[i].stop!) + 0.5 * Math.max(0, ...column[i].next.flatMap((k) => (next?.[k]?.stop ? [worth(run, next[k].stop!)] : [])))
-  return { type: 'go', index: ways(run).reduce((a, b) => (score(b) > score(a) ? b : a)) }
+  const safehouse = rest === undefined ? undefined : ways(run).find((i) => column[i].stop!.kind === 'safehouse')
+  if (safehouse !== undefined && (squadHealth(run) < rest! || ways(run).length === 1)) return { type: 'go', index: safehouse }
+  const score = (i: number) => worth(run, column[i].stop!, rest) + 0.5 * Math.max(0, ...column[i].next.flatMap((k) => (next?.[k]?.stop ? [worth(run, next[k].stop!, rest)] : [])))
+  return { type: 'go', index: ways(run).filter((i) => i !== safehouse).reduce((a, b) => (score(b) > score(a) ? b : a)) }
 }
 
 /** The challenges in sight or in the party's tier that no utility held answers. */
@@ -209,7 +212,8 @@ function starting(run: Run): Action {
   return { type: 'boons', picks: pairs.reduce((best, pair) => (score(pair) > score(best) ? pair : best)) }
 }
 
-export const strategic: Bot = (run) => {
+/** The strategic bot; given `rest`, it rests at a safehouse on the way exactly when the squad's health is under it. */
+export const resting = (rest?: number): Bot => (run) => {
   if (run.boonOffers.length > 0) return starting(run)
   if (run.spare) return keep(run)
   if (run.phase === 'reward') return reward(run)
@@ -220,5 +224,7 @@ export const strategic: Bot = (run) => {
     const options = EVENTS[run.event!].options.flatMap((option, i) => (!option.can || option.can(run) ? [i] : []))
     return { type: 'choose', index: options.at(-1)! }
   }
-  return current(run) ? { type: 'advance' } : route(run)
+  return current(run) ? { type: 'advance' } : route(run, rest)
 }
+
+export const strategic = resting()

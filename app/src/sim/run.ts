@@ -13,6 +13,7 @@ import type { Goal } from '../core/goals'
 import type { ArenaKind } from '../core/arena-kinds'
 import { carries, type UtilityId } from '../core/utilities'
 import { forksOf, type Fork } from './forks'
+import { restForks, type RestFork } from './rest'
 
 /** Whether a party met a challenge with an answer it picked, with one it held and left behind, or with none. */
 export type Answer = 'picked' | 'held' | 'none'
@@ -57,6 +58,8 @@ export interface RunResult {
   tolls: Toll[]
   /** With `forks` asked for: each deploy screen played on with every utility. */
   forks: Fork[]
+  /** With `rests` asked for: each safehouse on offer and fresh shop's medkit, the run played on both ways. */
+  restForks: RestFork[]
   /** With the seed, enough to replay the run. */
   actions: Action[]
   /** Boons found or bought, by leg; the starting pick not counted. */
@@ -78,10 +81,10 @@ const MAX_ACTIONS = 10000
 /**
  * Plays a run to its end, taking each action from `next` when the run waits for the player.
  */
-function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = [], forks = false): { run: Run; result: RunResult } {
+function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = [], forks = false, rests = false): { run: Run; result: RunResult } {
   const run = createRun(seed)
   run.doctrines.push(...doctrines)
-  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], actions: [], found: Array<number>(KEYS + 1).fill(0), rests: { safehouses: 0, medkits: 0 } }
+  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], restForks: [], actions: [], found: Array<number>(KEYS + 1).fill(0), rests: { safehouses: 0, medkits: 0 } }
   let clock = { next: 0, done: 0 }
   let leaps = 0
   /** This battle's hardest hero hit, its boss, and the round the boss was first wounded. */
@@ -129,6 +132,8 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
     if (result.actions.length >= MAX_ACTIONS) throw new Error(`seed ${seed}: no end after ${MAX_ACTIONS} actions, in phase ${run.phase}`)
     if (forks && run.phase === 'battle' && run.battle!.phase === 'deploy') result.forks.push(...forksOf(run))
     const action = next(run)
+    const rest = rests ? restForks(run, action) : null
+    if (rest) result.restForks.push(rest)
     if (action.type === 'advance' && nextStop(run) === 'safehouse') result.rests.safehouses++
     if (action.type === 'medkit') result.rests.medkits++
     const applied = apply(run, action)
@@ -146,7 +151,7 @@ export function replay(seed: number, actions: Action[]): Run {
 }
 
 /** Plays a run with `bot`, the squad holding `doctrines` from the start. */
-export function runWith(seed: number, bot: Bot, doctrines: DoctrineId[] = [], forks = false): RunResult {
+export function runWith(seed: number, bot: Bot, doctrines: DoctrineId[] = [], forks = false, rests = false): RunResult {
   const rng = { rng: seed }
-  return play(seed, (run) => bot(run, rng), doctrines, forks).result
+  return play(seed, (run) => bot(run, rng), doctrines, forks, rests).result
 }
