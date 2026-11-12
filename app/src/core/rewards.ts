@@ -45,7 +45,7 @@ export const SHOP_RELICS = 4
 /** Chance a piece of shop gear is epic rather than rare. */
 export const SHOP_EPIC = 0.3
 
-/** Stocks a shop: gear, each piece with an effect no other piece there has; relics the squad lacks; and a bribe. */
+/** Stocks a shop: gear, each piece with an effect no other piece there has; relics the squad lacks; and a medkit. */
 export function stockShop(run: Run): Shop {
   const wares: Gear[] = []
   const first = randomInt(run, run.soldiers.length)
@@ -60,7 +60,7 @@ export function stockShop(run: Run): Shop {
   while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(drawRelic(run, relics))
   const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
   const utilities = Array.from({ length: Math.min(SHOP_UTILITIES, kinds.length) }, () => ({ id: drawUtility(run, kinds), sold: false }))
-  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, bribed: false }
+  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, medkit: false }
 }
 
 /** A new piece of `hero`'s weapon, made for them. */
@@ -169,9 +169,10 @@ export function rollRarity(run: Run, lucky: boolean): Rarity {
   return roll < RARITY_CHANCE.common ? 'common' : roll < RARITY_CHANCE.common + RARITY_CHANCE.rare ? 'rare' : 'epic'
 }
 
-/** A piece of gear found, for the player to put on a soldier or sell. */
+/** A piece of gear found, for the player to put on a soldier or sell; none with every hero held. */
 export function dropGear(run: Run, lucky: boolean): void {
   const heroes = run.soldiers.filter((s) => !run.captives.includes(s.id))
+  if (heroes.length === 0) return
   run.finds.push(gearFor(run, heroes[randomInt(run, heroes.length)], rollRarity(run, lucky)))
   run.nextGear++
 }

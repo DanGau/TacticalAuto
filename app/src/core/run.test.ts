@@ -9,7 +9,7 @@ import { freeTilesNear } from './grid'
 import { stepBattle } from './combat'
 import type { GameEvent } from './combat-event'
 import { CLASSES } from './classes'
-import { EVENTS } from './events'
+import { EVENTS, MEDKIT } from './events'
 import { odds } from './sight'
 import { FORTIFIED_SOAK } from './doctrines'
 import { HUB } from './world'
@@ -43,7 +43,6 @@ import { hire, MAX_SQUAD } from './squad'
 import { LEVEL_STATS } from './squad'
 import { soldierStats } from './squad'
 import { health } from './squad'
-import { TRAVEL_HEAL } from './squad'
 import { skillOffers } from './squad'
 import { MAX_SKILLS, minorOffers, owesPick, PICK_LEVELS, picksEarned } from './squad'
 import { XP } from './squad'
@@ -324,7 +323,7 @@ test('every stop on the way across a continent is at a real town, none twice', (
   }
 })
 
-test('soldiers keep their health between battles, heal TRAVEL_HEAL for each stop travelled to, and come back from downed at 1', () => {
+test('soldiers keep their health between battles, heal nothing on the road, and come back from downed at 1', () => {
   const run = travelling(['battle', 'battle', 'battle'])
   hire(run)
   run.soldiers.at(-1)!.skills.splice(1)
@@ -346,25 +345,32 @@ test('soldiers keep their health between battles, heal TRAVEL_HEAL for each stop
   expect(run.report!.soldiers).toMatchObject([{ hp: 3, maxHp: most }, { hp: 1 }])
   onward(run)
   apply(run, { type: 'advance' })
-  expect(run.battle!.reserve.find((r) => r.soldier === hurt.id)!.hp).toBe(3 + TRAVEL_HEAL)
+  expect(run.battle!.reserve.find((r) => r.soldier === hurt.id)!.hp).toBe(3)
 })
 
-test('at a medic every soldier heals fully; at full health the squad takes a bonus instead', () => {
-  const run = travelling(['medic', 'medic', 'battle'])
+test('a safehouse heals every soldier fully on arrival and adds threat', () => {
+  const run = travelling(['safehouse', 'battle'])
   run.soldiers[0].wounds = 7
   apply(run, { type: 'advance' })
-  expect(run).toMatchObject({ phase: 'event', event: 'medic' })
-  const can = () => EVENTS.medic.options.flatMap((o, i) => (!o.can || o.can(run) ? [i] : []))
-  expect(can()).toEqual([0, 3])
-  apply(run, { type: 'choose', index: 0 })
+  expect(run).toMatchObject({ phase: 'overworld', threat: STOP_THREAT, stop: 1, report: { stop: 'safehouse' } })
   expect(run.soldiers[0].wounds).toBe(0)
-  expect(run.met).toEqual([])
-  onward(run)
-  apply(run, { type: 'advance' })
-  expect(can()).toEqual([1, 2, 3])
-  const xp = run.soldiers[0].xp
-  apply(run, { type: 'choose', index: 2 })
-  expect(run.soldiers[0].xp).toBeGreaterThan(xp)
+})
+
+test('every other split of the way puts a safehouse beside a battle', () => {
+  let count = 0
+  for (let seed = 0; seed < 20; seed++) {
+    const run = begun(seed)
+    const leg = run.legs[0]
+    count += leg.columns.flat().filter((n) => n.stop!.kind === 'safehouse').length
+    leg.columns.forEach((column, c) =>
+      column.forEach((node, i) => {
+        if (node.stop!.kind !== 'safehouse') return
+        const splits = leg.columns[c - 1].filter((n) => n.next.includes(i))
+        expect(splits.some((n) => n.next.some((k) => leg.columns[c][k].stop!.kind === 'battle'))).toBe(true)
+      }),
+    )
+  }
+  expect(count).toBeGreaterThan(5)
 })
 
 test('after the stops of a leg comes its satellite: winning it wins a key, a hero, and the next leg', () => {
@@ -588,7 +594,7 @@ test('a satellite won offers three relics; a relic held changes the run', () => 
   expect(paid(['contact']).finds.every((find) => find.rarity !== 'common')).toBe(true)
 })
 
-test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the squad lacks, utilities, and a bribe, each sold once and kept in its place; and is left for the road", () => {
+test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the squad lacks, utilities, and a medkit, each sold once and kept in its place; and is left for the road", () => {
   const run = travelling(['shop', 'battle'])
   expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: false, reason: 'not in a shop' })
   apply(run, { type: 'advance' })
@@ -622,13 +628,13 @@ test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the
   shop.utilities[0].sold = false
   expect(apply(run, { type: 'utility', index: 0 })).toEqual({ ok: true })
   expect(run.spare).toBe(shop.utilities[0].id)
-  expect(apply(run, { type: 'bribe' }).ok).toBe(false)
+  run.soldiers[0].wounds = 6
   const held = [...run.utilities]
   expect(apply(run, { type: 'keep', drop: 0 })).toEqual({ ok: true })
   expect(run.utilities).toEqual([shop.utilities[0].id, ...held.slice(1)])
-  expect(apply(run, { type: 'bribe' })).toEqual({ ok: true })
-  expect(run.threat).toBe(0)
-  expect(apply(run, { type: 'bribe' }).ok).toBe(false)
+  expect(apply(run, { type: 'medkit' })).toEqual({ ok: true })
+  expect(run.soldiers[0].wounds).toBe(6 - MEDKIT.heal)
+  expect(apply(run, { type: 'medkit' }).ok).toBe(false)
   run.supplies = 0
   expect(apply(run, { type: 'gear', index: 1 })).toEqual({ ok: false, reason: 'not enough supplies' })
   apply(run, { type: 'leave' })

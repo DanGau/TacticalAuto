@@ -10,7 +10,6 @@ import { dropGear, gainRelic, loseRelic } from './rewards'
 import { settle } from './rewards'
 import { stockShop } from './rewards'
 import { hire, MAX_SQUAD } from './squad'
-import { wounded } from './squad'
 import { mend } from './squad'
 import { level } from './squad'
 import { xpFor } from './squad'
@@ -35,8 +34,8 @@ export interface Encounter {
 
 /** What a shop's relic costs. */
 export const RELIC_PRICE = 8
-/** What a shop's bribe costs, and the threat it takes away. */
-export const BRIBE = { price: 3, threat: 6 }
+/** What a shop's medkit costs, and the health it heals every hero: less than a safehouse's full rest. */
+export const MEDKIT = { price: 3, heal: 4 }
 /** How likely an unknown stop is to be a battle, and a shop; otherwise it is an event. */
 const UNKNOWN_CHANCE = { battle: 0.3, shop: 0.3 }
 
@@ -60,21 +59,6 @@ const ahead = (run: Run, n = 1) => run.stop + n < LEG_STOPS
 const hurt = (run: Run, amount: number) => run.soldiers.forEach((s) => (s.wounds += amount))
 
 const encounters = {
-  medic: {
-    name: 'Field Hospital',
-    text: 'A field hospital still runs in a school gym, cots in rows under the basketball hoops. The surgeon has not slept in a week and has opinions about your posture.',
-    options: [
-      { quip: 'Beds. Real beds.', text: 'Rest: every hero heals fully', can: (run) => wounded(run), take: (run) => mend(run, Infinity) },
-      { quip: 'Nobody here is bleeding. Raid the stockroom.', text: 'At full HP, take: a piece of rare or better gear', can: (run) => !wounded(run), take: (run) => dropGear(run, true) },
-      {
-        quip: 'Nobody here is bleeding. Sit in on the trauma lectures.',
-        text: 'At full HP, train: your lowest-level hero gains a level',
-        can: (run) => !wounded(run),
-        take: (run) => train(run.soldiers.reduce((low, s) => (level(s) < level(low) ? s : low)), 1),
-      },
-      leave('Wave at the surgeon. The surgeon does not wave back.'),
-    ],
-  },
   vats: {
     name: 'Cloning Vats',
     text: `An abandoned cloning plant hums away, a sticky note on the console: SET TO 'ECONOMY' TO SAVE POWER. The vats can push out clones twice as fast. Nobody asks what economy skips.`,
@@ -370,14 +354,14 @@ const encounters = {
 export type EventId = keyof typeof encounters
 export const EVENTS: Record<EventId, Encounter> = encounters
 
-/** Opens a shop: gear, relics, and a bribe. */
+/** Opens a shop: gear, relics, and a medkit. */
 function openShop(run: Run): void {
   run.shop = stockShop(run)
   run.phase = 'shop'
 }
 
 /**
- * Arrives at a shop, a medic or an unknown stop. A medic is the Field Hospital, met at every medic stop. An unknown one is revealed: a battle begins at once, or the squad enters a
+ * Arrives at a shop or an unknown stop. An unknown one is revealed: a battle begins at once, or the squad enters a
  * shop or meets an event not met before this run. Either adds threat as a stop does.
  */
 export function arrive(run: Run): void {
@@ -391,8 +375,7 @@ export function arrive(run: Run): void {
   }
   raise(run, STOP_THREAT)
   run.report = null
-  if (nextStop(run) === 'medic') return meet(run, 'medic')
-  const fresh = (Object.keys(EVENTS) as EventId[]).filter((id) => id !== 'medic' && !run.met.includes(id))
+  const fresh = (Object.keys(EVENTS) as EventId[]).filter((id) => !run.met.includes(id))
   if (!unknown || roll < UNKNOWN_CHANCE.battle + UNKNOWN_CHANCE.shop || fresh.length === 0) return openShop(run)
   const id = fresh[randomInt(run, fresh.length)]
   run.met.push(id)

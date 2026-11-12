@@ -1,7 +1,7 @@
 // Plays one run with a bot, and replays a recorded one.
 import type { Bot } from '../bots/bots'
 import { apply, type Action } from '../core/apply'
-import { createRun, KEYS } from '../core/run'
+import { createRun, KEYS, nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Mission } from '../core/run-state'
 import { health } from '../core/squad'
@@ -61,6 +61,8 @@ export interface RunResult {
   actions: Action[]
   /** Boons found or bought, by leg; the starting pick not counted. */
   found: number[]
+  /** Safehouses rested at and medkits bought. */
+  rests: { safehouses: number; medkits: number }
 }
 
 /** How the party met the battle's challenge, given the utilities it held going in. */
@@ -79,7 +81,7 @@ const MAX_ACTIONS = 10000
 function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = [], forks = false): { run: Run; result: RunResult } {
   const run = createRun(seed)
   run.doctrines.push(...doctrines)
-  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], actions: [], found: Array<number>(KEYS + 1).fill(0) }
+  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], actions: [], found: Array<number>(KEYS + 1).fill(0), rests: { safehouses: 0, medkits: 0 } }
   let clock = { next: 0, done: 0 }
   let leaps = 0
   /** This battle's hardest hero hit, its boss, and the round the boss was first wounded. */
@@ -127,6 +129,8 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
     if (result.actions.length >= MAX_ACTIONS) throw new Error(`seed ${seed}: no end after ${MAX_ACTIONS} actions, in phase ${run.phase}`)
     if (forks && run.phase === 'battle' && run.battle!.phase === 'deploy') result.forks.push(...forksOf(run))
     const action = next(run)
+    if (action.type === 'advance' && nextStop(run) === 'safehouse') result.rests.safehouses++
+    if (action.type === 'medkit') result.rests.medkits++
     const applied = apply(run, action)
     if (action.type === 'boons') had.held = [...run.utilities]
     if (!applied.ok) throw new Error(`action rejected: ${applied.reason}`)

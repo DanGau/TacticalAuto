@@ -9,7 +9,7 @@ import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { SKILLS } from '../core/skills'
 import { EFFECTS, type Gear } from '../core/gear'
-import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
+import { MEDKIT, EVENTS, RELIC_PRICE } from '../core/events'
 import { current, legOf, ways } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Risk } from '../core/run-state'
@@ -17,10 +17,9 @@ import { danger } from '../core/missions'
 import { GEAR_PRICE } from '../core/rewards'
 import { squadKeywords } from '../core/squad'
 import { soldierStats } from '../core/squad'
-import { health } from '../core/squad'
+import { health, wounded } from '../core/squad'
 import { minorOffers, skillOffers } from '../core/squad'
 import { level } from '../core/squad'
-import { THREAT_MAX } from '../core/progress'
 
 /** Chooses the next action whenever the run waits for the player. `rng` is the bot's own, separate from the run's. */
 export type Bot = (run: Run, rng: { rng: number }) => Action
@@ -73,13 +72,14 @@ function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
   return { type: 'skill', soldier: learner.id, index: pick(run, rng, offers.map((id) => SKILLS[id].tags ?? [])) }
 }
 
-/** Purchases the run can pay for now: gear that fits its owner, then relics. */
+/** Purchases the run can pay for now: gear that fits its owner, relics, utilities, then a medkit while a hero is hurt. */
 const affordable = (run: Run): Action[] => [
   ...run.shop!.wares.flatMap(({ gear, sold }, index): Action[] => {
     return !sold && GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] <= run.supplies && fits(run, gear, false) ? [{ type: 'gear', index }] : []
   }),
   ...run.shop!.relics.flatMap((relic, index): Action[] => (!relic.sold && RELIC_PRICE <= run.supplies ? [{ type: 'buy', index }] : [])),
   ...run.shop!.utilities.flatMap((item, index): Action[] => (!item.sold && !run.utilities.includes(item.id) && run.utilities.length < UTILITY_SLOTS && UTILITY_PRICE <= run.supplies ? [{ type: 'utility', index }] : [])),
+  ...(!run.shop!.medkit && wounded(run) && MEDKIT.price <= run.supplies ? [{ type: 'medkit' } as const] : []),
 ]
 
 /** Goes in with the first utility held that can be used here; a rigged tank on the first tank. */
@@ -109,13 +109,11 @@ interface Strategy {
 /** The options of the event under way the squad can take, by index. */
 const takeable = (run: Run) => EVENTS[run.event!].options.flatMap((option, i) => (!option.can || option.can(run) ? [i] : []))
 
-/** A spending bot's next purchase in a shop: a relic, then gear, then a utility, then a bribe once threat builds. */
+/** A spending bot's next purchase in a shop: a medkit when below HURT, else a relic, then gear, then a utility, then a medkit. */
 function shop(run: Run): Action {
   const buys = affordable(run)
-  const buy = buys.find((a) => a.type === 'buy') ?? buys[0]
-  if (buy) return buy
-  if (!run.shop!.bribed && run.supplies >= BRIBE.price && run.threat >= THREAT_MAX / 2) return { type: 'bribe' }
-  return { type: 'leave' }
+  const medkit = squadHealth(run) < HURT ? buys.find((a) => a.type === 'medkit') : undefined
+  return medkit ?? buys.find((a) => a.type === 'buy') ?? buys[0] ?? { type: 'leave' }
 }
 
 /** A bot that plays `strategy`, deciding finds as decideFind says. */
@@ -128,15 +126,14 @@ const play =
     if (run.phase === 'recruit') return { type: 'recruit', index: 0 }
     if (run.phase === 'battle') return goIn(run)
     if (run.phase === 'shop') return build ? shop(run) : { type: 'leave' }
-    // At a medic, the first thing it offers: rest when hurt, a bonus at full health.
-    if (run.phase === 'event') return { type: 'choose', index: events === 'bold' || run.event === 'medic' ? takeable(run)[0] : takeable(run).at(-1)! }
+    if (run.phase === 'event') return { type: 'choose', index: events === 'bold' ? takeable(run)[0] : takeable(run).at(-1)! }
     const wanted = squadHealth(run) < HURT ? 'safe' : typeof risk === 'function' ? risk(run) : risk
     if (current(run)) return { type: 'advance' }
     // The ways on by danger, least first: a safe bot takes the first, a standard one the middle, a dangerous one the last.
     const column = legOf(run).columns[run.stop]
-    // A squad below HURT of its health makes for a medic when one is on the way.
-    const medic = ways(run).find((i) => column[i].stop!.kind === 'medic')
-    if (medic !== undefined && squadHealth(run) < HURT) return { type: 'go', index: medic }
+    // A squad below HURT of its health makes for a safehouse when one is on the way.
+    const safehouse = ways(run).find((i) => column[i].stop!.kind === 'safehouse')
+    if (safehouse !== undefined && squadHealth(run) < HURT) return { type: 'go', index: safehouse }
     const ranked = ways(run).sort((a, b) => danger(column[a].stop!) - danger(column[b].stop!))
     return { type: 'go', index: ranked[Math.round((ranked.length - 1) * { safe: 0, standard: 0.5, dangerous: 1 }[wanted])] }
   }

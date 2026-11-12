@@ -23,10 +23,10 @@ export type Risk = 'safe' | 'standard' | 'dangerous'
 
 /**
  * A stop on the road. A battle must be fought. A supply drop gives supplies and a cache gives gear, with no fight.
- * A shop sells gear, relics and a bribe. At a medic the squad heals, or takes a bonus at full health. An unknown stop is revealed on arrival as a battle, a shop or an event.
+ * A shop sells gear, relics and a medkit. A safehouse heals every hero fully, in place of a battle. An unknown stop is revealed on arrival as a battle, a shop or an event.
  * A key mission, at a satellite, wins an access key; the final mission strikes the alien source. Both have a boss.
  */
-export type StopKind = 'battle' | 'supply' | 'cache' | 'shop' | 'unknown' | 'medic' | 'key' | 'final'
+export type StopKind = 'battle' | 'supply' | 'cache' | 'shop' | 'unknown' | 'safehouse' | 'key' | 'final'
 
 /**
  * A stop on the road. A battle has its own risk, goal and kind of place, and `packs` holds the aliens it will send,
@@ -118,7 +118,7 @@ export interface Soldier {
 /** What the last stop changed, for the player to review. */
 export interface Report {
   /** The stop: a mission fought, or an event met on the road. */
-  stop: Mission['kind'] | 'supply' | 'cache'
+  stop: Mission['kind'] | 'supply' | 'cache' | 'safehouse'
   /** False only for a lost battle. */
   won: boolean
   /** Threat before the stop and after it. */
@@ -156,12 +156,12 @@ export interface Earned {
   xp: number
 }
 
-/** A shop's stock, each item staying in its place once sold, and whether its bribe is spent. */
+/** A shop's stock, each item staying in its place once sold, and whether its medkit is bought. */
 export interface Shop {
   wares: { gear: Gear; sold: boolean }[]
   relics: { id: RelicId; sold: boolean }[]
   utilities: { id: UtilityId; sold: boolean }[]
-  bribed: boolean
+  medkit: boolean
 }
 
 export interface Run {

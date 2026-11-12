@@ -2,7 +2,7 @@ import { ALIENS, DANGERS, type AlienKind } from '../core/aliens'
 import { CLASSES } from '../core/classes'
 import { GOALS } from '../core/goals'
 import { DOCTRINES } from '../core/doctrines'
-import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
+import { MEDKIT, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
 import { boonText, carries, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
 import { current, legOf, KEYS, ways, nextStop } from '../core/run'
@@ -15,7 +15,7 @@ import { RISKS } from '../core/missions'
 import { GEAR_PRICE } from '../core/rewards'
 import { squadKeywords } from '../core/squad'
 import { soldierStats } from '../core/squad'
-import { health } from '../core/squad'
+import { health, wounded } from '../core/squad'
 import { level } from '../core/squad'
 import { xpFor } from '../core/squad'
 import { LEG_STOPS } from '../core/progress'
@@ -47,14 +47,17 @@ function census(run: Run, kinds: AlienKind[]): string {
   }).join(', ')
 }
 
-const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '📦', cache: '🎁', shop: '🛒', medic: '✚', unknown: '❓', key: '⭐', final: '👁️' }
+/** What a safehouse does, told on its icon and card. */
+const SAFEHOUSE = 'every hero heals fully, in place of a fight'
+
+const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '📦', cache: '🎁', shop: '🛒', safehouse: '🏠', unknown: '❓', key: '⭐', final: '👁️' }
 
 /**
  * A stop as an icon; a battle's is coloured by its risk and marked by its twist, and hovering tells its goal, place, pay and twist.
  * `state` is done, here, or empty for ahead.
  */
 function stopIcon(run: Run, stop: Stop, state = ''): string {
-  if (stop.kind !== 'battle') return `<span class="node ${stop.kind} ${state}" title="${STOP_NAMES[stop.kind]}">${STOP_ICONS[stop.kind]}</span>`
+  if (stop.kind !== 'battle') return `<span class="node ${stop.kind} ${state}" title="${STOP_NAMES[stop.kind]}${stop.kind === 'safehouse' ? `: ${SAFEHOUSE}` : ''}">${STOP_ICONS[stop.kind]}</span>`
   const risk = RISKS[stop.risk]
   const goal = GOALS[stop.goal]
   const aliens = census(run, stop.aliens) + (stop.goal === 'assassinate' ? ', a Commander' : '')
@@ -132,12 +135,12 @@ function runMap(run: Run, picked: number | null): string {
   return `${squadStrip(run)}<div class="map flight">${globe(flightSize(innerWidth / ui, innerHeight / ui), run, pins, focus, path, picked !== null)}</div>`
 }
 
-/** The squad at a glance over the map: each soldier's badge over a health bar, red at half or less. */
+/** The squad at a glance over the map: each soldier's badge over a health bar and count, red at half or less. */
 function squadStrip(run: Run): string {
   const cells = run.soldiers.map((soldier) => {
     const hp = health(run, soldier)
     const max = soldierStats(run, soldier).hp
-    return `<div class="mate${hp <= max / 2 ? ' low' : ''}" title="${soldier.name} · ${hp}/${max}"><span class="portrait">${badge(soldier.cls)}</span><div class="bar"><div style="width: ${(100 * hp) / max}%"></div></div></div>`
+    return `<div class="mate${hp <= max / 2 ? ' low' : ''}" title="${soldier.name} · ${hp}/${max}"><span class="portrait">${badge(soldier.cls)}</span><div class="bar"><div style="width: ${(100 * hp) / max}%"></div></div><small>${hp}/${max}</small></div>`
   })
   return `<div class="strip">${cells.join('')}</div>`
 }
@@ -159,7 +162,8 @@ function readChallenge(run: Run, stop: Stop): string {
 /** What the squad faces at a stop, as the map's heading. */
 function where(run: Run, stop: Stop): string {
   const stage = run.route[run.keys]
-  // A stop's icon tells what it is; only a fight says more.
+  // A stop's icon tells what it is; only a fight or a safehouse says more.
+  if (stop.kind === 'safehouse') return `<b>🏠 Safehouse</b>: ${SAFEHOUSE}`
   if (stop.kind !== 'battle' && stop.kind !== 'key' && stop.kind !== 'final') return ''
   const order = `<b title="${GOALS[stop.goal].text}">${objective(stop.kind, stop.goal, stop.challenge, stop.terrain, stage.hero?.name)}</b>`
   const extras = stop.kind === 'battle' ? ` · ${RISKS[stop.risk].name}${stop.twist ? ` · <span title="${TWISTS[stop.twist].text}">${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}</span>` : ''}` : ''
@@ -168,7 +172,7 @@ function where(run: Run, stop: Stop): string {
 
 const PURCHASED = '<small class="purchased">Purchased</small>'
 
-/** Everything a shop sells, as cards of one size: weapons, relics, then boons and the bribe. */
+/** Everything a shop sells, as cards of one size: weapons, relics, then boons and the medkit. */
 function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
   const shop = run.shop!
   const held = squadKeywords(run)
@@ -186,8 +190,8 @@ function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
       spent: sold,
     }),
   )
-  const bribe: Pick = { key: 'b', action: { type: 'bribe' }, look: 'bribe', body: card('bribe', 'Buy off the hunters', `${BRIBE.price} supplies`, shop.bribed), detail: `<p><b>Buy off the hunters.</b> -${BRIBE.threat} threat, once.</p>`, go: `Tap again to pay ${BRIBE.price} supplies`, block: run.threat === 0 ? 'No threat to lower' : poor(BRIBE.price), spent: shop.bribed }
-  return [{ name: 'Weapons', picks: gear }, { name: 'Relics', picks: relics }, { name: 'Boons and favours', picks: [...utilities, bribe] }]
+  const medkit: Pick = { key: 'm', action: { type: 'medkit' }, look: 'medkit', body: card('medkit', '✚ Medkit', `${MEDKIT.price} supplies`, shop.medkit), detail: `<p><b>Medkit.</b> Every hero heals ${MEDKIT.heal}, once. A safehouse heals fully.</p>`, go: `Tap again to pay ${MEDKIT.price} supplies`, block: wounded(run) ? poor(MEDKIT.price) : 'No hero is hurt', spent: shop.medkit }
+  return [{ name: 'Weapons', picks: gear }, { name: 'Relics', picks: relics }, { name: 'Boons and favours', picks: [...utilities, medkit] }]
 }
 
 /** A shop: its cards, what the armed one does, and the way out. What is bought keeps its place, greyed out. With `ware` chosen, who takes it, in a pop-up. */

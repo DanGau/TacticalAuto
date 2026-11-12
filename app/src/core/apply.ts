@@ -3,7 +3,7 @@ import { land } from './landing'
 import { fuelTanks } from './objects'
 import { BOON_CHARGES } from './relics'
 import { START_PICKS, UTILITY_PRICE } from './utilities'
-import { arrive, BRIBE, depart, EVENTS, RELIC_PRICE } from './events'
+import { arrive, MEDKIT, depart, EVENTS, RELIC_PRICE } from './events'
 import { advance, current, go, nextStop, recruit, ways } from './run'
 import { type Run } from './run-state'
 import { gainRelic, takeDuo, takeRelic } from './rewards'
@@ -13,8 +13,7 @@ import { buyUtility, keepUtility, takeStart } from './rewards'
 import { GEAR_PRICE } from './rewards'
 import { equipFind } from './rewards'
 import { takePerk, takeSkill } from './rewards'
-import { mend } from './squad'
-import { TRAVEL_HEAL } from './squad'
+import { mend, wounded } from './squad'
 import { minorOffers, skillOffers } from './squad'
 
 export type Action =
@@ -31,7 +30,7 @@ export type Action =
   /** Shop or reward phase, with a utility to spare: drop the one held at `drop`, or with -1, the new one. */
   | { type: 'keep'; drop: number }
   /** Shop: pay to lower the threat, once. */
-  | { type: 'bribe' }
+  | { type: 'medkit' }
   /** Shop: leave for the road. */
   | { type: 'leave' }
   /** Event: meet it the way its option at `index` says. */
@@ -132,7 +131,7 @@ export function apply(run: Run, action: Action): Result {
     }
     return ok
   }
-  if (action.type === 'gear' || action.type === 'buy' || action.type === 'utility' || action.type === 'bribe' || action.type === 'leave') {
+  if (action.type === 'gear' || action.type === 'buy' || action.type === 'utility' || action.type === 'medkit' || action.type === 'leave') {
     const shop = run.shop
     if (run.phase !== 'shop' || !shop) return no('not in a shop')
     if (action.type === 'gear') {
@@ -154,12 +153,13 @@ export function apply(run: Run, action: Action): Result {
       if (!item || item.sold) return no('no such utility for sale')
       if (UTILITY_PRICE > run.supplies) return no('not enough supplies')
       buyUtility(run, action.index)
-    } else if (action.type === 'bribe') {
-      if (shop.bribed) return no('already bribed')
-      if (BRIBE.price > run.supplies) return no('not enough supplies')
-      run.supplies -= BRIBE.price
-      run.threat = Math.max(0, run.threat - BRIBE.threat)
-      shop.bribed = true
+    } else if (action.type === 'medkit') {
+      if (shop.medkit) return no('medkit already bought')
+      if (!wounded(run)) return no('no hero is hurt')
+      if (MEDKIT.price > run.supplies) return no('not enough supplies')
+      run.supplies -= MEDKIT.price
+      mend(run, MEDKIT.heal)
+      shop.medkit = true
     } else depart(run)
     return ok
   }
@@ -181,8 +181,7 @@ export function apply(run: Run, action: Action): Result {
   }
   if (!current(run)) return no('choose where to go first')
   const stop = nextStop(run)
-  mend(run, TRAVEL_HEAL)
-  if (stop === 'shop' || stop === 'unknown' || stop === 'medic') arrive(run)
+  if (stop === 'shop' || stop === 'unknown') arrive(run)
   else advance(run)
   return ok
 }

@@ -79,9 +79,6 @@ export function charges(run: Run, soldier: Soldier): number {
   return base + [...soldier.skills.map((id) => SKILLS[id]), ...soldier.perks.map((id) => PERKS[id])].reduce((sum, p) => sum + (p.charges ?? 0), 0) + run.relics.reduce((sum, id) => sum + ((RELICS[id] as Relic).charges ?? 0), 0)
 }
 
-/** Health every soldier heals for each stop travelled to. */
-export const TRAVEL_HEAL = 1
-
 /** A soldier's health now: its most less its wounds, never below 1. */
 export const health = (run: Run, soldier: Soldier) => Math.max(1, soldierStats(run, soldier).hp - soldier.wounds)
 

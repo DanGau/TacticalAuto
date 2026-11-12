@@ -83,7 +83,7 @@ export function loot(run: Run, index: number, armed: string | null): string {
 
 function title(report: Report): string {
   const name = STOP_NAMES[report.stop]
-  if (report.stop === 'supply' || report.stop === 'cache') return `<h1>${name}</h1>`
+  if (report.stop === 'supply' || report.stop === 'cache' || report.stop === 'safehouse') return `<h1>${name}</h1>`
   return `<h1 class="${report.won ? 'down' : 'up'}">${name} ${report.won ? 'won' : 'lost'}</h1>`
 }
 

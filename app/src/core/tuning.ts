@@ -8,8 +8,8 @@ export const TUNING = {
   legForce: [3, 10, 18, 20],
   /** Damage each hit on a marked unit adds. */
   markDamage: 1,
-  /** Damage Accelerant Gel adds to hits on a burning target. */
-  accelerantDamage: 1,
+  /** Burn stacks on a target for each point Accelerant Gel adds to a hit on it. */
+  accelerantStacks: 2,
   /** Damage Shatterglass Edge adds to hits on a chilled target. */
   shatterDamage: 2,
   /** Damage Thermal Shock Core adds to hits on a target both burning and chilled. */

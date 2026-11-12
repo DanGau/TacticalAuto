@@ -26,6 +26,8 @@ export interface Report {
   hits: { max: number; p99: number; bossRounds: number; leastBossRounds: number }
   /** Boons found or bought a run, by leg. */
   found: number[]
+  /** Safehouses rested at and medkits bought a run. */
+  rests: { safehouses: number; medkits: number }
   /** Battles past MAX_BATTLE_SECONDS, which the report warns of without failing. */
   warnings: string[]
   /** What fails the batch: battles stuck at the beat limit. */
@@ -95,6 +97,7 @@ export function report(results: RunResult[]): Report {
     },
     hits: { max: hardest.at(-1) ?? 0, p99: hardest[Math.floor(0.99 * hardest.length)] ?? 0, bossRounds: felled[Math.floor(felled.length / 2)] ?? 0, leastBossRounds: felled[0] ?? 0 },
     found: Array.from({ length: KEYS + 1 }, (_, leg) => mean((r) => r.found[leg])),
+    rests: { safehouses: mean((r) => r.rests.safehouses), medkits: mean((r) => r.rests.medkits) },
     warnings,
     failures,
   }
@@ -119,6 +122,7 @@ export function formatReport(r: Report): string {
     `ends at, by leg     ${r.attrition.legs.map((n) => `${n}%`).join(', ')}`,
     `sudden losses       ${r.attrition.sudden}% of runs lost began their last battle above 75%`,
     `hero hits           hardest ${r.hits.max}, p99 battle ${r.hits.p99}; a late boss falls in ${r.hits.bossRounds} rounds by median, ${r.hits.leastBossRounds} at least`,
+    `rests a run         ${r.rests.safehouses} safehouses, ${r.rests.medkits} medkits`,
     `boons found a run   ${Math.round(10 * r.found.reduce((a, b) => a + b, 0)) / 10}, by leg ${r.found.join(', ')}`,
     ...r.warnings.map((w) => `WARN                ${w}`),
     ...r.failures.map((f) => `FAIL                ${f}`),

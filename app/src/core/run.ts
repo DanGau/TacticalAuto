@@ -17,7 +17,7 @@ import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
 import { LEG_STOPS, OPENING, STOP_THREAT, THREAT_MAX } from './progress'
 import { kitOut } from './plans'
-import { abilityOf, charges, draft, health, join, MAX_SQUAD, offerRecruits, soldierStats, weaponOf, xpFor } from './squad'
+import { abilityOf, charges, draft, health, join, mend, MAX_SQUAD, offerRecruits, soldierStats, weaponOf, xpFor } from './squad'
 import { dropGear, offerStart, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
 import { forceOf, type ChallengeId } from './challenges'
@@ -258,7 +258,7 @@ function offset(stage: Stage, t: number, d: number): LonLat {
 const nearest = (id: ContinentId, at: LonLat) => Math.min(...CONTINENTS[id].cities.map((c) => arc(c.at, at)))
 
 /** How likely a stop past a leg's first column is to be each kind other than a battle; the rest are battles. */
-export const STOP_CHANCE = { unknown: 0.25, shop: 0.1, medic: 0.1, supply: 0.08, cache: 0.04 }
+export const STOP_CHANCE = { unknown: 0.25, shop: 0.1, supply: 0.08, cache: 0.04 }
 
 /**
  * The shape of a leg's map: trails start apart and wander a row up, down or on each column, never crossing, and
@@ -306,6 +306,24 @@ export function drawStops(run: Run): void {
       if (node.stop.challenge) taken.push(node.stop.challenge)
       // A stop is named for the town it is at.
       if (node.town) node.stop.city = node.town
+    }
+  })
+  placeSafehouses(leg, run.keys === 0 ? OPENING : 1)
+}
+
+/**
+ * At every other split of the way into column `from` or later, a stop it leads to becomes a safehouse while another
+ * stays a battle, so resting costs a fight's rewards. A stop other than a battle is turned first, keeping the fights.
+ */
+function placeSafehouses(leg: Leg, from: number): void {
+  let splits = 0
+  leg.columns.slice(0, LEG_STOPS - 1).forEach((column, c) => {
+    for (const node of column) {
+      const ways = node.next.map((i) => leg.columns[c + 1][i])
+      const battles = ways.filter((n) => n.stop!.kind === 'battle')
+      if (c + 1 < from || ways.length < 2 || battles.length === 0 || ways.some((n) => n.stop!.kind === 'safehouse') || splits++ % 2 === 1) continue
+      const turned = ways.find((n) => n.stop!.kind !== 'battle') ?? battles[1]
+      turned.stop = { ...fixed('safehouse', 'town'), city: turned.stop!.city }
     }
   })
 }
@@ -395,16 +413,17 @@ export function passStop(run: Run): void {
   run.stop++
 }
 
-/** Travels to the next stop, unless it is a shop or unknown. A battle begins; a supply drop or cache is collected at once. */
+/** Travels to the next stop, unless it is a shop or unknown. A battle begins; a supply drop, cache or safehouse is taken at once. */
 export function advance(run: Run): void {
   const here = current(run)!.stop!
   const stop = nextStop(run)!
-  if (stop === 'shop' || stop === 'unknown' || stop === 'medic') throw new Error('a shop, medic or unknown stop is arrived at, not advanced to')
-  if (stop === 'supply' || stop === 'cache') {
+  if (stop === 'shop' || stop === 'unknown') throw new Error('a shop or unknown stop is arrived at, not advanced to')
+  if (stop === 'supply' || stop === 'cache' || stop === 'safehouse') {
     const before = run.threat
     run.threat = Math.min(run.threat + STOP_THREAT, THREAT_MAX)
     const supplies = stop === 'supply' ? DROP_SUPPLIES : 0
     run.supplies += supplies
+    if (stop === 'safehouse') mend(run, Infinity)
     if (stop === 'cache') dropGear(run, run.relics.some((id) => (RELICS[id] as Relic).rareGear))
     run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, key: false, soldiers: [], hired: null, rescued: null }
     passStop(run)

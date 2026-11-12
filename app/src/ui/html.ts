@@ -32,7 +32,7 @@ export const STOP_NAMES: Record<StopKind | Mission["kind"], string> = {
   supply: "Supply drop",
   cache: "Gear cache",
   shop: "Shop",
-  medic: "Healer",
+  safehouse: "Safehouse",
   unknown: "❓ Unknown",
   key: "Guardian",
   final: "The alien source",

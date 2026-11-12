@@ -2,11 +2,10 @@
 import type { Action } from '../core/apply'
 import { CHALLENGES, rungOf, TIERS, type ChallengeId } from '../core/challenges'
 import type { ClassId } from '../core/classes'
-import { BRIBE, EVENTS, RELIC_PRICE } from '../core/events'
+import { MEDKIT, EVENTS, RELIC_PRICE } from '../core/events'
 import { EFFECTS, type Gear } from '../core/gear'
 import { distance } from '../core/grid'
 import { fuelTanks } from '../core/objects'
-import { THREAT_MAX } from '../core/progress'
 import { GEAR_PRICE } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
@@ -103,10 +102,10 @@ function keep(run: Run): { type: 'keep'; drop: number } {
 
 const squadHealth = (run: Run) => run.soldiers.reduce((sum, s) => sum + health(run, s), 0) / run.soldiers.reduce((sum, s) => sum + soldierStats(run, s).hp, 0)
 
-/** What a stop is worth to go to: an answered fight, or a rest when hurt, beats a fight it has no answer for. */
+/** What a stop is worth to go to: an answered fight beats a fight it has no answer for; a safehouse, more the more the squad is hurt. */
 function worth(run: Run, stop: Stop): number {
   const hale = squadHealth(run)
-  if (stop.kind === 'medic') return hale < 0.75 ? 6 : 1
+  if (stop.kind === 'safehouse') return hale < 0.6 ? 8 : hale < 0.8 ? 5 : hale < 0.95 ? 1 : -1
   if (stop.kind === 'shop') return run.supplies >= UTILITY_PRICE ? 3 : 0.5
   if (stop.kind === 'supply') return 1.5
   if (stop.kind === 'cache') return 2
@@ -147,18 +146,21 @@ function improves(run: Run, gear: Gear): boolean {
   return !!owner && gearWorth(run, gear, owner) > gearWorth(run, owner.gear, owner)
 }
 
-/** A shop: a relic, then an answer it lacks, then gear, then a bribe once threat builds. */
+/** A shop: a medkit when badly hurt, a relic, then an answer it lacks, a medkit when hurt, then gear, then a medkit at all hurt. */
 function shop(run: Run): Action {
-  const { utilities, relics, wares, bribed } = run.shop!
+  const { utilities, relics, wares, medkit } = run.shop!
+  const heal = (below: number) => !medkit && MEDKIT.price <= run.supplies && squadHealth(run) < below
+  if (heal(0.5)) return { type: 'medkit' }
   const relic = relics.findIndex((r) => !r.sold && RELIC_PRICE <= run.supplies)
   if (relic >= 0) return { type: 'buy', index: relic }
   const gaps = unanswered(run)
   const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && gaps.some((c) => carries(id, CHALLENGES[c].answers)) && (run.utilities.length < UTILITY_SLOTS || keep({ ...run, spare: id }).drop !== -1))
   if (answer >= 0) return { type: 'utility', index: answer }
+  if (heal(0.75)) return { type: 'medkit' }
   for (const [index, { gear, sold }] of wares.entries()) {
     if (!sold && GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] <= run.supplies && improves(run, gear)) return { type: 'gear', index }
   }
-  if (!bribed && BRIBE.price <= run.supplies && run.threat >= THREAT_MAX / 2) return { type: 'bribe' }
+  if (heal(1)) return { type: 'medkit' }
   return { type: 'leave' }
 }
 
@@ -216,7 +218,7 @@ export const strategic: Bot = (run) => {
   if (run.phase === 'shop') return shop(run)
   if (run.phase === 'event') {
     const options = EVENTS[run.event!].options.flatMap((option, i) => (!option.can || option.can(run) ? [i] : []))
-    return { type: 'choose', index: run.event === 'medic' ? options[0] : options.at(-1)! }
+    return { type: 'choose', index: options.at(-1)! }
   }
   return current(run) ? { type: 'advance' } : route(run)
 }

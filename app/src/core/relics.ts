@@ -60,7 +60,7 @@ const relics = {
   drones: { name: 'Scavenger Drones', text: 'Each won battle pays 1 more supply', supplies: 1 },
   contact: { name: 'Black Market Contact', text: 'Every piece of gear found is rare or better', rareGear: true },
   uplink: { name: "Seer's Uplink", text: 'The flight map names the aliens of each stop, not only how dangerous they are', recon: true },
-  accelerant: { name: 'Accelerant Gel', text: 'Hits on a burning target do +1 damage for each burn stack on it', tags: ['burn'], rarity: 'epic', effect: 'accelerant' },
+  accelerant: { name: 'Accelerant Gel', text: `Hits on a burning target do +1 damage for every ${TUNING.accelerantStacks} burn stacks on it`, tags: ['burn'], rarity: 'epic', effect: 'accelerant' },
   wildfire: { name: 'Wildfire Spores', text: `An alien that dies burning adds ${BURN_STACKS} burn stacks to every alien beside it`, tags: ['burn', 'kill'], effect: 'wildfire' },
   salamander: { name: 'Salamander Sigil', text: `Crits add ${BURN_STACKS} burn stacks to the target`, tags: ['crit', 'burn'], rarity: 'common', effect: 'ignite' },
   lattice: { name: 'Frost Lattice', text: 'Crits add a chill stack to the target', tags: ['crit', 'frost'], rarity: 'common', effect: 'freeze' },

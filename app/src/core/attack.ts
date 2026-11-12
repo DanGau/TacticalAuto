@@ -151,7 +151,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(unit.hp <= unit.stats.hp / 2, 'rage', RAGE_DAMAGE) +
     when(enemy.hp < enemy.stats.hp, 'slayer', SLAYER_DAMAGE) +
     (enemy.marked ? TUNING.markDamage : 0) +
-    when(enemy.burn > 0, 'accelerant', enemy.burn) +
+    when(enemy.burn > 0, 'accelerant', Math.floor(enemy.burn / TUNING.accelerantStacks)) +
     when(enemy.chill > 0, 'shatter', TUNING.shatterDamage) +
     when(enemy.burn > 0, 'searing', SEARING_DAMAGE) +
     when(enemy.chill > 0, 'icebreak', SEARING_DAMAGE) +
