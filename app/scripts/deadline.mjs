@@ -12,10 +12,15 @@ const alive = (pid) => {
   }
 }
 
+/** Every process as [id, parent id]. */
+function processes() {
+  const csv = execFileSync('powershell', ['-NoProfile', '-Command', 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId),$($_.ParentProcessId)" }'], { encoding: 'utf8' })
+  return csv.trim().split(/\r?\n/).map((line) => line.split(',').map(Number))
+}
+
 /** Every process descended from `root`, found by parent ids, which stay set after a parent between them has exited. */
 function descendants(root) {
-  const csv = execFileSync('powershell', ['-NoProfile', '-Command', 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId),$($_.ParentProcessId)" }'], { encoding: 'utf8' })
-  const pairs = csv.trim().split(/\r?\n/).map((line) => line.split(',').map(Number))
+  const pairs = processes()
   const found = [root]
   for (let i = 0; i < found.length; i++) found.push(...pairs.filter(([pid, parent]) => parent === found[i] && pid !== process.pid).map(([pid]) => pid))
   return found
@@ -34,17 +39,27 @@ function killTree(root) {
 
 const [mode, ...args] = process.argv.slice(2)
 
+/** The processes above this one, nearest first. */
+function ancestors() {
+  const parent = new Map(processes())
+  const found = []
+  for (let pid = process.ppid; pid && alive(pid) && !found.includes(pid); pid = parent.get(pid)) found.push(pid)
+  return found
+}
+
 if (mode === '--watch') {
-  const [owner, child, until] = args.map(Number)
+  const [until, child, ...owners] = args.map(Number)
   const timer = setInterval(() => {
-    if (alive(owner) && alive(child) && Date.now() < until) return
+    if (owners.every(alive) && alive(child) && Date.now() < until) return
     killTree(child)
     clearInterval(timer)
   }, 1000)
 } else {
   const seconds = Number(mode)
   const child = spawn(args.join(' '), { stdio: 'inherit', shell: true, detached: process.platform !== 'win32' })
-  const watchdog = spawn(process.execPath, [process.argv[1], '--watch', String(process.pid), String(child.pid), String(Date.now() + seconds * 1000)], {
+  // Killing a shell on Windows leaves its children running, so the watchdog also watches every process above this one.
+  const owners = [process.pid, ...(process.platform === 'win32' ? ancestors() : [])]
+  const watchdog = spawn(process.execPath, [process.argv[1], '--watch', String(Date.now() + seconds * 1000), String(child.pid), ...owners.map(String)], {
     stdio: 'ignore',
     detached: true,
   })
