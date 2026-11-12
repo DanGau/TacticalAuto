@@ -20,8 +20,12 @@ export interface Report {
   moments: { falls: number; fallKills: number; throws: number; farthest: number }
   /** Jumps a battle, by arena kind. */
   jumps: Record<string, number>
-  /** What battles cost the squad, as shares of its most health in percent: lost and left, each by mean, and left by leg; points lost; soldiers downed a battle; battles ended under 75%; runs lost whose last battle began above 75%. */
-  attrition: { lost: number; hp: number; points: number; downed: number; worn: number; legs: number[]; sudden: number }
+  /** What battles cost the squad, as shares of its most health in percent: lost and left, each by mean, and left by leg; points lost; soldiers downed a battle; battles ended under 75%. */
+  attrition: { lost: number; hp: number; points: number; downed: number; worn: number; legs: number[] }
+  /** Runs lost, by the squad's health entering the last battle: sudden from SUDDEN up, attrition under WORN, mixed between; the share of sudden ones with a boss or commander; and what the sudden ones were. */
+  losses: { sudden: number; mixed: number; attrition: number; elite: number; what: string }
+  /** Battles begun from SUDDEN up that ended under SPIKE or lost, in percent of such battles, by what they were. */
+  spikes: { rate: number; what: string }
   /** Heroes' hits on aliens: the hardest, and the hardest but one in a hundred battles; and rounds a boss from leg LATE_LEG on takes to fell, by median and least. */
   hits: { max: number; p99: number; bossRounds: number; leastBossRounds: number }
   /** Boons found or bought a run, by leg. */
@@ -93,8 +97,9 @@ export function report(results: RunResult[]): Report {
       downed: Math.round(100 * each((t) => t.downed)) / 100,
       worn: Math.round(100 * each((t) => (t.after < 0.75 * t.most ? 1 : 0))),
       legs: Array.from({ length: KEYS + 1 }, (_, leg) => share(tolls.filter((t) => t.leg === leg), (t) => t.after)),
-      sudden: Math.round((100 * fatal.filter((t) => t.before > 0.75 * t.most).length) / Math.max(1, fatal.length)),
     },
+    losses: losses(fatal),
+    spikes: spikes(tolls),
     hits: { max: hardest.at(-1) ?? 0, p99: hardest[Math.floor(0.99 * hardest.length)] ?? 0, bossRounds: felled[Math.floor(felled.length / 2)] ?? 0, leastBossRounds: felled[0] ?? 0 },
     found: Array.from({ length: KEYS + 1 }, (_, leg) => mean((r) => r.found[leg])),
     rests: { safehouses: mean((r) => r.rests.safehouses), medkits: mean((r) => r.rests.medkits) },
@@ -103,6 +108,35 @@ export function report(results: RunResult[]): Report {
   }
 }
 
+/** Shares of the squad's most health: entering a fatal battle at SUDDEN or more makes a loss sudden, under WORN attrition; a battle begun at SUDDEN that ends under SPIKE is a spike. */
+export const SUDDEN = 0.75
+export const WORN = 0.5
+export const SPIKE = 0.25
+
+/** What a battle was: its mission kind or goal, its challenge, and * if it had a commander or big one. */
+const what = (t: Toll) => `${t.kind === 'battle' ? t.goal : t.kind}${t.challenge ? `/${t.challenge}` : ''}${t.elite && t.kind === 'battle' ? '*' : ''}`
+
+/** `of`, counted by what each was, most first, as `what n`. */
+function tally(of: Toll[], top = 8): string {
+  const counts = new Map<string, number>()
+  for (const t of of) counts.set(what(t), (counts.get(what(t)) ?? 0) + 1)
+  return [...counts].sort((a, b) => b[1] - a[1]).slice(0, top).map(([k, n]) => `${k} ${n}`).join(', ')
+}
+
+function losses(fatal: Toll[]): Report['losses'] {
+  const pct = (n: number) => Math.round((100 * n) / Math.max(1, fatal.length))
+  const sudden = fatal.filter((t) => t.before >= SUDDEN * t.most)
+  const attrition = fatal.filter((t) => t.before < WORN * t.most).length
+  return { sudden: pct(sudden.length), mixed: pct(fatal.length - sudden.length - attrition), attrition: pct(attrition), elite: Math.round((100 * sudden.filter((t) => t.elite).length) / Math.max(1, sudden.length)), what: tally(sudden) }
+}
+
+function spikes(tolls: Toll[]): Report['spikes'] {
+  const healthy = tolls.filter((t) => t.before >= SUDDEN * t.most)
+  const spiked = new Set(healthy.filter((t) => !t.won || t.after < SPIKE * t.most))
+  const rate = (of: Toll[]) => Math.round((1000 * of.filter((t) => spiked.has(t)).length) / Math.max(1, of.length)) / 10
+  const kinds = [...new Set([...spiked].map(what))].map((k) => ({ k, of: healthy.filter((t) => what(t) === k) }))
+  return { rate: rate(healthy), what: kinds.sort((a, b) => rate(b.of) * b.of.length - rate(a.of) * a.of.length).slice(0, 10).map(({ k, of }) => `${k} ${rate(of)}% of ${of.length}`).join(', ') }
+}
 export function formatReport(r: Report): string {
   const percent = (n: number) => `${n} (${Math.round((100 * n) / r.runs)}%)`
   return [
@@ -120,7 +154,9 @@ export function formatReport(r: Report): string {
     `jumps a battle      ${Object.entries(r.jumps).map(([kind, n]) => `${kind} ${n}`).join(', ')}`,
     `squad health        loses ${r.attrition.lost}% (${r.attrition.points}) a battle, ends at ${r.attrition.hp}%; ${r.attrition.worn}% of battles end under 75%; ${r.attrition.downed} downed a battle`,
     `ends at, by leg     ${r.attrition.legs.map((n) => `${n}%`).join(', ')}`,
-    `sudden losses       ${r.attrition.sudden}% of runs lost began their last battle above 75%`,
+    `losses by health   ${r.losses.sudden}% sudden (began the last battle at ${100 * SUDDEN}%+), ${r.losses.mixed}% mixed, ${r.losses.attrition}% attrition (under ${100 * WORN}%); ${r.losses.elite}% of sudden had a boss`,
+    `sudden losses       ${r.losses.what}`,
+    `spikes              ${r.spikes.rate}% of battles begun at ${100 * SUDDEN}%+ end under ${100 * SPIKE}% or lost: ${r.spikes.what}`,
     `hero hits           hardest ${r.hits.max}, p99 battle ${r.hits.p99}; a late boss falls in ${r.hits.bossRounds} rounds by median, ${r.hits.leastBossRounds} at least`,
     `rests a run         ${r.rests.safehouses} safehouses, ${r.rests.medkits} medkits`,
     `boons found a run   ${Math.round(10 * r.found.reduce((a, b) => a + b, 0)) / 10}, by leg ${r.found.join(', ')}`,

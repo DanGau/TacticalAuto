@@ -19,7 +19,7 @@ export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test:
   swarm: { name: 'Swarm', icon: '🐜', test: 'Bodies flood in from every side, and keep coming', answers: ['meleeShield', 'tank', 'coldSnap', 'gravity'], grim: [[8, 12, 16], [14, 18, 22], [20, 24, 30]] },
   scattered: { name: 'Scattered', icon: '🗺️', test: 'Sentries spread far apart: clear them before the clock runs out and reinforcements pour in', answers: ['thrusters', 'farsight'], grim: [[8, 12, 16], [12, 16, 20], [16, 20, 24]] },
   bigOne: { name: 'Big one', icon: '👹', test: 'One huge, armored alien and its escort', answers: ['overcharge', 'crack', 'hunted', 'keen'], grim: [[1, 1, 2], [2, 3, 4], [3, 5, 6]] },
-  killBox: { name: 'Kill box', icon: '💥', test: 'The way in lands right beside a packed cluster that hits first', answers: ['flashbang', 'smoke', 'meleeShield', 'dampener', 'ironSkin'], grim: [[3, 5, 7], [7, 9, 12], [10, 14, 18]] },
+  killBox: { name: 'Kill box', icon: '💥', test: 'The way in lands right beside a packed cluster that hits first', answers: ['flashbang', 'smoke', 'meleeShield', 'dampener', 'ironSkin'], grim: [[3, 5, 6], [6, 8, 10], [9, 12, 15]] },
 }
 
 /** The challenges a party meets, by its size less one and the rung of the leg: harder ones arrive up each tier. */
@@ -29,9 +29,9 @@ export const TIERS: ChallengeId[][][] = [
   [['scattered', 'swarm', 'ironWall', 'slog', 'killBox', 'firingLine'], ['scattered', 'swarm', 'ironWall', 'slog', 'firingLine', 'bigOne'], ['swarm', 'ironWall', 'killBox', 'firingLine', 'bigOne']],
 ]
 
-/** Which challenges fit a goal: a flood's aliens come to the squad, so it meets nothing it must cross. */
+/** Which challenges fit a goal: a flood's aliens come to the squad, so it meets nothing it must cross, nor a swarm, a second flood. */
 const FLOOD_GOALS: Goal[] = ['hold', 'rescue']
-const FITS_FLOOD: ChallengeId[] = ['swarm', 'ironWall', 'bigOne']
+const FITS_FLOOD: ChallengeId[] = ['ironWall', 'bigOne']
 
 /** How far along a leg each rung starts, in columns. */
 const RUNG_EVERY = 3
@@ -77,7 +77,7 @@ export const STIFFEN: Partial<Record<ChallengeId, { range?: number; armor?: numb
 /** A big one's boss: its health over a soldier's base, its armor and its damage, by party size less one and rung. */
 export function bigOneStats(party: number, rung: number, base: Stats): Stats {
   const size = Math.min(party, 3) - 1
-  return { ...base, hp: [12, 60, 105][size] + [3, 12, 17][size] * rung, armor: [7, 14, 28][size] + [1, 3, 4][size] * rung, damage: base.damage - (size === 0 ? 1 : 0) + 2 * size + Math.floor(rung / 2) }
+  return { ...base, hp: [12, 60, 105][size] + [3, 12, 17][size] * rung, armor: [7, 14, 28][size] + [1, 3, 4][size] * rung, damage: base.damage + 2 + 2 * size + Math.floor(rung / 2) }
 }
 
 /** Of a Scattered's force of `count`, the sentries posted; the rest are the reinforcements. */

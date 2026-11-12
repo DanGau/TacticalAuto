@@ -24,6 +24,10 @@ export interface Toll {
   nth: number
   leg: number
   party: number
+  /** The kind of mission: a battle, key, final, ambush or recovery. */
+  kind: Mission['kind']
+  /** Whether it had a boss or commander: a key, final, ambush, Big one or takedown. */
+  elite: boolean
   won: boolean
   goal: Goal
   challenge: ChallengeId | null
@@ -90,7 +94,7 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
   /** This battle's hardest hero hit, its boss, and the round the boss was first wounded. */
   let hits = { max: 0, boss: -1, from: -1, rounds: null as number | null }
   /** The battle under way, its leg, the squad's health as it began, and the utilities it held. */
-  let begun: [Run['battle'], number, number, UtilityId[]] = [null, 0, 0, []]
+  let begun: [Run['battle'], number, number, UtilityId[], boolean] = [null, 0, 0, [], false]
   let had: { leg: number; held: (UtilityId | null)[] } = { leg: 0, held: [] }
   while (run.phase !== 'won' && run.phase !== 'lost') {
     const held = [...run.utilities, run.spare]
@@ -98,7 +102,7 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
     had = { leg: run.keys, held }
     const battle = run.battle
     if (run.phase === 'battle' && begun[0] !== battle) {
-      begun = [battle, run.keys, run.soldiers.reduce((sum, s) => sum + health(run, s), 0), [...run.utilities]]
+      begun = [battle, run.keys, run.soldiers.reduce((sum, s) => sum + health(run, s), 0), [...run.utilities], battle!.units.some((u) => u.boss || u.target)]
       hits = { max: 0, boss: battle!.units.find((u) => u.boss)?.id ?? -1, from: -1, rounds: null }
     }
     if (run.phase === 'battle' && battle!.phase === 'battle') {
@@ -124,7 +128,7 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
         const fought = run.report!.soldiers
-        result.tolls.push({ nth: result.battles, leg: begun[1], party: fought.length, won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3]), most: fought.reduce((sum, s) => sum + s.maxHp, 0), before: begun[2], after: fought.reduce((sum, s) => sum + s.hp, 0), downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds })
+        result.tolls.push({ nth: result.battles, leg: begun[1], party: fought.length, kind: run.mission!.kind, elite: begun[4], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3]), most: fought.reduce((sum, s) => sum + s.maxHp, 0), before: begun[2], after: fought.reduce((sum, s) => sum + s.hp, 0), downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds })
         clock = { next: 0, done: 0 }
       }
       continue
