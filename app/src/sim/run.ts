@@ -46,7 +46,7 @@ export interface Toll {
   healed: number
 }
 
-/** What the squad holds from the start of a run: doctrines and relics, and a gear effect every hero's weapon keeps all run. */
+/** What the squad holds from the start of a run: doctrines and relics, and a gear effect on every hero's weapon that has none, so gear found with its own effect still counts. */
 export interface Loadout {
   doctrines?: DoctrineId[]
   relics?: RelicId[]
@@ -101,7 +101,7 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
   run.doctrines.push(...(loadout.doctrines ?? []))
   run.relics = [...run.relics, ...(loadout.relics ?? [])]
   const arm = () => {
-    if (loadout.effect) for (const s of run.soldiers) if (s.gear) s.gear.effect = loadout.effect
+    if (loadout.effect) for (const s of run.soldiers) if (s.gear && !s.gear.effect) s.gear.effect = loadout.effect
   }
   arm()
   const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], restForks: [], actions: [], found: Array<number>(KEYS + 1).fill(0), rests: { safehouses: 0, medkits: 0 } }
