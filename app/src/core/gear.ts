@@ -55,6 +55,9 @@ export const EFFECTS: Record<GearEffect, { prefix: string; text: string; tags?: 
   booming: { prefix: 'Booming', text: 'Targets hit take 3 if they move next turn', rarity: 'epic' },
   shove: { prefix: 'Shoving', text: 'Knocks an alien back into what is behind it', tags: ['force'] },
   tether: { prefix: 'Tethered', text: 'Pulls the target 1 tile closer', tags: ['force'] },
+  twinned: { prefix: 'Twinned', text: 'A weapon of 2 or more shots fires one more', tags: ['volley'], pays: ['volley'] },
+  braced: { prefix: 'Bracing', text: 'Hits give the hero 1 armor, up to twice its own', tags: ['ward'] },
+  sapping: { prefix: 'Sapping', text: 'Hits weaken the target: it does a quarter less damage next turn', rarity: 'common' },
 }
 
 /** The weapon a hero starts with: any, with nothing added. */

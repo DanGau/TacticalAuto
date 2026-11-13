@@ -1,3 +1,4 @@
+import { TUNING } from './tuning'
 import { expect, test } from 'vitest'
 import { isSoldier, type Battle, type Unit } from './battle'
 import { stepBattle } from './combat'
@@ -64,14 +65,14 @@ test('the shotgun hurts those beside its target', () => {
   expect(aliens.map((a) => a.hp).every((hp) => hp < 500)).toBe(true)
 })
 
-test('a volley shares one crit roll, and what comes once an attack comes once', () => {
+test('a volley shares one crit roll; on-hit effects come every shot, knockback once', () => {
   const { b, hero, aliens } = field('lmg', [[12, 10]])
   hero.stats.crit = 0.5
   hero.effects = ['vampiric', 'thunder']
   hero.hp = 1
   const fired = shots(weaponAttack(b, hero, spotted(b)))
   expect(new Set(fired.map((s) => s.crit)).size).toBe(1)
-  expect(hero.hp).toBe(2)
+  expect(hero.hp).toBe(1 + Math.min(TUNING.healCap, fired.filter((s) => s.damage > 0).length))
   expect(aliens[0].x).toBe(12)
 })
 

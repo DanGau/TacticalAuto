@@ -6,7 +6,7 @@ import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { emptyTally, OVERKILL, type FeatId, type Tally } from './feats'
 import { engage, has, hostage, fireproof, immune, onTile } from './fighters'
-import { died, kindle } from './stacks'
+import { armorCap, died, kindle } from './stacks'
 import { TUNING } from './tuning'
 
 /** A soldier's tally for this battle, begun empty. */
@@ -55,7 +55,7 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
   const beside = battle.units.filter((u) => u.side === target.side && u !== target && distance(u, target) <= 1)
   if (target.burn > 0 && (wildfire || (killer && has(killer, 'backdraft')))) {
     for (const other of beside.filter((u) => !fireproof(battle, u))) {
-      kindle(battle, other, BURN_STACKS)
+      kindle(battle, other, wildfire ? target.burn : BURN_STACKS)
       events.push(fx(other.id, wildfire ? 'wildfire' : 'backdraft', 0))
     }
   }
@@ -143,12 +143,17 @@ export const BOOM_DAMAGE = 3
 /** Damage a unit knocked into something takes, and so does an alien it slams into. */
 export const SLAM_DAMAGE = 1
 
-/** Heals `unit` up to `amount`, to its full health and, for a `capped` source, to what TUNING.healCap leaves it this battle; says the gain. */
-export function mend(unit: Unit, amount: number, effect: Effect, events: GameEvent[], capped = true): void {
-  const left = capped ? TUNING.healCap - (unit.healed?.[effect] ?? 0) : amount
+/** Heals `unit` up to `amount`, to its full health and, for a `capped` source, to what TUNING.healCap, or the cap given, leaves it this battle; says the gain. */
+export function mend(unit: Unit, amount: number, effect: Effect, events: GameEvent[], capped: boolean | number = true): void {
+  const cap = capped === true ? TUNING.healCap : capped
+  const left = cap !== false ? cap - (unit.healed?.[effect] ?? 0) : amount
   const gain = Math.min(amount, left, unit.stats.hp - unit.hp)
+  if (unit.hp > 0 && amount > gain && has(unit, 'overflow') && unit.armor < armorCap(unit, 2 * unit.stats.armor)) {
+    unit.armor = Math.min(armorCap(unit, 2 * unit.stats.armor), unit.armor + amount - Math.max(0, gain))
+    events.push(fx(unit.id, 'overflow', 0))
+  }
   if (gain <= 0 || unit.hp <= 0) return
   unit.hp += gain
-  if (capped) (unit.healed ??= {})[effect] = (unit.healed[effect] ?? 0) + gain
+  if (cap !== false) (unit.healed ??= {})[effect] = (unit.healed[effect] ?? 0) + gain
   events.push(fx(unit.id, effect, gain))
 }

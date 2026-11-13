@@ -52,7 +52,7 @@ function actNext(battle: Battle): GameEvent[] {
     }
     if (unit.panicked) {
       unit.panicked = false
-      thaw(unit)
+      thaw(battle, unit)
       battle.shooter = unit.id
       battle.attacks = attacksOf(unit)
       return [{ type: 'frozen', id: unit.id }]

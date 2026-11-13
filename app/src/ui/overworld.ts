@@ -13,7 +13,7 @@ import { type Stop } from '../core/run-state'
 import { missionAt } from '../core/missions'
 import { huntForce } from '../core/missions'
 import { RISKS } from '../core/missions'
-import { GEAR_PRICE } from '../core/rewards'
+import { DRILL_PRICE, GEAR_PRICE } from '../core/rewards'
 import { squadKeywords } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { health, wounded } from '../core/squad'
@@ -28,7 +28,7 @@ import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
 import { pickCard, shopSwap, pickDetail, utilityPick, type Pick } from './cards'
 import { heroSheet } from './sheet'
-import { alienName, badge, button, describe, describeGear, gearCard, gearName, healthBar, keywordChips, resistChip, gearText, STOP_NAMES, threatBar } from './html'
+import { alienName, badge, button, describe, describeGear, gearCard, gearName, healthBar, keywordChips, examChip, gearText, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
 const TABS = ['Map', 'Team', 'Heroes'] as const
@@ -192,7 +192,11 @@ function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
     }),
   )
   const medkit: Pick = { key: 'm', action: { type: 'medkit' }, look: 'medkit', body: card('medkit', '✚ Medkit', `${MEDKIT.price} supplies`, shop.medkit), detail: `<p><b>Medkit.</b> Every hero heals ${MEDKIT.heal}, once. A safehouse heals fully.</p>`, go: `Tap again to pay ${MEDKIT.price} supplies`, block: wounded(run) ? poor(MEDKIT.price) : 'No hero is hurt', spent: shop.medkit }
-  return [{ name: 'Weapons', picks: gear }, { name: 'Relics', picks: relics }, { name: 'Boons and favours', picks: [...utilities, medkit] }]
+  const pupil = shop.drill && run.soldiers.find((s) => s.id === shop.drill!.soldier)
+  const drill: Pick[] = pupil
+    ? [{ key: 'd', action: { type: 'drill' }, look: 'medkit', body: card('favour', `🎖️ Drill ${pupil.name}`, `${DRILL_PRICE} supplies`, shop.drill!.sold), detail: `<p><b>Drill ${pupil.name} as the Carry.</b> Their hits add twice the burn, chill and marks, all run. Once a run.</p>`, go: `Tap again to pay ${DRILL_PRICE} supplies`, block: poor(DRILL_PRICE), spent: shop.drill!.sold }]
+    : []
+  return [{ name: 'Weapons', picks: gear }, { name: 'Relics', picks: relics }, { name: 'Boons and favours', picks: [...utilities, medkit, ...drill] }]
 }
 
 /** A shop: its cards, what the armed one does, and the way out. What is bought keeps its place, greyed out. With `ware` chosen, who takes it, in a pop-up. */
@@ -287,7 +291,7 @@ export function overworld(run: Run, tab: Tab, open: number | null, picked: numbe
     <div class="header">
       <div class="tabs">${tabs.join('')}</div>
       <span>Threat ${threatBar(run.threat)}</span>
-      <span>${run.keys === KEYS ? 'Source' : 'Guardian'} ${resistChip(run.bosses[run.keys])}</span>
+      <span>${run.keys === KEYS ? 'Source' : 'Guardian'} ${examChip(run.bosses[run.keys])}</span>
       <b class="supplies">${run.supplies} ${run.supplies === 1 ? 'supply' : 'supplies'}</b>
     </div>
     ${views[tab](run)}`

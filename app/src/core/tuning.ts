@@ -8,8 +8,8 @@ export const TUNING = {
   legForce: [3, 10, 18, 20],
   /** Damage each hit on a marked unit adds. */
   markDamage: 1,
-  /** Damage each stack a payoff spends gives: burn by Accelerant Gel, chill by Shatterglass Edge, marks by Spotter Network, either by Thermal Shock Core; and the burn and marks Accelerant Gel and Spotter Network wait for. */
-  spend: { burn: 2, chill: 2, mark: 2, thermal: 1, burns: 2, marks: 2 },
+  /** The share of the hero's damage each stack a payoff spends adds; and the burn, chill and marks Accelerant Gel, Shatterglass Edge and Spotter Network wait for. */
+  spend: { factor: 0.5, burns: 2, chills: 2, marks: 2 },
   /** Damage landing charges deal each alien they reach, before Breaching Charges add theirs. */
   impactDamage: 2,
   /** Damage Rime Grip adds to hits on a target beside its cryo. */

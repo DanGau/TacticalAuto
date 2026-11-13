@@ -1,3 +1,4 @@
+import { CATALYST_EVERY } from './relics'
 import { expect, test } from 'vitest'
 import { arena } from './arena'
 import { apply } from './apply'
@@ -102,13 +103,14 @@ test('Domino Rig: an alien knocked into another knocks that one back too; a hero
   expect(knocksInto(battle, { x: 10, y: 12 }, aliens[3])).toBe(false)
 })
 
-test('payoffs spend stacks for damage by the stack: a hit at enough burn the burn, any hit the chill, at enough marks the marks', () => {
-  for (const [effect, stacks, worth] of [['accelerant', { burn: 4 }, 4 * TUNING.spend.burn], ['shatter', { chill: 3 }, 3 * TUNING.spend.chill], ['spotter', { mark: 3 }, 3 * TUNING.spend.mark + TUNING.markDamage]] as const) {
+test("payoffs spend stacks for a share of the hero's damage a stack: a hit at enough burn the burn, any hit the chill, at enough marks the marks", () => {
+  const each = 4 * TUNING.spend.factor
+  for (const [effect, stacks, worth] of [['accelerant', { burn: 4 }, 4 * each], ['shatter', { chill: 3 }, 3 * each], ['spotter', { mark: 3 }, 3 * each + TUNING.markDamage]] as const) {
     const { hero, aliens, beats } = arena([effect], [{ x: 11, y: 10 }])
-    hero.stats = { ...hero.stats, damage: 1, crit: 0 }
+    hero.stats = { ...hero.stats, damage: 4, crit: 0 }
     Object.assign(aliens[0], stacks)
     const [shot] = shots(beats(1))
-    expect(shot.damage).toBeGreaterThanOrEqual(1 + worth)
+    expect(shot.damage).toBeGreaterThanOrEqual(4 + worth)
     expect(aliens[0][Object.keys(stacks)[0] as 'burn']).toBe(0)
   }
 })
@@ -156,9 +158,10 @@ test('Shield Slam: a shield hit does its armor in more damage', () => {
   expect(aliens[0].hp).toBeLessThan(40 - 7)
 })
 
-test('Catalyst Prism: a crit doubles the burn, chill and marks on its target', () => {
+test('Catalyst Prism: every CATALYST_EVERY-th hit doubles the burn, chill and marks on its target', () => {
   const { battle, hero, aliens, beats } = arena(['catalyst'], [{ x: 11, y: 10 }])
-  hero.stats = { ...hero.stats, damage: 1, crit: 1 }
+  hero.stats = { ...hero.stats, damage: 1, crit: 0 }
+  hero.hits = CATALYST_EVERY - 1
   kindle(battle, aliens[0], 2)
   Object.assign(aliens[0], { chill: 1, mark: 1 })
   beats(1)

@@ -56,6 +56,7 @@ function perkWorth(soldier: Soldier, id: PerkId): number {
   const worth: Record<PerkId, number> = {
     heave: 3, extraThrow: 2, longThrow: 1, crushingThrow: 3, strongman: 2,
     springLegs: 1, crashLanding: melee ? 3 : 1, freerunner: melee ? 2 : 1, fleetFoot: melee ? 3 : 2, firemansCarry: 1,
+    quickDraw: (weaponOf(soldier)?.attack.shots ?? 1) >= 2 ? 5 : 0,
     toughness: 4, ironGut: 4, padding: 4, keenEye: 2, longSight: melee ? 0 : 3, firstStrike: 2, finisher: 3, scavenger: 2, secondBreath: 3,
     hardCharger: 3, heavyFrame: 3, scope: 4, extraKit: 5, toolkit: 3, extraFuel: 5, frostLining: 3, deepShadow: 4,
   }

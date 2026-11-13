@@ -1,4 +1,5 @@
 // A battle's state: units, the board, and the numbers its rules share.
+import type { Exam } from './exams'
 import type { ArenaKind } from './arena-kinds'
 import type { SecondaryId } from './secondaries'
 import type { SKILL_EFFECTS } from './skill-effects'
@@ -158,13 +159,13 @@ export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, crit: 0.1, 
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' | 'napalm' | 'cryo' | 'cloak'
 
 /** Something a piece of gear does; gear.ts says what each does. */
-export type GearEffect = 'bellows' | 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'snare' | 'booming' | 'tether' | 'shove' | 'cadence' | 'lofty' | 'topple' | 'kiln' | 'quench'
+export type GearEffect = 'bellows' | 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'snare' | 'booming' | 'tether' | 'shove' | 'cadence' | 'lofty' | 'topple' | 'kiln' | 'quench' | 'twinned' | 'braced' | 'sapping'
 /** Something a skill does; skills.ts says what each does. */
 export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'domino' | 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'zenith' | 'fracture'
+export type RelicEffect = 'domino' | 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'zenith' | 'fracture' | 'eternal' | 'frostHeart' | 'ledger' | 'gravity' | 'ironclad' | 'split' | 'ram' | 'overflow' | 'adrenal' | 'hairTrigger'
 /** Anything a unit's gear, skills, the squad's relics or duos or its weapon doctrine do. Combat applies them. */
-export type Effect = GearEffect | SkillEffect | PerkEffect | RelicEffect | DoctrineEffect | DuoId | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning'
+export type Effect = GearEffect | SkillEffect | PerkEffect | RelicEffect | DoctrineEffect | DuoId | Exam | 'carry' | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning'
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
@@ -180,6 +181,8 @@ export interface Alien {
   /** Whether it is the commander an assassination is after. */
   target: boolean
   resists: Resist[]
+  /** A Guardian's trait. */
+  exam?: Exam
 }
 
 /** A soldier waiting to land. */

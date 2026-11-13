@@ -10,7 +10,7 @@ import { gainRelic, takeDuo, takeRelic } from './rewards'
 import { sellFind } from './rewards'
 import { buyWare } from './rewards'
 import { buyUtility, keepUtility, takeStart } from './rewards'
-import { GEAR_PRICE } from './rewards'
+import { DRILL_PRICE, GEAR_PRICE } from './rewards'
 import { equipFind } from './rewards'
 import { takePerk, takeSkill } from './rewards'
 import { mend, wounded } from './squad'
@@ -31,6 +31,8 @@ export type Action =
   | { type: 'keep'; drop: number }
   /** Shop: pay to lower the threat, once. */
   | { type: 'medkit' }
+  /** Shop: drill the hero on offer as the squad's Carry. */
+  | { type: 'drill' }
   /** Shop: leave for the road. */
   | { type: 'leave' }
   /** Event: meet it the way its option at `index` says. */
@@ -131,7 +133,7 @@ export function apply(run: Run, action: Action): Result {
     }
     return ok
   }
-  if (action.type === 'gear' || action.type === 'buy' || action.type === 'utility' || action.type === 'medkit' || action.type === 'leave') {
+  if (action.type === 'gear' || action.type === 'buy' || action.type === 'utility' || action.type === 'medkit' || action.type === 'drill' || action.type === 'leave') {
     const shop = run.shop
     if (run.phase !== 'shop' || !shop) return no('not in a shop')
     if (action.type === 'gear') {
@@ -160,6 +162,12 @@ export function apply(run: Run, action: Action): Result {
       run.supplies -= MEDKIT.price
       mend(run, MEDKIT.heal)
       shop.medkit = true
+    } else if (action.type === 'drill') {
+      if (!shop.drill || shop.drill.sold) return no('no drill on offer')
+      if (DRILL_PRICE > run.supplies) return no('not enough supplies')
+      run.supplies -= DRILL_PRICE
+      run.carry = shop.drill.soldier
+      shop.drill.sold = true
     } else depart(run)
     return ok
   }

@@ -58,6 +58,16 @@ export const RELIC_ICONS: Record<RelicId, string> = {
   relay: '<path d="M12 8L7 22M12 8l5 14M9 16h6M8 19h8M8 2a6 6 0 0 0 0 8M16 2a6 6 0 0 1 0 8"/><circle cx="12" cy="6" r="2"/>',
   flare: `<path d="M2 22C6 12 12 6 19 4M15 9l1 2M12 7l2 1M8 12l2 1"/><circle cx="20" cy="4" r="2.5" ${F}/>`,
   bounty: `<circle cx="12" cy="12" r="8"/><path d="M12 1v6M12 17v6M1 12h6M17 12h6"/><circle cx="12" cy="12" r="2" ${F}/>`,
+  eternal: '<path d="M12 3c3 4 5 6 5 10a5 5 0 01-10 0c0-4 2-6 5-10z"/><path d="M8.5 13.5c1.2 1.6 2.3 1.6 3.5 0s2.3-1.6 3.5 0"/>',
+  frostHeart: `${FLAKE}<path d="M9 5l3 3 3-3M9 19l3-3 3 3"/><circle cx="12" cy="12" r="2" ${F}/>`,
+  ledger: '<rect x="5" y="3" width="14" height="18" rx="1.5"/><circle cx="12" cy="11" r="3.5"/><path d="M12 6v2M12 14v2M7 11h2M15 11h2M8 19h8"/>',
+  gravity: '<circle cx="12" cy="12" r="2.5"/><path d="M12 3a9 9 0 019 9M12 21a9 9 0 01-9-9M5.5 5.5l3 3M18.5 18.5l-3-3"/>',
+  ironclad: '<path d="M4 4h16v16H4z"/><path d="M4 9h16M4 15h16M9 4v5M15 9v6M9 15v5"/>',
+  split: '<path d="M3 12h6l4-5h8M13 17h8M9 12l4 5"/><path d="M18 4l3 3-3 3M18 14l3 3-3 3"/>',
+  ram: '<path d="M3 8l6-4v16l-6-4z"/><path d="M9 12h8M14 8l4 4-4 4M20 6v12"/>',
+  overflow: '<path d="M6 4h12v6a6 6 0 01-12 0z"/><path d="M8 18h8M9 21h6M12 1v4M4 13l-2 2M20 13l2 2"/>',
+  adrenal: '<path d="M3 12h4l2-5 3 10 2-6 2 3h5"/><path d="M19 4v4M17 6h4"/>',
+  hairTrigger: `<path d="M4 9h13l3-3M4 9v4h4l1 3h3l1-4"/><path d="M14 13a3 3 0 01-3 3"/><circle cx="18" cy="15" r="1" ${F}/>`,
 }
 
 /** The relic's icon as inline SVG, titled with its name. */

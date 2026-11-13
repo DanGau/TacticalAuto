@@ -40,9 +40,9 @@ export interface Report {
 
 /** The leg from which a boss counts as late in a run. */
 export const LATE_LEG = 2
-/** The least median rounds a late boss may take to fell, and the hardest hit a hero may land. */
+/** The least median rounds a late boss may take to fell, and the hardest hit a hero may land: payoffs multiply by stacks, so a built hero hits far above its damage. */
 export const BOSS_ROUNDS_FLOOR = 4
-export const HIT_CEILING = 40
+export const HIT_CEILING = 80
 
 /** Seconds a battle may take to play in the view before the report warns. */
 const MAX_BATTLE_SECONDS = 60

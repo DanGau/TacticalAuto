@@ -14,7 +14,7 @@ import { current, legOf, ways } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Risk } from '../core/run-state'
 import { danger } from '../core/missions'
-import { GEAR_PRICE } from '../core/rewards'
+import { DRILL_PRICE, GEAR_PRICE } from '../core/rewards'
 import { squadKeywords } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { health, wounded } from '../core/squad'
@@ -80,6 +80,7 @@ const affordable = (run: Run): Action[] => [
   ...run.shop!.relics.flatMap((relic, index): Action[] => (!relic.sold && RELIC_PRICE <= run.supplies ? [{ type: 'buy', index }] : [])),
   ...run.shop!.utilities.flatMap((item, index): Action[] => (!item.sold && !run.utilities.includes(item.id) && run.utilities.length < UTILITY_SLOTS && UTILITY_PRICE <= run.supplies ? [{ type: 'utility', index }] : [])),
   ...(!run.shop!.medkit && wounded(run) && MEDKIT.price <= run.supplies ? [{ type: 'medkit' } as const] : []),
+  ...(run.shop!.drill && !run.shop!.drill.sold && DRILL_PRICE <= run.supplies ? [{ type: 'drill' } as const] : []),
 ]
 
 /** Goes in with the first utility held that can be used here; a rigged tank on the first tank. */

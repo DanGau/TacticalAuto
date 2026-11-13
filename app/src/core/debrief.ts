@@ -104,5 +104,5 @@ export function offerRelics(run: Run): void {
   const payoffs = pool.filter((id) => RELICS[id].pays?.some((tag) => causes.includes(tag)))
   const fits = payoffs.length > 0 ? payoffs : pool.filter((id) => RELICS[id].tags?.some((tag) => held.includes(tag)))
   if (fits.length > 0) run.relicOffers.push(...pool.splice(pool.indexOf(fits[randomInt(run, fits.length)]), 1))
-  while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(drawRelic(run, pool))
+  while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(drawRelic(run, pool, held))
 }

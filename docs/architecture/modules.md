@@ -33,7 +33,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `duo-effects.ts` | What each duo does in battle |
 | `ultimates.ts` | Ultimates, once-a-battle capstones: when each fires and what it does |
 | `wound.ts` | Damage landing, what it sets off, the battle tally |
-| `stacks.ts` | Stacks a fight builds and what they set off: burn, chill and freezing, Might, combos, exposure, every-Nth hits |
+| `stacks.ts` | Stacks a fight builds and what they set off: burn, chill and freezing, Might, combos, exposure, every-Nth hits; payoffs that spend them, shots a volley fires |
 | `talents.ts` | Talents: skills shaping a hit by where it lands, or answering a hit, a kill or a turn's start |
 | `perks.ts` | Minor perks: small upgrades picked between power picks, offers and effects' sizes |
 | `upkeep.ts` | What happens as a side's turn begins: more aliens engaging, waves |
@@ -60,7 +60,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 ## core/: content and helpers
 
-`aliens`, `challenges`, `classes`, `doctrines`, `duos`, `feats`, `gear`, `goals`, `keywords`, `powers`, `relics`, `secondaries`, `skill-effects`, `skills`, `twists`, `utilities`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`, `arena`: test helpers.
+`aliens`, `challenges`, `classes`, `doctrines`, `duos`, `exams`, `feats`, `gear`, `goals`, `keywords`, `powers`, `relics`, `secondaries`, `skill-effects`, `skills`, `twists`, `utilities`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`, `arena`: test helpers.
 
 ## view/: battle rendering
 

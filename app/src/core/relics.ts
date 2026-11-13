@@ -47,6 +47,10 @@ export const BOON_CHARGES = 3
 export const STREAK_FIGHTS = 2
 /** The battles Zenith Chronometer's come every. */
 export const ZENITH_EVERY = 3
+/** The most Might Adrenal Pump gives a hero a battle. */
+export const ADRENAL_MAX = 4
+/** Catalyst Prism's every-Nth hit. */
+export const CATALYST_EVERY = 3
 
 const relics = {
   plasma: { name: 'Plasma Core', text: 'Every hero does +1 damage', rarity: 'common', stats: { damage: 1 } },
@@ -62,24 +66,24 @@ const relics = {
   drones: { name: 'Scavenger Drones', text: 'Each won battle pays 1 more supply', supplies: 1 },
   contact: { name: 'Black Market Contact', text: 'Every piece of gear found is rare or better', rareGear: true },
   uplink: { name: "Seer's Uplink", text: 'The flight map names the aliens of each stop, not only how dangerous they are', recon: true },
-  accelerant: { name: 'Accelerant Gel', text: `Hits on a target with ${TUNING.spend.burns} or more burn spend it: +${TUNING.spend.burn} damage a stack to it and every alien beside it`, tags: ['burn'], pays: ['burn'], rarity: 'epic', effect: 'accelerant' },
-  wildfire: { name: 'Wildfire Spores', text: `An alien that dies burning adds ${BURN_STACKS} burn to every alien beside it`, tags: ['burn', 'kill'], pays: ['burn'], effect: 'wildfire' },
+  accelerant: { name: 'Accelerant Gel', text: `Hits on a target with ${TUNING.spend.burns} or more burn spend it: +${100 * TUNING.spend.factor}% of the hero's damage a stack, to it and every alien beside it, and as much temp HP`, tags: ['burn'], pays: ['burn'], rarity: 'epic', effect: 'accelerant' },
+  wildfire: { name: 'Wildfire Spores', text: 'An alien that dies burning gives its burn to every alien beside it', tags: ['burn', 'kill'], pays: ['burn'], effect: 'wildfire' },
   salamander: { name: 'Salamander Sigil', text: `Crits add ${BURN_STACKS} burn stacks to the target`, tags: ['crit', 'burn'], rarity: 'common', effect: 'ignite' },
   lattice: { name: 'Frost Lattice', text: 'Crits add a chill stack to the target', tags: ['crit', 'frost'], rarity: 'common', effect: 'freeze' },
-  shatter: { name: 'Shatterglass Edge', text: `Hits spend the target's chill: +${TUNING.spend.chill} damage a stack to it and every alien beside it`, tags: ['frost'], pays: ['frost'], effect: 'shatter' },
-  thermal: { name: 'Thermal Shock Core', text: `Hits on a target both burning and chilled spend both: +${TUNING.spend.thermal} damage a stack to it and every alien beside it`, tags: ['burn', 'frost'], pays: ['burn', 'frost'], effect: 'thermal' },
-  spotter: { name: 'Spotter Network', text: `Hits on a target with ${TUNING.spend.marks} or more marks spend them: +${TUNING.spend.mark} damage a mark to it and every alien beside it`, tags: ['mark'], pays: ['mark'], effect: 'spotter' },
+  shatter: { name: 'Shatterglass Edge', text: `Hits on a target with ${TUNING.spend.chills} or more chill spend it: +${100 * TUNING.spend.factor}% of the hero's damage a stack, to it and every alien beside it; the target is stunned, a boss weakened`, tags: ['frost'], pays: ['frost'], effect: 'shatter' },
+  thermal: { name: 'Thermal Shock Core', text: `Hits on a target both burning and chilled spend both: +${100 * TUNING.spend.factor}% of the hero's damage a stack, to it and every alien beside it, as much temp HP, and a stun`, tags: ['burn', 'frost'], pays: ['burn', 'frost'], effect: 'thermal' },
+  spotter: { name: 'Spotter Network', text: `Hits on a target with ${TUNING.spend.marks} or more marks spend them: +${100 * TUNING.spend.factor}% of the hero's damage a mark, to it and every alien beside it; the target is weakened`, tags: ['mark'], pays: ['mark'], effect: 'spotter' },
   hunt: { name: 'Eye of the Hunt', text: 'Crits add a mark to the target', tags: ['crit', 'mark'], rarity: 'common', effect: 'exploit' },
   bloodforged: { name: 'Bloodforged Plate', text: `A kill gives the hero 1 armor, up to ${MOMENTUM_MAX}`, tags: ['kill', 'ward'], effect: 'momentum' },
   rite: { name: 'Blood Rite', text: `Each kill gives the hero 1 Might, to at most ${MIGHT_MAX}`, tags: ['kill', 'might'], effect: 'bloodRite' },
   impetus: { name: 'Kinetic Engine', text: "An alien a hero knocks into something or off a ledge takes the hero's damage again", tags: ['force'], pays: ['force'], effect: 'impetus' },
-  catalyst: { name: 'Catalyst Prism', text: 'A crit doubles the burn, chill and marks on its target', tags: ['crit', 'burn', 'frost', 'mark'], pays: ['burn', 'frost', 'mark'], rarity: 'epic', effect: 'catalyst' },
+  catalyst: { name: 'Catalyst Prism', text: `Every ${CATALYST_EVERY}rd hit a hero lands doubles the burn, chill and marks on its target`, tags: ['burn', 'frost', 'mark'], pays: ['burn', 'frost', 'mark'], rarity: 'epic', effect: 'catalyst' },
   chrono: { name: 'Chrono Coil', text: 'Every 3rd turn, the hardest-hitting hero attacks twice over', effect: 'chrono' },
   reservoir: { name: 'Boon Reservoir', text: `Each fight won with no boon adds a charge; at the deploy screen, ${BOON_CHARGES} charges take a second boon in`, boons: true },
   zenith: { name: 'Zenith Chronometer', text: `Every ${ZENITH_EVERY}rd battle, each hero's tier 4 fires twice`, rarity: 'epic', effect: 'zenith' },
   streak: { name: 'Unbroken Line', text: `Every ${STREAK_FIGHTS} fights in a row won with no hero down pay 3 more supplies`, rarity: 'common', streak: 3 },
   fracture: { name: 'Frost Fracture', text: `A frozen alien that dies shatters: ${FRACTURE_DAMAGE} damage for each chill stack on it to every alien beside it`, tags: ['frost', 'kill'], pays: ['frost'], rarity: 'epic', effect: 'fracture' },
-  conductor: { name: 'Cryo Conductor', text: 'Hits on a chilled target chill every alien beside it', tags: ['frost'], pays: ['frost'], effect: 'conductor' },
+  conductor: { name: 'Cryo Conductor', text: 'Hits on a chilled target give half its chill to every alien beside it', tags: ['frost'], pays: ['frost'], effect: 'conductor' },
   kindling: { name: 'Kindling Plates', text: `Whoever hits a hero who has armor left takes ${BURN_STACKS} burn stacks`, tags: ['ward', 'burn'], effect: 'kindling' },
   overkill: { name: 'Overkill Coils', text: 'Damage beyond what a kill needs hits the nearest other alien', tags: ['kill', 'crit'], effect: 'overkill' },
   brittle: { name: 'Brittle Frost', text: 'Hits on a chilled target ignore its armor', tags: ['frost', 'ward'], pays: ['frost'], effect: 'brittle' },
@@ -103,6 +107,16 @@ const relics = {
   relay: { name: 'Relay Booster', text: `The uplink's zone reaches ${RELAY_REACH} tiles farther`, effect: 'relay' },
   flare: { name: 'Signal Flare', text: 'A hero lifts off from farther from the extraction zone', effect: 'flare' },
   bounty: { name: 'Bounty Sigil', text: `Hits on a boss, a Guardian or the Hunter, do +${BOUNTY_DAMAGE} damage`, tags: ['kill'], effect: 'bounty' },
+  eternal: { name: 'Eternal Flame', text: 'Burn never fades: a burning alien keeps its stacks', tags: ['burn'], pays: ['burn'], rarity: 'epic', effect: 'eternal' },
+  frostHeart: { name: 'Permafrost Heart', text: 'Bosses freeze too, and a frozen alien keeps its chill', tags: ['frost'], pays: ['frost'], rarity: 'epic', effect: 'frostHeart' },
+  ledger: { name: 'Dead Eye Ledger', text: 'Payoffs read marks without spending them', tags: ['mark'], pays: ['mark'], rarity: 'epic', effect: 'ledger' },
+  gravity: { name: 'Gravity Lens', text: 'Every shot of a knockback weapon knocks back, not only the first', tags: ['force'], pays: ['force'], rarity: 'epic', effect: 'gravity' },
+  ironclad: { name: 'Ironclad Lattice', text: 'Whatever builds armor builds it twice as high', tags: ['ward'], pays: ['ward'], rarity: 'epic', effect: 'ironclad' },
+  split: { name: 'Split Rounds', text: 'Every attack fires twice the shots, each at half power', tags: ['volley'], pays: ['volley'], rarity: 'epic', effect: 'split' },
+  ram: { name: 'Ram Plating', text: "Every hit does half the hero's armor more", tags: ['ward'], pays: ['ward'], effect: 'ram' },
+  overflow: { name: 'Overflow Capacitor', text: "Healing past full health, or past its cap, becomes armor, up to twice the hero's own", tags: ['ward'], pays: ['ward'], effect: 'overflow' },
+  adrenal: { name: 'Adrenal Pump', text: `Each hero gains 1 Might at the start of each of its turns, to at most ${ADRENAL_MAX} from it`, tags: ['might'], effect: 'adrenal' },
+  hairTrigger: { name: 'Hair Trigger', text: 'A weapon of 2 or more shots fires one more', tags: ['volley'], pays: ['volley'], rarity: 'common', effect: 'hairTrigger' },
 } satisfies Record<string, Relic>
 
 export type RelicId = keyof typeof relics
@@ -122,9 +136,12 @@ export const RELIC_OFFERS = 3
 /** How often each rarity is drawn against the others. */
 const WEIGHT: Record<Rarity, number> = { common: 3, rare: 2, epic: 1 }
 
-/** Takes a relic out of `pool`, the commoner the likelier. */
-export function drawRelic(rng: { rng: number }, pool: RelicId[]): RelicId {
-  const weight = (id: RelicId) => WEIGHT[RELICS[id].rarity ?? 'rare']
+/** How much likelier a relic sharing a keyword with the squad is drawn, so offers follow the build. */
+export const FOCUS = 3
+
+/** Takes a relic out of `pool`, the commoner the likelier, and one sharing a keyword of `held` FOCUS times likelier. */
+export function drawRelic(rng: { rng: number }, pool: RelicId[], held: readonly Keyword[] = []): RelicId {
+  const weight = (id: RelicId) => WEIGHT[RELICS[id].rarity ?? 'rare'] * (RELICS[id].tags?.some((tag) => held.includes(tag)) ? FOCUS : 1)
   let roll = random(rng) * pool.reduce((sum, id) => sum + weight(id), 0)
   const i = Math.max(0, pool.findIndex((id) => (roll -= weight(id)) < 0))
   return pool.splice(i, 1)[0]

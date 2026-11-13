@@ -1,4 +1,5 @@
 // What an event's action comes from. Combat imports it, so it reads only tables that import no combat.
+import { EXAMS } from './exams'
 import type { Ability, Effect, Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { CLASSES } from './classes'
@@ -27,6 +28,7 @@ export const has = <T extends object>(table: T, id: string): id is Extract<keyof
 export function srcOf(effect: Effect | Ability): Src {
   const kind = ((): SrcKind => {
     if (Object.values(CLASSES).some((c) => c.ability === effect) || has(DUOS, effect)) return 'class'
+    if (has(EXAMS, effect) && effect !== 'thorns') return 'alien'
     if (Object.values(WEAPONS).some((w) => w.effect === effect)) return 'weapon'
     if (effect === 'reckoning' || Object.values(DOCTRINES).some((d) => d.effect === effect)) return 'doctrine'
     if ((SKILL_EFFECTS as readonly string[]).includes(effect)) return 'skill'

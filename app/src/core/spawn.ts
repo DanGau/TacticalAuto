@@ -22,7 +22,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, engaged = fa
     // A hive node's charges are the swarmlings left in it.
     charges: alien.kind === 'hiveNode' ? NODE_SPAWNS : 0,
     // A commander blinks to safety once wounded.
-    effects: alien.target ? ['blink'] : [],
+    effects: [...(alien.target ? ['blink' as const] : []), ...(alien.exam ? [alien.exam] : [])],
     spent: [],
     ...FRESH,
     rooted: 0,

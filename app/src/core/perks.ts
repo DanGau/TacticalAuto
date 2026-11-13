@@ -5,7 +5,7 @@ import { random } from './rng'
 import { TUNING } from './tuning'
 
 /** Perk effects combat applies; each is described where it does. */
-export const PERK_EFFECTS = ['heave', 'extraThrow', 'longThrow', 'crushingThrow', 'crashLanding', 'freerunner', 'firemansCarry', 'firstStrike', 'finisher', 'scavenger', 'secondBreath'] as const
+export const PERK_EFFECTS = ['heave', 'extraThrow', 'longThrow', 'crushingThrow', 'crashLanding', 'freerunner', 'firemansCarry', 'firstStrike', 'finisher', 'scavenger', 'secondBreath', 'quickDraw'] as const
 export type PerkEffect = (typeof PERK_EFFECTS)[number]
 
 export interface Perk<Id extends string = PerkId> {
@@ -40,6 +40,7 @@ const perks = {
   padding: { name: 'Padding', text: '+1 armor', stats: { armor: 1 }, needs: 'ironGut' },
   keenEye: { name: 'Keen Eye', text: '+5% crit', stats: { crit: 0.05 } },
   longSight: { name: 'Long Sight', text: '+1 range with a ranged weapon', stats: { range: 1 }, needs: 'keenEye' },
+  quickDraw: { name: 'Quick Draw', text: 'A weapon of 2 or more shots fires one more', effect: 'quickDraw' },
   firstStrike: { name: 'First Strike', text: `+${PERK.firstStrike} damage on its first hit each battle`, effect: 'firstStrike' },
   finisher: { name: 'Finisher', text: `+${PERK.finisher} damage to a target at half HP or less`, effect: 'finisher' },
   scavenger: { name: 'Scavenger', text: `Each kill heals ${PERK.scavenge}, up to ${TUNING.healCap} a battle`, effect: 'scavenger' },

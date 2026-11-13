@@ -182,20 +182,21 @@ export function offerRecruits(run: Run): void {
   }
 }
 
-/** The keywords of everything the squad has: its soldiers' skills and gear, and its relics. */
+/** The keywords of everything the squad has: its soldiers' skills and gear, and its relics, and what its weapons cause. */
 export function squadKeywords(run: Run): Keyword[] {
   const tags = [
     ...run.soldiers.flatMap((s) => [...s.skills.map((id) => SKILLS[id].tags ?? []), (s.gear?.effect && EFFECTS[s.gear.effect].tags) || []]),
     ...run.relics.map((id) => RELICS[id].tags ?? []),
+    squadCauses(run),
   ].flat()
   return [...new Set(tags)]
 }
 
-/** Keywords the squad causes: those of its skills, its gear and relics bar what they only spend, and force for a weapon that knocks back. */
+/** Keywords the squad causes: those of its skills, its gear and relics bar what they only spend, force for a weapon that knocks back, volley for one of many shots. */
 export function squadCauses(run: Run): Keyword[] {
   const own = (source: { tags?: Keyword[]; pays?: Keyword[] }) => (source.tags ?? []).filter((tag) => !source.pays?.includes(tag))
   const tags = [
-    ...run.soldiers.flatMap((s) => [...s.skills.flatMap((id) => SKILLS[id].tags ?? []), ...(s.gear?.effect ? own(EFFECTS[s.gear.effect]) : []), ...(s.gear && WEAPONS[s.gear.weapon].effect === 'thunder' ? ['force' as const] : [])]),
+    ...run.soldiers.flatMap((s) => [...s.skills.flatMap((id) => SKILLS[id].tags ?? []), ...(s.gear?.effect ? own(EFFECTS[s.gear.effect]) : []), ...(s.gear && WEAPONS[s.gear.weapon].effect === 'thunder' ? ['force' as const] : []), ...(s.gear && WEAPONS[s.gear.weapon].attack.shots >= 2 ? ['volley' as const] : [])]),
     ...run.relics.flatMap((id) => own(RELICS[id])),
   ]
   return [...new Set(tags)]

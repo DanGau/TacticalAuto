@@ -1,13 +1,14 @@
 // Gear and relic rewards, the shop, and settling the reward phase.
 import { RARITY_CHANCE, type Rarity } from './base'
 import { BOON_WEIGHT, SHOP_UTILITIES, START_OFFERS, START_PICKS, UTILITIES, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
-import { generateGear, type Gear } from './gear'
+import { EFFECTS, generateGear, type Gear } from './gear'
+import { SKILLS } from './skills'
 import { random, randomInt } from './rng'
-import { drawRelic, offerable, type RelicId } from './relics'
+import { drawRelic, offerable, RELICS, type RelicId } from './relics'
 import { type Run } from './run-state'
 import { type Shop } from './run-state'
 import { type Soldier } from './run-state'
-import { minorOffers, owesPick, skillOffers, squadCauses } from './squad'
+import { minorOffers, owesPick, skillOffers, squadCauses, squadKeywords } from './squad'
 
 /** Learns the offered skill at `index`. */
 export function takeSkill(run: Run, soldier: Soldier, index: number): void {
@@ -42,6 +43,9 @@ export const SHOP_WARES = 4
 
 export const SHOP_RELICS = 4
 
+/** What drilling a hero as the squad's Carry costs. */
+export const DRILL_PRICE = 5
+
 /** Chance a piece of shop gear is epic rather than rare. */
 export const SHOP_EPIC = 0.3
 
@@ -57,10 +61,13 @@ export function stockShop(run: Run): Shop {
   }
   const relics = offerable(run.relics)
   const stocked: RelicId[] = []
-  while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(drawRelic(run, relics))
+  while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(drawRelic(run, relics, squadKeywords(run)))
   const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
   const utilities = Array.from({ length: Math.min(SHOP_UTILITIES, kinds.length) }, () => ({ id: drawUtility(run, kinds), sold: false }))
-  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, medkit: false }
+  // The hero most bent on one keyword: the most of its gear's and skills' keywords the squad's relics share.
+  const bent = (s: Soldier) => [...s.skills.flatMap((id) => SKILLS[id].tags ?? []), ...((s.gear?.effect && EFFECTS[s.gear.effect].tags) || [])].filter((tag) => run.relics.some((id) => RELICS[id].tags?.includes(tag))).length
+  const pupil = run.soldiers.reduce<Soldier | null>((best, s) => (!best || bent(s) > bent(best) ? s : best), null)
+  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, medkit: false, drill: run.carry === null && pupil ? { soldier: pupil.id, sold: false } : null }
 }
 
 /** A new piece of `hero`'s weapon, made for them. */

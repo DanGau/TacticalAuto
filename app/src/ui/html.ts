@@ -1,4 +1,5 @@
 // Shared HTML pieces: buttons, bars, chips, gear cards and descriptions.
+import { EXAMS, type Exam } from "../core/exams";
 import type { Action } from "../core/apply";
 import { EFFECTS, type Gear } from "../core/gear";
 import { WEAPONS, type Kit } from "../core/weapons";
@@ -151,6 +152,10 @@ const keywordChip = (tag: Keyword, held = false) =>
 /** A keyword something shrugs off: its icon struck through, explained on hover. */
 export const resistChip = (tag: Resist) =>
   `<span class="kw ${tag} resist" title="Resists ${KEYWORDS[tag].name}: ${RESISTS[tag]}">${KEYWORDS[tag].icon}</span>`;
+
+/** A Guardian's exam: its icon, explained on hover with what answers it. */
+export const examChip = (exam: Exam) =>
+  `<span class="kw exam" title="${EXAMS[exam].name}: ${EXAMS[exam].text}. Answer: ${EXAMS[exam].answer}">${EXAMS[exam].icon} ${EXAMS[exam].name}</span>`;
 
 /** The words in a description that name a keyword, and which. */
 const KEYWORD_WORDS: [RegExp, Keyword][] = [

@@ -102,19 +102,19 @@ test('a scorching weapon burns its target at the start of the target\'s turns', 
 })
 
 test('a rimed weapon chills its target, and a shatterglass edge and thermal shock core pay off on it', () => {
-  const d = duel({ weapon: 'rifle', rarity: 'rare', name: 'Rimed Steady Carbine', stats: {}, effect: 'frostbite' })
+  const d = duel({ weapon: 'sniper', rarity: 'rare', name: 'Rimed Steady Carbine', stats: {}, effect: 'frostbite' })
   d.soldier.stats = { ...d.soldier.stats, damage: 2, crit: 0 }
-  d.soldier.effects.push('shatter', 'thermal')
   const shots = () => {
     const events = untilAlienShoots(d)
     return events.filter((e) => e.type === 'shot' && e.id === d.soldier.id) as { damage: number }[]
   }
   const [first] = shots()
   expect(first).toMatchObject({ damage: 2 })
+  expect(d.alien.chill).toBeGreaterThan(0)
   Object.assign(d.alien, { chill: 3, frozen: true })
-  expect(spendStacks(d.battle, { ...d.soldier, effects: ['shatter'] }, d.alien, [], [])).toBe(3 * TUNING.spend.chill)
+  expect(spendStacks(d.battle, { ...d.soldier, effects: ['shatter'] }, d.alien, [], [])).toBe(Math.round(3 * 2 * TUNING.spend.factor))
   Object.assign(d.alien, { burn: 2, chill: 1 })
-  expect(spendStacks(d.battle, { ...d.soldier, effects: ['thermal'] }, d.alien, [], [])).toBe(3 * TUNING.spend.thermal)
+  expect(spendStacks(d.battle, { ...d.soldier, effects: ['thermal'] }, d.alien, [], [])).toBe(Math.round(3 * 2 * TUNING.spend.factor))
   expect(d.alien).toMatchObject({ burn: 0, chill: 0 })
 })
 

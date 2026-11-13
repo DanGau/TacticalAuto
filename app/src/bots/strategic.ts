@@ -6,7 +6,7 @@ import { MEDKIT, EVENTS, RELIC_PRICE } from '../core/events'
 import { EFFECTS, type Gear } from '../core/gear'
 import { distance } from '../core/grid'
 import { fuelTanks } from '../core/objects'
-import { GEAR_PRICE } from '../core/rewards'
+import { DRILL_PRICE, GEAR_PRICE } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
 import { SKILLS } from '../core/skills'
@@ -16,6 +16,7 @@ import { BOON_CHARGES, RELICS, type RelicId } from '../core/relics'
 import type { Keyword } from '../core/keywords'
 import { carries, RIG, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS, type EffectId, type UtilityId } from '../core/utilities'
 import type { Bot } from './bots'
+import { EXAMS } from '../core/exams'
 
 /** What to take into a fight no utility held answers, best first. */
 const FALLBACK: EffectId[] = ['overcharge', 'ironSkin', 'mending', 'keen', 'crack', 'rangedShield', 'dampener', 'thrusters', 'meleeShield', 'smoke', 'coldSnap', 'gravity', 'farsight', 'hunted', 'blaze', 'flashbang', 'hover']
@@ -154,8 +155,11 @@ function shop(run: Run): Action {
   const { utilities, relics, wares, medkit } = run.shop!
   const heal = (below: number) => !medkit && MEDKIT.price <= run.supplies && squadHealth(run) < below
   if (heal(0.5)) return { type: 'medkit' }
-  const relic = relics.findIndex((r) => !r.sold && RELIC_PRICE <= run.supplies)
+  const relic = relics.findIndex((r) => !r.sold && RELIC_PRICE <= run.supplies && relicWorth(run, r.id) >= 0)
   if (relic >= 0) return { type: 'buy', index: relic }
+  // A Carry pays once the squad holds a payoff of what it causes.
+  const drill = run.shop!.drill
+  if (drill && !drill.sold && DRILL_PRICE <= run.supplies && run.relics.some((id) => relicWorth(run, id) > 0)) return { type: 'drill' }
   const gaps = unanswered(run)
   const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && gaps.some((c) => carries(id, CHALLENGES[c].answers)) && (run.utilities.length < UTILITY_SLOTS || keep({ ...run, spare: id }).drop !== -1))
   if (answer >= 0) return { type: 'utility', index: answer }
@@ -171,8 +175,8 @@ function shop(run: Run): Action {
 /** What a payoff is worth beside what the squad causes: much with a cause of what it spends, little without; 0 for any other. */
 const paysOff = (run: Run, pays: Keyword[] | undefined) => (pays ? (pays.some((k) => squadCauses(run).includes(k)) ? 3 : -2) : 0)
 
-/** What a relic is worth beside what the squad holds: a payoff pays only beside a cause. */
-const relicWorth = (run: Run, id: RelicId) => paysOff(run, RELICS[id].pays)
+/** What a relic is worth beside what the squad holds: a payoff pays only beside a cause; one that answers the leg's Guardian a little more. */
+const relicWorth = (run: Run, id: RelicId) => paysOff(run, RELICS[id].pays) + (RELICS[id].tags?.some((tag) => EXAMS[run.bosses[run.keys]].answers.includes(tag)) ? 1 : 0)
 
 /** Takes a duo offered, else the first relic, on the same seeds better than choosing by shared keywords; and the skill its hero plans on. */
 function reward(run: Run): Action {

@@ -1,9 +1,11 @@
 // What happens as a side's turn begins: burns, acid, mending, cooldowns, spawns, goals that tick.
+import { REGROWTH } from './exams'
+import { ADRENAL_MAX } from './relics'
 import { alienSrc, fx } from './sources'
 import { REGEN_HEAL, alienStats, ALIENS, NODE_EVERY } from './aliens'
 import { replenish } from './abilities'
 import { type Battle, AURA_REACH, BURN_STACKS, isSoldier, SPAWN_EVERY, type Unit } from './battle'
-import { chrono, kindle, lastingArmor } from './stacks'
+import { armorCap, chrono, empower, kindle, lastingArmor } from './stacks'
 import { CONFLAGRATION_DAMAGE, HELLFIRE_REACH } from './keystones'
 import { stormBlows } from './ultimates'
 import { placeAlien } from './setup'
@@ -16,7 +18,7 @@ import { engageNearest, walkersFighting, has, fireproof, foeHas, onTile, FIRE_TU
 import { HOLD_ROUNDS, WAVE_EVERY } from './goals'
 import { randomInt } from './rng'
 import { tickBoons } from './boons'
-import { wound } from './wound'
+import { mend, wound } from './wound'
 import { talentTurn } from './talents'
 
 /**
@@ -59,7 +61,10 @@ export function upkeep(battle: Battle): GameEvent[] {
       events.push(fx(unit.id, 'glacialArmor', 0))
     }
     talentTurn(battle, unit, events)
-    if (has(unit, 'rearm') && unit.armor < unit.stats.armor) {
+    if (has(unit, 'adrenal') && battle.round < ADRENAL_MAX) empower(unit, 1, 'adrenal', events)
+    if (has(unit, 'rampage')) empower(unit, 1, 'rampage', events)
+    if (has(unit, 'regrowth') && unit.burn === 0) mend(unit, Math.ceil(unit.stats.hp * REGROWTH.turn), 'regrowth', events, Math.round(unit.stats.hp * REGROWTH.most))
+    if (has(unit, 'rearm') && unit.armor < armorCap(unit, unit.stats.armor)) {
       unit.armor++
       events.push(fx(unit.id, 'rearm', 0))
     }
@@ -79,7 +84,7 @@ export function upkeep(battle: Battle): GameEvent[] {
       }
       if (foeHas(battle, unit, 'pyre') && !onTile(battle.fire, unit)) battle.fire.push({ x: unit.x, y: unit.y, turns: FIRE_TURNS })
       const damage = unit.burn + (raging ? CONFLAGRATION_DAMAGE : 0)
-      unit.burn--
+      if (!foeHas(battle, unit, 'eternal')) unit.burn--
       events.push(fx(unit.id, 'incendiary', -damage))
       wound(battle, unit, damage, events)
     }

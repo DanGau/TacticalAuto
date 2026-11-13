@@ -6,7 +6,7 @@ import { holdCaptives } from './setup'
 import { CLASSES } from './classes'
 import { duoHeroes } from './duos'
 import { DOCTRINES, KILL_REWARDS, type Doctrine, type Rule } from './doctrines'
-import { RESISTS, type Resist } from './keywords'
+import { EXAMS, type Exam } from './exams'
 import { RELICS, ZENITH_EVERY, type Relic } from './relics'
 import { SKILLS } from './skills'
 import { PERKS } from './perks'
@@ -384,6 +384,7 @@ export function createRun(seed: number): Run {
     recruits: [],
     route: [],
     bosses: [],
+    carry: null,
     shop: null,
     event: null,
     met: [],
@@ -393,8 +394,8 @@ export function createRun(seed: number): Run {
   offerRecruits(run)
   run.legs = Array.from({ length: KEYS + 1 }, (_, k) => ({ columns: k === KEYS ? [[{ row: Math.floor(MAP_ROWS / 2), next: [], stop: null, town: null, at: null }]] : drawShape(run), path: [] }))
   run.phase = 'recruit'
-  const resists = Object.keys(RESISTS) as Resist[]
-  run.bosses = Array.from({ length: KEYS + 1 }, () => resists[randomInt(run, resists.length)])
+  const exams = Object.keys(EXAMS) as Exam[]
+  run.bosses = Array.from({ length: KEYS + 1 }, () => exams[randomInt(run, exams.length)])
   return run
 }
 
@@ -445,7 +446,7 @@ export function advance(run: Run): void {
     secondary: secondaryOf(s),
     weapon: doctrines.find((d) => d.fights)?.fights ?? s.gear?.weapon,
     stance: doctrines.find((d) => d.stance)?.stance ?? (s.cls === 'support' && run.soldiers.length > 1 ? CLASSES.support.stance : weaponOf(s)?.stance) ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
-    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...s.perks.flatMap((id) => PERKS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])].filter(
+    effects: [...(run.carry === s.id ? ['carry' as const] : []), ...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...s.perks.flatMap((id) => PERKS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])].filter(
       // Zenith Chronometer works every ZENITH_EVERY battles; under Executioner's Oath a kill pays a hero nothing.
       (effect) => (effect !== 'zenith' || (run.log.length + 1) % ZENITH_EVERY === 0) && !(rules.includes('reckoning') && KILL_REWARDS.includes(effect)),
     ),

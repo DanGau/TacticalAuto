@@ -2,9 +2,11 @@
 import { fx } from './sources'
 import { BURN_MAX, BURN_STACKS, CADENCE, CHILL_FREEZE, CHILL_MAX, MARK_MAX, COMBO_MAX, EXPOSED, FAULT, FRACTURE_DAMAGE, HIGH_CRIT, HIGH_LEVELS, MIGHT_MAX, GRID, isSoldier, LINGER_STACKS, type Battle, type Effect, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
+import type { Kit } from './weapons'
 import { fireproof, foeHas, has, nearest } from './fighters'
 import { distance, walks } from './grid'
 import { RECKONING_KILLS } from './doctrines'
+import { CATALYST_EVERY } from './relics'
 import { TUNING } from './tuning'
 import { talentDamage, talentHit, talentKill } from './talents'
 import { wound } from './wound'
@@ -12,6 +14,9 @@ import { wound } from './wound'
 /** Burn stacks a target `unit` sets burning takes on, and chill stacks one it chills. */
 export const burnFrom = (unit: Unit | null) => BURN_STACKS + (unit && has(unit, 'smolder') ? LINGER_STACKS : 0)
 export const chillFrom = (unit: Unit | null) => 1 + (unit && has(unit, 'permafrost') ? LINGER_STACKS : 0)
+
+/** Stacks a hit by `unit` adds: twice as many by the squad's Carry. */
+export const carried = (unit: Unit, stacks: number) => (has(unit, 'carry') ? 2 * stacks : stacks)
 
 /** Adds burn stacks to `target`, to at most BURN_MAX, unless it cannot burn. */
 export function kindle(battle: Battle, target: Unit, stacks: number): void {
@@ -22,7 +27,7 @@ export function kindle(battle: Battle, target: Unit, stacks: number): void {
 export function chillUnit(_battle: Battle, target: Unit, stacks: number, events: GameEvent[]): void {
   if (target.hp <= 0 || target.resists.includes('frost')) return
   target.chill = Math.min(CHILL_MAX, target.chill + stacks)
-  if (target.boss || target.chill < CHILL_FREEZE || target.frozen) return
+  if ((target.boss && !foeHas(_battle, target, 'frostHeart')) || target.chill < CHILL_FREEZE || target.frozen) return
   target.frozen = true
   target.panicked = true
   events.push(fx(target.id, 'frozen', 0))
@@ -34,35 +39,55 @@ export function markUnit(target: Unit, stacks: number): void {
 }
 
 /**
- * Damage the payoffs add by spending `enemy`'s stacks, which they clear: a hit at TUNING.spend.burns burn or more the burn (Accelerant),
- * a hit the chill (Shatterglass), one at TUNING.spend.marks marks or more the marks (Spotter); then a hit on one both
- * burning and chilled spends what is left of both (Thermal Shock). What is spent bursts on every alien beside the target as well.
+ * Damage the payoffs add by spending `enemy`'s stacks, which they clear: each stack spent is TUNING.spend.factor of the hero's
+ * damage, so stacks multiply it. Accelerant Gel spends burn at TUNING.spend.burns or more and gives the hero that
+ * much temp HP; Shatterglass Edge spends chill at TUNING.spend.chills or more and stuns; Spotter Network spends marks at TUNING.spend.marks or more and weakens;
+ * Thermal Shock Core spends what burn and chill are left on one with both, and does both. What is spent bursts on every alien
+ * beside the target too. Dead Eye Ledger leaves marks on.
  */
 export function spendStacks(battle: Battle, unit: Unit, enemy: Unit, used: Effect[], events: GameEvent[]): number {
   let more = 0
-  const spend = (effect: Effect, applies: boolean, stacks: number, worth: number, clear: () => void) => {
+  const each = unit.stats.damage * TUNING.spend.factor
+  const spend = (effect: Effect, applies: boolean, stacks: number, clear: () => void, rider: (stacks: number) => void) => {
     if (!applies || stacks <= 0 || !has(unit, effect)) return
     used.push(effect)
-    more += stacks * worth
+    const worth = Math.round(stacks * each)
+    more += worth
     clear()
+    rider(stacks)
     for (const other of battle.units.filter((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && distance(u, enemy) <= 1)) {
-      events.push(fx(other.id, effect, -stacks * worth))
-      wound(battle, other, stacks * worth, events)
+      events.push(fx(other.id, effect, -worth))
+      wound(battle, other, worth, events)
     }
   }
-  spend('accelerant', enemy.burn >= TUNING.spend.burns, enemy.burn, TUNING.spend.burn, () => (enemy.burn = 0))
-  spend('shatter', true, enemy.chill, TUNING.spend.chill, () => (enemy.chill = 0))
-  spend('spotter', enemy.mark >= TUNING.spend.marks, enemy.mark, TUNING.spend.mark, () => (enemy.mark = 0))
-  spend('thermal', enemy.burn > 0 && enemy.chill > 0, enemy.burn + enemy.chill, TUNING.spend.thermal, () => Object.assign(enemy, { burn: 0, chill: 0 }))
+  const shield = (stacks: number) => {
+    unit.temp = Math.min(unit.stats.hp, (unit.temp ?? 0) + stacks)
+  }
+  const stun = () => {
+    if (enemy.boss) enemy.suppressed = Math.max(enemy.suppressed, WEAKEN_TURNS)
+    else enemy.panicked = true
+  }
+  const weaken = () => (enemy.suppressed = Math.max(enemy.suppressed, WEAKEN_TURNS))
+  spend('accelerant', enemy.burn >= TUNING.spend.burns, enemy.burn, () => (enemy.burn = 0), shield)
+  spend('shatter', enemy.chill >= TUNING.spend.chills, enemy.chill, () => (enemy.chill = 0), stun)
+  const ledger = has(unit, 'ledger')
+  spend('spotter', enemy.mark >= TUNING.spend.marks, enemy.mark, () => (enemy.mark = ledger ? enemy.mark : 0), weaken)
+  spend('thermal', enemy.burn > 0 && enemy.chill > 0, enemy.burn + enemy.chill, () => Object.assign(enemy, { burn: 0, chill: 0 }), (stacks) => (shield(stacks), stun()))
   return more
 }
 
+/** Turns a weakened unit does SUPPRESS_DAMAGE less. */
+export const WEAKEN_TURNS = 2
+
 /** A frozen unit's lost action: it thaws with no chill left. */
-export function thaw(unit: Unit): void {
+export function thaw(battle: Battle, unit: Unit): void {
   if (!unit.frozen) return
   unit.frozen = false
-  unit.chill = 0
+  if (!foeHas(battle, unit, 'frostHeart')) unit.chill = 0
 }
+
+/** The most armor `unit` builds to by a source that stops at `cap`: twice that with Ironclad Lattice. */
+export const armorCap = (unit: Unit, cap: number) => (has(unit, 'ironclad') ? 2 * cap : cap)
 
 /** Gives `unit` Might, to at most MIGHT_MAX, saying what gave it. */
 export function empower(unit: Unit, amount: number, effect: Effect, events: GameEvent[]): void {
@@ -108,7 +133,9 @@ export function stackDamage(battle: Battle, unit: Unit, enemy: Unit, used: Effec
   if (slam > 0) used.push('shieldSlam')
   if (grip > 0) used.push('rimeGrip')
   if (opportune > 0) used.push('opportunist')
-  return unit.might + combo + slam + grip + opportune + talentDamage(battle, unit, enemy, used, events)
+  const ram = has(unit, 'ram') ? Math.floor(unit.armor / 2) : 0
+  if (ram > 0) used.push('ram')
+  return unit.might + combo + slam + grip + opportune + ram + talentDamage(battle, unit, enemy, used, events)
 }
 
 /** A hit on an exposed target does half again; the every-Nth hit of Cadenced gear twice. */
@@ -128,7 +155,7 @@ export function struck(battle: Battle, unit: Unit, enemy: Unit, crit: boolean, e
   talentHit(battle, unit, enemy, crit, events)
   if (unit.comboOn === enemy.id) unit.combo++
   else Object.assign(unit, { comboOn: enemy.id, combo: 1 })
-  if (crit && enemy.hp > 0 && has(unit, 'catalyst') && enemy.burn + enemy.chill + enemy.mark > 0) {
+  if (unit.hits % CATALYST_EVERY === 0 && enemy.hp > 0 && has(unit, 'catalyst') && enemy.burn + enemy.chill + enemy.mark > 0) {
     kindle(battle, enemy, enemy.burn)
     events.push(fx(enemy.id, 'catalyst', 0))
     chillUnit(battle, enemy, enemy.chill, events)
@@ -136,8 +163,8 @@ export function struck(battle: Battle, unit: Unit, enemy: Unit, crit: boolean, e
   }
   const beside = battle.units.filter((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && distance(u, enemy) <= 1)
   for (const [effect, applies, add] of [
-    ['bellows', enemy.burn > 0, (u: Unit) => kindle(battle, u, 1)],
-    ['conductor', enemy.chill > 0, (u: Unit) => chillUnit(battle, u, 1, events)],
+    ['bellows', enemy.burn > 0, (u: Unit) => kindle(battle, u, Math.ceil(enemy.burn / 2))],
+    ['conductor', enemy.chill > 0, (u: Unit) => chillUnit(battle, u, Math.ceil(enemy.chill / 2), events)],
   ] as const) {
     if (!applies || !has(unit, effect)) continue
     for (const other of beside) {
@@ -199,4 +226,10 @@ export function died(battle: Battle, target: Unit, killer: Unit | null, events: 
 /** Lasting Guard: armor whole again each own turn, and half of what was left unused carries on top, to at most double. */
 export function lastingArmor(unit: Unit): void {
   if (has(unit, 'lasting') && unit.stats.armor > 0) unit.armor = Math.min(2 * unit.stats.armor, unit.stats.armor + Math.floor(unit.armor / 2))
+}
+
+/** A kit as the unit fires it: Hair Trigger, Quick Draw and Twinned gear each add a shot to one of two or more; Split Rounds doubles the shots at half power. */
+export function volley(unit: Unit, kit: Kit): Kit {
+  const shots = kit.shots + (kit.shots >= 2 ? (['hairTrigger', 'quickDraw', 'twinned'] as const).filter((effect) => has(unit, effect)).length : 0)
+  return has(unit, 'split') ? { ...kit, shots: shots * 2, power: kit.power / 2 } : { ...kit, shots }
 }

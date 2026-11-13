@@ -17,7 +17,7 @@ import type { DuoId } from './duos'
 import type { Battle } from './battle'
 import type { DoctrineId } from './doctrines'
 import type { EventId } from './events'
-import type { Resist } from './keywords'
+import type { Exam } from './exams'
 
 export type Risk = 'safe' | 'standard' | 'dangerous'
 
@@ -162,6 +162,8 @@ export interface Shop {
   relics: { id: RelicId; sold: boolean }[]
   utilities: { id: UtilityId; sold: boolean }[]
   medkit: boolean
+  /** The hero the shop offers to drill as the squad's Carry, by id, while the squad has none. */
+  drill: { soldier: number; sold: boolean } | null
 }
 
 export interface Run {
@@ -226,8 +228,10 @@ export interface Run {
   recruits: Soldier[]
   /** The journey across the globe, a stage for each leg; set once the first soldier is chosen, from its home. */
   route: Stage[]
-  /** What each leg's boss resists, by keys won; known from the start so the squad can build to beat it. */
-  bosses: Resist[]
+  /** Each leg's Guardian's exam, by keys won; known from the start so the squad can build to pass it. */
+  bosses: Exam[]
+  /** The squad's Carry, by id: its hits add twice the stacks. Drilled once a run, at a shop. */
+  carry: number | null
   /** Soldiers the aliens hold, by id: left downed on a field. The next stop is a recovery until they are back. */
   captives: number[]
 }
