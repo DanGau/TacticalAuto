@@ -4,6 +4,7 @@ import { DOCTRINES } from '../core/doctrines'
 import type { Tally } from '../core/feats'
 import { GOALS } from '../core/goals'
 import { RELICS } from '../core/relics'
+import { relicIcon } from './relic-icons'
 import type { Fought, Run } from '../core/run-state'
 import { SKILLS } from '../core/skills'
 import { level, MAX_SQUAD } from '../core/squad'
@@ -90,7 +91,7 @@ export function runSummary(run: Run): string {
     <h1 class="${won ? 'down' : 'up'}">${ended}</h1>${cause}
     <button id="again" class="decide">New run</button>
     <section><h3>Heroes</h3><div class="endheroes">${heroes.join('')}</div></section>
-    ${list('Relics', run.relics.map((id) => RELICS[id].name))}
+    ${list('Relics', run.relics.map((id) => `${relicIcon(id)} ${RELICS[id].name}`))}
     ${list('Oaths', run.doctrines.map((id) => DOCTRINES[id].name))}
     ${list('Boons', run.utilities.map((id) => `${UTILITIES[id].icon} ${UTILITIES[id].name}`))}
     <section><h3>Run totals · ${run.log.length} battles, ${run.log.filter((f) => f.won).length} won</h3>${charts(runRows(run), colour)}</section>

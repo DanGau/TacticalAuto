@@ -18,6 +18,7 @@ import { button, STOP_NAMES } from './html'
 import { fuelTanks } from '../core/objects'
 import { carries, UTILITIES } from '../core/utilities'
 import { BOON_CHARGES } from '../core/relics'
+import { relicIcon } from './relic-icons'
 import { RECKONING_KILLS } from '../core/doctrines'
 import { pickCard, pickDetail, utilityPick, type Pick } from './cards'
 import { alienBlock } from './sheet'
@@ -64,7 +65,7 @@ function drop(run: Run, battle: Battle, armed: string | null, rigging: number | 
   const challenge = battle.challenge && CHALLENGES[battle.challenge]
   const go = (detail: string, picks: Pick[], idle: string) => `<p>${detail}</p><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, idle)}`
   const charged = run.relics.includes('reservoir') && run.boons >= BOON_CHARGES && run.utilities.filter((id) => id !== 'tank').length >= 2
-  const reservoir = run.relics.includes('reservoir') ? `<p class="reservoir">🔋 Boon Reservoir: ${run.boons} charge${run.boons === 1 ? '' : 's'}${charged ? `; ${BOON_CHARGES} take a second boon in` : `; go in with no boon to charge it`}.</p>` : ''
+  const reservoir = run.relics.includes('reservoir') ? `<p class="reservoir">${relicIcon('reservoir')} Boon Reservoir: ${run.boons} charge${run.boons === 1 ? '' : 's'}${charged ? `; ${BOON_CHARGES} take a second boon in` : `; go in with no boon to charge it`}.</p>` : ''
   const second = (i: number): Pick[] => [
     { key: 'one', action: { type: 'enter', utility: i }, look: 'utility', body: `<small>keep charges</small><b>${UTILITIES[run.utilities[i]].icon} Just one</b>`, detail: '', go: `Tap again to go in with ${UTILITIES[run.utilities[i]].name} alone` },
     ...run.utilities.flatMap((id, j): Pick[] => (j === i || id === 'tank' ? [] : [utilityPick(`s${j}`, { type: 'enter', utility: i, second: j }, id, `+${BOON_CHARGES} charges`, `Tap again to go in with ${UTILITIES[run.utilities[i]].name} and ${UTILITIES[id].name}`)])),

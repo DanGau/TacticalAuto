@@ -4,6 +4,7 @@ import { emptyTally, FEATS } from '../core/feats'
 import type { Keyword } from '../core/keywords'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
+import { relicIcon } from './relic-icons'
 import { DUOS } from '../core/duos'
 import { boonText, UTILITIES } from '../core/utilities'
 import { type Gain, type Run } from '../core/run-state'
@@ -59,7 +60,7 @@ export function joined(run: Run, name: string): string {
 /** What the squad gained or lost unchosen, alone in a pop-up: what it is, what it does, and a button to go on. */
 export function acquired(run: Run, gain: Gain): string {
   const shown = (top: string, look: string, name: string, text: string) => `<small class="up-top">${top}</small><div class="prize gear ${look}"><b>${name}</b><br>${text}</div>`
-  const relicBody = (top: string, look: string, id: RelicId, held: Keyword[] = []) => shown(top, look, RELICS[id].name, describe(RELICS[id].text, RELICS[id].tags, held))
+  const relicBody = (top: string, look: string, id: RelicId, held: Keyword[] = []) => shown(top, look, `${relicIcon(id)} ${RELICS[id].name}`, describe(RELICS[id].text, RELICS[id].tags, held))
   const heroBody = (id: number) => {
     const hero = run.soldiers.find((s) => s.id === id)!
     return shown('Hero joined', hero.gear?.rarity ?? '', `${badge(hero.cls)} ${hero.name}`, heroSheet(run, hero))
@@ -117,14 +118,25 @@ export function spareChoice(run: Run, armed: string | null): string {
   return modal(`<h2>${spare.icon} ${spare.name}: ${spare.text}. The party holds three: drop which?</h2><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a card for its details; tap it again to choose it.')}`)
 }
 
+/** The relics offered, and a duo if one is, as cards with their icons: one tapped is armed, then Take carries it. */
+function relicChoice(run: Run, duo: (typeof DUOS)[keyof typeof DUOS] | null, armed: string | null): string {
+  const held = squadKeywords(run)
+  const card = (key: string, icon: string, top: string, name: string, text: string, look: string) =>
+    `<button class="side ${look}${armed === key ? ' keep' : ''}" role="radio" aria-checked="${armed === key}" data-arm="${key}"><span class="art">${icon}</span><small class="tier">${top}</small><b>${name}</b><span>${text}</span></button>`
+  const relics = run.relicOffers.map((id, i) => card(`r${i}`, relicIcon(id), `${RELICS[id].rarity ?? 'rare'} relic`, RELICS[id].name, describe(RELICS[id].text, RELICS[id].tags, held), `relic ${RELICS[id].rarity ?? 'rare'}`))
+  const pair = duo?.pair.map((cls) => CLASSES[cls].name)
+  const bond = duo ? [card('duo', '<span class="glyph">✦</span>', `duo · ${pair!.join(' + ')}`, duo.name, describe(duo.text, [], held), 'duo')] : []
+  const pick = armed === 'duo' && duo ? { type: 'duo' as const } : armed?.match(/^r\d$/) ? { type: 'relic' as const, index: Number(armed.slice(1)) } : null
+  return `<div class="gearswap relics"><h1>Alien artifacts</h1><h2>Carry one for the run${pair ? `, or ${pair.join(' and ')} train as a duo` : ''}</h2>
+    <div class="swap" style="--n:${relics.length + bond.length}">${[...relics, ...bond].join('')}</div>
+    <button class="decide confirm"${pick ? ` data-action='${JSON.stringify(pick)}'` : ' disabled'}>${pick ? 'Take it' : 'Pick one'}</button></div>`
+}
+
 /** The next choice of the reward phase, alone on its screen: the starting boons, a relic, then each find and who takes it, then each skill and perk owed. */
 export function choice(run: Run, armed: string | null = null): string {
   if (run.boonOffers.length > 0) return startChoice(run, armed)
-  const held = squadKeywords(run)
-  const relic = (id: RelicId, index: number) => button({ type: 'relic', index }, `<small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags, held)}`, 'card relic')
   const duo = run.duoOffer && DUOS[run.duoOffer]
-  const bond = duo ? button({ type: 'duo' }, `<small>duo · ${duo.pair.map((cls) => CLASSES[cls].name).join(' + ')}</small><br><b>✦ ${duo.name}</b><br>${describe(duo.text, [], held)}`, 'card duo') : ''
-  if (run.relicOffers.length > 0 || duo) return `<h2>Alien artifacts lie in the wreckage. The party can carry one, and keeps it for the run${duo ? `, or ${duo.pair.map((cls) => CLASSES[cls].name).join(' and ')} can train as a duo in its place` : ''}.</h2><div class="choices">${run.relicOffers.map(relic).join('')}${bond}</div>`
+  if (run.relicOffers.length > 0 || duo) return relicChoice(run, duo || null, armed)
   if (run.finds.length > 0) {
     const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
     return findSwap(run, 0, armed, more)

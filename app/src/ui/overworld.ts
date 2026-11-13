@@ -4,6 +4,7 @@ import { GOALS } from '../core/goals'
 import { DOCTRINES } from '../core/doctrines'
 import { MEDKIT, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
+import { relicIcon } from './relic-icons'
 import { boonText, carries, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
 import { current, legOf, KEYS, ways, nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
@@ -182,7 +183,7 @@ function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
     const price = GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
     return { key: `g${index}`, attrs: `data-ware="${index}"`, look: `gear ${gear.rarity}`, body: card(gear.rarity, gearName(gear), `${price} supplies`, sold), detail: `<p><b>${gear.name}</b>. ${describeGear(gear, held)}</p>`, go: `Tap again to choose who takes it, for ${price} supplies`, block: poor(price), spent: sold }
   })
-  const relics = shop.relics.map(({ id, sold }, index): Pick => ({ key: `r${index}`, action: { type: 'buy', index }, look: 'relic', body: card('relic', RELICS[id].name, `${RELIC_PRICE} supplies`, sold), detail: `<p><b>${RELICS[id].name}.</b> ${describe(RELICS[id].text, RELICS[id].tags, held)}</p>`, go: `Tap again to buy for ${RELIC_PRICE} supplies`, block: poor(RELIC_PRICE), spent: sold }))
+  const relics = shop.relics.map(({ id, sold }, index): Pick => ({ key: `r${index}`, action: { type: 'buy', index }, look: 'relic', body: card('relic', `${relicIcon(id)} ${RELICS[id].name}`, `${RELIC_PRICE} supplies`, sold), detail: `<p><b>${RELICS[id].name}.</b> ${describe(RELICS[id].text, RELICS[id].tags, held)}</p>`, go: `Tap again to buy for ${RELIC_PRICE} supplies`, block: poor(RELIC_PRICE), spent: sold }))
   const utilities = shop.utilities.map(({ id, sold }, index): Pick =>
     utilityPick(`u${index}`, { type: 'utility', index }, id, 'boon', `Tap again to buy for ${UTILITY_PRICE} supplies${run.utilities.length >= UTILITY_SLOTS ? ', dropping one' : ''}`, {
       body: card('boon', `${UTILITIES[id].icon} ${UTILITIES[id].name}`, `${UTILITY_PRICE} supplies`, sold),
@@ -235,7 +236,7 @@ function mapView(run: Run, picked: number | null, armed: string | null, ware: nu
 }
 
 function baseView(run: Run): string {
-  const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags)}</div>`)
+  const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${relicIcon(id)} ${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags)}</div>`)
   const doctrines = run.doctrines.map((id) => `<div class="gear doctrine"><small>oath</small><br><b>${DOCTRINES[id].name}</b><br>${DOCTRINES[id].text}</div>`)
   const utilities = run.utilities.map((id) => `<div class="gear"><small>boon</small><br><b>${UTILITIES[id].icon} ${UTILITIES[id].name}</b><br>${boonText(id)}</div>`)
   const held = squadKeywords(run)

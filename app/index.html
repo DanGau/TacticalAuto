@@ -346,7 +346,19 @@
       button.pick.utility { border-color: #6fc3d0; }
       button.pick.utility.rare, .boons .side.rare { border-color: #4da3ff; }
       button.pick.utility.epic, .boons .side.epic { border-color: #c77dff; }
-      .boons .swap { width: min(900px, 100%); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .ricon { width: 1.15em; height: 1.15em; vertical-align: -0.2em; color: #ffd84d; }
+    .gearswap.relics .swap { width: min(900px, 100%); grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+    .gearswap.relics .side { position: relative; align-items: center; text-align: center; border-color: #ffd84d80; }
+    .gearswap.relics .side.epic { border-color: #c77dff; } .gearswap.relics .side.common { border-color: #9aa6bd; }
+    .gearswap.relics .side.duo { border-color: #6fc3d0; }
+    .gearswap.relics .side .tier { text-transform: capitalize; color: #9aa6bd; }
+    .gearswap.relics .side .art { display: grid; place-items: center; width: 84px; height: 84px; margin: 2px 0 6px; border-radius: 50%; background: radial-gradient(circle, #ffd84d22, transparent 70%); }
+    .gearswap.relics .side .art .ricon { width: 64px; height: 64px; filter: drop-shadow(0 0 6px #ffd84d66); }
+    .gearswap.relics .side .art .glyph { font-size: 48px; color: #6fc3d0; }
+    .gearswap.relics .side.keep { border-color: #6fe08c; }
+    @media (max-width: 600px) { .gearswap.relics .swap { grid-template-columns: 1fr; } .gearswap.relics .side { display: grid; grid-template-columns: 56px 1fr; column-gap: 12px; align-items: center; text-align: left; } .gearswap.relics .side .art { grid-row: span 3; width: 56px; height: 56px; margin: 0; } .gearswap.relics .side .art .ricon { width: 44px; height: 44px; } }
+    @media (max-height: 520px) { .gearswap.relics .side .art { width: 48px; height: 48px; margin: 0; } .gearswap.relics .side .art .ricon { width: 38px; height: 38px; } .gearswap.relics .side .art .glyph { font-size: 30px; } .gearswap.relics .side { font-size: 12px; } }
+    .boons .swap { width: min(900px, 100%); grid-template-columns: repeat(3, minmax(0, 1fr)); }
       @media (max-width: 600px) { .boons .swap { grid-template-columns: 1fr; } }
       button.pick.blocked .price { color: #ff6b6b; }
       @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 #5aa9ff99; } 50% { box-shadow: 0 0 0 5px #5aa9ff00; } }

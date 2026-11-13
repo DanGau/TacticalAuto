@@ -5,6 +5,7 @@ import { CLASSES } from '../core/classes'
 import { DOCTRINES } from '../core/doctrines'
 import { EFFECTS } from '../core/gear'
 import { RELICS } from '../core/relics'
+import { relicIcon } from './relic-icons'
 import type { Run, Soldier } from '../core/run-state'
 import { SECONDARIES } from '../core/secondaries'
 import { BASICS, type SrcKind } from '../core/sources'
@@ -33,7 +34,7 @@ export function kitOf(run: Run, hero: Soldier, battle: Battle | null): [SrcKind,
     ['skill', hero.skills.filter((id) => !SKILLS[id].teaches).map((id) => SKILLS[id])],
     ['weapon', weapon ? [{ name: weapon.name, text: weapon.special ?? '' }] : []],
     ['gear', hero.gear?.effect ? [{ name: EFFECTS[hero.gear.effect].prefix, text: EFFECTS[hero.gear.effect].text }] : []],
-    ['relic', run.relics.map((id) => RELICS[id])],
+    ['relic', run.relics.map((id) => ({ name: `${relicIcon(id)} ${RELICS[id].name}`, text: RELICS[id].text }))],
     ['doctrine', run.doctrines.map((id) => DOCTRINES[id])],
     ['boon', (battle?.boons ?? []).filter((b) => b.until > battle!.round).map((b) => UTILITIES[b.id])],
   ]
