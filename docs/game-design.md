@@ -14,6 +14,8 @@ Theme: superheroes on D&D-style rules; see [premise](premise.md). Test every new
 10. **Heroes, not hiders.** The party never sneaks: every turn is a full turn, and heroes march on the fight from the first. Heroes dash where the fight needs them rather than crawl: a hero with no shot dashes on to one. The turn dial shows whose turn it is. [7] [8]
 11. **Cut to the fight.** No walk to find the aliens: the game cuts to the heroes landing at the fight, and the fight is plainly one of two flows by mission and map: a push, heroes knocking down clusters one at a time, or a flood, heroes holding their ground as clumps pour in. The way in shows with every alien but burrowers in sight. [3] [8]
 
+How builds scale, and the bosses that test them: [archetypes](archetypes.md).
+
 ## Events
 
 A draft event ships only if it passes every gate:
