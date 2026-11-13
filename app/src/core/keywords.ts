@@ -1,6 +1,6 @@
 // Keywords builds share, and the resists aliens have.
 import { TUNING } from './tuning'
-import { BURN_MAX, CHILL_FREEZE } from './battle'
+import { BURN_MAX, CHILL_FREEZE, CHILL_MAX, MARK_MAX } from './battle'
 
 /**
  * Words that tie skills, gear and relics together: some cause a keyword, others pay off on it, so a party built
@@ -10,8 +10,8 @@ export type Keyword = 'burn' | 'frost' | 'mark' | 'crit' | 'kill' | 'ward' | 'mi
 
 export const KEYWORDS: Record<Keyword, { name: string; icon: string; text: string }> = {
   burn: { name: 'Burn', icon: '🔥', text: `Burn stacks: at the start of each of its turns a unit takes its stacks in damage, then loses one; at most ${BURN_MAX}` },
-  frost: { name: 'Frost', icon: '❄️', text: `Chill stacks: a chilled unit has -2 move and does 1 less damage, and loses a stack each turn; at ${CHILL_FREEZE} it freezes, losing its next action` },
-  mark: { name: 'Mark', icon: '🎯', text: `Every hit on a marked unit does ${TUNING.markDamage} more damage` },
+  frost: { name: 'Frost', icon: '❄️', text: `Chill stacks: a chilled unit has -2 move and does 1 less damage, and loses a stack each turn; at ${CHILL_FREEZE} it freezes, losing its next action, bar a boss; at most ${CHILL_MAX}` },
+  mark: { name: 'Mark', icon: '🎯', text: `Mark stacks: every hit on a marked unit does ${TUNING.markDamage} more damage; at most ${MARK_MAX}` },
   crit: { name: 'Crit', icon: '💥', text: 'A crit does 2 more damage' },
   kill: { name: 'Kill', icon: '💀', text: 'Pays off when the hero kills' },
   ward: { name: 'Ward', icon: '🛡️', text: 'Armor: temporary HP that takes damage first and is whole again each fight' },

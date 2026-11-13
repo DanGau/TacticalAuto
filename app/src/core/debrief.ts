@@ -9,7 +9,7 @@ import { random, randomInt } from './rng'
 import { openDuos } from './duos'
 import { drawStops, passStop } from './run'
 import { type Run } from './run-state'
-import { earn, soldierStats, join, MAX_SQUAD, squadKeywords } from './squad'
+import { earn, soldierStats, join, MAX_SQUAD, squadCauses, squadKeywords } from './squad'
 
 /** Chance an ambush or a key mission won turns up a utility. */
 const AMBUSH_BOON = 0.06
@@ -91,13 +91,18 @@ export function endBattle(run: Run): void {
   settle(run)
 }
 
-/** Offers RELIC_OFFERS relics, the first building on a keyword the squad has when one can; those turned down come back only once every other is spent. */
+/**
+ * Offers RELIC_OFFERS relics, the first a payoff of a keyword the squad causes when one can, else one building on a keyword it has;
+ * those turned down come back only once every other is spent.
+ */
 export function offerRelics(run: Run): void {
   const all = offerable(run.relics)
   const unpassed = all.filter((id) => !run.passed.relics.includes(id))
   const pool = unpassed.length > 0 ? unpassed : all
+  const causes = squadCauses(run)
   const held = squadKeywords(run)
-  const fits = pool.filter((id) => RELICS[id].tags?.some((tag) => held.includes(tag)))
+  const payoffs = pool.filter((id) => RELICS[id].pays?.some((tag) => causes.includes(tag)))
+  const fits = payoffs.length > 0 ? payoffs : pool.filter((id) => RELICS[id].tags?.some((tag) => held.includes(tag)))
   if (fits.length > 0) run.relicOffers.push(...pool.splice(pool.indexOf(fits[randomInt(run, fits.length)]), 1))
   while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(drawRelic(run, pool))
 }

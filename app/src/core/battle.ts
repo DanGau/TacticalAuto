@@ -45,6 +45,9 @@ export const BURN_STACKS = 2
 export const BURN_MAX = 6
 /** Chill stacks freeze a unit at CHILL_FREEZE: it loses its next action, then thaws with none. */
 export const CHILL_FREEZE = 3
+/** The most mark and chill stacks a unit holds. */
+export const MARK_MAX = 6
+export const CHILL_MAX = 6
 /** The most Might a unit holds, the most a combo adds, and what makes a hit exposed or every-Nth. */
 export const MIGHT_MAX = 8
 export const COMBO_MAX = 4
@@ -60,7 +63,6 @@ export const HIGH_LEVELS = 4
 export const CHILL_TURNS = 2
 export const CHILL_MOVE = 2
 export const CHILL_DAMAGE = 1
-export const SPOTTER_DAMAGE = 1
 /** Damage the executioner effect adds against a target at half health or less. */
 export const EXECUTE_BONUS = 2
 /** Damage a burster's explosion does within BLAST_RADIUS. */
@@ -156,11 +158,11 @@ export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, crit: 0.1, 
 export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' | 'napalm' | 'cryo' | 'cloak'
 
 /** Something a piece of gear does; gear.ts says what each does. */
-export type GearEffect = 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'snare' | 'booming' | 'tether' | 'shove' | 'cadence' | 'lofty' | 'topple' | 'kiln' | 'quench'
+export type GearEffect = 'bellows' | 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'snare' | 'booming' | 'tether' | 'shove' | 'cadence' | 'lofty' | 'topple' | 'kiln' | 'quench'
 /** Something a skill does; skills.ts says what each does. */
 export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'stasis' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'zenith' | 'embers' | 'fracture'
+export type RelicEffect = 'domino' | 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'zenith' | 'fracture'
 /** Anything a unit's gear, skills, the squad's relics or duos or its weapon doctrine do. Combat applies them. */
 export type Effect = GearEffect | SkillEffect | PerkEffect | RelicEffect | DoctrineEffect | DuoId | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning'
 
@@ -195,7 +197,7 @@ export interface Reserve {
 }
 
 /** What every unit starts a battle with: no stacks, no counts. */
-export const FRESH = { burn: 0, chill: 0, frozen: false, might: 0, combo: 0, comboOn: 0, exposed: 0, hits: 0 }
+export const FRESH = { burn: 0, chill: 0, mark: 0, frozen: false, might: 0, combo: 0, comboOn: 0, exposed: 0, hits: 0 }
 
 export interface Unit {
   id: number
@@ -275,8 +277,8 @@ export interface Unit {
   guarded?: ('any' | 'near' | 'far')[]
   /** Own turns for which its attacks do SUPPRESS_DAMAGE less. */
   suppressed: number
-  /** Whether every hit on it does TUNING.markDamage more damage. */
-  marked: boolean
+  /** Mark stacks: while any, every hit on it does TUNING.markDamage more damage. At most MARK_MAX. */
+  mark: number
   /** Alien turns until the unit's recurring ability is ready: a psion's panic, a spawner's spawn. */
   cooldown: number
   /** What a soldier with no shot does this turn in place of attacking, until its next turn; null otherwise. */
@@ -289,6 +291,8 @@ export interface Unit {
   storm?: number
   /** Grown to giant size, by a tier 4. */
   giant?: boolean
+  /** Health healed this battle by each capped source; see mend. */
+  healed?: Partial<Record<Effect, number>>
 }
 
 /**

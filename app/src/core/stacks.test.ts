@@ -2,9 +2,11 @@ import { expect, test } from 'vitest'
 import { arena } from './arena'
 import { apply } from './apply'
 import { bots } from '../bots/bots'
-import { BURN_MAX, CADENCE, CHILL_FREEZE, COMBO_MAX, EXPOSED, FAULT, FRACTURE_DAMAGE, FRESH, GRID, HIGH_CRIT, isSoldier, MIGHT_MAX } from './battle'
+import { BURN_MAX, CADENCE, CHILL_FREEZE, CHILL_MAX, COMBO_MAX, EXPOSED, FAULT, FRACTURE_DAMAGE, FRESH, GRID, HIGH_CRIT, isSoldier, MIGHT_MAX } from './battle'
 import { endBattle } from './debrief'
-import { fall, knockback } from './knockback'
+import { knockback, knocksInto } from './knockback'
+import { mend, SLAM_DAMAGE } from './wound'
+import { TUNING } from './tuning'
 import { BOON_CHARGES, STREAK_FIGHTS } from './relics'
 import { gainRelic } from './rewards'
 import { begun } from './roads'
@@ -56,17 +58,17 @@ test('burn stacks: each source adds, to at most BURN_MAX; a burning alien takes 
   expect(aliens[0]).toMatchObject({ hp: 40 - BURN_MAX, burn: BURN_MAX - 1 })
 })
 
-test('chill stacks: at CHILL_FREEZE an alien freezes; a boss stays a stack short; chill wears off as its turn ends', () => {
+test('chill stacks: at CHILL_FREEZE an alien freezes; a boss never does, and holds CHILL_MAX; chill wears off as its turn ends', () => {
   const { battle, aliens } = arena([], [{ x: 14, y: 10 }, { x: 15, y: 10 }])
   const events: GameEvent[] = []
   chillUnit(battle, aliens[0], CHILL_FREEZE, events)
   expect(aliens[0]).toMatchObject({ frozen: true, panicked: true })
   aliens[1].boss = true
   chillUnit(battle, aliens[1], 9, events)
-  expect(aliens[1]).toMatchObject({ frozen: false, chill: CHILL_FREEZE - 1 })
+  expect(aliens[1]).toMatchObject({ frozen: false, chill: CHILL_MAX })
   battle.turn = 'human'
   upkeep(battle)
-  expect(aliens[1].chill).toBe(CHILL_FREEZE - 2)
+  expect(aliens[1].chill).toBe(CHILL_MAX - 1)
   expect(aliens[0].chill).toBe(CHILL_FREEZE)
 })
 
@@ -81,16 +83,42 @@ test('Might adds damage to every hit, to at most MIGHT_MAX; Blood Rite gives it 
   expect(hero.might).toBe(MIGHT_MAX)
 })
 
-test('Kinetic Engine: a slam or a fall the hero causes gives it Might; Kilned and Hailing gear add a burn or chill stack on a slam', () => {
+test("Kinetic Engine: a slam or a fall the hero causes does the hero's damage again; Kilned and Hailing gear add a burn or chill stack on a slam", () => {
   const { battle, hero, aliens } = arena(['impetus', 'kiln', 'quench'], [{ x: 11, y: 10 }, { x: 12, y: 10 }])
+  hero.stats = { ...hero.stats, damage: 5 }
   battle.actor = hero.id
   knockback(battle, hero, aliens[0], [])
-  expect(hero.might).toBe(1)
-  expect(aliens[0]).toMatchObject({ burn: 1, chill: 1 })
-  battle.height[10 * GRID + 13] = 0
+  expect(aliens[0]).toMatchObject({ hp: 40 - SLAM_DAMAGE - 5, burn: 1, chill: 1 })
   for (let x = 0; x < GRID; x++) battle.height[10 * GRID + x] = x <= 12 ? 4 : 0
-  fall(battle, aliens[1], aliens[1], { x: 13, y: 10 }, [])
-  expect(hero.might).toBe(2)
+  expect(fell(battle, aliens[1], 4, [])).toBe(5)
+})
+
+test('Domino Rig: an alien knocked into another knocks that one back too; a hero knocks only into something', () => {
+  const { battle, hero, aliens } = arena(['domino'], [{ x: 11, y: 10 }, { x: 12, y: 10 }, { x: 13, y: 10 }, { x: 11, y: 12 }])
+  battle.actor = hero.id
+  knockback(battle, hero, aliens[0], [])
+  expect(aliens[2]).toMatchObject({ x: 14, y: 10 })
+  expect(aliens[1].hp).toBeLessThan(40)
+  expect(knocksInto(battle, { x: 10, y: 12 }, aliens[3])).toBe(false)
+})
+
+test('payoffs spend stacks for damage by the stack: a hit at enough burn the burn, any hit the chill, at enough marks the marks', () => {
+  for (const [effect, stacks, worth] of [['accelerant', { burn: 4 }, 4 * TUNING.spend.burn], ['shatter', { chill: 3 }, 3 * TUNING.spend.chill], ['spotter', { mark: 3 }, 3 * TUNING.spend.mark + TUNING.markDamage]] as const) {
+    const { hero, aliens, beats } = arena([effect], [{ x: 11, y: 10 }])
+    hero.stats = { ...hero.stats, damage: 1, crit: 0 }
+    Object.assign(aliens[0], stacks)
+    const [shot] = shots(beats(1))
+    expect(shot.damage).toBeGreaterThanOrEqual(1 + worth)
+    expect(aliens[0][Object.keys(stacks)[0] as 'burn']).toBe(0)
+  }
+})
+
+test('on-hit and on-kill healing gives a hero at most TUNING.healCap a battle by each source', () => {
+  const { hero } = arena([], [{ x: 11, y: 10 }])
+  hero.hp = 1
+  for (let i = 0; i < 5; i++) mend(hero, 2, 'feast', [])
+  mend(hero, 2, 'vampiric', [])
+  expect(hero.hp).toBe(1 + TUNING.healCap + 2)
 })
 
 test('Toppling gear: a fall the hero causes hurts more by its levels and leaves the alien exposed: hits do half again', () => {
@@ -128,14 +156,15 @@ test('Shield Slam: a shield hit does its armor in more damage', () => {
   expect(aliens[0].hp).toBeLessThan(40 - 7)
 })
 
-test('Catalyst Prism: a crit doubles the burn and chill stacks on its target', () => {
+test('Catalyst Prism: a crit doubles the burn, chill and marks on its target', () => {
   const { battle, hero, aliens, beats } = arena(['catalyst'], [{ x: 11, y: 10 }])
   hero.stats = { ...hero.stats, damage: 1, crit: 1 }
   kindle(battle, aliens[0], 2)
-  aliens[0].chill = 1
+  Object.assign(aliens[0], { chill: 1, mark: 1 })
   beats(1)
   expect(aliens[0].burn).toBeGreaterThanOrEqual(4)
   expect(aliens[0].chill).toBeGreaterThanOrEqual(2)
+  expect(aliens[0].mark).toBeGreaterThanOrEqual(2)
 })
 
 test('Cadenced gear: every CADENCE-th shot does double damage', () => {
@@ -228,9 +257,9 @@ test('Fault Line: every FAULT.every-th hit up close drops the ground around the 
   expect(aliens[1].hp).toBe(40 - FAULT.damage)
 })
 
-test('Ember Brand passes a marked dead alien\'s burn on; Frost Fracture shatters a frozen one over those beside it', () => {
-  const { battle, aliens } = arena(['embers', 'fracture'], [{ x: 11, y: 10 }, { x: 12, y: 10 }])
-  Object.assign(aliens[0], { marked: true, burn: 5, frozen: true, chill: 3 })
+test("Witch's Hex passes a dead alien's stacks on; Frost Fracture shatters a frozen one over those beside it", () => {
+  const { battle, aliens } = arena(['hex', 'fracture'], [{ x: 11, y: 10 }, { x: 12, y: 10 }])
+  Object.assign(aliens[0], { mark: 2, burn: 5, frozen: true, chill: 3 })
   died(battle, aliens[0], null, [])
   expect(aliens[1].burn).toBe(5)
   expect(aliens[1].hp).toBe(40 - FRACTURE_DAMAGE * 3)

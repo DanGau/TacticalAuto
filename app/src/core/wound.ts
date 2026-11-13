@@ -1,12 +1,13 @@
 // Damage landing on a unit, what it sets off, and the tally it adds to.
 import { alienSrc, fx, srcOf } from './sources'
-import { REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_STACKS, BLAST_RADIUS, type Battle, type Unit, type Tile } from './battle'
+import { REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_STACKS, BLAST_RADIUS, type Battle, type Effect, type Unit, type Tile } from './battle'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { emptyTally, OVERKILL, type FeatId, type Tally } from './feats'
-import { engage, has, hostage, fireproof, foeHas, nearest, immune, onTile } from './fighters'
+import { engage, has, hostage, fireproof, immune, onTile } from './fighters'
 import { died, kindle } from './stacks'
+import { TUNING } from './tuning'
 
 /** A soldier's tally for this battle, begun empty. */
 export function tallyOf(battle: Battle, soldier: number): Tally {
@@ -99,12 +100,6 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
     if (target.boss || target.target) feat(tally, 'giantSlayer')
     if (tally.kills === 3) feat(tally, 'hatTrick')
   }
-  // A hexed death passes the mark to the nearest unmarked alien.
-  const heir = target.marked && foeHas(battle, target, 'hex') ? nearest(battle.units.filter((u) => u.side === target.side && !u.marked && !u.resists.includes('mark')), target) : undefined
-  if (heir) {
-    heir.marked = true
-    events.push(fx(heir.id, 'hex', 0))
-  }
   if (target.kind === 'burster') {
     const caught = battle.units.filter((u) => distance(target, u) <= BLAST_RADIUS && !immune(battle, u, 'blast'))
     events.push({ type: 'rocket', src: alienSrc(target), id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: burstOn(u) })) })
@@ -147,3 +142,13 @@ export const BOOM_DAMAGE = 3
 
 /** Damage a unit knocked into something takes, and so does an alien it slams into. */
 export const SLAM_DAMAGE = 1
+
+/** Heals `unit` up to `amount`, to its full health and, for a `capped` source, to what TUNING.healCap leaves it this battle; says the gain. */
+export function mend(unit: Unit, amount: number, effect: Effect, events: GameEvent[], capped = true): void {
+  const left = capped ? TUNING.healCap - (unit.healed?.[effect] ?? 0) : amount
+  const gain = Math.min(amount, left, unit.stats.hp - unit.hp)
+  if (gain <= 0 || unit.hp <= 0) return
+  unit.hp += gain
+  if (capped) (unit.healed ??= {})[effect] = (unit.healed[effect] ?? 0) + gain
+  events.push(fx(unit.id, effect, gain))
+}

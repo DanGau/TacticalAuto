@@ -11,7 +11,7 @@ import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
 import { SKILLS } from '../core/skills'
 import { plannedPerk, plannedSkill } from '../core/plans'
-import { health, MAX_SQUAD, minorOffers, skillOffers, soldierStats, squadKeywords } from '../core/squad'
+import { health, MAX_SQUAD, minorOffers, skillOffers, soldierStats, squadCauses } from '../core/squad'
 import { BOON_CHARGES, RELICS, type RelicId } from '../core/relics'
 import type { Keyword } from '../core/keywords'
 import { carries, RIG, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS, type EffectId, type UtilityId } from '../core/utilities'
@@ -140,7 +140,7 @@ function gearWorth(run: Run, gear: Gear | null, soldier: Soldier): number {
   if (!gear) return -1
   const own = [...soldier.skills.flatMap((id) => SKILLS[id].tags ?? []), ...run.relics.flatMap((id) => RELICS[id].tags ?? [])]
   const shared = gear.effect ? (EFFECTS[gear.effect].tags ?? []).filter((tag) => own.includes(tag)).length : 0
-  return RARITY[gear.rarity] + shared
+  return RARITY[gear.rarity] + shared + (gear.effect ? paysOff(run, EFFECTS[gear.effect].pays) : 0)
 }
 
 /** Whether `gear` improves on what its owner holds. */
@@ -168,20 +168,11 @@ function shop(run: Run): Action {
 }
 
 
-/** What a relic is worth beside what the squad holds: a bridge or engine pays only with its pieces, and is dead without them. */
-function relicWorth(run: Run, id: RelicId): number {
-  const held = squadKeywords(run)
-  const has = (...tags: Keyword[]) => tags.every((tag) => held.includes(tag))
-  const needs: Partial<Record<RelicId, boolean>> = {
-    catalyst: has('crit') && (has('burn') || has('frost')),
-    fracture: has('frost'),
-    embers: has('mark', 'burn'),
-    impetus: has('force'),
-    accelerant: has('burn'),
-  }
-  const fit = needs[id]
-  return fit === undefined ? 0 : fit ? 2 : -2
-}
+/** What a payoff is worth beside what the squad causes: much with a cause of what it spends, little without; 0 for any other. */
+const paysOff = (run: Run, pays: Keyword[] | undefined) => (pays ? (pays.some((k) => squadCauses(run).includes(k)) ? 3 : -2) : 0)
+
+/** What a relic is worth beside what the squad holds: a payoff pays only beside a cause. */
+const relicWorth = (run: Run, id: RelicId) => paysOff(run, RELICS[id].pays)
 
 /** Takes a duo offered, else the first relic, on the same seeds better than choosing by shared keywords; and the skill its hero plans on. */
 function reward(run: Run): Action {

@@ -7,7 +7,7 @@ import { drawRelic, offerable, type RelicId } from './relics'
 import { type Run } from './run-state'
 import { type Shop } from './run-state'
 import { type Soldier } from './run-state'
-import { minorOffers, owesPick, skillOffers } from './squad'
+import { minorOffers, owesPick, skillOffers, squadCauses } from './squad'
 
 /** Learns the offered skill at `index`. */
 export function takeSkill(run: Run, soldier: Soldier, index: number): void {
@@ -64,7 +64,7 @@ export function stockShop(run: Run): Shop {
 }
 
 /** A new piece of `hero`'s weapon, made for them. */
-const gearFor = (run: Run, hero: Soldier, rarity: Rarity): Gear => ({ ...generateGear(run, run.nextGear, rarity, hero.gear?.weapon), owner: hero.id })
+const gearFor = (run: Run, hero: Soldier, rarity: Rarity): Gear => ({ ...generateGear(run, run.nextGear, rarity, hero.gear?.weapon, squadCauses(run)), owner: hero.id })
 
 /** Buys the ware at `index` for `soldier`, its owner, to wear. The caller checks it is affordable. */
 export function buyWare(run: Run, index: number, soldier: Soldier): void {

@@ -77,7 +77,7 @@ test('Sure Shot crits standing still; Apex Predator marks, then crits the marked
   const apex = arena(['apex'], [{ x: 11, y: 10 }])
   apex.hero.stats = { ...apex.hero.stats, crit: 0 }
   expect(shots(apex.beats(1))[0].crit).toBe(false)
-  expect(apex.aliens[0].marked).toBe(true)
+  expect(apex.aliens[0].mark).toBeGreaterThan(0)
   apex.aliens[0].resists = []
   apex.hero.effects.push('apex')
   apex.battle.turn = 'human'

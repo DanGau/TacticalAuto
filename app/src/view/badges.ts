@@ -1,4 +1,4 @@
-// The stacks and counts a unit's token shows over its health: burn, chill, Might, kept armor, a combo, exposure, the next every-Nth.
+// The stacks and counts a unit's token shows over its health: burn, chill, marks, Might, kept armor, a combo, exposure, the next every-Nth.
 import { CADENCE, FAULT, type Unit } from '../core/battle'
 import { has } from '../core/fighters'
 import { CanvasTexture, Sprite as Billboard, SpriteMaterial } from 'three'
@@ -13,6 +13,7 @@ export interface Badge {
 const BURN = 0xff7a1a
 const CHILL = 0x7fd6ff
 const MIGHT = 0xe8433a
+const MARK = 0xd36bff
 const ARMOR = 0xf2c94c
 const COUNT = 0xb8c0cc
 
@@ -22,6 +23,7 @@ export function badges(unit: Unit): Badge[] {
   if (unit.burn > 0) out.push({ text: `🔥${unit.burn}`, color: BURN })
   if (unit.frozen) out.push({ text: 'ICE', color: CHILL })
   else if (unit.chill > 0) out.push({ text: `❄️${unit.chill}`, color: CHILL })
+  if (unit.mark > 0) out.push({ text: `🎯${unit.mark}`, color: MARK })
   if (unit.might > 0) out.push({ text: `⚔️${unit.might}`, color: MIGHT })
   if (unit.armor > unit.stats.armor && has(unit, 'lasting')) out.push({ text: `+${unit.armor - unit.stats.armor}`, color: ARMOR })
   if (unit.exposed > 0) out.push({ text: '!', color: MIGHT })

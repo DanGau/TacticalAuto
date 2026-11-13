@@ -125,6 +125,19 @@ export function knockback(battle: Battle, unit: Unit, target: Unit, events: Game
   drive(battle, target, step, tiles, events, way > 0 ? slam : 0, effect)
 }
 
+/** Whether a knockback from `unit` drives `target` into something or off a ledge within `tiles`. */
+export function knocksInto(battle: Battle, unit: Tile, target: Unit, tiles = 1): boolean {
+  const step = knockWay(battle, unit, target)
+  if (!step) return false
+  let from: Tile = target
+  for (let i = 0; i < tiles; i++) {
+    const to = { x: from.x + step.x, y: from.y + step.y }
+    if (fallBeyond(battle, from, to) !== 0 || blocked(battle, to.x, to.y) || !unwalled(battle, from, to) || heightAt(battle, to) - heightAt(battle, from) >= CLIFF) return true
+    from = to
+  }
+  return false
+}
+
 /** Drives `target` up to `tiles` along `step`; see knockback. Returns whether it fell. */
 export function drive(battle: Battle, target: Unit, step: Tile, tiles: number, events: GameEvent[], slam: number, effect: Effect): boolean {
   const path: Tile[] = []
@@ -156,9 +169,13 @@ export function drive(battle: Battle, target: Unit, step: Tile, tiles: number, e
   if (into && into.side === target.side) {
     events.push(fx(into.id, effect, -slam))
     wound(battle, into, slam, events)
+    if (into.hp > 0 && into.side === 'alien' && dominoes(battle)) drive(battle, into, step, 1, events, slam, 'domino')
   }
   return false
 }
+
+/** Whether the acting hero's knockbacks knock on, by Domino Rig. */
+const dominoes = (battle: Battle) => battle.units.some((u) => u.id === battle.actor && u.side === 'human' && has(u, 'domino'))
 
 /** A unit over the void that no longer levitates drifts to the nearest open ground, unhurt. */
 export function settle(battle: Battle, unit: Unit): GameEvent[] {

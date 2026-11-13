@@ -6,7 +6,7 @@ import { foes, has, nearest } from './fighters'
 import { fx } from './sources'
 import { distance } from './grid'
 import { chillFrom, chillUnit, empower, kindle, burnFrom } from './stacks'
-import { wound } from './wound'
+import { mend, wound } from './wound'
 import { TALENT } from './tuning'
 import { PERK } from './perks'
 
@@ -16,12 +16,8 @@ const machines = (battle: Battle, u: Unit) => battle.units.filter((m) => m.summo
 const ownerOf = (battle: Battle, u: Unit) => (u.summoner === null ? undefined : battle.units.find((s) => s.soldier === u.summoner))
 const allies = (battle: Battle, u: Unit) => battle.units.filter((a) => a.side === u.side && a !== u && a.hp > 0 && !a.civilian)
 
-function heal(u: Unit, amount: number, effect: Effect, events: GameEvent[]): void {
-  const gain = Math.min(amount, u.stats.hp - u.hp)
-  if (gain <= 0 || u.hp <= 0) return
-  u.hp += gain
-  events.push(fx(u.id, effect, gain))
-}
+/** A heal on a turn's start, which no cap holds. */
+const heal = (u: Unit, amount: number, effect: Effect, events: GameEvent[]) => mend(u, amount, effect, events, false)
 
 function stun(u: Unit, effect: Effect, events: GameEvent[]): void {
   if (u.hp <= 0 || u.boss) return
@@ -144,10 +140,10 @@ export function talentHit(battle: Battle, unit: Unit, enemy: Unit, crit: boolean
   if (crit && has(unit, 'resonance')) for (const u of beside) zap(battle, u, TALENT.zap, 'resonance', events)
   const arc = has(unit, 'arcWelder') ? nearest(battle.units.filter((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && distance(u, enemy) <= TALENT.reach), enemy) : undefined
   if (arc) zap(battle, arc, TALENT.zap, 'arcWelder', events)
-  if (has(unit, 'soulDrain')) heal(unit, 1, 'soulDrain', events)
+  if (has(unit, 'soulDrain')) mend(unit, 1, 'soulDrain', events)
   if (has(unit, 'lifeLink')) {
     const mate = allies(battle, unit).filter((a) => a.hp < a.stats.hp && distance(a, unit) <= TALENT.reach).sort((a, b) => a.hp / a.stats.hp - b.hp / b.stats.hp)[0]
-    if (mate) heal(mate, 1, 'lifeLink', events)
+    if (mate) mend(mate, 1, 'lifeLink', events)
   }
   if (enemy.hp > 0 && has(enemy, 'vengeance')) empower(enemy, 1, 'vengeance', events)
   if (has(enemy, 'cinderSkin') && distance(unit, enemy) <= 1 && unit.hp > 0 && unit.burn < BURN_MAX) {
@@ -165,15 +161,15 @@ export function talentKill(battle: Battle, target: Unit, killer: Unit, events: G
   if (has(killer, 'iceAge') && target.chill > 0) for (const u of kin.filter((u) => distance(u, target) <= 1)) stun(u, 'iceAge', events)
   if (has(killer, 'nightmare')) for (const u of kin.filter((u) => distance(u, target) <= 2)) stun(u, 'nightmare', events)
   if (has(killer, 'soulHarvest')) {
-    heal(killer, TALENT.heal, 'soulHarvest', events)
+    mend(killer, TALENT.heal, 'soulHarvest', events)
     empower(killer, 1, 'soulHarvest', events)
   }
   const queen = ownerOf(battle, killer)
-  if (queen && has(queen, 'hiveQueen')) for (const u of [killer, queen]) heal(u, TALENT.heal, 'hiveQueen', events)
+  if (queen && has(queen, 'hiveQueen')) for (const u of [killer, queen]) mend(u, TALENT.heal, 'hiveQueen', events)
   if (has(killer, 'shroud') && distance(killer, target) >= TALENT.far && !killer.cloaked) events.push(cloakOn(killer))
-  if (has(killer, 'cauterize') && target.burn > 0) heal(killer, TALENT.heal, 'cauterize', events)
-  if (has(killer, 'shadowFeed')) heal(killer, TALENT.heal, 'shadowFeed', events)
-  if (has(killer, 'scavenger')) heal(killer, PERK.scavenge, 'scavenger', events)
+  if (has(killer, 'cauterize') && target.burn > 0) mend(killer, TALENT.heal, 'cauterize', events)
+  if (has(killer, 'shadowFeed')) mend(killer, TALENT.heal, 'shadowFeed', events)
+  if (has(killer, 'scavenger')) mend(killer, PERK.scavenge, 'scavenger', events)
   if (has(killer, 'carnage') && killer.spent.filter((e) => e === 'carnage').length < TALENT.moveMax) {
     killer.spent.push('carnage')
     killer.stats = { ...killer.stats, move: killer.stats.move + 1 }

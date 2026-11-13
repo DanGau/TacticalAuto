@@ -32,7 +32,7 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, engaged = fa
     panicked: false,
     moved: false,
     suppressed: 0,
-    marked: false,
+   
     order: null,
     cooldown: alien.spawns ? SPAWN_EVERY : alien.kind === 'incubator' ? HATCH_TURNS : 0,
   }
@@ -40,18 +40,18 @@ export function alienUnit(battle: Battle, alien: Alien, tile: Tile, engaged = fa
 
 /** A mech built by the engineer `owner`, with `stats` and the `effects` its skills give it, standing on `tile`. */
 export function mechUnit(battle: Battle, owner: Unit, stats: Stats, effects: Effect[], tile: Tile): Unit {
-  return { id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: stats.armor, stats, soldier: null, engaged: true, cluster: 0, revealed: true, surprised: 0, ability: null, charges: 0, stance: 'rush', effects, spent: [], ...FRESH, rooted: 0, booming: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: null, summoner: owner.soldier, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null }
+  return { id: battle.nextId++, side: 'human', ...tile, hp: stats.hp, armor: stats.armor, stats, soldier: null, engaged: true, cluster: 0, revealed: true, surprised: 0, ability: null, charges: 0, stance: 'rush', effects, spent: [], ...FRESH, rooted: 0, booming: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: null, summoner: owner.soldier, panicked: false, moved: false, suppressed: 0, cooldown: 0, order: null }
 }
 
 /** A civilian of `kind` with `hp` health, standing on `tile`. */
 export function civilianUnit(battle: Battle, tile: Tile, hp: number, kind: NonNullable<Unit['civilian']>): Unit {
   const stats = { ...BASE_STATS, hp, damage: 0, range: 0, move: CIVILIAN_MOVE, crit: 0, strength: 1, jump: 1 }
-  return { id: battle.nextId++, side: 'human', ...tile, hp, armor: 0, stats, soldier: null, engaged: true, cluster: 0, revealed: true, surprised: 0, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], ...FRESH, rooted: 0, booming: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: kind, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null }
+  return { id: battle.nextId++, side: 'human', ...tile, hp, armor: 0, stats, soldier: null, engaged: true, cluster: 0, revealed: true, surprised: 0, ability: null, charges: 0, stance: 'anchor', effects: [], spent: [], ...FRESH, rooted: 0, booming: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: kind, summoner: null, panicked: false, moved: false, suppressed: 0, cooldown: 0, order: null }
 }
 
 /** A soldier's unit, coming in from the reserve on `tile`. */
 export function soldierUnit(battle: Battle, soldier: Reserve, tile: Tile): Unit {
-  return { id: battle.nextId++, side: 'human', ...tile, armor: soldier.stats.armor, engaged: true, cluster: 0, revealed: true, surprised: 0, spent: [], ...FRESH, rooted: 0, booming: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: null, summoner: null, panicked: false, moved: false, suppressed: 0, marked: false, cooldown: 0, order: null, ...soldier }
+  return { id: battle.nextId++, side: 'human', ...tile, armor: soldier.stats.armor, engaged: true, cluster: 0, revealed: true, surprised: 0, spent: [], ...FRESH, rooted: 0, booming: 0, kind: null, boss: false, spawns: false, target: false, resists: [], civilian: null, summoner: null, panicked: false, moved: false, suppressed: 0, cooldown: 0, order: null, ...soldier }
 }
 
 /**

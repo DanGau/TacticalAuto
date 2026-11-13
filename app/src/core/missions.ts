@@ -79,7 +79,9 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], cha
   if (boss) {
     const k = run.keys
     const rung = extraction ? 2 : rungOf(run.stop)
-    const stats = { ...bigOneStats(run.soldiers.length, rung, BASE_STATS), range: BASE_STATS.range + (k >= 2 ? 1 : 0) }
+    const big = bigOneStats(run.soldiers.length, rung, BASE_STATS)
+    // A leg's boss is the build's test: long to kill, so a squad whose pieces pay off ends it sooner, but no harder hitting.
+    const stats = { ...big, ...(extraction ? { hp: Math.round(big.hp * LEG_BOSS.hp), damage: big.damage - LEG_BOSS.damage } : {}), range: BASE_STATS.range + (k >= 2 ? 1 : 0) }
     const escorts = Array.from({ length: escort }, (_, i) => alien(i % 2 === 0 ? 'zealot' : 'vise'))
     aliens.unshift({ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: extraction && k >= 1, target: false, resists: [run.bosses[k]] }, ...escorts)
   }
@@ -88,6 +90,9 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], cha
 
 /** The depth from which a rescue has a second harvester. */
 export const HARVESTERS_MORE_FROM = 2
+
+/** What a leg's boss multiplies its health by, and the damage it does less. */
+export const LEG_BOSS = { hp: 1.5, damage: 2 }
 
 /** What an ambush's Hunter multiplies the strongest soldier's health and damage by. */
 export const HUNTER = { hp: 2, damage: 1.2 }

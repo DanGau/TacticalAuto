@@ -97,7 +97,7 @@ test("Target Painter marks who hits the Gadgeteer's mech; Napalm Payload bursts 
     const events: GameEvent[] = []
     duoHit(battle, aliens[0], mech, 3, plain, [], events)
     expect(fired(events, id)).toBe(true)
-    if (id === 'painter') expect(aliens[0].marked).toBe(true)
+    if (id === 'painter') expect(aliens[0].mark).toBe(1)
     else expect(aliens[0]).toMatchObject({ hp: 40 - PAYLOAD_DAMAGE, burn: expect.any(Number) })
   }
 })

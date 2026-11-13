@@ -95,7 +95,7 @@ test('each effect lands on a hit', () => {
     shoot(d.b, d.hero, spotted(d.b), undefined, undefined, SECONDARIES[id])
     return d
   }
-  expect(hit('flare').alien.marked).toBe(true)
+  expect(hit('flare').alien.mark).toBe(1)
   expect(hit('shockCoil').alien.suppressed).toBeGreaterThan(0)
   expect(hit('iceShard').alien.rooted).toBeGreaterThan(0)
   expect(hit('slug').alien.x).toBe(7 + KNOCK_TILES)

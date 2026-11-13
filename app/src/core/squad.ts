@@ -191,6 +191,16 @@ export function squadKeywords(run: Run): Keyword[] {
   return [...new Set(tags)]
 }
 
+/** Keywords the squad causes: those of its skills, its gear and relics bar what they only spend, and force for a weapon that knocks back. */
+export function squadCauses(run: Run): Keyword[] {
+  const own = (source: { tags?: Keyword[]; pays?: Keyword[] }) => (source.tags ?? []).filter((tag) => !source.pays?.includes(tag))
+  const tags = [
+    ...run.soldiers.flatMap((s) => [...s.skills.flatMap((id) => SKILLS[id].tags ?? []), ...(s.gear?.effect ? own(EFFECTS[s.gear.effect]) : []), ...(s.gear && WEAPONS[s.gear.weapon].effect === 'thunder' ? ['force' as const] : [])]),
+    ...run.relics.flatMap((id) => own(RELICS[id])),
+  ]
+  return [...new Set(tags)]
+}
+
 /** What a soldier earns from a battle, after the feats it ends the battle with are recorded. */
 export function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | null): { earned: Earned[]; feats: FeatId[]; tally: Tally } {
   const tally = battle.tally[soldier.id] ?? emptyTally()

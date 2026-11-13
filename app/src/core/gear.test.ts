@@ -1,6 +1,7 @@
 import { fx } from './sources'
 import { powerOf } from './skills'
 import { expect, test } from 'vitest'
+import { spendStacks } from './stacks'
 import { enterAt, begun } from './roads'
 import { apply } from './apply'
 import { BURN_STACKS, CRIT_BONUS, SEARING_DAMAGE, SOLDIER_ATTACKS, GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
@@ -106,14 +107,15 @@ test('a rimed weapon chills its target, and a shatterglass edge and thermal shoc
   d.soldier.effects.push('shatter', 'thermal')
   const shots = () => {
     const events = untilAlienShoots(d)
-    return events.filter((e) => e.type === 'shot' && e.id === d.soldier.id)
+    return events.filter((e) => e.type === 'shot' && e.id === d.soldier.id) as { damage: number }[]
   }
   const [first] = shots()
   expect(first).toMatchObject({ damage: 2 })
-  expect(d.alien.chill).toBeGreaterThan(0)
-  d.alien.burn = 5
-  const [second] = shots()
-  expect(second).toMatchObject({ damage: 2 + TUNING.shatterDamage + TUNING.thermalDamage })
+  Object.assign(d.alien, { chill: 3, frozen: true })
+  expect(spendStacks(d.battle, { ...d.soldier, effects: ['shatter'] }, d.alien, [], [])).toBe(3 * TUNING.spend.chill)
+  Object.assign(d.alien, { burn: 2, chill: 1 })
+  expect(spendStacks(d.battle, { ...d.soldier, effects: ['thermal'] }, d.alien, [], [])).toBe(3 * TUNING.spend.thermal)
+  expect(d.alien).toMatchObject({ burn: 0, chill: 0 })
 })
 
 test('an alien that resists frost and burn is neither chilled nor set burning', () => {
@@ -184,10 +186,10 @@ test('a volatile kill bursts on the aliens beside it', () => {
   expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: other.id, effect: 'volatile', amount: -2 }))
 })
 
-test('a thundering hit knocks the target back, or slams it into what stops it, an alien it slams into taking as much', () => {
+test('a thundering hit knocks the target only into what stops it, an alien it slams into taking as much', () => {
   const d = armed(['thunder'])
   const events = untilAlienShoots(d)
-  expect(events).toContainEqual(expect.objectContaining({ type: 'move', id: d.alien.id, path: [{ x: 10, y: 12 }], with: 'thunder' }))
+  expect(events).not.toContainEqual(expect.objectContaining({ type: 'move', id: d.alien.id, with: 'thunder' }))
   const behind = another(d, 0, 1)
   const slam = [fx(d.alien.id, 'thunder', -1), fx(behind.id, 'thunder', -1)]
   expect(effectsOf(untilAlienShoots(d), 'thunder')).toEqual(Array(SOLDIER_ATTACKS).fill(slam).flat())
@@ -217,20 +219,12 @@ test('a pyre censer sets the ground under a burning alien ablaze', () => {
   expect(d.battle.fire).toContainEqual(expect.objectContaining({ x, y }))
 })
 
-test('a stasis field freezes a chilled alien a crit lands on', () => {
-  const d = armed(['stasis'], { crit: 1 })
-  d.alien.chill = 5
-  const events = untilAlienShoots(d)
-  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: d.alien.id, effect: 'stasis', amount: 0 }))
-  expect(events).toContainEqual({ type: 'frozen', id: d.alien.id })
-})
-
-test("a witch's hex passes a marked alien's mark to the nearest alien when it dies", () => {
+test("a witch's hex passes a dead alien's marks to the nearest alien", () => {
   const d = armed(['hex'], { damage: 5 })
-  Object.assign(d.alien, { hp: 1, marked: true })
+  Object.assign(d.alien, { hp: 1, mark: 2 })
   const other = another(d, 2, 0)
   for (let beats = 0; d.alien.hp > 0 && beats < 200; beats++) d.step()
-  expect(other.marked).toBe(true)
+  expect(other.mark).toBeGreaterThanOrEqual(2)
 })
 
 test('a snaring hit roots its target, and a hunter\'s net hits a rooted alien harder', () => {

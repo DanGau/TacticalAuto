@@ -102,8 +102,8 @@ export function duoHit(battle: Battle, unit: Unit, enemy: Unit, damage: number, 
 /** An alien's hit on a summoned machine: Target Painter marks it; Napalm Payload bursts the machine destroyed. */
 function summonHit(battle: Battle, alien: Unit, machine: Unit, events: GameEvent[]): void {
   const painter = heroes(battle, 'painter')
-  if (painter && painter[0].soldier === machine.summoner && alien.hp > 0 && !alien.marked && !alien.resists.includes('mark')) {
-    alien.marked = true
+  if (painter && painter[0].soldier === machine.summoner && alien.hp > 0 && alien.mark === 0 && !alien.resists.includes('mark')) {
+    alien.mark = 1
     events.push(moment('painter', painter, alien), fx(alien.id, 'painter', 0))
   }
   const payload = heroes(battle, 'payload')

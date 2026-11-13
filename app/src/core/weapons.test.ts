@@ -72,7 +72,7 @@ test('a volley shares one crit roll, and what comes once an attack comes once', 
   const fired = shots(weaponAttack(b, hero, spotted(b)))
   expect(new Set(fired.map((s) => s.crit)).size).toBe(1)
   expect(hero.hp).toBe(2)
-  expect(aliens[0].x).toBe(13)
+  expect(aliens[0].x).toBe(12)
 })
 
 test('a kill grants one more volley, not one for each kill, and none after it', () => {

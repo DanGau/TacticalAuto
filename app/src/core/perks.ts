@@ -2,6 +2,7 @@
 import type { Stats } from './battle'
 import type { ClassId } from './classes'
 import { random } from './rng'
+import { TUNING } from './tuning'
 
 /** Perk effects combat applies; each is described where it does. */
 export const PERK_EFFECTS = ['heave', 'extraThrow', 'longThrow', 'crushingThrow', 'crashLanding', 'freerunner', 'firemansCarry', 'firstStrike', 'finisher', 'scavenger', 'secondBreath'] as const
@@ -41,7 +42,7 @@ const perks = {
   longSight: { name: 'Long Sight', text: '+1 range with a ranged weapon', stats: { range: 1 }, needs: 'keenEye' },
   firstStrike: { name: 'First Strike', text: `+${PERK.firstStrike} damage on its first hit each battle`, effect: 'firstStrike' },
   finisher: { name: 'Finisher', text: `+${PERK.finisher} damage to a target at half HP or less`, effect: 'finisher' },
-  scavenger: { name: 'Scavenger', text: `Each kill heals ${PERK.scavenge}`, effect: 'scavenger' },
+  scavenger: { name: 'Scavenger', text: `Each kill heals ${PERK.scavenge}, up to ${TUNING.healCap} a battle`, effect: 'scavenger' },
   secondBreath: { name: 'Second Breath', text: `Once a battle, at half HP or less, heals ${PERK.breath} as its turn begins`, effect: 'secondBreath' },
   hardCharger: { name: 'Hard Charger', text: '+1 move and +1 jump', stats: { move: 1, jump: 1 }, cls: 'assault' },
   heavyFrame: { name: 'Heavy Frame', text: '+1 strength and +2 HP', stats: { strength: 1, hp: 2 }, cls: 'heavy' },
