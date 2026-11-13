@@ -1,12 +1,11 @@
 // Stacks a fight builds on a unit and what they set off: burn, chill and freezing, marks, Might, combos, exposure, every-Nth hits; payoffs that spend them, spreaders that pass them on.
 import { fx } from './sources'
-import { BURN_MAX, BURN_STACKS, CADENCE, CHILL_FREEZE, CHILL_MAX, MARK_MAX, COMBO_MAX, EXPOSED, FAULT, FRACTURE_DAMAGE, HIGH_CRIT, HIGH_LEVELS, MIGHT_MAX, GRID, isSoldier, LINGER_STACKS, type Battle, type Effect, type Unit } from './battle'
+import { BURN_MAX, BURN_STACKS, CADENCE, CATALYST_EVERY, CHILL_FREEZE, CHILL_MAX, MARK_MAX, COMBO_MAX, EXPOSED, FAULT, FRACTURE_DAMAGE, HIGH_CRIT, HIGH_LEVELS, MIGHT_MAX, GRID, isSoldier, LINGER_STACKS, type Battle, type Effect, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import type { Kit } from './weapons'
 import { fireproof, foeHas, has, nearest } from './fighters'
 import { distance, walks } from './grid'
 import { RECKONING_KILLS } from './doctrines'
-import { CATALYST_EVERY } from './relics'
 import { TUNING } from './tuning'
 import { talentDamage, talentHit, talentKill } from './talents'
 import { wound } from './wound'

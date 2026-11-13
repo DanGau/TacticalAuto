@@ -1,10 +1,9 @@
 // What happens as a side's turn begins: burns, acid, mending, cooldowns, spawns, goals that tick.
 import { REGROWTH } from './exams'
-import { ADRENAL_MAX } from './relics'
 import { alienSrc, fx } from './sources'
 import { REGEN_HEAL, alienStats, ALIENS, NODE_EVERY } from './aliens'
 import { replenish } from './abilities'
-import { type Battle, AURA_REACH, BURN_STACKS, isSoldier, SPAWN_EVERY, type Unit } from './battle'
+import { type Battle, ADRENAL_MAX, AURA_REACH, BURN_STACKS, isSoldier, SPAWN_EVERY, type Unit } from './battle'
 import { armorCap, chrono, empower, kindle, lastingArmor } from './stacks'
 import { CONFLAGRATION_DAMAGE, HELLFIRE_REACH } from './keystones'
 import { stormBlows } from './ultimates'

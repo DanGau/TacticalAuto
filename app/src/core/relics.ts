@@ -1,5 +1,5 @@
 // Relics: what each does, and which may be offered.
-import { BURN_STACKS, FRACTURE_DAMAGE, MIGHT_MAX, type RelicEffect, type Stats } from './battle'
+import { ADRENAL_MAX, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, MIGHT_MAX, type RelicEffect, type Stats } from './battle'
 import type { Rarity } from './base'
 import { random } from './rng'
 import { MOMENTUM_MAX } from './attack'
@@ -47,10 +47,6 @@ export const BOON_CHARGES = 3
 export const STREAK_FIGHTS = 2
 /** The battles Zenith Chronometer's come every. */
 export const ZENITH_EVERY = 3
-/** The most Might Adrenal Pump gives a hero a battle. */
-export const ADRENAL_MAX = 4
-/** Catalyst Prism's every-Nth hit. */
-export const CATALYST_EVERY = 3
 
 const relics = {
   plasma: { name: 'Plasma Core', text: 'Every hero does +1 damage', rarity: 'common', stats: { damage: 1 } },
