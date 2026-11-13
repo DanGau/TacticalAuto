@@ -18,7 +18,7 @@ Architecture rules: [docs/architecture/CLAUDE.md](docs/architecture/CLAUDE.md). 
 
 Run in `app/`.
 
-- `npm run check` — lint, typecheck, tests, and sim batches: no battle stuck, and the strategic bot can win runs.
+- `npm run check` — lint, typecheck, the built game loading with no error (`npm run smoke`), tests, and sim batches: no battle stuck, and the strategic bot can win runs.
 - `npm run -s sim -- --runs=500 --bot=random` — bots play runs in Node and print a report.
 - `npm run -s sim -- --runs=100 --bot=all --doctrine=blades` — the same, the squad holding a doctrine from the start.
 - `npm run -s sim -- --runs=100 --bot=all` — every bot strategy on the same seeds, ranked.

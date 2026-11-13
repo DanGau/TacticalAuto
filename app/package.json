@@ -11,7 +11,8 @@
     "sim": "node scripts/deadline.mjs 1800 tsx src/sim/cli.ts",
     "eye": "tsx eye/eye.ts",
     "tsx": "node scripts/deadline.mjs 600 tsx",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run -s sim -- --runs=100 && npm run -s sim -- --runs=100 --seed-start=200 --bot=random && npm run -s sim -- --runs=300 --seed-start=400 --bot=strategic --floor",
+    "smoke": "node scripts/deadline.mjs 180 node scripts/smoke.mjs",
+    "check": "npm run lint && npm run typecheck && npm run -s smoke && npm run test && npm run -s sim -- --runs=100 && npm run -s sim -- --runs=100 --seed-start=200 --bot=random && npm run -s sim -- --runs=300 --seed-start=400 --bot=strategic --floor",
     "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {

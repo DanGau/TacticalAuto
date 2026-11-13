@@ -10,7 +10,7 @@ const layer = (dir, allowed, message) => ({
 })
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules', 'screenshots', '.eye'] },
+  { ignores: ['dist', 'node_modules', 'screenshots', '.eye', '.smoke'] },
   ...tseslint.configs.recommended,
   layer('core', '\./', 'core/ imports only core/. Pass data in instead.'),
   layer('bots', '\./|\.\./core/', 'bots/ imports only bots/ and core/.'),

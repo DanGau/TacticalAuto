@@ -3,3 +3,4 @@ dist/
 app/screenshots/
 app/.eye/
 app/.tune.json
+app/.smoke/
