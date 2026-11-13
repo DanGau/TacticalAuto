@@ -6,7 +6,7 @@ import { availableParallelism, freemem, tmpdir, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DoctrineId } from '../core/doctrines'
-import type { RunResult } from './run'
+import type { Loadout, RunResult } from './run'
 
 /** worker.ts bundled once, on first use, into plain JavaScript, so sim processes start without tsx. */
 let bundle: string | undefined
@@ -45,6 +45,8 @@ interface PoolOptions {
   forks?: boolean
   /** Play each safehouse and medkit on offer on both ways: see rest.ts. */
   rests?: boolean
+  /** With loadouts, the one bot plays each on the same seeds, and results come back by loadout name instead of bot. */
+  loadouts?: Record<string, Loadout>
   /** Memory, in MB, the sim processes together may hold before the pool shrinks. */
   memoryMb?: number
 }
@@ -56,13 +58,14 @@ interface PoolOptions {
  * its batch retried on a fresh one.
  */
 export async function playAll(bots: string[], runs: number, start: number, options: PoolOptions = {}): Promise<Record<string, RunResult[]>> {
-  const { threads = threadsFor(availableParallelism(), freemem() / MB), doctrines = [], forks = false, rests = false, memoryMb = (totalmem() / MB) * 0.6 } = options
-  const jobs = bots.flatMap((bot) => Array.from({ length: runs }, (_, i) => ({ bot, seed: start + i })))
+  const { threads = threadsFor(availableParallelism(), freemem() / MB), doctrines = [], forks = false, rests = false, loadouts, memoryMb = (totalmem() / MB) * 0.6 } = options
+  const keys = loadouts ? Object.keys(loadouts) : bots
+  const jobs = keys.flatMap((key) => Array.from({ length: runs }, (_, i) => ({ key, bot: loadouts ? bots[0] : key, seed: start + i, loadout: { ...loadouts?.[key], doctrines: [...doctrines, ...(loadouts?.[key].doctrines ?? [])] } })))
   // Fewer seeds a batch when there are too few to keep every process busy; one when each run plays on its forks, so a kill under pressure costs little.
   const size = forks || rests ? 1 : Math.max(1, Math.min(BATCH, Math.ceil(jobs.length / Math.max(1, threads))))
   const batches = Array.from({ length: Math.ceil(jobs.length / size) }, (_, id) => ({ id, jobs: jobs.slice(id * size, (id + 1) * size), tries: 0 }))
   const queue = [...batches]
-  const played: { bot: string; result: RunResult }[] = []
+  const played: { key: string; result: RunResult }[] = []
   let left = batches.length
   let target = Math.max(1, threads)
   let shrunk = 0
@@ -108,7 +111,7 @@ export async function playAll(bots: string[], runs: number, start: number, optio
       // Maglev can crash a CPU-starved process (nodejs/node#64841); without it the sim runs as fast.
       const proc = fork(BUNDLE(), { execArgv: [`--max-old-space-size=${HEAP_MB}`, '--no-maglev'], stdio: ['ignore', 'inherit', 'inherit', 'ipc'] })
       procs.set(proc, { rss: 0 })
-      proc.send({ doctrines, forks, rests })
+      proc.send({ forks, rests })
       proc.on('message', (m: { ready: true } | { id: number; played: typeof played; rss: number }) => {
         if (failed) return
         if ('ready' in m) return give(proc)
@@ -118,8 +121,8 @@ export async function playAll(bots: string[], runs: number, start: number, optio
         state.batch = undefined
         if (--left === 0) {
           stop()
-          const bySeed = (bot: string) => played.filter((p) => p.bot === bot).map((p) => p.result).sort((a, b) => a.seed - b.seed)
-          return resolve(Object.fromEntries(bots.map((bot) => [bot, bySeed(bot)])))
+          const bySeed = (key: string) => played.filter((p) => p.key === key).map((p) => p.result).sort((a, b) => a.seed - b.seed)
+          return resolve(Object.fromEntries(keys.map((key) => [key, bySeed(key)])))
         }
         if (pressured() && procs.size > 1) {
           target = procs.size - 1

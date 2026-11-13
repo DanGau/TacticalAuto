@@ -8,6 +8,8 @@ import { health } from '../core/squad'
 import { distance } from '../core/grid'
 import { timedFlow } from '../core/step'
 import type { DoctrineId } from '../core/doctrines'
+import type { RelicId } from '../core/relics'
+import type { GearEffect } from '../core/battle'
 import { CHALLENGES, type ChallengeId } from '../core/challenges'
 import type { Goal } from '../core/goals'
 import type { ArenaKind } from '../core/arena-kinds'
@@ -40,6 +42,15 @@ export interface Toll {
   maxHit: number
   /** Rounds from the boss's first wound to its fall, counting both; null with no boss felled. */
   bossRounds: number | null
+  /** Health the heroes healed in it. */
+  healed: number
+}
+
+/** What the squad holds from the start of a run: doctrines and relics, and a gear effect every hero's weapon keeps all run. */
+export interface Loadout {
+  doctrines?: DoctrineId[]
+  relics?: RelicId[]
+  effect?: GearEffect
 }
 
 export interface RunResult {
@@ -85,9 +96,14 @@ const MAX_ACTIONS = 10000
 /**
  * Plays a run to its end, taking each action from `next` when the run waits for the player.
  */
-function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] = [], forks = false, rests = false): { run: Run; result: RunResult } {
+function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, forks = false, rests = false): { run: Run; result: RunResult } {
   const run = createRun(seed)
-  run.doctrines.push(...doctrines)
+  run.doctrines.push(...(loadout.doctrines ?? []))
+  run.relics = [...run.relics, ...(loadout.relics ?? [])]
+  const arm = () => {
+    if (loadout.effect) for (const s of run.soldiers) if (s.gear) s.gear.effect = loadout.effect
+  }
+  arm()
   const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], restForks: [], actions: [], found: Array<number>(KEYS + 1).fill(0), rests: { safehouses: 0, medkits: 0 } }
   let clock = { next: 0, done: 0 }
   let leaps = 0
@@ -128,7 +144,7 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
         const fought = run.report!.soldiers
-        result.tolls.push({ nth: result.battles, leg: begun[1], party: fought.length, kind: run.mission!.kind, elite: begun[4], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3]), most: fought.reduce((sum, s) => sum + s.maxHp, 0), before: begun[2], after: fought.reduce((sum, s) => sum + s.hp, 0), downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds })
+        result.tolls.push({ nth: result.battles, leg: begun[1], party: fought.length, kind: run.mission!.kind, elite: begun[4], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3]), most: fought.reduce((sum, s) => sum + s.maxHp, 0), before: begun[2], after: fought.reduce((sum, s) => sum + s.hp, 0), downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.reduce((sum, s) => sum + s.tally.healed, 0) })
         clock = { next: 0, done: 0 }
       }
       continue
@@ -143,6 +159,7 @@ function play(seed: number, next: (run: Run) => Action, doctrines: DoctrineId[] 
     const applied = apply(run, action)
     if (action.type === 'boons') had.held = [...run.utilities]
     if (!applied.ok) throw new Error(`action rejected: ${applied.reason}`)
+    arm()
     result.actions.push(action)
   }
   return { run, result: { ...result, won: run.phase === 'won', keys: run.keys, endedOn: run.mission!.kind } }
@@ -154,8 +171,8 @@ export function replay(seed: number, actions: Action[]): Run {
   return play(seed, () => queue.shift()!).run
 }
 
-/** Plays a run with `bot`, the squad holding `doctrines` from the start. */
-export function runWith(seed: number, bot: Bot, doctrines: DoctrineId[] = [], forks = false, rests = false): RunResult {
+/** Plays a run with `bot`, the squad holding `loadout` from the start. */
+export function runWith(seed: number, bot: Bot, loadout: Loadout = {}, forks = false, rests = false): RunResult {
   const rng = { rng: seed }
-  return play(seed, (run) => bot(run, rng), doctrines, forks, rests).result
+  return play(seed, (run) => bot(run, rng), loadout, forks, rests).result
 }

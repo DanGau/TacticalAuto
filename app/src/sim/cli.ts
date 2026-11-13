@@ -5,6 +5,7 @@ import { DOCTRINES, type DoctrineId } from '../core/doctrines'
 import { formatForks, formatMatrix } from './forks'
 import { playAll } from './pool'
 import { formatRest, POLICIES } from './rest'
+import { formatPower, loadoutOf, SINGLES } from './power'
 import { byBattle, byGoal, formatDiagnosis, formatReport, ranked, report, rows, OPENING_FLOOR, STRATEGIC_FLOOR, BOSS_ROUNDS_FLOOR, HIT_CEILING } from './report'
 import { OPENING } from '../core/progress'
 
@@ -21,6 +22,10 @@ const { values } = parseArgs({
     clean: { type: 'boolean', default: false },
     /** Print the rest comparison: each safehouse and medkit on offer played on both ways, and fixed rest policies on the same seeds. */
     rest: { type: 'boolean', default: false },
+    /** Print the power comparison: the strategic bot holding each relic and gear effect from the start, and none, on the same seeds. */
+    power: { type: 'boolean', default: false },
+    /** Loadouts for the power comparison in place of every single: relic and effect ids joined by '+', comma-separated; each pair's halves and none are added. */
+    loadouts: { type: 'string', default: '' },
     /** Fail if the strategic bot wins fewer runs than STRATEGIC_FLOOR or fewer opening battles than OPENING_FLOOR, a late boss falls faster than BOSS_ROUNDS_FLOOR, or a hit passes HIT_CEILING. */
     floor: { type: 'boolean', default: false },
     json: { type: 'boolean', default: false },
@@ -35,7 +40,12 @@ const start = Number(values['seed-start'])
 const doctrines = values.doctrine.split(',').filter(Boolean) as DoctrineId[]
 for (const id of doctrines) if (!(id in DOCTRINES)) throw new Error(`unknown doctrine "${id}"; choose from ${Object.keys(DOCTRINES).join(', ')}`)
 
-if (values.rest) {
+if (values.power || values.loadouts) {
+  const asked = values.loadouts.split(',').filter(Boolean)
+  const names = asked.length ? [...new Set(['none', ...asked.flatMap((n) => n.split('+')), ...asked])] : SINGLES
+  const played = await playAll(['strategic'], runs, start, { doctrines, threads, loadouts: Object.fromEntries(names.map((n) => [n, loadoutOf(n)])) })
+  console.log(formatPower(played))
+} else if (values.rest) {
   const forks = (await playAll(['strategic'], runs, start, { doctrines, rests: true, threads })).strategic
   console.log(formatRest(forks.flatMap((r) => r.restForks)))
   const played = { strategic: forks, ...(await playAll(Object.keys(POLICIES), runs, start, { doctrines, threads })) }
