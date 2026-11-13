@@ -1,5 +1,5 @@
 // Relics: what each does, and which may be offered.
-import { ADRENAL_MAX, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, MIGHT_MAX, type RelicEffect, type Stats } from './battle'
+import { ADRENAL_MAX, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, GUARD_MAX, MIGHT_MAX, type RelicEffect, type Stats } from './battle'
 import type { Rarity } from './base'
 import { random } from './rng'
 import { MOMENTUM_MAX } from './attack'
@@ -48,6 +48,9 @@ export const STREAK_FIGHTS = 2
 /** The battles Zenith Chronometer's come every. */
 export const ZENITH_EVERY = 3
 
+/** What each stack a payoff spends adds, in words. */
+const SPENT = TUNING.spend.factor === 1 ? "the hero's damage" : `${100 * TUNING.spend.factor}% of the hero's damage`
+
 const relics = {
   plasma: { name: 'Plasma Core', text: 'Every hero does +1 damage', rarity: 'common', stats: { damage: 1 } },
   alloys: { name: 'Alien Alloys', text: 'Every hero has +3 armor', tags: ['ward'], rarity: 'common', stats: { armor: 3 } },
@@ -62,13 +65,13 @@ const relics = {
   drones: { name: 'Scavenger Drones', text: 'Each won battle pays 1 more supply', supplies: 1 },
   contact: { name: 'Black Market Contact', text: 'Every piece of gear found is rare or better', rareGear: true },
   uplink: { name: "Seer's Uplink", text: 'The flight map names the aliens of each stop, not only how dangerous they are', recon: true },
-  accelerant: { name: 'Accelerant Gel', text: `Hits on a target with ${TUNING.spend.burns} or more burn spend it: +${100 * TUNING.spend.factor}% of the hero's damage a stack, to it and every alien beside it, and as much temp HP`, tags: ['burn'], pays: ['burn'], rarity: 'epic', effect: 'accelerant' },
+  accelerant: { name: 'Accelerant Gel', text: `Hits on a target with ${TUNING.spend.burns} or more burn spend it: +${SPENT} a stack to it, half that to each alien beside it; the hero gains a temp HP a stack`, tags: ['burn'], pays: ['burn'], rarity: 'epic', effect: 'accelerant' },
   wildfire: { name: 'Wildfire Spores', text: 'An alien that dies burning gives its burn to every alien beside it', tags: ['burn', 'kill'], pays: ['burn'], effect: 'wildfire' },
   salamander: { name: 'Salamander Sigil', text: `Crits add ${BURN_STACKS} burn stacks to the target`, tags: ['crit', 'burn'], rarity: 'common', effect: 'ignite' },
   lattice: { name: 'Frost Lattice', text: 'Crits add a chill stack to the target', tags: ['crit', 'frost'], rarity: 'common', effect: 'freeze' },
-  shatter: { name: 'Shatterglass Edge', text: `Hits on a target with ${TUNING.spend.chills} or more chill spend it: +${100 * TUNING.spend.factor}% of the hero's damage a stack, to it and every alien beside it; the target is stunned, a boss weakened`, tags: ['frost'], pays: ['frost'], effect: 'shatter' },
-  thermal: { name: 'Thermal Shock Core', text: `Hits on a target both burning and chilled spend both: +${100 * TUNING.spend.factor}% of the hero's damage a stack, to it and every alien beside it, as much temp HP, and a stun`, tags: ['burn', 'frost'], pays: ['burn', 'frost'], effect: 'thermal' },
-  spotter: { name: 'Spotter Network', text: `Hits on a target with ${TUNING.spend.marks} or more marks spend them: +${100 * TUNING.spend.factor}% of the hero's damage a mark, to it and every alien beside it; the target is weakened`, tags: ['mark'], pays: ['mark'], effect: 'spotter' },
+  shatter: { name: 'Shatterglass Edge', text: `Hits on a target with ${TUNING.spend.chills} or more chill spend it: +${SPENT} a stack to it, half that to each alien beside it; the target is stunned, a boss weakened`, tags: ['frost'], pays: ['frost'], effect: 'shatter' },
+  thermal: { name: 'Thermal Shock Core', text: `Hits on a target both burning and chilled spend both: +${SPENT} a stack to it, half that to each alien beside it; a temp HP a stack, and a stun`, tags: ['burn', 'frost'], pays: ['burn', 'frost'], effect: 'thermal' },
+  spotter: { name: 'Spotter Network', text: `Hits on a target with ${TUNING.spend.marks} or more marks spend them: +${SPENT} a mark to it, half that to each alien beside it; the target is weakened`, tags: ['mark'], pays: ['mark'], effect: 'spotter' },
   hunt: { name: 'Eye of the Hunt', text: 'Crits add a mark to the target', tags: ['crit', 'mark'], rarity: 'common', effect: 'exploit' },
   bloodforged: { name: 'Bloodforged Plate', text: `A kill gives the hero 1 armor, up to ${MOMENTUM_MAX}`, tags: ['kill', 'ward'], effect: 'momentum' },
   rite: { name: 'Blood Rite', text: `Each kill gives the hero 1 Might, to at most ${MIGHT_MAX}`, tags: ['kill', 'might'], effect: 'bloodRite' },
@@ -109,8 +112,8 @@ const relics = {
   gravity: { name: 'Gravity Lens', text: 'Every shot of a knockback weapon knocks back, not only the first', tags: ['force'], pays: ['force'], rarity: 'epic', effect: 'gravity' },
   ironclad: { name: 'Ironclad Lattice', text: 'Whatever builds armor builds it twice as high', tags: ['ward'], pays: ['ward'], rarity: 'epic', effect: 'ironclad' },
   split: { name: 'Split Rounds', text: 'Every attack fires twice the shots, each at half power', tags: ['volley'], pays: ['volley'], rarity: 'epic', effect: 'split' },
-  ram: { name: 'Ram Plating', text: "Every hit does half the hero's armor more", tags: ['ward'], pays: ['ward'], effect: 'ram' },
-  overflow: { name: 'Overflow Capacitor', text: "Healing past full health, or past its cap, becomes armor, up to twice the hero's own", tags: ['ward'], pays: ['ward'], effect: 'overflow' },
+  ram: { name: 'Ram Plating', text: "Every hit does the hero's armor more", tags: ['ward'], pays: ['ward'], effect: 'ram' },
+  overflow: { name: 'Overflow Capacitor', text: `Healing past full health, or past its cap, becomes armor, up to ${GUARD_MAX} past the hero's own`, tags: ['ward'], pays: ['ward'], effect: 'overflow' },
   adrenal: { name: 'Adrenal Pump', text: `Each hero gains 1 Might at the start of each of its turns, to at most ${ADRENAL_MAX} from it`, tags: ['might'], effect: 'adrenal' },
   hairTrigger: { name: 'Hair Trigger', text: 'A weapon of 2 or more shots fires one more', tags: ['volley'], pays: ['volley'], rarity: 'common', effect: 'hairTrigger' },
 } satisfies Record<string, Relic>

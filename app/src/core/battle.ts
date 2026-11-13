@@ -53,6 +53,8 @@ export const CHILL_MAX = 6
 export const MIGHT_MAX = 8
 /** The most Might Adrenal Pump gives a hero a battle. */
 export const ADRENAL_MAX = 4
+/** Armor Bracing gear and Overflow Capacitor build past a hero's own. */
+export const GUARD_MAX = 6
 /** Catalyst Prism's every-Nth hit. */
 export const CATALYST_EVERY = 3
 export const COMBO_MAX = 4

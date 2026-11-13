@@ -1,7 +1,7 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
 import { PLATES_UNDER } from './exams'
 import { attackSrc, fx, srcOf } from './sources'
-import { type Battle, type Unit, BASE_STATS, SUPPRESS_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_STACKS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
+import { type Battle, type Unit, BASE_STATS, GUARD_MAX, SUPPRESS_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_STACKS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE } from './battle'
 import { cloakOn } from './abilities'
 import { duoCrit, duoDamage, duoHit } from './duo-effects'
 import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './keystones'
@@ -293,7 +293,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (enemy.hp <= 0 && has(unit, 'bloodRite')) empower(unit, 1, 'bloodRite', events)
   if (enemy.hp > 0 && when(true, 'suppress', 1)) enemy.suppressed = 2
   if (enemy.hp > 0 && damage > 0 && when(true, 'sapping', 1)) enemy.suppressed = Math.max(enemy.suppressed, WEAKEN_TURNS)
-  if (damage > 0 && unit.armor < armorCap(unit, 2 * unit.stats.armor) && when(true, 'braced', 1)) unit.armor++
+  if (damage > 0 && unit.armor < armorCap(unit, unit.stats.armor + GUARD_MAX) && when(true, 'braced', 1)) unit.armor++
   if (enemy.hp > 0 && crit && has(unit, 'concussion')) {
     enemy.panicked = true
     events.push(fx(enemy.id, 'concussion', 0))

@@ -41,22 +41,22 @@ export function markUnit(target: Unit, stacks: number): void {
  * Damage the payoffs add by spending `enemy`'s stacks, which they clear: each stack spent is TUNING.spend.factor of the hero's
  * damage, so stacks multiply it. Accelerant Gel spends burn at TUNING.spend.burns or more and gives the hero that
  * much temp HP; Shatterglass Edge spends chill at TUNING.spend.chills or more and stuns; Spotter Network spends marks at TUNING.spend.marks or more and weakens;
- * Thermal Shock Core spends what burn and chill are left on one with both, and does both. What is spent bursts on every alien
- * beside the target too. Dead Eye Ledger leaves marks on.
+ * Thermal Shock Core spends burn and chill on one with both, and does both. A hit spends by one payoff, Thermal Shock Core's first.
+ * Half of what is spent bursts on every alien beside the target. Dead Eye Ledger leaves marks on.
  */
 export function spendStacks(battle: Battle, unit: Unit, enemy: Unit, used: Effect[], events: GameEvent[]): number {
   let more = 0
   const each = unit.stats.damage * TUNING.spend.factor
   const spend = (effect: Effect, applies: boolean, stacks: number, clear: () => void, rider: (stacks: number) => void) => {
-    if (!applies || stacks <= 0 || !has(unit, effect)) return
+    if (more > 0 || !applies || stacks <= 0 || !has(unit, effect)) return
     used.push(effect)
     const worth = Math.round(stacks * each)
     more += worth
     clear()
     rider(stacks)
     for (const other of battle.units.filter((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && distance(u, enemy) <= 1)) {
-      events.push(fx(other.id, effect, -worth))
-      wound(battle, other, worth, events)
+      events.push(fx(other.id, effect, -Math.ceil(worth / 2)))
+      wound(battle, other, Math.ceil(worth / 2), events)
     }
   }
   const shield = (stacks: number) => {
@@ -67,11 +67,11 @@ export function spendStacks(battle: Battle, unit: Unit, enemy: Unit, used: Effec
     else enemy.panicked = true
   }
   const weaken = () => (enemy.suppressed = Math.max(enemy.suppressed, WEAKEN_TURNS))
+  spend('thermal', enemy.burn > 0 && enemy.chill > 0, enemy.burn + enemy.chill, () => Object.assign(enemy, { burn: 0, chill: 0 }), (stacks) => (shield(stacks), stun()))
   spend('accelerant', enemy.burn >= TUNING.spend.burns, enemy.burn, () => (enemy.burn = 0), shield)
   spend('shatter', enemy.chill >= TUNING.spend.chills, enemy.chill, () => (enemy.chill = 0), stun)
   const ledger = has(unit, 'ledger')
   spend('spotter', enemy.mark >= TUNING.spend.marks, enemy.mark, () => (enemy.mark = ledger ? enemy.mark : 0), weaken)
-  spend('thermal', enemy.burn > 0 && enemy.chill > 0, enemy.burn + enemy.chill, () => Object.assign(enemy, { burn: 0, chill: 0 }), (stacks) => (shield(stacks), stun()))
   return more
 }
 
@@ -132,7 +132,7 @@ export function stackDamage(battle: Battle, unit: Unit, enemy: Unit, used: Effec
   if (slam > 0) used.push('shieldSlam')
   if (grip > 0) used.push('rimeGrip')
   if (opportune > 0) used.push('opportunist')
-  const ram = has(unit, 'ram') ? Math.floor(unit.armor / 2) : 0
+  const ram = has(unit, 'ram') ? unit.armor : 0
   if (ram > 0) used.push('ram')
   return unit.might + combo + slam + grip + opportune + ram + talentDamage(battle, unit, enemy, used, events)
 }

@@ -92,7 +92,7 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], cha
 export const HARVESTERS_MORE_FROM = 2
 
 /** What a leg's boss multiplies its health by, and the damage it does less. */
-export const LEG_BOSS = { hp: 2.5, damage: 3 }
+export const LEG_BOSS = { hp: 3.2, damage: 4 }
 
 /** What an ambush's Hunter multiplies the strongest soldier's health and damage by. */
 export const HUNTER = { hp: 2, damage: 1.2 }

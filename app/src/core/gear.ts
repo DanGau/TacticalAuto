@@ -3,7 +3,7 @@ import type { GearEffect, Stats } from './battle'
 import type { Rarity } from './base'
 import type { Keyword } from './keywords'
 import { random, randomInt } from './rng'
-import { BURN_STACKS, CADENCE, EXPOSED, HIGH_CRIT } from './battle'
+import { BURN_STACKS, CADENCE, EXPOSED, GUARD_MAX, HIGH_CRIT } from './battle'
 import { TUNING } from './tuning'
 import { WEAPONS, type WeaponId } from './weapons'
 
@@ -56,7 +56,7 @@ export const EFFECTS: Record<GearEffect, { prefix: string; text: string; tags?: 
   shove: { prefix: 'Shoving', text: 'Knocks an alien back into what is behind it', tags: ['force'] },
   tether: { prefix: 'Tethered', text: 'Pulls the target 1 tile closer', tags: ['force'] },
   twinned: { prefix: 'Twinned', text: 'A weapon of 2 or more shots fires one more', tags: ['volley'], pays: ['volley'] },
-  braced: { prefix: 'Bracing', text: 'Hits give the hero 1 armor, up to twice its own', tags: ['ward'] },
+  braced: { prefix: 'Bracing', text: `Hits give the hero 1 armor, up to ${GUARD_MAX} past its own`, tags: ['ward'] },
   sapping: { prefix: 'Sapping', text: 'Hits weaken the target: it does a quarter less damage next turn', rarity: 'common' },
 }
 

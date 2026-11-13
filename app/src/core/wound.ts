@@ -1,6 +1,6 @@
 // Damage landing on a unit, what it sets off, and the tally it adds to.
 import { alienSrc, fx, srcOf } from './sources'
-import { REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_STACKS, BLAST_RADIUS, type Battle, type Effect, type Unit, type Tile } from './battle'
+import { GUARD_MAX, REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_STACKS, BLAST_RADIUS, type Battle, type Effect, type Unit, type Tile } from './battle'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
@@ -148,8 +148,8 @@ export function mend(unit: Unit, amount: number, effect: Effect, events: GameEve
   const cap = capped === true ? TUNING.healCap : capped
   const left = cap !== false ? cap - (unit.healed?.[effect] ?? 0) : amount
   const gain = Math.min(amount, left, unit.stats.hp - unit.hp)
-  if (unit.hp > 0 && amount > gain && has(unit, 'overflow') && unit.armor < armorCap(unit, 2 * unit.stats.armor)) {
-    unit.armor = Math.min(armorCap(unit, 2 * unit.stats.armor), unit.armor + amount - Math.max(0, gain))
+  if (unit.hp > 0 && amount > gain && has(unit, 'overflow') && unit.armor < armorCap(unit, unit.stats.armor + GUARD_MAX)) {
+    unit.armor = Math.min(armorCap(unit, unit.stats.armor + GUARD_MAX), unit.armor + amount - Math.max(0, gain))
     events.push(fx(unit.id, 'overflow', 0))
   }
   if (gain <= 0 || unit.hp <= 0) return
