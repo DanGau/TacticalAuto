@@ -53,7 +53,7 @@ export const EFFECTS: Record<GearEffect, Flow & { prefix: string; text: string; 
   thunder: { prefix: 'Thundering', text: 'Knocks an alien back into what is behind it: 1 damage to both', makes: ['moved', 'impact'], rarity: 'epic' },
   snare: { prefix: 'Snaring', text: 'Roots the target for a turn' },
   booming: { prefix: 'Booming', text: 'Targets hit take 3 when next they move, by their own feet or knocked', reads: ['moved'], rarity: 'epic' },
-  shove: { prefix: 'Shoving', text: 'Knocks an alien back into what is behind it', makes: ['moved', 'impact'] },
+  shove: { prefix: 'Shoving', text: 'Knocks the target back a tile, slamming it into whatever stops it', makes: ['moved', 'impact'] },
   tether: { prefix: 'Tethered', text: 'Pulls the target 1 tile closer', makes: ['moved'] },
   twinned: { prefix: 'Twinned', text: 'A weapon of 2 or more shots fires one more', makes: ['shots'] },
   braced: { prefix: 'Bracing', text: `Hits give the hero 1 armor, up to ${GUARD_MAX} past its own`, reads: ['shots'], makes: ['armor'] },

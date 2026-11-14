@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { arena } from './arena'
-import { CHILL_SLIDE, isSoldier, LODESTONE_REACH, SHELL_MAX, STAGGER_DAMAGE } from './battle'
+import { CHILL_SLIDE, CHILL_TURNS, isSoldier, LODESTONE_REACH, SHELL_MAX, STAGGER_DAMAGE } from './battle'
 import { knockback, pull } from './knockback'
 import { SLAM_DAMAGE, wound } from './wound'
 import { chillUnit, kindle } from './stacks'
@@ -12,23 +12,26 @@ import type { GameEvent } from './combat-event'
 
 const said = (events: GameEvent[], effect: string) => events.some((e) => e.type === 'effect' && e.effect === effect)
 
-test('burn and chill on one alien cancel stack for stack, and say so', () => {
+test('burn and chill on one alien cancel: the older goes out, the newer loses as many, and it says so', () => {
   const { battle, aliens } = arena([], [{ x: 14, y: 10 }])
   const events: GameEvent[] = []
   kindle(battle, aliens[0], 3, events)
   chillUnit(battle, aliens[0], 2, events)
-  expect(aliens[0]).toMatchObject({ burn: 1, chill: 0, hp: 40 })
+  expect(aliens[0]).toMatchObject({ burn: 0, chill: 0, hp: 40 })
+  chillUnit(battle, aliens[0], 2, events)
+  kindle(battle, aliens[0], 3, events)
+  expect(aliens[0]).toMatchObject({ burn: 1, chill: 0 })
   expect(said(events, 'quenched')).toBe(true)
 })
 
-test('Thermal Shock Core: burn meeting chill detonates for the hero\'s damage a stack, half to those beside', () => {
+test('Thermal Shock Core: burn meeting chill detonates for twice the hero\'s damage a stack, half to those beside', () => {
   const { battle, hero, aliens } = arena(['thermal'], [{ x: 14, y: 10 }, { x: 15, y: 10 }])
   hero.stats = { ...hero.stats, damage: 4 }
   battle.actor = hero.id
   kindle(battle, aliens[0], 3)
   chillUnit(battle, aliens[0], 2, [])
-  expect(aliens[0]).toMatchObject({ burn: 1, chill: 0, hp: 40 - 8 })
-  expect(aliens[1].hp).toBe(40 - 4)
+  expect(aliens[0]).toMatchObject({ burn: 0, chill: 0, hp: 40 - 24 })
+  expect(aliens[1].hp).toBe(40 - 12)
 })
 
 test('a chilled alien knocked back slides on and slams a point harder a tile slid', () => {
@@ -38,7 +41,7 @@ test('a chilled alien knocked back slides on and slams a point harder a tile sli
   knockback(battle, hero, aliens[0], [])
   expect(aliens[0].x).toBe(11 + CHILL_SLIDE)
   expect(aliens[0].hp).toBe(40 - SLAM_DAMAGE - (CHILL_SLIDE - 1))
-  expect(aliens[0].shifted).toBe(true)
+  expect(aliens[0]).toMatchObject({ shifted: true, rooted: CHILL_TURNS })
 })
 
 test('moving a frozen alien thaws it and moving a marked one clears its marks; Shatterglass Edge and Lock-On Rig strike instead', () => {

@@ -267,10 +267,10 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (shock) for (const other of battle.units.filter((u) => u.side === enemy.side && distance(u, enemy) <= shock.reach)) stun(other, shock.chance, battle, events)
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
   else if (first && enemy.hp > 0 && damage > 0 && when(true, 'repulse', 1)) knockback(battle, unit, enemy, events, 1, REPULSE_TILES, SLAM_DAMAGE, 'repulse')
-  // A shove or thunder that would hit nothing leaves the alien where the party can finish it.
+  // A thunder that would hit nothing leaves the alien where the party can finish it.
   else if (first && enemy.hp > 0 && damage > 0 && (unit.side !== 'human' || knocksInto(battle, unit, enemy)) && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
-  else if (first && enemy.hp > 0 && damage > 0 && (unit.side !== 'human' || knocksInto(battle, unit, enemy)) && when(true, 'shove', 1)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'shove')
-  else if (first && enemy.hp > 0 && damage > 0 && unit.side === 'human' && knocksInto(battle, unit, enemy) && when(true, 'gravity', 1)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'gravity')
+  else if (first && enemy.hp > 0 && damage > 0 && when(true, 'shove', 1)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'shove')
+  else if (first && enemy.hp > 0 && damage > 0 && unit.side === 'human' && when(true, 'gravity', 1)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'gravity')
   if (first && enemy.hp > 0 && crit && when(true, 'gale', 1)) knockback(battle, unit, enemy, events, 1, REPULSE_TILES, SLAM_DAMAGE, 'gale')
   if (first && enemy.hp > 0 && damage > 0) shoveOff(battle, unit, enemy, events)
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'tether', 1)) knockback(battle, unit, enemy, events, -1)

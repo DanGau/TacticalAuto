@@ -9,10 +9,10 @@ import { BURN_MAX, CHILL_FREEZE, CHILL_MAX, CHILL_SLIDE, MARK_MAX } from './batt
 export type Quantity = 'burn' | 'chill' | 'mark' | 'moved' | 'impact' | 'shots' | 'crit' | 'kill' | 'overkill' | 'armor' | 'hurt'
 
 export const QUANTITIES: Record<Quantity, { name: string; icon: string; text: string }> = {
-  burn: { name: 'Burn', icon: '🔥', text: `Burn stacks: at the start of each of its turns a unit takes its stacks in damage, then loses one; at most ${BURN_MAX}. Burn and chill on one alien cancel, stack for stack` },
+  burn: { name: 'Burn', icon: '🔥', text: `Burn stacks: at the start of each of its turns a unit takes its stacks in damage, then loses one; at most ${BURN_MAX}. Burn and chill on one alien cancel: the older goes out, and the newer loses as many stacks` },
   chill: { name: 'Chill', icon: '❄️', text: `Chill stacks: -2 move and 1 less damage, a stack lost each turn; at ${CHILL_FREEZE} it freezes, losing its next action, bar a boss; at most ${CHILL_MAX}. A chilled alien knocked back slides up to ${CHILL_SLIDE} tiles more, slamming harder the farther it goes. Burn cancels chill; moving a frozen alien thaws it` },
   mark: { name: 'Mark', icon: '🎯', text: `Mark stacks: every hit on a marked unit does ${TUNING.markDamage} more damage; at most ${MARK_MAX}. Moving a marked alien clears its marks` },
-  moved: { name: 'Moved', icon: '↔️', text: "Knocked back, pulled, or slid since its last turn. An alien driven onto fire catches it. Moving a marked alien clears its marks, and a frozen one thaws" },
+  moved: { name: 'Moved', icon: '↔️', text: "Knocked back, pulled, or slid since its last turn: it cannot walk on its next. An alien driven onto fire catches it. Moving a marked alien clears its marks, and a frozen one thaws" },
   impact: { name: 'Impact', icon: '💢', text: 'Knocked into something, or off a ledge' },
   shots: { name: 'Shots', icon: '🔫', text: 'Shots an attack fires: every on-hit effect fires on each' },
   crit: { name: 'Crit', icon: '💥', text: 'A crit does 2 more damage' },
@@ -33,7 +33,7 @@ export interface Flow {
  * `pair` names the quantities whose makers cancel, and `effect` the floating word the cancel shows.
  */
 export const CANCELS = {
-  quench: { pair: ['burn', 'chill'], effect: 'quenched', name: 'Quenched', text: 'Burn and chill on one alien cancel, stack for stack', bridge: 'thermal' },
+  quench: { pair: ['burn', 'chill'], effect: 'quenched', name: 'Quenched', text: 'Burn and chill on one alien cancel: the older goes out, and the newer loses as many stacks', bridge: 'thermal' },
   thaw: { pair: ['moved', 'chill'], effect: 'thawed', name: 'Thawed', text: 'Moving a frozen alien thaws it: its chill is lost and it acts again', bridge: 'shatter' },
   unlock: { pair: ['moved', 'mark'], effect: 'unlocked', name: 'Lock lost', text: 'Moving a marked alien clears its marks', bridge: 'lockOn' },
 } as const satisfies Record<string, { pair: [Quantity, Quantity]; effect: string; name: string; text: string; bridge: string }>

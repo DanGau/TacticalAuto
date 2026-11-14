@@ -1,6 +1,6 @@
 // Stacks a fight builds on a unit and what they set off: burn, chill and freezing and how they cancel, marks, moving, Might, combos, exposure, every-Nth hits; payoffs that spend them, spreaders that pass them on.
 import { fx } from './sources'
-import { BURN_MAX, BURN_STACKS, CADENCE, CATALYST_EVERY, CHILL_FREEZE, CHILL_MAX, MARK_MAX, COMBO_MAX, EXPOSED, FAULT, FRACTURE_DAMAGE, HIGH_CRIT, HIGH_LEVELS, MIGHT_MAX, GRID, isSoldier, LINGER_STACKS, type Battle, type Effect, type Unit } from './battle'
+import { BURN_MAX, BURN_STACKS, CHILL_TURNS, CADENCE, CATALYST_EVERY, CHILL_FREEZE, CHILL_MAX, MARK_MAX, COMBO_MAX, EXPOSED, FAULT, FRACTURE_DAMAGE, HIGH_CRIT, HIGH_LEVELS, MIGHT_MAX, GRID, isSoldier, LINGER_STACKS, type Battle, type Effect, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import type { Kit } from './weapons'
 import { fireproof, foeHas, has, nearest } from './fighters'
@@ -37,27 +37,27 @@ export function chillUnit(battle: Battle, target: Unit, stacks: number, events: 
 }
 
 /**
- * `stacks` of burn or chill meet the `opposite` on `target`: as many as there are of it cancel, stack for stack. With
- * Thermal Shock Core they detonate instead: the hero's damage each to the target, half that to each alien beside it.
+ * `stacks` of burn or chill meet the `opposite` on `target`: all of it goes out, and the new stacks lose as many. With
+ * Thermal Shock Core they detonate instead: twice the hero's damage each to the target, half that to each alien beside it.
  * Returns the stacks left to add.
  */
 function meet(battle: Battle, target: Unit, stacks: number, opposite: 'burn' | 'chill', events: GameEvent[]): number {
-  const met = Math.min(stacks, target[opposite])
-  if (met <= 0) return stacks
-  target[opposite] -= met
+  const met = target[opposite]
+  if (met <= 0 || stacks <= 0) return stacks
+  target[opposite] = 0
   if (opposite === 'chill' && target.chill === 0) target.frozen = false
   if (!foeHas(battle, target, 'thermal')) {
     events.push(fx(target.id, 'quenched', 0))
-    return stacks - met
+    return Math.max(0, stacks - met)
   }
-  const blast = met * strikerOf(battle, target).stats.damage
+  const blast = 2 * met * strikerOf(battle, target).stats.damage
   events.push(fx(target.id, 'thermal', -blast))
   for (const other of battle.units.filter((u) => u.side === target.side && u !== target && u.hp > 0 && distance(u, target) <= 1)) {
     events.push(fx(other.id, 'thermal', -Math.ceil(blast / 2)))
     wound(battle, other, Math.ceil(blast / 2), events)
   }
   wound(battle, target, blast, events)
-  return stacks - met
+  return Math.max(0, stacks - met)
 }
 
 /** The hero whose blow a bridge's damage counts as: the one acting, else the hardest hitter facing `target`. */
@@ -65,13 +65,14 @@ const strikerOf = (battle: Battle, target: Unit): Unit =>
   actorOf(battle) ?? battle.units.filter((u) => u.side !== target.side && isSoldier(u)).reduce<Unit | undefined>((a, b) => (!a || b.stats.damage > a.stats.damage ? b : a), undefined) ?? target
 
 /**
- * `target` is driven from where it stood, by a knockback, a pull or a slide: it counts as moved until its own turn, a
+ * `target` is driven from where it stood, by a knockback, a pull or a slide: it counts as moved until its own turn and cannot walk on that turn, a
  * booming charge on it goes off, a frozen alien thaws and a marked one loses its marks. Shatterglass Edge shatters the
  * frozen in place of thawing, and Lock-On Rig keeps the marks and strikes for each.
  */
 export function displaced(battle: Battle, target: Unit, events: GameEvent[]): void {
   if (target.hp <= 0 || target.side !== 'alien') return
   target.shifted = true
+  target.rooted = Math.max(target.rooted, CHILL_TURNS)
   const blow = strikerOf(battle, target).stats.damage
   if (target.frozen && foeHas(battle, target, 'shatter')) {
     events.push(fx(target.id, 'shatter', -blow * target.chill))

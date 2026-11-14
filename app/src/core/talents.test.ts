@@ -231,8 +231,8 @@ test('newer kill talents: a chilled kill freezes those beside, a kill terrifies 
   expect([mech.hp, hive.hero.hp]).toEqual([2 + TALENT.heal, 1 + TALENT.heal])
 })
 
-test('newer turn talents: zaps beside and within 2, a wider chill, heals by burning foes, an ally healed', () => {
-  const { battle, hero, aliens } = arena(['tremor', 'staticField', 'polarVortex', 'emberHeart', 'wellspring'], [{ x: 11, y: 10 }, { x: 12, y: 10 }])
+test('newer turn talents: zaps beside and within 2, heals by burning foes, an ally healed; Polar Vortex chills within 2', () => {
+  const { battle, hero, aliens } = arena(['tremor', 'staticField', 'emberHeart', 'wellspring'], [{ x: 11, y: 10 }, { x: 12, y: 10 }])
   const mate = mechUnit(battle, hero, { ...MECH_STATS, hp: 10 }, [], { x: 10, y: 11 })
   mate.hp = 4
   battle.units.push(mate)
@@ -240,9 +240,11 @@ test('newer turn talents: zaps beside and within 2, a wider chill, heals by burn
   hero.hp = 1
   talentTurn(battle, hero, [])
   expect(aliens.map((a) => a.hp)).toEqual([40 - 2 * TALENT.zap, 40 - TALENT.zap])
-  expect(aliens[1].chill).toBeGreaterThan(0)
   expect(hero.hp).toBe(1 + TALENT.heal)
   expect(mate.hp).toBe(4 + TALENT.mend)
+  const vortex = arena(['polarVortex'], [{ x: 11, y: 10 }, { x: 12, y: 10 }])
+  talentTurn(vortex.battle, vortex.hero, [])
+  expect(vortex.aliens[1].chill).toBeGreaterThan(0)
 })
 
 test('Berserker crits at half HP or less; Perfect Shot adds to a crit', () => {

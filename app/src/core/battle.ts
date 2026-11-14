@@ -59,11 +59,11 @@ export const ADRENAL_MAX = 1
 /** Armor Bracing gear and Overflow Capacitor build past a hero's own. */
 export const GUARD_MAX = 6
 /** Damage Stagger Sights adds to hits on a moved alien; tiles Lodestone Harness pulls from; armor Reactive Shell builds past a hero's own. */
-export const STAGGER_DAMAGE = 2
+export const STAGGER_DAMAGE = 3
 /** The least a Volatile kill bursts for. */
 export const VOLATILE_DAMAGE = 2
 export const LODESTONE_REACH = 6
-export const SHELL_MAX = 4
+export const SHELL_MAX = 2
 /** Catalyst Prism's every-Nth hit. */
 export const CATALYST_EVERY = 3
 export const COMBO_MAX = 4
