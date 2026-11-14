@@ -31,8 +31,8 @@ export type Action =
   | { type: 'keep'; drop: number }
   /** Shop: pay to lower the threat, once. */
   | { type: 'medkit' }
-  /** Shop: drill the hero on offer as the squad's Carry. */
-  | { type: 'drill' }
+  /** Shop: drill the hero `soldier`, by id, as the squad's Carry. */
+  | { type: 'drill'; soldier: number }
   /** Shop: leave for the road. */
   | { type: 'leave' }
   /** Event: meet it the way its option at `index` says. */
@@ -164,9 +164,10 @@ export function apply(run: Run, action: Action): Result {
       shop.medkit = true
     } else if (action.type === 'drill') {
       if (!shop.drill || shop.drill.sold) return no('no drill on offer')
+      if (!run.soldiers.some((s) => s.id === action.soldier)) return no('no such hero')
       if (DRILL_PRICE > run.supplies) return no('not enough supplies')
       run.supplies -= DRILL_PRICE
-      run.carry = shop.drill.soldier
+      run.carry = action.soldier
       shop.drill.sold = true
     } else depart(run)
     return ok

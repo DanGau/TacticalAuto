@@ -1,10 +1,9 @@
 // Gear and relic rewards, the shop, and settling the reward phase.
 import { RARITY_CHANCE, type Rarity } from './base'
 import { BOON_WEIGHT, SHOP_UTILITIES, START_OFFERS, START_PICKS, UTILITIES, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
-import { EFFECTS, generateGear, type Gear } from './gear'
-import { SKILLS } from './skills'
+import { generateGear, type Gear } from './gear'
 import { random, randomInt } from './rng'
-import { drawRelic, offerable, RELICS, type RelicId } from './relics'
+import { drawRelic, offerable, type RelicId } from './relics'
 import { type Run } from './run-state'
 import { type Shop } from './run-state'
 import { type Soldier } from './run-state'
@@ -64,10 +63,7 @@ export function stockShop(run: Run): Shop {
   while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(drawRelic(run, relics, squadKeywords(run)))
   const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
   const utilities = Array.from({ length: Math.min(SHOP_UTILITIES, kinds.length) }, () => ({ id: drawUtility(run, kinds), sold: false }))
-  // The hero most bent on one keyword: the most of its gear's and skills' keywords the squad's relics share.
-  const bent = (s: Soldier) => [...s.skills.flatMap((id) => SKILLS[id].tags ?? []), ...((s.gear?.effect && EFFECTS[s.gear.effect].tags) || [])].filter((tag) => run.relics.some((id) => RELICS[id].tags?.includes(tag))).length
-  const pupil = run.soldiers.reduce<Soldier | null>((best, s) => (!best || bent(s) > bent(best) ? s : best), null)
-  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, medkit: false, drill: run.carry === null && pupil ? { soldier: pupil.id, sold: false } : null }
+  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, medkit: false, drill: run.carry === null ? { sold: false } : null }
 }
 
 /** A new piece of `hero`'s weapon, made for them. */

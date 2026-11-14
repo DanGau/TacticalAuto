@@ -150,6 +150,9 @@ function improves(run: Run, gear: Gear): boolean {
   return !!owner && gearWorth(run, gear, owner) > gearWorth(run, owner.gear, owner)
 }
 
+/** How bent a hero is on the squad's build: its skills' and gear's keywords that its relics share. */
+const bent = (run: Run, s: Soldier) => [...s.skills.flatMap((id) => SKILLS[id].tags ?? []), ...((s.gear?.effect && EFFECTS[s.gear.effect].tags) || [])].filter((tag) => run.relics.some((id) => RELICS[id].tags?.includes(tag))).length
+
 /** A shop: a medkit when badly hurt, a relic, then an answer it lacks, a medkit when hurt, then gear, then a medkit at all hurt. */
 function shop(run: Run): Action {
   const { utilities, relics, wares, medkit } = run.shop!
@@ -159,7 +162,7 @@ function shop(run: Run): Action {
   if (relic >= 0) return { type: 'buy', index: relic }
   // A Carry pays once the squad holds a payoff of what it causes.
   const drill = run.shop!.drill
-  if (drill && !drill.sold && DRILL_PRICE <= run.supplies && run.relics.some((id) => relicWorth(run, id) > 0)) return { type: 'drill' }
+  if (drill && !drill.sold && DRILL_PRICE <= run.supplies && run.relics.some((id) => relicWorth(run, id) > 0)) return { type: 'drill', soldier: run.soldiers.reduce((a, b) => (bent(run, b) > bent(run, a) ? b : a)).id }
   const gaps = unanswered(run)
   const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && gaps.some((c) => carries(id, CHALLENGES[c].answers)) && (run.utilities.length < UTILITY_SLOTS || keep({ ...run, spare: id }).drop !== -1))
   if (answer >= 0) return { type: 'utility', index: answer }

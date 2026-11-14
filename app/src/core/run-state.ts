@@ -162,8 +162,8 @@ export interface Shop {
   relics: { id: RelicId; sold: boolean }[]
   utilities: { id: UtilityId; sold: boolean }[]
   medkit: boolean
-  /** The hero the shop offers to drill as the squad's Carry, by id, while the squad has none. */
-  drill: { soldier: number; sold: boolean } | null
+  /** Drilling a hero of the player's choice as the squad's Carry, on offer while the squad has none. */
+  drill: { sold: boolean } | null
 }
 
 export interface Run {

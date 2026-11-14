@@ -192,10 +192,7 @@ function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
     }),
   )
   const medkit: Pick = { key: 'm', action: { type: 'medkit' }, look: 'medkit', body: card('medkit', '✚ Medkit', `${MEDKIT.price} supplies`, shop.medkit), detail: `<p><b>Medkit.</b> Every hero heals ${MEDKIT.heal}, once. A safehouse heals fully.</p>`, go: `Tap again to pay ${MEDKIT.price} supplies`, block: wounded(run) ? poor(MEDKIT.price) : 'No hero is hurt', spent: shop.medkit }
-  const pupil = shop.drill && run.soldiers.find((s) => s.id === shop.drill!.soldier)
-  const drill: Pick[] = pupil
-    ? [{ key: 'd', action: { type: 'drill' }, look: 'medkit', body: card('favour', `🎖️ Drill ${pupil.name}`, `${DRILL_PRICE} supplies`, shop.drill!.sold), detail: `<p><b>Drill ${pupil.name} as the Carry.</b> Their hits add twice the burn, chill and marks, all run. Once a run.</p>`, go: `Tap again to pay ${DRILL_PRICE} supplies`, block: poor(DRILL_PRICE), spent: shop.drill!.sold }]
-    : []
+  const drill = (shop.drill ? run.soldiers : []).map((pupil): Pick => ({ key: `d${pupil.id}`, action: { type: 'drill', soldier: pupil.id }, look: 'medkit', body: card('favour', `🎖️ Drill ${pupil.name}`, `${DRILL_PRICE} supplies`, shop.drill!.sold), detail: `<p><b>Drill ${pupil.name} as the Carry.</b> Their hits add twice the burn, chill and marks, all run. One hero, once a run.</p>`, go: `Tap again to pay ${DRILL_PRICE} supplies`, block: poor(DRILL_PRICE), spent: shop.drill!.sold }))
   return [{ name: 'Weapons', picks: gear }, { name: 'Relics', picks: relics }, { name: 'Boons and favours', picks: [...utilities, medkit, ...drill] }]
 }
 
