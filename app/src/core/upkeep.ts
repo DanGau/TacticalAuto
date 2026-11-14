@@ -3,7 +3,7 @@ import { REGROWTH } from './exams'
 import { alienSrc, fx } from './sources'
 import { REGEN_HEAL, alienStats, ALIENS, NODE_EVERY } from './aliens'
 import { replenish } from './abilities'
-import { type Battle, ADRENAL_MAX, AURA_REACH, BURN_STACKS, isSoldier, SPAWN_EVERY, type Unit } from './battle'
+import { type Battle, ADRENAL_FROM, ADRENAL_MAX, AURA_REACH, BURN_STACKS, isSoldier, SPAWN_EVERY, type Unit } from './battle'
 import { armorCap, chrono, empower, kindle, lastingArmor } from './stacks'
 import { CONFLAGRATION_DAMAGE, HELLFIRE_REACH } from './keystones'
 import { stormBlows } from './ultimates'
@@ -60,7 +60,7 @@ export function upkeep(battle: Battle): GameEvent[] {
       events.push(fx(unit.id, 'glacialArmor', 0))
     }
     talentTurn(battle, unit, events)
-    if (has(unit, 'adrenal') && battle.round < ADRENAL_MAX) empower(unit, 1, 'adrenal', events)
+    if (has(unit, 'adrenal') && battle.round >= ADRENAL_FROM && battle.round < ADRENAL_FROM + ADRENAL_MAX) empower(unit, 1, 'adrenal', events)
     if (has(unit, 'rampage')) empower(unit, 1, 'rampage', events)
     if (has(unit, 'regrowth') && unit.burn === 0) mend(unit, Math.ceil(unit.stats.hp * REGROWTH.turn), 'regrowth', events, Math.round(unit.stats.hp * REGROWTH.most))
     if (has(unit, 'rearm') && unit.armor < armorCap(unit, unit.stats.armor)) {

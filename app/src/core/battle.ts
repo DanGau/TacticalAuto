@@ -51,8 +51,9 @@ export const MARK_MAX = 6
 export const CHILL_MAX = 6
 /** The most Might a unit holds, the most a combo adds, and what makes a hit exposed or every-Nth. */
 export const MIGHT_MAX = 8
-/** The most Might Adrenal Pump gives a hero a battle. */
-export const ADRENAL_MAX = 4
+/** The round from which Adrenal Pump gives Might, and the most it gives a hero a battle. */
+export const ADRENAL_FROM = 2
+export const ADRENAL_MAX = 1
 /** Armor Bracing gear and Overflow Capacitor build past a hero's own. */
 export const GUARD_MAX = 6
 /** Catalyst Prism's every-Nth hit. */

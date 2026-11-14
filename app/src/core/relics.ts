@@ -1,5 +1,5 @@
 // Relics: what each does, and which may be offered.
-import { ADRENAL_MAX, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, GUARD_MAX, MIGHT_MAX, type RelicEffect, type Stats } from './battle'
+import { ADRENAL_FROM, ADRENAL_MAX, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, GUARD_MAX, MIGHT_MAX, type RelicEffect, type Stats } from './battle'
 import type { Rarity } from './base'
 import { random } from './rng'
 import { MOMENTUM_MAX } from './attack'
@@ -112,9 +112,9 @@ const relics = {
   gravity: { name: 'Gravity Lens', text: 'Every shot of a knockback weapon knocks back, not only the first', tags: ['force'], pays: ['force'], rarity: 'epic', effect: 'gravity' },
   ironclad: { name: 'Ironclad Lattice', text: 'Whatever builds armor builds it twice as high', tags: ['ward'], pays: ['ward'], rarity: 'epic', effect: 'ironclad' },
   split: { name: 'Split Rounds', text: 'Every attack fires twice the shots, each at half power', tags: ['volley'], pays: ['volley'], rarity: 'epic', effect: 'split' },
-  ram: { name: 'Ram Plating', text: "Every hit does the hero's armor more", tags: ['ward'], pays: ['ward'], effect: 'ram' },
+  ram: { name: 'Ram Plating', text: "Every hit does the hero's armor more, up to its damage", tags: ['ward'], pays: ['ward'], effect: 'ram' },
   overflow: { name: 'Overflow Capacitor', text: `Healing past full health, or past its cap, becomes armor, up to ${GUARD_MAX} past the hero's own`, tags: ['ward'], pays: ['ward'], effect: 'overflow' },
-  adrenal: { name: 'Adrenal Pump', text: `Each hero gains 1 Might at the start of each of its turns, to at most ${ADRENAL_MAX} from it`, tags: ['might'], effect: 'adrenal' },
+  adrenal: { name: 'Adrenal Pump', text: `On its ${ADRENAL_FROM + 1}rd turn, each hero gains ${ADRENAL_MAX} Might`, tags: ['might'], effect: 'adrenal' },
   hairTrigger: { name: 'Hair Trigger', text: 'A weapon of 2 or more shots fires one more', tags: ['volley'], pays: ['volley'], rarity: 'common', effect: 'hairTrigger' },
 } satisfies Record<string, Relic>
 

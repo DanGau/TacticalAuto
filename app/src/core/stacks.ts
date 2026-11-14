@@ -132,7 +132,7 @@ export function stackDamage(battle: Battle, unit: Unit, enemy: Unit, used: Effec
   if (slam > 0) used.push('shieldSlam')
   if (grip > 0) used.push('rimeGrip')
   if (opportune > 0) used.push('opportunist')
-  const ram = has(unit, 'ram') ? unit.armor : 0
+  const ram = has(unit, 'ram') ? Math.min(unit.armor, unit.stats.damage) : 0
   if (ram > 0) used.push('ram')
   return unit.might + combo + slam + grip + opportune + ram + talentDamage(battle, unit, enemy, used, events)
 }
