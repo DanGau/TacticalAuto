@@ -13,6 +13,8 @@ import { CLIFF } from '../core/grid'
 import { callout, chest, dashTo, daze, drawing, effectCallout, fireRocket, float, playShot, shockwave, sourceCallout } from './effects'
 import { drawAcid, drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
+import { badges, BURN, CHILL } from './badges'
+import { cancelOf, QUANTITIES } from '../core/quantities'
 import { cloakLook, create, fade, letter, place, remove, squash, vitals } from './sprites'
 import { CAMERA_MS, type Sprite, type Stage } from './stage'
 import { playUltimate } from './ultimates'
@@ -32,6 +34,9 @@ const TRIGGERS = {
   projectile: { tiles: 1, color: COLOR.crit },
   topple: { tiles: 0, color: COLOR.crit },
 }
+
+/** How high a stack's callout floats over a hit's. */
+const STACK_LIFT = 26
 
 /** What a soldier's order says over it. */
 const ORDERS: Record<Order, string> = { prepare: '👁 READY', sprint: '» SPRINT' }
@@ -99,7 +104,14 @@ function glide(s: Stage, glow: { node: Object3D; tile: Tile }, path: Tile[], ms:
 /** Plays a beat in order. Moves in a row play together; moves by unseen aliens are skipped. */
 export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promise<void> {
   const { sprites, glows } = s
-  for (let i = 0; i < events.length; i++) {
+  let i = 0
+  /** What `id` shows now: as the battle has it, but its health as last drawn while a shot later in the beat has yet to land on it. */
+  const shown = (id: number): ReturnType<typeof vitals> => {
+    const now = vitals(battle, id)
+    const drawn = sprites.get(id)?.drawn
+    return drawn && events.slice(i + 1).some((e) => e.type === 'shot' && e.target === id && e.after) ? [...drawn, now[3]] : now
+  }
+  for (; i < events.length; i++) {
     const e = events[i]
     if (e.type === 'move' && e.with === 'dash') {
       const sprite = sprites.get(e.id)
@@ -141,7 +153,8 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       // A shooter gone from the field later in the beat, as one lifted off, leaves its shot unshown.
       const shooter = battle.units.find((u) => u.id === e.id)
       if (!from || !to || !shooter) continue
-      const after = vitals(battle, e.target)
+      const now = shown(e.target)
+      const after: typeof now = e.after ? [e.after.hp, e.after.armor, e.after.temp, now[3]] : now
       const weapon = attackOf(shooter, e.form)
       const gun = e.secondary ? finisher(secondaryAttack(e.secondary)) : e.opens && !e.lasts ? opener(weapon) : weapon
       const ground = { x: to.at.x, y: to.at.y }
@@ -182,7 +195,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
         }),
       )
       if (e.type === 'spit') {
-        to.drawHp(...vitals(battle, e.target))
+        to.drawHp(...shown(e.target))
         drawAcid(s, battle)
         float(s, callout(s, `ACID -${e.damage}`, COLOR.acid, to))
       } else float(s, callout(s, 'PANICKED', COLOR.psi, to))
@@ -197,17 +210,26 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
     } else if (e.type === 'frozen' || e.type === 'hurt') {
       const on = sprites.get(e.id)
       if (!on) continue
-      if (e.type === 'hurt') on.drawHp(...vitals(battle, e.id))
+      if (e.type === 'hurt') on.drawHp(...shown(e.id))
       float(s, e.type === 'frozen' ? callout(s, battle.units.find((u) => u.id === e.id)?.side === 'alien' ? 'STUNNED' : 'TOO SHAKEN TO ACT', COLOR.psi, on) : callout(s, `${e.cause.toUpperCase()} -${e.amount}`, e.cause === 'acid' ? COLOR.acid : e.cause === 'impact' ? COLOR.crit : COLOR.psi, on))
     } else if (e.type === 'spawn') {
       const unit = battle.units.find((u) => u.id === e.unit.id)
       if (!unit || !unit.revealed) continue
       const born = create(s, { ...unit, x: e.unit.x, y: e.unit.y }, 0, letter(unit))
       await s.tween(PACE.reveal, (t) => fade(born, t))
+    } else if (e.type === 'stacks') {
+      const on = sprites.get(e.id)
+      const unit = battle.units.find((u) => u.id === e.id)
+      if (!on || !unit) continue
+      const [hp, armor, temp] = shown(e.id)
+      on.drawHp(hp, armor, temp, badges({ ...unit, burn: e.burn, chill: e.chill, numb: 0 }))
+      float(s, callout(s, `+${e.added} ${QUANTITIES[e.quantity].icon}`, e.quantity === 'burn' ? BURN : CHILL, on, 15, STACK_LIFT))
     } else if (e.type === 'effect') {
       const on = sprites.get(e.id)
       if (!on) continue
-      on.drawHp(...vitals(battle, e.id))
+      // A cancellation lets the stacks it meets be seen before they go out.
+      if (cancelOf(e.effect)) await s.tween(PACE.cancel, () => {})
+      on.drawHp(...shown(e.id))
       // A demolishing hit has already wrecked what stood in the battle; show it as the hit lands.
       if (e.effect === 'demolish') drawTerrain(s, battle)
       if (e.effect === 'stun') void drawing(s, (fx) => daze(s, fx, on))
@@ -246,14 +268,14 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       for (const id of e.on) {
         const on = sprites.get(id)
         if (!on) continue
-        on.drawHp(...vitals(battle, id))
+        on.drawHp(...shown(id))
         float(s, callout(s, word, e.ended ? COLOR.crit : COLOR.heal, on))
       }
       await s.tween(PACE.reveal, () => {})
     } else if (e.type === 'heal') {
       const to = sprites.get(e.target)
       if (!to) continue
-      to.drawHp(...vitals(battle, e.target))
+      to.drawHp(...shown(e.target))
       float(s, sourceCallout(s, e.src, to, ` +${e.amount}`))
     } else if (e.type === 'death') {
       const sprite = sprites.get(e.id)

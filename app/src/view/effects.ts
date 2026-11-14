@@ -5,7 +5,7 @@ import type { GameEvent } from '../core/combat-event'
 import { sourceName } from '../core/source-names'
 import { srcOf, type Src } from '../core/sources'
 import { PACE } from '../core/pace'
-import { CANCELS } from '../core/quantities'
+import { cancelOf } from '../core/quantities'
 import type { Attack } from './attacks'
 import { along, lerp } from './camera'
 import { blast } from './blast'
@@ -57,7 +57,7 @@ const CANCEL_LIFT = 90
 /** What a gear effect did to a unit, in a word: the effect's name, and the health it gave or took. */
 export function effectCallout(s: Stage, e: Extract<GameEvent, { type: 'effect' }>, over: Sprite): Label {
   // A cancellation stands out above the rest, so the player learns why a build stalls.
-  const cancel = Object.values(CANCELS).find((c) => c.effect === e.effect)
+  const cancel = cancelOf(e.effect)
   if (cancel) return callout(s, `⚠ ${cancel.name.toUpperCase()}`, COLOR.cancel, over, CANCEL_SIZE, CANCEL_LIFT)
   return sourceCallout(s, e.src, over, e.amount === 0 ? '' : ` ${e.amount > 0 ? '+' : ''}${e.amount}`)
 }

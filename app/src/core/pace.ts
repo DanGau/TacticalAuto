@@ -1,6 +1,7 @@
 // How long the view takes to play each event, which also times battles in the sim.
 import type { GameEvent } from './combat-event'
 import { distance } from './grid'
+import { cancelOf } from './quantities'
 
 /** How long the view takes to play each kind of event, in ms. The view animates by these; the sim times battles by them. */
 export const PACE = {
@@ -44,6 +45,8 @@ export const PACE = {
   flight: 240,
   flightTile: 70,
   impact: 220,
+  /** A cancellation: the stacks it meets show, then go out. */
+  cancel: 420,
 }
 
 /** How long one jump takes, besides the walk it is part of. */
@@ -62,7 +65,7 @@ export const overlaps = (events: GameEvent[]) => events.some((e) => e.type === '
 export const staggerOf = (events: GameEvent[]) => (events.some((e) => e.type === 'shot' && e.opens) ? PACE.combo : PACE.stagger) + events.reduce((sum, e) => sum + beyond(e), 0)
 
 /** Events the view shows at once, as a word over a unit or a change of marks, without waiting on them. */
-const INSTANT = new Set<GameEvent['type']>(['order', 'feed', 'effect', 'carried', 'grabbed', 'extract', 'frozen', 'hurt', 'heal', 'cloak'])
+const INSTANT = new Set<GameEvent['type']>(['stacks', 'order', 'feed', 'effect', 'carried', 'grabbed', 'extract', 'frozen', 'hurt', 'heal', 'cloak'])
 export const instant = (e: GameEvent) => INSTANT.has(e.type)
 
 /** A unit's ms per tile. */
@@ -90,7 +93,7 @@ export function beatMs(events: GameEvent[], pace: Map<number, number>, shown: Se
       if (pace.has(e.id)) walk = e.with === 'dash' ? PACE.lunge : Math.max(walk, walkMs([{ path: e.path, pace: pace.get(e.id)!, leaps: e.leaps }]))
       continue
     }
-    if (instant(e)) continue
+    if (instant(e) && !(e.type === 'effect' && cancelOf(e.effect))) continue
     ms += walk
     walk = 0
     if (e.type === 'shot') ms += e.lasts ?? PACE.attack
@@ -104,6 +107,7 @@ export function beatMs(events: GameEvent[], pace: Map<number, number>, shown: Se
     else if (e.type === 'spawn' || e.type === 'freed') ms += shown.has(e.unit.id) ? PACE.reveal : 0
     else if (e.type === 'death' || e.type === 'saved' || e.type === 'escaped') ms += PACE.death
     else if (e.type === 'used') ms += PACE.reveal
+    else if (e.type === 'effect') ms += PACE.cancel
   }
   return ms + walk
 }

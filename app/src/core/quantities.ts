@@ -40,6 +40,9 @@ export const CANCELS = {
 
 export type Cancel = keyof typeof CANCELS
 
+/** The cancellation whose floating word is `effect`, if any. */
+export const cancelOf = (effect: string) => Object.values(CANCELS).find((c) => c.effect === effect)
+
 /** The cancellations a squad making `made` sets off: both halves made. */
 export const cancelling = (made: readonly Quantity[]): Cancel[] => (Object.keys(CANCELS) as Cancel[]).filter((id) => CANCELS[id].pair.every((q) => made.includes(q)))
 

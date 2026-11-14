@@ -20,6 +20,7 @@ export const carried = (unit: Unit, stacks: number) => (has(unit, 'carry') ? 2 *
 /** Adds burn stacks to `target`, to at most BURN_MAX, unless it cannot burn or is numb. Chill on it cancels them; see meet. */
 export function kindle(battle: Battle, target: Unit, stacks: number, events: GameEvent[] = []): void {
   if (target.hp <= 0 || fireproof(battle, target) || target.numb > 0) return
+  if (stacks > 0) events.push({ type: 'stacks', id: target.id, quantity: 'burn', added: stacks, burn: Math.min(BURN_MAX, target.burn + stacks), chill: target.chill })
   const left = meet(battle, target, stacks, 'chill', events)
   if (left > 0) target.burn = Math.min(BURN_MAX, target.burn + left)
 }
@@ -27,6 +28,7 @@ export function kindle(battle: Battle, target: Unit, stacks: number, events: Gam
 /** Adds chill stacks to `target`, to at most CHILL_MAX, unless it cannot be chilled; burn on it cancels them first. At CHILL_FREEZE it freezes and loses its next action; a boss never freezes. */
 export function chillUnit(battle: Battle, target: Unit, stacks: number, events: GameEvent[]): void {
   if (target.hp <= 0 || target.resists.includes('chill') || target.numb > 0) return
+  if (stacks > 0) events.push({ type: 'stacks', id: target.id, quantity: 'chill', added: stacks, burn: target.burn, chill: Math.min(CHILL_MAX, target.chill + stacks) })
   const left = meet(battle, target, stacks, 'burn', events)
   if (left <= 0) return
   target.chill = Math.min(CHILL_MAX, target.chill + left)

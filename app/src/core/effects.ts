@@ -7,7 +7,7 @@ import { DUOS, type DuoId } from './duos'
 import { EFFECTS } from './gear'
 import { UTILITIES } from './utilities'
 import { RELICS } from './relics'
-import { CANCELS } from './quantities'
+import { cancelOf } from './quantities'
 import { PERKS } from './perks'
 import { SKILLS, type SkillId } from './skills'
 import { WEAPONS, type WeaponId } from './weapons'
@@ -24,7 +24,7 @@ export function effectName(effect: Effect | Ability, squad: { skills: SkillId[];
   if (effect === 'carry') return 'Carry'
   if (effect === 'frozen') return 'Frozen'
   if (effect === 'reckoning') return "Executioner's Oath"
-  const cancel = Object.values(CANCELS).find((c) => c.effect === effect)
+  const cancel = cancelOf(effect)
   if (cancel) return cancel.name
   if (effect in DUOS) return DUOS[effect as DuoId].name
   if (effect in EXAMS && effect !== 'thorns') return EXAMS[effect as Exam].name
