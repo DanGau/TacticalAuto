@@ -1,5 +1,5 @@
 // Relics: what each does, and which may be offered.
-import { ADRENAL_FROM, ADRENAL_MAX, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, GUARD_MAX, LODESTONE_REACH, MIGHT_MAX, SHELL_MAX, STAGGER_DAMAGE, type RelicEffect, type Stats } from './battle'
+import { ADRENAL_FROM, ADRENAL_MAX, BRIDGE_FACTOR, THERMAL_FACTOR, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, GUARD_MAX, LODESTONE_REACH, MIGHT_MAX, SHELL_MAX, STAGGER_DAMAGE, type RelicEffect, type Stats } from './battle'
 import type { Rarity } from './base'
 import { random } from './rng'
 import { MOMENTUM_MAX } from './attack'
@@ -68,8 +68,8 @@ const relics = {
   wildfire: { name: 'Wildfire Spores', text: 'An alien that dies burning gives its burn to every alien beside it', reads: ['burn', 'kill'], makes: ['burn'], effect: 'wildfire' },
   salamander: { name: 'Salamander Sigil', text: `Crits add ${BURN_STACKS} burn stacks to the target`, reads: ['crit'], makes: ['burn'], rarity: 'common', effect: 'ignite' },
   lattice: { name: 'Frost Lattice', text: 'Crits add a chill stack to the target', reads: ['crit'], makes: ['chill'], rarity: 'common', effect: 'freeze' },
-  shatter: { name: 'Shatterglass Edge', text: "Moving a frozen alien shatters it in place of thawing it: the hero's damage for each chill stack on it, and it stays frozen", reads: ['moved', 'chill'], bridge: 'thaw', rarity: 'epic', effect: 'shatter' },
-  thermal: { name: 'Thermal Shock Core', text: "Burn meeting chill on an alien detonates in place of cancelling: twice the hero's damage for each stack that meets, to it, and half that to each alien beside it", reads: ['burn', 'chill'], bridge: 'quench', rarity: 'epic', effect: 'thermal' },
+  shatter: { name: 'Shatterglass Edge', text: `Moving a chilled alien shatters it: ${BRIDGE_FACTOR} times the hero's damage for each chill stack on it; a frozen one stays frozen`, reads: ['moved', 'chill'], bridge: 'thaw', rarity: 'epic', effect: 'shatter' },
+  thermal: { name: 'Thermal Shock Core', text: `Burn meeting chill on an alien detonates in place of cancelling: ${THERMAL_FACTOR} times the hero's damage for each stack of both, to it, and half that to each alien beside it`, reads: ['burn', 'chill'], bridge: 'quench', rarity: 'epic', effect: 'thermal' },
   spotter: { name: 'Spotter Network', text: `Hits on a target with ${TUNING.spend.marks} or more marks spend them: +${SPENT} a mark to it, half that to each alien beside it; the target is weakened`, reads: ['mark'], effect: 'spotter' },
   hunt: { name: 'Eye of the Hunt', text: 'Crits add a mark to the target', reads: ['crit'], makes: ['mark'], rarity: 'common', effect: 'exploit' },
   bloodforged: { name: 'Bloodforged Plate', text: `A kill gives the hero 1 armor, up to ${MOMENTUM_MAX}`, reads: ['kill'], makes: ['armor'], effect: 'momentum' },
@@ -83,7 +83,7 @@ const relics = {
   fracture: { name: 'Frost Fracture', text: `A frozen alien that dies shatters: ${FRACTURE_DAMAGE} damage for each chill stack on it to every alien beside it`, reads: ['chill', 'kill'], rarity: 'epic', effect: 'fracture' },
   conductor: { name: 'Cryo Conductor', text: 'Hits on a chilled target give half its chill to every alien beside it', reads: ['chill'], makes: ['chill'], effect: 'conductor' },
   kindling: { name: 'Kindling Plates', text: `Whoever hits a hero who has armor left takes ${BURN_STACKS} burn stacks`, reads: ['armor', 'hurt'], makes: ['burn'], effect: 'kindling' },
-  overkill: { name: 'Overkill Coils', text: 'Damage beyond what a kill needs hits the nearest other alien', reads: ['overkill'], effect: 'overkill' },
+  overkill: { name: 'Overkill Coils', text: "Damage beyond what a kill needs hits the nearest other alien, and half adds to the hero's next hit", reads: ['overkill'], effect: 'overkill' },
   brittle: { name: 'Brittle Frost', text: 'Hits on a chilled target ignore its armor', reads: ['chill'], effect: 'brittle' },
   pyre: { name: 'Pyre Censer', text: `A burning alien sets its tile ablaze for 2 turns; an alien that ends its move in fire, or is driven onto it, has at least ${BURN_STACKS} burn stacks`, reads: ['burn', 'moved'], makes: ['burn'], effect: 'pyre' },
   hex: { name: "Witch's Hex", text: 'An alien that dies passes its burn, chill and marks to the nearest alien', reads: ['kill', 'burn', 'chill', 'mark'], effect: 'hex' },
@@ -117,8 +117,8 @@ const relics = {
   hairTrigger: { name: 'Hair Trigger', text: 'A weapon of 2 or more shots fires one more', makes: ['shots'], rarity: 'common', effect: 'hairTrigger' },
   stagger: { name: 'Stagger Sights', text: `Hits on an alien knocked back, pulled or slid since its last turn do +${STAGGER_DAMAGE} damage`, reads: ['moved'], effect: 'stagger' },
   lodestone: { name: 'Lodestone Harness', text: `As each turn begins, the hero with the most armor pulls the nearest alien within ${LODESTONE_REACH} tiles to beside it`, makes: ['moved', 'hurt'], effect: 'lodestone' },
-  shell: { name: 'Reactive Shell', text: `Each hit a hero takes gives it 1 armor, up to ${SHELL_MAX} past its own`, reads: ['hurt'], makes: ['armor'], rarity: 'common', effect: 'shell' },
-  lockOn: { name: 'Lock-On Rig', text: "Moving a marked alien keeps its marks, and it takes the hero's damage for each", reads: ['moved', 'mark'], bridge: 'unlock', rarity: 'epic', effect: 'lockOn' },
+  shell: { name: 'Reactive Shell', text: `The first hit a hero takes each round gives it 1 armor, up to ${SHELL_MAX} past its own`, reads: ['hurt'], makes: ['armor'], rarity: 'common', effect: 'shell' },
+  lockOn: { name: 'Lock-On Rig', text: `Moving a marked alien keeps its marks, and it takes ${BRIDGE_FACTOR} times the hero's damage for each`, reads: ['moved', 'mark'], bridge: 'unlock', rarity: 'epic', effect: 'lockOn' },
 } satisfies Record<string, Relic>
 
 export type RelicId = keyof typeof relics

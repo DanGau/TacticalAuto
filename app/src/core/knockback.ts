@@ -5,7 +5,7 @@ import type { GameEvent } from './combat-event'
 import { blocked, CLIFF, distance, edgeBetween, freeTilesNear, heightAt, onGrid, openNear, unitAt, unwalled, walks } from './grid'
 import { fireproof, foeHas, has, onTile } from './fighters'
 import { SLAM_DAMAGE, wound } from './wound'
-import { displaced, fell, kindle, slammed } from './stacks'
+import { displaced, fell, kindle, slammed, strikerOf } from './stacks'
 
 /** Damage a fall beyond the unit's jump does for each level dropped; what one over the edge does to a hero or a boss, which catches the edge. Any other alien is lost. */
 export const FALL_DAMAGE = 2
@@ -177,7 +177,8 @@ export function drive(battle: Battle, target: Unit, step: Tile, tiles: number, e
   }
   if (!stopped || slam === 0) return false
   const into = unitAt(battle, target.x + step.x, target.y + step.y)
-  const hard = slam + Math.max(0, path.length - tiles)
+  // A chilled alien that slides into something takes the blow of the hero that sent it.
+  const hard = slam + (path.length > tiles ? strikerOf(battle, target).stats.damage : 0)
   events.push(fx(target.id, effect, -hard))
   wound(battle, target, hard, events)
   slammed(battle, target, events)

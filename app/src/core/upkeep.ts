@@ -39,6 +39,7 @@ export function upkeep(battle: Battle): GameEvent[] {
     if (unit.hp <= 0) continue
     const shifted = unit.shifted
     unit.shifted = false
+    if (unit.numb > 0) unit.numb--
     unit.moved = false
     unit.order = null
     if (unit.suppressed > 0) unit.suppressed--

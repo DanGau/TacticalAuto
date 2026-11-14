@@ -36,7 +36,8 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
   const lost = Math.min(target.hp, damage - absorbed)
   target.armor -= plated ? 1 : absorbed
   target.hp -= damage - absorbed
-  if (target.hp > 0 && hit > 0 && has(target, 'shell') && target.armor < armorCap(target, target.stats.armor + SHELL_MAX)) {
+  if (target.hp > 0 && hit > 0 && has(target, 'shell') && target.shelled !== battle.round && target.armor < armorCap(target, target.stats.armor + SHELL_MAX)) {
+    target.shelled = battle.round
     target.armor++
     events.push(fx(target.id, 'shell', 0))
   }

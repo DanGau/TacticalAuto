@@ -1,7 +1,7 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
 import { PLATES_UNDER } from './exams'
 import { attackSrc, fx, srcOf } from './sources'
-import { type Battle, type Unit, BASE_STATS, GUARD_MAX, SUPPRESS_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_STACKS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE, STAGGER_DAMAGE, VOLATILE_DAMAGE } from './battle'
+import { type Battle, type Unit, BASE_STATS, GUARD_MAX, SUPPRESS_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_STACKS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE, STAGGER_DAMAGE, VOLATILE_DAMAGE, NUMB_SOAK } from './battle'
 import { cloakOn } from './abilities'
 import { duoCrit, duoDamage, duoHit } from './duo-effects'
 import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './keystones'
@@ -10,7 +10,7 @@ import { PARRY_SOAK } from './doctrines'
 import { FRAG_SPLASH, KNOCK_TILES, type Secondary } from './secondaries'
 import type { GameEvent } from './combat-event'
 import { aiming, powering, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
-import { armorCap, carried, volley, WEAKEN_TURNS, burnFrom, chillFrom, chillUnit, empower, highCrit, kindle, markUnit, scaledDamage, spendStacks, stackDamage, struck } from './stacks'
+import { armorCap, carried, carryOverkill, volley, WEAKEN_TURNS, burnFrom, chillFrom, chillUnit, empower, highCrit, kindle, markUnit, scaledDamage, spendStacks, stackDamage, struck } from './stacks'
 import { mend, wound } from './wound'
 import { shoveOff, drive, knockback, knocksInto, pushesOff } from './knockback'
 import { SLAM_DAMAGE } from './wound'
@@ -127,6 +127,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     (unit.suppressed > 0 ? Math.max(SUPPRESS_DAMAGE, Math.round(unit.stats.damage / 4)) : 0) +
     (has(enemy, 'dodge') ? DODGE_SOAK : 0) +
     (parried ? PARRY_SOAK : 0) +
+    (enemy.numb > 0 ? NUMB_SOAK : 0) +
     (shielded ? BLOCK_SOAK : 0)
 
   const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.mark > 0, 'apex', 1) + when(enemy.hp <= enemy.stats.hp / 2, 'deadeye', 1) + when(unit.hp <= unit.stats.hp / 2, 'berserk', 1) > 0 || duoCrit(battle, unit, enemy, events)
@@ -153,11 +154,13 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(unit.armor > 0, 'armored', 1) +
     when(enemy.rooted > 0, 'net', 2) +
     when(enemy.shifted, 'stagger', STAGGER_DAMAGE) +
+    when(!!unit.banked, 'overkill', unit.banked ?? 0) +
     when(enemy.boss, 'bounty', BOUNTY_DAMAGE) +
     stackDamage(battle, unit, enemy, used, events) +
     spendStacks(battle, unit, enemy, used, events) +
     fury(battle, unit, enemy) +
     duoDamage(battle, unit, enemy, events)
+  if (unit.banked && used.includes('overkill')) unit.banked = 0
   // Light shots split bonuses by power too; a heavy blow adds them once. A fraction is a chance of one point more, so small shots add up to their share.
   const power = blow?.kit.power ?? 1
   // Might adds whole to every shot, so many shots multiply it.
@@ -216,11 +219,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     wound(battle, bounce, half, events)
   }
   const spare = enemy.hp <= 0 ? when(damage > left, 'overkill', damage - left) : 0
-  const next = spare > 0 ? nearest(battle.units.filter((u) => u.side === enemy.side && u.hp > 0), enemy) : undefined
-  if (next) {
-    events.push(fx(next.id, 'overkill', -spare))
-    wound(battle, next, spare, events)
-  }
+  if (spare > 0) carryOverkill(battle, unit, enemy, spare, events)
   const splash = when(damage > 0, 'volley', Math.ceil(damage / 2)) || when(enemy.hp <= 0, 'cleave', CLEAVE_DAMAGE)
   for (const other of splash > 0 ? beside : []) {
     events.push(fx(other.id, has(unit, 'volley') ? 'volley' : 'cleave', -splash))

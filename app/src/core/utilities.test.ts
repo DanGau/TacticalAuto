@@ -82,7 +82,8 @@ test('every boon lasts its rounds, then ends on the units it held and gives back
     expect(battle.boons).toHaveLength(0)
     for (const u of battle.units.filter((u) => u.hp > 0 && before.has(u.id) && (isSoldier(u) || u.side === 'alien'))) {
       const was = before.get(u.id)!
-      if (['thrusters', 'gravity'].includes(id)) expect(u.stats.move).toBeLessThanOrEqual(was.move)
+      if (id === 'thrusters' && isSoldier(u)) expect(u.stats.move).toBeLessThanOrEqual(was.move)
+      if (id === 'gravity' && u.side === 'alien') expect(u.stats.move).toBeGreaterThanOrEqual(was.move)
       if (id === 'overcharge' && isSoldier(u)) expect(u.stats.damage).toBe(was.damage - OVERCHARGE)
       if (id === 'dampener' && u.side === 'alien' && was.damage > 1) expect(u.stats.damage).toBeGreaterThan(was.damage)
       if (id === 'farsight' && isSoldier(u)) expect(u.stats.range).toBe(was.range - FARSIGHT)

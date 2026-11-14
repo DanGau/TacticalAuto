@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { beforeAll, expect, test } from 'vitest'
 import { powerOf } from './skills'
 import { apply } from './apply'
 import { enterAt, begun } from './roads'
@@ -9,6 +9,10 @@ import { alienUnit } from './spawn'
 import { shoot } from './attack'
 import { spotted } from './fighters'
 import { harm, threat } from './threat'
+import { TUNING } from './tuning'
+
+// These choices are staged on aliens of a set toughness, whatever the balance numbers are.
+beforeAll(() => void Object.assign(TUNING, { alienHp: 0.4 }))
 
 function arena(aliens: { kind: AlienKind; x: number; y: number }[]): { battle: Battle; hero: Unit; aliens: Unit[] } {
   const run = begun(1)

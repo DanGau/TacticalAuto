@@ -60,6 +60,12 @@ export const ADRENAL_MAX = 1
 export const GUARD_MAX = 6
 /** Damage Stagger Sights adds to hits on a moved alien; tiles Lodestone Harness pulls from; armor Reactive Shell builds past a hero's own. */
 export const STAGGER_DAMAGE = 3
+/** Own turns a cancellation leaves an alien numb; what Thermal Shock Core multiplies, and Shatterglass Edge and Lock-On Rig. */
+export const NUMB_TURNS = 2
+export const THERMAL_FACTOR = 3
+/** Damage less each hit does to a numb alien. */
+export const NUMB_SOAK = 2
+export const BRIDGE_FACTOR = 2
 /** The least a Volatile kill bursts for. */
 export const VOLATILE_DAMAGE = 2
 export const LODESTONE_REACH = 6
@@ -215,7 +221,7 @@ export interface Reserve {
 }
 
 /** What every unit starts a battle with: no stacks, no counts. */
-export const FRESH = { burn: 0, chill: 0, mark: 0, frozen: false, shifted: false, might: 0, combo: 0, comboOn: 0, exposed: 0, hits: 0 }
+export const FRESH = { burn: 0, chill: 0, mark: 0, frozen: false, shifted: false, numb: 0, might: 0, combo: 0, comboOn: 0, exposed: 0, hits: 0 }
 
 export interface Unit {
   id: number
@@ -252,8 +258,14 @@ export interface Unit {
   chill: number
   /** Frozen by its chill: it loses its next action. */
   frozen: boolean
+  /** Damage Overkill Coils banked from its last kill for its next hit. */
+  banked?: number
+  /** The round Reactive Shell last gave it armor. */
+  shelled?: number
   /** Knocked back, pulled or slid since its own turn began. */
   shifted: boolean
+  /** Own turns left in which a cancellation leaves it taking no burn, chill or marks. */
+  numb: number
   /** Own turns for which it is rooted and cannot move. */
   rooted: number
   /** Own turns for which moving hurts it, by a booming hit. */
