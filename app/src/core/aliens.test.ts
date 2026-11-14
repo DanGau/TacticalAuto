@@ -522,11 +522,11 @@ test('Ground Slam hurts every alien beside the soldier and hurls each back; Hurl
   expect(hurl.aliens[0]).toMatchObject({ x: 10, y: 12, hp: 99 - 1 - HURL_DAMAGE })
 })
 
-test('Intimidate stuns every alien near the soldier but a boss; Force Field armors a squadmate in trouble', () => {
+test('EMP Pulse stuns every alien near the soldier but a boss; Force Field armors a squadmate in trouble', () => {
   const { soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 12 }, { kind: 'trooper', x: 12, y: 10 }, { kind: 'trooper', x: 8, y: 10, boss: true }])
-  Object.assign(soldier, { effects: ['warcry'], stats: { ...soldier.stats, move: 0 } })
-  const events = until((all) => all.some((e) => e.type === 'effect' && e.effect === 'warcry'))
-  expect(events.filter((e) => e.type === 'effect' && e.effect === 'warcry').map((e) => (e as { id: number }).id)).toEqual([aliens[0].id, aliens[1].id])
+  Object.assign(soldier, { effects: ['emp'], stats: { ...soldier.stats, move: 0 } })
+  const events = until((all) => all.some((e) => e.type === 'effect' && e.effect === 'emp'))
+  expect(events.filter((e) => e.type === 'effect' && e.effect === 'emp').map((e) => (e as { id: number }).id)).toEqual([aliens[0].id, aliens[1].id])
 
   const field = arena([{ kind: 'trooper', x: 10, y: 20 }])
   Object.assign(field.soldier, { effects: ['forceField'], hp: 10 })

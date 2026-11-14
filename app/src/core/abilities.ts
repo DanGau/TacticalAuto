@@ -39,13 +39,11 @@ export function stun(caught: Unit[], effect: Effect): GameEvent[] {
     })
 }
 
-/**
- * Intimidate and EMP Pulse: once per battle, with two or more foes within STUN_REACH of the soldier, or for an EMP of
- * its machines too, each is stunned.
- */
-export function pulse(battle: Battle, unit: Unit, effect: 'warcry' | 'emp'): GameEvent[] {
+/** EMP Pulse: once per battle, with two or more foes within STUN_REACH of the soldier or its machines, each is stunned. */
+export function pulse(battle: Battle, unit: Unit): GameEvent[] {
+  const effect = 'emp'
   if (!has(unit, effect) || unit.spent.includes(effect)) return []
-  const centres = [unit, ...(effect === 'emp' ? battle.units.filter((u) => u.summoner !== null && u.summoner === unit.soldier) : [])]
+  const centres = [unit, ...battle.units.filter((u) => u.summoner !== null && u.summoner === unit.soldier)]
   const caught = foes(battle, unit).filter((u) => !u.boss && centres.some((c) => distance(c, u) <= STUN_REACH))
   if (caught.length < 2) return []
   unit.spent.push(effect)

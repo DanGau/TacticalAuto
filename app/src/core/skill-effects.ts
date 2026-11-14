@@ -15,7 +15,7 @@ export const SKILL_EFFECTS = [
   'pierce', 'revive', 'inspire', 'barrier', 'surgeon', 'surge', 'secondWind', 'skirmish', 
   'cleave', 'taunt', 'steadfast', 'bigBlast', 'concussion', 'assassinate', 'slayer', 'volley', 'elusive', 'haste',
   'vitality', 'bane', 'ward', 'drone', 'inferno', 'fireSuit', 'tinder', 'searing', 'backdraft', 'smolder',
-  'icebreak', 'deepFreeze', 'permafrost', 'rimeLock', 'leap', 'hurl', 'slam', 'warcry',
+  'icebreak', 'deepFreeze', 'permafrost', 'rimeLock', 'leap', 'hurl', 'slam',
   'emp', 'flashbang', 'forceField', 'shadowStrike', 'vanish', 'daze', 'afterimage', 'bloodbath',
   'riposte', 'earthshaker', 'impact', 'fortress', 'aftershock', 'sureShot', 'apex', 'warMachine', 'endlessSwarm',
   'tesla', 'fontOfLife', 'sacredGround', 'command', 'firestorm', 'conflagration', 'hellfire', 'frozenHeart',

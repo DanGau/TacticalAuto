@@ -81,7 +81,7 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], cha
     const rung = extraction ? 2 : rungOf(run.stop)
     const big = bigOneStats(run.soldiers.length, rung, BASE_STATS)
     // A leg's boss is the build's test: long to kill, so a squad whose pieces pay off ends it sooner, but no harder hitting.
-    const stats = { ...big, ...(extraction ? { hp: Math.round(big.hp * LEG_BOSS.hp), damage: big.damage - LEG_BOSS.damage } : {}), range: BASE_STATS.range + (k >= 2 ? 1 : 0) }
+    const stats = { ...big, ...(extraction ? { hp: Math.round(big.hp * LEG_BOSS.hp), damage: big.damage - LEG_BOSS.damage } : { hp: Math.round(big.hp * ELITE_HP) }), range: BASE_STATS.range + (k >= 2 ? 1 : 0) }
     const escorts = Array.from({ length: escort }, (_, i) => alien(i % 2 === 0 ? 'zealot' : 'vise'))
     aliens.unshift({ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: extraction && k >= 1, target: false, resists: [], exam: run.bosses[k] }, ...escorts)
   }
@@ -93,6 +93,9 @@ export const HARVESTERS_MORE_FROM = 2
 
 /** What a leg's boss multiplies its health by, and the damage it does less. */
 export const LEG_BOSS = { hp: 3.2, damage: 4 }
+
+/** What an elite's Big One multiplies its health by, so it lasts long enough for a build to pay. */
+export const ELITE_HP = 1.5
 
 /** What an ambush's Hunter multiplies the strongest soldier's health and damage by. */
 export const HUNTER = { hp: 2, damage: 1.2 }

@@ -78,7 +78,7 @@ function actNext(battle: Battle): GameEvent[] {
       unit.charges <= 0 ? [] : unit.ability === 'rocket' ? blast(battle, unit, seen, ROCKET_DAMAGE + (has(unit, 'impact') ? IMPACT_DAMAGE : 0), has(unit, 'bigBlast') ? BIG_BLAST_RADIUS : BLAST_RADIUS) : unit.ability === 'napalm' ? napalm(battle, unit, seen) : []
     if (unit.ability === 'rocket') fired.push(...firefall(battle, unit, fired))
     if (healed.length + fired.length > 0 && !(has(unit, 'firestorm') && fired.some((e) => e.type === 'death' && e.id !== unit.id))) unit.charges--
-    const powers = [...ultimate(battle, unit, seen), ...pulse(battle, unit, 'warcry'), ...pulse(battle, unit, 'emp'), ...flashbang(battle, unit, seen), ...forceField(battle, unit), ...leap(battle, unit, seen)]
+    const powers = [...ultimate(battle, unit, seen), ...pulse(battle, unit), ...flashbang(battle, unit, seen), ...forceField(battle, unit), ...leap(battle, unit, seen)]
     const slammed = fired.length > 0 ? [] : slam(battle, unit)
     const levered = fired.length + slammed.length > 0 ? [] : leverage(battle, unit)
     const primary = fired.length > 0 ? fired : slammed.length > 0 ? slammed : levered.length > 0 ? levered : [...dash(battle, unit, seen), ...weaponAttack(battle, unit, seen)]

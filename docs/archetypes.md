@@ -4,13 +4,13 @@ How a build scales, borrowed from Slay the Spire. Each archetype has causes that
 
 ## The seven rules
 
-1. **Long fights.** Leg Guardians and elites are few tough aliens that last 3 to 5 rounds, so scaling has time to pay. Guardians are the power check.
+1. **Long fights.** Leg Guardians and elites' Big Ones are few tough aliens that last 3 to 5 rounds, so scaling has time to pay. Guardians are the power check.
 2. **Multiplication.** Might adds its whole value to every shot, as Strength does to every hit. A payoff adds the hero's damage for each stack it spends, so stacks multiply damage; a hit spends by one payoff. Catalyst Prism doubles a target's stacks.
 3. **Frequency.** On-hit effects fire on every shot of a multi-shot weapon, so shots × stacks a shot is a build. Engines add shots.
 4. **Defense scales too.** Spending stacks also shields the hero, stuns or weakens; armor builds and hits back; healing past full becomes armor.
 5. **Rule-breakers.** One relic per archetype changes how its mechanic works.
 6. **Guardians as exams.** Each leg's Guardian has a trait shown on the map from the leg's start: the gap it tests and the builds that pass it.
-7. **A focused pool.** Relic offers favour keywords the squad holds, the first one a payoff of what it causes. A shop may drill one hero as the squad's Carry: its hits add twice the stacks.
+7. **A focused pool.** Relic offers favour keywords the squad holds, the first one a payoff of what it causes. A shop drills one hero of the player's choice as the squad's Carry: its hits add twice the stacks.
 
 ## Archetypes
 
@@ -22,6 +22,8 @@ How a build scales, borrowed from Slay the Spire. Each archetype has causes that
 | Force | Shoving, Thundering, Tethered gear | Domino Rig | Kinetic Engine, Toppling gear | Gravity Lens: every shot knocks back | Thorned |
 | Guard | Alien Alloys, Bracing gear, Bloodforged Plate | Adaptive Plating, Overflow Capacitor | Ram Plating: the armor on every hit | Ironclad Lattice: armor builds twice as high | Thorned, Berserker |
 | Volley | Rifle, SMG, Machine Gun, Twin Pistols | Hair Trigger, Quick Draw, Twinned gear | Might on every shot: Blood Rite, Adrenal Pump | Split Rounds: twice the shots at half power | Regenerator |
+
+Each class leans to one or two: Pyro burn (Stoke spends it), Cryo chill (Glass Edge), Sniper marks (Called Shot), Heavy knockback and armor (Kinetic Core), Assault armor (Bracer), Phantom volleys (Flurry), Engineer marks (Spotter Drones).
 
 Thermal Shock Core and Catalyst Prism tie burn, chill and marks together. Sapping gear weakens on every hit.
 
