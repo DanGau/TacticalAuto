@@ -152,12 +152,12 @@ function travelLabel(run: Run, stop: Stop, next: 'battle' | 'key' | 'final'): st
   return `${stop.aliens.length} aliens${hunt > 0 ? ` + ${hunt} hunting` : ''}${stop.challenge === 'bigOne' ? ' + boss' : ''}`
 }
 
-/** What a stop tests, and which utility held answers it, or that none does. */
+/** What a stop tests, and which utility held answers it. */
 function readChallenge(run: Run, stop: Stop): string {
   if (!stop.challenge) return ''
   const challenge = CHALLENGES[stop.challenge]
   const held = run.utilities.filter((id) => carries(id, challenge.answers))
-  return `<span title="${challenge.name}: ${challenge.test}">${challenge.icon} ${THREATS[stop.challenge]}</span> <small class="${held.length > 0 ? 'down' : 'up'}">${held.length > 0 ? `Held: ${held.map((id) => UTILITIES[id].name).join(', ')}` : 'No answer held'}</small>`
+  return `<span title="${challenge.name}: ${challenge.test}">${challenge.icon} ${THREATS[stop.challenge]}</span>${held.length > 0 ? ` <small class="down">Held: ${held.map((id) => UTILITIES[id].name).join(', ')}</small>` : ''}`
 }
 
 /** What the squad faces at a stop, as the map's heading. */
