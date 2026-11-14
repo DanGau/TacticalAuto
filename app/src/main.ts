@@ -5,10 +5,10 @@ import type { GameEvent } from './core/combat-event'
 import { createRun } from './core/run'
 import { type Run } from './core/run-state'
 import { step } from './core/step'
-import { PACE } from './core/pace'
 import { brief } from './ui/briefing'
 import { introduce, newcomers } from './ui/intro'
 import { createUi } from './ui/ui'
+import { beat, type Player } from './ui/beat'
 import { createLog } from './ui/log'
 import { installKit } from './ui/kit'
 import { createView } from './view/view'
@@ -95,6 +95,15 @@ const ui = createUi(act)
 const log = createLog()
 installKit(view, state)
 
+const player: Player = {
+  step: () => step(state),
+  turn: () => state.battle?.turn,
+  settle: () => view.settle(),
+  update: () => ui.update(state),
+  pause: (ms) => new Promise((done) => setTimeout(done, ms)),
+  show: (events) => show(events, true),
+}
+
 window.debug = {
   snapshot: () => structuredClone(state),
   apply: act,
@@ -105,7 +114,7 @@ window.debug = {
     return structuredClone(state)
   },
   async watch(n) {
-    for (let i = 0; i < n; i++) await show(step(state), true)
+    for (let i = 0; i < n; i++) await beat(player)
   },
   edit(code) {
     new Function('state', code)(state)
@@ -121,15 +130,7 @@ if (!params.has('manual')) {
   for (;;) {
     await showing
     if (state.phase === 'battle' && state.battle?.phase === 'battle') {
-      const side = state.battle.turn
-      const events = step(state)
-      // A beat that passes the turn opens the new side's turn: the old side's attacks finish, then a breath.
-      if (state.battle?.turn !== side) {
-        await view.settle()
-        ui.update(state)
-        await new Promise((done) => setTimeout(done, PACE.turn))
-      }
-      await show(events, true)
+      const events = await beat(player)
       // The battle waits while the player meets each new kind of alien.
       for (const kind of newcomers(state.battle, events)) await introduce(kind)
     } else await new Promise(requestAnimationFrame)
