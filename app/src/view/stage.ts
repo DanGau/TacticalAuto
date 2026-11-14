@@ -21,6 +21,8 @@ export interface Sprite {
   marks: BadgeBoard
   /** Redraws the picture with the given health, armor and temp HP. */
   drawHp(hp: number, armor: number, temp?: number, badges?: Badge[]): void
+  /** The health, armor and temp HP last drawn. */
+  drawn: [number, number, number]
   /** The tile the sprite stands on, which lags the battle while a beat animates. */
   tile: Tile
   /** Where its feet show in the camera's picture, which a lunge, knockback or fall moves off its tile. */

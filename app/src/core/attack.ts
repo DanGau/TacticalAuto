@@ -8,10 +8,10 @@ import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './key
 import { freeTilesNear, blocked, crumble, wreck, onGrid, NEIGHBORS, distance } from './grid'
 import { PARRY_SOAK } from './doctrines'
 import { FRAG_SPLASH, KNOCK_TILES, type Secondary } from './secondaries'
-import type { GameEvent } from './combat-event'
+import type { GameEvent, ShotEvent } from './combat-event'
 import { aiming, powering, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
 import { armorCap, carried, carryOverkill, displaced, volley, WEAKEN_TURNS, burnFrom, chillFrom, chillUnit, empower, highCrit, kindle, markUnit, scaledDamage, spendStacks, stackDamage, struck } from './stacks'
-import { mend, wound } from './wound'
+import { land, mend, wound } from './wound'
 import { shoveOff, drive, knockback, knocksInto, pushesOff } from './knockback'
 import { SLAM_DAMAGE } from './wound'
 import { TALENT, TUNING } from './tuning'
@@ -201,10 +201,11 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   // The weapon's attack of a turn with a secondary still to come opens a combo.
   const opens = !secondary && !granted && isSoldier(unit) && battle.actor === unit.id && battle.attacks < attacksOf(unit)
   const shock = first && !secondary && unit.weapon ? WEAPONS[unit.weapon].stun : undefined
-  events.unshift({ type: 'shot', src: used[0] ? srcOf(used[0]) : attackSrc(unit, secondary ? unit.secondary : undefined), id: unit.id, target: enemy.id, crit, damage, with: used, ...(deflect ? { deflect: deflect.word } : {}), ...(shock ? { ring: shock.reach } : {}), ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}), ...(blow ? { nth: blow.nth, ...(blow.kit.ms ? { lasts: blow.kit.ms } : {}), ...(blow.form ? { form: blow.form } : {}) } : {}) })
+  const shot: ShotEvent = { type: 'shot', src: used[0] ? srcOf(used[0]) : attackSrc(unit, secondary ? unit.secondary : undefined), id: unit.id, target: enemy.id, crit, damage, with: used, ...(deflect ? { deflect: deflect.word } : {}), ...(shock ? { ring: shock.reach } : {}), ...(secondary ? { secondary: unit.secondary } : {}), ...(opens ? { opens } : {}), ...(blow ? { nth: blow.nth, ...(blow.kit.ms ? { lasts: blow.kit.ms } : {}), ...(blow.form ? { form: blow.form } : {}) } : {}) }
+  events.unshift(shot)
   if (battle.twist === 'crumbling' && damage > 0) crumble(battle, enemy, unit)
   const alive = enemy.hp > 0
-  wound(battle, enemy, damage, events, pierced, crit)
+  land(battle, shot, enemy, events, pierced, crit)
   if (damage > 0) struck(battle, unit, enemy, crit, events)
   const surged = !secondary && alive && enemy.hp <= 0 && unit.weapon && !battle.rules.includes('reckoning') ? WEAPONS[unit.weapon].surge : undefined
   if (surged) surge(unit, surged, events)

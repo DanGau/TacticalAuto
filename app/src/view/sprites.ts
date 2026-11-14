@@ -176,7 +176,9 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
     hovering: false,
     lift: 0,
     marks,
+    drawn: [unit.hp, unit.armor, unit.temp ?? 0],
     drawHp(hp, armor, temp = 0, badges = []) {
+      sprite.drawn = [hp, armor, temp]
       g.setTransform(BODY_RES, 0, 0, BODY_RES, BODY.left * BODY_RES, BODY.up * BODY_RES)
       g.clearRect(-BODY.left, -BODY.up, 2 * BODY.left, BODY.up + BODY.down)
       g.fillStyle = css(color)

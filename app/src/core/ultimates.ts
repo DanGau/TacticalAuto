@@ -3,13 +3,13 @@ import { fx, srcOf } from './sources'
 import { cloakOn } from './abilities'
 import { chillUnit, kindle } from './stacks'
 import { BURN_STACKS, CRIT_BONUS, isSoldier, type Battle, type Tile, type Unit } from './battle'
-import type { GameEvent } from './combat-event'
+import type { GameEvent, ShotEvent } from './combat-event'
 import { foes, FIRE_TURNS, has, onTile } from './fighters'
 import { distance, freeTilesNear, NEIGHBORS, onGrid, wreck } from './grid'
 import { randomInt } from './rng'
 import type { ULTIMATE_EFFECTS } from './skill-effects'
 import { mechUnit } from './spawn'
-import { wound } from './wound'
+import { land, wound } from './wound'
 
 export const SPREE = { strikes: 6, reach: 10, damage: 3 }
 export const INDESTRUCTIBLE = { turns: 3, damage: 3 }
@@ -62,9 +62,10 @@ function barrage(battle: Battle, unit: Unit, count: number, amount: number, effe
     const left = foes(battle, unit).filter((u) => u.hp > 0)
     if (left.length === 0) return
     const target = left[randomInt(battle, left.length)]
-    events.push({ type: 'shot', src: srcOf(effect), id: unit.id, target: target.id, crit: true, damage: amount, with: [effect], nth: 1 + (i % 3), lasts: 90 })
+    const shot: ShotEvent = { type: 'shot', src: srcOf(effect), id: unit.id, target: target.id, crit: true, damage: amount, with: [effect], nth: 1 + (i % 3), lasts: 90 }
+    events.push(shot)
     if (chill) chillUnit(battle, target, 1, events)
-    wound(battle, target, amount, events, pierce, true)
+    land(battle, shot, target, events, pierce, true)
   }
 }
 
@@ -95,8 +96,9 @@ const ultimates = {
           events.push({ type: 'move', src: srcOf('killingSpree'), id: unit.id, path: [tile], with: 'killingSpree' })
         }
         const damage = unit.stats.damage + SPREE.damage
-        events.push({ type: 'shot', src: srcOf('killingSpree'), id: unit.id, target: target.id, crit: true, damage, with: ['killingSpree'], nth: 1, lasts: 120 })
-        wound(battle, target, damage, events, false, true)
+        const shot: ShotEvent = { type: 'shot', src: srcOf('killingSpree'), id: unit.id, target: target.id, crit: true, damage, with: ['killingSpree'], nth: 1, lasts: 120 }
+        events.push(shot)
+        land(battle, shot, target, events, false, true)
       }
     },
   },
@@ -153,8 +155,9 @@ const ultimates = {
     go(battle, unit, events, seen) {
       const damage = unit.stats.damage + CRIT_BONUS + BULLET_TIME.damage
       for (const target of foes(battle, unit).filter((u) => seen.has(u.id)).slice(0, BULLET_TIME.targets)) {
-        events.push({ type: 'shot', src: srcOf('bulletTime'), id: unit.id, target: target.id, crit: true, damage, with: ['bulletTime'], nth: 1, lasts: 150 })
-        wound(battle, target, damage, events, false, true)
+        const shot: ShotEvent = { type: 'shot', src: srcOf('bulletTime'), id: unit.id, target: target.id, crit: true, damage, with: ['bulletTime'], nth: 1, lasts: 150 }
+        events.push(shot)
+        land(battle, shot, target, events, false, true)
       }
     },
   },
@@ -164,8 +167,9 @@ const ultimates = {
       const target = foes(battle, unit).reduce((best, u) => (u.hp + u.armor > best.hp + best.armor ? u : best))
       const to = { x: target.x, y: target.y }
       const damage = Math.ceil(target.hp / 2) + SENTENCE
-      events.push({ type: 'shot', src: srcOf('deathSentence'), id: unit.id, target: target.id, crit: true, damage, with: ['deathSentence'] })
-      wound(battle, target, damage, events, true, true)
+      const shot: ShotEvent = { type: 'shot', src: srcOf('deathSentence'), id: unit.id, target: target.id, crit: true, damage, with: ['deathSentence'] }
+      events.push(shot)
+      land(battle, shot, target, events, true, true)
       return { to }
     },
   },

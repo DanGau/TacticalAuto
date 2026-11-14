@@ -3,7 +3,7 @@ import { alienSrc, fx, srcOf } from './sources'
 import { GUARD_MAX, SHELL_MAX, REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_STACKS, BLAST_RADIUS, type Battle, type Effect, type Unit, type Tile } from './battle'
 import { wreck } from './grid'
 import { distance } from './grid'
-import type { GameEvent } from './combat-event'
+import type { GameEvent, ShotEvent } from './combat-event'
 import { emptyTally, OVERKILL, type FeatId, type Tally } from './feats'
 import { engage, has, hostage, fireproof, immune, onTile } from './fighters'
 import { armorCap, died, kindle } from './stacks'
@@ -15,6 +15,12 @@ export function tallyOf(battle: Battle, soldier: number): Tally {
 }
 
 export const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || tally.feats.push(id)
+
+/** `shot` lands on `target` for its damage, and keeps what `target` has left, so the view shows each hit as it lands. */
+export function land(battle: Battle, shot: ShotEvent, target: Unit, events: GameEvent[], pierce = false, crit = false): void {
+  wound(battle, target, shot.damage, events, pierce, crit)
+  shot.after = { hp: target.hp, armor: target.armor, temp: target.temp ?? 0 }
+}
 
 /**
  * Deals `damage` to a unit: its temp HP takes it first, then its armor, then its health. At zero health the unit is removed and its

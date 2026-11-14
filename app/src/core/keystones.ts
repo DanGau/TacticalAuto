@@ -2,10 +2,10 @@
 import { fx, srcOf } from './sources'
 import { type Unit, type Battle, MIGHT_MAX } from './battle'
 import { chillUnit } from './stacks'
-import type { GameEvent } from './combat-event'
+import type { GameEvent, ShotEvent } from './combat-event'
 import { has, shootable, nearest } from './fighters'
 import { distance } from './grid'
-import { wound } from './wound'
+import { land, wound } from './wound'
 
 export const BLOODBATH_HEAL = 3
 export const AFTERSHOCK_DAMAGE = 2
@@ -64,8 +64,9 @@ export function tesla(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[
   for (let i = 0; i < TESLA.bolts; i++) {
     const target = nearest(inReach.filter((u) => u.hp > 0 && !events.some((e) => e.type === 'shot' && e.target === u.id)), unit)
     if (!target) break
-    events.push({ type: 'shot', src: srcOf('tesla'), id: unit.id, target: target.id, crit: false, damage: TESLA.damage, with: ['tesla'] })
-    wound(battle, target, TESLA.damage, events)
+    const shot: ShotEvent = { type: 'shot', src: srcOf('tesla'), id: unit.id, target: target.id, crit: false, damage: TESLA.damage, with: ['tesla'] }
+    events.push(shot)
+    land(battle, shot, target, events)
   }
   return events
 }

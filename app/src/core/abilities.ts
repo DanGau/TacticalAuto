@@ -6,13 +6,13 @@ import { freeTilesNear } from './grid'
 import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
-import type { GameEvent } from './combat-event'
+import type { GameEvent, ShotEvent } from './combat-event'
 import { duoHeal, lifelineTo } from './duo-effects'
 import { has, hostage, foes, powering, shootable, nearest, immune, silenced, spend, enemiesOf, onTile } from './fighters'
 import { walk, bestPath, paths } from './pathing'
 import { canShoot, lineOfSight } from './sight'
 import { FONT_REACH, SWARM_BUILDS, SWARM_LIMIT, WAR_MACHINE } from './keystones'
-import { wound, SLAM_DAMAGE } from './wound'
+import { land, wound, SLAM_DAMAGE } from './wound'
 import { knockback } from './knockback'
 
 /** Ground Slam: once per battle, with two or more foes beside it, in place of an attack, it hurts each and hurls it back. */
@@ -152,8 +152,9 @@ export function drone(battle: Battle, unit: Unit): GameEvent[] {
     unit,
   )
   if (!target) return []
-  const events: GameEvent[] = [{ type: 'shot', src: srcOf('drone'), id: unit.id, target: target.id, crit: false, damage: DRONE_DAMAGE, with: ['drone'] }]
-  wound(battle, target, DRONE_DAMAGE, events)
+  const shot: ShotEvent = { type: 'shot', src: srcOf('drone'), id: unit.id, target: target.id, crit: false, damage: DRONE_DAMAGE, with: ['drone'] }
+  const events: GameEvent[] = [shot]
+  land(battle, shot, target, events)
   return events
 }
 

@@ -12,14 +12,16 @@ export type GameEvent =
   | { type: 'move'; src: Src; id: number; path: Tile[]; with?: Effect | 'dash'; /** Strides of the path that are jumps. */ leaps?: number }
   /** Aliens are sighted. `units` gives each one's tile at that moment. */
   | { type: 'reveal'; units: { id: number; x: number; y: number }[] }
-  /** `damage` is 0 if a shield or image took it. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. `secondary` names the attack if not the weapon; `opens` tells of a combo's first blow. `nth` numbers a weapon attack's shots, each playing for `lasts` ms if set; `form` tells of one thrown or rocketed; `deflect` is the word of the target's weapon guard that saved it; `ring` is the reach in tiles of a stunning shockwave. */
-  | { type: 'shot'; src: Src; id: number; target: number; crit: boolean; damage: number; with: Effect[]; deflect?: string; ring?: number; secondary?: SecondaryId; opens?: boolean; nth?: number; lasts?: number; form?: 'throw' | 'rocket' }
+  /** `damage` is 0 if a shield or image took it. `with` lists the skills, gear and relics of the shooter that shaped the shot or granted it. `secondary` names the attack if not the weapon; `opens` tells of a combo's first blow. `nth` numbers a weapon attack's shots, each playing for `lasts` ms if set; `form` tells of one thrown or rocketed; `deflect` is the word of the target's weapon guard that saved it; `ring` is the reach in tiles of a stunning shockwave; `after` is the target's health, armor and temp HP once it landed. */
+  | { type: 'shot'; src: Src; id: number; target: number; crit: boolean; damage: number; with: Effect[]; deflect?: string; ring?: number; secondary?: SecondaryId; opens?: boolean; nth?: number; lasts?: number; form?: 'throw' | 'rocket'; after?: { hp: number; armor: number; temp: number } }
   /** A rocket, grenade or napalm (`fire`) lands on a tile, or a burster explodes on it; every unit in `hits` is damaged and the terrain around is wrecked. */
   /** A unit off a ledge, `drop` levels, onto `to`, landing on `onto` if anyone stood there; or over the edge, caught or lost. */
   | { type: 'fall'; id: number; to: Tile; drop: number | 'edge'; damage: number; onto?: number; fatal?: true }
   /** A hero throws the object on `from`, or the alien `thrown`, onto `to`, striking each of `hits`. */
   | { type: 'throw'; src: Src; id: number; from: Tile; to: Tile; object: Prop | 'alien'; thrown?: number; hits: { target: number; damage: number }[] }
   | { type: 'rocket'; src: Src; id: number; x: number; y: number; hits: { target: number; damage: number }[]; fire?: true }
+  /** `added` stacks of `quantity` reach the unit `id`, which then holds `burn` and `chill`, before any cancellation of the two. */
+  | { type: 'stacks'; id: number; quantity: 'burn' | 'chill'; added: number; burn: number; chill: number }
   | { type: 'heal'; src: Src; id: number; target: number; amount: number }
   /** An effect of gear, a skill, a relic or a class ability acts on the unit `id`. `amount` is the health it gained, or lost if negative; 0 when neither. */
   | { type: 'effect'; src: Src; id: number; effect: Effect | Ability; amount: number }
@@ -60,4 +62,6 @@ export type GameEvent =
   | { type: 'death'; id: number }
   /** A utility takes hold on the units `on`, or with `ended`, its rounds run out. */
   | { type: 'used'; src: Src; utility: UtilityId; on: number[]; ended?: true }
-  | { type: 'end'; winner: Side | null } 
+  | { type: 'end'; winner: Side | null }
+
+export type ShotEvent = Extract<GameEvent, { type: 'shot' }> 
