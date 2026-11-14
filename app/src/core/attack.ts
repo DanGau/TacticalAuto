@@ -254,7 +254,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   }
   if (enemy.hp > 0 && (when(true, 'mark', 1) || when(true, 'apex', 1) || when(true, 'tracer', 1) || when(crit, 'exploit', 1))) markUnit(enemy, carried(unit, 1))
   const cryo = damage > 0 && unit.ability === 'cryo'
-  if (enemy.hp > 0 && !enemy.resists.includes('chill') && (when(damage > 0, 'frostbite', 1) || (first && cryo) || when(crit, 'freeze', 1))) {
+  if (enemy.hp > 0 && enemy.numb === 0 && !enemy.resists.includes('chill') && (when(damage > 0, 'frostbite', 1) || (first && cryo) || when(crit, 'freeze', 1))) {
     events.push(fx(enemy.id, has(unit, 'frostbite') ? 'frostbite' : cryo ? 'cryo' : 'freeze', 0))
     chillUnit(battle, enemy, carried(unit, chillFrom(unit)), events)
     if (when(true, 'glacial', 1) + when(true, 'rimeLock', 1) > 0) enemy.rooted = CHILL_TURNS
@@ -297,7 +297,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     enemy.panicked = true
     events.push(fx(enemy.id, 'concussion', 0))
   }
-  if (enemy.hp > 0 && !fireproof(battle, enemy) && ((damage > 0 && has(unit, 'incendiary')) || (first && damage > 0 && has(unit, 'tinder')) || when(crit, 'ignite', 1))) {
+  if (enemy.hp > 0 && enemy.numb === 0 && !fireproof(battle, enemy) && ((damage > 0 && has(unit, 'incendiary')) || (first && damage > 0 && has(unit, 'tinder')) || when(crit, 'ignite', 1))) {
     kindle(battle, enemy, carried(unit, has(unit, 'incendiary') && !first ? 1 : burnFrom(unit)), events)
     events.push(fx(enemy.id, has(unit, 'incendiary') ? 'incendiary' : has(unit, 'tinder') ? 'tinder' : 'ignite', 0))
   }
