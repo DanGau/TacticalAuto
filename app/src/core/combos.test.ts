@@ -9,6 +9,8 @@ import { cancelling, CANCELS, feeds, type Cancel } from './quantities'
 import { RELICS, type RelicId } from './relics'
 import { EFFECTS } from './gear'
 import type { GameEvent } from './combat-event'
+import { srcOf } from './sources'
+import { sourceName } from './source-names'
 
 const said = (events: GameEvent[], effect: string) => events.some((e) => e.type === 'effect' && e.effect === effect)
 
@@ -101,4 +103,8 @@ test('every quantity read is made by two or more relics or gear effects, so comb
   // Heroes kill and aliens hurt them in every fight, so nothing need make either.
   for (const q of new Set(flows.flatMap((f) => f.reads ?? []).filter((q) => q !== 'kill' && q !== 'hurt'))) expect(flows.filter((f) => f.makes?.includes(q)).length, q).toBeGreaterThanOrEqual(2)
   expect(feeds(RELICS.stagger, ['moved'], [])).toBe(true)
+})
+
+test('a cancellation floats and logs under its own name', () => {
+  for (const { effect, name } of Object.values(CANCELS)) expect(sourceName(srcOf(effect))).toBe(name)
 })
