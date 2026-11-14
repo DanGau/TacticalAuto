@@ -1,3 +1,4 @@
+import { OVERKILL_FROM } from './battle'
 import { fx } from './sources'
 import { powerOf } from './skills'
 import { expect, test } from 'vitest'
@@ -126,19 +127,18 @@ test('an alien that resists chill and burn is neither chilled nor set burning', 
   expect(d.alien.burn).toBe(0)
 })
 
-test('overkill coils carry half the damage beyond a kill to the nearest other alien', () => {
+test("overkill coils carry a hit's damage past OVERKILL_FROM to the nearest other alien", () => {
   const d = duel({ weapon: 'rifle', rarity: 'rare', name: 'Steady Carbine', stats: {}, effect: null })
-  d.soldier.stats = { ...d.soldier.stats, damage: 10, crit: 0 }
+  d.soldier.stats = { ...d.soldier.stats, damage: 12, crit: 0 }
   d.soldier.effects.push('overkill')
-  d.alien.hp = 4
   d.alien.armor = 0
   const other = alienUnit(d.battle, { kind: 'trooper', stats: { ...d.alien.stats, hp: 99, armor: 0 }, stance: 'anchor', boss: false, spawns: false, target: false, resists: [] }, { x: d.alien.x + 1, y: d.alien.y }, true)
   d.battle.units.push(other)
-  const events = []
-  while (d.alien.hp > 0) events.push(...d.step())
+  const events: GameEvent[] = []
+  while (!events.some((e) => e.type === 'shot')) events.push(...d.step())
   const shot = events.find((e) => e.type === 'shot' && e.target === d.alien.id)
   expect(shot).toBeDefined()
-  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: other.id, effect: 'overkill', amount: -(shot!.type === 'shot' ? Math.ceil((shot!.damage - 4) / 2) : 0) }))
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: other.id, effect: 'overkill', amount: -(shot!.type === 'shot' ? shot!.damage - OVERKILL_FROM : 0) }))
 })
 
 /** Another alien in the duel, at `dx`, `dy` from the first, too tough to die. */

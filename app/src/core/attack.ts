@@ -1,7 +1,7 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
 import { PLATES_UNDER } from './exams'
 import { attackSrc, fx, srcOf } from './sources'
-import { type Battle, type Unit, BASE_STATS, GUARD_MAX, SUPPRESS_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_STACKS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE, STAGGER_DAMAGE, VOLATILE_DAMAGE, NUMB_SOAK } from './battle'
+import { type Battle, type Unit, BASE_STATS, GUARD_MAX, SUPPRESS_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_STACKS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE, STAGGER_DAMAGE, VOLATILE_DAMAGE, NUMB_SOAK, OVERKILL_FROM } from './battle'
 import { cloakOn } from './abilities'
 import { duoCrit, duoDamage, duoHit } from './duo-effects'
 import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './keystones'
@@ -10,7 +10,7 @@ import { PARRY_SOAK } from './doctrines'
 import { FRAG_SPLASH, KNOCK_TILES, type Secondary } from './secondaries'
 import type { GameEvent } from './combat-event'
 import { aiming, powering, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
-import { armorCap, carried, carryOverkill, volley, WEAKEN_TURNS, burnFrom, chillFrom, chillUnit, empower, highCrit, kindle, markUnit, scaledDamage, spendStacks, stackDamage, struck } from './stacks'
+import { armorCap, carried, carryOverkill, displaced, volley, WEAKEN_TURNS, burnFrom, chillFrom, chillUnit, empower, highCrit, kindle, markUnit, scaledDamage, spendStacks, stackDamage, struck } from './stacks'
 import { mend, wound } from './wound'
 import { shoveOff, drive, knockback, knocksInto, pushesOff } from './knockback'
 import { SLAM_DAMAGE } from './wound'
@@ -154,13 +154,11 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(unit.armor > 0, 'armored', 1) +
     when(enemy.rooted > 0, 'net', 2) +
     when(enemy.shifted, 'stagger', STAGGER_DAMAGE) +
-    when(!!unit.banked, 'overkill', unit.banked ?? 0) +
     when(enemy.boss, 'bounty', BOUNTY_DAMAGE) +
     stackDamage(battle, unit, enemy, used, events) +
     spendStacks(battle, unit, enemy, used, events) +
     fury(battle, unit, enemy) +
     duoDamage(battle, unit, enemy, events)
-  if (unit.banked && used.includes('overkill')) unit.banked = 0
   // Light shots split bonuses by power too; a heavy blow adds them once. A fraction is a chance of one point more, so small shots add up to their share.
   const power = blow?.kit.power ?? 1
   // Might adds whole to every shot, so many shots multiply it.
@@ -218,8 +216,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     events.push(fx(bounce.id, 'ricochet', -half))
     wound(battle, bounce, half, events)
   }
-  const spare = enemy.hp <= 0 ? when(damage > left, 'overkill', damage - left) : 0
-  if (spare > 0) carryOverkill(battle, unit, enemy, spare, events)
+  if (when(damage > OVERKILL_FROM, 'overkill', 1)) carryOverkill(battle, enemy, damage - OVERKILL_FROM, events)
   const splash = when(damage > 0, 'volley', Math.ceil(damage / 2)) || when(enemy.hp <= 0, 'cleave', CLEAVE_DAMAGE)
   for (const other of splash > 0 ? beside : []) {
     events.push(fx(other.id, has(unit, 'volley') ? 'volley' : 'cleave', -splash))
@@ -269,7 +266,11 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   // A thunder that would hit nothing leaves the alien where the party can finish it.
   else if (first && enemy.hp > 0 && damage > 0 && (unit.side !== 'human' || knocksInto(battle, unit, enemy)) && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
   else if (first && enemy.hp > 0 && damage > 0 && when(true, 'shove', 1)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'shove')
-  else if (first && enemy.hp > 0 && damage > 0 && unit.side === 'human' && when(true, 'gravity', 1)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'gravity')
+  else if (first && enemy.hp > 0 && damage > 0 && unit.side === 'human' && when(true, 'gravity', 1)) {
+    // A boss is too heavy to knock: it reels where it stands, moved for what reads it.
+    if (enemy.boss) displaced(battle, enemy, events)
+    else knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'gravity')
+  }
   if (first && enemy.hp > 0 && crit && when(true, 'gale', 1)) knockback(battle, unit, enemy, events, 1, REPULSE_TILES, SLAM_DAMAGE, 'gale')
   if (first && enemy.hp > 0 && damage > 0) shoveOff(battle, unit, enemy, events)
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'tether', 1)) knockback(battle, unit, enemy, events, -1)

@@ -61,11 +61,13 @@ export const GUARD_MAX = 6
 /** Damage Stagger Sights adds to hits on a moved alien; tiles Lodestone Harness pulls from; armor Reactive Shell builds past a hero's own. */
 export const STAGGER_DAMAGE = 3
 /** Own turns a cancellation leaves an alien numb; what Thermal Shock Core multiplies, and Shatterglass Edge and Lock-On Rig. */
-export const NUMB_TURNS = 2
+export const NUMB_TURNS = 1
 export const THERMAL_FACTOR = 3
 /** Damage less each hit does to a numb alien. */
-export const NUMB_SOAK = 2
+export const NUMB_SOAK = 1
 export const BRIDGE_FACTOR = 2
+/** Damage a hit does past which Overkill Coils carry the rest. */
+export const OVERKILL_FROM = 6
 /** The least a Volatile kill bursts for. */
 export const VOLATILE_DAMAGE = 2
 export const LODESTONE_REACH = 6
@@ -258,8 +260,6 @@ export interface Unit {
   chill: number
   /** Frozen by its chill: it loses its next action. */
   frozen: boolean
-  /** Damage Overkill Coils banked from its last kill for its next hit. */
-  banked?: number
   /** The round Reactive Shell last gave it armor. */
   shelled?: number
   /** Knocked back, pulled or slid since its own turn began. */

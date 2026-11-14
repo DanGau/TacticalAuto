@@ -1,6 +1,6 @@
 // The plain game quantities items make and read, the cancellations between them, and the resists aliens have.
 import { TUNING } from './tuning'
-import { BURN_MAX, CHILL_FREEZE, CHILL_MAX, CHILL_SLIDE, MARK_MAX, NUMB_SOAK, NUMB_TURNS } from './battle'
+import { BURN_MAX, CHILL_FREEZE, CHILL_MAX, CHILL_SLIDE, MARK_MAX, NUMB_SOAK, NUMB_TURNS, OVERKILL_FROM } from './battle'
 
 /**
  * A quantity the fight has that items make more of or read: an item that reads one pays beside any item that makes it,
@@ -17,7 +17,7 @@ export const QUANTITIES: Record<Quantity, { name: string; icon: string; text: st
   shots: { name: 'Shots', icon: '🔫', text: 'Shots an attack fires: every on-hit effect fires on each' },
   crit: { name: 'Crit', icon: '💥', text: 'A crit does 2 more damage' },
   kill: { name: 'Kill', icon: '💀', text: 'An alien felled' },
-  overkill: { name: 'Overkill', icon: '🔨', text: 'Damage past what a kill needs: big single hits make it' },
+  overkill: { name: 'Overkill', icon: '🔨', text: `Damage a hit does past ${OVERKILL_FROM}: big single hits make it` },
   armor: { name: 'Armor', icon: '🛡️', text: 'Takes damage before health, and is whole again each fight' },
   hurt: { name: 'Hurt', icon: '🩸', text: 'Hits a hero takes' },
 }

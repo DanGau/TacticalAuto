@@ -1,5 +1,5 @@
 // Relics: what each does, and which may be offered.
-import { ADRENAL_FROM, ADRENAL_MAX, BRIDGE_FACTOR, THERMAL_FACTOR, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, GUARD_MAX, LODESTONE_REACH, MIGHT_MAX, SHELL_MAX, STAGGER_DAMAGE, type RelicEffect, type Stats } from './battle'
+import { ADRENAL_FROM, ADRENAL_MAX, OVERKILL_FROM, BRIDGE_FACTOR, THERMAL_FACTOR, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, GUARD_MAX, LODESTONE_REACH, MIGHT_MAX, SHELL_MAX, STAGGER_DAMAGE, type RelicEffect, type Stats } from './battle'
 import type { Rarity } from './base'
 import { random } from './rng'
 import { MOMENTUM_MAX } from './attack'
@@ -83,7 +83,7 @@ const relics = {
   fracture: { name: 'Frost Fracture', text: `A frozen alien that dies shatters: ${FRACTURE_DAMAGE} damage for each chill stack on it to every alien beside it`, reads: ['chill', 'kill'], rarity: 'epic', effect: 'fracture' },
   conductor: { name: 'Cryo Conductor', text: 'Hits on a chilled target give half its chill to every alien beside it', reads: ['chill'], makes: ['chill'], effect: 'conductor' },
   kindling: { name: 'Kindling Plates', text: `Whoever hits a hero who has armor left takes ${BURN_STACKS} burn stacks`, reads: ['armor', 'hurt'], makes: ['burn'], effect: 'kindling' },
-  overkill: { name: 'Overkill Coils', text: "Half the damage beyond what a kill needs hits the nearest other alien, and half adds to the hero's next hit", reads: ['overkill'], effect: 'overkill' },
+  overkill: { name: 'Overkill Coils', text: `A hit's damage past ${OVERKILL_FROM} also hits the nearest other alien`, reads: ['overkill'], effect: 'overkill' },
   brittle: { name: 'Brittle Frost', text: 'Hits on a chilled target ignore its armor', reads: ['chill'], effect: 'brittle' },
   pyre: { name: 'Pyre Censer', text: `A burning alien sets its tile ablaze for 2 turns; an alien that ends its move in fire, or is driven onto it, has at least ${BURN_STACKS} burn stacks`, reads: ['burn', 'moved'], makes: ['burn'], effect: 'pyre' },
   hex: { name: "Witch's Hex", text: 'An alien that dies passes its burn, chill and marks to the nearest alien', reads: ['kill', 'burn', 'chill', 'mark'], effect: 'hex' },
@@ -108,7 +108,7 @@ const relics = {
   eternal: { name: 'Eternal Flame', text: 'Burn never fades: a burning alien keeps its stacks', reads: ['burn'], rarity: 'epic', effect: 'eternal' },
   frostHeart: { name: 'Permafrost Heart', text: 'Bosses freeze too, and a frozen alien keeps its chill', reads: ['chill'], rarity: 'epic', effect: 'frostHeart' },
   ledger: { name: 'Dead Eye Ledger', text: 'Payoffs read marks without spending them', reads: ['mark'], rarity: 'epic', effect: 'ledger' },
-  gravity: { name: 'Gravity Lens', text: "Each hero's first hit of an attack knocks its target back a tile", makes: ['moved', 'impact'], rarity: 'epic', effect: 'gravity' },
+  gravity: { name: 'Gravity Lens', text: "Each hero's first hit of an attack knocks its target back a tile; a boss reels in place, counting as moved", makes: ['moved', 'impact'], rarity: 'epic', effect: 'gravity' },
   ironclad: { name: 'Ironclad Lattice', text: 'Whatever builds armor builds it twice as high', reads: ['armor'], rarity: 'epic', effect: 'ironclad' },
   split: { name: 'Split Rounds', text: 'Every attack fires twice the shots, each at half power', reads: ['shots'], makes: ['shots'], rarity: 'epic', effect: 'split' },
   ram: { name: 'Ram Plating', text: "Every hit does the hero's armor more, up to its damage", reads: ['armor'], makes: ['overkill'], effect: 'ram' },

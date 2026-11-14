@@ -36,7 +36,7 @@ function fight(seed: number, foe: Exam | 'elite', { effects, stats }: Kit): { ro
   const battle: Battle = structuredClone(template.battle)
   battle.rng = seed * 7919 + FIGHTS.indexOf(foe)
   const [hero, boss, ...escorts] = battle.units
-  const heroes: Unit[] = SQUAD.map((s, i) => ({ ...structuredClone(hero), id: 1 + i, soldier: hero.soldier! + i, x: s.x, y: s.y, weapon: s.weapon, effects: [...effects, ...(WEAPONS[s.weapon].effect ? [WEAPONS[s.weapon].effect!] : [])], stance: WEAPONS[s.weapon].stance ?? 'balanced', ...withStats({ ...BASE_STATS, hp: 20, damage: 5, crit: 0.25, move: 4, range: 6 }, stats) }))
+  const heroes: Unit[] = SQUAD.map((s, i) => ({ ...structuredClone(hero), id: 1 + i, soldier: hero.soldier! + i, x: s.x, y: s.y, weapon: s.weapon, effects: [...effects, ...(WEAPONS[s.weapon].effect ? [WEAPONS[s.weapon].effect!] : [])], stance: WEAPONS[s.weapon].stance ?? 'balanced', ...withStats({ ...BASE_STATS, hp: 30, armor: 1, damage: 5, crit: 0.25, move: 4, range: 6 }, stats) }))
   Object.assign(boss, { boss: true, effects: foe === 'elite' ? [] : [foe], hp: BOSS.hp, stats: { ...boss.stats, hp: BOSS.hp, damage: foe === 'elite' ? BOSS.damage + 1 : BOSS.damage, move: 3, range: 5 } })
   for (const e of escorts) Object.assign(e, { hp: ESCORT.hp, stats: { ...e.stats, hp: ESCORT.hp, damage: ESCORT.damage, move: 3, range: 5 } })
   battle.units = [...heroes, boss, ...escorts]
