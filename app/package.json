@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.json",
     "test": "node scripts/deadline.mjs 300 vitest run",
     "sim": "node scripts/deadline.mjs 1800 tsx src/sim/cli.ts",
+    "exam": "node scripts/deadline.mjs 3600 tsx src/sim/exam.ts",
     "eye": "tsx eye/eye.ts",
     "tsx": "node scripts/deadline.mjs 600 tsx",
     "smoke": "node scripts/deadline.mjs 180 node scripts/smoke.mjs",

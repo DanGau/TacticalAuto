@@ -66,14 +66,15 @@ function numb(target: Unit, effect: Effect, events: GameEvent[]): void {
   events.push(fx(target.id, effect, 0))
 }
 
-/** Overkill Coils: `spare` damage past killing `dead` hits the nearest other alien, and half banks on `unit`'s next hit, so a big kill pays against a lone Guardian too. */
+/** Overkill Coils: half the `spare` damage past killing `dead` hits the nearest other alien, and half banks on `unit`'s next hit, so a big kill pays against a lone Guardian too. */
 export function carryOverkill(battle: Battle, unit: Unit, dead: Unit, spare: number, events: GameEvent[]): void {
   const next = nearest(battle.units.filter((u) => u.side === dead.side && u.hp > 0), dead)
+  const half = Math.ceil(spare / 2)
   if (next) {
-    events.push(fx(next.id, 'overkill', -spare))
-    wound(battle, next, spare, events)
+    events.push(fx(next.id, 'overkill', -half))
+    wound(battle, next, half, events)
   }
-  unit.banked = Math.ceil(spare / 2)
+  unit.banked = half
 }
 
 /** The hero whose blow a bridge's damage counts as: the one acting, else the hardest hitter facing `target`. */

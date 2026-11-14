@@ -69,7 +69,7 @@ export const BRIDGE_FACTOR = 2
 /** The least a Volatile kill bursts for. */
 export const VOLATILE_DAMAGE = 2
 export const LODESTONE_REACH = 6
-export const SHELL_MAX = 2
+export const SHELL_MAX = 1
 /** Catalyst Prism's every-Nth hit. */
 export const CATALYST_EVERY = 3
 export const COMBO_MAX = 4

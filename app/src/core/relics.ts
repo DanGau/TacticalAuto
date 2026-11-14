@@ -83,7 +83,7 @@ const relics = {
   fracture: { name: 'Frost Fracture', text: `A frozen alien that dies shatters: ${FRACTURE_DAMAGE} damage for each chill stack on it to every alien beside it`, reads: ['chill', 'kill'], rarity: 'epic', effect: 'fracture' },
   conductor: { name: 'Cryo Conductor', text: 'Hits on a chilled target give half its chill to every alien beside it', reads: ['chill'], makes: ['chill'], effect: 'conductor' },
   kindling: { name: 'Kindling Plates', text: `Whoever hits a hero who has armor left takes ${BURN_STACKS} burn stacks`, reads: ['armor', 'hurt'], makes: ['burn'], effect: 'kindling' },
-  overkill: { name: 'Overkill Coils', text: "Damage beyond what a kill needs hits the nearest other alien, and half adds to the hero's next hit", reads: ['overkill'], effect: 'overkill' },
+  overkill: { name: 'Overkill Coils', text: "Half the damage beyond what a kill needs hits the nearest other alien, and half adds to the hero's next hit", reads: ['overkill'], effect: 'overkill' },
   brittle: { name: 'Brittle Frost', text: 'Hits on a chilled target ignore its armor', reads: ['chill'], effect: 'brittle' },
   pyre: { name: 'Pyre Censer', text: `A burning alien sets its tile ablaze for 2 turns; an alien that ends its move in fire, or is driven onto it, has at least ${BURN_STACKS} burn stacks`, reads: ['burn', 'moved'], makes: ['burn'], effect: 'pyre' },
   hex: { name: "Witch's Hex", text: 'An alien that dies passes its burn, chill and marks to the nearest alien', reads: ['kill', 'burn', 'chill', 'mark'], effect: 'hex' },

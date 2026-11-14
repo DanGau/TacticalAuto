@@ -5,6 +5,7 @@ import type { GameEvent } from '../core/combat-event'
 import { sourceName } from '../core/source-names'
 import { srcOf, type Src } from '../core/sources'
 import { PACE } from '../core/pace'
+import { CANCELS } from '../core/quantities'
 import type { Attack } from './attacks'
 import { along, lerp } from './camera'
 import { blast } from './blast'
@@ -49,8 +50,15 @@ export function shotCallout(s: Stage, e: Extract<GameEvent, { type: 'shot' }>, o
   return e.crit ? callout(s, `CRIT -${e.damage}`, COLOR.crit, over, e.secondary ? 22 : 18, lift) : callout(s, `HIT -${e.damage}`, COLOR.hit, over, e.secondary ? 18 : 13, lift)
 }
 
+/** A cancellation's callout: bigger than a crit's, and lifted clear of the hit callouts. */
+const CANCEL_SIZE = 22
+const CANCEL_LIFT = 60
+
 /** What a gear effect did to a unit, in a word: the effect's name, and the health it gave or took. */
 export function effectCallout(s: Stage, e: Extract<GameEvent, { type: 'effect' }>, over: Sprite): Label {
+  // A cancellation stands out above the rest, so the player learns why a build stalls.
+  const cancel = Object.values(CANCELS).find((c) => c.effect === e.effect)
+  if (cancel) return callout(s, `⚠ ${cancel.name.toUpperCase()}`, COLOR.cancel, over, CANCEL_SIZE, CANCEL_LIFT)
   return sourceCallout(s, e.src, over, e.amount === 0 ? '' : ` ${e.amount > 0 ? '+' : ''}${e.amount}`)
 }
 

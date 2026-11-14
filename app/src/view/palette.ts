@@ -41,6 +41,8 @@ export const COLOR = {
   crit: 0xff7a3d,
   /** A weapon guard saving a hit: steel catching light. */
   deflect: 0xbfe8ff,
+  /** A cancellation: opposites on one alien wasting each other. */
+  cancel: 0xff9a1f,
   heal: 0x7ddc5a,
   temp: 0x9fd8ff,
   acid: 0xa6e22e,

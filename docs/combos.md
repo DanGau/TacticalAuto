@@ -23,7 +23,7 @@ Borrowed from Slay the Spire: combos the player finds, not ones an item names. E
 | Impact | Shoving, Thundering gear; Gravity Lens, Domino Rig; ledges | Kinetic Engine, Kinetic Core, Toppling, Kilned, Hailing gear |
 | Shots | multi-shot weapons; Hair Trigger, Twinned gear, Split Rounds, Flurry | every on-hit maker: Scorching, Rimed, Seeking, Bracing, Leeching, Sapping, Cadenced |
 | Crit | Focusing Lens, Kinetic Capacitor, Lofty gear; Sniper skills | Salamander Sigil, Frost Lattice, Eye of the Hunt, Arcing gear |
-| Overkill | Glass Cannon, Blood Rite, Adrenal Pump, Ram Plating, Bounty Sigil, Cadenced, Merciless gear | Overkill Coils (the rest hits the nearest alien, and half adds to the hero's next hit), Volatile gear (kills burst for the rest) |
+| Overkill | Glass Cannon, Blood Rite, Adrenal Pump, Ram Plating, Bounty Sigil, Cadenced, Merciless gear | Overkill Coils (half the rest hits the nearest alien, half adds to the hero's next hit), Volatile gear (kills burst for the rest) |
 | Armor | Alien Alloys, Adaptive Plating, Bloodforged Plate, Overflow Capacitor, Reactive Shell, Bracing gear | Ram Plating, Juggernaut Servos, Kindling Plates, Ironclad Lattice; Shield Slam |
 | Hurt | aliens; Lodestone Harness pulls them onto the tank | Reactive Shell, Kindling Plates; Hardened |
 
