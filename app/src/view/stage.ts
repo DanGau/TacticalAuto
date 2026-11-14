@@ -53,6 +53,8 @@ export interface Label {
 }
 
 export const CAMERA_MS = 350
+/** How fast animations play against real time: below 1 slows the battle so it reads. */
+export const PLAYBACK = 0.8
 /** World units a unit's picture stands toward the camera from its feet, so the ground it stands on never cuts it. */
 const STANDOFF = 0.6
 /** Picture pixels a sprite's body stands above its feet. */
@@ -150,7 +152,7 @@ export class Stage {
     this.renderer.setAnimationLoop((now) => {
       const ms = now - last
       last = now
-      for (const tick of [...this.ticks]) tick(ms)
+      for (const tick of [...this.ticks]) tick(ms * PLAYBACK)
       for (const sprite of this.sprites.values()) {
         if (sprite.cloaked) shimmer(sprite, now)
         if (sprite.hovering) bob(sprite, now)

@@ -12,6 +12,7 @@ import { beat, type Player } from './ui/beat'
 import { createLog } from './ui/log'
 import { installKit } from './ui/kit'
 import { createView } from './view/view'
+import { PLAYBACK } from './view/stage'
 import { HEIGHT, WIDTH } from './view/camera'
 
 // A failure shows on screen, where a player on a phone, with no console, can report it.
@@ -100,7 +101,7 @@ const player: Player = {
   turn: () => state.battle?.turn,
   settle: () => view.settle(),
   update: () => ui.update(state),
-  pause: (ms) => new Promise((done) => setTimeout(done, ms)),
+  pause: (ms) => new Promise((done) => setTimeout(done, ms / PLAYBACK)),
   show: (events) => show(events, true),
 }
 
