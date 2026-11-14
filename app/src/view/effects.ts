@@ -52,7 +52,7 @@ export function shotCallout(s: Stage, e: Extract<GameEvent, { type: 'shot' }>, o
 
 /** A cancellation's callout: bigger than a crit's, and lifted clear of the hit callouts. */
 const CANCEL_SIZE = 22
-const CANCEL_LIFT = 60
+const CANCEL_LIFT = 90
 
 /** What a gear effect did to a unit, in a word: the effect's name, and the health it gave or took. */
 export function effectCallout(s: Stage, e: Extract<GameEvent, { type: 'effect' }>, over: Sprite): Label {

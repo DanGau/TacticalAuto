@@ -25,7 +25,7 @@ Run in `app/`.
 - `npm run -s sim -- --runs=100 --bot=strategic --diagnose` — battles by challenge and answer, saying of what is off whether the game or the bot is at fault.
 - `npm run -s tsx -- src/sim/encounter.ts --runs=30` — the challenge lab: each challenge by party, rung and utility.
 - `npm run -s sim -- --runs=150 --bot=strategic --clean` — each deploy screen played on with every utility and with none: what an answer pays, unconfounded.
-- `npm run -s exam -- --seeds=150 --loadouts=a+b,a+b+c` — the exam lab: a fixed squad per loadout against each Guardian exam and a late elite; rounds to fell it, health lost, and each combo's synergy ± se.
+- `npm run -s exam -- --seeds=150 --loadouts=a+b,a+b+c [--escorts=hp]` — the exam lab: a fixed squad per loadout against each Guardian exam and a late elite; rounds to fell it, health lost, and each combo's synergy ± se.
 - `npm run -s sim -- --runs=100 --rest` — each safehouse and medkit on offer played on both ways, by health and leg, and fixed rest policies on the same seeds.
 - `npm run -s sim -- --runs=60 --loadouts=nanites,overkill+volatile` — the strategic bot holds each relic or gear effect (`+` pairs them) from the start, against none on the same seeds: win difference, synergy of pairs, healing a battle. `--power` plays every single.
 - `npm run test -- <files>`, `npm run tsx -- <script>` — run tests or a script under a deadline that kills it if it hangs. A hook blocks running `vitest` or `tsx` directly.

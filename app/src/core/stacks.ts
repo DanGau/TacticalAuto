@@ -89,7 +89,8 @@ export const strikerOf = (battle: Battle, target: Unit): Unit =>
 export function displaced(battle: Battle, target: Unit, events: GameEvent[]): void {
   if (target.hp <= 0 || target.side !== 'alien') return
   target.shifted = true
-  target.rooted = Math.max(target.rooted, CHILL_TURNS)
+  // A boss shrugs off the stagger, so a knockback build never pins one out of reach.
+  if (!target.boss) target.rooted = Math.max(target.rooted, CHILL_TURNS)
   const blow = strikerOf(battle, target).stats.damage
   if (target.chill > 0 && foeHas(battle, target, 'shatter')) {
     const shards = BRIDGE_FACTOR * blow * target.chill

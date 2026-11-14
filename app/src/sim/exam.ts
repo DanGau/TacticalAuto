@@ -8,7 +8,7 @@ import { RELICS } from '../core/relics'
 import { WEAPONS, type WeaponId } from '../core/weapons'
 import { loadoutOf } from './power'
 
-const { values } = parseArgs({ options: { seeds: { type: 'string', default: '100' }, loadouts: { type: 'string', default: '' } } })
+const { values } = parseArgs({ options: { seeds: { type: 'string', default: '100' }, loadouts: { type: 'string', default: '' }, escorts: { type: 'string', default: '12' } } })
 
 /** The squad every loadout is fought with: one of each kind of weapon reach, at a late leg's strength. */
 const SQUAD: { weapon: WeaponId; x: number; y: number }[] = [
@@ -22,7 +22,8 @@ const FIGHTS: (Exam | 'elite')[] = [...(Object.keys(EXAMS) as Exam[]), 'elite']
 
 /** The boss's health and damage, and an escort's: tough enough to last the rounds a Guardian fight does. */
 const BOSS = { hp: 220, damage: 3 }
-const ESCORT = { hp: 12, damage: 2 }
+/** `--escorts` sets an escort's health: tough ones leave overkill to carry. */
+const ESCORT = { hp: Number(values.escorts), damage: 2 }
 
 /** Rounds a fight may last before it counts as a stall. */
 const MOST_ROUNDS = 30

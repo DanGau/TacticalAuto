@@ -12,7 +12,7 @@ export const QUANTITIES: Record<Quantity, { name: string; icon: string; text: st
   burn: { name: 'Burn', icon: '🔥', text: `Burn stacks: at the start of each of its turns a unit takes its stacks in damage, then loses one; at most ${BURN_MAX}. Burn and chill on one alien cancel: both go out, and for ${NUMB_TURNS} of its turns it takes no burn, chill or marks and ${NUMB_SOAK} less from each hit` },
   chill: { name: 'Chill', icon: '❄️', text: `Chill stacks: -2 move and 1 less damage, a stack lost each turn; at ${CHILL_FREEZE} it freezes, losing its next action, bar a boss; at most ${CHILL_MAX}. A chilled alien knocked back slides up to ${CHILL_SLIDE} tiles more, and one that slides into something takes the hero's blow. Burn cancels chill; moving a frozen alien thaws it` },
   mark: { name: 'Mark', icon: '🎯', text: `Mark stacks: every hit on a marked unit does ${TUNING.markDamage} more damage; at most ${MARK_MAX}. Moving a marked alien clears its marks and numbs it` },
-  moved: { name: 'Moved', icon: '↔️', text: "Knocked back, pulled, or slid since its last turn: it cannot walk on its next. An alien driven onto fire catches it. Moving a marked alien clears its marks, and a frozen one thaws" },
+  moved: { name: 'Moved', icon: '↔️', text: "Knocked back, pulled, or slid since its last turn: it cannot walk on its next, bar a boss. An alien driven onto fire catches it. Moving a marked alien clears its marks, and a frozen one thaws" },
   impact: { name: 'Impact', icon: '💢', text: 'Knocked into something, or off a ledge' },
   shots: { name: 'Shots', icon: '🔫', text: 'Shots an attack fires: every on-hit effect fires on each' },
   crit: { name: 'Crit', icon: '💥', text: 'A crit does 2 more damage' },
