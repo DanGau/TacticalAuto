@@ -1,7 +1,7 @@
 // Alien kinds: their stats, stances and powers, and the packs they muster in.
 import { BASE_STATS, type Stance, type Stats } from './battle'
 import { TUNING } from './tuning'
-import type { Resist } from './keywords'
+import type { Resist } from './quantities'
 import { randomInt } from './rng'
 
 /** Alien turns after an incubator is seen before it hatches. */
@@ -84,7 +84,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     hp: 0.8,
     stats: { range: 6, strength: 1, jump: 2 },
     stance: 'balanced',
-    resists: ['ward'],
+    resists: ['armor'],
   },
   burster: {
     name: 'Burster',
@@ -102,7 +102,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
     hp: 2,
     stats: { range: 1, move: 3, damage: 5, strength: 4, jump: 2 },
     stance: 'rush',
-    resists: ['frost'],
+    resists: ['chill'],
   },
   psion: {
     name: 'Psion',

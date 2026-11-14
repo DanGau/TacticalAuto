@@ -32,6 +32,9 @@ function guardian(rs: RunResult[]) {
   return { fights: fights.length, rounds, roundsSe, lost, lostSe }
 }
 
+/** A loadout's halves for its synergy: all but the last id together, and the last. */
+const halves = (name: string) => [name.slice(0, name.lastIndexOf('+')), name.slice(name.lastIndexOf('+') + 1)]
+
 /** By loadout: wins, the difference from none and its standard error over paired seeds, keys won, and health healed a battle, most first. */
 export function formatPower(played: Record<string, RunResult[]>): string {
   const base = played.none
@@ -54,7 +57,7 @@ export function formatPower(played: Record<string, RunResult[]>): string {
     lines.push('', 'pair                    diff   a+b alone   synergy')
     const of = (name: string) => rows.find((r) => r.name === name)?.d ?? NaN
     for (const p of pairs) {
-      const [a, b] = p.name.split('+')
+      const [a, b] = halves(p.name)
       lines.push(`${p.name.padEnd(22)}${pp(p.d).padStart(6)}${pp(of(a) + of(b)).padStart(12)}${pp(p.d - of(a) - of(b)).padStart(10)}`)
     }
     // On Guardian fights, what each loadout saves over none: rounds to fell it, and the squad's health lost to it.
@@ -62,7 +65,7 @@ export function formatPower(played: Record<string, RunResult[]>): string {
     const saved = (name: string, key: 'rounds' | 'lost') => guard.none[key] - guard[name][key]
     const se = (names: string[], key: 'roundsSe' | 'lostSe') => Math.sqrt(names.reduce((sum, n) => sum + guard[n][key] ** 2, 0))
     for (const p of pairs) {
-      const [a, b] = p.name.split('+')
+      const [a, b] = halves(p.name)
       const four = [p.name, a, b, 'none']
       const r = [saved(p.name, 'rounds'), saved(a, 'rounds') + saved(b, 'rounds')]
       const h = [saved(p.name, 'lost'), saved(a, 'lost') + saved(b, 'lost')]

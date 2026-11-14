@@ -245,7 +245,7 @@ const ultimates = {
       unit.hp = Math.max(1, Math.ceil(unit.hp / 2))
       wreck(battle, unit, 2)
       strike(battle, caught, SUPERNOVA.damage, 'supernova', events)
-      for (const foe of caught) kindle(battle, foe, BURN_STACKS)
+      for (const foe of caught) kindle(battle, foe, BURN_STACKS, events)
       return { radius: SUPERNOVA.radius }
     },
   },
@@ -255,7 +255,7 @@ const ultimates = {
       const caught = foes(battle, unit)
       for (const foe of caught) {
         foe.armor = 0
-        kindle(battle, foe, ABLAZE.burn)
+        kindle(battle, foe, ABLAZE.burn, events)
         if (!onTile(battle.fire, foe)) battle.fire.push({ x: foe.x, y: foe.y, turns: FIRE_TURNS })
       }
       strike(battle, caught, ABLAZE.damage, 'worldAblaze', events)
@@ -268,7 +268,7 @@ const ultimates = {
       const caught = foes(battle, unit)
       for (const foe of caught) {
         freeze(foe, ZERO.frozen)
-        if (!foe.resists.includes('frost')) Object.assign(foe, { chilled: ZERO.frozen + 1, rooted: ZERO.frozen + 1 })
+        if (!foe.resists.includes('chill')) Object.assign(foe, { chilled: ZERO.frozen + 1, rooted: ZERO.frozen + 1 })
       }
       strike(battle, caught, ZERO.damage, 'absoluteZero', events, true)
       return { radius: 30 }

@@ -8,7 +8,7 @@ import type { WeaponId } from './weapons'
 import { type AlienKind } from './aliens'
 import type { Tally } from './feats'
 import type { DoctrineEffect, Rule } from './doctrines'
-import type { Resist } from './keywords'
+import type { Resist } from './quantities'
 import { type Flow, Goal } from './goals'
 import type { Twist } from './twists'
 import type { UtilityId } from './utilities'
@@ -46,6 +46,8 @@ export const BURN_STACKS = 2
 export const BURN_MAX = 6
 /** Chill stacks freeze a unit at CHILL_FREEZE: it loses its next action, then thaws with none. */
 export const CHILL_FREEZE = 3
+/** Tiles more a chilled unit knocked back slides on, each one slid adding a point to its slam. */
+export const CHILL_SLIDE = 3
 /** The most mark and chill stacks a unit holds. */
 export const MARK_MAX = 6
 export const CHILL_MAX = 6
@@ -56,6 +58,12 @@ export const ADRENAL_FROM = 2
 export const ADRENAL_MAX = 1
 /** Armor Bracing gear and Overflow Capacitor build past a hero's own. */
 export const GUARD_MAX = 6
+/** Damage Stagger Sights adds to hits on a moved alien; tiles Lodestone Harness pulls from; armor Reactive Shell builds past a hero's own. */
+export const STAGGER_DAMAGE = 2
+/** The least a Volatile kill bursts for. */
+export const VOLATILE_DAMAGE = 2
+export const LODESTONE_REACH = 6
+export const SHELL_MAX = 4
 /** Catalyst Prism's every-Nth hit. */
 export const CATALYST_EVERY = 3
 export const COMBO_MAX = 4
@@ -170,9 +178,9 @@ export type GearEffect = 'bellows' | 'frostbite' | 'tracer' | 'incendiary' | 'pi
 /** Something a skill does; skills.ts says what each does. */
 export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'domino' | 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'zenith' | 'fracture' | 'eternal' | 'frostHeart' | 'ledger' | 'gravity' | 'ironclad' | 'split' | 'ram' | 'overflow' | 'adrenal' | 'hairTrigger'
+export type RelicEffect = 'domino' | 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'zenith' | 'fracture' | 'eternal' | 'frostHeart' | 'ledger' | 'gravity' | 'ironclad' | 'split' | 'ram' | 'overflow' | 'adrenal' | 'hairTrigger' | 'stagger' | 'lodestone' | 'shell' | 'lockOn'
 /** Anything a unit's gear, skills, the squad's relics or duos or its weapon doctrine do. Combat applies them. */
-export type Effect = GearEffect | SkillEffect | PerkEffect | RelicEffect | DoctrineEffect | DuoId | Exam | 'carry' | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning'
+export type Effect = GearEffect | SkillEffect | PerkEffect | RelicEffect | DoctrineEffect | DuoId | Exam | 'carry' | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning' | 'quenched' | 'thawed' | 'unlocked' | 'glassEdge'
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
@@ -207,7 +215,7 @@ export interface Reserve {
 }
 
 /** What every unit starts a battle with: no stacks, no counts. */
-export const FRESH = { burn: 0, chill: 0, mark: 0, frozen: false, might: 0, combo: 0, comboOn: 0, exposed: 0, hits: 0 }
+export const FRESH = { burn: 0, chill: 0, mark: 0, frozen: false, shifted: false, might: 0, combo: 0, comboOn: 0, exposed: 0, hits: 0 }
 
 export interface Unit {
   id: number
@@ -244,6 +252,8 @@ export interface Unit {
   chill: number
   /** Frozen by its chill: it loses its next action. */
   frozen: boolean
+  /** Knocked back, pulled or slid since its own turn began. */
+  shifted: boolean
   /** Own turns for which it is rooted and cannot move. */
   rooted: number
   /** Own turns for which moving hurts it, by a booming hit. */

@@ -24,7 +24,7 @@ const { values } = parseArgs({
     rest: { type: 'boolean', default: false },
     /** Print the power comparison: the strategic bot holding each relic and gear effect from the start, and none, on the same seeds. */
     power: { type: 'boolean', default: false },
-    /** Loadouts for the power comparison in place of every single: relic and effect ids joined by '+', comma-separated; each pair's halves and none are added. */
+    /** Loadouts for the power comparison in place of every single: relic and effect ids joined by '+', comma-separated; each loadout's halves (all but its last id, and its last) and none are added. */
     loadouts: { type: 'string', default: '' },
     /** Fail if the strategic bot wins fewer runs than STRATEGIC_FLOOR or fewer opening battles than OPENING_FLOOR, a late boss falls faster than BOSS_ROUNDS_FLOOR, or a hit passes HIT_CEILING. */
     floor: { type: 'boolean', default: false },
@@ -42,7 +42,7 @@ for (const id of doctrines) if (!(id in DOCTRINES)) throw new Error(`unknown doc
 
 if (values.power || values.loadouts) {
   const asked = values.loadouts.split(',').filter(Boolean)
-  const names = asked.length ? [...new Set(['none', ...asked.flatMap((n) => n.split('+')), ...asked])] : SINGLES
+  const names = asked.length ? [...new Set(['none', ...asked.flatMap((n) => n.split('+').flatMap((id, i, ids) => [id, ids.slice(0, i + 1).join('+')])), ...asked])] : SINGLES
   const played = await playAll(['strategic'], runs, start, { doctrines, threads, loadouts: Object.fromEntries(names.map((n) => [n, loadoutOf(n)])) })
   console.log(formatPower(played))
 } else if (values.rest) {

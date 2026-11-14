@@ -14,7 +14,7 @@ import { missionAt } from '../core/missions'
 import { huntForce } from '../core/missions'
 import { RISKS } from '../core/missions'
 import { DRILL_PRICE, GEAR_PRICE } from '../core/rewards'
-import { squadKeywords } from '../core/squad'
+import { squadMakes } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { health, wounded } from '../core/squad'
 import { level } from '../core/squad'
@@ -28,7 +28,7 @@ import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
 import { pickCard, shopSwap, pickDetail, utilityPick, type Pick } from './cards'
 import { heroSheet } from './sheet'
-import { alienName, badge, button, describe, describeGear, gearCard, gearName, healthBar, keywordChips, examChip, gearText, STOP_NAMES, threatBar } from './html'
+import { alienName, badge, button, describe, describeGear, gearCard, gearName, healthBar, quantityChips, examChip, gearText, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
 const TABS = ['Map', 'Team', 'Heroes'] as const
@@ -176,14 +176,14 @@ const PURCHASED = '<small class="purchased">Purchased</small>'
 /** Everything a shop sells, as cards of one size: weapons, relics, then boons and the medkit. */
 function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
   const shop = run.shop!
-  const held = squadKeywords(run)
+  const held = squadMakes(run)
   const poor = (price: number) => (price > run.supplies ? 'Not enough supplies' : null)
   const card = (top: string, name: string, foot: string, sold: boolean) => `<small>${top}</small><b>${name}</b>${sold ? PURCHASED : `<small class="price">${foot}</small>`}`
   const gear = shop.wares.map(({ gear, sold }, index): Pick => {
     const price = GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
     return { key: `g${index}`, attrs: `data-ware="${index}"`, look: `gear ${gear.rarity}`, body: card(gear.rarity, gearName(gear), `${price} supplies`, sold), detail: `<p><b>${gear.name}</b>. ${describeGear(gear, held)}</p>`, go: `Tap again to choose who takes it, for ${price} supplies`, block: poor(price), spent: sold }
   })
-  const relics = shop.relics.map(({ id, sold }, index): Pick => ({ key: `r${index}`, action: { type: 'buy', index }, look: 'relic', body: card('relic', `${relicIcon(id)} ${RELICS[id].name}`, `${RELIC_PRICE} supplies`, sold), detail: `<p><b>${RELICS[id].name}.</b> ${describe(RELICS[id].text, RELICS[id].tags, held)}</p>`, go: `Tap again to buy for ${RELIC_PRICE} supplies`, block: poor(RELIC_PRICE), spent: sold }))
+  const relics = shop.relics.map(({ id, sold }, index): Pick => ({ key: `r${index}`, action: { type: 'buy', index }, look: 'relic', body: card('relic', `${relicIcon(id)} ${RELICS[id].name}`, `${RELIC_PRICE} supplies`, sold), detail: `<p><b>${RELICS[id].name}.</b> ${describe(RELICS[id].text, RELICS[id], held)}</p>`, go: `Tap again to buy for ${RELIC_PRICE} supplies`, block: poor(RELIC_PRICE), spent: sold }))
   const utilities = shop.utilities.map(({ id, sold }, index): Pick =>
     utilityPick(`u${index}`, { type: 'utility', index }, id, 'boon', `Tap again to buy for ${UTILITY_PRICE} supplies${run.utilities.length >= UTILITY_SLOTS ? ', dropping one' : ''}`, {
       body: card('boon', `${UTILITIES[id].icon} ${UTILITIES[id].name}`, `${UTILITY_PRICE} supplies`, sold),
@@ -192,7 +192,10 @@ function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
     }),
   )
   const medkit: Pick = { key: 'm', action: { type: 'medkit' }, look: 'medkit', body: card('medkit', '✚ Medkit', `${MEDKIT.price} supplies`, shop.medkit), detail: `<p><b>Medkit.</b> Every hero heals ${MEDKIT.heal}, once. A safehouse heals fully.</p>`, go: `Tap again to pay ${MEDKIT.price} supplies`, block: wounded(run) ? poor(MEDKIT.price) : 'No hero is hurt', spent: shop.medkit }
-  const drill = (shop.drill ? run.soldiers : []).map((pupil): Pick => ({ key: `d${pupil.id}`, action: { type: 'drill', soldier: pupil.id }, look: 'medkit', body: card('favour', `🎖️ Drill ${pupil.name}`, `${DRILL_PRICE} supplies`, shop.drill!.sold), detail: `<p><b>Drill ${pupil.name} as the Carry.</b> Their hits add twice the burn, chill and marks, all run. One hero, once a run.</p>`, go: `Tap again to pay ${DRILL_PRICE} supplies`, block: poor(DRILL_PRICE), spent: shop.drill!.sold }))
+  const drill = (shop.drill ? run.soldiers : []).map((pupil): Pick => {
+    const drilled = shop.drill!.sold === pupil.id
+    return { key: `d${pupil.id}`, action: { type: 'drill', soldier: pupil.id }, look: 'medkit', body: card('favour', `🎖️ Drill ${pupil.name}`, `${DRILL_PRICE} supplies`, drilled), detail: `<p><b>Drill ${pupil.name} as the Carry.</b> Their hits add twice the burn, chill and marks, all run. One hero, once a run.</p>`, go: `Tap again to pay ${DRILL_PRICE} supplies`, block: shop.drill!.sold !== null && !drilled ? 'The Carry is chosen' : poor(DRILL_PRICE), spent: drilled }
+  })
   return [{ name: 'Weapons', picks: gear }, { name: 'Relics', picks: relics }, { name: 'Boons and favours', picks: [...utilities, medkit, ...drill] }]
 }
 
@@ -237,13 +240,13 @@ function mapView(run: Run, picked: number | null, armed: string | null, ware: nu
 }
 
 function baseView(run: Run): string {
-  const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${relicIcon(id)} ${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id].tags)}</div>`)
+  const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${relicIcon(id)} ${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id])}</div>`)
   const doctrines = run.doctrines.map((id) => `<div class="gear doctrine"><small>oath</small><br><b>${DOCTRINES[id].name}</b><br>${DOCTRINES[id].text}</div>`)
   const utilities = run.utilities.map((id) => `<div class="gear"><small>boon</small><br><b>${UTILITIES[id].icon} ${UTILITIES[id].name}</b><br>${boonText(id)}</div>`)
-  const held = squadKeywords(run)
+  const held = squadMakes(run)
   return `${relics.length + doctrines.length + held.length + utilities.length === 0 ? '<h2>Relics, oaths and boons the party gains show here.</h2>' : ''}
     ${utilities.length > 0 ? `<h2>Boons ${utilities.length}/${UTILITY_SLOTS}</h2><div class="stash">${utilities.join('')}</div>` : ''}
-    ${held.length > 0 ? `<h2>Keywords</h2>${keywordChips(held, held)}` : ''}
+    ${held.length > 0 ? `<h2>The squad makes</h2>${quantityChips(held, held)}` : ''}
     ${doctrines.length > 0 ? `<h2>Oaths</h2><div class="stash">${doctrines.join('')}</div>` : ''}
     ${relics.length > 0 ? `<h2>Relics</h2><div class="stash">${relics.join('')}</div>` : ''}`
 }

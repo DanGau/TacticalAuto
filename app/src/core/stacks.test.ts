@@ -83,12 +83,12 @@ test('Might adds damage to every hit, to at most MIGHT_MAX; Blood Rite gives it 
   expect(hero.might).toBe(MIGHT_MAX)
 })
 
-test("Kinetic Engine: a slam or a fall the hero causes does the hero's damage again; Kilned and Hailing gear add a burn or chill stack on a slam", () => {
-  const { battle, hero, aliens } = arena(['impetus', 'kiln', 'quench'], [{ x: 11, y: 10 }, { x: 12, y: 10 }])
+test("Kinetic Engine: a slam or a fall the hero causes does the hero's damage again; Kilned gear adds a burn stack on a slam", () => {
+  const { battle, hero, aliens } = arena(['impetus', 'kiln'], [{ x: 11, y: 10 }, { x: 12, y: 10 }])
   hero.stats = { ...hero.stats, damage: 5 }
   battle.actor = hero.id
   knockback(battle, hero, aliens[0], [])
-  expect(aliens[0]).toMatchObject({ hp: 40 - SLAM_DAMAGE - 5, burn: 1, chill: 1 })
+  expect(aliens[0]).toMatchObject({ hp: 40 - SLAM_DAMAGE - 5, burn: 1 })
   for (let x = 0; x < GRID; x++) battle.height[10 * GRID + x] = x <= 12 ? 4 : 0
   expect(fell(battle, aliens[1], 4, [])).toBe(5)
 })
@@ -104,7 +104,7 @@ test('Domino Rig: an alien knocked into another knocks that one back too; a hero
 
 test("payoffs spend stacks for a share of the hero's damage a stack: a hit at enough burn the burn, any hit the chill, at enough marks the marks", () => {
   const each = 4 * TUNING.spend.factor
-  for (const [effect, stacks, worth] of [['accelerant', { burn: 4 }, 4 * each], ['shatter', { chill: 3 }, 3 * each], ['spotter', { mark: 3 }, 3 * each + TUNING.markDamage]] as const) {
+  for (const [effect, stacks, worth] of [['accelerant', { burn: 4 }, 4 * each], ['glassEdge', { chill: 3 }, 3 * each], ['spotter', { mark: 3 }, 3 * each + TUNING.markDamage]] as const) {
     const { hero, aliens, beats } = arena([effect], [{ x: 11, y: 10 }])
     hero.stats = { ...hero.stats, damage: 4, crit: 0 }
     Object.assign(aliens[0], stacks)
@@ -162,10 +162,9 @@ test('Catalyst Prism: every CATALYST_EVERY-th hit doubles the burn, chill and ma
   hero.stats = { ...hero.stats, damage: 1, crit: 0 }
   hero.hits = CATALYST_EVERY - 1
   kindle(battle, aliens[0], 2)
-  Object.assign(aliens[0], { chill: 1, mark: 1 })
+  Object.assign(aliens[0], { mark: 1 })
   beats(1)
   expect(aliens[0].burn).toBeGreaterThanOrEqual(4)
-  expect(aliens[0].chill).toBeGreaterThanOrEqual(2)
   expect(aliens[0].mark).toBeGreaterThanOrEqual(2)
 })
 
@@ -261,9 +260,9 @@ test('Fault Line: every FAULT.every-th hit up close drops the ground around the 
 
 test("Witch's Hex passes a dead alien's stacks on; Frost Fracture shatters a frozen one over those beside it", () => {
   const { battle, aliens } = arena(['hex', 'fracture'], [{ x: 11, y: 10 }, { x: 12, y: 10 }])
-  Object.assign(aliens[0], { mark: 2, burn: 5, frozen: true, chill: 3 })
+  Object.assign(aliens[0], { mark: 2, frozen: true, chill: 3 })
   died(battle, aliens[0], null, [])
-  expect(aliens[1].burn).toBe(5)
+  expect(aliens[1].mark).toBe(2)
   expect(aliens[1].hp).toBe(40 - FRACTURE_DAMAGE * 3)
 })
 

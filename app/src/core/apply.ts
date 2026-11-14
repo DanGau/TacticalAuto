@@ -163,12 +163,12 @@ export function apply(run: Run, action: Action): Result {
       mend(run, MEDKIT.heal)
       shop.medkit = true
     } else if (action.type === 'drill') {
-      if (!shop.drill || shop.drill.sold) return no('no drill on offer')
+      if (!shop.drill || shop.drill.sold !== null) return no('no drill on offer')
       if (!run.soldiers.some((s) => s.id === action.soldier)) return no('no such hero')
       if (DRILL_PRICE > run.supplies) return no('not enough supplies')
       run.supplies -= DRILL_PRICE
       run.carry = action.soldier
-      shop.drill.sold = true
+      shop.drill.sold = action.soldier
     } else depart(run)
     return ok
   }

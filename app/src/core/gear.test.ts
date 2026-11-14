@@ -101,7 +101,7 @@ test('a scorching weapon burns its target at the start of the target\'s turns', 
   expect(d.alien.hp).toBe(99 - SOLDIER_ATTACKS - SOLDIER_ATTACKS * BURN_STACKS)
 })
 
-test('a rimed weapon chills its target, and a shatterglass edge and thermal shock core pay off on it', () => {
+test('a rimed weapon chills its target, and Glass Edge pays off on it', () => {
   const d = duel({ weapon: 'sniper', rarity: 'rare', name: 'Rimed Steady Carbine', stats: {}, effect: 'frostbite' })
   d.soldier.stats = { ...d.soldier.stats, damage: 2, crit: 0 }
   const shots = () => {
@@ -112,17 +112,15 @@ test('a rimed weapon chills its target, and a shatterglass edge and thermal shoc
   expect(first).toMatchObject({ damage: 2 })
   expect(d.alien.chill).toBeGreaterThan(0)
   Object.assign(d.alien, { chill: 3, frozen: true })
-  expect(spendStacks(d.battle, { ...d.soldier, effects: ['shatter'] }, d.alien, [], [])).toBe(Math.round(3 * 2 * TUNING.spend.factor))
-  Object.assign(d.alien, { burn: 2, chill: 1 })
-  expect(spendStacks(d.battle, { ...d.soldier, effects: ['thermal'] }, d.alien, [], [])).toBe(Math.round(3 * 2 * TUNING.spend.factor))
-  expect(d.alien).toMatchObject({ burn: 0, chill: 0 })
+  expect(spendStacks(d.battle, { ...d.soldier, effects: ['glassEdge'] }, d.alien, [], [])).toBe(Math.round(3 * 2 * TUNING.spend.factor))
+  expect(d.alien.chill).toBe(0)
 })
 
-test('an alien that resists frost and burn is neither chilled nor set burning', () => {
+test('an alien that resists chill and burn is neither chilled nor set burning', () => {
   const d = duel({ weapon: 'rifle', rarity: 'rare', name: 'Rimed Steady Carbine', stats: {}, effect: 'frostbite' })
   d.soldier.stats = { ...d.soldier.stats, damage: 1, crit: 0 }
   d.soldier.effects.push('incendiary')
-  d.alien.resists = ['frost', 'burn']
+  d.alien.resists = ['chill', 'burn']
   untilAlienShoots(d)
   expect(d.alien.chill).toBe(0)
   expect(d.alien.burn).toBe(0)
@@ -177,13 +175,13 @@ test('an arcing crit leaps to the two nearest other aliens for half its damage',
   expect(arcs.every((e) => e.type === 'effect' && e.amount === -half && [d.alien.id, a.id, b.id].includes(e.id))).toBe(true)
 })
 
-test('a volatile kill bursts on the aliens beside it', () => {
+test('a volatile kill bursts on the aliens beside it for the damage past the kill', () => {
   const d = armed(['volatile'], { damage: 5 })
   d.alien.hp = 1
   const other = another(d, 1, 0)
   const events = []
   for (let beats = 0; d.alien.hp > 0 && beats < 200; beats++) events.push(...d.step())
-  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: other.id, effect: 'volatile', amount: -2 }))
+  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: other.id, effect: 'volatile', amount: -4 }))
 })
 
 test('a thundering hit knocks the target only into what stops it, an alien it slams into taking as much', () => {

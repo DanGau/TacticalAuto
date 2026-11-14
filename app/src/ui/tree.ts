@@ -37,7 +37,7 @@ export const chip = (hero: Soldier, id: SkillId) => {
 
 /** An offered skill in full, for the sheet: name, use and text. */
 const offerCard = (id: SkillId, held?: Parameters<typeof describe>[2]) =>
-  `<div class="toffer"><b>${SKILLS[id].name}</b><small class="use">${usage(SKILLS[id])}</small><span>${describe(SKILLS[id].text, SKILLS[id].tags, held)}</span></div>`
+  `<div class="toffer"><b>${SKILLS[id].name}</b><small class="use">${usage(SKILLS[id])}</small><span>${describe(SKILLS[id].text, SKILLS[id], held)}</span></div>`
 
 /** Depth still ahead, as faint ticks. */
 const ticks = (n: number) => `<span class="tticks" aria-hidden="true">${'<i></i>'.repeat(n)}</span>`

@@ -133,7 +133,7 @@ export function talentHit(battle: Battle, unit: Unit, enemy: Unit, crit: boolean
   }
   const tinder = has(unit, 'spread') && enemy.burn > 0 ? beside.find((u) => u.burn === 0) : undefined
   if (tinder) {
-    kindle(battle, tinder, burnFrom(unit))
+    kindle(battle, tinder, burnFrom(unit), events)
     events.push(fx(tinder.id, 'spread', 0))
   }
   if (crit && has(unit, 'splinter')) for (const u of beside) chillUnit(battle, u, chillFrom(unit), events)
@@ -147,7 +147,7 @@ export function talentHit(battle: Battle, unit: Unit, enemy: Unit, crit: boolean
   }
   if (enemy.hp > 0 && has(enemy, 'vengeance')) empower(enemy, 1, 'vengeance', events)
   if (has(enemy, 'cinderSkin') && distance(unit, enemy) <= 1 && unit.hp > 0 && unit.burn < BURN_MAX) {
-    kindle(battle, unit, burnFrom(enemy))
+    kindle(battle, unit, burnFrom(enemy), events)
     events.push(fx(unit.id, 'cinderSkin', 0))
   }
   const avenger = allies(battle, enemy).find((a) => has(a, 'retribution') && distance(a, enemy) <= TALENT.reach)

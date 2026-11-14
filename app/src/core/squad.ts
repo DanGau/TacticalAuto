@@ -14,7 +14,7 @@ import { type Soldier } from './run-state'
 import { committed, powerOf, SKILLS, type SkillId, TREES } from './skills'
 import { MELEE_RANGE, WEAPONS } from './weapons'
 import { CONTINENT_IDS, type City, CONTINENTS } from './world'
-import type { Keyword } from './keywords'
+import type { Flow, Quantity } from './quantities'
 import { emptyTally, type FeatId, type Tally, FEATS } from './feats'
 
 /** Experience each level takes beyond the last: level n takes LEVEL_XP × n more. */
@@ -182,25 +182,28 @@ export function offerRecruits(run: Run): void {
   }
 }
 
-/** The keywords of everything the squad has: its soldiers' skills and gear, and its relics, and what its weapons cause. */
-export function squadKeywords(run: Run): Keyword[] {
-  const tags = [
-    ...run.soldiers.flatMap((s) => [...s.skills.map((id) => SKILLS[id].tags ?? []), (s.gear?.effect && EFFECTS[s.gear.effect].tags) || []]),
-    ...run.relics.map((id) => RELICS[id].tags ?? []),
-    squadCauses(run),
-  ].flat()
-  return [...new Set(tags)]
+/** What a hero's class ability makes. */
+const ABILITY_MAKES: Partial<Record<string, Quantity[]>> = { napalm: ['burn'], cryo: ['chill'], rocket: ['impact'] }
+
+/** What `soldier` has that makes or reads: skills, gear effect, weapon, class ability. */
+export function heroFlows(soldier: Soldier): Flow[] {
+  const weapon = soldier.gear && WEAPONS[soldier.gear.weapon]
+  return [
+    ...soldier.skills.map((id) => SKILLS[id]),
+    ...(soldier.gear?.effect ? [EFFECTS[soldier.gear.effect]] : []),
+    { makes: [...(weapon?.effect === 'thunder' ? (['moved', 'impact'] as const) : []), ...(weapon && weapon.attack.shots >= 2 ? (['shots'] as const) : [])] },
+    { makes: ABILITY_MAKES[CLASSES[soldier.cls!].ability] ?? [] },
+  ]
 }
 
-/** Keywords the squad causes: those of its skills, its gear and relics bar what they only spend, force for a weapon that knocks back, volley for one of many shots. */
-export function squadCauses(run: Run): Keyword[] {
-  const own = (source: { tags?: Keyword[]; pays?: Keyword[] }) => (source.tags ?? []).filter((tag) => !source.pays?.includes(tag))
-  const tags = [
-    ...run.soldiers.flatMap((s) => [...s.skills.flatMap((id) => SKILLS[id].tags ?? []), ...(s.gear?.effect ? own(EFFECTS[s.gear.effect]) : []), ...(s.gear && WEAPONS[s.gear.weapon].effect === 'thunder' ? ['force' as const] : []), ...(s.gear && WEAPONS[s.gear.weapon].attack.shots >= 2 ? ['volley' as const] : [])]),
-    ...run.relics.flatMap((id) => own(RELICS[id])),
-  ]
-  return [...new Set(tags)]
-}
+/** Everything the squad has that makes or reads: its heroes' and its relics. */
+const flows = (run: Run): Flow[] => [...run.soldiers.flatMap(heroFlows), ...run.relics.map((id) => RELICS[id])]
+
+/** The quantities the squad makes. */
+export const squadMakes = (run: Run): Quantity[] => [...new Set(flows(run).flatMap((f) => f.makes ?? []))]
+
+/** The quantities the squad reads. */
+export const squadReads = (run: Run): Quantity[] => [...new Set(flows(run).flatMap((f) => f.reads ?? []))]
 
 /** What a soldier earns from a battle, after the feats it ends the battle with are recorded. */
 export function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | null): { earned: Earned[]; feats: FeatId[]; tally: Tally } {

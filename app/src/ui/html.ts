@@ -6,7 +6,7 @@ import { WEAPONS, type Kit } from "../core/weapons";
 import { tip as markTip } from "./charts";
 import { ALIENS, type AlienKind } from "../core/aliens";
 import { BASE_STATS, type Stats } from "../core/battle";
-import { KEYWORDS, RESISTS, type Keyword, type Resist } from "../core/keywords";
+import { CANCELS, QUANTITIES, RESISTS, type Cancel, type Flow, type Quantity, type Resist } from "../core/quantities";
 import { TUNING } from "../core/tuning";
 import type { ClassId } from "../core/classes";
 import { type Mission } from "../core/run-state";
@@ -145,74 +145,90 @@ export const gearName = (gear: Gear) =>
 const tip = (label: string, text: string) =>
   `<span class="tip" title="${text}">${label}</span>`;
 
-/** A keyword's chip: its icon and name, lit if the squad has it, explained on hover. */
-const keywordChip = (tag: Keyword, held = false) =>
-  `<span class="kw ${tag} ${held ? "held" : ""}" title="${KEYWORDS[tag].name}: ${KEYWORDS[tag].text}">${KEYWORDS[tag].icon} ${KEYWORDS[tag].name}</span>`;
+/** A quantity's chip: its icon and name, lit if the squad makes it, explained on hover. */
+const quantityChip = (q: Quantity, held = false) =>
+  `<span class="kw ${q} ${held ? "held" : ""}" title="${QUANTITIES[q].name}: ${QUANTITIES[q].text}">${QUANTITIES[q].icon} ${QUANTITIES[q].name}</span>`;
 
-/** A keyword something shrugs off: its icon struck through, explained on hover. */
-export const resistChip = (tag: Resist) =>
-  `<span class="kw ${tag} resist" title="Resists ${KEYWORDS[tag].name}: ${RESISTS[tag]}">${KEYWORDS[tag].icon}</span>`;
+/** A quantity something shrugs off: its icon struck through, explained on hover. */
+export const resistChip = (q: Resist) =>
+  `<span class="kw ${q} resist" title="Resists ${QUANTITIES[q].name}: ${RESISTS[q]}">${QUANTITIES[q].icon}</span>`;
 
 /** A Guardian's exam: its icon, explained on hover with what answers it. */
 export const examChip = (exam: Exam) =>
   `<span class="kw exam" title="${EXAMS[exam].name}: ${EXAMS[exam].text}. Answer: ${EXAMS[exam].answer}">${EXAMS[exam].icon} ${EXAMS[exam].name}</span>`;
 
-/** The words in a description that name a keyword, and which. */
-const KEYWORD_WORDS: [RegExp, Keyword][] = [
+/** The words in a description that name a quantity, and which; the first that fits wins. */
+const QUANTITY_WORDS: [RegExp, Quantity][] = [
+  [/past the kill|beyond what a kill needs/, "overkill"],
   [/burning|burns?/, "burn"],
-  [/chilled|chills?/, "frost"],
+  [/chilled|chills?|frozen|freezes?/, "chill"],
   [/marked|marks?/, "mark"],
+  [/knock\w*|pull\w*|slides?|slid|moved|moving/, "moved"],
+  [/into something|off a ledge/, "impact"],
+  [/shots?/, "shots"],
   [/crits?/, "crit"],
   [/kills?/, "kill"],
-  [/armor/, "ward"],
+  [/armor/, "armor"],
 ];
-const KEYWORD_PATTERN = new RegExp(
-  `\\b(${KEYWORD_WORDS.map(([re]) => re.source).join("|")})\\b`,
+const QUANTITY_PATTERN = new RegExp(
+  `\\b(${QUANTITY_WORDS.map(([re]) => re.source).join("|")})\\b`,
   "gi",
 );
-const keywordOf = (word: string) =>
-  KEYWORD_WORDS.find(([re]) =>
+const quantityOf = (word: string) =>
+  QUANTITY_WORDS.find(([re]) =>
     new RegExp(`^(${re.source})$`, "i").test(word),
   )![1];
 
+/** The cancellations a flow's quantities take part in: those it bridges, and those whose half it makes. */
+const cancelsOf = (flow: Flow & { bridge?: Cancel }): Cancel[] =>
+  (Object.keys(CANCELS) as Cancel[]).filter(
+    (id) => flow.bridge === id || !!flow.makes?.some((q) => (CANCELS[id].pair as readonly Quantity[]).includes(q)),
+  );
+
 /**
- * A description as Slay the Spire writes a card: each keyword in it coloured in place, lit if the squad has it,
- * and on hover a box beside it defining every keyword it names or carries.
+ * A description as Slay the Spire writes a card: each quantity in it coloured in place, lit if the squad makes it,
+ * and on hover a box beside it defining every quantity it names, makes or reads, and each cancellation it is part of.
  */
 export function describe(
   text: string,
-  tags: Keyword[] = [],
-  held: Keyword[] = [],
+  flow: Flow & { bridge?: Cancel } = {},
+  held: Quantity[] = [],
 ): string {
-  const named = new Set<Keyword>(tags);
-  const rich = text.replace(KEYWORD_PATTERN, (word) => {
-    const tag = keywordOf(word);
-    named.add(tag);
-    return `<span class="kwi ${tag} ${held.includes(tag) ? "held" : ""}">${KEYWORDS[tag].icon}${word}</span>`;
+  const named = new Set<Quantity>([...(flow.makes ?? []), ...(flow.reads ?? [])]);
+  const rich = text.replace(QUANTITY_PATTERN, (word) => {
+    const q = quantityOf(word);
+    named.add(q);
+    return `<span class="kwi ${q} ${held.includes(q) ? "held" : ""}">${QUANTITIES[q].icon}${word}</span>`;
   });
-  const defs = [...named].map(
-    (tag) =>
-      `<span class="def"><b class="kwi ${tag}">${KEYWORDS[tag].icon} ${KEYWORDS[tag].name}</b>${KEYWORDS[tag].text}.</span>`,
-  );
+  const defs = [
+    ...[...named].map(
+      (q) =>
+        `<span class="def"><b class="kwi ${q}">${QUANTITIES[q].icon} ${QUANTITIES[q].name}</b>${QUANTITIES[q].text}.</span>`,
+    ),
+    ...cancelsOf(flow).map(
+      (id) =>
+        `<span class="def cancel"><b>⚠ ${CANCELS[id].name}</b>${CANCELS[id].text}${flow.bridge === id ? "; this turns it into a payoff" : ""}.</span>`,
+    ),
+  ];
   // One span, so a flex card keeps the sentence on one line.
   return `<span>${rich}</span>${defs.length > 0 ? `<span class="defs">${defs.join("")}</span>` : ""}`;
 }
 
-/** Keyword chips; one the squad already has, in `held`, is lit. */
-export const keywordChips = (tags: Keyword[] = [], held: Keyword[] = []) =>
-  tags.length === 0
+/** Quantity chips; one the squad makes, in `held`, is lit. */
+export const quantityChips = (qs: Quantity[] = [], held: Quantity[] = []) =>
+  qs.length === 0
     ? ""
-    : `<span class="keywords">${tags.map((tag) => keywordChip(tag, held.includes(tag))).join("")}</span>`;
+    : `<span class="keywords">${qs.map((q) => quantityChip(q, held.includes(q))).join("")}</span>`;
 
 /** An alien kind's name, its rules on hover, and what it resists. */
 export const alienName = (kind: AlienKind, label = ALIENS[kind].name) =>
   `${tip(label, ALIENS[kind].text)}${ALIENS[kind].resists.map(resistChip).join("")}`;
 
 /** What a piece of gear does, its keywords coloured and defined. */
-export const describeGear = (gear: Gear, held: Keyword[] = []) =>
-  describe(gearText(gear), gear.effect ? EFFECTS[gear.effect].tags : [], held);
+export const describeGear = (gear: Gear, held: Quantity[] = []) =>
+  describe(gearText(gear), gear.effect ? EFFECTS[gear.effect] : {}, held);
 
 /** A piece of gear as a card's contents: rarity, name and special. */
-export function gearCard(gear: Gear, held: Keyword[] = []): string {
+export function gearCard(gear: Gear, held: Quantity[] = []): string {
   return `<small>${gear.rarity}</small><br><b>${gearName(gear)}</b><br>${describeGear(gear, held)}`;
 }

@@ -4,7 +4,7 @@ import { strategic } from './strategic'
 import { plannedPerk } from '../core/plans'
 import { fuelTanks } from '../core/objects'
 import { UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
-import type { Keyword } from '../core/keywords'
+import type { Flow } from '../core/quantities'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { SKILLS } from '../core/skills'
@@ -15,7 +15,7 @@ import { type Run } from '../core/run-state'
 import { type Risk } from '../core/run-state'
 import { danger } from '../core/missions'
 import { DRILL_PRICE, GEAR_PRICE } from '../core/rewards'
-import { squadKeywords } from '../core/squad'
+import { squadMakes, squadReads } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { health, wounded } from '../core/squad'
 import { minorOffers, skillOffers } from '../core/squad'
@@ -29,36 +29,41 @@ const RARITY_ORDER = ['common', 'rare', 'epic']
 /** What a piece of gear is worth on its own: rarer is better, a plain one, such as the starting rifle, least; an empty slot nothing. */
 const value = (gear: Gear | null) => (gear ? 2 * RARITY_ORDER.indexOf(gear.rarity) + (gear.effect || Object.keys(gear.stats).length > 0 ? 1 : 0) : -1)
 
-/** Whether a piece of gear raises its owner's worth over what they hold; a `keen` bot also counts the keywords it shares with their skills. */
+/** Whether a piece of gear raises its owner's worth over what they hold; a `keen` bot also counts the quantities it trades with the squad. */
 function fits(run: Run, gear: Gear, keen: boolean): boolean {
   const owner = run.soldiers.find((s) => s.id === gear.owner)
   if (!owner) return false
-  const own = owner.skills.flatMap((id) => SKILLS[id].tags ?? [])
-  const shared = keen && gear.effect ? (EFFECTS[gear.effect].tags ?? []).filter((tag) => own.includes(tag)).length : 0
+  const shared = keen && gear.effect ? trades(run, EFFECTS[gear.effect]) : 0
   return value(gear) - value(owner.gear) + shared > 0
+}
+
+/** How many quantities `flow` reads that the squad makes, or makes that it reads. */
+const trades = (run: Run, flow: Flow) => {
+  const made = squadMakes(run)
+  const read = squadReads(run)
+  return (flow.reads ?? []).filter((q) => made.includes(q)).length + (flow.makes ?? []).filter((q) => read.includes(q)).length
 }
 
 /** Puts the first find on its owner if it fits them, else sells it; a `keen` bot weighs keywords too. */
 const decideFind = (run: Run, keen: boolean): Action => (fits(run, run.finds[0], keen) ? { type: 'equip', find: 0 } : { type: 'sell', find: 0 })
 
-/** Chooses among `count` offers, given each offer's keywords. */
-type Pick = (run: Run, rng: { rng: number }, tags: Keyword[][]) => number
+/** Chooses among offers, given what each makes and reads. */
+type Pick = (run: Run, rng: { rng: number }, flows: Flow[]) => number
 
 const PICKS = {
   first: () => 0,
-  random: (_run, rng, tags) => randomInt(rng, tags.length),
-  /** The offer sharing the most keywords with the squad's; with none held yet, the first that has any. */
-  synergy: (run, _rng, tags) => {
-    const held = squadKeywords(run)
-    const score = (i: number) => 10 * tags[i].filter((tag) => held.includes(tag)).length + tags[i].length
-    return tags.reduce((best, _, i) => (score(i) > score(best) ? i : best), 0)
+  random: (_run, rng, flows) => randomInt(rng, flows.length),
+  /** The offer trading the most quantities with the squad; with none, the first that makes or reads any. */
+  synergy: (run, _rng, flows) => {
+    const score = (i: number) => 10 * trades(run, flows[i]) + (flows[i].makes?.length ?? 0) + (flows[i].reads?.length ?? 0)
+    return flows.reduce((best, _, i) => (score(i) > score(best) ? i : best), 0)
   },
 } satisfies Record<string, Pick>
 
 /** The reward phase's next choice: a relic, or a duo with none, then finds, then skills. A random bot equips a find or sells it at random. */
 function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
   if (run.duoOffer && run.relicOffers.length === 0) return { type: 'duo' }
-  if (run.relicOffers.length > 0) return { type: 'relic', index: pick(run, rng, run.relicOffers.map((id) => RELICS[id].tags ?? [])) }
+  if (run.relicOffers.length > 0) return { type: 'relic', index: pick(run, rng, run.relicOffers.map((id) => RELICS[id])) }
   if (run.finds.length > 0 && pick === PICKS.random) {
     return randomInt(rng, 2) === 0 ? { type: 'sell', find: 0 } : { type: 'equip', find: 0 }
   }
@@ -69,7 +74,7 @@ function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
     return { type: 'perk', soldier: picker.id, index: pick === PICKS.random ? randomInt(rng, minorOffers(picker).length) : plannedPerk(picker) }
   }
   const offers = skillOffers(learner)
-  return { type: 'skill', soldier: learner.id, index: pick(run, rng, offers.map((id) => SKILLS[id].tags ?? [])) }
+  return { type: 'skill', soldier: learner.id, index: pick(run, rng, offers.map((id) => SKILLS[id])) }
 }
 
 /** Purchases the run can pay for now: gear that fits its owner, relics, utilities, then a medkit while a hero is hurt. */

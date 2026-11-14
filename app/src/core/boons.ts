@@ -82,7 +82,7 @@ export function tickBoons(battle: Battle, events: GameEvent[]): void {
       events.push(fx(u.id, 'regen', healed))
     }
     if (has('coldSnap')) for (const u of aliens.filter((u) => u.engaged)) chillUnit(battle, u, 1, events)
-    if (has('blaze') && battle.entry) for (const u of aliens.filter((u) => distance(u, battle.entry!) <= BLAZE_REACH)) kindle(battle, u, 1)
+    if (has('blaze') && battle.entry) for (const u of aliens.filter((u) => distance(u, battle.entry!) <= BLAZE_REACH)) kindle(battle, u, 1, events)
     if (has('hunted')) {
       const prey = aliens.reduce<Unit | null>((a, b) => (!a || b.stats.hp > a.stats.hp ? b : a), null)
       if (prey) prey.exposed = Math.max(prey.exposed, 1)

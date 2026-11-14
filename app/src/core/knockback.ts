@@ -1,11 +1,11 @@
 // Driving a unit back, and what it hits or falls from: a ledge, a window, or the edge of the world.
 import { fx, srcOf } from './sources'
-import { GRID, type Battle, type Effect, type Tile, type Unit } from './battle'
+import { BURN_STACKS, CHILL_SLIDE, GRID, type Battle, type Effect, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
-import { blocked, CLIFF, edgeBetween, freeTilesNear, heightAt, onGrid, openNear, unitAt, unwalled, walks } from './grid'
-import { has } from './fighters'
+import { blocked, CLIFF, distance, edgeBetween, freeTilesNear, heightAt, onGrid, openNear, unitAt, unwalled, walks } from './grid'
+import { fireproof, foeHas, has, onTile } from './fighters'
 import { SLAM_DAMAGE, wound } from './wound'
-import { fell, slammed } from './stacks'
+import { displaced, fell, kindle, slammed } from './stacks'
 
 /** Damage a fall beyond the unit's jump does for each level dropped; what one over the edge does to a hero or a boss, which catches the edge. Any other alien is lost. */
 export const FALL_DAMAGE = 2
@@ -122,15 +122,18 @@ export function fall(battle: Battle, unit: Unit, from: Tile, to: Tile, events: G
 export function knockback(battle: Battle, unit: Unit, target: Unit, events: GameEvent[], way = 1, tiles = 1, slam = SLAM_DAMAGE, effect: Effect = way > 0 ? 'thunder' : 'tether'): void {
   const back = way > 0 ? knockWay(battle, unit, target) : undefined
   const step = back ?? { x: way * Math.sign(target.x - unit.x), y: way * Math.sign(target.y - unit.y) }
-  drive(battle, target, step, tiles, events, way > 0 ? slam : 0, effect)
+  drive(battle, target, step, tiles, events, way > 0 ? slam : 0, effect, way > 0)
 }
+
+/** Tiles more `target` slides when knocked back: CHILL_SLIDE while chilled. */
+const slideOf = (target: Unit) => (target.chill > 0 ? CHILL_SLIDE : 0)
 
 /** Whether a knockback from `unit` drives `target` into something or off a ledge within `tiles`. */
 export function knocksInto(battle: Battle, unit: Tile, target: Unit, tiles = 1): boolean {
   const step = knockWay(battle, unit, target)
   if (!step) return false
   let from: Tile = target
-  for (let i = 0; i < tiles; i++) {
+  for (let i = 0; i < tiles + slideOf(target); i++) {
     const to = { x: from.x + step.x, y: from.y + step.y }
     if (fallBeyond(battle, from, to) !== 0 || blocked(battle, to.x, to.y) || !unwalled(battle, from, to) || heightAt(battle, to) - heightAt(battle, from) >= CLIFF) return true
     from = to
@@ -138,12 +141,19 @@ export function knocksInto(battle: Battle, unit: Tile, target: Unit, tiles = 1):
   return false
 }
 
-/** Drives `target` up to `tiles` along `step`; see knockback. Returns whether it fell. */
-export function drive(battle: Battle, target: Unit, step: Tile, tiles: number, events: GameEvent[], slam: number, effect: Effect): boolean {
+/**
+ * Drives `target` up to `tiles` along `step`; see knockback. It counts as moved: see displaced. A chilled target that
+ * may `slide` goes up to CHILL_SLIDE tiles more, and slams a point harder for each. One driven onto fire catches it.
+ * Returns whether it fell.
+ */
+export function drive(battle: Battle, target: Unit, step: Tile, tiles: number, events: GameEvent[], slam: number, effect: Effect, slide = false): boolean {
+  displaced(battle, target, events)
+  if (target.hp <= 0) return false
+  const most = tiles + (slide ? slideOf(target) : 0)
   const path: Tile[] = []
   let over: Tile | null = null
   let stopped = false
-  for (let i = 0; i < tiles && !stopped && !over; i++) {
+  for (let i = 0; i < most && !stopped && !over; i++) {
     const from = path.at(-1) ?? target
     const to = { x: from.x + step.x, y: from.y + step.y }
     if (fallBeyond(battle, from, to) !== 0) over = to
@@ -156,6 +166,10 @@ export function drive(battle: Battle, target: Unit, step: Tile, tiles: number, e
     target.x = end.x
     target.y = end.y
     events.push({ type: 'move', src: srcOf(effect), id: target.id, path, with: effect })
+    if (onTile(battle.fire, end) && target.side === 'alien' && !fireproof(battle, target)) {
+      kindle(battle, target, BURN_STACKS, events)
+      events.push(fx(target.id, foeHas(battle, target, 'pyre') ? 'pyre' : 'napalm', 0))
+    }
   }
   if (over) {
     fall(battle, target, end ?? start, over, events)
@@ -163,15 +177,32 @@ export function drive(battle: Battle, target: Unit, step: Tile, tiles: number, e
   }
   if (!stopped || slam === 0) return false
   const into = unitAt(battle, target.x + step.x, target.y + step.y)
-  events.push(fx(target.id, effect, -slam))
-  wound(battle, target, slam, events)
+  const hard = slam + Math.max(0, path.length - tiles)
+  events.push(fx(target.id, effect, -hard))
+  wound(battle, target, hard, events)
   slammed(battle, target, events)
   if (into && into.side === target.side) {
     events.push(fx(into.id, effect, -slam))
     wound(battle, into, slam, events)
-    if (into.hp > 0 && into.side === 'alien' && dominoes(battle)) drive(battle, into, step, 1, events, slam, 'domino')
+    if (into.hp > 0 && into.side === 'alien' && dominoes(battle)) drive(battle, into, step, 1, events, slam, 'domino', true)
   }
   return false
+}
+
+/** Lodestone Harness: `target` is pulled tile by tile toward `to` until beside it, as far as the way is free. It counts as moved. */
+export function pull(battle: Battle, target: Unit, to: Tile, events: GameEvent[]): void {
+  displaced(battle, target, events)
+  const path: Tile[] = []
+  let from: Tile = target
+  while (target.hp > 0 && distance(from, to) > 1) {
+    const next = { x: from.x + Math.sign(to.x - from.x), y: from.y + Math.sign(to.y - from.y) }
+    if (fallBeyond(battle, from, next) !== 0 || blocked(battle, next.x, next.y) || !unwalled(battle, from, next) || Math.abs(heightAt(battle, next) - heightAt(battle, from)) >= CLIFF) break
+    path.push(next)
+    from = next
+  }
+  if (path.length === 0) return
+  Object.assign(target, from)
+  events.push({ type: 'move', src: srcOf('lodestone'), id: target.id, path, with: 'lodestone' })
 }
 
 /** Whether the acting hero's knockbacks knock on, by Domino Rig. */

@@ -2,7 +2,7 @@
 import { ALIENS, type AlienKind } from "../core/aliens";
 import type { Stats } from "../core/battle";
 import { classPower, CLASSES } from "../core/classes";
-import type { Keyword } from "../core/keywords";
+import type { Flow, Quantity } from "../core/quantities";
 import { usage, type Power } from "../core/powers";
 import type { Run, Soldier } from "../core/run-state";
 import {
@@ -48,8 +48,8 @@ export const statBlock = (cells: [string, string | number][]) =>
   `<div class="statblock">${cells.map(([name, value]) => `<span><small>${name}</small><b>${value}</b></span>`).join("")}</div>`;
 
 /** A power in full: its name, usage line and effect. */
-export const powerBlock = (power: Power, tags?: Keyword[], held?: Keyword[]) =>
-  `<div class="power described"><b>${power.name}</b> <small class="use">${usage(power)}</small><div>${describe(power.text, tags, held)}</div></div>`;
+export const powerBlock = (power: Power, flow?: Flow, held?: Quantity[]) =>
+  `<div class="power described"><b>${power.name}</b> <small class="use">${usage(power)}</small><div>${describe(power.text, flow, held)}</div></div>`;
 
 /** A hero's numbers. */
 const heroStats = (run: Run, hero: Soldier) => {
@@ -71,7 +71,7 @@ const kit = ({ gear }: Soldier) =>
   gear ? `${gearName(gear)}. ${gearText(gear)}` : "";
 
 /** A hero's powers: its bonus attack, then those it learned, its class's ability with its uses worked out. */
-const powers = (run: Run, hero: Soldier): (Power & { tags?: Keyword[] })[] => [
+const powers = (run: Run, hero: Soldier): (Power & Flow)[] => [
   secondaryPower(SECONDARIES[secondaryOf(hero)]),
   ...hero.skills.map((id) =>
     id === powerOf(hero.cls!)
@@ -123,9 +123,9 @@ export function heroDossier(run: Run, hero: Soldier, actions: string): string {
 }
 
 /** A hero's powers in full. */
-export const powerList = (run: Run, hero: Soldier, held?: Keyword[]) =>
+export const powerList = (run: Run, hero: Soldier, held?: Quantity[]) =>
   `<div class="powers">${powers(run, hero)
-    .map((p) => powerBlock(p, p.tags, held))
+    .map((p) => powerBlock(p, p, held))
     .join("")}</div>`;
 
 /** A hero's whole sheet: numbers, weapon and kit, how it fights, and its powers in full. */

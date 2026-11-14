@@ -407,13 +407,14 @@ export function fleePath(battle: Battle, unit: Unit): Tile[] {
   return bestPath(paths(battle, unit, unit.stats.move), unit, (end) => [SAFE - Math.min(SAFE, ...aliens.map((a) => distance(a, end))), toSquad ? toSquad[end.y * GRID + end.x] : 0])
 }
 
-/** A freed VIP's path: toward the extraction zone, away from the aliens' shots and, while hunted, never beyond ESCORT_REACH of a hero or summon. */
+/** A freed VIP's path: toward the extraction zone, away from the aliens' shots and, while hunted and before RESTLESS_ROUND, never beyond ESCORT_REACH of a hero or summon. */
 export function escapePath(battle: Battle, unit: Unit): Tile[] {
   const toExtract = walkingDistances(battle, battle.extract!, leap(unit))
   const guards = battle.units.filter((u) => u.side === 'human' && !u.civilian && u.hp > 0)
   const aliens = battle.units.filter((u) => u.side === 'alien' && u.revealed)
-  const hunted = pursuers(battle, unit).length > 0
-  // Hunted, it keeps by a hero or a summon. Fire shapes its way only among tiles nearer the way out, so a turret's field cannot pen it.
+  // Hunted, it keeps by a hero or a summon, until the battle drags on: then it makes its own way, so it and its escort never wait on each other.
+  const hunted = pursuers(battle, unit).length > 0 && battle.round < RESTLESS_ROUND
+  // Fire shapes its way only among tiles nearer the way out, so a turret's field cannot pen it.
   return bestPath(paths(battle, unit, unit.stats.move), unit, (end) => [
     hunted ? Math.max(0, Math.min(...guards.map((s) => distance(s, end))) - ESCORT_REACH) : 0,
     toExtract[end.y * GRID + end.x] < toExtract[unit.y * GRID + unit.x] ? 0 : 1,

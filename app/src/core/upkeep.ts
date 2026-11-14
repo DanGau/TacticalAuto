@@ -3,7 +3,8 @@ import { REGROWTH } from './exams'
 import { alienSrc, fx } from './sources'
 import { REGEN_HEAL, alienStats, ALIENS, NODE_EVERY } from './aliens'
 import { replenish } from './abilities'
-import { type Battle, ADRENAL_FROM, ADRENAL_MAX, AURA_REACH, BURN_STACKS, isSoldier, SPAWN_EVERY, type Unit } from './battle'
+import { type Battle, ADRENAL_FROM, ADRENAL_MAX, AURA_REACH, BURN_STACKS, isSoldier, LODESTONE_REACH, SPAWN_EVERY, type Unit } from './battle'
+import { pull } from './knockback'
 import { armorCap, chrono, empower, kindle, lastingArmor } from './stacks'
 import { CONFLAGRATION_DAMAGE, HELLFIRE_REACH } from './keystones'
 import { stormBlows } from './ultimates'
@@ -13,7 +14,7 @@ import { openNear } from './grid'
 import { freeTilesNear } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { engageNearest, walkersFighting, has, fireproof, foeHas, onTile, FIRE_TURNS, uplinkReach, extractionFrom, silenced, centreOf } from './fighters'
+import { engageNearest, walkersFighting, has, nearest, fireproof, foeHas, onTile, FIRE_TURNS, uplinkReach, extractionFrom, silenced, centreOf } from './fighters'
 import { HOLD_ROUNDS, WAVE_EVERY } from './goals'
 import { randomInt } from './rng'
 import { tickBoons } from './boons'
@@ -31,10 +32,13 @@ export function upkeep(battle: Battle): GameEvent[] {
   if (battle.turn === 'human') {
     chrono(battle, events)
     tickBoons(battle, events)
+    lodestone(battle, events)
   }
   for (const unit of battle.units.filter((u) => u.side === battle.turn)) {
     // An explosion earlier in this upkeep may have killed it.
     if (unit.hp <= 0) continue
+    const shifted = unit.shifted
+    unit.shifted = false
     unit.moved = false
     unit.order = null
     if (unit.suppressed > 0) unit.suppressed--
@@ -61,8 +65,8 @@ export function upkeep(battle: Battle): GameEvent[] {
     }
     talentTurn(battle, unit, events)
     if (has(unit, 'adrenal') && battle.round >= ADRENAL_FROM && battle.round < ADRENAL_FROM + ADRENAL_MAX) empower(unit, 1, 'adrenal', events)
-    if (has(unit, 'rampage')) empower(unit, 1, 'rampage', events)
-    if (has(unit, 'regrowth') && unit.burn === 0) mend(unit, Math.ceil(unit.stats.hp * REGROWTH.turn), 'regrowth', events, Math.round(unit.stats.hp * REGROWTH.most))
+    if (has(unit, 'rampage') && !shifted) empower(unit, 1, 'rampage', events)
+    if (has(unit, 'regrowth') && unit.burn === 0 && unit.chill === 0) mend(unit, Math.ceil(unit.stats.hp * REGROWTH.turn), 'regrowth', events, Math.round(unit.stats.hp * REGROWTH.most))
     if (has(unit, 'rearm') && unit.armor < armorCap(unit, unit.stats.armor)) {
       unit.armor++
       events.push(fx(unit.id, 'rearm', 0))
@@ -73,13 +77,13 @@ export function upkeep(battle: Battle): GameEvent[] {
       events.push(fx(unit.id, 'regen', amount))
     }
     if (battle.units.some((u) => u.side !== unit.side && has(u, 'hellfire') && distance(u, unit) <= HELLFIRE_REACH) && !fireproof(battle, unit)) {
-      kindle(battle, unit, 1)
+      kindle(battle, unit, 1, events)
       events.push(fx(unit.id, 'hellfire', 0))
     }
     if (unit.burn > 0) {
       const raging = foeHas(battle, unit, 'conflagration')
       if (raging) {
-        for (const other of battle.units.filter((u) => u.side === unit.side && u !== unit && distance(u, unit) <= 1 && u.burn === 0)) kindle(battle, other, BURN_STACKS)
+        for (const other of battle.units.filter((u) => u.side === unit.side && u !== unit && distance(u, unit) <= 1 && u.burn === 0)) kindle(battle, other, BURN_STACKS, events)
       }
       if (foeHas(battle, unit, 'pyre') && !onTile(battle.fire, unit)) battle.fire.push({ x: unit.x, y: unit.y, turns: FIRE_TURNS })
       const damage = unit.burn + (raging ? CONFLAGRATION_DAMAGE : 0)
@@ -169,4 +173,13 @@ export function hatch(battle: Battle, unit: Unit): GameEvent[] {
     events.push({ type: 'spawn', src: alienSrc(unit), id: unit.id, unit: { id: brute.id, x: brute.x, y: brute.y } })
   }
   return events
+}
+
+/** Lodestone Harness: the hero with the most armor pulls the nearest alien within LODESTONE_REACH, not yet beside it, to beside it. */
+function lodestone(battle: Battle, events: GameEvent[]): void {
+  const heroes = battle.units.filter((u) => isSoldier(u) && u.hp > 0 && has(u, 'lodestone'))
+  if (heroes.length === 0) return
+  const tank = heroes.reduce((a, b) => (b.armor > a.armor ? b : a))
+  const prey = nearest(battle.units.filter((u) => u.side === 'alien' && u.hp > 0 && u.engaged && u.revealed && distance(u, tank) > 1 && distance(u, tank) <= LODESTONE_REACH), tank)
+  if (prey) pull(battle, prey, tank, events)
 }

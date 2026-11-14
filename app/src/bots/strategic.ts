@@ -9,11 +9,10 @@ import { fuelTanks } from '../core/objects'
 import { DRILL_PRICE, GEAR_PRICE } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
-import { SKILLS } from '../core/skills'
 import { plannedPerk, plannedSkill } from '../core/plans'
-import { health, MAX_SQUAD, minorOffers, skillOffers, soldierStats, squadCauses } from '../core/squad'
+import { health, heroFlows, MAX_SQUAD, minorOffers, skillOffers, soldierStats, squadMakes, squadReads } from '../core/squad'
 import { BOON_CHARGES, RELICS, type RelicId } from '../core/relics'
-import type { Keyword } from '../core/keywords'
+import { CANCELS, cancelling, type Cancel, type Flow, type Quantity } from '../core/quantities'
 import { carries, RIG, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS, type EffectId, type UtilityId } from '../core/utilities'
 import type { Bot } from './bots'
 import { EXAMS } from '../core/exams'
@@ -136,12 +135,11 @@ const unanswered = (run: Run): ChallengeId[] => {
 
 const RARITY = { common: 0, rare: 2, epic: 4 }
 
-/** What a weapon is worth to `soldier`: its rarity, and the keywords its effect shares with their skills and the relics. */
+/** What a weapon is worth to `soldier`: its rarity, and what its effect adds to the squad's combos. */
 function gearWorth(run: Run, gear: Gear | null, soldier: Soldier): number {
   if (!gear) return -1
-  const own = [...soldier.skills.flatMap((id) => SKILLS[id].tags ?? []), ...run.relics.flatMap((id) => RELICS[id].tags ?? [])]
-  const shared = gear.effect ? (EFFECTS[gear.effect].tags ?? []).filter((tag) => own.includes(tag)).length : 0
-  return RARITY[gear.rarity] + shared + (gear.effect ? paysOff(run, EFFECTS[gear.effect].pays) : 0)
+  const others = { ...run, soldiers: run.soldiers.map((s) => (s.id === soldier.id ? { ...s, gear: null } : s)) }
+  return RARITY[gear.rarity] + (gear.effect ? comboWorth(others, EFFECTS[gear.effect]) : 0)
 }
 
 /** Whether `gear` improves on what its owner holds. */
@@ -150,8 +148,14 @@ function improves(run: Run, gear: Gear): boolean {
   return !!owner && gearWorth(run, gear, owner) > gearWorth(run, owner.gear, owner)
 }
 
-/** How bent a hero is on the squad's build: its skills' and gear's keywords that its relics share. */
-const bent = (run: Run, s: Soldier) => [...s.skills.flatMap((id) => SKILLS[id].tags ?? []), ...((s.gear?.effect && EFFECTS[s.gear.effect].tags) || [])].filter((tag) => run.relics.some((id) => RELICS[id].tags?.includes(tag))).length
+/** How much of what the squad reads `s` makes: the Carry's doubled stacks pay most on such a hero. */
+const bent = (run: Run, s: Soldier) => {
+  const read = squadReads(run)
+  return heroFlows(s).flatMap((f) => f.makes ?? []).filter((q) => read.includes(q) && STACKED.includes(q)).length
+}
+
+/** The quantities a Carry's hits add twice of. */
+const STACKED: Quantity[] = ['burn', 'chill', 'mark']
 
 /** A shop: a medkit when badly hurt, a relic, then an answer it lacks, a medkit when hurt, then gear, then a medkit at all hurt. */
 function shop(run: Run): Action {
@@ -160,9 +164,9 @@ function shop(run: Run): Action {
   if (heal(0.5)) return { type: 'medkit' }
   const relic = relics.findIndex((r) => !r.sold && RELIC_PRICE <= run.supplies && relicWorth(run, r.id) >= 0)
   if (relic >= 0) return { type: 'buy', index: relic }
-  // A Carry pays once the squad holds a payoff of what it causes.
+  // A Carry pays once a hero makes stacks the squad reads.
   const drill = run.shop!.drill
-  if (drill && !drill.sold && DRILL_PRICE <= run.supplies && run.relics.some((id) => relicWorth(run, id) > 0)) return { type: 'drill', soldier: run.soldiers.reduce((a, b) => (bent(run, b) > bent(run, a) ? b : a)).id }
+  if (drill && drill.sold === null && DRILL_PRICE <= run.supplies && run.soldiers.some((s) => bent(run, s) > 0)) return { type: 'drill', soldier: run.soldiers.reduce((a, b) => (bent(run, b) > bent(run, a) ? b : a)).id }
   const gaps = unanswered(run)
   const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && gaps.some((c) => carries(id, CHALLENGES[c].answers)) && (run.utilities.length < UTILITY_SLOTS || keep({ ...run, spare: id }).drop !== -1))
   if (answer >= 0) return { type: 'utility', index: answer }
@@ -175,11 +179,29 @@ function shop(run: Run): Action {
 }
 
 
-/** What a payoff is worth beside what the squad causes: much with a cause of what it spends, little without; 0 for any other. */
-const paysOff = (run: Run, pays: Keyword[] | undefined) => (pays ? (pays.some((k) => squadCauses(run).includes(k)) ? 3 : -2) : 0)
+/**
+ * What `flow` adds to the squad's combos: much for each quantity it reads that the squad makes, less for each it makes
+ * that the squad reads, a little lost for each it reads that nothing makes. A cancellation it starts costs much unless
+ * the squad holds the bridge; a bridge pays much once the squad makes both halves. Answering the leg's Guardian adds one.
+ */
+export function comboWorth(run: Run, flow: Flow & { bridge?: Cancel }): number {
+  const made = squadMakes(run)
+  const read = squadReads(run)
+  const reads = flow.reads ?? []
+  const makes = flow.makes ?? []
+  const fed = reads.filter((q) => made.includes(q)).length
+  const feeding = makes.filter((q) => read.includes(q)).length
+  const starved = flow.bridge ? 0 : reads.length - fed
+  const held = new Set(run.relics.flatMap((id) => RELICS[id].bridge ?? []))
+  const before = cancelling(made)
+  const fresh = cancelling([...made, ...makes]).filter((id) => !before.includes(id) && !held.has(id) && flow.bridge !== id).length
+  const bridge = flow.bridge ? (CANCELS[flow.bridge].pair.every((q) => made.includes(q)) ? 6 : -2) : 0
+  const exam = [...reads, ...makes].some((q) => EXAMS[run.bosses[run.keys]].answers.includes(q)) ? 1 : 0
+  return 3 * fed + 2 * feeding - starved - 4 * fresh + bridge + exam
+}
 
-/** What a relic is worth beside what the squad holds: a payoff pays only beside a cause; one that answers the leg's Guardian a little more. */
-const relicWorth = (run: Run, id: RelicId) => paysOff(run, RELICS[id].pays) + (RELICS[id].tags?.some((tag) => EXAMS[run.bosses[run.keys]].answers.includes(tag)) ? 1 : 0)
+/** What a relic is worth to the squad: see comboWorth. */
+const relicWorth = (run: Run, id: RelicId) => comboWorth(run, RELICS[id])
 
 /** Takes a duo offered, else the first relic, on the same seeds better than choosing by shared keywords; and the skill its hero plans on. */
 function reward(run: Run): Action {

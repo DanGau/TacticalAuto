@@ -7,7 +7,7 @@ import { drawRelic, offerable, type RelicId } from './relics'
 import { type Run } from './run-state'
 import { type Shop } from './run-state'
 import { type Soldier } from './run-state'
-import { minorOffers, owesPick, skillOffers, squadCauses, squadKeywords } from './squad'
+import { minorOffers, owesPick, skillOffers, squadMakes, squadReads } from './squad'
 
 /** Learns the offered skill at `index`. */
 export function takeSkill(run: Run, soldier: Soldier, index: number): void {
@@ -60,14 +60,14 @@ export function stockShop(run: Run): Shop {
   }
   const relics = offerable(run.relics)
   const stocked: RelicId[] = []
-  while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(drawRelic(run, relics, squadKeywords(run)))
+  while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(drawRelic(run, relics, squadMakes(run), squadReads(run)))
   const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
   const utilities = Array.from({ length: Math.min(SHOP_UTILITIES, kinds.length) }, () => ({ id: drawUtility(run, kinds), sold: false }))
-  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, medkit: false, drill: run.carry === null ? { sold: false } : null }
+  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, medkit: false, drill: run.carry === null ? { sold: null } : null }
 }
 
 /** A new piece of `hero`'s weapon, made for them. */
-const gearFor = (run: Run, hero: Soldier, rarity: Rarity): Gear => ({ ...generateGear(run, run.nextGear, rarity, hero.gear?.weapon, squadCauses(run)), owner: hero.id })
+const gearFor = (run: Run, hero: Soldier, rarity: Rarity): Gear => ({ ...generateGear(run, run.nextGear, rarity, hero.gear?.weapon, squadMakes(run), squadReads(run)), owner: hero.id })
 
 /** Buys the ware at `index` for `soldier`, its owner, to wear. The caller checks it is affordable. */
 export function buyWare(run: Run, index: number, soldier: Soldier): void {

@@ -7,7 +7,7 @@ import { EVENTS } from './events'
 import { FEATS } from './feats'
 import { GOALS } from './goals'
 import { EFFECTS } from './gear'
-import { KEYWORDS } from './keywords'
+import { CANCELS, QUANTITIES } from './quantities'
 import { usage } from './powers'
 import { RELICS } from './relics'
 import { SECONDARIES, secondaryPower } from './secondaries'
@@ -30,6 +30,6 @@ it('states every power in a usage line and at most two lines of effect', () => {
 })
 
 it('speaks of heroes and a party, never soldiers and squads', () => {
-  const told = JSON.stringify([ALIENS, CHALLENGES, CLASSES, DOCTRINES, EVENTS, FEATS, GOALS, EFFECTS, KEYWORDS, RELICS, SECONDARIES, SKILLS, TWISTS, UTILITIES, WEAPONS])
+  const told = JSON.stringify([ALIENS, CHALLENGES, CLASSES, DOCTRINES, EVENTS, FEATS, GOALS, EFFECTS, QUANTITIES, CANCELS, RELICS, SECONDARIES, SKILLS, TWISTS, UTILITIES, WEAPONS])
   expect(told).not.toMatch(/\b(soldiers?|squads?|squadmates?|grenades?|AIM\?)\b/i)
 })

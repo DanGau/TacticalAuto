@@ -236,7 +236,7 @@ test('newer turn talents: zaps beside and within 2, a wider chill, heals by burn
   const mate = mechUnit(battle, hero, { ...MECH_STATS, hp: 10 }, [], { x: 10, y: 11 })
   mate.hp = 4
   battle.units.push(mate)
-  aliens[1].burn = 1
+  aliens[0].burn = 4
   hero.hp = 1
   talentTurn(battle, hero, [])
   expect(aliens.map((a) => a.hp)).toEqual([40 - 2 * TALENT.zap, 40 - TALENT.zap])

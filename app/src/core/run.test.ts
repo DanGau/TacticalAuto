@@ -37,7 +37,8 @@ import { SELL } from './rewards'
 import { SHOP_RELICS } from './rewards'
 import { SHOP_WARES } from './rewards'
 import { GEAR_PRICE } from './rewards'
-import { squadKeywords } from './squad'
+import { squadMakes, squadReads } from './squad'
+import { feeds } from './quantities'
 import { RECRUITS } from './squad'
 import { hire, MAX_SQUAD } from './squad'
 import { LEVEL_STATS } from './squad'
@@ -742,14 +743,14 @@ test("a soldier lands with its class's ability and its uses, the effects of its 
   expect(unit.hp).toBe(soldierStats(run, run.soldiers[0]).hp)
 })
 
-test("the first relic offered shares a keyword with the squad's skills, gear or relics", () => {
+test('the first relic offered reads a quantity the squad makes, or makes one it reads', () => {
   for (let seed = 1; seed <= 5; seed++) {
     const run = started()
     run.rng = seed
     run.soldiers[0].skills = ['mark']
     atKey(run)
     fight(run, 'human')
-    expect(RELICS[run.relicOffers[0]].tags!.some((tag) => squadKeywords(run).includes(tag))).toBe(true)
+    expect(feeds(RELICS[run.relicOffers[0]], squadMakes(run), squadReads(run))).toBe(true)
   }
 })
 

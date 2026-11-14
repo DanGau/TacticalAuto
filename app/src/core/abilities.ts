@@ -82,7 +82,7 @@ export function spit(battle: Battle, unit: Unit): GameEvent[] {
   if (!target) return []
   const events: GameEvent[] = [{ type: 'spit', src: alienSrc(unit), id: unit.id, target: target.id, damage: SPIT_DAMAGE }]
   battle.acid = [...battle.acid.filter((pool) => pool.x !== target.x || pool.y !== target.y), { x: target.x, y: target.y, turns: ACID_TURNS }]
-  wound(battle, target, SPIT_DAMAGE, events, unit.resists.includes('ward'))
+  wound(battle, target, SPIT_DAMAGE, events, unit.resists.includes('armor'))
   return events
 }
 

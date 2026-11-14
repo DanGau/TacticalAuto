@@ -3,13 +3,14 @@ import { DOCTRINES, type Doctrine } from './doctrines'
 import { CIVILIANS, CIVILIANS_PER_THREAT, CIVILIAN_SUPPLIES } from './goals'
 import { RISKS } from './missions'
 import { STOP_THREAT, LOSS_THREAT, THREAT_MAX } from './progress'
-import { type Relic, RELICS, offerable, RELIC_OFFERS, drawRelic, STREAK_FIGHTS } from './relics'
+import { type Relic, RELICS, offerable, RELIC_OFFERS, drawRelic, STREAK_FIGHTS, bridged } from './relics'
+import { feeds } from './quantities'
 import { dropGear, findUtility, settle } from './rewards'
 import { random, randomInt } from './rng'
 import { openDuos } from './duos'
 import { drawStops, passStop } from './run'
 import { type Run } from './run-state'
-import { earn, soldierStats, join, MAX_SQUAD, squadCauses, squadKeywords } from './squad'
+import { earn, soldierStats, join, MAX_SQUAD, squadMakes, squadReads } from './squad'
 
 /** Chance an ambush or a key mission won turns up a utility. */
 const AMBUSH_BOON = 0.06
@@ -92,17 +93,18 @@ export function endBattle(run: Run): void {
 }
 
 /**
- * Offers RELIC_OFFERS relics, the first a payoff of a keyword the squad causes when one can, else one building on a keyword it has;
- * those turned down come back only once every other is spent.
+ * Offers RELIC_OFFERS relics, the first one that reads a quantity the squad makes or makes one it reads, when one can,
+ * a bridge of a cancellation it makes both halves of first; the rest drawn as drawRelic leans. Those turned down come
+ * back only once every other is spent.
  */
 export function offerRelics(run: Run): void {
   const all = offerable(run.relics)
   const unpassed = all.filter((id) => !run.passed.relics.includes(id))
   const pool = unpassed.length > 0 ? unpassed : all
-  const causes = squadCauses(run)
-  const held = squadKeywords(run)
-  const payoffs = pool.filter((id) => RELICS[id].pays?.some((tag) => causes.includes(tag)))
-  const fits = payoffs.length > 0 ? payoffs : pool.filter((id) => RELICS[id].tags?.some((tag) => held.includes(tag)))
+  const made = squadMakes(run)
+  const read = squadReads(run)
+  const bridges = pool.filter((id) => bridged(id, made))
+  const fits = bridges.length > 0 ? bridges : pool.filter((id) => feeds(RELICS[id], made, read))
   if (fits.length > 0) run.relicOffers.push(...pool.splice(pool.indexOf(fits[randomInt(run, fits.length)]), 1))
-  while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(drawRelic(run, pool, held))
+  while (run.relicOffers.length < RELIC_OFFERS && pool.length > 0) run.relicOffers.push(drawRelic(run, pool, made, read))
 }

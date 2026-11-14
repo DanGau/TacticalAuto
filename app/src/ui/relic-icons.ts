@@ -67,6 +67,10 @@ export const RELIC_ICONS: Record<RelicId, string> = {
   ram: '<path d="M3 8l6-4v16l-6-4z"/><path d="M9 12h8M14 8l4 4-4 4M20 6v12"/>',
   overflow: '<path d="M6 4h12v6a6 6 0 01-12 0z"/><path d="M8 18h8M9 21h6M12 1v4M4 13l-2 2M20 13l2 2"/>',
   adrenal: '<path d="M3 12h4l2-5 3 10 2-6 2 3h5"/><path d="M19 4v4M17 6h4"/>',
+  stagger: '<path d="M4 20l4-8 3 4 3-9 3 6 3-3"/><path d="M3 5h4M5 3v4"/>',
+  lodestone: '<path d="M6 3v9a6 6 0 0012 0V3h-4v9a2 2 0 01-4 0V3z"/><path d="M6 7h4M14 7h4"/>',
+  shell: '<path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/><path d="M8 10l2 2-2 2M16 10l-2 2 2 2"/>',
+  lockOn: '<circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/><rect x="10" y="10" width="4" height="4" fill="currentColor"/>',
   hairTrigger: `<path d="M4 9h13l3-3M4 9v4h4l1 3h3l1-4"/><path d="M14 13a3 3 0 01-3 3"/><circle cx="18" cy="15" r="1" ${F}/>`,
 }
 

@@ -1,4 +1,4 @@
-// Stacks a fight builds on a unit and what they set off: burn, chill and freezing, marks, Might, combos, exposure, every-Nth hits; payoffs that spend them, spreaders that pass them on.
+// Stacks a fight builds on a unit and what they set off: burn, chill and freezing and how they cancel, marks, moving, Might, combos, exposure, every-Nth hits; payoffs that spend them, spreaders that pass them on.
 import { fx } from './sources'
 import { BURN_MAX, BURN_STACKS, CADENCE, CATALYST_EVERY, CHILL_FREEZE, CHILL_MAX, MARK_MAX, COMBO_MAX, EXPOSED, FAULT, FRACTURE_DAMAGE, HIGH_CRIT, HIGH_LEVELS, MIGHT_MAX, GRID, isSoldier, LINGER_STACKS, type Battle, type Effect, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
@@ -8,7 +8,7 @@ import { distance, walks } from './grid'
 import { RECKONING_KILLS } from './doctrines'
 import { TUNING } from './tuning'
 import { talentDamage, talentHit, talentKill } from './talents'
-import { wound } from './wound'
+import { BOOM_DAMAGE, wound } from './wound'
 
 /** Burn stacks a target `unit` sets burning takes on, and chill stacks one it chills. */
 export const burnFrom = (unit: Unit | null) => BURN_STACKS + (unit && has(unit, 'smolder') ? LINGER_STACKS : 0)
@@ -17,19 +17,81 @@ export const chillFrom = (unit: Unit | null) => 1 + (unit && has(unit, 'permafro
 /** Stacks a hit by `unit` adds: twice as many by the squad's Carry. */
 export const carried = (unit: Unit, stacks: number) => (has(unit, 'carry') ? 2 * stacks : stacks)
 
-/** Adds burn stacks to `target`, to at most BURN_MAX, unless it cannot burn. */
-export function kindle(battle: Battle, target: Unit, stacks: number): void {
-  if (target.hp > 0 && !fireproof(battle, target)) target.burn = Math.min(BURN_MAX, target.burn + stacks)
+/** Adds burn stacks to `target`, to at most BURN_MAX, unless it cannot burn. Chill on it cancels them first; see meet. */
+export function kindle(battle: Battle, target: Unit, stacks: number, events: GameEvent[] = []): void {
+  if (target.hp <= 0 || fireproof(battle, target)) return
+  const left = meet(battle, target, stacks, 'chill', events)
+  if (left > 0) target.burn = Math.min(BURN_MAX, target.burn + left)
 }
 
-/** Adds chill stacks to `target`, to at most CHILL_MAX, unless it cannot be chilled. At CHILL_FREEZE it freezes and loses its next action; a boss never freezes. */
-export function chillUnit(_battle: Battle, target: Unit, stacks: number, events: GameEvent[]): void {
-  if (target.hp <= 0 || target.resists.includes('frost')) return
-  target.chill = Math.min(CHILL_MAX, target.chill + stacks)
-  if ((target.boss && !foeHas(_battle, target, 'frostHeart')) || target.chill < CHILL_FREEZE || target.frozen) return
+/** Adds chill stacks to `target`, to at most CHILL_MAX, unless it cannot be chilled; burn on it cancels them first. At CHILL_FREEZE it freezes and loses its next action; a boss never freezes. */
+export function chillUnit(battle: Battle, target: Unit, stacks: number, events: GameEvent[]): void {
+  if (target.hp <= 0 || target.resists.includes('chill')) return
+  const left = meet(battle, target, stacks, 'burn', events)
+  if (left <= 0) return
+  target.chill = Math.min(CHILL_MAX, target.chill + left)
+  if ((target.boss && !foeHas(battle, target, 'frostHeart')) || target.chill < CHILL_FREEZE || target.frozen) return
   target.frozen = true
   target.panicked = true
   events.push(fx(target.id, 'frozen', 0))
+}
+
+/**
+ * `stacks` of burn or chill meet the `opposite` on `target`: as many as there are of it cancel, stack for stack. With
+ * Thermal Shock Core they detonate instead: the hero's damage each to the target, half that to each alien beside it.
+ * Returns the stacks left to add.
+ */
+function meet(battle: Battle, target: Unit, stacks: number, opposite: 'burn' | 'chill', events: GameEvent[]): number {
+  const met = Math.min(stacks, target[opposite])
+  if (met <= 0) return stacks
+  target[opposite] -= met
+  if (opposite === 'chill' && target.chill === 0) target.frozen = false
+  if (!foeHas(battle, target, 'thermal')) {
+    events.push(fx(target.id, 'quenched', 0))
+    return stacks - met
+  }
+  const blast = met * strikerOf(battle, target).stats.damage
+  events.push(fx(target.id, 'thermal', -blast))
+  for (const other of battle.units.filter((u) => u.side === target.side && u !== target && u.hp > 0 && distance(u, target) <= 1)) {
+    events.push(fx(other.id, 'thermal', -Math.ceil(blast / 2)))
+    wound(battle, other, Math.ceil(blast / 2), events)
+  }
+  wound(battle, target, blast, events)
+  return stacks - met
+}
+
+/** The hero whose blow a bridge's damage counts as: the one acting, else the hardest hitter facing `target`. */
+const strikerOf = (battle: Battle, target: Unit): Unit =>
+  actorOf(battle) ?? battle.units.filter((u) => u.side !== target.side && isSoldier(u)).reduce<Unit | undefined>((a, b) => (!a || b.stats.damage > a.stats.damage ? b : a), undefined) ?? target
+
+/**
+ * `target` is driven from where it stood, by a knockback, a pull or a slide: it counts as moved until its own turn, a
+ * booming charge on it goes off, a frozen alien thaws and a marked one loses its marks. Shatterglass Edge shatters the
+ * frozen in place of thawing, and Lock-On Rig keeps the marks and strikes for each.
+ */
+export function displaced(battle: Battle, target: Unit, events: GameEvent[]): void {
+  if (target.hp <= 0 || target.side !== 'alien') return
+  target.shifted = true
+  const blow = strikerOf(battle, target).stats.damage
+  if (target.frozen && foeHas(battle, target, 'shatter')) {
+    events.push(fx(target.id, 'shatter', -blow * target.chill))
+    wound(battle, target, blow * target.chill, events)
+  } else if (target.frozen) {
+    Object.assign(target, { frozen: false, panicked: false, chill: 0 })
+    events.push(fx(target.id, 'thawed', 0))
+  }
+  if (target.hp > 0 && target.mark > 0 && foeHas(battle, target, 'lockOn')) {
+    events.push(fx(target.id, 'lockOn', -blow * target.mark))
+    wound(battle, target, blow * target.mark, events)
+  } else if (target.mark > 0) {
+    target.mark = 0
+    events.push(fx(target.id, 'unlocked', 0))
+  }
+  if (target.hp > 0 && target.booming > 0) {
+    target.booming = 0
+    events.push(fx(target.id, 'booming', -BOOM_DAMAGE))
+    wound(battle, target, BOOM_DAMAGE, events)
+  }
 }
 
 /** Adds mark stacks to `target`, to at most MARK_MAX, unless it cannot be marked. */
@@ -40,8 +102,8 @@ export function markUnit(target: Unit, stacks: number): void {
 /**
  * Damage the payoffs add by spending `enemy`'s stacks, which they clear: each stack spent is TUNING.spend.factor of the hero's
  * damage, so stacks multiply it. Accelerant Gel spends burn at TUNING.spend.burns or more and gives the hero that
- * much temp HP; Shatterglass Edge spends chill at TUNING.spend.chills or more and stuns; Spotter Network spends marks at TUNING.spend.marks or more and weakens;
- * Thermal Shock Core spends burn and chill on one with both, and does both. A hit spends by one payoff, Thermal Shock Core's first.
+ * much temp HP; Glass Edge spends chill at TUNING.spend.chills or more and stuns; Spotter Network spends marks at TUNING.spend.marks or more and weakens.
+ * A hit spends by one payoff.
  * Half of what is spent bursts on every alien beside the target. Dead Eye Ledger leaves marks on.
  */
 export function spendStacks(battle: Battle, unit: Unit, enemy: Unit, used: Effect[], events: GameEvent[]): number {
@@ -67,9 +129,8 @@ export function spendStacks(battle: Battle, unit: Unit, enemy: Unit, used: Effec
     else enemy.panicked = true
   }
   const weaken = () => (enemy.suppressed = Math.max(enemy.suppressed, WEAKEN_TURNS))
-  spend('thermal', enemy.burn > 0 && enemy.chill > 0, enemy.burn + enemy.chill, () => Object.assign(enemy, { burn: 0, chill: 0 }), (stacks) => (shield(stacks), stun()))
   spend('accelerant', enemy.burn >= TUNING.spend.burns, enemy.burn, () => (enemy.burn = 0), shield)
-  spend('shatter', enemy.chill >= TUNING.spend.chills, enemy.chill, () => (enemy.chill = 0), stun)
+  spend('glassEdge', enemy.chill >= TUNING.spend.chills, enemy.chill, () => (enemy.chill = 0), stun)
   const ledger = has(unit, 'ledger')
   spend('spotter', enemy.mark >= TUNING.spend.marks, enemy.mark, () => (enemy.mark = ledger ? enemy.mark : 0), weaken)
   return more
@@ -115,7 +176,7 @@ export function fell(battle: Battle, unit: Unit, levels: number, events: GameEve
 export function slammed(battle: Battle, unit: Unit, events: GameEvent[]): void {
   const by = actorOf(battle)
   if (!by || unit.side !== 'alien' || unit.hp <= 0) return
-  if (has(by, 'kiln')) kindle(battle, unit, 1)
+  if (has(by, 'kiln')) kindle(battle, unit, 1, events)
   if (has(by, 'quench')) chillUnit(battle, unit, 1, events)
   if (!has(by, 'impetus')) return
   events.push(fx(unit.id, 'impetus', -by.stats.damage))
@@ -155,14 +216,14 @@ export function struck(battle: Battle, unit: Unit, enemy: Unit, crit: boolean, e
   if (unit.comboOn === enemy.id) unit.combo++
   else Object.assign(unit, { comboOn: enemy.id, combo: 1 })
   if (unit.hits % CATALYST_EVERY === 0 && enemy.hp > 0 && has(unit, 'catalyst') && enemy.burn + enemy.chill + enemy.mark > 0) {
-    kindle(battle, enemy, enemy.burn)
+    kindle(battle, enemy, enemy.burn, events)
     events.push(fx(enemy.id, 'catalyst', 0))
     chillUnit(battle, enemy, enemy.chill, events)
     markUnit(enemy, enemy.mark)
   }
   const beside = battle.units.filter((u) => u.side === enemy.side && u !== enemy && u.hp > 0 && distance(u, enemy) <= 1)
   for (const [effect, applies, add] of [
-    ['bellows', enemy.burn > 0, (u: Unit) => kindle(battle, u, Math.ceil(enemy.burn / 2))],
+    ['bellows', enemy.burn > 0, (u: Unit) => kindle(battle, u, Math.ceil(enemy.burn / 2), events)],
     ['conductor', enemy.chill > 0, (u: Unit) => chillUnit(battle, u, Math.ceil(enemy.chill / 2), events)],
   ] as const) {
     if (!applies || !has(unit, effect)) continue
@@ -172,7 +233,7 @@ export function struck(battle: Battle, unit: Unit, enemy: Unit, crit: boolean, e
     }
   }
   if (enemy.hp > 0 && enemy.burn > 0 && has(unit, 'fanFlames')) {
-    kindle(battle, enemy, TUNING.fanStacks)
+    kindle(battle, enemy, TUNING.fanStacks, events)
     events.push(fx(enemy.id, 'fanFlames', 0))
   }
   if (has(unit, 'faultLine') && distance(unit, enemy) <= 1 && unit.hits % FAULT.every === 0) fault(battle, unit, enemy, events)
@@ -211,7 +272,7 @@ export function died(battle: Battle, target: Unit, killer: Unit | null, events: 
   }
   const heir = target.burn + target.chill + target.mark > 0 && foeHas(battle, target, 'hex') ? nearest(kin, target) : undefined
   if (heir) {
-    kindle(battle, heir, target.burn)
+    kindle(battle, heir, target.burn, events)
     chillUnit(battle, heir, target.chill, events)
     markUnit(heir, target.mark)
     events.push(fx(heir.id, 'hex', 0))

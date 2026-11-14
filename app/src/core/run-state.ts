@@ -163,7 +163,7 @@ export interface Shop {
   utilities: { id: UtilityId; sold: boolean }[]
   medkit: boolean
   /** Drilling a hero of the player's choice as the squad's Carry, on offer while the squad has none. */
-  drill: { sold: boolean } | null
+  drill: { sold: number | null } | null
 }
 
 export interface Run {

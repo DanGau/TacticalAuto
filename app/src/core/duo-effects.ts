@@ -114,7 +114,7 @@ function summonHit(battle: Battle, alien: Unit, machine: Unit, events: GameEvent
   for (const other of battle.units.filter((u) => u.side === 'alien' && u.hp > 0 && distance(u, machine) <= 1)) {
     events.push(fx(other.id, 'payload', -PAYLOAD_DAMAGE))
     wound(battle, other, PAYLOAD_DAMAGE, events)
-    kindle(battle, other, burnFrom(payload[1]))
+    kindle(battle, other, burnFrom(payload[1]), events)
   }
   battle.actor = actor
 }
@@ -133,7 +133,7 @@ export function duoHeal(battle: Battle, medic: Unit, target: Unit, amount: numbe
     events.push(moment('lifeline', life, target), fx(target.id, 'lifeline', 0))
   }
   const cold = as(battle, 'coldComfort', medic, 0)
-  const near = battle.units.filter((u) => u.side === 'alien' && u.hp > 0 && distance(u, target) <= 1 && !u.resists.includes('frost'))
+  const near = battle.units.filter((u) => u.side === 'alien' && u.hp > 0 && distance(u, target) <= 1 && !u.resists.includes('chill'))
   if (!cold || near.length === 0) return
   events.push(moment('coldComfort', cold, target))
   for (const alien of near) {
@@ -148,8 +148,9 @@ export function firefall(battle: Battle, unit: Unit, fired: GameEvent[]): GameEv
   const hit = fired.flatMap((e) => (e.type === 'rocket' ? e.hits.map((h) => battle.units.find((u) => u.id === h.target)) : []))
   const burnt = hit.filter((u): u is Unit => !!u && u.side === 'alien' && u.hp > 0 && !fireproof(battle, u))
   if (!pair || burnt.length === 0) return []
-  for (const alien of burnt) kindle(battle, alien, burnFrom(pair[1]))
-  return [moment('firefall', pair), ...burnt.map((u): GameEvent => fx(u.id, 'firefall', 0))]
+  const events: GameEvent[] = [moment('firefall', pair), ...burnt.map((u): GameEvent => fx(u.id, 'firefall', 0))]
+  for (const alien of burnt) kindle(battle, alien, burnFrom(pair[1]), events)
+  return events
 }
 
 /** Pincer: once a round, after the Vanguard's attacks, the alien it last hit, for the Phantom to strike; then the pair. */

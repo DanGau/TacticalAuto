@@ -1,7 +1,7 @@
 // Screens after a battle or stop: rewards, loot, skill choices, the stop report, and the run's end.
 import { CLASSES } from '../core/classes'
 import { emptyTally, FEATS } from '../core/feats'
-import type { Keyword } from '../core/keywords'
+import type { Quantity } from '../core/quantities'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { relicIcon } from './relic-icons'
@@ -10,7 +10,7 @@ import { boonText, UTILITIES } from '../core/utilities'
 import { type Gain, type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { type Soldier } from '../core/run-state'
-import { squadKeywords } from '../core/squad'
+import { squadMakes } from '../core/squad'
 import { soldierStats } from '../core/squad'
 import { health } from '../core/squad'
 import { minorOffers, owesPick, skillOffers } from '../core/squad'
@@ -60,12 +60,12 @@ export function joined(run: Run, name: string): string {
 /** What the squad gained or lost unchosen, alone in a pop-up: what it is, what it does, and a button to go on. */
 export function acquired(run: Run, gain: Gain): string {
   const shown = (top: string, look: string, name: string, text: string) => `<small class="up-top">${top}</small><div class="prize gear ${look}"><b>${name}</b><br>${text}</div>`
-  const relicBody = (top: string, look: string, id: RelicId, held: Keyword[] = []) => shown(top, look, `${relicIcon(id)} ${RELICS[id].name}`, describe(RELICS[id].text, RELICS[id].tags, held))
+  const relicBody = (top: string, look: string, id: RelicId, held: Quantity[] = []) => shown(top, look, `${relicIcon(id)} ${RELICS[id].name}`, describe(RELICS[id].text, RELICS[id], held))
   const heroBody = (id: number) => {
     const hero = run.soldiers.find((s) => s.id === id)!
     return shown('Hero joined', hero.gear?.rarity ?? '', `${badge(hero.cls)} ${hero.name}`, heroSheet(run, hero))
   }
-  const body = gain.kind === 'relic' ? relicBody('Relic gained', 'relic', gain.id, squadKeywords(run)) : gain.kind === 'relicLost' ? relicBody('Relic lost', 'relic lost', gain.id) : gain.kind === 'boon' ? shown(`${UTILITIES[gain.id].rarity} boon gained`, UTILITIES[gain.id].rarity, `${UTILITIES[gain.id].icon} ${UTILITIES[gain.id].name}`, boonText(gain.id)) : heroBody(gain.soldier)
+  const body = gain.kind === 'relic' ? relicBody('Relic gained', 'relic', gain.id, squadMakes(run)) : gain.kind === 'relicLost' ? relicBody('Relic lost', 'relic lost', gain.id) : gain.kind === 'boon' ? shown(`${UTILITIES[gain.id].rarity} boon gained`, UTILITIES[gain.id].rarity, `${UTILITIES[gain.id].icon} ${UTILITIES[gain.id].name}`, boonText(gain.id)) : heroBody(gain.soldier)
   return modal(`<div class="acquired">${body}<button class="decide" data-action='${JSON.stringify({ type: 'ack' })}'>Got it</button></div>`)
 }
 
@@ -90,10 +90,10 @@ function title(report: Report): string {
 
 /** The class's tree as far as the soldier can see, its offers as cards: one tapped is armed, and tapped again is learned. */
 export function skillChoice(run: Run, soldier: Soldier, armed: string | null = null): string {
-  const held = squadKeywords(run)
+  const held = squadMakes(run)
   const pick = (id: SkillId, index: number): Pick => {
     const skill = SKILLS[id]
-    return { key: id, action: { type: 'skill', soldier: soldier.id, index }, look: 'skillnode offered', body: `<b>${skill.name}</b><small class="use">${usage(skill)}</small><span>${describe(skill.text, skill.tags, held)}</span>`, detail: `<p><b>${skill.name}</b></p>`, go: `Tap again to learn ${skill.name}` }
+    return { key: id, action: { type: 'skill', soldier: soldier.id, index }, look: 'skillnode offered', body: `<b>${skill.name}</b><small class="use">${usage(skill)}</small><span>${describe(skill.text, skill, held)}</span>`, detail: `<p><b>${skill.name}</b></p>`, go: `Tap again to learn ${skill.name}` }
   }
   const picks = skillOffers(soldier).map(pick)
   return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name} level ${level(soldier)}. Choose one of the powers offered; those turned down are lost for the run.</h2>
@@ -120,12 +120,12 @@ export function spareChoice(run: Run, armed: string | null): string {
 
 /** The relics offered, and a duo if one is, as cards with their icons: one tapped is armed, then Take carries it. */
 function relicChoice(run: Run, duo: (typeof DUOS)[keyof typeof DUOS] | null, armed: string | null): string {
-  const held = squadKeywords(run)
+  const held = squadMakes(run)
   const card = (key: string, icon: string, top: string, name: string, text: string, look: string) =>
     `<button class="side ${look}${armed === key ? ' keep' : ''}" role="radio" aria-checked="${armed === key}" data-arm="${key}"><span class="art">${icon}</span><small class="tier">${top}</small><b>${name}</b><span>${text}</span></button>`
-  const relics = run.relicOffers.map((id, i) => card(`r${i}`, relicIcon(id), `${RELICS[id].rarity ?? 'rare'} relic`, RELICS[id].name, describe(RELICS[id].text, RELICS[id].tags, held), `relic ${RELICS[id].rarity ?? 'rare'}`))
+  const relics = run.relicOffers.map((id, i) => card(`r${i}`, relicIcon(id), `${RELICS[id].rarity ?? 'rare'} relic`, RELICS[id].name, describe(RELICS[id].text, RELICS[id], held), `relic ${RELICS[id].rarity ?? 'rare'}`))
   const pair = duo?.pair.map((cls) => CLASSES[cls].name)
-  const bond = duo ? [card('duo', '<span class="glyph">✦</span>', `duo · ${pair!.join(' + ')}`, duo.name, describe(duo.text, [], held), 'duo')] : []
+  const bond = duo ? [card('duo', '<span class="glyph">✦</span>', `duo · ${pair!.join(' + ')}`, duo.name, describe(duo.text, {}, held), 'duo')] : []
   const pick = armed === 'duo' && duo ? { type: 'duo' as const } : armed?.match(/^r\d$/) ? { type: 'relic' as const, index: Number(armed.slice(1)) } : null
   return `<div class="gearswap relics"><h1>Alien artifacts</h1><h2>Carry one for the run${pair ? `, or ${pair.join(' and ')} train as a duo` : ''}</h2>
     <div class="swap" style="--n:${relics.length + bond.length}">${[...relics, ...bond].join('')}</div>

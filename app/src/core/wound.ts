@@ -1,6 +1,6 @@
 // Damage landing on a unit, what it sets off, and the tally it adds to.
 import { alienSrc, fx, srcOf } from './sources'
-import { GUARD_MAX, REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_STACKS, BLAST_RADIUS, type Battle, type Effect, type Unit, type Tile } from './battle'
+import { GUARD_MAX, SHELL_MAX, REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_STACKS, BLAST_RADIUS, type Battle, type Effect, type Unit, type Tile } from './battle'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
@@ -36,6 +36,10 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
   const lost = Math.min(target.hp, damage - absorbed)
   target.armor -= plated ? 1 : absorbed
   target.hp -= damage - absorbed
+  if (target.hp > 0 && hit > 0 && has(target, 'shell') && target.armor < armorCap(target, target.stats.armor + SHELL_MAX)) {
+    target.armor++
+    events.push(fx(target.id, 'shell', 0))
+  }
   if (target.soldier !== null) {
     tallyOf(battle, target.soldier).taken += lost
     tallyOf(battle, target.soldier).blocked += (plated ? 0 : absorbed) + soaked
@@ -55,7 +59,7 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
   const beside = battle.units.filter((u) => u.side === target.side && u !== target && distance(u, target) <= 1)
   if (target.burn > 0 && (wildfire || (killer && has(killer, 'backdraft')))) {
     for (const other of beside.filter((u) => !fireproof(battle, u))) {
-      kindle(battle, other, wildfire ? target.burn : BURN_STACKS)
+      kindle(battle, other, wildfire ? target.burn : BURN_STACKS, events)
       events.push(fx(other.id, wildfire ? 'wildfire' : 'backdraft', 0))
     }
   }
@@ -74,7 +78,7 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
     target.hp = target.stats.hp
     events.push({ type: 'ultimate', src: srcOf('phoenixRising'), id: target.id, effect: 'phoenixRising', x: target.x, y: target.y, radius: PHOENIX_RISING.radius })
     for (const foe of battle.units.filter((u) => u.side !== target.side && !u.civilian && distance(u, target) <= PHOENIX_RISING.radius)) {
-      kindle(battle, foe, BURN_STACKS)
+      kindle(battle, foe, BURN_STACKS, events)
       events.push(fx(foe.id, 'phoenixRising', -PHOENIX_RISING.damage))
       wound(battle, foe, PHOENIX_RISING.damage, events)
     }
