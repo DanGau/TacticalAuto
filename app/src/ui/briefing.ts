@@ -83,7 +83,7 @@ const FEATURES: Partial<Record<Prop, string>> = { car: 'wrecked cars', truck: 'w
 function nearby(battle: Battle, at: Tile): string {
   const kinds = new Map<string, number>()
   for (const u of battle.units.filter((a) => a.side === 'alien' && a.revealed && Math.hypot(a.x - at.x, a.y - at.y) <= NEARBY)) {
-    const name = u.boss ? 'the Hunter' : ALIENS[u.kind!].name.toLowerCase()
+    const name = u.boss ? (battle.goal === 'ambush' ? 'the Hunter' : 'the Guardian') : ALIENS[u.kind!].name.toLowerCase()
     kinds.set(name, (kinds.get(name) ?? 0) + 1)
   }
   return kinds.size === 0 ? '' : `Near it: ${[...kinds].map(([k, n]) => (n > 1 ? `${n} ${k}s` : k)).join(', ')}. `

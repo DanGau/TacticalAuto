@@ -41,7 +41,7 @@ function status(run: Run): string {
   if (run.phase !== 'battle' || !battle) return ''
   const title = missionOrder(run)
   if (battle.phase === 'deploy') return title
-  const rounds = battle.extract ? ' · make for the extraction zone' : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
+  const rounds = battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
   const clock = battle.deadline !== null && battle.round < battle.deadline ? ` · reinforcements in ${battle.deadline - battle.round} rounds` : ''
   const boons = battle.boons.filter((b) => b.until > battle.round).map((b) => ` · ${UTILITIES[b.id].icon} ${UTILITIES[b.id].name} ⏳${b.until - battle.round}`).join('')
   return `${title}${rounds}${clock}${boons}${counts(run, battle)}`

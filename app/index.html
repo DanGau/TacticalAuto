@@ -407,6 +407,13 @@
       #drop .detail { min-height: 52px; margin: 6px auto; }
       #drop p { margin: 4px 0; }
       #drop .challenge { margin: 0; font-size: 20px; color: #ffd166; }
+      /* A short landscape screen keeps the deploy panel to one side, so the route stays in sight. */
+      @media (orientation: landscape) and (max-height: 500px) {
+        #drop { left: auto; right: 8px; top: 8px; bottom: 8px; transform: none; width: min(360px, 44vw); overflow-y: auto; padding: 6px 10px; }
+        #drop .challenge { font-size: 15px; }
+        #drop .picks button.pick { height: 64px; }
+        #drop .detail { min-height: 0; }
+      }
       .node.answered { outline: 2px solid #6fd08c; }
       button.pick.armed { outline: 3px solid #fff; outline-offset: 1px; background: #33405a; }
       .swap { display: grid; width: min(720px, 100%); grid-template-columns: 1fr 1fr; gap: 10px; min-height: 96px; }

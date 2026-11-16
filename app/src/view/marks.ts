@@ -23,7 +23,7 @@ function route(shapes: Shapes, path: Tile[], color: number, alpha: number): void
     const a = spot(path[i - 1].x, path[i - 1].y)
     const b = spot(path[i].x, path[i].y)
     const lift = Math.max(a.y, b.y) + DECAL_LIFT * 3
-    shapes.band({ ...a, y: lift }, { ...b, y: lift }, 5 / ACROSS, color, alpha)
+    shapes.band({ ...a, y: lift }, { ...b, y: lift }, 8 / ACROSS, color, alpha)
   }
 }
 
@@ -90,7 +90,7 @@ export function drawMarks(s: Stage, battle: Battle): void {
       }
     }
     // Those the mission turns on are named; every other alien speaks for itself.
-    for (const u of battle.units.filter((a) => a.side === 'alien' && (a.target || a.boss))) marks.push(label(u.target ? '🎯 COMMANDER' : battle.goal === 'ambush' ? 'THE HUNTER' : battle.place === 'hive' ? 'THE SOURCE' : 'GUARDIAN', u, COLOR.contact, 20))
+    for (const u of battle.units.filter((a) => a.side === 'alien' && (a.target || a.boss))) marks.push(label(!u.boss ? '🎯 COMMANDER' : battle.goal === 'ambush' ? 'THE HUNTER' : battle.place === 'hive' ? 'THE SOURCE' : 'GUARDIAN', u, COLOR.contact, 20))
   }
   lay(s.zones, tint)
   // A fence rings each zone in play: the landing, the uplink to hold, the way out.
