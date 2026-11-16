@@ -283,6 +283,7 @@ test('caltrops slow an alien that must cross them, and hurt it', () => {
 test('the sentinel protocol shoots an alien that walks away from beside a soldier', () => {
   const d = armed(['sentinel'], { damage: 0 })
   d.alien.stance = 'standoff'
+  d.alien.stats = { ...d.alien.stats, damage: 3, range: 6 }
   const events = untilAlienShoots(d)
   expect(events).toContainEqual(expect.objectContaining({ type: 'shot', id: d.soldier.id, with: ['sentinel'] }))
 })

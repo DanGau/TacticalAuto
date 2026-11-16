@@ -35,7 +35,7 @@ export interface Encounter {
 /** What a shop's relic costs. */
 export const RELIC_PRICE = 8
 /** What a shop's medkit costs, and the health it heals the hero: less than a safehouse's full rest. */
-export const MEDKIT = { price: 3, heal: 4 }
+export const MEDKIT = { price: 3, heal: 6 }
 /** How likely an unknown stop is to be a battle, and a shop; otherwise it is an event. */
 const UNKNOWN_CHANCE = { battle: 0.3, shop: 0.3 }
 

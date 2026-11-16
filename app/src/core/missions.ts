@@ -31,7 +31,7 @@ export const huntForce = (run: Run, mission: Mission) => Math.round((mission.for
 
 /** The mission the hero would fight at a stop of the given kind now. Its force follows the leg. */
 export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goal = 'exterminate'): Mission {
-  const extra = { battle: 0, key: 1, final: 0, ambush: run.keys }[kind]
+  const extra = { battle: 0, key: 0, final: 0, ambush: 0 }[kind]
   return { kind, goal, risk, force: Math.max(1, TUNING.legForce[run.keys] + (late(run) ? 1 : 0) + extra + RISKS[risk].aliens + GOALS[goal].force) }
 }
 
@@ -90,13 +90,13 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], cha
 export const HARVESTERS_MORE_FROM = 2
 
 /** What a leg's boss multiplies its health by, and the damage it does less. */
-export const LEG_BOSS = { hp: 3.8, damage: 4 }
+export const LEG_BOSS = { hp: 3, damage: 4 }
 
 /** What an elite's Big One multiplies its health by, so it lasts long enough for a build to pay. */
 export const ELITE_HP = 1.8
 
 /** What an ambush's Hunter multiplies the hero's health and damage by. */
-export const HUNTER = { hp: 2, damage: 1.2 }
+export const HUNTER = { hp: 1.3, damage: 1 }
 
 /** A goal drawn by GOALS' weights, among those the leg of `when` has. */
 export function drawGoal(run: Run, when: Run): Goal {

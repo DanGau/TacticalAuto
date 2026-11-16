@@ -18,7 +18,7 @@ export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test:
   ironWall: { name: 'Iron wall', icon: '🧱', test: 'Heavily armored aliens that shrug off small hits', answers: ['crack', 'overcharge', 'blaze'], grim: [[2, 3, 4], [4, 6, 8], [7, 9, 11]] },
   swarm: { name: 'Swarm', icon: '🐜', test: 'Bodies flood in from every side, and keep coming', answers: ['meleeShield', 'tank', 'coldSnap', 'gravity'], grim: [[8, 12, 16], [14, 18, 22], [20, 24, 30]] },
   scattered: { name: 'Scattered', icon: '🗺️', test: 'Sentries spread far apart: clear them before the clock runs out and reinforcements pour in', answers: ['thrusters', 'farsight'], grim: [[8, 12, 16], [12, 16, 20], [16, 20, 24]] },
-  bigOne: { name: 'Big one', icon: '👹', test: 'One huge, armored alien and its escort', answers: ['overcharge', 'crack', 'hunted', 'keen'], grim: [[1, 1, 2], [2, 3, 4], [3, 5, 6]] },
+  bigOne: { name: 'Big one', icon: '👹', test: 'One huge, armored alien and its escort', answers: ['overcharge', 'crack', 'hunted', 'keen'], grim: [[1, 1, 2], [2, 3, 3], [3, 4, 5]] },
   killBox: { name: 'Kill box', icon: '💥', test: 'The way in lands right beside a packed cluster that hits first', answers: ['flashbang', 'smoke', 'meleeShield', 'dampener', 'ironSkin'], grim: [[3, 5, 6], [6, 8, 10], [9, 12, 15]] },
 }
 
@@ -73,13 +73,13 @@ export function forceOf(id: ChallengeId, leg: number, rung: number, more: number
 export const STIFFEN: Partial<Record<ChallengeId, { range?: number; armor?: number[] }>> = {
   slog: { range: 3 },
   firingLine: { range: 4 },
-  ironWall: { armor: [5, 8, 10] },
+  ironWall: { armor: [5, 12, 16] },
 }
 
 /** A big one's boss: its health over a hero's base, its armor and its damage, by leg and rung. */
 export function bigOneStats(leg: number, rung: number, base: Stats): Stats {
   const size = Math.min(leg, 2)
-  return { ...base, hp: [12, 60, 105][size] + [3, 12, 17][size] * rung, armor: [7, 14, 28][size] + [1, 3, 4][size] * rung, damage: base.damage + 2 + 2 * size + Math.floor(rung / 2) }
+  return { ...base, hp: [10, 30, 60][size] + [3, 6, 10][size] * rung, armor: [7, 10, 16][size] + [1, 2, 3][size] * rung, damage: base.damage + 2 + 2 * size + Math.floor(rung / 2) }
 }
 
 /** Of a Scattered's force of `count`, the sentries posted; the rest are the reinforcements. */

@@ -118,7 +118,7 @@ function relicChoice(run: Run, armed: string | null): string {
     <button class="decide confirm"${pick ? ` data-action='${JSON.stringify(pick)}'` : ' disabled'}>${pick ? 'Take it' : 'Pick one'}</button></div>`
 }
 
-/** The next choice of the reward phase, alone on its screen: the starting boons, a relic, then each find and who takes it, then each skill and perk owed. */
+/** The next choice of the reward phase, alone on its screen: the starting boons, a relic, then each find, taken or sold, then each skill and perk owed. */
 export function choice(run: Run, armed: string | null = null): string {
   if (run.boonOffers.length > 0) return startChoice(run, armed)
   if (run.relicOffers.length > 0) return relicChoice(run, armed)
