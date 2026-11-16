@@ -57,7 +57,7 @@ export function spotted(battle: Battle): Set<number> {
 export const hostage = (battle: Battle, unit: Unit) => unit.civilian === 'vip' && battle.vip !== 'freed'
 
 /** Whether `unit`, standing on `from`, may shoot `target`. An elusive target is safe from far off, and a cloaked one from all. */
-/** A secondary's reach under Squadsight: any spotted alien in a clear line. */
+/** A secondary's reach under Far Sight: any alien in sight and a clear line. */
 const SPOTTED_REACH = Infinity
 
 /** Tiles Longshot adds to a secondary's reach. */

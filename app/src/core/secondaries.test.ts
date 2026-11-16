@@ -1,3 +1,4 @@
+import { FAR_SIGHT_CRIT } from './classes'
 import { powering } from './fighters'
 import { expect, test } from 'vitest'
 import { begun, enterAt } from './roads'
@@ -117,12 +118,21 @@ test("a combo's blows are closer together than two heroes' attacks", () => {
   expect(tick({ next: 0, done: 0 }, PACE.attack, true, staggerOf([opens])).next).toBe(PACE.combo)
 })
 
-test('Squadsight carries the secondary to any spotted alien, never the weapon', () => {
+test('Far Sight carries the secondary to any alien in sight, never the weapon', () => {
   const { b, hero } = duel(20)
   Object.assign(hero, { ability: 'eagleEye', stats: { ...hero.stats, range: 1 } })
   expect(shoot(b, hero, spotted(b))).toEqual([])
   const seen = new Set(b.units.filter((u) => u.side === 'alien').map((u) => u.id))
   expect(shots(shoot(b, hero, seen, undefined, undefined, SECONDARIES.pistol))).toHaveLength(1)
+})
+
+test('a Far Sight bonus attack always crits from far, not from near', () => {
+  for (const [range, crit] of [[FAR_SIGHT_CRIT, true], [2, false]] as const) {
+    const { b, hero } = duel(range)
+    Object.assign(hero, { ability: 'eagleEye', stats: { ...hero.stats, crit: 0 } })
+    const seen = new Set(b.units.filter((u) => u.side === 'alien').map((u) => u.id))
+    expect(shots(shoot(b, hero, seen, undefined, undefined, SECONDARIES.pistol))[0]).toMatchObject({ crit })
+  }
 })
 
 test('Longshot adds to a secondary, and a power reaches the same with any weapon', () => {

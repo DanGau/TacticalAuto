@@ -22,6 +22,9 @@ export interface SoldierClass {
   secondary: SecondaryId
 }
 
+/** Tiles from which a Far Sight bonus attack always crits. */
+export const FAR_SIGHT_CRIT = 5
+
 const classes = {
   assault: {
     name: 'Vanguard',
@@ -53,7 +56,7 @@ const classes = {
     stanceText: 'Hangs back out of reach',
     ability: 'eagleEye',
     abilityName: 'Far Sight',
-    abilityText: 'Bonus attack hits any alien an ally sees, at any range',
+    abilityText: `Bonus attack reaches any alien in sight. It always crits from ${FAR_SIGHT_CRIT}+ tiles`,
     charges: 0,
     secondary: 'pistol',
   },
@@ -120,6 +123,7 @@ const classes = {
 } satisfies Record<string, SoldierClass>
 
 export type ClassId = keyof typeof classes
+
 export const CLASSES: Record<ClassId, SoldierClass> = classes
 
 /** A class's ability as a power, with `uses` a battle; Chill Touch rides on each attack, the rest with no uses sit on the sheet. */
@@ -127,3 +131,4 @@ export function classPower(cls: SoldierClass, uses: number): Power {
   const use: Use = uses > 0 ? `${uses}/battle` : cls.ability === 'cryo' ? 'At will' : 'Passive'
   return { name: cls.abilityName, use, range: cls.range, target: cls.target, text: cls.abilityText }
 }
+

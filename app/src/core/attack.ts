@@ -8,6 +8,7 @@ import { freeTilesNear, blocked, crumble, wreck, onGrid, NEIGHBORS, distance } f
 import { PARRY_SOAK } from './doctrines'
 import { FRAG_SPLASH, KNOCK_TILES, type Secondary } from './secondaries'
 import type { GameEvent, ShotEvent } from './combat-event'
+import { FAR_SIGHT_CRIT } from './classes'
 import { aiming, powering, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
 import { armorCap, carryOverkill, displaced, volley, WEAKEN_TURNS, burnFrom, chillFrom, chillUnit, empower, highCrit, kindle, markUnit, scaledDamage, spendStacks, stackDamage, struck } from './stacks'
 import { land, mend, wound } from './wound'
@@ -129,7 +130,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     (enemy.numb > 0 ? NUMB_SOAK : 0) +
     (shielded ? BLOCK_SOAK : 0)
 
-  const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.mark > 0, 'apex', 1) + when(enemy.hp <= enemy.stats.hp / 2, 'deadeye', 1) + when(unit.hp <= unit.stats.hp / 2, 'berserk', 1) > 0
+  const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.mark > 0, 'apex', 1) + when(enemy.hp <= enemy.stats.hp / 2, 'deadeye', 1) + when(unit.hp <= unit.stats.hp / 2, 'berserk', 1) + (secondary && unit.ability === 'eagleEye' && distance(unit, enemy) >= FAR_SIGHT_CRIT ? 1 : 0) > 0
   const crit = !enemy.resists.includes('crit') && (sure || (blow ? (blow.crit ??= random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)) : random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)))
   unit.hits++
   // A mirror hits as hard as the hardest-hitting hero; a feeder as hard as it has grown.

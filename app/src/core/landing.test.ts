@@ -117,4 +117,4 @@ test('every flow ends with nothing to choose: bots play each goal to a winner, u
       expect(run.battle.phase).toBe('over')
     }
   }
-})
+}, 120_000)

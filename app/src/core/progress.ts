@@ -7,6 +7,9 @@ export const LEG_STOPS = 9
 /** Columns at the start of the first leg that are all battles, and normal ones: time to build a kit before the first challenge. */
 export const OPENING = 5
 
+/** Columns of each leg that are all safehouses, so every way rests there. */
+export const REST_COLUMNS = [8]
+
 /** Threat at which the next stop becomes an ambush. */
 export const THREAT_MAX = 24
 

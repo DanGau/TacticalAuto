@@ -13,7 +13,7 @@ import { random, randomInt } from './rng'
 import { TOWNS } from './towns'
 import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
-import { LEG_STOPS, OPENING, STOP_THREAT, THREAT_MAX } from './progress'
+import { LEG_STOPS, OPENING, REST_COLUMNS, STOP_THREAT, THREAT_MAX } from './progress'
 import { abilityOf, charges, health, mend, offerCandidates, soldierStats, weaponOf } from './hero'
 import { dropGear, offerStart, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
@@ -286,28 +286,10 @@ export function drawStops(run: Run): void {
     for (const node of column) {
       let roll = random(run)
       const kind = c < (run.keys === 0 ? OPENING : 1) ? undefined : (Object.keys(STOP_CHANCE) as (keyof typeof STOP_CHANCE)[]).find((k) => (roll -= STOP_CHANCE[k]) < 0)
-      node.stop = c === LEG_STOPS ? { ...fixed('key', 'compound'), ...placed(run, 'compound'), challenge: 'bigOne', aliens: forceOf('bigOne', run.keys, 2, 0), city: run.route[run.keys].to.name } : kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], { ...run, stop: c }, taken)
+      node.stop = REST_COLUMNS.includes(c) ? fixed('safehouse', 'town') : c === LEG_STOPS ? { ...fixed('key', 'compound'), ...placed(run, 'compound'), challenge: 'bigOne', aliens: forceOf('bigOne', run.keys, 2, 0), city: run.route[run.keys].to.name } : kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], { ...run, stop: c }, taken)
       if (node.stop.challenge) taken.push(node.stop.challenge)
       // A stop is named for the town it is at.
       if (node.town) node.stop.city = node.town
-    }
-  })
-  placeSafehouses(leg, run.keys === 0 ? OPENING : 1)
-}
-
-/**
- * At every other split of the way into column `from` or later, a stop it leads to becomes a safehouse while another
- * stays a battle, so resting costs a fight's rewards. A stop other than a battle is turned first, keeping the fights.
- */
-function placeSafehouses(leg: Leg, from: number): void {
-  let splits = 0
-  leg.columns.slice(0, LEG_STOPS - 1).forEach((column, c) => {
-    for (const node of column) {
-      const ways = node.next.map((i) => leg.columns[c + 1][i])
-      const battles = ways.filter((n) => n.stop!.kind === 'battle')
-      if (c + 1 < from || ways.length < 2 || battles.length === 0 || ways.some((n) => n.stop!.kind === 'safehouse') || splits++ % 2 === 1) continue
-      const turned = ways.find((n) => n.stop!.kind !== 'battle') ?? battles[1]
-      turned.stop = { ...fixed('safehouse', 'town'), city: turned.stop!.city }
     }
   })
 }

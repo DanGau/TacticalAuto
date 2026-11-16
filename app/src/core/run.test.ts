@@ -47,6 +47,7 @@ import { xpFor } from './hero'
 import { STOP_THREAT } from './progress'
 import { THREAT_MAX } from './progress'
 import { LEG_STOPS } from './progress'
+import { REST_COLUMNS } from './progress'
 import { powerOf, SKILLS } from './skills'
 import { atKey, road, enterAt, begun } from './roads'
 import { RELICS } from './relics'
@@ -241,21 +242,11 @@ test('a safehouse heals the hero fully on arrival and adds threat', () => {
   expect(run.hero.wounds).toBe(0)
 })
 
-test('every other split of the way puts a safehouse beside a battle', () => {
-  let count = 0
+test('every stop in a rest column is a safehouse, and no other is', () => {
   for (let seed = 0; seed < 20; seed++) {
-    const run = begun(seed)
-    const leg = run.legs[0]
-    count += leg.columns.flat().filter((n) => n.stop!.kind === 'safehouse').length
-    leg.columns.forEach((column, c) =>
-      column.forEach((node, i) => {
-        if (node.stop!.kind !== 'safehouse') return
-        const splits = leg.columns[c - 1].filter((n) => n.next.includes(i))
-        expect(splits.some((n) => n.next.some((k) => leg.columns[c][k].stop!.kind === 'battle'))).toBe(true)
-      }),
-    )
+    const leg = begun(seed).legs[0]
+    leg.columns.slice(0, LEG_STOPS).forEach((column, c) => expect(column.every((n) => (n.stop!.kind === 'safehouse') === REST_COLUMNS.includes(c))).toBe(true))
   }
-  expect(count).toBeGreaterThan(5)
 })
 
 test('after the stops of a leg comes its satellite: winning it wins a key and the next leg', () => {

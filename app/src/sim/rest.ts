@@ -36,7 +36,7 @@ export function restForks(run: Run, took: Action): RestFork | null {
   if (run.phase === 'overworld' && !current(run)) {
     const column = legOf(run).columns[run.stop]
     const safehouse = ways(run).find((i) => column[i].stop!.kind === 'safehouse')
-    if (safehouse === undefined || ways(run).length < 2) return null
+    if (safehouse === undefined || ways(run).every((i) => column[i].stop!.kind === 'safehouse')) return null
     const pressed = structuredClone(run)
     return { kind: 'safehouse', ...at, took: took.type === 'go' && took.index === safehouse, rested: playOut(structuredClone(run), { type: 'go', index: safehouse }), pressed: playOut(pressed, resting(0)(pressed, { rng: 0 })) }
   }
