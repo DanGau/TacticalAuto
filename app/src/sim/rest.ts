@@ -1,14 +1,14 @@
 // The rest comparison: at each safehouse on offer, and each shop's medkit, the run played on both ways by the strategic bot.
-import { resting, squadHealth, strategic } from '../bots/strategic'
+import { heroHealth, resting, strategic } from '../bots/strategic'
 import type { Bot } from '../bots/bots'
 import { apply, type Action } from '../core/apply'
 import { MEDKIT } from '../core/events'
 import { current, legOf, ways } from '../core/run'
 import { type Run } from '../core/run-state'
-import { wounded } from '../core/squad'
+import { wounded } from '../core/hero'
 import { step } from '../core/step'
 
-/** A choice played on both ways: rest (safehouse or medkit) or not, the squad's health and leg then, whether the bot rested, and which way won the run. */
+/** A choice played on both ways: rest (safehouse or medkit) or not, the hero's health and leg then, whether the bot rested, and which way won the run. */
 export interface RestFork {
   kind: 'safehouse' | 'medkit'
   health: number
@@ -18,7 +18,7 @@ export interface RestFork {
   pressed: boolean
 }
 
-/** Fixed policies, by name: rest at every safehouse on the way when the squad's health is under the threshold. */
+/** Fixed policies, by name: rest at every safehouse on the way when the hero's health is under the threshold. */
 export const POLICIES: Record<string, Bot> = { never: resting(0), 'under 50%': resting(0.5), 'under 60%': resting(0.6), 'under 75%': resting(0.75), 'under 90%': resting(0.9), always: resting(1.01) }
 
 function playOut(run: Run, first: Action): boolean {
@@ -32,7 +32,7 @@ function playOut(run: Run, first: Action): boolean {
 
 /** The forks at this point of the run, if it offers a safehouse or a fresh shop's medkit; the run is left as it was. */
 export function restForks(run: Run, took: Action): RestFork | null {
-  const at = { health: squadHealth(run), leg: run.keys }
+  const at = { health: heroHealth(run), leg: run.keys }
   if (run.phase === 'overworld' && !current(run)) {
     const column = legOf(run).columns[run.stop]
     const safehouse = ways(run).find((i) => column[i].stop!.kind === 'safehouse')

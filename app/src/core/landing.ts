@@ -97,10 +97,9 @@ export function deploy(battle: Battle, at: Tile): void {
   battle.opening = true
   const squad = battle.units.filter(isSoldier)
   engageNearest(battle, [at])
-  // A barrier projector armors every squadmate of its carrier.
-  for (const carrier of squad.filter((u) => u.effects.includes('barrier'))) {
-    for (const mate of squad) if (mate !== carrier) mate.armor += BARRIER_ARMOR
-  }
+  // Each Shield of Faith armors its holder and every ally.
+  const shields = squad.filter((u) => u.effects.includes('barrier')).length
+  for (const mate of squad) mate.armor += shields * BARRIER_ARMOR
 }
 
 /** Stands a barricade on the free tile beside `soldier` nearest the nearest alien, unless it would cut ground off. */

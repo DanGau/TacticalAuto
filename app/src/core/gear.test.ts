@@ -13,7 +13,7 @@ import type { GameEvent } from './combat-event'
 import { alienStats } from './aliens'
 import { EFFECTS, generateGear, type Gear } from './gear'
 import { type Run } from './run-state'
-import { soldierStats } from './squad'
+import { soldierStats } from './hero'
 import { MELEE_RANGE, WEAPONS } from './weapons'
 import { TUNING } from './tuning'
 
@@ -35,7 +35,7 @@ test('gear does one thing: commons a stat mod, rares a simple effect, epics an e
 
 test('any soldier wields any weapon: a melee one reaches the next tile and charges in, whatever the class', () => {
   const run = begun(1)
-  const [soldier] = run.soldiers
+  const soldier = run.hero
   const rifle = soldierStats(run, soldier)
   soldier.gear = { id: 9, rarity: 'common', name: 'Hammer', weapon: 'hammer', stats: {}, effect: null }
   const hammer = soldierStats(run, soldier)
@@ -48,8 +48,8 @@ test('any soldier wields any weapon: a melee one reaches the next tile and charg
 /** A run whose soldier has learned its first skill and found `gear`. */
 function withFind(gear: Omit<Gear, 'id'>): Run {
   const run = begun(1)
-  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
-  run.finds.push({ id: 1, owner: run.soldiers[0].id, ...gear })
+  run.hero.skills = [powerOf(run.hero.cls!)]
+  run.finds.push({ id: 1, ...gear })
   run.phase = 'reward'
   return run
 }
@@ -71,7 +71,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   battle.north.fill('none')
   battle.west.fill('none')
   reshaped(battle)
-  const soldier = battle.units.find((u) => u.soldier === run.soldiers[0].id)!
+  const soldier = battle.units.find((u) => u.soldier === run.hero.id)!
   const alien = battle.units.find((u) => u.side === 'alien')!
   battle.units = [soldier, alien]
   for (const u of battle.units) Object.assign(u, { revealed: true, engaged: true })

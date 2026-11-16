@@ -15,7 +15,7 @@ import { drawTwist, FUEL_DAMAGE, TWISTS, type Twist } from './twists'
 /** A soldier at (10, 10) and a trooper at (10, 12) on open, flat ground, with `twist`. */
 function duel(twist: Twist | null): Battle {
   const run = begun(1)
-  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
+  run.hero.skills = [powerOf(run.hero.cls!)]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   enterAt(run)

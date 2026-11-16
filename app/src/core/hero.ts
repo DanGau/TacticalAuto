@@ -1,4 +1,4 @@
-// Soldiers: experience and levels, skills, stats and health, and hiring.
+// The hero: experience and levels, skills, stats and health, and the candidates a run starts from.
 import type { SecondaryId } from './secondaries'
 import type { Lasting } from './base'
 import { type Battle, type Stats, BASE_STATS } from './battle'
@@ -82,13 +82,13 @@ export function charges(run: Run, soldier: Soldier): number {
 /** A soldier's health now: its most less its wounds, never below 1. */
 export const health = (run: Run, soldier: Soldier) => Math.max(1, soldierStats(run, soldier).hp - soldier.wounds)
 
-/** Heals every soldier `amount`; Infinity heals fully. */
+/** Heals the hero `amount`; Infinity heals fully. */
 export function mend(run: Run, amount: number): void {
-  for (const s of run.soldiers) s.wounds = Math.max(0, Math.min(s.wounds, soldierStats(run, s).hp - 1) - amount)
+  run.hero.wounds = Math.max(0, Math.min(run.hero.wounds, soldierStats(run, run.hero).hp - 1) - amount)
 }
 
-/** Whether any soldier is below full health. */
-export const wounded = (run: Run) => run.soldiers.some((s) => health(run, s) < soldierStats(run, s).hp)
+/** Whether the hero is below full health. */
+export const wounded = (run: Run) => health(run, run.hero) < soldierStats(run, run.hero).hp
 
 /** A soldier's stats in battle: base, plus class, level, skills, perks, gear and its weapon, plus relics. A melee weapon reaches the next tile. */
 export function soldierStats(run: Run, soldier: Soldier): Stats {
@@ -119,37 +119,14 @@ const MIN_MOVE = 2
 /** What each level adds to a soldier's stats. */
 export const LEVEL_STATS: Partial<Stats> = { hp: 2, crit: 0.03 }
 
-/**
- * Adds a recruit the player has not seen to the squad, while it has room, and tells the player. Under a
- * doctrine of unique classes it takes a class no squadmate has, while one is left.
- */
-export function hire(run: Run): void {
-  if (run.soldiers.length < MAX_SQUAD) run.gains.push({ kind: 'hero', soldier: join(run, draft(run, [])).id })
-}
-
-/** The most heroes a party has. */
-export const MAX_SQUAD = 3
-
-/** Adds `soldier` to the squad and returns it. */
-export function join(run: Run, soldier: Soldier): Soldier {
-  soldier.id = run.nextSoldier++
-  run.soldiers.push(soldier)
-  return soldier
-}
-
-/** A plain level 1 soldier of a class none of `taken` has, if one is left, not yet in the squad. */
-export function draft(run: Run, taken: ClassId[]): Soldier {
-  const unused = (Object.keys(CLASSES) as ClassId[]).filter((id) => !run.soldiers.some((s) => s.cls === id))
-  const unique = run.doctrines.some((id) => (DOCTRINES[id] as Doctrine).uniqueClasses) && unused.length > 0
-  const all = (unique ? unused : (Object.keys(CLASSES) as ClassId[])).filter((id) => !taken.includes(id))
-  const fresh = all.filter((id) => !run.passed.classes.includes(id))
-  const classes = fresh.length > 0 ? fresh : all.length > 0 ? all : (Object.keys(CLASSES) as ClassId[])
-  const gear = plainGear(run, run.nextGear++)
-  const free = NAMES.filter((name) => ![...run.soldiers, ...run.recruits].some((s) => s.name === name))
+/** A plain level 1 hero of a class none of `taken` has, from `home`. */
+export function draft(run: Run, taken: ClassId[], home: City): Soldier {
+  const all = (Object.keys(CLASSES) as ClassId[]).filter((id) => !taken.includes(id))
+  const free = NAMES.filter((name) => !run.candidates.some((s) => s.name === name))
   const name = free[randomInt(run, free.length)]
-  const cls = classes[randomInt(run, classes.length)]
-  const soldier: Soldier = {
-    id: 0,
+  const cls = all[randomInt(run, all.length)]
+  return {
+    id: HERO_ID,
     name,
     xp: xpFor(1),
     cls,
@@ -159,26 +136,26 @@ export function draft(run: Run, taken: ClassId[]): Soldier {
     // Read, not drawn: the seed costs the run no draw.
     seed: run.rng,
     feats: [],
-    gear,
-    home: null,
+    gear: plainGear(run, run.nextGear++),
+    home,
     wounds: 0,
   }
-  return soldier
 }
+
+/** The id the hero fights under in a battle. */
+export const HERO_ID = 1
 
 export const NAMES = ['Vega', 'Okafor', 'Lindqvist', 'Tanaka', 'Reyes', 'Novak', 'Haddad', 'Brandt', 'Silva', 'Kowalski', 'Mbeki', 'Dufour', 'Ivanov', 'Castillo', 'Ng', 'Shaw']
 
-/** Recruits offered at a run's start. */
-export const RECRUITS = 3
+/** Heroes offered at a run's start. */
+export const CANDIDATES = 3
 
-/** Offers the run's first soldier: recruits of different classes from different continents. */
-export function offerRecruits(run: Run): void {
+/** Offers the run's hero: candidates of different classes from different continents. */
+export function offerCandidates(run: Run): void {
   const continents = [...CONTINENT_IDS]
-  for (let i = 0; i < RECRUITS; i++) {
-    const recruit = draft(run, run.recruits.map((r) => r.cls!))
+  for (let i = 0; i < CANDIDATES; i++) {
     const cities: City[] = CONTINENTS[continents.splice(randomInt(run, continents.length), 1)[0]].cities
-    recruit.home = cities[randomInt(run, cities.length)]
-    run.recruits.push(recruit)
+    run.candidates.push(draft(run, run.candidates.map((c) => c.cls!), cities[randomInt(run, cities.length)]))
   }
 }
 
@@ -196,14 +173,14 @@ export function heroFlows(soldier: Soldier): Flow[] {
   ]
 }
 
-/** Everything the squad has that makes or reads: its heroes' and its relics. */
-const flows = (run: Run): Flow[] => [...run.soldiers.flatMap(heroFlows), ...run.relics.map((id) => RELICS[id])]
+/** Everything the run has that makes or reads: the hero's and its relics. */
+const flows = (run: Run): Flow[] => [...heroFlows(run.hero), ...run.relics.map((id) => RELICS[id])]
 
-/** The quantities the squad makes. */
-export const squadMakes = (run: Run): Quantity[] => [...new Set(flows(run).flatMap((f) => f.makes ?? []))]
+/** The quantities the run makes. */
+export const makes = (run: Run): Quantity[] => [...new Set(flows(run).flatMap((f) => f.makes ?? []))]
 
-/** The quantities the squad reads. */
-export const squadReads = (run: Run): Quantity[] => [...new Set(flows(run).flatMap((f) => f.reads ?? []))]
+/** The quantities the run reads. */
+export const reads = (run: Run): Quantity[] => [...new Set(flows(run).flatMap((f) => f.reads ?? []))]
 
 /** What a soldier earns from a battle, after the feats it ends the battle with are recorded. */
 export function earn(battle: Battle, soldier: Soldier, won: boolean, rescued: number | null): { earned: Earned[]; feats: FeatId[]; tally: Tally } {

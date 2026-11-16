@@ -4,7 +4,7 @@ import { ALIENS } from '../core/aliens'
 import { type Battle, type Tile, type Unit } from '../core/battle'
 import { CLASSES } from '../core/classes'
 import { type Run } from '../core/run-state'
-import { level } from '../core/squad'
+import { level } from '../core/hero'
 import { axes, DECAL_LIFT, picture, spot } from './camera'
 import { drawAcid } from './marks'
 import { ALIEN_LOOK, COLOR } from './palette'
@@ -246,7 +246,7 @@ export function sync(s: Stage, run: Run, battle: Battle): void {
   const live = new Set(visible.map((u) => u.id))
   for (const id of [...s.sprites.keys()]) if (!live.has(id)) remove(s, id)
   for (const unit of visible) {
-    const soldier = run.soldiers.find((member) => member.id === unit.soldier)
+    const soldier = unit.soldier === run.hero.id ? run.hero : undefined
     const sprite = s.sprites.get(unit.id) ?? create(s, unit, soldier ? level(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : letter(unit))
     place(s, sprite, { x: unit.x, y: unit.y })
     if (unit.giant) grow(sprite)

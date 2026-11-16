@@ -1,10 +1,8 @@
 // A run's journey: creating it, the route and each leg's map of stops, and moving along it.
 import { type Reserve } from './battle'
-import { secondaryOf } from './squad'
+import { secondaryOf } from './hero'
 import { createBattle } from './setup'
-import { holdCaptives } from './setup'
 import { CLASSES } from './classes'
-import { duoHeroes } from './duos'
 import { DOCTRINES, KILL_REWARDS, type Doctrine, type Rule } from './doctrines'
 import { EXAMS, type Exam } from './exams'
 import { RELICS, ZENITH_EVERY, type Relic } from './relics'
@@ -16,8 +14,7 @@ import { TOWNS } from './towns'
 import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
 import { LEG_STOPS, OPENING, STOP_THREAT, THREAT_MAX } from './progress'
-import { kitOut } from './plans'
-import { abilityOf, charges, draft, health, join, mend, MAX_SQUAD, offerRecruits, soldierStats, weaponOf, xpFor } from './squad'
+import { abilityOf, charges, health, mend, offerCandidates, soldierStats, weaponOf } from './hero'
 import { dropGear, offerStart, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
 import { forceOf, type ChallengeId } from './challenges'
@@ -32,20 +29,18 @@ export const START_SUPPLIES = 3
 /** Supplies a supply drop gives. */
 export const DROP_SUPPLIES = 4
 
-/** Takes the recruit at `index` as the run's first soldier, and sets out from its home. */
-export function recruit(run: Run, index: number): void {
-  const soldier = run.recruits[index]
-  run.passed.classes.push(...run.recruits.filter((r) => r !== soldier).map((r) => r.cls!))
-  run.recruits = []
-  run.route = plotRoute(run, soldier.home!)
+/** Takes the candidate at `index` as the run's hero, and sets out from its home. */
+export function choose(run: Run, index: number): void {
+  run.hero = run.candidates[index]
+  run.candidates = []
+  run.route = plotRoute(run, run.hero.home)
   run.route.forEach((stage, l) => placeLeg(run, run.legs[l], stage))
   drawStops(run)
-  join(run, soldier)
   offerStart(run)
   settle(run)
 }
 
-/** How many towns lie on the way to a hero's city at least, as a share of the most on the way to any on its continent. */
+/** How many towns lie on the way to a leg's city at least, as a share of the most on the way to any on its continent. */
 const FAR_CITY = 0.8
 
 /** How many of a continent's towns lie on the way from `a` to `b`: past the one, short of the other. */
@@ -55,13 +50,9 @@ function townsBetween(continent: ContinentId, a: LonLat, b: LonLat): number {
   return TOWNS[continent].filter(([, at]) => flat(at).x > x0 && flat(at).x < x1).length
 }
 
-/** The level of a hero waiting at the first leg's end, and what each leg on adds: it joins a power behind the squad's lead. */
-const HERO_LEVEL = 3
-const HERO_LEVEL_LEG = 1
-
 /**
- * The journey from `home`: across its own continent to a hero in another of its cities, then on to the nearest
- * continent not yet crossed, a leg each, and at last to the alien hub. A hero waits at the end of each leg while the party has room for one.
+ * The journey from `home`: across its own continent to a satellite in another of its cities, then on to the nearest
+ * continent not yet crossed, a leg each, and at last to the alien hub.
  */
 function plotRoute(run: Run, home: City): Stage[] {
   const route: Stage[] = []
@@ -70,30 +61,24 @@ function plotRoute(run: Run, home: City): Stage[] {
   for (let leg = 0; leg < KEYS; leg++) {
     const continent = leg === 0 ? left.find((id) => CONTINENTS[id].cities.some((c) => c.name === home.name))! : left.reduce((a, b) => (nearest(b, from.at) < nearest(a, from.at) ? b : a))
     left.splice(left.indexOf(continent), 1)
-    // The hero waits in a city with about the most towns on the way there, so the leg crosses the continent.
+    // The satellite stands in a city with about the most towns on the way there, so the leg crosses the continent.
     const others: City[] = CONTINENTS[continent].cities.filter((c) => c.name !== from.name)
     const most = Math.max(...others.map((c) => townsBetween(continent, from.at, c.at)))
     const cities = others.filter((c) => townsBetween(continent, from.at, c.at) >= FAR_CITY * most)
     const to = cities[randomInt(run, cities.length)]
-    const hero = leg < MAX_SQUAD - 1 ? draft(run, []) : null
-    if (hero) {
-      hero.home = to
-      hero.xp = xpFor(HERO_LEVEL + HERO_LEVEL_LEG * leg)
-      kitOut(hero)
-    }
-    route.push({ continent, from: from.at, to, hero })
+    route.push({ continent, from: from.at, to })
     from = to
   }
-  route.push({ continent: null, from: from.at, to: HUB, hero: null })
+  route.push({ continent: null, from: from.at, to: HUB })
   return route
 }
 
 /**
  * Sets each stop of a leg at a real town on the way across its continent, as a traveller would plan the trip: each
- * column of stops a step on from the last, rows in order across the way, so every trail heads on toward the hero's
+ * column of stops a step on from the last, rows in order across the way, so every trail heads on toward the leg's
  * city, no two trails cross, and no stop stands on a trail not its own or crowds another. Each column takes the towns
  * nearest where it would ideally fall that keep the map so, going back to try a column's next best when the columns
- * after cannot; if no way works, the rules ease. The leg ends at the hero's city; the hub's leg at the hub.
+ * after cannot; if no way works, the rules ease. The leg ends at the satellite's city; the hub's leg at the hub.
  */
 function placeLeg(run: Run, leg: Leg, stage: Stage): void {
   const end = leg.columns.length - 1
@@ -144,7 +129,7 @@ function placeLeg(run: Run, leg: Leg, stage: Stage): void {
     // Below 0 the picture may tangle; below -1 any towns in order do.
     const [loose, any, ease] = [strict < 0, strict < -1, Math.max(0, strict)]
     const [clear, room] = [ease * CLEAR * step, ease * ROOM * step]
-    // A town fits a stop on its own if it is short of the hero's city and near its column's step, its trails there
+    // A town fits a stop on its own if it is short of the leg's city and near its column's step, its trails there
     // head on, and it and they keep clear of the picture so far.
     const alone = (town: Town, i: number) =>
       any ||
@@ -160,7 +145,7 @@ function placeLeg(run: Run, leg: Leg, stage: Stage): void {
         .sort((a, b) => off(a, i) - off(b, i))
         .slice(0, POOL),
     )
-    // The trails a choice adds; the last column's lead on to the hero's city.
+    // The trails a choice adds; the last column's lead on to the leg's city.
     const trails = [...column.flatMap((_, i) => into(i).map((k): [number, number] => [k, first + i])), ...(last ? column.map((_, i): [number, number] => [first + i, first + column.length]) : [])]
     // The BRANCH cheapest choices that keep the picture untangled, cheapest first.
     const choices: { picks: Town[]; cost: number }[] = []
@@ -291,18 +276,17 @@ function drawShape(run: Run): MapNode[][] {
 export function drawStops(run: Run): void {
   const leg = run.legs[run.keys]
   if (run.keys === KEYS) {
-    leg.columns[0][0].stop = { ...fixed('final', 'hive'), challenge: 'bigOne', aliens: forceOf('bigOne', run.soldiers.length, 2, 2) }
+    leg.columns[0][0].stop = { ...fixed('final', 'hive'), challenge: 'bigOne', aliens: forceOf('bigOne', run.keys, 2, 2) }
     return
   }
   const risks = Object.keys(RISKS) as Risk[]
-  const party = Math.max(1, run.soldiers.length)
   leg.columns.forEach((column, c) => {
     // The challenges on offer in a column differ where they can, so the way taken is a choice.
     const taken: ChallengeId[] = []
     for (const node of column) {
       let roll = random(run)
       const kind = c < (run.keys === 0 ? OPENING : 1) ? undefined : (Object.keys(STOP_CHANCE) as (keyof typeof STOP_CHANCE)[]).find((k) => (roll -= STOP_CHANCE[k]) < 0)
-      node.stop = c === LEG_STOPS ? { ...fixed('key', 'compound'), ...placed(run, 'compound'), challenge: 'bigOne', aliens: forceOf('bigOne', party, 2, 0), city: run.route[run.keys].to.name } : kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], { ...run, stop: c }, taken)
+      node.stop = c === LEG_STOPS ? { ...fixed('key', 'compound'), ...placed(run, 'compound'), challenge: 'bigOne', aliens: forceOf('bigOne', run.keys, 2, 0), city: run.route[run.keys].to.name } : kind ? fixed(kind, 'town') : drawBattle(run, risks[randomInt(run, risks.length)], { ...run, stop: c }, taken)
       if (node.stop.challenge) taken.push(node.stop.challenge)
       // A stop is named for the town it is at.
       if (node.town) node.stop.city = node.town
@@ -334,13 +318,13 @@ const fixed = (kind: StopKind, terrain: TerrainKind): Stop => ({ kind, risk: 'st
 /** The leg under way. */
 export const legOf = (run: Run) => run.legs[run.keys]
 
-/** The node the squad has entered and not yet passed; null while it chooses where to go. */
+/** The node the hero has entered and not yet passed; null while it chooses where to go. */
 export function current(run: Run): MapNode | null {
   const leg = legOf(run)
   return leg.path.length > run.stop ? leg.columns[run.stop][leg.path[run.stop]] : null
 }
 
-/** Indexes in the next column of where the squad can go: where its last stop leads, or anywhere at a leg's start or out of a tunnel. */
+/** Indexes in the next column of where the hero can go: where its last stop leads, or anywhere at a leg's start or out of a tunnel. */
 export function ways(run: Run): number[] {
   const leg = legOf(run)
   const last = leg.path[run.stop - 1] ?? -1
@@ -364,8 +348,7 @@ export function createRun(seed: number): Run {
     mission: null,
     battle: null,
     report: null,
-    soldiers: [],
-    nextSoldier: 1,
+    hero: null!,
     supplies: START_SUPPLIES,
     finds: [],
     nextGear: 1,
@@ -378,38 +361,33 @@ export function createRun(seed: number): Run {
     spare: null,
     boonOffers: [],
     relicOffers: [],
-    passed: { relics: [], classes: [] },
-    duos: [],
-    duoOffer: null,
-    recruits: [],
+    passed: [],
+    candidates: [],
     route: [],
     bosses: [],
-    carry: null,
     shop: null,
     event: null,
     met: [],
     doctrines: [],
-    captives: [],
   }
-  offerRecruits(run)
+  offerCandidates(run)
   run.legs = Array.from({ length: KEYS + 1 }, (_, k) => ({ columns: k === KEYS ? [[{ row: Math.floor(MAP_ROWS / 2), next: [], stop: null, town: null, at: null }]] : drawShape(run), path: [] }))
-  run.phase = 'recruit'
+  run.phase = 'select'
   const exams = Object.keys(EXAMS) as Exam[]
   run.bosses = Array.from({ length: KEYS + 1 }, () => exams[randomInt(run, exams.length)])
   return run
 }
 
 /**
- * The stop the squad travels to next: a recovery if the aliens hold soldiers, an ambush if threat is full, else the
- * stop it has entered. Null while it chooses.
+ * The stop the hero travels to next: an ambush if threat is full, else the stop it has entered. Null while it chooses.
  */
-export function nextStop(run: Run): StopKind | 'ambush' | 'recovery' | null {
+export function nextStop(run: Run): StopKind | 'ambush' | null {
   const node = current(run)
   if (!node) return null
-  return run.captives.length > 0 ? 'recovery' : run.threat >= THREAT_MAX ? 'ambush' : node.stop!.kind
+  return run.threat >= THREAT_MAX ? 'ambush' : node.stop!.kind
 }
 
-/** Moves past the stop the squad is at. */
+/** Moves past the stop the hero is at. */
 export function passStop(run: Run): void {
   run.stop++
 }
@@ -426,18 +404,19 @@ export function advance(run: Run): void {
     run.supplies += supplies
     if (stop === 'safehouse') mend(run, Infinity)
     if (stop === 'cache') dropGear(run, run.relics.some((id) => (RELICS[id] as Relic).rareGear))
-    run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, key: false, soldiers: [], hired: null, rescued: null }
+    run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, key: false, hero: null, rescued: null }
     passStop(run)
     settle(run)
     return
   }
-  const goal = stop === 'battle' ? here.goal : stop === 'ambush' ? 'ambush' : stop === 'recovery' ? 'recover' : 'exterminate'
-  const mission = missionAt(run, stop, stop === 'recovery' ? 'standard' : here.risk, goal)
+  const goal = stop === 'battle' ? here.goal : stop === 'ambush' ? 'ambush' : 'exterminate'
+  const mission = missionAt(run, stop, here.risk, goal)
   const rules = run.doctrines.map((id) => (DOCTRINES[id] as Doctrine).rule).filter((rule): rule is Rule => !!rule)
   run.mission = mission
   run.phase = 'battle'
   const doctrines = run.doctrines.map((id): Doctrine => DOCTRINES[id])
-  const reserve = run.soldiers.map((s): Reserve => ({
+  const s = run.hero
+  const reserve: Reserve = {
     soldier: s.id,
     stats: soldierStats(run, s),
     hp: health(run, s),
@@ -445,16 +424,13 @@ export function advance(run: Run): void {
     charges: charges(run, s),
     secondary: secondaryOf(s),
     weapon: doctrines.find((d) => d.fights)?.fights ?? s.gear?.weapon,
-    stance: doctrines.find((d) => d.stance)?.stance ?? (s.cls === 'support' && run.soldiers.length > 1 ? CLASSES.support.stance : weaponOf(s)?.stance) ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
-    effects: [...(run.carry === s.id ? ['carry' as const] : []), ...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...s.perks.flatMap((id) => PERKS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])].filter(
+    stance: doctrines.find((d) => d.stance)?.stance ?? weaponOf(s)?.stance ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
+    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...s.perks.flatMap((id) => PERKS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])].filter(
       // Zenith Chronometer works every ZENITH_EVERY battles; under Executioner's Oath a kill pays a hero nothing.
       (effect) => (effect !== 'zenith' || (run.log.length + 1) % ZENITH_EVERY === 0) && !(rules.includes('reckoning') && KILL_REWARDS.includes(effect)),
     ),
-  }))
-  const held = (r: Reserve) => run.captives.includes(r.soldier)
+  }
   const challenge = stop === 'battle' || stop === 'key' || stop === 'final' ? here.challenge : null
-  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), reserve.filter((r) => !held(r)), mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city } : undefined, challenge)
-  run.battle.duos.pairs = duoHeroes(run)
-  holdCaptives(run.battle, reserve.filter(held))
+  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), [reserve], mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city } : undefined, challenge)
 }
 

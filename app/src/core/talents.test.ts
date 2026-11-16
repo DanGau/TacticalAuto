@@ -112,7 +112,7 @@ test('kill talents: stuns beside, a cloak from afar, heals, move and a hymn’s 
   expect(far.hero.cloaked).toBeGreaterThan(0)
 })
 
-test('turn talents: armor for it and the most wounded ally, HP given away, aliens beside chilled, machines mended', () => {
+test('turn talents: armor for it and the most wounded of it and its allies, HP drained from the nearest alien, aliens beside chilled, machines mended', () => {
   const { battle, hero, aliens } = arena(['bedrock', 'rally', 'transfusion', 'coldSnap', 'mechanic'], [{ x: 11, y: 10 }])
   const mech = mechUnit(battle, hero, { ...MECH_STATS, hp: 10 }, [], { x: 10, y: 11 })
   mech.hp = 4
@@ -121,11 +121,13 @@ test('turn talents: armor for it and the most wounded ally, HP given away, alien
   talentTurn(battle, hero, [])
   expect(hero.armor).toBe(armor + TALENT.armor)
   expect(mech.armor).toBe(TALENT.armor)
-  expect(mech.hp).toBe(4 + TALENT.heal)
-  expect(hero.hp).toBe(hero.stats.hp - TALENT.heal)
+  expect(aliens[0].hp).toBe(40 - TALENT.zap)
   expect(aliens[0].chill).toBeGreaterThan(0)
+  hero.hp = 5
+  talentTurn(battle, hero, [])
+  expect(hero.hp).toBe(5 + TALENT.zap)
   talentTurn(battle, mech, [])
-  expect(mech.hp).toBe(Math.min(10, 4 + 2 * TALENT.heal))
+  expect(mech.hp).toBe(4 + TALENT.heal)
 })
 
 test('Mercy Shot crits a target at half HP or less; Ice Spear strikes a chilled target past its armor', () => {
@@ -181,7 +183,7 @@ test('the newer guards: from afar, standing still, against the burning, for mach
   const mech = mechUnit(battle, hero, { ...MECH_STATS }, [], { x: 10, y: 11 })
   battle.units.push(mech)
   expect(talentDamage(battle, aliens[0], mech, [], [])).toBe(-TALENT.soak)
-  expect(talentDamage(battle, aliens[0], hero, [], [])).toBe(0)
+  expect(talentDamage(battle, aliens[0], hero, [], [])).toBe(-TALENT.soak)
 })
 
 test('Overdrive and War Song add damage: an engineer’s machines, and anyone near the singer', () => {
@@ -231,7 +233,7 @@ test('newer kill talents: a chilled kill freezes those beside, a kill terrifies 
   expect([mech.hp, hive.hero.hp]).toEqual([2 + TALENT.heal, 1 + TALENT.heal])
 })
 
-test('newer turn talents: zaps beside and within 2, heals by burning foes, an ally healed; Polar Vortex chills within 2', () => {
+test('newer turn talents: zaps beside and within 2, heals by burning foes, it and an ally healed; Polar Vortex chills within 2', () => {
   const { battle, hero, aliens } = arena(['tremor', 'staticField', 'emberHeart', 'wellspring'], [{ x: 11, y: 10 }, { x: 12, y: 10 }])
   const mate = mechUnit(battle, hero, { ...MECH_STATS, hp: 10 }, [], { x: 10, y: 11 })
   mate.hp = 4
@@ -240,7 +242,7 @@ test('newer turn talents: zaps beside and within 2, heals by burning foes, an al
   hero.hp = 1
   talentTurn(battle, hero, [])
   expect(aliens.map((a) => a.hp)).toEqual([40 - 2 * TALENT.zap, 40 - TALENT.zap])
-  expect(hero.hp).toBe(1 + TALENT.heal)
+  expect(hero.hp).toBe(1 + TALENT.heal + TALENT.mend)
   expect(mate.hp).toBe(4 + TALENT.mend)
   const vortex = arena(['polarVortex'], [{ x: 11, y: 10 }, { x: 12, y: 10 }])
   talentTurn(vortex.battle, vortex.hero, [])

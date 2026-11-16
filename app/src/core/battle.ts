@@ -14,8 +14,6 @@ import type { Twist } from './twists'
 import type { UtilityId } from './utilities'
 import type { Boon } from './boons'
 import type { ChallengeId } from './challenges'
-import type { DuoId } from './duos'
-import type { DuoState } from './duo-effects'
 import { type Bulk, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
 
 export type { Bulk }
@@ -111,7 +109,6 @@ export const AURA_REACH = 2
 export const BULWARK_SOAK = 1
 export const INSPIRE_DAMAGE = 1
 export const HEADSHOT_DAMAGE = 2
-export const REVIVE_REACH = 3
 export const REVIVE_HEALTH = 3
 export const BARRIER_ARMOR = 2
 export const SURGEON_HEAL = 3
@@ -187,8 +184,8 @@ export type GearEffect = 'bellows' | 'frostbite' | 'tracer' | 'incendiary' | 'pi
 export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'domino' | 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'zenith' | 'fracture' | 'eternal' | 'frostHeart' | 'ledger' | 'gravity' | 'ironclad' | 'split' | 'ram' | 'overflow' | 'adrenal' | 'hairTrigger' | 'stagger' | 'lodestone' | 'shell' | 'lockOn'
-/** Anything a unit's gear, skills, the squad's relics or duos or its weapon doctrine do. Combat applies them. */
-export type Effect = GearEffect | SkillEffect | PerkEffect | RelicEffect | DoctrineEffect | DuoId | Exam | 'carry' | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning' | 'quenched' | 'thawed' | 'unlocked' | 'glassEdge'
+/** Anything a unit's gear, skills, relics or weapon doctrine do. Combat applies them. */
+export type Effect = GearEffect | SkillEffect | PerkEffect | RelicEffect | DoctrineEffect | Exam | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning' | 'quenched' | 'thawed' | 'unlocked' | 'glassEdge'
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
@@ -395,7 +392,6 @@ export interface Battle {
   used: Effect[]
   /** Aliens the squad has killed this battle, toward the oath's every-Nth. */
   kills: number
-  duos: DuoState
   /** What this battle tests; an ambush or a recovery has none. */
   challenge: ChallengeId | null
   /** The round reinforcements start coming, one clump a round, if the aliens posted are not all down; null when they come on a flood's beat. */
@@ -436,7 +432,7 @@ export interface Battle {
   uplink: Tile | null
   /** On a hold, once it is held, the extraction zone; null otherwise. */
   extract: Tile | null
-  /** Soldiers lifted off from the extraction zone, by soldier id, and the health each left with; 0 if carried. */
+  /** Soldiers lifted off from the extraction zone, by soldier id, and the health each left with. */
   escaped: number[]
   lifted: Record<number, number>
   /** On a raid, the supply caches still on the map, and how many the squad has grabbed. */
@@ -444,19 +440,8 @@ export interface Battle {
   grabbed: number
   /** Soldiers not yet landed. */
   reserve: Reserve[]
-  /** Soldiers down on the field: lying where they fell, or carried by the unit `carrier`. */
-  downed: Downed[]
-  /** On a recovery, the soldiers the aliens hold, each lying in `downed` until a squadmate reaches it. */
-  captives: Reserve[]
-}
-
-interface Downed {
-  soldier: number
-  x: number
-  y: number
-  carrier: number | null
-  /** The hero as it fell, for a power to raise; none for a captive. */
-  unit?: Unit
+  /** Soldiers down on the field, where they fell. */
+  downed: { soldier: number; x: number; y: number }[]
 }
 
 /** Primary attacks a soldier makes each turn; an alien makes one. */

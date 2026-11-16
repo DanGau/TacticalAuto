@@ -212,17 +212,8 @@ const ultimates = {
     },
   },
   resurrection: {
-    when: (battle) => battle.downed.some((d) => d.unit && d.carrier === null) || soldiers(battle).some((u) => u.hp <= u.stats.hp / 3),
+    when: (battle) => soldiers(battle).some((u) => u.hp <= u.stats.hp / 3),
     go(battle, unit, events) {
-      const fallen = battle.downed.filter((d) => d.unit && d.carrier === null)
-      battle.downed = battle.downed.filter((d) => !fallen.includes(d))
-      const tiles = freeTilesNear(battle, unit, fallen.length)
-      fallen.forEach((d, i) => {
-        const risen = d.unit!
-        Object.assign(risen, { ...(tiles[i] ?? { x: d.x, y: d.y }), hp: risen.stats.hp, armor: risen.stats.armor, burn: 0, chill: 0, panicked: false })
-        battle.units.push(risen)
-        events.push({ type: 'freed', id: unit.id, unit: { id: risen.id, x: risen.x, y: risen.y } })
-      })
       for (const mate of soldiers(battle).filter((u) => u.hp < u.stats.hp)) {
         const amount = mate.stats.hp - mate.hp
         mate.hp += amount

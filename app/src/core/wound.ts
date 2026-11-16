@@ -1,6 +1,6 @@
 // Damage landing on a unit, what it sets off, and the tally it adds to.
 import { alienSrc, fx, srcOf } from './sources'
-import { GUARD_MAX, SHELL_MAX, REVIVE_REACH, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_STACKS, BLAST_RADIUS, type Battle, type Effect, type Unit, type Tile } from './battle'
+import { GUARD_MAX, SHELL_MAX, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_STACKS, BLAST_RADIUS, type Battle, type Effect, type Unit, type Tile } from './battle'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent, ShotEvent } from './combat-event'
@@ -70,11 +70,11 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
       events.push(fx(other.id, wildfire ? 'wildfire' : 'backdraft', 0))
     }
   }
-  // A soldier who would fall may be got back up: by a squadmate's revive, or once by the squad's phoenix protocol.
-  const reviver = battle.units.find((u) => u.side === target.side && u !== target && u.hp > 0 && distance(u, target) <= REVIVE_REACH && has(u, 'revive') && !u.spent.includes('revive'))
-  const rises = reviver ? 'revive' : has(target, 'phoenix') && !battle.used.includes('phoenix') ? 'phoenix' : null
+  // A hero who would fall may get back up: once by its own revive, or once by the phoenix protocol.
+  const revives = has(target, 'revive') && !target.spent.includes('revive')
+  const rises = revives ? 'revive' : has(target, 'phoenix') && !battle.used.includes('phoenix') ? 'phoenix' : null
   if (rises) {
-    if (reviver) reviver.spent.push('revive')
+    if (revives) target.spent.push('revive')
     else battle.used.push('phoenix')
     target.hp = rises === 'revive' ? REVIVE_HEALTH : PHOENIX_HEALTH
     events.push(fx(target.id, rises, target.hp))
@@ -92,11 +92,8 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
     return
   }
   battle.units = battle.units.filter((u) => u !== target)
-  // A soldier falls where it stands, dropping whoever it carried.
-  if (isSoldier(target)) {
-    for (const body of battle.downed.filter((d) => d.carrier === target.id)) Object.assign(body, { x: target.x, y: target.y, carrier: null })
-    battle.downed.push({ soldier: target.soldier!, x: target.x, y: target.y, carrier: null, unit: target })
-  }
+  // A soldier falls where it stands.
+  if (isSoldier(target)) battle.downed.push({ soldier: target.soldier!, x: target.x, y: target.y })
   events.push({ type: 'death', id: target.id })
   died(battle, target, killer, events)
   if (target.civilian && killer?.kind === 'harvester') battle.husks.push({ x: target.x, y: target.y })

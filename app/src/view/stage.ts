@@ -102,11 +102,11 @@ export class Stage {
   readonly labels = new Set<Label>()
 
   readonly sprites = new Map<number, Sprite>()
-  /** The squad of the run shown, for each soldier's class, and whether it fights with blades. */
-  soldiers: Run['soldiers'] = []
-  /** Whether the party holds a rigged tank, so the deploy screen numbers the tanks. */
+  /** The hero of the run shown, whose skills and weapon name the effects at work. */
+  hero: Run['hero'] | null = null
+  /** Whether the hero holds a rigged tank, so the deploy screen numbers the tanks. */
   rigging = false
-  /** A red glow under each alien the squad hasn't found, by unit id. */
+  /** A red glow under each alien the hero hasn't found, by unit id. */
   readonly glows = new Map<number, { node: Object3D; tile: Tile }>()
   /** Each prop, wall and window on the board, with the tiles that light it: it is lit when a soldier sees any of them. */
   readonly scenery: { node: Object3D; tiles: number[] }[] = []
@@ -167,9 +167,9 @@ export class Stage {
     })
   }
 
-  /** The skills and weapons the squad has, which name the effects shown at work. */
+  /** The skills and weapon the hero has, which name the effects shown at work. */
   kit() {
-    return { skills: this.soldiers.flatMap((s) => s.skills), weapons: this.soldiers.flatMap((s) => s.gear?.weapon ?? []) }
+    return { skills: this.hero?.skills ?? [], weapons: this.hero?.gear ? [this.hero.gear.weapon] : [] }
   }
 
   /** Where a tile falls in the camera's picture. */

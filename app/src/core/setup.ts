@@ -9,19 +9,8 @@ import { flowOf, type Goal, VIP_HP, CIVILIANS, CIVILIAN_HP } from './goals'
 import { generateTerrain } from './terrain-gen'
 import type { Twist } from './twists'
 import { deploy, planEntry } from './landing'
-import { noDuos } from './duo-effects'
 import { ARENA_REACH, designEncounter } from './encounter'
 import { deadlineFor, sentries, type ChallengeId } from './challenges'
-
-/** Lays each soldier the aliens hold on a recovery beside an alien, in turn. */
-export function holdCaptives(battle: Battle, captives: Reserve[]): void {
-  battle.captives = captives
-  const guards = battle.units.filter((u) => u.side === 'alien')
-  captives.forEach((captive, i) => {
-    const [tile] = freeTilesNear(battle, guards[i % guards.length], 12).filter((t) => !battle.downed.some((d) => d.x === t.x && d.y === t.y))
-    battle.downed.push({ soldier: captive.soldier, ...tile, carrier: null })
-  })
-}
 
 /** Fills every open tile outside the walkable area holding `keep`, or else the largest, with stacks, so any open tile can reach any other. */
 export function sealPockets(battle: Battle, keep?: Tile): void {
@@ -141,7 +130,6 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     ...terrain,
     bulk: terrain.props.map((prop) => PROP_BULK[prop]),
     used: [],
-    duos: noDuos(),
     challenge,
     deadline: challenge === 'scattered' ? 0 : null,
     utility: null,
@@ -173,7 +161,6 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     opening: false,
     reserve,
     downed: [],
-    captives: [],
   }
   sealPockets(battle)
   const flood = battle.flow === 'flood'

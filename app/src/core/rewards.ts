@@ -7,19 +7,20 @@ import { drawRelic, offerable, type RelicId } from './relics'
 import { type Run } from './run-state'
 import { type Shop } from './run-state'
 import { type Soldier } from './run-state'
-import { minorOffers, owesPick, skillOffers, squadMakes, squadReads } from './squad'
+import { makes, minorOffers, owesPick, reads, skillOffers } from './hero'
+import { WEAPONS, type WeaponId } from './weapons'
 
-/** Learns the offered skill at `index`. */
-export function takeSkill(run: Run, soldier: Soldier, index: number): void {
-  const offers = skillOffers(soldier)
-  soldier.lost.push(...offers.filter((_, i) => i !== index))
-  soldier.skills.push(offers[index])
+/** The hero learns the offered skill at `index`. */
+export function takeSkill(run: Run, index: number): void {
+  const offers = skillOffers(run.hero)
+  run.hero.lost.push(...offers.filter((_, i) => i !== index))
+  run.hero.skills.push(offers[index])
   settle(run)
 }
 
-/** Takes the offered perk at `index`; those passed over stay in the pool. */
-export function takePerk(run: Run, soldier: Soldier, index: number): void {
-  soldier.perks.push(minorOffers(soldier)[index])
+/** The hero takes the offered perk at `index`; those passed over stay in the pool. */
+export function takePerk(run: Run, index: number): void {
+  run.hero.perks.push(minorOffers(run.hero)[index])
   settle(run)
 }
 
@@ -28,9 +29,9 @@ export function wear(soldier: Soldier, gear: Gear): void {
   soldier.gear = gear
 }
 
-/** Equips the find at `index` on `soldier`. */
-export function equipFind(run: Run, index: number, soldier: Soldier): void {
-  wear(soldier, run.finds.splice(index, 1)[0])
+/** Equips the find at `index` on the hero. */
+export function equipFind(run: Run, index: number): void {
+  wear(run.hero, run.finds.splice(index, 1)[0])
   settle(run)
 }
 
@@ -42,55 +43,60 @@ export const SHOP_WARES = 4
 
 export const SHOP_RELICS = 4
 
-/** What drilling a hero as the squad's Carry costs. */
-export const DRILL_PRICE = 5
-
 /** Chance a piece of shop gear is epic rather than rare. */
 export const SHOP_EPIC = 0.3
 
-/** Stocks a shop: gear, each piece with an effect no other piece there has; relics the squad lacks; and a medkit. */
+/** Pieces of a shop's gear that are a weapon other than the hero's, each a different one, so a build can change hands. */
+export const SHOP_OTHER_WEAPONS = 2
+
+/**
+ * Stocks a shop: gear, each piece with an effect no other piece there has, most of it the hero's weapon and some
+ * other weapons; relics the hero lacks; and a medkit.
+ */
 export function stockShop(run: Run): Shop {
   const wares: Gear[] = []
-  const first = randomInt(run, run.soldiers.length)
+  const others = (Object.keys(WEAPONS) as WeaponId[]).filter((id) => id !== run.hero.gear?.weapon)
   for (let tries = 0; wares.length < SHOP_WARES && tries < 50; tries++) {
-    const gear = gearFor(run, run.soldiers[(first + wares.length) % run.soldiers.length], random(run) < SHOP_EPIC ? 'epic' : 'rare')
+    const other = wares.length >= SHOP_WARES - SHOP_OTHER_WEAPONS && others.length > 0
+    const weapon = other ? others.splice(randomInt(run, others.length), 1)[0] : run.hero.gear?.weapon
+    const gear = gearFor(run, random(run) < SHOP_EPIC ? 'epic' : 'rare', weapon)
     if (wares.some((w) => w.effect === gear.effect)) continue
     run.nextGear++
     wares.push(gear)
   }
   const relics = offerable(run.relics)
   const stocked: RelicId[] = []
-  while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(drawRelic(run, relics, squadMakes(run), squadReads(run)))
+  while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(drawRelic(run, relics, makes(run), reads(run)))
   const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
   const utilities = Array.from({ length: Math.min(SHOP_UTILITIES, kinds.length) }, () => ({ id: drawUtility(run, kinds), sold: false }))
-  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, medkit: false, drill: run.carry === null ? { sold: null } : null }
+  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, medkit: false }
 }
 
-/** A new piece of `hero`'s weapon, made for them. */
-const gearFor = (run: Run, hero: Soldier, rarity: Rarity): Gear => ({ ...generateGear(run, run.nextGear, rarity, hero.gear?.weapon, squadMakes(run), squadReads(run)), owner: hero.id })
+/** A new piece of gear for the hero: `weapon`, or its own. */
+const gearFor = (run: Run, rarity: Rarity, weapon = run.hero.gear?.weapon): Gear => generateGear(run, run.nextGear, rarity, weapon, makes(run), reads(run))
 
-/** Buys the ware at `index` for `soldier`, its owner, to wear. The caller checks it is affordable. */
-export function buyWare(run: Run, index: number, soldier: Soldier): void {
+/** Buys the ware at `index` for the hero to wield. The caller checks it is affordable. */
+export function buyWare(run: Run, index: number): void {
   const ware = run.shop!.wares[index]
   ware.sold = true
   const { gear } = ware
   run.supplies -= GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE]
-  wear(soldier, gear)
+  wear(run.hero, gear)
 }
 
-/** The party gains a utility; with no room, the player must choose what to drop. */
+/** The hero gains a utility; with no room, the player must choose what to drop. */
 export function gainUtility(run: Run, id: UtilityId): void {
   if (run.utilities.length < UTILITY_SLOTS) run.utilities.push(id)
   else run.spare = id
 }
 
-/** The squad gains a relic: `seen` if the player chose it from a card, else the player is told. */
+/** The hero gains a relic: `seen` if the player chose it from a card, else the player is told. */
 export function gainRelic(run: Run, id: RelicId, seen = false): void {
   run.relics = [...run.relics, id]
   if (!seen) run.gains.push({ kind: 'relic', id })
 }
 
-/** The squad loses the relic at `index`, and the player is told which. */
+/** The hero loses the relic at `index`, and the player is told which. */
 export function loseRelic(run: Run, index: number): RelicId {
   const id = run.relics[index]
   run.relics = run.relics.filter((_, i) => i !== index)
@@ -106,7 +112,7 @@ export function drawUtility(rng: { rng: number }, pool: UtilityId[]): UtilityId 
   return pool.splice(i, 1)[0]
 }
 
-/** At the run's start, the commons the party picks its first utilities from: drawn from the seed apart from the run's own stream, so they shift no later draw. */
+/** At the run's start, the commons the hero picks its first utilities from: drawn from the seed apart from the run's own stream, so they shift no later draw. */
 export function offerStart(run: Run): void {
   const commons = UTILITY_IDS.filter((id) => UTILITIES[id].rarity === 'common')
   const rng = { rng: ~run.seed }
@@ -120,7 +126,7 @@ export function takeStart(run: Run, picks: number[]): void {
   settle(run)
 }
 
-/** A utility the party lacks, found at a stop; none if it holds them all. With no room the choice of what to drop tells of it; else the player is told. */
+/** A utility the hero lacks, found at a stop; none if it holds them all. With no room the choice of what to drop tells of it; else the player is told. */
 export function findUtility(run: Run): UtilityId | null {
   const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
   if (kinds.length === 0) return null
@@ -158,7 +164,7 @@ export function sellFind(run: Run, index: number): void {
 
 /** Ends the reward phase once no choice is left: no starting utilities, relic, find, spare utility, skill or perk. */
 export function settle(run: Run): void {
-  const owed = run.boonOffers.length > 0 || run.relicOffers.length > 0 || run.duoOffer !== null || run.finds.length > 0 || run.spare !== null || run.soldiers.some(owesPick)
+  const owed = run.boonOffers.length > 0 || run.relicOffers.length > 0 || run.finds.length > 0 || run.spare !== null || owesPick(run.hero)
   run.phase = owed ? 'reward' : 'overworld'
 }
 
@@ -172,28 +178,16 @@ export function rollRarity(run: Run, lucky: boolean): Rarity {
   return roll < RARITY_CHANCE.common ? 'common' : roll < RARITY_CHANCE.common + RARITY_CHANCE.rare ? 'rare' : 'epic'
 }
 
-/** A piece of gear found, for the player to put on a soldier or sell; none with every hero held. */
+/** A piece of the hero's weapon found, for the player to put on the hero or sell. */
 export function dropGear(run: Run, lucky: boolean): void {
-  const heroes = run.soldiers.filter((s) => !run.captives.includes(s.id))
-  if (heroes.length === 0) return
-  run.finds.push(gearFor(run, heroes[randomInt(run, heroes.length)], rollRarity(run, lucky)))
+  run.finds.push(gearFor(run, rollRarity(run, lucky)))
   run.nextGear++
 }
 
 /** Takes an offered relic. */
 export function takeRelic(run: Run, id: RelicId): void {
   gainRelic(run, id, true)
-  run.passed.relics.push(...run.relicOffers.filter((other) => other !== id))
+  run.passed.push(...run.relicOffers.filter((other) => other !== id))
   run.relicOffers = []
-  run.duoOffer = null
-  settle(run)
-}
-
-/** Takes the offered duo in place of a relic. */
-export function takeDuo(run: Run): void {
-  run.duos = [...run.duos, run.duoOffer!]
-  run.passed.relics.push(...run.relicOffers)
-  run.relicOffers = []
-  run.duoOffer = null
   settle(run)
 }

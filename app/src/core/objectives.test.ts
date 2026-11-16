@@ -12,7 +12,7 @@ test('every order is at most four words, every threat at most eight', () => {
     for (const challenge of [null, ...(Object.keys(CHALLENGES) as ChallengeId[])])
       for (const place of places)
         for (const kind of ['battle', 'key', 'final'] as const) {
-          const order = objective(kind, goal, challenge, place, 'Nova')
+          const order = objective(kind, goal, challenge, place)
           expect(order).toBeTruthy()
           expect(words(order)).toBeLessThanOrEqual(4)
         }

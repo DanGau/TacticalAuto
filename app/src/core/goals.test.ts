@@ -23,7 +23,7 @@ import { START_SUPPLIES } from './run'
 import { type Run } from './run-state'
 import { endBattle } from './debrief'
 import { RISKS } from './missions'
-import { XP } from './squad'
+import { XP } from './hero'
 import { LOSS_THREAT } from './progress'
 import { STOP_THREAT } from './progress'
 import { THREAT_MAX } from './progress'
@@ -31,7 +31,7 @@ import { THREAT_MAX } from './progress'
 /** A run about to fight a battle of `goal`, with six aliens. */
 function before(goal: Goal): Run {
   const run = begun(1)
-  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
+  run.hero.skills = [powerOf(run.hero.cls!)]
   apply(run, { type: 'go', index: 1 })
   road(run, [{ kind: 'battle', risk: 'standard', goal, terrain: 'town', challenge: null, twist: null, aliens: Array.from({ length: 6 }, () => 'trooper' as const) }])
   apply(run, { type: 'advance' })
@@ -64,7 +64,6 @@ test('a hold sets its uplink within, its landing by it; once held, it is won onl
   expect(battle.winner).toBe('human')
   expect(battle.escaped).toHaveLength(soldiers.length)
   endBattle(run)
-  expect(run.report!.soldiers.every((s) => !s.taken)).toBe(true)
   expect(run.relicOffers).toHaveLength(3)
   expect(run.finds).toEqual([])
 })
@@ -124,7 +123,7 @@ test('a rescue pays supplies and experience for each civilian saved or alive; a 
   rescue.battle!.winner = 'human'
   endBattle(rescue)
   expect(rescue.report!.rescued).toBe(alive)
-  expect(rescue.report!.soldiers[0].earned).toContainEqual({ label: `${alive} civilians saved`, xp: alive * XP.civilian })
+  expect(rescue.report!.hero!.earned).toContainEqual({ label: `${alive} civilians saved`, xp: alive * XP.civilian })
   expect(rescue.supplies).toBe(supplies + RISKS.standard.supplies + alive * CIVILIAN_SUPPLIES)
 
   const raid = before('raid')

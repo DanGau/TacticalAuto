@@ -54,9 +54,8 @@ export function drawMarks(s: Stage, battle: Battle): void {
   if (battle.phase === 'deploy' && s.rigging && !s.briefing) fuelTanks(battle).forEach((tank, i) => marks.push(label(`🛢️ ${i + 1}`, tank, COLOR.crit, 24)))
   const vip = battle.vip === 'held' && battle.units.find((u) => u.civilian === 'vip')
   if (vip) marks.push(label('⭐ VIP', vip, COLOR.vip, 28))
-  // Soldiers down where they fell; a recovery's captives are held.
-  for (const body of battle.downed.filter((d) => d.carrier === null)) marks.push(label(battle.captives.some((c) => c.soldier === body.soldier) ? '⛓ HELD' : '✚ DOWNED', body, COLOR.contact, 22))
-  // Aliens caught off guard say so over their heads until they recover, while the squad sees them.
+  for (const body of battle.downed) marks.push(label('✚ DOWN', body, COLOR.contact, 22))
+  // Aliens caught off guard say so over their heads until they recover, while the hero sees them.
   for (const u of battle.units) {
     if (u.surprised && s.sprites.has(u.id) && (!s.seen || s.seen[u.y * GRID + u.x])) marks.push(label('❗ SURPRISED', u, COLOR.crit, 16))
   }

@@ -19,8 +19,6 @@ export interface Gear {
   /** Added to the stats of the hero who wields it. */
   stats: Partial<Stats>
   effect: GearEffect | null
-  /** The hero a find or ware is made for: only they may equip it. */
-  owner?: number
 }
 
 /** A stat mod and the word it adds to a name. Some trade one stat for another. */

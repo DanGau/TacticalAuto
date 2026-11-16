@@ -1,6 +1,7 @@
 // Unknown stops' events: their choices and what each does.
 import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type DoctrineId } from './doctrines'
+import { powerOf } from './skills'
 import { offerable } from './relics'
 import { random, randomInt } from './rng'
 import { advance, current, legOf, nextStop, passStop } from './run'
@@ -9,15 +10,14 @@ import { drawBattle } from './missions'
 import { dropGear, gainRelic, loseRelic } from './rewards'
 import { settle } from './rewards'
 import { stockShop } from './rewards'
-import { hire, MAX_SQUAD } from './squad'
-import { mend } from './squad'
-import { level } from './squad'
-import { xpFor } from './squad'
+import { mend } from './hero'
+import { level } from './hero'
+import { xpFor } from './hero'
 import { STOP_THREAT } from './progress'
 import { THREAT_MAX } from './progress'
 import { LEG_STOPS } from './progress'
 
-/** One way to meet an event: the squad's quip, what it does, whether the squad can, and doing it. */
+/** One way to meet an event: the hero's quip, what it does, whether the hero can, and doing it. */
 interface Option {
   quip: string
   text: string
@@ -34,99 +34,45 @@ export interface Encounter {
 
 /** What a shop's relic costs. */
 export const RELIC_PRICE = 8
-/** What a shop's medkit costs, and the health it heals every hero: less than a safehouse's full rest. */
+/** What a shop's medkit costs, and the health it heals the hero: less than a safehouse's full rest. */
 export const MEDKIT = { price: 3, heal: 4 }
 /** How likely an unknown stop is to be a battle, and a shop; otherwise it is an event. */
 const UNKNOWN_CHANCE = { battle: 0.3, shop: 0.3 }
 
 const raise = (run: Run, threat: number) => (run.threat = Math.max(0, Math.min(run.threat + threat, THREAT_MAX)))
-/** Adopts a doctrine; a weapon doctrine sets aside the one the squad fought with. */
+/** Adopts a doctrine; a weapon doctrine sets aside the one the hero fought with. */
 const adopt = (run: Run, id: DoctrineId) => {
   if (DOCTRINES[id].weapon) run.doctrines = run.doctrines.filter((held) => !DOCTRINES[held].weapon)
   run.doctrines.push(id)
 }
 const gain = (supplies: number, quip: string): Option => ({ quip, text: `Salvage it: +${supplies} supplies`, take: (run) => (run.supplies += supplies) })
 const leave = (quip: string): Option => ({ quip, text: 'Move on', take: () => {} })
-/** Relics the squad may be offered. */
+/** Relics the hero may be offered. */
 const unheld = (run: Run) => offerable(run.relics)
 const pick = <T>(run: Run, options: T[]): T => options[randomInt(run, options.length)]
 /** Moves a hero `levels` up or down, never below level 1. */
-const train = (soldier: Run['soldiers'][number], levels: number) => (soldier.xp = xpFor(Math.max(1, level(soldier) + levels)))
+const train = (soldier: Run['hero'], levels: number) => (soldier.xp = xpFor(Math.max(1, level(soldier) + levels)))
 /** Whether `n` more stops lie between this one and the satellite. */
 const ahead = (run: Run, n = 1) => run.stop + n < LEG_STOPS
 
-/** Wounds every hero `amount`, never below 1 health. */
-const hurt = (run: Run, amount: number) => run.soldiers.forEach((s) => (s.wounds += amount))
+/** Wounds the hero `amount`, never below 1 health. */
+const hurt = (run: Run, amount: number) => (run.hero.wounds += amount)
 
 const encounters = {
-  vats: {
-    name: 'Cloning Vats',
-    text: `An abandoned cloning plant hums away, a sticky note on the console: SET TO 'ECONOMY' TO SAVE POWER. The vats can push out clones twice as fast. Nobody asks what economy skips.`,
-    options: [
-      {
-        quip: 'Crank it to eleven. What could a few skipped organs hurt?',
-        text: 'Mass Cloning: clones join until the party is full, and every hero has 2 less HP for the run',
-        can: (run) => run.soldiers.length < MAX_SQUAD,
-        take: (run) => {
-          hire(run)
-          hire(run)
-          adopt(run, 'massCloning')
-        },
-      },
-      gain(5, 'Strip the vats for parts before they make anything weird.'),
-    ],
-  },
-  survivor: {
-    name: 'The Last Survivor',
-    text: 'A grizzled veteran sits on a pile of alien helmets, chewing an unlit cigar. "Teams," they spit. "Teams are just people to get you killed. Pick your best. Send the rest home."',
-    options: [
-      {
-        quip: '"You. The one who still has eyebrows. You\'re with me."',
-        text: `Lone Wolf: only your highest-level hero stays. ${DOCTRINES.loneWolf.text}`,
-        take: (run) => {
-          const best = run.soldiers.reduce((top, s) => (level(s) > level(top) ? s : top))
-          run.soldiers = [best]
-          adopt(run, 'loneWolf')
-        },
-      },
-      leave("Thank them for their service and back away slowly."),
-    ],
-  },
-  instructor: {
-    name: 'Rogue Instructor',
-    text: 'A retired hero coach in mirrored shades blocks the road with a whiteboard. It reads SYNERGY, underlined four times. "Three heroes, three jobs. If two of you do the same thing, one of you is furniture."',
-    options: [
-      {
-        quip: 'Drop and give me twenty, each in a different discipline.',
-        text: 'Specialists: every hero retrains into a different class and gains a level, and no two heroes share a class while one is left unused; +2 threat',
-        take: (run) => {
-          const classes = Object.keys(CLASSES) as ClassId[]
-          const offset = randomInt(run, classes.length)
-          run.soldiers.forEach((s, i) => {
-            s.cls = classes[(offset + i) % classes.length]
-            s.xp = xpFor(level(s) + 1)
-          })
-          raise(run, 2)
-          adopt(run, 'specialists')
-        },
-      },
-      leave('"We are a team of generalists." The whiteboard weeps.'),
-    ],
-  },
   exosuits: {
     name: 'Power Armor Prototype',
     text: 'A crashed transport holds four suits of power armor, still in their packing foam. The manual has one page: DO NOT CROUCH. Underneath, in pen: seriously, the knees.',
-    options: [{ quip: 'Suit up. Walking is for people without a reactor on their back.', text: 'Power Armor: every hero has +3 armor and 1 less move', take: (run) => adopt(run, 'exosuits') }, gain(4, 'Sell the suits on the black market as very large toasters.')],
+    options: [{ quip: 'Suit up. Walking is for people without a reactor on their back.', text: `Power Armor: ${DOCTRINES.exosuits.text}`, take: (run) => adopt(run, 'exosuits') }, gain(4, 'Sell the suits on the black market as very large toasters.')],
   },
   bunker: {
     name: 'Bunker Plans',
-    text: 'A filing cabinet of bunker blueprints, stamped TOP SECRET and, below that, ALSO FILED ON THE PUBLIC WIKI. Whatever the party learns from them, the aliens will have read too.',
-    options: [{ quip: 'Sandbag everything. Sandbag the sandbags.', text: 'Iron Skin: every hit, on either side, does 1 less damage, down to 1', take: (run) => adopt(run, 'fortified') }, leave('Leave the cabinet for the aliens. Let them do the reading.')],
+    text: 'A filing cabinet of bunker blueprints, stamped TOP SECRET and, below that, ALSO FILED ON THE PUBLIC WIKI. Whatever the hero learns from them, the aliens will have read too.',
+    options: [{ quip: 'Sandbag everything. Sandbag the sandbags.', text: `Iron Skin: ${DOCTRINES.fortified.text}`, take: (run) => adopt(run, 'fortified') }, leave('Leave the cabinet for the aliens. Let them do the reading.')],
   },
   shotguns: {
     name: 'Smuggled Gauntlets',
     text: 'A crate rattles in the back of an abandoned pickup. The label says MEDICAL SUPPLIES. Inside: blast gauntlets, built to reach about as far as a lunchbox. One has "CLOSER" scratched across the knuckles.',
-    options: [{ quip: 'Range is a state of mind.', text: 'Brawlers: every hero has +2 damage and 2 less range', take: (run) => adopt(run, 'scatterguns') }, gain(4, 'Return them to the medical supply chain, for a fee.')],
+    options: [{ quip: 'Range is a state of mind.', text: `Brawlers: ${DOCTRINES.scatterguns.text}`, take: (run) => adopt(run, 'scatterguns') }, gain(4, 'Return them to the medical supply chain, for a fee.')],
   },
   armory: {
     name: 'Ancient Armory',
@@ -135,12 +81,12 @@ const encounters = {
   },
   awakening: {
     name: 'Psionic Awakening',
-    text: "An alien broadcast leaks into the party's radios, and now everyone can hear what everyone else is thinking. Mostly it is about lunch. With practice, it could be about killing things through walls.",
+    text: "An alien broadcast leaks into the hero's radio, and now it can hear what the aliens are thinking. Mostly it is about lunch. With practice, it could be about killing things through walls.",
     options: [{ quip: 'Think violent thoughts, together, in unison.', text: `Psi Operatives: ${DOCTRINES.psionics.text}`, take: (run) => adopt(run, 'psionics') }, leave('Switch the radios off and agree never to discuss what anyone heard.')],
   },
   quarry: {
     name: 'Demolition Crew',
-    text: 'A quarry crew in hard hats waves the party over, surrounded by crates marked EXPLOSIVE and FRAGILE and, on one, SORRY. "You lot stand behind walls a lot," says the foreman. "Have you tried not having walls?"',
+    text: 'A quarry crew in hard hats waves the hero over, surrounded by crates marked EXPLOSIVE and FRAGILE and, on one, SORRY. "You lot stand behind walls a lot," says the foreman. "Have you tried not having walls?"',
     options: [{ quip: 'Yes. Yes, we have not tried not having walls.', text: `Demolitions: ${DOCTRINES.demolitions.text}`, take: (run) => adopt(run, 'demolitions') }, gain(4, 'Buy the SORRY crate off them, then sell it to someone you dislike.')],
   },
   creed: {
@@ -158,7 +104,6 @@ const encounters = {
     text: 'A column of survivors blocks the road: grandparents, a goat, a teenager livestreaming. The aliens are not far behind, and the goat is very loud.',
     options: [
       { quip: 'Feed the goat. The goat has earned this.', text: 'Shelter them: -4 supplies, -2 threat', can: (run) => run.supplies >= 4, take: (run) => ((run.supplies -= 4), raise(run, -2)) },
-      { quip: '"Anyone with powers, step forward." The goat steps forward.', text: 'Recruit the fit: a new hero joins; +2 threat', can: (run) => run.soldiers.length < MAX_SQUAD, take: (run) => (hire(run), raise(run, 2)) },
       leave('Wave, smile, and take the other road very quickly.'),
     ],
   },
@@ -179,23 +124,6 @@ const encounters = {
       leave('Some ringtones are best left unanswered.'),
     ],
   },
-  market: {
-    name: 'Black Market',
-    text: `Behind a laundromat, a trader in a very nice suit runs a stall with no sign. "Clones, organs, alien sidearms, warranties void. I'll pay well for a trained one. I don't ask what happens to them, and neither should you."`,
-    options: [
-      {
-        quip: 'Everybody chip in for a new paint job. Somebody has to be the chip.',
-        text: 'Sell a hero: your lowest-level hero leaves; +10 supplies',
-        can: (run) => run.soldiers.length > 1,
-        take: (run) => {
-          const worst = run.soldiers.reduce((low, s) => (level(s) < level(low) ? s : low))
-          run.soldiers = run.soldiers.filter((s) => s !== worst)
-          run.supplies += 10
-        },
-      },
-      leave('"We don\'t sell our own." Out loud, anyway.'),
-    ],
-  },
   loanShark: {
     name: 'Loan Shark',
     text: 'A man in a tracksuit runs a lending business from the boot of a hatchback. Interest rates are written on a napkin. The napkin has been laminated.',
@@ -206,7 +134,7 @@ const encounters = {
   },
   salesman: {
     name: 'Door-to-Door Salesman',
-    text: 'A salesman steps out of a crater, brushing off ash, briefcase already open. "Have you got a minute to hear about heroic gear?" He has been following the party for three stops.',
+    text: 'A salesman steps out of a crater, brushing off ash, briefcase already open. "Have you got a minute to hear about heroic gear?" He has been following the hero for three stops.',
     options: [
       { quip: '"Fine. Fine! Just stop standing so close."', text: 'Buy: -2 supplies; a random piece of gear', can: (run) => run.supplies >= 2, take: (run) => ((run.supplies -= 2), dropGear(run, false)) },
       { quip: 'Slam the door. There is no door. Slam it anyway.', text: 'Refuse: +1 threat, as he yells about you across the valley', take: (run) => raise(run, 1) },
@@ -217,13 +145,14 @@ const encounters = {
     text: 'In a gutted shopping centre, a careers fair carries on, staffed by one very committed volunteer. "Ever thought about a change? The aliens certainly have."',
     options: [
       {
-        quip: 'Send someone in. Whoever loses at rock-paper-scissors.',
-        text: 'A random hero takes a random class, forgets its powers and gains a level',
+        quip: 'Fill in the form. Leave "previous experience" blank.',
+        text: 'Your hero takes a random other class, forgets its powers and gains a level',
         take: (run) => {
-          const soldier = pick(run, run.soldiers)
-          soldier.cls = pick(run, Object.keys(CLASSES) as ClassId[])
-          soldier.skills = []
-          train(soldier, 1)
+          const cls = pick(run, (Object.keys(CLASSES) as ClassId[]).filter((id) => id !== run.hero.cls))
+          run.hero.cls = cls
+          run.hero.skills = [powerOf(cls)]
+          run.hero.lost = []
+          train(run.hero, 1)
         },
       },
       leave('Take a free pen. Take all the free pens.'),
@@ -231,7 +160,7 @@ const encounters = {
   },
   collector: {
     name: 'The Collector',
-    text: 'An eccentric collector in a fur coat appraises the party through a monocle. "Your trinkets. I simply must. I have a little trade in mind, or cash, darling, cash."',
+    text: 'An eccentric collector in a fur coat appraises the hero through a monocle. "Your trinkets. I simply must. I have a little trade in mind, or cash, darling, cash."',
     options: [
       {
         quip: '"Surprise us." He claps, delighted, which is worrying.',
@@ -285,15 +214,13 @@ const encounters = {
   },
   reactor: {
     name: 'Leaking Reactor',
-    text: 'A power plant leaks a warm green glow. Heroes who stand in it come out sharper, faster and very faintly humming. Every alien for miles can see the glow too.',
+    text: 'A power plant leaks a warm green glow. Whoever stands in it comes out sharper, faster and very faintly humming. Every alien for miles can see the glow too.',
     options: [
       {
-        quip: 'Two volunteers. Bring sunscreen.',
-        text: 'Bathe: two random heroes gain a level; +2 threat',
+        quip: 'Bring sunscreen.',
+        text: 'Bathe: your hero gains a level; +2 threat',
         take: (run) => {
-          const first = pick(run, run.soldiers)
-          const second = pick(run, run.soldiers.filter((s) => s !== first))
-          for (const soldier of [first, second]) if (soldier) train(soldier, 1)
+          train(run.hero, 1)
           raise(run, 2)
         },
       },
@@ -305,10 +232,10 @@ const encounters = {
     text: 'A supply depot sits under a metre of something that is not water. The crates are fine. Whoever fetches them will come back older and wiser and smelling of regret.',
     options: [
       {
-        quip: '"Veterans first," says everyone else.',
-        text: 'Wade in: +6 supplies; your highest-level hero loses a level',
+        quip: 'Hold your nose. Hold everything.',
+        text: 'Wade in: +6 supplies; your hero loses a level',
         take: (run) => {
-          train(run.soldiers.reduce((top, s) => (level(s) > level(top) ? s : top)), -1)
+          train(run.hero, -1)
           run.supplies += 6
         },
       },
@@ -319,7 +246,7 @@ const encounters = {
     name: 'Blood Bank',
     text: 'A clinic pays in canned goods for blood, no questions asked, though the nurse does ask whether anyone is part alien. Nobody is sure.',
     options: [
-      { quip: 'Roll up your sleeves. Both of them.', text: 'Donate: every hero loses 4 HP; +6 supplies', take: (run) => (hurt(run, 4), (run.supplies += 6)) },
+      { quip: 'Roll up your sleeves. Both of them.', text: 'Donate: your hero loses 4 HP; +6 supplies', take: (run) => (hurt(run, 4), (run.supplies += 6)) },
       leave('Keep your blood on the inside, where it works best.'),
     ],
   },
@@ -327,14 +254,14 @@ const encounters = {
     name: 'Stim Lab',
     text: 'A pharmacist in a hazmat suit sells hero stims from a vending machine he has hot-wired. "Side effects include feeling great. Also, they glow. The aliens love the glow."',
     options: [
-      { quip: 'One each. Two for the Deadeye.', text: 'Buy: -3 supplies; every hero heals 6', can: (run) => run.supplies >= 3, take: (run) => ((run.supplies -= 3), mend(run, 6)) },
-      { quip: 'Take the whole machine.', text: 'Steal: every hero heals fully; +3 threat', take: (run) => (mend(run, Infinity), raise(run, 3)) },
+      { quip: 'One for now. One for later.', text: 'Buy: -3 supplies; your hero heals 6', can: (run) => run.supplies >= 3, take: (run) => ((run.supplies -= 3), mend(run, 6)) },
+      { quip: 'Take the whole machine.', text: 'Steal: your hero heals fully; +3 threat', take: (run) => (mend(run, Infinity), raise(run, 3)) },
       leave('Nothing that glows goes in anyone.'),
     ],
   },
   tunnel: {
     name: 'Smugglers\' Tunnel',
-    text: 'A tunnel runs under the next two stops, signposted EXIT and, in smaller letters, MOSTLY. It skips every fight there, and every prize. The aliens will notice the party has gone missing.',
+    text: 'A tunnel runs under the next two stops, signposted EXIT and, in smaller letters, MOSTLY. It skips every fight there, and every prize. The aliens will notice the hero has gone missing.',
     options: [
       {
         quip: 'Mind your heads. Mind your everything.',
@@ -361,7 +288,7 @@ function openShop(run: Run): void {
 }
 
 /**
- * Arrives at a shop or an unknown stop. An unknown one is revealed: a battle begins at once, or the squad enters a
+ * Arrives at a shop or an unknown stop. An unknown one is revealed: a battle begins at once, or the hero enters a
  * shop or meets an event not met before this run. Either adds threat as a stop does.
  */
 export function arrive(run: Run): void {

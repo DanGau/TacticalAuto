@@ -3,7 +3,6 @@ import { EXAMS, type Exam } from './exams'
 import type { Ability, Effect } from './battle'
 import { CLASSES } from './classes'
 import { DOCTRINES } from './doctrines'
-import { DUOS, type DuoId } from './duos'
 import { EFFECTS } from './gear'
 import { UTILITIES } from './utilities'
 import { RELICS } from './relics'
@@ -21,12 +20,10 @@ export function effectName(effect: Effect | Ability, squad: { skills: SkillId[];
   if (effect === 'overwatch') return 'Overwatch'
   if (effect === 'stun') return 'Stunned'
   if (effect === 'surge') return 'Temp HP'
-  if (effect === 'carry') return 'Carry'
   if (effect === 'frozen') return 'Frozen'
   if (effect === 'reckoning') return "Executioner's Oath"
   const cancel = cancelOf(effect)
   if (cancel) return cancel.name
-  if (effect in DUOS) return DUOS[effect as DuoId].name
   if (effect in EXAMS && effect !== 'thorns') return EXAMS[effect as Exam].name
   const ability = Object.values(CLASSES).find((cls) => cls.ability === effect)
   if (ability) return ability.abilityName

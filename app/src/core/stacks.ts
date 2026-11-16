@@ -14,9 +14,6 @@ import { BOOM_DAMAGE, wound } from './wound'
 export const burnFrom = (unit: Unit | null) => BURN_STACKS + (unit && has(unit, 'smolder') ? LINGER_STACKS : 0)
 export const chillFrom = (unit: Unit | null) => 1 + (unit && has(unit, 'permafrost') ? LINGER_STACKS : 0)
 
-/** Stacks a hit by `unit` adds: twice as many by the squad's Carry. */
-export const carried = (unit: Unit, stacks: number) => (has(unit, 'carry') ? 2 * stacks : stacks)
-
 /** Adds burn stacks to `target`, to at most BURN_MAX, unless it cannot burn or is numb. Chill on it cancels them; see meet. */
 export function kindle(battle: Battle, target: Unit, stacks: number, events: GameEvent[] = []): void {
   if (target.hp <= 0 || fireproof(battle, target) || target.numb > 0) return

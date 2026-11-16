@@ -1,4 +1,4 @@
-// A run's state: the squad, its route and stops, the mission under way and its report.
+// A run's state: the hero, its route and stops, the mission under way and its report.
 import type { AlienKind } from './aliens'
 import type { Twist } from './twists'
 import type { TerrainKind } from './terrain'
@@ -13,7 +13,6 @@ import type { PerkId } from './perks'
 import type { UtilityId } from './utilities'
 import type { ChallengeId } from './challenges'
 import type { RelicId } from './relics'
-import type { DuoId } from './duos'
 import type { Battle } from './battle'
 import type { DoctrineId } from './doctrines'
 import type { EventId } from './events'
@@ -23,7 +22,7 @@ export type Risk = 'safe' | 'standard' | 'dangerous'
 
 /**
  * A stop on the road. A battle must be fought. A supply drop gives supplies and a cache gives gear, with no fight.
- * A shop sells gear, relics and a medkit. A safehouse heals every hero fully, in place of a battle. An unknown stop is revealed on arrival as a battle, a shop or an event.
+ * A shop sells gear, relics and a medkit. A safehouse heals the hero fully, in place of a battle. An unknown stop is revealed on arrival as a battle, a shop or an event.
  * A key mission, at a satellite, wins an access key; the final mission strikes the alien source. Both have a boss.
  */
 export type StopKind = 'battle' | 'supply' | 'cache' | 'shop' | 'unknown' | 'safehouse' | 'key' | 'final'
@@ -49,15 +48,13 @@ export interface Stop {
 }
 
 /**
- * A stage of the journey across the globe: a leg crossing a continent from where the last ended to the city where an
- * elite hero waits to be extracted, or the last, from there to the alien hub.
+ * A stage of the journey across the globe: a leg crossing a continent from where the last ended to a city whose
+ * satellite holds an access key, or the last, from there to the alien hub.
  */
 export interface Stage {
   continent: ContinentId | null
   from: LonLat
   to: City
-  /** Who waits at the stage's end; none at the hub. */
-  hero: Soldier | null
 }
 
 /** A stop on a leg's map: its row, the stops in the next column it leads to, and the stop, null until its leg begins. */
@@ -72,7 +69,7 @@ export interface MapNode {
 
 /**
  * A leg of the road as a map: columns of stops, LEG_STOPS of them then the satellite, or the source alone on the
- * last. `path` is the index the squad took in each column entered, -1 for a column passed underground.
+ * last. `path` is the index the hero took in each column entered, -1 for a column passed underground.
  */
 export interface Leg {
   columns: MapNode[][]
@@ -80,12 +77,12 @@ export interface Leg {
 }
 
 /**
- * A battle to fight. An ambush comes when threat is full, and a recovery when the aliens hold soldiers, in place of
- * the next stop; losing either loses the run, as does losing the final mission. `force` is what the aliens can muster: a trooper costs one, and some kinds
+ * A battle to fight. An ambush comes when threat is full, in place of the next stop; losing it loses the run, as does
+ * losing a key or the final mission. `force` is what the aliens can muster: a trooper costs one, and some kinds
  * cost two or come in pairs.
  */
 export interface Mission {
-  kind: 'battle' | 'key' | 'final' | 'ambush' | 'recovery'
+  kind: 'battle' | 'key' | 'final' | 'ambush'
   goal: Goal
   risk: Risk
   force: number
@@ -103,8 +100,8 @@ export interface Soldier {
   feats: FeatId[]
   /** Its one item, the weapon it fights with. */
   gear: Gear | null
-  /** Where it comes from: a recruit's home, a hero's city; none for one who joined on the road. */
-  home: City | null
+  /** The city it waits in at the run's start, where the journey sets out. */
+  home: City
   /** Health lost and not yet healed; it carries from battle to battle. */
   wounds: number
   /** Draws the skills it is offered at each level. */
@@ -127,19 +124,16 @@ export interface Report {
   /** Whether an access key was won. */
   key: boolean
   /**
-   * Every soldier in the squad when a battle began, with the class each has after it; empty for an event. A taken
-   * soldier was left downed on the field, and the aliens hold it. `earned` is what its experience came from; `feats`,
-   * those first pulled off; `tally`, what it did in the battle.
+   * The hero after a battle; null for an event. `earned` is what its experience came from; `feats`, those first
+   * pulled off; `tally`, what it did in the battle.
    */
-  soldiers: { id: number; name: string; cls: ClassId | null; xpBefore: number; xpAfter: number; taken: boolean; earned: Earned[]; feats: FeatId[]; hp: number; maxHp: number; tally: Tally }[]
-  /** The name of the hero the stop added to the squad. */
-  hired: string | null
+  hero: { xpBefore: number; xpAfter: number; earned: Earned[]; feats: FeatId[]; hp: number; maxHp: number; tally: Tally } | null
   /** Civilians kept alive on a rescue; null on any other stop. */
   rescued: number | null
 }
 
-/** What the squad gained or lost without choosing it from a card the player could read; the player is told, one screen each. */
-export type Gain = { kind: 'relic'; id: RelicId } | { kind: 'relicLost'; id: RelicId } | { kind: 'boon'; id: UtilityId } | { kind: 'hero'; soldier: number }
+/** What the hero gained or lost without choosing it from a card the player could read; the player is told, one screen each. */
+export type Gain = { kind: 'relic'; id: RelicId } | { kind: 'relicLost'; id: RelicId } | { kind: 'boon'; id: UtilityId }
 
 /** A battle as the run remembers it, for the post-game summary. */
 export interface Fought {
@@ -147,7 +141,7 @@ export interface Fought {
   goal: Goal
   won: boolean
   rounds: number
-  soldiers: { name: string; cls: ClassId | null; tally: Tally }[]
+  tally: Tally
 }
 
 /** Experience from one source. */
@@ -162,8 +156,6 @@ export interface Shop {
   relics: { id: RelicId; sold: boolean }[]
   utilities: { id: UtilityId; sold: boolean }[]
   medkit: boolean
-  /** Drilling a hero of the player's choice as the squad's Carry, on offer while the squad has none. */
-  drill: { sold: number | null } | null
 }
 
 export interface Run {
@@ -173,17 +165,17 @@ export interface Run {
   keys: number
   /** Every leg's map, its shape drawn when the run begins; the one at `keys` is under way. */
   legs: Leg[]
-  /** Columns passed on the leg under way. The squad chooses where to go when it has entered no column beyond them. */
+  /** Columns passed on the leg under way. The hero chooses where to go when it has entered no column beyond them. */
   stop: number
   threat: number
   /**
    * In the overworld the player chooses where to go or travels on; in the reward phase, makes the choices a stop left;
    * in a shop, buys; at an event, chooses how to meet it.
    */
-  phase: 'recruit' | 'overworld' | 'battle' | 'reward' | 'shop' | 'event' | 'won' | 'lost'
-  /** What the shop the squad is in sells; null outside a shop. */
+  phase: 'select' | 'overworld' | 'battle' | 'reward' | 'shop' | 'event' | 'won' | 'lost'
+  /** What the shop the hero is in sells; null outside a shop. */
   shop: Shop | null
-  /** The event the squad is meeting; null outside one. */
+  /** The event the hero is meeting; null outside one. */
   event: EventId | null
   /** Events met this run, which are not met again. */
   met: EventId[]
@@ -195,10 +187,9 @@ export interface Run {
   battle: Battle | null
   /** Null until the first stop is done. */
   report: Report | null
-  soldiers: Soldier[]
-  nextSoldier: number
+  hero: Soldier
   supplies: number
-  /** Gear found and not yet put on a soldier the player picks, or sold. */
+  /** Gear found and not yet put on the hero or sold. */
   finds: Gear[]
   nextGear: number
   /** Changed only through gainRelic and loseRelic, so the player hears of it. */
@@ -207,9 +198,9 @@ export interface Run {
   log: Fought[]
   /** What the player has yet to be told of. */
   gains: Gain[]
-  /** Utilities the party holds, at most UTILITY_SLOTS. One is picked for each fight, and it is never used up. */
+  /** Utilities the hero holds, at most UTILITY_SLOTS. One is picked for each fight, and it is never used up. */
   utilities: UtilityId[]
-  /** Boon Reservoir's charges, and fights won in a row with no hero down, for Unbroken Line. */
+  /** Boon Reservoir's charges, and fights won in a row, for Unbroken Line. */
   boons: number
   streak: number
   /** At the run's start, the commons to pick its first utilities from. */
@@ -218,20 +209,12 @@ export interface Run {
   spare: UtilityId | null
   /** Relics to choose from in the reward phase. */
   relicOffers: RelicId[]
-  /** Relics and recruit classes offered and turned down, not offered again until every other is spent. */
-  passed: { relics: RelicId[]; classes: ClassId[] }
-  /** Duos taken, kept for the run. */
-  duos: DuoId[]
-  /** A duo offered beside the relics, taken in place of one. */
-  duoOffer: DuoId | null
-  /** At the run's start, the recruits to choose the first soldier from. */
-  recruits: Soldier[]
-  /** The journey across the globe, a stage for each leg; set once the first soldier is chosen, from its home. */
+  /** Relics offered and turned down, not offered again until every other is spent. */
+  passed: RelicId[]
+  /** At the run's start, the heroes to choose the run's one from. */
+  candidates: Soldier[]
+  /** The journey across the globe, a stage for each leg; set once the hero is chosen, from its home. */
   route: Stage[]
-  /** Each leg's Guardian's exam, by keys won; known from the start so the squad can build to pass it. */
+  /** Each leg's Guardian's exam, by keys won; known from the start so the hero can build to pass it. */
   bosses: Exam[]
-  /** The squad's Carry, by id: its hits add twice the stacks. Drilled once a run, at a shop. */
-  carry: number | null
-  /** Soldiers the aliens hold, by id: left downed on a field. The next stop is a recovery until they are back. */
-  captives: number[]
 }

@@ -124,18 +124,13 @@ export function immune(battle: Battle, unit: Unit, to: 'panic' | 'acid' | 'blast
   return has(unit, 'steadfast') || (to !== 'blast' && (has(unit, 'ward') || inAura(battle, unit, 'ward')))
 }
 
-/** Whether a squadmate of `unit` with the aura `effect` stands within its reach. */
+/** Whether `unit`, or an ally within reach, has the aura `effect`. */
 export function inAura(battle: Battle, unit: Unit, effect: Effect): boolean {
-  return battle.units.some((u) => u.side === unit.side && u !== unit && has(u, effect) && distance(u, unit) <= AURA_REACH)
+  return battle.units.some((u) => u.side === unit.side && has(u, effect) && distance(u, unit) <= AURA_REACH)
 }
 
 /** A VIP rescue's VIP, while on the field. */
 export const vipOf = (battle: Battle) => battle.units.find((u) => u.civilian === 'vip')
-
-/** Soldiers down and not carried. */
-export const lying = (battle: Battle) => battle.downed.filter((d) => d.carrier === null)
-
-export const carrying = (battle: Battle, unit: Unit) => battle.downed.some((d) => d.carrier === unit.id)
 
 /** On a hold, how far from the uplink a soldier may stand and still defend it; Relay Booster widens it. */
 export const UPLINK_REACH = 3

@@ -1,4 +1,4 @@
-// Test helpers that lay a leg's stops and send the squad in.
+// Test helpers that lay a leg's stops and send the hero in.
 import { apply, type Result } from './apply'
 import { createRun, legOf } from './run'
 import { type Run } from './run-state'
@@ -12,7 +12,7 @@ export function road(run: Run, stops: Stop[]): void {
   leg.path = [...leg.path.slice(0, run.stop), 0]
 }
 
-/** For tests: puts the squad at its leg's satellite, its leg's stops drawn or not. */
+/** For tests: puts the hero at its leg's satellite, its leg's stops drawn or not. */
 export function atKey(run: Run): void {
   const leg = legOf(run)
   leg.columns.at(-1)![0].stop ??= { kind: 'key', risk: 'standard', goal: 'exterminate', terrain: 'compound', challenge: null, twist: null, aliens: [] }
@@ -25,13 +25,13 @@ export function enterAt(run: Run): Result {
   return apply(run, { type: 'enter' })
 }
 
-/** For tests: a run of `seed` under way, its first soldier the first recruit, a Deadeye with a plain rifle, holding no boons. */
+/** For tests: a run of `seed` under way, its hero the first candidate, a Deadeye with a plain rifle, holding no boons. */
 export function begun(seed: number): Run {
   const run = createRun(seed)
-  run.recruits[0].cls = 'sniper'
-  run.recruits[0].skills = [powerOf('sniper')]
-  run.recruits[0].gear = { id: 0, rarity: 'common', name: 'Rifle', weapon: 'rifle', stats: {}, effect: null }
-  apply(run, { type: 'recruit', index: 0 })
+  run.candidates[0].cls = 'sniper'
+  run.candidates[0].skills = [powerOf('sniper')]
+  run.candidates[0].gear = { id: 0, rarity: 'common', name: 'Rifle', weapon: 'rifle', stats: {}, effect: null }
+  apply(run, { type: 'hero', index: 0 })
   apply(run, { type: 'boons', picks: [0, 1] })
   run.utilities = []
   return run

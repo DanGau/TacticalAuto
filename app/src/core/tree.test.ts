@@ -1,12 +1,12 @@
 import { expect, test } from 'vitest'
 import { CLASSES, type ClassId } from './classes'
 import { begun } from './roads'
-import { PICK_LEVELS, skillOffers, xpFor } from './squad'
+import { PICK_LEVELS, skillOffers, xpFor } from './hero'
 import { SKILL_EFFECTS, ULTIMATE_EFFECTS } from './skill-effects'
 import { capstones, pathOf, powerOf, SKILLS, TREES, treeOf, type SkillId } from './skills'
 
 const classes = Object.keys(CLASSES) as ClassId[]
-const veteran = (cls: ClassId, skills: SkillId[]) => ({ ...begun(1).soldiers[0], cls, skills, lost: [] as SkillId[], xp: xpFor(PICK_LEVELS.at(-1)!) })
+const veteran = (cls: ClassId, skills: SkillId[]) => ({ ...begun(1).hero, cls, skills, lost: [] as SkillId[], xp: xpFor(PICK_LEVELS.at(-1)!) })
 
 test('every skill stands in one tree; each tree roots in its power, which teaches, then 3 paths of an entry and a row of 3 for each later pick', () => {
   const all = classes.flatMap(treeOf)

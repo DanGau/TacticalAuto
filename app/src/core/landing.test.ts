@@ -65,9 +65,9 @@ test('entering puts the whole squad down by the landing and engages only the clu
   const run = entering()
   const at = run.battle.entry!
   expect(enterAt(run)).toEqual({ ok: true })
-  const squad = run.battle.units.filter(isSoldier)
-  expect(squad).toHaveLength(run.soldiers.length)
-  for (const unit of squad) expect(distance(unit, at)).toBeLessThanOrEqual(3)
+  const heroes = run.battle.units.filter(isSoldier)
+  expect(heroes).toHaveLength(1)
+  for (const unit of heroes) expect(distance(unit, at)).toBeLessThanOrEqual(3)
   expect(nearestAlien(run.battle, at)!.engaged).toBe(true)
   const first = nearestAlien(run.battle, at)!
   for (const alien of run.battle.units.filter((u) => u.side === 'alien')) expect(alien.engaged).toBe(alien.cluster === first.cluster)

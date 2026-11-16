@@ -9,10 +9,10 @@ import { createRun, legOf, ways, go } from './run'
 import { step } from './step'
 import type { Run } from './run-state'
 
-/** A run met at `event`, holding a relic, its squad of one short of full. */
+/** A run met at `event`, holding a relic. */
 function atEvent(event: EventId): Run {
   const run = createRun(1)
-  apply(run, { type: 'recruit', index: 0 })
+  apply(run, { type: 'hero', index: 0 })
   apply(run, { type: 'boons', picks: [0, 1] })
   gainRelic(run, 'plasma', true)
   go(run, ways(run)[0])
@@ -22,20 +22,19 @@ function atEvent(event: EventId): Run {
   return run
 }
 
-/** Whether every relic and hero that came or went between `before` and `run`, unchosen, is told of. */
-function untold(before: { relics: readonly string[]; soldiers: number[] }, run: Run): string[] {
+/** Whether every relic that came or went between `before` and `run`, unchosen, is told of. */
+function untold(before: { relics: readonly string[] }, run: Run): string[] {
   const told = run.gains
   const relic = (kind: string, id: string) => told.some((g) => g.kind === kind && 'id' in g && g.id === id)
   return [
     ...run.relics.filter((id) => !before.relics.includes(id) && !relic('relic', id)).map((id) => `gained ${id}`),
     ...before.relics.filter((id) => !run.relics.includes(id as never) && !relic('relicLost', id)).map((id) => `lost ${id}`),
-    ...run.soldiers.filter((s) => !before.soldiers.includes(s.id) && !told.some((g) => g.kind === 'hero' && g.soldier === s.id)).map((s) => `hero ${s.name}`),
   ]
 }
 
-const held = (run: Run) => ({ relics: [...run.relics], soldiers: run.soldiers.map((s) => s.id) })
+const held = (run: Run) => ({ relics: [...run.relics] })
 
-test('every event option tells of each relic and hero it adds or takes', () => {
+test('every event option tells of each relic it adds or takes', () => {
   const found: string[] = []
   for (const id of Object.keys(EVENTS) as EventId[]) {
     EVENTS[id].options.forEach((_, index) => {
@@ -56,15 +55,14 @@ test('in whole bot runs, only a relic chosen from a card goes untold', () => {
       if (run.phase === 'battle' && run.battle!.phase === 'battle') {
         const before = held(run)
         step(run)
-        // A hero met at the leg's end shows on the battle report.
-        found.push(...untold(before, run).filter((t) => !run.report?.hired || t !== `hero ${run.report.hired}`))
+        found.push(...untold(before, run))
         continue
       }
       const action: Action = bots.strategic(run, rng)
       const before = held(run)
       expect(apply(run, action).ok).toBe(true)
-      // A card read and chosen, or the first hero, or a hero met at the leg's end, has a screen of its own.
-      if (action.type !== 'relic' && action.type !== 'buy' && action.type !== 'recruit') found.push(...untold(before, run))
+      // A card read and chosen has a screen of its own.
+      if (action.type !== 'relic' && action.type !== 'buy') found.push(...untold(before, run))
       run.gains.length = 0
     }
   }

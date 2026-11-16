@@ -8,7 +8,6 @@ import { type Run } from './run-state'
 import { offerable, RELIC_OFFERS, REQUIRES, type RelicId } from './relics'
 import { offerRelics } from './debrief'
 import { takeRelic } from './rewards'
-import { draft } from './squad'
 import { begun, enterAt } from './roads'
 
 /** A run entering an exterminate battle with `relics`. */
@@ -54,14 +53,12 @@ test('relics turned down are not offered again until every other is spent', () =
     if (fresh.length >= RELIC_OFFERS) expect(run.relicOffers.filter((id) => passed.has(id))).toEqual([])
     run.relicOffers.slice(1).forEach((id) => passed.add(id))
     takeRelic(run, run.relicOffers[0])
-    expect(new Set(run.passed.relics)).toEqual(passed)
+    expect(new Set(run.passed)).toEqual(passed)
   }
 })
 
-test('recruit classes turned down are not drafted again while others are left', () => {
+test('the candidates a run starts from are of different classes, from different continents', () => {
   const run = createRun(4)
-  const declined = run.recruits.slice(1).map((r) => r.cls!)
-  apply(run, { type: 'recruit', index: 0 })
-  expect(run.passed.classes).toEqual(declined)
-  for (let i = 0; i < 10; i++) expect(declined).not.toContain(draft(run, []).cls)
+  expect(new Set(run.candidates.map((c) => c.cls)).size).toBe(run.candidates.length)
+  expect(new Set(run.candidates.map((c) => c.home.country)).size).toBe(run.candidates.length)
 })

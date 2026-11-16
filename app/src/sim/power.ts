@@ -20,7 +20,7 @@ const wins = (rs: RunResult[]) => rs.filter((r) => r.won).length / rs.length
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0)
 const pp = (n: number) => `${n >= 0 ? '+' : ''}${(100 * n).toFixed(1)}`
 
-/** Over a loadout's Guardian fights: how many, the mean rounds from first wound to fall of those felled, and the mean share of the squad's health lost; each with its standard error. */
+/** Over a loadout's Guardian fights: how many, the mean rounds from first wound to fall of those felled, and the mean share of the hero's health lost; each with its standard error. */
 function guardian(rs: RunResult[]) {
   const fights = rs.flatMap((r) => r.tolls).filter((t) => t.kind === 'key' || t.kind === 'final')
   const stat = (xs: number[]) => {
@@ -60,7 +60,7 @@ export function formatPower(played: Record<string, RunResult[]>): string {
       const [a, b] = halves(p.name)
       lines.push(`${p.name.padEnd(22)}${pp(p.d).padStart(6)}${pp(of(a) + of(b)).padStart(12)}${pp(p.d - of(a) - of(b)).padStart(10)}`)
     }
-    // On Guardian fights, what each loadout saves over none: rounds to fell it, and the squad's health lost to it.
+    // On Guardian fights, what each loadout saves over none: rounds to fell it, and the hero's health lost to it.
     lines.push('', 'Guardian synergy        rounds saved  a+b   synergy ±se   hp saved%  a+b   synergy ±se')
     const saved = (name: string, key: 'rounds' | 'lost') => guard.none[key] - guard[name][key]
     const se = (names: string[], key: 'roundsSe' | 'lostSe') => Math.sqrt(names.reduce((sum, n) => sum + guard[n][key] ** 2, 0))

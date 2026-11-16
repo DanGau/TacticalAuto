@@ -15,6 +15,8 @@ const hurt = (u: Unit) => u.hp <= u.stats.hp / 2
 const machines = (battle: Battle, u: Unit) => battle.units.filter((m) => m.summoner !== null && m.summoner === u.soldier && m.hp > 0)
 const ownerOf = (battle: Battle, u: Unit) => (u.summoner === null ? undefined : battle.units.find((s) => s.soldier === u.summoner))
 const allies = (battle: Battle, u: Unit) => battle.units.filter((a) => a.side === u.side && a !== u && a.hp > 0 && !a.civilian)
+/** `u` and its allies. */
+const team = (battle: Battle, u: Unit) => [u, ...allies(battle, u)].filter((a) => a.hp > 0)
 
 /** A heal on a turn's start, which no cap holds. */
 const heal = (u: Unit, amount: number, effect: Effect, events: GameEvent[]) => mend(u, amount, effect, events, false)
@@ -45,7 +47,7 @@ export function talentDamage(battle: Battle, unit: Unit, enemy: Unit, used: Effe
     ['bloodScent', hurt(enemy), TALENT.bonus],
     ['ambush', unit.hits === 1, TALENT.big],
     ['shatterpoint', enemy.frozen, TALENT.big],
-    ['smite', allies(battle, unit).some((a) => distance(a, enemy) <= 1), TALENT.big],
+    ['smite', team(battle, unit).some((a) => distance(a, enemy) <= 1), TALENT.big],
     ['pilotLink', machines(battle, unit).length > 0, TALENT.bonus],
     ['pyromania', burning >= 2, Math.min(3, Math.floor(burning / 2))],
     ['combust', enemy.burn > 0, enemy.burn],
@@ -95,7 +97,7 @@ export function talentDamage(battle: Battle, unit: Unit, enemy: Unit, used: Effe
     events.push(fx(enemy.id, effect, 0))
     more -= worth
   }
-  const guard = ownerOf(battle, enemy) && has(ownerOf(battle, enemy)!, 'armoredDrones') ? 'armoredDrones' : allies(battle, enemy).find((a) => has(a, 'guardian') && distance(a, enemy) <= 2) ? 'guardian' : undefined
+  const guard = ownerOf(battle, enemy) && has(ownerOf(battle, enemy)!, 'armoredDrones') ? 'armoredDrones' : team(battle, enemy).find((a) => has(a, 'guardian') && distance(a, enemy) <= 2) ? 'guardian' : undefined
   if (guard) {
     events.push(fx(enemy.id, guard, 0))
     more -= TALENT.soak
@@ -142,7 +144,7 @@ export function talentHit(battle: Battle, unit: Unit, enemy: Unit, crit: boolean
   if (arc) zap(battle, arc, TALENT.zap, 'arcWelder', events)
   if (has(unit, 'soulDrain')) mend(unit, 1, 'soulDrain', events)
   if (has(unit, 'lifeLink')) {
-    const mate = allies(battle, unit).filter((a) => a.hp < a.stats.hp && distance(a, unit) <= TALENT.reach).sort((a, b) => a.hp / a.stats.hp - b.hp / b.stats.hp)[0]
+    const mate = team(battle, unit).filter((a) => a.hp < a.stats.hp && distance(a, unit) <= TALENT.reach).sort((a, b) => a.hp / a.stats.hp - b.hp / b.stats.hp)[0]
     if (mate) mend(mate, 1, 'lifeLink', events)
   }
   if (enemy.hp > 0 && has(enemy, 'vengeance')) empower(enemy, 1, 'vengeance', events)
@@ -150,7 +152,7 @@ export function talentHit(battle: Battle, unit: Unit, enemy: Unit, crit: boolean
     kindle(battle, unit, burnFrom(enemy), events)
     events.push(fx(unit.id, 'cinderSkin', 0))
   }
-  const avenger = allies(battle, enemy).find((a) => has(a, 'retribution') && distance(a, enemy) <= TALENT.reach)
+  const avenger = team(battle, enemy).find((a) => has(a, 'retribution') && distance(a, enemy) <= TALENT.reach)
   if (avenger && unit.hp > 0) zap(battle, unit, TALENT.zap, 'retribution', events)
 }
 
@@ -191,19 +193,18 @@ export function talentTurn(battle: Battle, unit: Unit, events: GameEvent[]): voi
     unit.armor = Math.min(unit.stats.armor + TALENT.armorMax, unit.armor + TALENT.armor)
     events.push(fx(unit.id, 'bedrock', 0))
   }
-  const near = allies(battle, unit).filter((a) => distance(a, unit) <= 2)
+  const near = team(battle, unit).filter((a) => distance(a, unit) <= 2)
   const shaken = near.filter((a) => a.armor < a.stats.armor + TALENT.armorMax).sort((a, b) => a.hp / a.stats.hp - b.hp / b.stats.hp)[0]
   if (has(unit, 'rally') && shaken) {
     shaken.armor = Math.min(shaken.stats.armor + TALENT.armorMax, shaken.armor + TALENT.armor)
     events.push(fx(shaken.id, 'rally', 0))
   }
-  const faint = allies(battle, unit).filter((a) => distance(a, unit) <= TALENT.reach && a.stats.hp - a.hp >= TALENT.heal).sort((a, b) => a.hp / a.stats.hp - b.hp / b.stats.hp)[0]
-  if (has(unit, 'transfusion') && faint && unit.hp - TALENT.heal > unit.stats.hp / 2) {
-    unit.hp -= TALENT.heal
-    events.push(fx(unit.id, 'transfusion', -TALENT.heal))
-    heal(faint, TALENT.heal, 'transfusion', events)
-  }
   const around = (reach: number) => battle.units.filter((u) => u.side !== unit.side && u.hp > 0 && distance(u, unit) <= reach)
+  const prey = around(TALENT.reach).sort((a, b) => distance(a, unit) - distance(b, unit))[0]
+  if (has(unit, 'transfusion') && prey) {
+    zap(battle, prey, TALENT.zap, 'transfusion', events)
+    heal(unit, TALENT.zap, 'transfusion', events)
+  }
   for (const [effect, reach] of [['coldSnap', 1], ['polarVortex', 2]] as const) {
     if (!has(unit, effect)) continue
     for (const u of around(reach)) {

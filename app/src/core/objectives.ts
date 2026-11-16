@@ -1,4 +1,4 @@
-// Objectives: each battle's order to the squad in a few words, true to its rules, and the threat it poses.
+// Objectives: each battle's order to the hero in a few words, true to its rules, and the threat it poses.
 import type { ChallengeId } from './challenges'
 import type { Goal } from './goals'
 import type { Mission, Run } from './run-state'
@@ -11,7 +11,6 @@ const GOAL_ORDERS: Record<Exclude<Goal, 'exterminate'>, string> = {
   rescue: 'Save the civilians',
   vip: 'Extract the VIP',
   raid: 'Seize the caches',
-  recover: 'Bring them back',
   ambush: 'Survive the hunt',
 }
 
@@ -37,7 +36,7 @@ const GROUND_ORDERS: Record<TerrainKind, string> = {
   hive: 'Purge the hive',
 }
 
-/** What a challenge throws at the squad, and how to meet it. */
+/** What a challenge throws at the hero, and how to meet it. */
 export const THREATS: Record<ChallengeId, string> = {
   slog: 'Swamp, foes scattered. Levitate, shield or reach.',
   firingLine: 'Snipers. Mist, shield or dampener.',
@@ -48,10 +47,10 @@ export const THREATS: Record<ChallengeId, string> = {
   killBox: 'Hot landing. Flash, mist, shield or dampener.',
 }
 
-/** The squad's order at a battle: a key frees its hero or storms the stronghold, the final takes the hub. */
-export function objective(kind: Mission['kind'], goal: Goal, challenge: ChallengeId | null, place: TerrainKind, hero: string | null = null): string {
+/** The hero's order at a battle: a key storms the satellite, the final takes the hub. */
+export function objective(kind: Mission['kind'], goal: Goal, challenge: ChallengeId | null, place: TerrainKind): string {
   if (kind === 'final') return 'Take the hub'
-  if (kind === 'key') return hero ? `Free ${hero}` : 'Storm the stronghold'
+  if (kind === 'key') return 'Storm the satellite'
   if (goal !== 'exterminate') return GOAL_ORDERS[goal]
   if (!challenge) return GROUND_ORDERS[place]
   const orders = CHALLENGE_ORDERS[challenge]
@@ -59,4 +58,4 @@ export function objective(kind: Mission['kind'], goal: Goal, challenge: Challeng
 }
 
 /** The order for the battle under way. */
-export const missionOrder = (run: Run): string => objective(run.mission!.kind, run.mission!.goal, run.battle!.challenge, run.battle!.place, run.route[run.keys].hero?.name)
+export const missionOrder = (run: Run): string => objective(run.mission!.kind, run.mission!.goal, run.battle!.challenge, run.battle!.place)

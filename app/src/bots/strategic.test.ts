@@ -11,7 +11,7 @@ import { PLANS, plannedSkill } from '../core/plans'
 import { CLASSES, type ClassId } from '../core/classes'
 import { pathOf, powerOf, SKILLS, TREES, type SkillId } from '../core/skills'
 import { ULTIMATE_EFFECTS } from '../core/skill-effects'
-import { skillOffers, xpFor } from '../core/squad'
+import { skillOffers, xpFor } from '../core/hero'
 import type { WeaponId } from '../core/weapons'
 
 function deploying(challenge: ChallengeId, held: Run['utilities']): Run {
@@ -31,7 +31,7 @@ test.each(Object.keys(CHALLENGES) as ChallengeId[])('the strategic bot takes the
 
 test('the plan: every class names a real path; a hero takes the path its weapon suits, then an ultimate for its capstone', () => {
   const hero = (cls: ClassId, weapon: WeaponId) => {
-    const h = { ...begun(3).soldiers[0], cls, skills: [powerOf(cls)], lost: [] as SkillId[], xp: xpFor(20) }
+    const h = { ...begun(3).hero, cls, skills: [powerOf(cls)], lost: [] as SkillId[], xp: xpFor(20) }
     h.gear = { ...h.gear!, weapon }
     for (let offers = skillOffers(h); offers.length > 0; offers = skillOffers(h)) h.skills.push(offers[plannedSkill(h)])
     return h
@@ -52,7 +52,7 @@ test('with a utility to spare, it keeps what answers the most, and plays a run t
   expect(['won', 'lost']).toContain(runWith(5, strategic).won ? 'won' : 'lost')
 })
 
-const toll = (challenge: ChallengeId, answer: Toll['answer'], won: boolean, lost: number): Toll => ({ nth: 1, leg: 0, party: 1, kind: 'battle', elite: false, won, goal: 'exterminate', challenge, answer, most: 100, before: 100, after: 100 - lost, downed: 0, maxHit: 0, bossRounds: null, healed: 0 })
+const toll = (challenge: ChallengeId, answer: Toll['answer'], won: boolean, lost: number): Toll => ({ nth: 1, leg: 0, kind: 'battle', elite: false, won, goal: 'exterminate', challenge, answer, most: 100, before: 100, after: 100 - lost, downed: 0, maxHit: 0, bossRounds: null, healed: 0 })
 const of = (tolls: Toll[]) => rows([{ tolls } as RunResult])
 
 test('the diagnosis tells the game from the bot', () => {

@@ -3,11 +3,7 @@ import { WEAPONS } from './weapons'
 import { expect, test } from 'vitest'
 import { TUNING } from './tuning'
 import { apply } from './apply'
-import { GRID, isSoldier, BASE_STATS, type Side } from './battle'
-import { edgeNear } from './grid'
-import { freeTilesNear } from './grid'
-import { stepBattle } from './combat'
-import type { GameEvent } from './combat-event'
+import { isSoldier, BASE_STATS, type Side } from './battle'
 import { CLASSES } from './classes'
 import { EVENTS, MEDKIT } from './events'
 import { odds } from './sight'
@@ -35,20 +31,19 @@ import { RISKS } from './missions'
 import { dropGear } from './rewards'
 import { SELL } from './rewards'
 import { SHOP_RELICS } from './rewards'
-import { SHOP_WARES } from './rewards'
+import { SHOP_OTHER_WEAPONS, SHOP_WARES } from './rewards'
 import { GEAR_PRICE } from './rewards'
-import { squadMakes, squadReads } from './squad'
+import { makes, reads } from './hero'
 import { feeds } from './quantities'
-import { RECRUITS } from './squad'
-import { hire, MAX_SQUAD } from './squad'
-import { LEVEL_STATS } from './squad'
-import { soldierStats } from './squad'
-import { health } from './squad'
-import { skillOffers } from './squad'
-import { MAX_SKILLS, minorOffers, owesPick, PICK_LEVELS, picksEarned } from './squad'
-import { XP } from './squad'
-import { level } from './squad'
-import { xpFor } from './squad'
+import { CANDIDATES } from './hero'
+import { LEVEL_STATS } from './hero'
+import { soldierStats } from './hero'
+import { health } from './hero'
+import { skillOffers } from './hero'
+import { MAX_SKILLS, minorOffers, PICK_LEVELS, picksEarned } from './hero'
+import { XP } from './hero'
+import { level } from './hero'
+import { xpFor } from './hero'
 import { LOSS_THREAT } from './progress'
 import { STOP_THREAT } from './progress'
 import { THREAT_MAX } from './progress'
@@ -58,10 +53,10 @@ import { atKey, road, enterAt, begun } from './roads'
 import { RELICS } from './relics'
 import { SHOP_UTILITIES, UTILITY_SLOTS } from './utilities'
 
-/** A run whose first soldier has learned its first skill, so the overworld waits. */
+/** A run whose hero has learned its first skill, so the overworld waits. */
 function started(): Run {
   const run = begun(1)
-  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
+  run.hero.skills = [powerOf(run.hero.cls!)]
   return run
 }
 
@@ -90,7 +85,7 @@ function travelling(stops: StopKind[], risk: Risk = 'standard'): Run {
   return run
 }
 
-/** Takes the first way on, if the squad has passed its stop. */
+/** Takes the first way on, if the hero has passed its stop. */
 function onward(run: Run): void {
   if (!current(run)) apply(run, { type: 'go', index: ways(run)[0] })
 }
@@ -102,19 +97,18 @@ function fight(run: Run, winner: Side): void {
   // Clear of Danger Close, which costs threat.
   if (run.battle!.phase === 'deploy') enterAt(run)
   const battle = run.battle!
-  for (const u of battle.units.filter((u) => isSoldier(u) && winner === 'alien')) battle.downed.push({ soldier: u.soldier!, x: u.x, y: u.y, carrier: null })
+  for (const u of battle.units.filter((u) => isSoldier(u) && winner === 'alien')) battle.downed.push({ soldier: u.soldier!, x: u.x, y: u.y })
   battle.units = battle.units.filter((u) => u.side === winner)
   battle.phase = 'over'
   battle.winner = winner
   endBattle(run)
 }
 
-test('a run begins with one level 1 recruit on a path of its class, choosing where to start among the battles of its first leg', () => {
+test('a run begins with its hero at level 1 on a path of its class, choosing where to start among the battles of its first leg', () => {
   const run = begun(1)
-  expect(run.soldiers).toHaveLength(1)
-  expect(level(run.soldiers[0])).toBe(1)
-  expect(run.soldiers[0].skills[0]).toBe(powerOf(run.soldiers[0].cls!))
-  expect(run).toMatchObject({ phase: 'overworld', soldiers: [{ skills: [expect.anything()] }] })
+  expect(level(run.hero)).toBe(1)
+  expect(run.hero.skills[0]).toBe(powerOf(run.hero.cls!))
+  expect(run).toMatchObject({ phase: 'overworld', hero: { skills: [expect.anything()] } })
   const leg = legOf(run)
   expect(leg.columns).toHaveLength(LEG_STOPS + 1)
   expect(leg.columns[0].length).toBeGreaterThan(1)
@@ -154,9 +148,9 @@ test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone
   expect(run.finds.length).toBeLessThanOrEqual(1)
   if (RISKS[risk].gear !== 0.5) expect(run.finds).toHaveLength(RISKS[risk].gear)
   if (RISKS[risk].rareGear) expect(run.finds[0].rarity).not.toBe('common')
-  expect(run.report).toMatchObject({ stop: 'battle', won: true, threat: { before: 0, after: STOP_THREAT }, key: false, hired: null })
-  const [report] = run.report!.soldiers
-  expect(report).toMatchObject({ xpBefore: xpFor(1), taken: false })
+  expect(run.report).toMatchObject({ stop: 'battle', won: true, threat: { before: 0, after: STOP_THREAT }, key: false })
+  const report = run.report!.hero!
+  expect(report).toMatchObject({ xpBefore: xpFor(1) })
   expect(report.earned).toEqual(expect.arrayContaining([{ label: 'fought', xp: XP.fought }, { label: 'won', xp: XP.won }]))
   expect(report.xpAfter - report.xpBefore).toBe(report.earned.reduce((sum, e) => sum + e.xp, 0))
   while (run.finds.length > 0) apply(run, { type: 'sell', find: 0 })
@@ -166,22 +160,17 @@ test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone
   expect(run.phase).toBe('overworld')
 })
 
-test("a find is a piece of one hero's weapon: equipped on them, replacing and discarding what they held, or sold; nothing is taken off", () => {
+test("a find is a piece of the hero's weapon: equipped, replacing and discarding what it held, or sold; nothing is taken off", () => {
   const run = started()
-  hire(run)
-  const [first] = run.soldiers
-  expect(first.gear).toMatchObject({ rarity: 'common' })
+  expect(run.hero.gear).toMatchObject({ rarity: 'common' })
   dropGear(run, false)
   dropGear(run, false)
   const [gear] = run.finds
   const supplies = run.supplies
   run.phase = 'reward'
-  const owner = run.soldiers.find((s) => s.id === gear.owner)!
-  expect(gear.weapon).toBe(owner.gear!.weapon)
-  const others = run.soldiers.filter((s) => s !== owner).map((s) => s.gear)
+  expect(gear.weapon).toBe(run.hero.gear!.weapon)
   expect(apply(run, { type: 'equip', find: 0 })).toEqual({ ok: true })
-  expect(owner.gear).toBe(gear)
-  expect(run.soldiers.filter((s) => s !== owner).map((s) => s.gear)).toEqual(others)
+  expect(run.hero.gear).toBe(gear)
   expect(run.supplies).toBe(supplies)
   const [other] = run.finds
   expect(apply(run, { type: 'sell', find: 0 })).toEqual({ ok: true })
@@ -189,123 +178,26 @@ test("a find is a piece of one hero's weapon: equipped on them, replacing and di
   expect(run).toMatchObject({ finds: [] })
 })
 
-test('a battle lost with every soldier down pays nothing and loses the run, the aliens taking them; they still earn experience', () => {
+test('a battle on the road lost with the hero down pays nothing and adds threat; the hero is flown out at 1 HP and still earns experience', () => {
   const run = travelling(['battle', 'battle'])
   fight(run, 'alien')
-  expect(run).toMatchObject({ phase: 'lost', threat: STOP_THREAT + LOSS_THREAT, supplies: START_SUPPLIES, captives: [run.soldiers[0].id] })
-  expect(run.report!.soldiers).toMatchObject([{ taken: true, xpBefore: xpFor(1), earned: [{ label: 'fought', xp: XP.fought }] }])
+  expect(run).toMatchObject({ phase: 'overworld', threat: STOP_THREAT + LOSS_THREAT, supplies: START_SUPPLIES, stop: 1 })
+  expect(health(run, run.hero)).toBe(1)
+  expect(run.report!.hero).toMatchObject({ hp: 1, xpBefore: xpFor(1), earned: [{ label: 'fought', xp: XP.fought }] })
 })
 
-test('a wipe loses the run even when the last alien falls with the last soldier', () => {
-  const run = travelling(['battle', 'battle'])
-  apply(run, { type: 'advance' })
-  enterAt(run)
-  const battle = run.battle!
-  const [soldier] = battle.units.filter(isSoldier)
-  battle.downed.push({ soldier: soldier.soldier!, x: soldier.x, y: soldier.y, carrier: null })
-  Object.assign(battle, { units: [], phase: 'over', winner: 'human' })
-  endBattle(run)
+test('the hero falling at a satellite loses the run', () => {
+  const run = started()
+  atKey(run)
+  fight(run, 'alien')
   expect(run.phase).toBe('lost')
-})
-
-/** A run of two soldiers whose battle ended lost with the second left downed on the field, the first standing. */
-function leftBehind(): Run {
-  const run = travelling(['battle', 'battle'])
-  hire(run)
-  run.soldiers.at(-1)!.skills.splice(1)
-  run.phase = 'overworld'
-  apply(run, { type: 'advance' })
-  enterAt(run)
-  const battle = run.battle!
-  const fallen = battle.units.find((u) => u.soldier === run.soldiers[1].id)!
-  battle.downed.push({ soldier: fallen.soldier!, x: fallen.x, y: fallen.y, carrier: null })
-  battle.units.splice(battle.units.indexOf(fallen), 1)
-  Object.assign(battle, { phase: 'over', winner: 'alien' })
-  endBattle(run)
-  return run
-}
-
-test('soldiers left downed on a field the squad did not hold are taken, and a recovery comes next: all or nothing', () => {
-  const run = leftBehind()
-  const [free, held] = run.soldiers
-  expect(run).toMatchObject({ phase: 'overworld', captives: [held.id], stop: 1 })
-  expect(run.report!.soldiers).toMatchObject([{ taken: false }, { taken: true }])
-  onward(run)
-  expect(nextStop(run)).toBe('recovery')
-  apply(run, { type: 'advance' })
-  const battle = run.battle!
-  expect(run.mission).toMatchObject({ kind: 'recovery', goal: 'recover' })
-  expect(battle.reserve.map((r) => r.soldier)).toEqual([free.id])
-  expect(battle.captives.map((r) => r.soldier)).toEqual([held.id])
-  expect(battle.downed).toMatchObject([{ soldier: held.id, carrier: null }])
-  expect(battle.flow).toBe('push')
-
-  const lost = structuredClone(run)
-  fight(lost, 'alien')
-  expect(lost.phase).toBe('lost')
-
-  fight(run, 'human')
-  expect(run.captives).toEqual([])
-  expect(run.soldiers).toHaveLength(2)
-  expect(run.stop).toBe(1)
-  expect(nextStop(run)).toBe('battle')
-})
-
-test('on a recovery, a soldier who reaches a held squadmate gets them up at half health to fight', () => {
-  const run = leftBehind()
-  onward(run)
-  apply(run, { type: 'advance' })
-  enterAt(run)
-  const battle = run.battle!
-  const [body] = battle.downed
-  const rescuer = battle.units.find(isSoldier)!
-  Object.assign(rescuer, freeTilesNear(battle, body, 2).find((t) => t.x !== body.x || t.y !== body.y)!)
-  // It cannot end the battle by shooting, nor walk off, before it gets them up.
-  rescuer.stats = { ...rescuer.stats, damage: 0, move: 0 }
-  rescuer.ability = null
-  const events: GameEvent[] = []
-  for (let beats = 0; beats < 50 && !events.some((e) => e.type === 'freed'); beats++) events.push(...stepBattle(battle))
-  const freed = battle.units.find((u) => u.soldier === body.soldier)!
-  expect(events).toContainEqual(expect.objectContaining({ type: 'freed', unit: expect.objectContaining({ id: freed.id }) }))
-  expect(battle.captives).toEqual([])
-  expect(freed.hp).toBeLessThanOrEqual(Math.ceil(freed.stats.hp / 2))
-})
-
-test('getting out, a soldier picks up a squadmate down, walks at half its move carrying them, and lifts off with them', () => {
-  const run = travelling(['battle', 'battle'])
-  hire(run)
-  run.soldiers.at(-1)!.skills.splice(1)
-  run.phase = 'overworld'
-  apply(run, { type: 'advance' })
-  enterAt(run)
-  const battle = run.battle!
-  const [carrier, fallen] = battle.units.filter(isSoldier)
-  // One alien is left, rooted and harmless, and the carrier cannot kill it: the battle ends only by lifting off.
-  Object.assign(carrier, { ability: null, effects: [], spent: ['throw', 'throw', 'throw'], stats: { ...carrier.stats, damage: 0 } })
-  const alien = battle.units.find((u) => u.side === 'alien')!
-  Object.assign(alien, { hp: 9999, stats: { ...alien.stats, damage: 0, move: 0 } })
-  battle.units = [carrier, alien]
-  battle.waves = []
-  battle.extract = edgeNear(battle, { x: GRID - carrier.x, y: GRID - carrier.y })
-  battle.downed.push({ soldier: fallen.soldier!, x: carrier.x, y: carrier.y, carrier: null })
-  const events: GameEvent[] = []
-  for (let beats = 0; beats < 3000 && battle.phase === 'battle'; beats++) events.push(...stepBattle(battle))
-  expect(events).toContainEqual({ type: 'carried', id: carrier.id, soldier: fallen.soldier })
-  const picked = events.findIndex((e) => e.type === 'carried')
-  const walks = events.slice(picked).filter((e) => e.type === 'move' && e.id === carrier.id && !e.with)
-  expect(walks.length).toBeGreaterThan(0)
-  for (const walk of walks) expect(walk.type === 'move' && walk.path.length).toBeLessThanOrEqual(Math.ceil(carrier.stats.move / 2))
-  expect(battle.escaped).toEqual([carrier.soldier, fallen.soldier])
-  endBattle(run)
-  expect(run.captives).toEqual([])
-  expect(run.report!.soldiers.every((s) => !s.taken)).toBe(true)
 })
 
 test('a supply drop and a cache are collected on arrival, each adding threat', () => {
   const run = travelling(['supply', 'cache', 'battle'])
   apply(run, { type: 'advance' })
   expect(run).toMatchObject({ phase: 'overworld', supplies: START_SUPPLIES + DROP_SUPPLIES, threat: STOP_THREAT, stop: 1 })
-  expect(run.report).toMatchObject({ stop: 'supply', supplies: DROP_SUPPLIES, soldiers: [] })
+  expect(run.report).toMatchObject({ stop: 'supply', supplies: DROP_SUPPLIES, hero: null })
   onward(run)
   apply(run, { type: 'advance' })
   expect(run).toMatchObject({ report: { stop: 'cache' } })
@@ -324,37 +216,31 @@ test('every stop on the way across a continent is at a real town, none twice', (
   }
 })
 
-test('soldiers keep their health between battles, heal nothing on the road, and come back from downed at 1', () => {
+test('the hero keeps its health between battles and heals nothing on the road', () => {
   const run = travelling(['battle', 'battle', 'battle'])
-  hire(run)
-  run.soldiers.at(-1)!.skills.splice(1)
-  run.phase = 'overworld'
-  const [hurt, fallen] = run.soldiers
-  const most = soldierStats(run, hurt).hp
+  const hero = run.hero
+  const most = soldierStats(run, hero).hp
   apply(run, { type: 'advance' })
   enterAt(run)
   const battle = run.battle!
-  battle.units.find((u) => u.soldier === hurt.id)!.hp = 3
-  const body = battle.units.find((u) => u.soldier === fallen.id)!
-  battle.downed.push({ soldier: fallen.id, x: body.x, y: body.y, carrier: null })
-  battle.units = battle.units.filter((u) => u.side === 'human' && u !== body)
+  battle.units.find((u) => u.soldier === hero.id)!.hp = 3
+  battle.units = battle.units.filter((u) => u.side === 'human')
   Object.assign(battle, { phase: 'over', winner: 'human' })
   endBattle(run)
   run.phase = 'overworld'
-  expect(health(run, hurt)).toBe(3)
-  expect(health(run, fallen)).toBe(1)
-  expect(run.report!.soldiers).toMatchObject([{ hp: 3, maxHp: most }, { hp: 1 }])
+  expect(health(run, hero)).toBe(3)
+  expect(run.report!.hero).toMatchObject({ hp: 3, maxHp: most })
   onward(run)
   apply(run, { type: 'advance' })
-  expect(run.battle!.reserve.find((r) => r.soldier === hurt.id)!.hp).toBe(3)
+  expect(run.battle!.reserve[0].hp).toBe(3)
 })
 
-test('a safehouse heals every soldier fully on arrival and adds threat', () => {
+test('a safehouse heals the hero fully on arrival and adds threat', () => {
   const run = travelling(['safehouse', 'battle'])
-  run.soldiers[0].wounds = 7
+  run.hero.wounds = 7
   apply(run, { type: 'advance' })
   expect(run).toMatchObject({ phase: 'overworld', threat: STOP_THREAT, stop: 1, report: { stop: 'safehouse' } })
-  expect(run.soldiers[0].wounds).toBe(0)
+  expect(run.hero.wounds).toBe(0)
 })
 
 test('every other split of the way puts a safehouse beside a battle', () => {
@@ -374,53 +260,36 @@ test('every other split of the way puts a safehouse beside a battle', () => {
   expect(count).toBeGreaterThan(5)
 })
 
-test('after the stops of a leg comes its satellite: winning it wins a key, a hero, and the next leg', () => {
+test('after the stops of a leg comes its satellite: winning it wins a key and the next leg', () => {
   const run = started()
   enter(run, 'safe', ['battle', 'battle'])
   for (let i = 0; i < 2; i++) {
     fight(run, 'human')
-    while (skillOffers(run.soldiers[0]).length > 0) apply(run, { type: 'skill', soldier: run.soldiers[0].id, index: 0 })
-    while (minorOffers(run.soldiers[0]).length > 0) apply(run, { type: 'perk', soldier: run.soldiers[0].id, index: 0 })
+    while (skillOffers(run.hero).length > 0) apply(run, { type: 'skill', index: 0 })
+    while (minorOffers(run.hero).length > 0) apply(run, { type: 'perk', index: 0 })
   }
   onward(run)
   expect(current(run)!.stop).toMatchObject({ kind: 'key', terrain: 'compound' })
   expect(nextStop(run)).toBe('key')
-  expect(run.soldiers).toHaveLength(1)
   run.threat = 0
   fight(run, 'human')
   expect(run).toMatchObject({ keys: 1, stop: 0, phase: 'reward' })
   expect(current(run)).toBeNull()
-  expect(run.soldiers).toHaveLength(2)
-  expect(run.report).toMatchObject({ stop: 'key', key: true, hired: run.soldiers[1].name })
+  expect(run.report).toMatchObject({ stop: 'key', key: true })
   expect(run.finds.every((find) => find.rarity !== 'common')).toBe(true)
   expect(legOf(run).columns.flat().every((node) => node.stop !== null)).toBe(true)
 })
 
-test("each leg crosses a continent to a hero in one of its cities, who joins seasoned once extracted, its picks made; the last leads to the hub", () => {
+test('each leg crosses a continent to a satellite in one of its cities; the last leads to the hub', () => {
   const run = started()
   expect(run.route).toHaveLength(KEYS + 1)
   expect(new Set(run.route.slice(0, KEYS).map((stage) => stage.continent)).size).toBe(KEYS)
   expect(run.route[KEYS].to).toBe(HUB)
-  const hero = run.route[0].hero!
-  atKey(run)
-  fight(run, 'human')
-  expect(run.soldiers[1]).toBe(hero)
-  expect(level(hero)).toBeGreaterThan(1)
-  expect(hero.skills.length).toBe(1 + picksEarned(hero))
-  expect(owesPick(hero)).toBe(false)
-  expect(run.phase).toBe('reward')
 })
 
-test("losing a hero's extraction loses the run", () => {
-  const run = started()
-  atKey(run)
-  fight(run, 'alien')
-  expect(run.phase).toBe('lost')
-})
-
-test('experience follows what a soldier did: kills and damage its own, feats only the first time', () => {
+test('experience follows what the hero did: kills and damage, feats only the first time', () => {
   const run = travelling(['battle', 'battle', 'battle'])
-  const [soldier] = run.soldiers
+  const soldier = run.hero
   const battle = () => {
     apply(run, { type: 'advance' })
     enterAt(run)
@@ -430,7 +299,7 @@ test('experience follows what a soldier did: kills and damage its own, feats onl
     Object.assign(b, { phase: 'over', winner: 'human' })
     endBattle(run)
     while (run.finds.length > 0) apply(run, { type: 'sell', find: 0 })
-    return run.report!.soldiers[0]
+    return run.report!.hero!
   }
   const first = battle()
   expect(first.feats).toEqual(['hatTrick'])
@@ -451,10 +320,10 @@ test('an ambush has no landing: the squad is down at once, every posted alien in
   apply(run, { type: 'advance' })
   const battle = run.battle!
   expect(battle).toMatchObject({ goal: 'ambush', phase: 'battle', flow: 'flood' })
-  expect(battle.units.filter(isSoldier)).toHaveLength(run.soldiers.length)
+  expect(battle.units.filter(isSoldier)).toHaveLength(1)
   for (const u of battle.units.filter((a) => a.side === 'alien')) expect(u.engaged).toBe(true)
   const hunter = battle.units.find((u) => u.boss)!.stats
-  const best = soldierStats(run, run.soldiers[0])
+  const best = soldierStats(run, run.hero)
   expect(hunter.hp * hunter.damage).toBeGreaterThanOrEqual(0.9 * HUNTER.hp * HUNTER.damage * best.hp * best.damage)
   expect(hunter.hp * hunter.damage).toBeLessThanOrEqual(1.15 * HUNTER.hp * HUNTER.damage * best.hp * best.damage)
 })
@@ -478,11 +347,10 @@ test.each(['human', 'alien'] as const)('with every key won the squad is three, o
     fight(run, 'human')
     apply(run, { type: 'relic', index: 0 })
     while (run.finds.length > 0) apply(run, { type: 'equip', find: 0 })
-    for (const s of run.soldiers) while (skillOffers(s).length > 0) apply(run, { type: 'skill', soldier: s.id, index: 0 })
-    for (const s of run.soldiers) while (minorOffers(s).length > 0) apply(run, { type: 'perk', soldier: s.id, index: 0 })
+    while (skillOffers(run.hero).length > 0) apply(run, { type: 'skill', index: 0 })
+    while (minorOffers(run.hero).length > 0) apply(run, { type: 'perk', index: 0 })
     expect(run.phase).toBe('overworld')
   }
-  expect(run.soldiers).toHaveLength(MAX_SQUAD)
   expect(run.relics).toHaveLength(KEYS)
   onward(run)
   expect(current(run)!.stop).toMatchObject({ kind: 'final', terrain: 'hive' })
@@ -526,7 +394,7 @@ test('a key mission has one boss, with an escort for each key already won', () =
   }
 })
 
-const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: null, home: null, wounds: 0, seed: 0, lost: [], perks: [], ...extra })
+const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: null, home: HUB, wounds: 0, seed: 0, lost: [], perks: [], ...extra })
 
 test('stats add class, level, skills and relics to the base', () => {
   const run = begun(1)
@@ -551,14 +419,14 @@ test('levels never stop: each takes more experience than the last', () => {
 
 test('each pick owed offers its row, and the rest of it is lost; past the last, levels add stats only', () => {
   const run = begun(1)
-  const [soldier] = run.soldiers
+  const soldier = run.hero
   expect(skillOffers(soldier)).toEqual([])
   soldier.xp = xpFor(PICK_LEVELS.at(-1)! + 3)
   run.phase = 'reward'
   while (soldier.skills.length < MAX_SKILLS) {
     const offers = skillOffers(soldier)
     expect(offers).toHaveLength(3)
-    apply(run, { type: 'skill', soldier: soldier.id, index: 1 })
+    apply(run, { type: 'skill', index: 1 })
     expect(soldier.skills.at(-1)).toBe(offers[1])
     expect(soldier.lost).toEqual(expect.arrayContaining([offers[0], offers[2]]))
   }
@@ -566,7 +434,7 @@ test('each pick owed offers its row, and the rest of it is lost; past the last, 
 })
 
 test('a power comes only at its level: none at level 2, one at the first, none past the last', () => {
-  const [hero] = begun(1).soldiers
+  const hero = begun(1).hero
   hero.skills = []
   hero.xp = xpFor(PICK_LEVELS[0] - 1)
   expect(skillOffers(hero)).toEqual([])
@@ -608,8 +476,8 @@ test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the
   run.supplies = 100
   const { gear } = shop.wares[0]
   expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: true })
-  expect(shop.wares.every((w) => run.soldiers.find((s) => s.id === w.gear.owner)?.gear?.weapon === w.gear.weapon)).toBe(true)
-  expect(run.soldiers.find((s) => s.id === gear.owner)!.gear).toBe(gear)
+  expect(new Set(shop.wares.map((w) => w.gear.weapon)).size).toBe(1 + SHOP_OTHER_WEAPONS)
+  expect(run.hero.gear).toBe(gear)
   expect(run.supplies).toBe(100 - GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE])
   expect(shop.wares).toHaveLength(SHOP_WARES)
   expect(shop.wares[0]).toEqual({ gear, sold: true })
@@ -629,12 +497,12 @@ test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the
   shop.utilities[0].sold = false
   expect(apply(run, { type: 'utility', index: 0 })).toEqual({ ok: true })
   expect(run.spare).toBe(shop.utilities[0].id)
-  run.soldiers[0].wounds = 6
+  run.hero.wounds = 6
   const held = [...run.utilities]
   expect(apply(run, { type: 'keep', drop: 0 })).toEqual({ ok: true })
   expect(run.utilities).toEqual([shop.utilities[0].id, ...held.slice(1)])
   expect(apply(run, { type: 'medkit' })).toEqual({ ok: true })
-  expect(run.soldiers[0].wounds).toBe(6 - MEDKIT.heal)
+  expect(run.hero.wounds).toBe(6 - MEDKIT.heal)
   expect(apply(run, { type: 'medkit' }).ok).toBe(false)
   run.supplies = 0
   expect(apply(run, { type: 'gear', index: 1 })).toEqual({ ok: false, reason: 'not enough supplies' })
@@ -646,7 +514,7 @@ test('an unknown stop turns out a battle, a shop, or an event met once a run, wh
   const kinds = new Set<string>()
   for (let seed = 0; seed < 40; seed++) {
     const run = begun(seed)
-    run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
+    run.hero.skills = [powerOf(run.hero.cls!)]
     enter(run, 'standard', ['unknown', 'battle'])
     apply(run, { type: 'advance' })
     kinds.add(run.phase)
@@ -687,37 +555,6 @@ test('the Smugglers\' Tunnel skips the next two stops and comes out anywhere in 
   for (const i of next) expect(legOf(raided).columns[1][i].stop).toMatchObject({ kind: 'battle', risk: 'dangerous' })
 })
 
-test('the party never passes three', () => {
-  const run = started()
-  for (let i = 0; i < 5; i++) hire(run)
-  expect(run.soldiers).toHaveLength(MAX_SQUAD)
-})
-
-test('doctrines change the run: Lone Wolf leaves one soldier and stops recruits; Specialists give every soldier its own class', () => {
-  const run = started()
-  for (let i = 0; i < 2; i++) hire(run)
-  run.event = 'instructor'
-  run.phase = 'event'
-  enter(run)
-  const levels = run.soldiers.map(level)
-  apply(run, { type: 'choose', index: 0 })
-  expect(new Set(run.soldiers.map((s) => s.cls)).size).toBe(MAX_SQUAD)
-  expect(run.soldiers.map(level)).toEqual(levels.map((l) => l + 1))
-  expect(run.doctrines).toEqual(['specialists'])
-
-  const wolf = started()
-  hire(wolf)
-  const hp = soldierStats(wolf, wolf.soldiers[0]).hp
-  enter(wolf)
-  Object.assign(wolf, { event: 'survivor', phase: 'event' })
-  apply(wolf, { type: 'choose', index: 0 })
-  expect(wolf.soldiers).toHaveLength(1)
-  expect(soldierStats(wolf, wolf.soldiers[0]).hp).toBe(hp + 40)
-  atKey(wolf)
-  fight(wolf, 'human')
-  expect(wolf.soldiers).toHaveLength(1)
-})
-
 test('under fortification every hit does 1 less damage, on either side', () => {
   const run = begun(1)
   apply(run, { type: 'go', index: 1 })
@@ -733,64 +570,58 @@ test('under fortification every hit does 1 less damage, on either side', () => {
 
 test("a soldier lands with its class's ability and its uses, the effects of its skills and the squad's relics, and armor from its class's skills", () => {
   const run = travelling(['battle'])
-  run.soldiers[0].cls = 'heavy'
-  run.soldiers[0].skills = ['meteorStrike', 'arsenal', 'shredder', 'reactive']
+  run.hero.cls = 'heavy'
+  run.hero.skills = ['meteorStrike', 'arsenal', 'shredder', 'reactive']
   run.relics = ['echo', 'capacitor']
   apply(run, { type: 'advance' })
   enterAt(run)
   const [unit] = run.battle!.units.filter(isSoldier)
   expect(unit).toMatchObject({ ability: 'rocket', charges: 3, stance: 'anchor', armor: 4, effects: ['shred', 'opener'] })
-  expect(unit.hp).toBe(soldierStats(run, run.soldiers[0]).hp)
+  expect(unit.hp).toBe(soldierStats(run, run.hero).hp)
 })
 
 test('the first relic offered reads a quantity the squad makes, or makes one it reads', () => {
   for (let seed = 1; seed <= 5; seed++) {
     const run = started()
     run.rng = seed
-    run.soldiers[0].skills = ['mark']
+    run.hero.skills = ['mark']
     atKey(run)
     fight(run, 'human')
-    expect(feeds(RELICS[run.relicOffers[0]], squadMakes(run), squadReads(run))).toBe(true)
+    expect(feeds(RELICS[run.relicOffers[0]], makes(run), reads(run))).toBe(true)
   }
 })
 
-test('a run begins with a choice of recruits of different classes, each with a common weapon', () => {
+test('a run begins with a choice of heroes of different classes, each with a common weapon', () => {
   for (let seed = 1; seed <= 20; seed++) {
     const run = createRun(seed)
-    expect(run.phase).toBe('recruit')
-    expect(run.soldiers).toHaveLength(0)
-    expect(new Set(run.recruits.map((r) => r.cls)).size).toBe(RECRUITS)
-    for (const r of run.recruits) {
+    expect(run.phase).toBe('select')
+    expect(new Set(run.candidates.map((r) => r.cls)).size).toBe(CANDIDATES)
+    for (const r of run.candidates) {
       expect(r.skills).toEqual([powerOf(r.cls!)])
       expect(r.gear!.stats).toEqual({})
       expect(r.gear).toMatchObject({ rarity: 'common' })
     }
   }
   const run = createRun(1)
-  const chosen = run.recruits[0]
-  expect(apply(run, { type: 'recruit', index: 0 })).toEqual({ ok: true })
-  expect(run.soldiers).toEqual([chosen])
+  const chosen = run.candidates[0]
+  expect(apply(run, { type: 'hero', index: 0 })).toEqual({ ok: true })
+  expect(run.hero).toBe(chosen)
   expect(run.supplies).toBe(START_SUPPLIES)
-  expect(run.recruits).toHaveLength(0)
-  expect(run.phase).not.toBe('recruit')
-  expect(apply(run, { type: 'recruit', index: 0 }).ok).toBe(false)
+  expect(run.candidates).toHaveLength(0)
+  expect(run.phase).not.toBe('select')
+  expect(apply(run, { type: 'hero', index: 0 }).ok).toBe(false)
 })
 
-test('heroes start with every weapon between them, melee among them, those on the route too', () => {
+test('heroes start with every weapon between them, melee among them', () => {
   const kinds = new Set<string>()
-  for (let seed = 1; seed <= 40; seed++) {
-    const run = createRun(seed)
-    kinds.add(run.recruits[0].gear!.weapon)
-    apply(run, { type: 'recruit', index: 1 })
-    for (const stage of run.route) if (stage.hero) kinds.add(stage.hero.gear!.weapon)
-  }
+  for (let seed = 1; seed <= 60; seed++) for (const c of createRun(seed).candidates) kinds.add(c.gear!.weapon)
   expect([...kinds].sort()).toEqual(Object.keys(WEAPONS).sort())
 })
 
 test('the first leg opens with OPENING battles and meets no challenge before its satellite', () => {
   for (let seed = 1; seed <= 40; seed++) {
     const run = createRun(seed)
-    apply(run, { type: 'recruit', index: 0 })
+    apply(run, { type: 'hero', index: 0 })
     const columns = legOf(run).columns.slice(0, LEG_STOPS)
     for (const column of columns.slice(0, OPENING)) for (const node of column) expect(node.stop!.kind).toBe('battle')
     for (const column of columns) for (const node of column) expect(node.stop!.challenge).toBeNull()

@@ -215,7 +215,7 @@ test("a combo's effects take hold together, the minor at its lesser strength, an
 
 test('a run starts with three commons offered, exactly two picked before anything else', () => {
   const run = createRun(5)
-  apply(run, { type: 'recruit', index: 0 })
+  apply(run, { type: 'hero', index: 0 })
   expect(run.boonOffers).toHaveLength(3)
   expect(run.boonOffers.every((id) => UTILITIES[id].rarity === 'common')).toBe(true)
   expect(apply(run, { type: 'go', index: 0 }).ok).toBe(false)

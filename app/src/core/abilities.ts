@@ -7,7 +7,6 @@ import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import type { GameEvent, ShotEvent } from './combat-event'
-import { duoHeal, lifelineTo } from './duo-effects'
 import { has, hostage, foes, powering, shootable, nearest, immune, silenced, spend, enemiesOf, onTile } from './fighters'
 import { walk, bestPath, paths } from './pathing'
 import { canShoot, lineOfSight } from './sight'
@@ -126,14 +125,11 @@ export function heal(battle: Battle, unit: Unit): GameEvent[] {
     })
   }
   const wounded =
-    battle.units.filter((u) => u.side === unit.side && u.hp > 0 && u.hp <= u.stats.hp / 2 && distance(unit, u) <= MEDIC_REACH).reduce<Unit | undefined>((worst, u) => (!worst || u.hp < worst.hp ? u : worst), undefined) ??
-    lifelineTo(battle, unit)
+    battle.units.filter((u) => u.side === unit.side && u.hp > 0 && u.hp <= u.stats.hp / 2 && distance(unit, u) <= MEDIC_REACH).reduce<Unit | undefined>((worst, u) => (!worst || u.hp < worst.hp ? u : worst), undefined)
   if (!wounded) return []
   const amount = Math.min(MEDIC_HEAL + boost, wounded.stats.hp - wounded.hp)
   wounded.hp += amount
-  const events: GameEvent[] = [{ type: 'heal', src: srcOf('medic'), id: unit.id, target: wounded.id, amount }]
-  duoHeal(battle, unit, wounded, MEDIC_HEAL + boost, amount, events)
-  return events
+  return [{ type: 'heal', src: srcOf('medic'), id: unit.id, target: wounded.id, amount }]
 }
 
 /** Second wind: once per battle, a soldier at half health or less heals. */

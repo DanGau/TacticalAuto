@@ -1,13 +1,13 @@
 // The UI shell: renders the panel for the run's phase and turns clicks into actions.
-import { recruits, story, title } from './menu'
+import { candidates, story, title } from './menu'
 import type { Action } from '../core/apply'
 import { nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
-import { owesPick } from '../core/squad'
+import { owesPick } from '../core/hero'
 import { battlePage, runSummary } from './summary'
 import { installTips } from './tip'
-import { acquired, choice, joined, loot, modal, pickChoice, spareChoice, stopReport } from './aftermath'
+import { acquired, choice, loot, modal, pickChoice, spareChoice, stopReport } from './aftermath'
 import { ALIENS } from '../core/aliens'
 import { TWISTS } from '../core/twists'
 import { CHALLENGES } from '../core/challenges'
@@ -39,14 +39,14 @@ function status(run: Run): string {
   if (run.phase !== 'battle' || !battle) return ''
   const title = missionOrder(run)
   if (battle.phase === 'deploy') return title
-  const rounds = battle.extract ? ` · ${battle.escaped.length} lifted off` : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
+  const rounds = battle.extract ? ' · make for the extraction zone' : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
   const clock = battle.deadline !== null && battle.round < battle.deadline ? ` · reinforcements in ${battle.deadline - battle.round} rounds` : ''
-  const vip = battle.vip ? ` · the VIP ${{ held: 'held', breached: 'held', freed: 'with the party', out: 'lifted off' }[battle.vip]}` : ''
+  const vip = battle.vip ? ` · the VIP ${{ held: 'held', breached: 'held', freed: 'with you', out: 'lifted off' }[battle.vip]}` : ''
   const boons = battle.boons.filter((b) => b.until > battle.round).map((b) => ` · ${UTILITIES[b.id].icon} ${UTILITIES[b.id].name} ⏳${b.until - battle.round}`).join('')
   return `${title}${vip}${rounds}${clock}${boons}${counts(run, battle)}`
 }
 
-/** The squad's counts toward its every-Nth triggers. */
+/** The hero's counts toward its every-Nth triggers. */
 function counts(run: Run, battle: Battle): string {
   const turn = (battle.round % 3) + 1
   const chrono = run.relics.includes('chrono') ? ` · Chrono Coil: turn ${turn} of 3` : ''
@@ -55,7 +55,7 @@ function counts(run: Run, battle: Battle): string {
 }
 
 /**
- * Before the landing: what the battle tests, the twist, and how the squad goes in: with no utility held, a tap; else a
+ * Before the landing: what the battle tests, the twist, and how the hero goes in: with no utility held, a tap; else a
  * card per utility, tapped to arm and again to go in with it. A rigged tank then asks which tank, `rigging` holding its index.
  * With the reservoir charged, a boon picked, `doubling` its index, asks for a second or none.
  */
@@ -114,19 +114,16 @@ export function createUi(act: (action: Action) => void): Ui {
   /** The report the player has continued past. */
   let seen: Report | null = null
   let tab: Tab = 'Map'
-  /** The soldier opened in the Barracks. */
-  let open: number | null = null
   /** The stop ahead the player clicked to look at, before setting out for it. */
   let picked: number | null = null
   let shown: Run | null = null
-  /** Whether the player has left the title screen, and the recruit picked before confirming. */
+  /** Whether the player has left the title screen, and the candidate opened before confirming. */
   let started = false
   /** Whether the story has been told, before the first choice. */
   let told = false
-  let recruit: number | null = null
-  /** The report whose joining hero has been met, and the soldier whose skill choice is open. */
-  let met: Report | null = null
-  let ability: number | null = null
+  let candidate: number | null = null
+  /** Whether the hero's skill or perk choice is open over the debrief. */
+  let picking = false
   /** The debrief shown, whether a pop-up has been over it, and the crate open now, by index into run.finds. */
   let opened: { report: Report | null; still: boolean } = { report: null, still: false }
   let crate: number | null = null
@@ -147,21 +144,23 @@ export function createUi(act: (action: Action) => void): Ui {
   function panel(run: Run): string {
     const screen = phaseScreen(run)
     // Told after the debrief, once the player has seen how the fight went.
-    const debriefing = run.report && seen !== run.report && run.report.soldiers.length > 0
+    const debriefing = run.report && seen !== run.report && run.report.hero
     if (run.gains.length > 0 && !debriefing && run.phase !== 'battle' && run.phase !== 'won' && run.phase !== 'lost') return screen + acquired(run, run.gains[0])
     return run.spare ? screen + spareChoice(run, armed) : screen
   }
 
   function phaseScreen(run: Run): string {
     const report = run.report
-    if (run.phase === 'recruit') return !started ? title() : !told ? story() : recruits(run, recruit)
+    if (run.phase === 'select') return !started ? title() : !told ? story() : candidates(run, candidate)
     if (run.phase === 'battle') return ''
     if (run.phase === 'won' || run.phase === 'lost') return runSummary(run)
-    // After a fight: a hero joining, then the debrief, where each soldier owed a skill or perk chooses it, then the rewards.
-    if (report && seen !== report && report.soldiers.length > 0) {
-      if (report.hired && met !== report) return joined(run, report.hired)
-      if (opened.report !== report) opened = { report, still: false }
-      const learner = run.soldiers.find((s) => s.id === ability && owesPick(s))
+    // After a fight: the debrief, where the hero chooses any skill or perk owed, then the rewards.
+    if (report && seen !== report && report.hero) {
+      if (opened.report !== report) {
+        opened = { report, still: false }
+        picking = false
+      }
+      const learner = picking && owesPick(run.hero) ? run.hero : null
       const find = crate !== null && run.finds[crate] ? crate : null
       // A pop-up opened over it leaves the debrief at rest behind: nothing in it plays again.
       if (learner || find !== null) opened.still = true
@@ -169,15 +168,15 @@ export function createUi(act: (action: Action) => void): Ui {
       const debrief = stopReport(run, report, opened.still)
       return learner ? debrief + modal(pickChoice(run, learner, armed)) : find !== null ? debrief + loot(run, find, armed) : debrief
     }
-    if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.soldiers.length > 0 ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run, armed)}`
+    if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.hero ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run, armed)}`
     if (run.phase === 'shop' || run.phase === 'event') {
       // Arriving shows the shop or event; the other tabs stay open to the player while they decide.
       if (phase !== run.phase) tab = 'Map'
       phase = run.phase
-      return overworld(run, tab, open, picked, armed, ware)
+      return overworld(run, tab, picked, armed, ware)
     }
     phase = run.phase
-    return report && seen !== report ? stopReport(run, report) : overworld(run, tab, open, picked)
+    return report && seen !== report ? stopReport(run, report) : overworld(run, tab, picked)
   }
 
   function render(run: Run): void {
@@ -241,7 +240,7 @@ export function createUi(act: (action: Action) => void): Ui {
   })
   addEventListener('resize', () => requestAnimationFrame(shrink))
 
-  /** Sets the squad in to the stop it stands at: a fight dives down through the clouds to it. */
+  /** Sets the hero in to the stop it stands at: a fight dives down through the clouds to it. */
   function setIn(): void {
     const next = nextStop(shown!)
     if (!next) return
@@ -277,7 +276,7 @@ export function createUi(act: (action: Action) => void): Ui {
 
   /** Whether the helicopter is in the air, the map waiting for it to land. */
   let flying = false
-  /** Flies the squad's helicopter from where it stands to the stop `to` is pinned at, then `land`s. */
+  /** Flies the hero's helicopter from where it stands to the stop `to` is pinned at, then `land`s. */
   function fly(to: HTMLElement, land: () => void): void {
     const chopper = overlay.querySelector<HTMLElement>('.chopper')
     const cell = to.closest<HTMLElement>('.cell')
@@ -295,18 +294,18 @@ export function createUi(act: (action: Action) => void): Ui {
   }
   /** Closes the open hero's dossier back into their card, and focuses it. */
   function closeDossier(): void {
-    const index = recruit
-    const card = () => overlay.querySelector<HTMLElement>(`[data-recruit="${index}"]`)
+    const index = candidate
+    const card = () => overlay.querySelector<HTMLElement>(`[data-candidate="${index}"]`)
     flying = true
     collapse(overlay, card()?.getBoundingClientRect(), () => {
       flying = false
-      recruit = null
+      candidate = null
       render(shown!)
       card()?.focus()
     })
   }
   addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && recruit !== null && !flying && shown?.phase === 'recruit') closeDossier()
+    if (e.key === 'Escape' && candidate !== null && !flying && shown?.phase === 'select') closeDossier()
   })
   // Arrow keys move a radio group's choice, as a radio group's do.
   overlay.addEventListener('keydown', (e) => {
@@ -329,8 +328,8 @@ export function createUi(act: (action: Action) => void): Ui {
     if (target.id === 'again') location.href = location.pathname
     else if (target.id === 'start') started = true
     else if (target.id === 'begin' || target.dataset.begin !== undefined) told = true
-    else if (target.dataset.recruit) {
-      recruit = Number(target.dataset.recruit)
+    else if (target.dataset.candidate) {
+      candidate = Number(target.dataset.candidate)
       const card = target.getBoundingClientRect()
       render(shown!)
       return expand(overlay, card)
@@ -341,14 +340,13 @@ export function createUi(act: (action: Action) => void): Ui {
       const index = Number(target.dataset.deploy)
       return deploy(overlay, () => {
         flying = false
-        recruit = null
-        act({ type: 'recruit', index })
+        candidate = null
+        act({ type: 'hero', index })
       })
     }
     else if (target.dataset.stats !== undefined) statsOpen = target.dataset.stats === 'open'
     else if (target.dataset.seen) seen = shown!.report
-    else if (target.dataset.met) met = shown!.report
-    else if (target.dataset.ability) ability = Number(target.dataset.ability)
+    else if (target.dataset.ability) picking = true
     else if (target.dataset.crate) crate = Number(target.dataset.crate)
     else if (target.dataset.ware !== undefined) {
       ware = target.dataset.ware ? Number(target.dataset.ware) : null
@@ -360,10 +358,10 @@ export function createUi(act: (action: Action) => void): Ui {
       ware = null
     }
     else if (target.dataset.pick) {
-      // A stop tapped once is picked to look at; tapped again, the squad sets out for it.
+      // A stop tapped once is picked to look at; tapped again, the hero sets out for it.
       const index = Number(target.dataset.pick)
       if (picked !== index) picked = index
-      // The squad flies there and sets in: a fight dives down through the clouds.
+      // The hero flies there and sets in: a fight dives down through the clouds.
       else return fly(target, () => {
         picked = null
         act({ type: 'go', index })
@@ -371,11 +369,7 @@ export function createUi(act: (action: Action) => void): Ui {
       })
     }
     else if (target.dataset.in !== undefined) return setIn()
-    else if (target.dataset.open) {
-      // Clicking the soldier open closes it.
-      const id = Number(target.dataset.open)
-      open = open === id ? null : id
-    } else if (target.dataset.action) {
+    else if (target.dataset.action) {
       picked = null
       crate = null
       armed = null

@@ -5,7 +5,7 @@ import { random } from './rng'
 import { TUNING } from './tuning'
 
 /** Perk effects combat applies; each is described where it does. */
-export const PERK_EFFECTS = ['heave', 'extraThrow', 'longThrow', 'crushingThrow', 'crashLanding', 'freerunner', 'firemansCarry', 'firstStrike', 'finisher', 'scavenger', 'secondBreath', 'quickDraw'] as const
+export const PERK_EFFECTS = ['heave', 'extraThrow', 'longThrow', 'crushingThrow', 'crashLanding', 'freerunner', 'firstStrike', 'finisher', 'scavenger', 'secondBreath', 'quickDraw'] as const
 export type PerkEffect = (typeof PERK_EFFECTS)[number]
 
 export interface Perk<Id extends string = PerkId> {
@@ -34,7 +34,6 @@ const perks = {
   crashLanding: { name: 'Crash Landing', text: `Landing a jump does ${PERK.landing} damage to each alien beside it`, effect: 'crashLanding', needs: 'springLegs' },
   freerunner: { name: 'Freerunner', text: 'Climbing, jumping and rough ground cost only the tiles crossed', effect: 'freerunner', needs: 'springLegs' },
   fleetFoot: { name: 'Fleet Foot', text: '+1 move', stats: { move: 1 } },
-  firemansCarry: { name: "Fireman's Carry", text: 'Carries a downed ally at full move', effect: 'firemansCarry' },
   toughness: { name: 'Toughness', text: '+2 HP', stats: { hp: 2 } },
   ironGut: { name: 'Iron Gut', text: '+2 HP', stats: { hp: 2 }, needs: 'toughness' },
   padding: { name: 'Padding', text: '+1 armor', stats: { armor: 1 }, needs: 'ironGut' },

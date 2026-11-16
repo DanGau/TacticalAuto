@@ -2,7 +2,7 @@
 import { type Battle, type Unit, type Tile, GRID, type Stance, isSoldier, STANDOFF, MEDIC_REACH, HASTE_MOVE, CHILL_MOVE, type Order, ENGAGE_REACH } from './battle'
 import { barred, blocked, breach, walkingDistances, bulkAt, stepCost, onGrid, NEIGHBORS, distance, strides, jumps } from './grid'
 import type { GameEvent } from './combat-event'
-import { hasAttack, vipOf, pursuers, carrying, nearest, lying, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes, leap } from './fighters'
+import { hasAttack, vipOf, pursuers, nearest, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes, leap } from './fighters'
 import { ESCORT_REACH } from './goals'
 import { canHurlFrom } from './objects'
 import { pushesOff } from './knockback'
@@ -177,10 +177,7 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
   const vip = vipOf(battle)
   if (vip && unit.side === 'human' && battle.vip !== 'freed' && !(battle.vip === 'breached' && battle.round >= RESTLESS_ROUND && enemies.length > 0)) return vip
   if (enemies.length === 0 && !(battle.extract && unit.side === 'human')) return undefined
-  // Getting out, a soldier with its hands free goes for the nearest squadmate down first.
-  if (battle.extract && unit.side === 'human') return (!carrying(battle, unit) && nearest(lying(battle), unit)) || battle.extract
-  const captive = unit.side === 'human' && nearest(lying(battle).filter((d) => battle.captives.some((r) => r.soldier === d.soldier)), unit)
-  if (captive) return captive
+  if (battle.extract && unit.side === 'human') return battle.extract
   // A raider makes for the nearest cache it can walk to until it has as many as it came for; walled off from all, it fights.
   const caches = battle.goal === 'raid' && unit.side === 'human' ? battle.caches.filter((c) => walkingDistances(battle, c, leap(unit))[unit.y * GRID + unit.x] < Infinity) : []
   if (caches.length > 0) return caches.reduce((a, b) => (walkingDistances(battle, b, leap(unit))[unit.y * GRID + unit.x] < walkingDistances(battle, a, leap(unit))[unit.y * GRID + unit.x] ? b : a))
@@ -345,10 +342,10 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
   const end = path.at(-1) ?? unit
   const shot = hasAttack(battle, unit, end, enemies, seen)
-  if (unit.side === 'human' && shot && !battle.extract && !carrying(battle, unit)) battle.strides[unit.id] = move - costOf(battle, unit, path)
+  if (unit.side === 'human' && shot && !battle.extract) battle.strides[unit.id] = move - costOf(battle, unit, path)
   if (unit.side !== 'human' || shot) return path
   // A soldier dashes on to a shot, if one is within a dash.
-  if (isSoldier(unit) && move > 0 && !battle.extract && !carrying(battle, unit)) {
+  if (isSoldier(unit) && move > 0 && !battle.extract) {
     const dash = choose(move + DASH_MOVE)
     if (hasAttack(battle, unit, dash.at(-1) ?? unit, enemies, seen)) return dash
   }
@@ -369,8 +366,7 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
 export function orderFor(battle: Battle, unit: Unit, threatened: boolean): Order | null {
   if (unit.charges > 0 && (unit.ability === 'medic' || unit.ability === 'mech')) return null
   if (leapTo(battle, unit)) return null
-  // A carrier cannot sprint.
-  if (battle.extract) return carrying(battle, unit) ? null : 'sprint'
+  if (battle.extract) return 'sprint'
   return threatened ? 'prepare' : 'sprint'
 }
 
@@ -428,8 +424,8 @@ export function costOf(battle: Battle, unit: Unit, path: Tile[]): number {
   return path.reduce((sum, tile, i) => sum + stepCost(battle, path[i - 1] ?? unit, tile, has(unit, 'hover') || has(unit, 'freerunner')), 0)
 }
 
-/** The move a unit has this turn: haste adds, chill takes, and a carrier without Fireman's Carry walks at half. */
-export const moveOf = (battle: Battle, unit: Unit) => Math.ceil(Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chill > 0 ? CHILL_MOVE : 0)) / (carrying(battle, unit) && !has(unit, 'firemansCarry') ? 2 : 1))
+/** The move a unit has this turn: haste adds, chill takes. */
+export const moveOf = (battle: Battle, unit: Unit) => Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chill > 0 ? CHILL_MOVE : 0))
 
 /** Moves `unit` along `path`, saying how many of its strides are jumps; a jump with Crash Landing hurts each alien beside where it lands. */
 export function walk(battle: Battle, unit: Unit, path: Tile[], events: GameEvent[]): void {

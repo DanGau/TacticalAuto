@@ -13,7 +13,7 @@ import { blocked, distance, walkingDistances } from './grid'
 
 function battle(seed: number): Battle {
   const run = begun(seed)
-  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
+  run.hero.skills = [powerOf(run.hero.cls!)]
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'exterminate'
   apply(run, { type: 'advance' })

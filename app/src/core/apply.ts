@@ -4,24 +4,24 @@ import { fuelTanks } from './objects'
 import { BOON_CHARGES } from './relics'
 import { START_PICKS, UTILITY_PRICE } from './utilities'
 import { arrive, MEDKIT, depart, EVENTS, RELIC_PRICE } from './events'
-import { advance, current, go, nextStop, recruit, ways } from './run'
+import { advance, choose, current, go, nextStop, ways } from './run'
 import { type Run } from './run-state'
-import { gainRelic, takeDuo, takeRelic } from './rewards'
+import { gainRelic, takeRelic } from './rewards'
 import { sellFind } from './rewards'
 import { buyWare } from './rewards'
 import { buyUtility, keepUtility, takeStart } from './rewards'
-import { DRILL_PRICE, GEAR_PRICE } from './rewards'
+import { GEAR_PRICE } from './rewards'
 import { equipFind } from './rewards'
 import { takePerk, takeSkill } from './rewards'
-import { mend, wounded } from './squad'
-import { minorOffers, skillOffers } from './squad'
+import { mend, wounded } from './hero'
+import { minorOffers, skillOffers } from './hero'
 
 export type Action =
-  /** At the run's start: take the recruit at `index` of run.recruits as the first soldier. */
-  | { type: 'recruit'; index: number }
+  /** At the run's start: take the candidate at `index` of run.candidates as the run's hero. */
+  | { type: 'hero'; index: number }
   /** Run start: take the offers at `picks` of run.boonOffers, START_PICKS of them. */
   | { type: 'boons'; picks: number[] }
-  /** Shop: buy the gear at `index` of shop.wares for its owner to wear, discarding what it replaces. */
+  /** Shop: buy the gear at `index` of shop.wares for the hero to wield, discarding what it replaces. */
   | { type: 'gear'; index: number }
   /** Shop: buy the relic at `index` of shop.relics. */
   | { type: 'buy'; index: number }
@@ -29,10 +29,8 @@ export type Action =
   | { type: 'utility'; index: number }
   /** Shop or reward phase, with a utility to spare: drop the one held at `drop`, or with -1, the new one. */
   | { type: 'keep'; drop: number }
-  /** Shop: pay to lower the threat, once. */
+  /** Shop: heal the hero some, once. */
   | { type: 'medkit' }
-  /** Shop: drill the hero `soldier`, by id, as the squad's Carry. */
-  | { type: 'drill'; soldier: number }
   /** Shop: leave for the road. */
   | { type: 'leave' }
   /** Event: meet it the way its option at `index` says. */
@@ -45,17 +43,15 @@ export type Action =
   | { type: 'enter'; utility?: number; tank?: number; second?: number }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
-  /** Reward phase: take the offered duo in place of a relic. */
-  | { type: 'duo' }
-  /** Reward phase: put the find at `find` of run.finds on its owner, discarding what it replaces. */
+  /** Reward phase: put the find at `find` of run.finds on the hero, discarding what it replaces. */
   | { type: 'equip'; find: number }
   /** Reward phase: sell the find at `find` of run.finds. */
   | { type: 'sell'; find: number }
   /** Any time: the player has read the first of run.gains. */
   | { type: 'ack' }
-  /** Reward phase: the soldier with id `soldier` learns the skill at `index` of its offers. */
-  | { type: 'skill'; soldier: number; index: number }
-  | { type: 'perk'; soldier: number; index: number }
+  /** Reward phase: the hero learns the skill, or takes the perk, at `index` of its offers. */
+  | { type: 'skill'; index: number }
+  | { type: 'perk'; index: number }
 
 export type Result = { ok: true } | { ok: false; reason: string }
 
@@ -69,13 +65,13 @@ export function apply(run: Run, action: Action): Result {
     run.gains.shift()
     return ok
   }
-  if (action.type === 'recruit') {
-    if (run.phase !== 'recruit') return no('not recruiting')
-    if (!run.recruits[action.index]) return no('no such recruit')
-    recruit(run, action.index)
+  if (action.type === 'hero') {
+    if (run.phase !== 'select') return no('not choosing a hero')
+    if (!run.candidates[action.index]) return no('no such hero')
+    choose(run, action.index)
     return ok
   }
-  if (run.phase === 'recruit') return no('choose a recruit first')
+  if (run.phase === 'select') return no('choose a hero first')
   if (action.type === 'boons') {
     const { picks } = action
     if (run.boonOffers.length === 0) return no('no boons on offer')
@@ -103,11 +99,6 @@ export function apply(run: Run, action: Action): Result {
     keepUtility(run, action.drop)
     return ok
   }
-  if (action.type === 'duo') {
-    if (run.phase !== 'reward' || run.duoOffer === null) return no('no duo on offer')
-    takeDuo(run)
-    return ok
-  }
   if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill' || action.type === 'perk') {
     if (run.phase !== 'reward') return no('nothing to choose')
     if (action.type === 'relic') {
@@ -115,34 +106,26 @@ export function apply(run: Run, action: Action): Result {
       if (!id) return no('no such relic')
       takeRelic(run, id)
     } else if (action.type === 'skill') {
-      const soldier = run.soldiers.find((s) => s.id === action.soldier)
-      if (!soldier || !skillOffers(soldier)[action.index]) return no('no such skill on offer')
-      takeSkill(run, soldier, action.index)
+      if (!skillOffers(run.hero)[action.index]) return no('no such skill on offer')
+      takeSkill(run, action.index)
     } else if (action.type === 'perk') {
-      const soldier = run.soldiers.find((s) => s.id === action.soldier)
-      if (!soldier || !minorOffers(soldier)[action.index]) return no('no such perk on offer')
-      takePerk(run, soldier, action.index)
+      if (!minorOffers(run.hero)[action.index]) return no('no such perk on offer')
+      takePerk(run, action.index)
     } else {
       if (!run.finds[action.find]) return no('no such find')
       if (action.type === 'sell') sellFind(run, action.find)
-      else {
-        const soldier = run.soldiers.find((s) => s.id === run.finds[action.find].owner)
-        if (!soldier) return no('its hero is gone')
-        equipFind(run, action.find, soldier)
-      }
+      else equipFind(run, action.find)
     }
     return ok
   }
-  if (action.type === 'gear' || action.type === 'buy' || action.type === 'utility' || action.type === 'medkit' || action.type === 'drill' || action.type === 'leave') {
+  if (action.type === 'gear' || action.type === 'buy' || action.type === 'utility' || action.type === 'medkit' || action.type === 'leave') {
     const shop = run.shop
     if (run.phase !== 'shop' || !shop) return no('not in a shop')
     if (action.type === 'gear') {
       const ware = shop.wares[action.index]
       if (!ware || ware.sold) return no('no such gear for sale')
-      const soldier = run.soldiers.find((s) => s.id === ware.gear.owner)
-      if (!soldier) return no('its hero is gone')
       if (GEAR_PRICE[ware.gear.rarity as keyof typeof GEAR_PRICE] > run.supplies) return no('not enough supplies')
-      buyWare(run, action.index, soldier)
+      buyWare(run, action.index)
     } else if (action.type === 'buy') {
       const relic = shop.relics[action.index]
       if (!relic || relic.sold) return no('no such relic for sale')
@@ -157,18 +140,11 @@ export function apply(run: Run, action: Action): Result {
       buyUtility(run, action.index)
     } else if (action.type === 'medkit') {
       if (shop.medkit) return no('medkit already bought')
-      if (!wounded(run)) return no('no hero is hurt')
+      if (!wounded(run)) return no('the hero is not hurt')
       if (MEDKIT.price > run.supplies) return no('not enough supplies')
       run.supplies -= MEDKIT.price
       mend(run, MEDKIT.heal)
       shop.medkit = true
-    } else if (action.type === 'drill') {
-      if (!shop.drill || shop.drill.sold !== null) return no('no drill on offer')
-      if (!run.soldiers.some((s) => s.id === action.soldier)) return no('no such hero')
-      if (DRILL_PRICE > run.supplies) return no('not enough supplies')
-      run.supplies -= DRILL_PRICE
-      run.carry = action.soldier
-      shop.drill.sold = action.soldier
     } else depart(run)
     return ok
   }

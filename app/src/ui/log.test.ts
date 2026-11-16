@@ -17,7 +17,7 @@ test("a hero's shot logs as who, with what, how much and to whom; plain walks lo
     for (const e of step(run)) {
       const line = logLine(run, battle, names, e)
       if (e.type === 'move' && e.src.kind === 'basic') expect(line).toBeNull()
-      if (line && e.type === 'shot' && run.soldiers.some((s) => line.startsWith(s.name))) lines.push(line)
+      if (line && e.type === 'shot' && line.startsWith(run.hero.name)) lines.push(line)
     }
   }
   expect(lines.length).toBeGreaterThan(0)

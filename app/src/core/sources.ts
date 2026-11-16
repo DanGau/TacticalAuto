@@ -4,7 +4,6 @@ import type { Ability, Effect, Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { CLASSES } from './classes'
 import { DOCTRINES } from './doctrines'
-import { DUOS } from './duos'
 import { EFFECTS } from './gear'
 import type { SecondaryId } from './secondaries'
 import { SKILL_EFFECTS } from './skill-effects'
@@ -24,10 +23,10 @@ export const BASICS = { attack: 'Attack', throw: 'Throw', jump: 'Jump', move: 'M
 
 export const has = <T extends object>(table: T, id: string): id is Extract<keyof T, string> => Object.hasOwn(table, id)
 
-/** The kind an effect comes from: a class ability or duo, a weapon's own, a doctrine's, a skill's, a perk's, a gear mod's, a basic; any other is a relic's. */
+/** The kind an effect comes from: a class ability, a weapon's own, a doctrine's, a skill's, a perk's, a gear mod's, a basic; any other is a relic's. */
 export function srcOf(effect: Effect | Ability): Src {
   const kind = ((): SrcKind => {
-    if (Object.values(CLASSES).some((c) => c.ability === effect) || has(DUOS, effect)) return 'class'
+    if (Object.values(CLASSES).some((c) => c.ability === effect) ) return 'class'
     if (has(EXAMS, effect) && effect !== 'thorns') return 'alien'
     if (Object.values(WEAPONS).some((w) => w.effect === effect)) return 'weapon'
     if (effect === 'reckoning' || Object.values(DOCTRINES).some((d) => d.effect === effect)) return 'doctrine'

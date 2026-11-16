@@ -22,7 +22,7 @@ export function arena(effects: Effect[], spots: Tile[]): { battle: Battle; hero:
   battle.north.fill('none')
   battle.west.fill('none')
   reshaped(battle)
-  const hero = battle.units.find((u) => u.soldier === run.soldiers[0].id)!
+  const hero = battle.units.find((u) => u.soldier === run.hero.id)!
   const model = battle.units.find((u) => u.side === 'alien')!
   Object.assign(hero, { x: 10, y: 10, stance: 'anchor', ability: null, charges: 0, effects, spent: [], weapon: undefined, secondary: undefined, stats: { ...hero.stats, move: 0, range: 8 } })
   const aliens = spots.map((tile, i) => ({ ...model, id: 1000 + i, ...tile, kind: 'trooper' as const, boss: false, target: false, spawns: false, resists: [], effects: [], revealed: true, engaged: true, cluster: 0, hp: 40, armor: 0, stats: { ...alienStats('trooper', 0, 0), hp: 40, move: 0, range: 8 } }))

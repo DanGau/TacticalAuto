@@ -3,14 +3,13 @@ import { PLATES_UNDER } from './exams'
 import { attackSrc, fx, srcOf } from './sources'
 import { type Battle, type Unit, BASE_STATS, GUARD_MAX, SUPPRESS_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_STACKS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE, STAGGER_DAMAGE, VOLATILE_DAMAGE, NUMB_SOAK, OVERKILL_FROM } from './battle'
 import { cloakOn } from './abilities'
-import { duoCrit, duoDamage, duoHit } from './duo-effects'
 import { afterHit, EARTHSHAKER_DAMAGE, hallowed, INTANGIBLE_CHANCE } from './keystones'
 import { freeTilesNear, blocked, crumble, wreck, onGrid, NEIGHBORS, distance } from './grid'
 import { PARRY_SOAK } from './doctrines'
 import { FRAG_SPLASH, KNOCK_TILES, type Secondary } from './secondaries'
 import type { GameEvent, ShotEvent } from './combat-event'
 import { aiming, powering, onTile, has, spend, shootable, nearest, enemiesOf, MIRROR_IMAGES, inAura, fireproof, BOUNTY_DAMAGE, immune, FIRE_TURNS } from './fighters'
-import { armorCap, carried, carryOverkill, displaced, volley, WEAKEN_TURNS, burnFrom, chillFrom, chillUnit, empower, highCrit, kindle, markUnit, scaledDamage, spendStacks, stackDamage, struck } from './stacks'
+import { armorCap, carryOverkill, displaced, volley, WEAKEN_TURNS, burnFrom, chillFrom, chillUnit, empower, highCrit, kindle, markUnit, scaledDamage, spendStacks, stackDamage, struck } from './stacks'
 import { land, mend, wound } from './wound'
 import { shoveOff, drive, knockback, knocksInto, pushesOff } from './knockback'
 import { SLAM_DAMAGE } from './wound'
@@ -130,7 +129,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     (enemy.numb > 0 ? NUMB_SOAK : 0) +
     (shielded ? BLOCK_SOAK : 0)
 
-  const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.mark > 0, 'apex', 1) + when(enemy.hp <= enemy.stats.hp / 2, 'deadeye', 1) + when(unit.hp <= unit.stats.hp / 2, 'berserk', 1) > 0 || duoCrit(battle, unit, enemy, events)
+  const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.mark > 0, 'apex', 1) + when(enemy.hp <= enemy.stats.hp / 2, 'deadeye', 1) + when(unit.hp <= unit.stats.hp / 2, 'berserk', 1) > 0
   const crit = !enemy.resists.includes('crit') && (sure || (blow ? (blow.crit ??= random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)) : random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)))
   unit.hits++
   // A mirror hits as hard as the squad's hardest hitter; a feeder as hard as it has grown.
@@ -157,8 +156,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     when(enemy.boss, 'bounty', BOUNTY_DAMAGE) +
     stackDamage(battle, unit, enemy, used, events) +
     spendStacks(battle, unit, enemy, used, events) +
-    fury(battle, unit, enemy) +
-    duoDamage(battle, unit, enemy, events)
+    fury(battle, unit, enemy)
   // Light shots split bonuses by power too; a heavy blow adds them once. A fraction is a chance of one point more, so small shots add up to their share.
   const power = blow?.kit.power ?? 1
   // Might adds whole to every shot, so many shots multiply it.
@@ -250,11 +248,11 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
       wound(battle, other, burst, events)
     }
   }
-  if (enemy.hp > 0 && (when(true, 'mark', 1) || when(true, 'apex', 1) || when(true, 'tracer', 1) || when(crit, 'exploit', 1))) markUnit(enemy, carried(unit, 1))
+  if (enemy.hp > 0 && (when(true, 'mark', 1) || when(true, 'apex', 1) || when(true, 'tracer', 1) || when(crit, 'exploit', 1))) markUnit(enemy, 1)
   const cryo = damage > 0 && unit.ability === 'cryo'
   if (enemy.hp > 0 && enemy.numb === 0 && !enemy.resists.includes('chill') && (when(damage > 0, 'frostbite', 1) || (first && cryo) || when(crit, 'freeze', 1))) {
     events.push(fx(enemy.id, has(unit, 'frostbite') ? 'frostbite' : cryo ? 'cryo' : 'freeze', 0))
-    chillUnit(battle, enemy, carried(unit, chillFrom(unit)), events)
+    chillUnit(battle, enemy, chillFrom(unit), events)
     if (when(true, 'glacial', 1) + when(true, 'rimeLock', 1) > 0) enemy.rooted = CHILL_TURNS
   }
   if (enemy.hp > 0 && crit && enemy.chill > 0 && when(true, 'deepFreeze', 1)) {
@@ -300,7 +298,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     events.push(fx(enemy.id, 'concussion', 0))
   }
   if (enemy.hp > 0 && enemy.numb === 0 && !fireproof(battle, enemy) && ((damage > 0 && has(unit, 'incendiary')) || (first && damage > 0 && has(unit, 'tinder')) || when(crit, 'ignite', 1))) {
-    kindle(battle, enemy, carried(unit, has(unit, 'incendiary') && !first ? 1 : burnFrom(unit)), events)
+    kindle(battle, enemy, has(unit, 'incendiary') && !first ? 1 : burnFrom(unit), events)
     events.push(fx(enemy.id, has(unit, 'incendiary') ? 'incendiary' : has(unit, 'tinder') ? 'tinder' : 'ignite', 0))
   }
   if (damage > 0 && has(unit, 'vampiric')) mend(unit, 1, 'vampiric', events)
@@ -323,7 +321,6 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   }
   if (secondary && damage > 0) secondaryHit(battle, unit, enemy, beside, secondary, events)
   afterHit(battle, unit, enemy, damage, beside, events)
-  duoHit(battle, unit, enemy, damage, { crit, unseen }, beside, events)
   if (first && enemy.kind === 'brute' && enemy.hp > 0 && unit.hp > 0) charge(battle, enemy, unit, events)
   if (first && damage > 0) hold(unit, enemy, events)
   return blow ? events : [...events, ...again(battle, unit, seen, granted, enemy.hp <= 0)]

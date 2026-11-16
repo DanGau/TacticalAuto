@@ -168,7 +168,7 @@ export async function createView(): Promise<View> {
     settle: () => attacks,
     async show(run, events, animate) {
       const { fx, sprites } = s
-      s.soldiers = run.soldiers
+      s.hero = run.hero
       s.rigging = run.utilities.includes('tank')
       fx.clear()
       const battle = run.battle

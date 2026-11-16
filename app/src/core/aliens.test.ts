@@ -35,7 +35,7 @@ test('a mission musters packs its depth allows, for exactly its force, and a lon
  */
 function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }[]): { battle: Battle; soldier: Unit; aliens: Unit[]; until: (done: (events: GameEvent[]) => boolean) => GameEvent[] } {
   const run = begun(1)
-  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
+  run.hero.skills = [powerOf(run.hero.cls!)]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   enterAt(run)
@@ -188,14 +188,11 @@ test('a soldier on overwatch shoots an alien that moves in its sights on the ali
   expect(events[shot - 1]).toMatchObject({ type: 'move', id: aliens[0].id })
 })
 
-test('revive gets a fallen squadmate back up, once', () => {
+test('revive gets the hero back up once as it falls', () => {
   const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
-  const medic: Unit = { ...structuredClone(soldier), id: 900, x: 11, y: 10, effects: ['revive'] }
-  battle.units.push(medic)
-  for (const unit of [soldier, medic]) unit.stats = { ...unit.stats, move: 0, range: 0 }
+  soldier.effects = ['revive']
+  soldier.stats = { ...soldier.stats, move: 0, range: 0 }
   soldier.hp = 1
-  medic.hp = 500
-  medic.stats = { ...medic.stats, hp: 99999 }
   aliens[0].stats = { ...aliens[0].stats, move: 0, crit: 0 }
   const events = until((all) => all.some((e) => e.type === 'effect' && e.effect === 'revive'))
   expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: soldier.id, effect: 'revive', amount: REVIVE_HEALTH }))

@@ -54,7 +54,7 @@ export function upkeep(battle: Battle): GameEvent[] {
       stormBlows(battle, unit, events)
     }
     if (has(unit, 'vitality')) {
-      for (const mate of battle.units.filter((u) => u.side === unit.side && u !== unit && u.hp < u.stats.hp && distance(u, unit) <= AURA_REACH)) {
+      for (const mate of battle.units.filter((u) => u.side === unit.side && u.hp < u.stats.hp && distance(u, unit) <= AURA_REACH)) {
         mate.hp++
         events.push(fx(mate.id, 'vitality', 1))
       }

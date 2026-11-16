@@ -30,7 +30,6 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `abilities.ts` | Actions in place of a shot: alien powers, soldier skills and gear |
 | `keystones.ts` | Deep path powers: what a hit sets off, their numbers |
 | `follow-ups.ts` | Command's ally attack, Blade Dance's extra strikes |
-| `duo-effects.ts` | What each duo does in battle |
 | `ultimates.ts` | Ultimates, once-a-battle capstones: when each fires and what it does |
 | `wound.ts` | Damage landing, what it sets off, the battle tally |
 | `stacks.ts` | Stacks a fight builds and what they set off: burn, chill and freezing and how they cancel, moving, Might, combos, exposure, every-Nth hits; payoffs that spend them, shots a volley fires |
@@ -51,8 +50,8 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `run-state.ts` | Run state types (`Run`, `Soldier`, `Stop`, `Leg`, `Mission`) |
 | `run.ts` | `createRun`, the route and each leg's map of stops, moving along it |
 | `progress.ts` | How far along the run is, and threat |
-| `squad.ts` | Soldiers: experience, levels, skills, stats, health, hiring |
-| `rewards.ts` | Gear, relic and duo rewards, the shop, settling the reward phase |
+| `hero.ts` | The hero: experience, levels, skills, stats, health, the candidates a run starts from |
+| `rewards.ts` | Gear and relic rewards, the shop, settling the reward phase |
 | `missions.ts` | Missions: their force, aliens, goal and place |
 | `debrief.ts` | `endBattle`: settling a battle into the run |
 | `events.ts` | Unknown stops' events |
@@ -60,7 +59,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 ## core/: content and helpers
 
-`aliens`, `challenges`, `classes`, `doctrines`, `duos`, `exams`, `feats`, `gear`, `goals`, `powers`, `quantities`, `relics`, `secondaries`, `skill-effects`, `skills`, `twists`, `utilities`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`, `arena`: test helpers.
+`aliens`, `challenges`, `classes`, `doctrines`, `exams`, `feats`, `gear`, `goals`, `powers`, `quantities`, `relics`, `secondaries`, `skill-effects`, `skills`, `twists`, `utilities`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`, `arena`: test helpers.
 
 ## view/: battle rendering
 
@@ -72,7 +71,6 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `play.ts` | Plays a beat's events in order |
 | `effects.ts` | Shots, lunges, rockets, sparks, shake, callouts |
 | `ultimates.ts` | An ultimate on screen: its name, colour and shape |
-| `duos.ts` | A duo's moment on screen |
 | `sprites.ts` | Unit pictures and moving them |
 | `badges.ts` | The stacks and counts over a unit's head, the same size on any screen |
 | `marks.ts` | Ground marks: the way in, goals, fences, acid, fog, glows |

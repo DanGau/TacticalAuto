@@ -4,7 +4,7 @@ import { apply, type Action } from '../core/apply'
 import { createRun, KEYS, nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Mission } from '../core/run-state'
-import { health } from '../core/squad'
+import { health } from '../core/hero'
 import { distance } from '../core/grid'
 import { timedFlow } from '../core/step'
 import type { DoctrineId } from '../core/doctrines'
@@ -17,16 +17,15 @@ import { carries, type UtilityId } from '../core/utilities'
 import { forksOf, type Fork } from './forks'
 import { restForks, type RestFork } from './rest'
 
-/** Whether a party met a challenge with an answer it picked, with one it held and left behind, or with none. */
+/** Whether the hero met a challenge with an answer it picked, with one it held and left behind, or with none. */
 export type Answer = 'picked' | 'held' | 'none'
 
-/** A battle's toll: which of the run it was, the leg it was on, the squad's most health, its health at the start and end, soldiers downed, whether it was won, and what it tested. */
+/** A battle's toll: which of the run it was, the leg it was on, the hero's most health, its health at the start and end, whether it fell, whether it was won, and what it tested. */
 export interface Toll {
   /** Which battle of the run it was, from 1. */
   nth: number
   leg: number
-  party: number
-  /** The kind of mission: a battle, key, final, ambush or recovery. */
+  /** The kind of mission: a battle, key, final or ambush. */
   kind: Mission['kind']
   /** Whether it had a boss or commander: a key, final, ambush, Big one or takedown. */
   elite: boolean
@@ -46,7 +45,7 @@ export interface Toll {
   healed: number
 }
 
-/** What the squad holds from the start of a run: doctrines and relics, and a gear effect on every hero's weapon that has none, so gear found with its own effect still counts. */
+/** What the hero holds from the start of a run: doctrines and relics, and a gear effect on its weapon if it has none, so gear found with its own effect still counts. */
 export interface Loadout {
   doctrines?: DoctrineId[]
   relics?: RelicId[]
@@ -69,7 +68,7 @@ export interface RunResult {
   moments: { falls: number; fallKills: number; throws: number; farthest: number }
   /** By arena kind: battles fought there, and the jumps units made in them. */
   jumps: Partial<Record<ArenaKind, { battles: number; jumps: number }>>
-  /** Each battle's toll on the squad's health. */
+  /** Each battle's toll on the hero's health. */
   tolls: Toll[]
   /** With `forks` asked for: each deploy screen played on with every utility. */
   forks: Fork[]
@@ -83,7 +82,7 @@ export interface RunResult {
   rests: { safehouses: number; medkits: number }
 }
 
-/** How the party met the battle's challenge, given the utilities it held going in. */
+/** How the hero met the battle's challenge, given the utilities it held going in. */
 function answerOf(battle: NonNullable<Run['battle']>, held: UtilityId[]): Answer {
   const answers = battle.challenge ? CHALLENGES[battle.challenge].answers : []
   if (battle.utility && carries(battle.utility, answers)) return 'picked'
@@ -101,7 +100,7 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
   run.doctrines.push(...(loadout.doctrines ?? []))
   run.relics = [...run.relics, ...(loadout.relics ?? [])]
   const arm = () => {
-    if (loadout.effect) for (const s of run.soldiers) if (s.gear && !s.gear.effect) s.gear.effect = loadout.effect
+    if (loadout.effect && run.hero?.gear && !run.hero.gear.effect) run.hero.gear.effect = loadout.effect
   }
   arm()
   const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], restForks: [], actions: [], found: Array<number>(KEYS + 1).fill(0), rests: { safehouses: 0, medkits: 0 } }
@@ -109,7 +108,7 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
   let leaps = 0
   /** This battle's hardest hero hit, its boss, and the round the boss was first wounded. */
   let hits = { max: 0, boss: -1, from: -1, rounds: null as number | null }
-  /** The battle under way, its leg, the squad's health as it began, and the utilities it held. */
+  /** The battle under way, its leg, the hero's health as it began, and the utilities it held. */
   let begun: [Run['battle'], number, number, UtilityId[], boolean] = [null, 0, 0, [], false]
   let had: { leg: number; held: (UtilityId | null)[] } = { leg: 0, held: [] }
   while (run.phase !== 'won' && run.phase !== 'lost') {
@@ -118,7 +117,7 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
     had = { leg: run.keys, held }
     const battle = run.battle
     if (run.phase === 'battle' && begun[0] !== battle) {
-      begun = [battle, run.keys, run.soldiers.reduce((sum, s) => sum + health(run, s), 0), [...run.utilities], battle!.units.some((u) => u.boss || u.target)]
+      begun = [battle, run.keys, health(run, run.hero), [...run.utilities], battle!.units.some((u) => u.boss || u.target)]
       hits = { max: 0, boss: battle!.units.find((u) => u.boss)?.id ?? -1, from: -1, rounds: null }
     }
     if (run.phase === 'battle' && battle!.phase === 'battle') {
@@ -143,8 +142,8 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
         leaps = 0
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
-        const fought = run.report!.soldiers
-        result.tolls.push({ nth: result.battles, leg: begun[1], party: fought.length, kind: run.mission!.kind, elite: begun[4], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3]), most: fought.reduce((sum, s) => sum + s.maxHp, 0), before: begun[2], after: fought.reduce((sum, s) => sum + s.hp, 0), downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.reduce((sum, s) => sum + s.tally.healed, 0) })
+        const fought = run.report!.hero!
+        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[4], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3]), most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
         clock = { next: 0, done: 0 }
       }
       continue
@@ -171,7 +170,7 @@ export function replay(seed: number, actions: Action[]): Run {
   return play(seed, () => queue.shift()!).run
 }
 
-/** Plays a run with `bot`, the squad holding `loadout` from the start. */
+/** Plays a run with `bot`, the hero holding `loadout` from the start. */
 export function runWith(seed: number, bot: Bot, loadout: Loadout = {}, forks = false, rests = false): RunResult {
   const rng = { rng: seed }
   return play(seed, (run) => bot(run, rng), loadout, forks, rests).result

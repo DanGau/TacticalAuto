@@ -7,7 +7,6 @@ export interface Report {
   runs: number
   wins: number
   lostToBattle: number
-  lostToRecovery: number
   lostToAmbush: number
   lostToExtraction: number
   lostToFinal: number
@@ -20,9 +19,9 @@ export interface Report {
   moments: { falls: number; fallKills: number; throws: number; farthest: number }
   /** Jumps a battle, by arena kind. */
   jumps: Record<string, number>
-  /** What battles cost the squad, as shares of its most health in percent: lost and left, each by mean, and left by leg; points lost; soldiers downed a battle; battles ended under 75%. */
+  /** What battles cost the hero, as shares of its most health in percent: lost and left, each by mean, and left by leg; points lost; falls a battle; battles ended under 75%. */
   attrition: { lost: number; hp: number; points: number; downed: number; worn: number; legs: number[] }
-  /** Runs lost, by the squad's health entering the last battle: sudden from SUDDEN up, attrition under WORN, mixed between; the share of sudden ones with a boss or commander; and what the sudden ones were. */
+  /** Runs lost, by the hero's health entering the last battle: sudden from SUDDEN up, attrition under WORN, mixed between; the share of sudden ones with a boss or commander; and what the sudden ones were. */
   losses: { sudden: number; mixed: number; attrition: number; elite: number; what: string }
   /** Battles begun from SUDDEN up that ended under SPIKE or lost, in percent of such battles, by what they were. */
   spikes: { rate: number; what: string }
@@ -81,7 +80,6 @@ export function report(results: RunResult[]): Report {
     runs: results.length,
     wins: results.filter((r) => r.won).length,
     lostToBattle: lost('battle'),
-    lostToRecovery: lost('recovery'),
     lostToAmbush: lost('ambush'),
     lostToExtraction: lost('key'),
     lostToFinal: lost('final'),
@@ -108,7 +106,7 @@ export function report(results: RunResult[]): Report {
   }
 }
 
-/** Shares of the squad's most health: entering a fatal battle at SUDDEN or more makes a loss sudden, under WORN attrition; a battle begun at SUDDEN that ends under SPIKE is a spike. */
+/** Shares of the hero's most health: entering a fatal battle at SUDDEN or more makes a loss sudden, under WORN attrition; a battle begun at SUDDEN that ends under SPIKE is a spike. */
 export const SUDDEN = 0.75
 export const WORN = 0.5
 export const SPIKE = 0.25
@@ -143,7 +141,6 @@ export function formatReport(r: Report): string {
     `runs                ${r.runs}`,
     `wins                ${percent(r.wins)}`,
     `lost a battle       ${percent(r.lostToBattle)}`,
-    `lost a recovery     ${percent(r.lostToRecovery)}`,
     `lost an ambush      ${percent(r.lostToAmbush)}`,
     `lost an extraction  ${percent(r.lostToExtraction)}`,
     `lost final mission  ${percent(r.lostToFinal)}`,
@@ -152,7 +149,7 @@ export function formatReport(r: Report): string {
     `battle seconds      median ${r.seconds.median}, p90 ${r.seconds.p90}, max ${r.seconds.max}`,
     `a battle            ${r.moments.falls} falls, ${r.moments.fallKills} fall kills, ${r.moments.throws} throws, farthest ${r.moments.farthest} tiles`,
     `jumps a battle      ${Object.entries(r.jumps).map(([kind, n]) => `${kind} ${n}`).join(', ')}`,
-    `squad health        loses ${r.attrition.lost}% (${r.attrition.points}) a battle, ends at ${r.attrition.hp}%; ${r.attrition.worn}% of battles end under 75%; ${r.attrition.downed} downed a battle`,
+    `hero health         loses ${r.attrition.lost}% (${r.attrition.points}) a battle, ends at ${r.attrition.hp}%; ${r.attrition.worn}% of battles end under 75%; ${r.attrition.downed} fell a battle`,
     `ends at, by leg     ${r.attrition.legs.map((n) => `${n}%`).join(', ')}`,
     `losses by health   ${r.losses.sudden}% sudden (began the last battle at ${100 * SUDDEN}%+), ${r.losses.mixed}% mixed, ${r.losses.attrition}% attrition (under ${100 * WORN}%); ${r.losses.elite}% of sudden had a boss`,
     `sudden losses       ${r.losses.what}`,
@@ -168,25 +165,25 @@ export function formatReport(r: Report): string {
 /** Each bot's win rate on the same seeds, best first. */
 export const ranked = (rates: Record<string, number>) => Object.entries(rates).sort((a, b) => b[1] - a[1]).map(([name, rate]) => `${name.padEnd(12)}${`${Math.round(100 * rate)}%`.padStart(5)}`).join('\n')
 
-/** One row of the diagnosis: how battles of a challenge went, by whether the party met it with an answer. */
+/** One row of the diagnosis: how battles of a challenge went, by whether the hero met it with an answer. */
 export interface Row {
   challenge: ChallengeId
-  party: number
+  leg: number
   answer: Answer
   battles: number
   won: number
-  /** Health lost, as a share of the party's most, in percent. */
+  /** Health lost, as a share of the hero's most, in percent. */
   lost: number
 }
 
-/** Battles of each challenge, by party size and answer. */
+/** Battles of each challenge, by leg and answer. */
 export function rows(results: RunResult[]): Row[] {
   const tolls = results.flatMap((r) => r.tolls)
   return (Object.keys(CHALLENGES) as ChallengeId[]).flatMap((challenge) =>
-    [1, 2, 3].flatMap((party) => (['picked', 'held', 'none'] as const).flatMap((answer): Row[] => {
-      const of = tolls.filter((t) => t.challenge === challenge && t.party === party && t.answer === answer)
+    [0, 1, 2, 3].flatMap((leg) => (['picked', 'held', 'none'] as const).flatMap((answer): Row[] => {
+      const of = tolls.filter((t) => t.challenge === challenge && t.leg === leg && t.answer === answer)
       if (of.length === 0) return []
-      return [{ challenge, party, answer, battles: of.length, won: Math.round((100 * of.filter((t) => t.won).length) / of.length), lost: Math.round((100 * of.reduce((sum, t) => sum + (t.before - t.after) / t.most, 0)) / of.length) }]
+      return [{ challenge, leg, answer, battles: of.length, won: Math.round((100 * of.filter((t) => t.won).length) / of.length), lost: Math.round((100 * of.reduce((sum, t) => sum + (t.before - t.after) / t.most, 0)) / of.length) }]
     })),
   )
 }
@@ -205,12 +202,12 @@ const CHEAP = { won: 95, lost: 20 }
 export function verdicts(of: Row[]): string[] {
   const found: string[] = []
   for (const row of of) {
-    const name = `${CHALLENGES[row.challenge].name} (party of ${row.party})`
+    const name = `${CHALLENGES[row.challenge].name} (leg ${row.leg + 1})`
     if (row.answer === 'held') found.push(`BOT: held an answer to ${name} and went in without it, ${row.battles} times`)
     if (row.battles < READ_FROM) continue
     if (row.answer === 'picked' && row.won < HARD) found.push(`GAME: ${name} too hard even with its answer: won ${row.won}% of ${row.battles}`)
     if (row.answer === 'none' && row.won >= CHEAP.won && row.lost < CHEAP.lost) found.push(`GAME: a mismatch on ${name} costs too little: won ${row.won}%, lost ${row.lost}% health`)
-    const none = of.find((r) => r.challenge === row.challenge && r.party === row.party && r.answer === 'none')
+    const none = of.find((r) => r.challenge === row.challenge && r.leg === row.leg && r.answer === 'none')
     if (row.answer === 'picked' && none && none.battles >= READ_FROM && row.lost >= none.lost && row.won <= none.won) found.push(`GAME: the answer to ${name} does not answer it: lost ${row.lost}% health with, ${none.lost}% without`)
   }
   return found
@@ -242,8 +239,8 @@ export function byGoal(results: RunResult[]): string {
 }
 
 export function formatDiagnosis(bot: string, of: Row[]): string {
-  const head = `${bot}: challenge, party, answer, battles, won, health lost`
-  const lines = of.map((r) => `${CHALLENGES[r.challenge].name.padEnd(14)}${r.party}  ${r.answer.padEnd(9)}${String(r.battles).padStart(7)}${`${r.won}%`.padStart(6)}${`${r.lost}%`.padStart(13)}`)
+  const head = `${bot}: challenge, leg, answer, battles, won, health lost`
+  const lines = of.map((r) => `${CHALLENGES[r.challenge].name.padEnd(14)}${r.leg + 1}  ${r.answer.padEnd(9)}${String(r.battles).padStart(7)}${`${r.won}%`.padStart(6)}${`${r.lost}%`.padStart(13)}`)
   const found = verdicts(of)
   return [head, ...lines, ...(found.length > 0 ? found : ['nothing off'])].join('\n')
 }

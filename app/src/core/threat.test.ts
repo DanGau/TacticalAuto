@@ -16,7 +16,7 @@ beforeAll(() => void Object.assign(TUNING, { alienHp: 0.4 }))
 
 function arena(aliens: { kind: AlienKind; x: number; y: number }[]): { battle: Battle; hero: Unit; aliens: Unit[] } {
   const run = begun(1)
-  run.soldiers[0].skills = [powerOf(run.soldiers[0].cls!)]
+  run.hero.skills = [powerOf(run.hero.cls!)]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   enterAt(run)

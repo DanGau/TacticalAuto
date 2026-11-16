@@ -6,7 +6,6 @@ import { weaponAttack } from './attack'
 import { WEAPONS } from './weapons'
 import { GRID, type Battle, ACID_DAMAGE, BURN_STACKS, isSoldier, type Unit, type Tile, ENGAGE_REACH, STANDOFF } from './battle'
 import { opening } from './landing'
-import { soldierUnit } from './spawn'
 import { breach } from './grid'
 import { freeTilesNear } from './grid'
 import { walkingDistances } from './grid'
@@ -14,7 +13,7 @@ import { blowRigged } from './objects'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { engage, immune, onTile, fireproof, foeHas, has, lying, extractReach, carrying, BEACON_REACH, vipOf, nearest, extractionFrom, pursuers, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
+import { engage, immune, onTile, fireproof, foeHas, has, extractReach, BEACON_REACH, vipOf, nearest, extractionFrom, pursuers, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
 import { fleePath, fightPath, walk, paths, costOf, bestPath, COHESION, POCKET } from './pathing'
 import { detects, sees } from './sight'
 import { upkeep } from './upkeep'
@@ -70,33 +69,12 @@ export function sight(battle: Battle): GameEvent[] {
   const sighted = aliens.filter((u) => !u.revealed && soldiers.some((s) => detects(battle, s, u)))
   for (const alien of sighted) alien.revealed = true
   if (sighted.length > 0) events.push({ type: 'reveal', units: sighted.map(({ id, x, y }) => ({ id, x, y })) })
-  // Getting out, a soldier with its hands free beside a squadmate down picks them up.
-  for (const body of battle.extract ? lying(battle) : []) {
-    const carrier = soldiers.find((s) => distance(s, body) <= 1 && !carrying(battle, s))
-    if (!carrier) continue
-    body.carrier = carrier.id
-    events.push({ type: 'carried', id: carrier.id, soldier: body.soldier })
-  }
-  // A soldier beside a squadmate the aliens hold gets them up, at half health.
-  for (const body of lying(battle)) {
-    const captive = battle.captives.find((r) => r.soldier === body.soldier)
-    const rescuer = captive && soldiers.find((s) => distance(s, body) <= 1)
-    if (!captive || !rescuer) continue
-    battle.captives.splice(battle.captives.indexOf(captive), 1)
-    battle.downed.splice(battle.downed.indexOf(body), 1)
-    const [tile] = freeTilesNear(battle, body, 1)
-    const unit = soldierUnit(battle, captive, tile)
-    unit.hp = Math.ceil(unit.stats.hp / 2)
-    battle.units.push(unit)
-    events.push({ type: 'freed', id: rescuer.id, unit: { id: unit.id, x: unit.x, y: unit.y } })
-  }
   events.push(...escortVip(battle))
-  // A soldier at the extraction zone, or in the crowd at it, lifts off, with whoever it carries, once any VIP has.
+  // A soldier at the extraction zone, or in the crowd at it, lifts off, once any VIP has.
   for (const soldier of battle.extract && battle.vip !== 'freed' ? soldiers.filter((s) => atExtraction(battle, s)) : []) {
     battle.units.splice(battle.units.indexOf(soldier), 1)
-    battle.escaped.push(soldier.soldier!, ...battle.downed.filter((d) => d.carrier === soldier.id).map((d) => d.soldier))
+    battle.escaped.push(soldier.soldier!)
     battle.lifted[soldier.soldier!] = soldier.hp
-    battle.downed = battle.downed.filter((d) => d.carrier !== soldier.id)
     events.push({ type: 'escaped', id: soldier.id })
   }
   // A soldier or its mech beside a raid's cache grabs it, so a crowd of mechs cannot bar the way.

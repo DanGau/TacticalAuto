@@ -239,7 +239,6 @@ export const PERK_ICONS: Record<PerkId, string> = {
   crashLanding: '<path d="M12 3v10M8 9l4 4 4-4M4 20l3-3M20 20l-3-3M12 20v0M3 21h18"/>',
   freerunner: '<path d="M3 20h5v-5h5v-5h5V5"/><path d="M15 4l3-1 1 3"/>',
   fleetFoot: '<path d="M5 18h9l5-3-4-2-3-6H8l-3 11z"/><path d="M3 9h3M2 13h3"/>',
-  firemansCarry: '<circle cx="12" cy="5" r="2"/><path d="M12 8v6l-3 7M12 14l3 7M5 10h14"/>',
   toughness: '<path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/><path d="M12 9v6M9 12h6"/>',
   ironGut: '<rect x="6" y="5" width="12" height="14" rx="3"/><path d="M6 10h12M6 14h12M12 5v14"/>',
   padding: '<path d="M5 6c4-2 10-2 14 0v7c0 4-3 6-7 8-4-2-7-4-7-8z"/><path d="M8 9v5M12 9v6M16 9v5"/>',

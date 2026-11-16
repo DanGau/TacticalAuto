@@ -39,7 +39,6 @@ export const STOP_NAMES: Record<StopKind | Mission["kind"], string> = {
   key: "Guardian",
   final: "The alien source",
   ambush: "Ambush",
-  recovery: "Recovery",
 };
 
 /** A soldier's health as a red bar and a count, and the armor it starts each fight with as a yellow bar after it. */

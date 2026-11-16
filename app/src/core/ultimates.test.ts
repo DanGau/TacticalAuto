@@ -102,16 +102,11 @@ test('Level the Block and Orbital Lance flatten what stands in reach', () => {
   expect(lance.battle.props[10 * 96 + 16]).toBe('none')
 })
 
-test('Resurrection raises the fallen and heals all; Phoenix Rising comes back from death', () => {
-  const { battle, hero, beats } = arena(['resurrection'], crowd)
-  const fallen = { ...hero, id: 700, soldier: 99, hp: 0 }
-  battle.downed.push({ soldier: 99, x: 8, y: 8, carrier: null, unit: fallen })
+test('Resurrection heals fully at a third of HP; Phoenix Rising comes back from death', () => {
+  const { hero, beats } = arena(['resurrection'], crowd)
   hero.hp = 3
   beats(1)
-  expect(battle.units.includes(fallen)).toBe(true)
-  expect(fallen.hp).toBe(fallen.stats.hp)
   expect(hero.hp).toBe(hero.stats.hp)
-  expect(battle.downed).toEqual([])
 
   const phoenix = arena(['phoenixRising'], crowd)
   Object.assign(phoenix.hero, { hp: 1, stats: { ...phoenix.hero.stats, damage: 0 } })

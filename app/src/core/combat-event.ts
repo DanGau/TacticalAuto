@@ -3,7 +3,6 @@ import type { Prop } from './terrain'
 import type { Tile, Effect, Ability, Order, Side } from './battle'
 import type { UtilityId } from './utilities'
 import type { SecondaryId } from './secondaries'
-import type { DuoId } from './duos'
 import type { Src } from './sources'
 
 /** Every event of an action carries `src`, what the action comes from. */
@@ -33,12 +32,8 @@ export type GameEvent =
   | { type: 'feed'; src: Src; id: number; damage: number }
   /** A soldier reaches a civilian and gets them out. */
   | { type: 'saved'; id: number }
-  /** A soldier reaches the extraction zone and lifts off, with any squadmate it carries. */
+  /** A soldier reaches the extraction zone and lifts off. */
   | { type: 'escaped'; id: number }
-  /** A soldier picks up the downed soldier `soldier` to carry out. */
-  | { type: 'carried'; id: number; soldier: number }
-  /** A soldier reaches a squadmate the aliens held, who gets up and fights as `unit`. */
-  | { type: 'freed'; id: number; unit: { id: number; x: number; y: number } }
   /** A soldier grabs a raid's supply cache. */
   | { type: 'grabbed'; id: number; x: number; y: number }
   /** A psion panics a soldier, who loses its next action. */
@@ -57,8 +52,6 @@ export type GameEvent =
   | { type: 'wave'; units: { id: number; x: number; y: number }[] }
   /** A boss spawns a swarmling, or an engineer deploys a mech. */
   | { type: 'spawn'; src: Src; id: number; unit: { id: number; x: number; y: number } }
-  /** A duo's two heroes, `ids`, act together, on the unit `target` if any. */
-  | { type: 'duo'; src: Src; duo: DuoId; ids: number[]; target?: number }
   | { type: 'death'; id: number }
   /** A utility takes hold on the units `on`, or with `ended`, its rounds run out. */
   | { type: 'used'; src: Src; utility: UtilityId; on: number[]; ended?: true }

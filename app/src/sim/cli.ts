@@ -14,7 +14,7 @@ const { values } = parseArgs({
     runs: { type: 'string', default: '100' },
     'seed-start': { type: 'string', default: '0' },
     bot: { type: 'string', default: 'standard' },
-    /** Doctrines, comma-separated, the squad holds from the start of every run. */
+    /** Doctrines, comma-separated, the hero holds from the start of every run. */
     doctrine: { type: 'string', default: '' },
     /** Print battles by challenge and answer, and whose fault what is off is. */
     diagnose: { type: 'boolean', default: false },

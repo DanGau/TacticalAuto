@@ -1,4 +1,4 @@
-// Challenge encounters: what each tests, what answers it, its tiers by party size, and the force each sends.
+// Challenge encounters: what each tests, what answers it, its tiers by leg, and the force each sends.
 import type { AlienKind } from './aliens'
 import type { Stats } from './battle'
 import type { Goal } from './goals'
@@ -10,7 +10,7 @@ export type ChallengeId = 'slog' | 'firingLine' | 'ironWall' | 'swarm' | 'scatte
 
 /**
  * `answers`: the effects that meet it, best first. `volley`: every alien fires from the start, across the ground it holds.
- * `grim`: the alien force, by party size less one and then by rung, each rung harder.
+ * `grim`: the alien force, by leg and then by rung, each rung harder; the hub reads the last leg's.
  */
 export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test: string; answers: EffectId[]; volley?: true; grim: number[][] }> = {
   slog: { name: 'Slog', icon: '🌿', test: 'Small groups of shooters scattered across a swamp, firing from the start; its mire takes three times the move to cross', answers: ['hover', 'rangedShield', 'thrusters', 'farsight'], volley: true, grim: [[2, 3, 4], [3, 4, 6], [5, 7, 8]] },
@@ -22,14 +22,14 @@ export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test:
   killBox: { name: 'Kill box', icon: '💥', test: 'The way in lands right beside a packed cluster that hits first', answers: ['flashbang', 'smoke', 'meleeShield', 'dampener', 'ironSkin'], grim: [[3, 5, 6], [6, 8, 10], [9, 12, 15]] },
 }
 
-/** The challenges a party meets, by its size less one and the rung of the leg: harder ones arrive up each tier. */
+/** The challenges the hero meets, by leg and rung: harder ones arrive up each tier. */
 export const TIERS: ChallengeId[][][] = [
   [['scattered', 'swarm', 'ironWall'], ['scattered', 'swarm', 'ironWall', 'slog', 'killBox'], ['swarm', 'ironWall', 'slog', 'killBox', 'firingLine', 'bigOne']],
   [['swarm', 'ironWall', 'slog', 'killBox'], ['scattered', 'swarm', 'ironWall', 'slog', 'killBox', 'firingLine'], ['scattered', 'slog', 'killBox', 'firingLine', 'bigOne']],
   [['scattered', 'swarm', 'ironWall', 'slog', 'killBox', 'firingLine'], ['scattered', 'swarm', 'ironWall', 'slog', 'firingLine', 'bigOne'], ['swarm', 'ironWall', 'killBox', 'firingLine', 'bigOne']],
 ]
 
-/** Which challenges fit a goal: a flood's aliens come to the squad, so it meets nothing it must cross, nor a swarm, a second flood. */
+/** Which challenges fit a goal: a flood's aliens come to the hero, so it meets nothing it must cross, nor a swarm, a second flood. */
 const FLOOD_GOALS: Goal[] = ['hold', 'rescue']
 const FITS_FLOOD: ChallengeId[] = ['ironWall', 'bigOne']
 
@@ -37,9 +37,12 @@ const FITS_FLOOD: ChallengeId[] = ['ironWall', 'bigOne']
 const RUNG_EVERY = 3
 export const rungOf = (column: number) => Math.min(2, Math.floor(column / RUNG_EVERY))
 
-/** A challenge for a battle of `goal`, none of `taken` if it can be, for a party of `party` at `rung`. */
-export function drawChallenge(rng: { rng: number }, party: number, rung: number, goal: Goal, taken: ChallengeId[]): ChallengeId {
-  const tier = TIERS[Math.min(party, TIERS.length) - 1][rung]
+/** A row of a table by leg: the hub reads the last. */
+const byLeg = <T>(rows: T[], leg: number): T => rows[Math.min(leg, rows.length - 1)]
+
+/** A challenge for a battle of `goal`, none of `taken` if it can be, on `leg` at `rung`. */
+export function drawChallenge(rng: { rng: number }, leg: number, rung: number, goal: Goal, taken: ChallengeId[]): ChallengeId {
+  const tier = byLeg(TIERS, leg)[rung]
   const fit = FLOOD_GOALS.includes(goal) ? tier.filter((id) => FITS_FLOOD.includes(id)) : tier
   const open = (fit.length > 0 ? fit : FITS_FLOOD).filter((id) => !taken.includes(id))
   const pool = open.length > 0 ? open : fit.length > 0 ? fit : FITS_FLOOD
@@ -61,26 +64,25 @@ const FORCES: Record<ChallengeId, AlienKind[]> = {
 const REINFORCEMENTS: AlienKind[] = ['brute', 'brute', 'sprinter']
 
 /** The aliens of a challenge at `rung`: its grim count moved by what the risk and the goal add. */
-export function forceOf(id: ChallengeId, party: number, rung: number, more: number): AlienKind[] {
-  const { grim } = CHALLENGES[id]
-  const count = Math.max(1, grim[Math.min(party, grim.length) - 1][rung] + more)
+export function forceOf(id: ChallengeId, leg: number, rung: number, more: number): AlienKind[] {
+  const count = Math.max(1, byLeg(CHALLENGES[id].grim, leg)[rung] + more)
   return Array.from({ length: count }, (_, i) => (id === 'scattered' && i >= sentries(count) ? REINFORCEMENTS[i % REINFORCEMENTS.length] : FORCES[id][i % FORCES[id].length]))
 }
 
-/** What a challenge's ground does to its aliens' stats, by party size less one. */
+/** What a challenge's ground does to its aliens' stats, armor by leg. */
 export const STIFFEN: Partial<Record<ChallengeId, { range?: number; armor?: number[] }>> = {
   slog: { range: 3 },
   firingLine: { range: 4 },
   ironWall: { armor: [5, 8, 10] },
 }
 
-/** A big one's boss: its health over a soldier's base, its armor and its damage, by party size less one and rung. */
-export function bigOneStats(party: number, rung: number, base: Stats): Stats {
-  const size = Math.min(party, 3) - 1
+/** A big one's boss: its health over a hero's base, its armor and its damage, by leg and rung. */
+export function bigOneStats(leg: number, rung: number, base: Stats): Stats {
+  const size = Math.min(leg, 2)
   return { ...base, hp: [12, 60, 105][size] + [3, 12, 17][size] * rung, armor: [7, 14, 28][size] + [1, 3, 4][size] * rung, damage: base.damage + 2 + 2 * size + Math.floor(rung / 2) }
 }
 
 /** Of a Scattered's force of `count`, the sentries posted; the rest are the reinforcements. */
 export const sentries = (count: number) => Math.ceil(count * 0.3)
-/** The round a Scattered's reinforcements start: what walking and dashing `tour` tiles takes a squad of `move` with Thrusters on, and a round for each pair of its `posted` sentries to fall. */
+/** The round a Scattered's reinforcements start: what walking and dashing `tour` tiles takes a hero of `move` with Thrusters on, and a round for each pair of its `posted` sentries to fall. */
 export const deadlineFor = (tour: number, move: number, posted: number) => 1 + Math.ceil(posted / 2) + Math.ceil(tour / (1.6 * (move + THRUST)))

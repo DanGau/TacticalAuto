@@ -12,7 +12,7 @@ import { weaponIcon } from './weapon-icons'
 import type { Run, Soldier } from '../core/run-state'
 import { SECONDARIES } from '../core/secondaries'
 import { BASICS, type SrcKind } from '../core/sources'
-import { abilityOf, secondaryOf } from '../core/squad'
+import { abilityOf, secondaryOf } from '../core/hero'
 import { SKILLS } from '../core/skills'
 import { UTILITIES } from '../core/utilities'
 import { WEAPONS } from '../core/weapons'
@@ -59,7 +59,7 @@ export function installKit(view: View, run: Run): void {
   const show = (e: PointerEvent) => {
     const battle = run.phase === 'battle' ? run.battle : null
     const unit = battle && battle.phase === 'battle' ? battle.units.find((u) => u.id === view.unitAt(e.clientX, e.clientY)) : undefined
-    const hero = unit?.soldier !== null && unit ? run.soldiers.find((s) => s.id === unit.soldier) : undefined
+    const hero = unit && unit.soldier === run.hero.id ? run.hero : undefined
     card.hidden = !hero
     if (!hero) return
     card.innerHTML = kitCard(run, hero, battle)

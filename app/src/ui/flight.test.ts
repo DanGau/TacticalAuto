@@ -55,7 +55,7 @@ test('on the flight map, at every stop of every leg, trails never cross nor run 
   }
   for (let seed = 0; seed < SEEDS; seed++) {
     const run = createRun(seed)
-    apply(run, { type: 'recruit', index: seed % run.recruits.length })
+    apply(run, { type: 'hero', index: seed % run.candidates.length })
     apply(run, { type: 'boons', picks: [0, 1] })
     for (let key = 0; key < KEYS; key++) {
       for (let stop = 0; stop < legOf(run).columns.length; stop++) {
@@ -77,7 +77,7 @@ test('every stop the player can take next is on screen and clear to tap, at ever
   let source = 0
   for (let seed = 0; seed < 60; seed++) {
     const run = createRun(seed)
-    apply(run, { type: 'recruit', index: seed % run.recruits.length })
+    apply(run, { type: 'hero', index: seed % run.candidates.length })
     apply(run, { type: 'boons', picks: [0, 1] })
     for (let key = 0; key <= KEYS; key++) {
       run.keys = key
@@ -102,7 +102,7 @@ test('the tunnel, taken at every stop of every leg, leaves the squad at its last
     for (let key = 0; key < KEYS; key++) {
       for (let at = 0; at + 2 < LEG_STOPS; at++) {
         const run = createRun(seed)
-        apply(run, { type: 'recruit', index: seed % run.recruits.length })
+        apply(run, { type: 'hero', index: seed % run.candidates.length })
         apply(run, { type: 'boons', picks: [0, 1] })
         run.keys = key
         for (let c = 0; c <= at; c++) {
@@ -115,10 +115,10 @@ test('the tunnel, taken at every stop of every leg, leaves the squad at its last
         const taken = apply(run, { type: 'choose', index: 0 })
         if (!taken.ok) found.push(`${label}: ${taken.reason}`)
         const { pins, focus } = flight(run, null)
-        const squad = pins.filter((pin) => pin.squad)
+        const stand = pins.filter((pin) => pin.stand)
         const stood = `${key}-${at}-${legOf(run).path[at]}`
-        if (squad.length !== 1 || squad[0].id !== stood || squad[0].at !== focus) found.push(`${label}: squad not at ${stood}`)
-        if (squad[0].next.join() !== ways(run).map((i) => `${key}-${at + 3}-${i}`).join()) found.push(`${label}: no trails to the ways out`)
+        if (stand.length !== 1 || stand[0].id !== stood || stand[0].at !== focus) found.push(`${label}: hero not at ${stood}`)
+        if (stand[0].next.join() !== ways(run).map((i) => `${key}-${at + 3}-${i}`).join()) found.push(`${label}: no trails to the ways out`)
         for (const [w, h] of [[1280, 800], [390, 844]]) found.push(...tangled(run, w, h).map((t) => `${label} ${w}px: ${t}`))
         while (run.stop < legOf(run).columns.length) {
           const open = ways(run)

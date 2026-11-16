@@ -1,13 +1,13 @@
 import { expect, test } from 'vitest'
 import { begun } from '../core/roads'
-import { skillOffers, xpFor, PICK_LEVELS } from '../core/squad'
+import { skillOffers, xpFor, PICK_LEVELS } from '../core/hero'
 import { powerOf, SKILLS, TREES } from '../core/skills'
 import { rule, skillState, treeMap, treeView } from './tree'
 
-const recruit = () => ({ ...begun(1).soldiers[0], xp: xpFor(PICK_LEVELS[1]) })
+const fresh = () => ({ ...begun(1).hero, xp: xpFor(PICK_LEVELS[1]) })
 
 test('each skill shows its state: the power taken, the offers pickable, the turned down lost, the paths not taken locked', () => {
-  const hero = recruit()
+  const hero = fresh()
   const cls = hero.cls!
   expect(skillState(hero, powerOf(cls))).toBe('taken')
   const entries = skillOffers(hero)
@@ -21,7 +21,7 @@ test('each skill shows its state: the power taken, the offers pickable, the turn
 })
 
 test('before the first pick, the tree shows each path by its entry and capstones, its rows between unnamed', () => {
-  const hero = recruit()
+  const hero = fresh()
   const { paths } = TREES[hero.cls!]
   expect(treeView(hero).kind).toBe('choose')
   const shown = treeMap(hero).split('<details')[0]
@@ -34,7 +34,7 @@ test('before the first pick, the tree shows each path by its entry and capstones
 })
 
 test('once committed, the tree shows the taken path, the offer in full, the next row by name, and the other paths closed', () => {
-  const hero = { ...recruit(), xp: xpFor(PICK_LEVELS[2]) }
+  const hero = { ...fresh(), xp: xpFor(PICK_LEVELS[2]) }
   const [path, ...others] = TREES[hero.cls!].paths
   hero.skills = [...hero.skills, path.rows[0][0]]
   expect(treeView(hero)).toMatchObject({ kind: 'path', path, offer: path.rows[1], next: path.rows[2], closed: others.map((p) => p.name) })

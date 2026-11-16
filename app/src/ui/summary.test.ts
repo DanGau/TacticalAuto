@@ -4,7 +4,7 @@ import { apply } from '../core/apply'
 import { createRun } from '../core/run'
 import { step } from '../core/step'
 import { scale } from './charts'
-import { battleColumns, battlePage, colours, heroMarks, runSummary } from './summary'
+import { battleColumns, battlePage, heroMarks, runSummary } from './summary'
 
 function playedRun() {
   const run = createRun(5)
@@ -18,11 +18,11 @@ function playedRun() {
   return { run, battles }
 }
 
-test('a whole run ends in a summary of its heroes and a column per battle, each battle with a page, and no accuracy', () => {
+test('a whole run ends in a summary of its hero and a column per battle, each battle with a page, and no accuracy', () => {
   const { run, battles } = playedRun()
   expect(run.log.length).toBe(battles)
   const end = runSummary(run)
-  for (const hero of run.soldiers) expect(end).toContain(hero.name)
+  expect(end).toContain(run.hero.name)
   expect(end).toContain(run.phase === 'won' ? 'Earth is saved' : 'Ended by')
   expect((end.match(/class="col /g) ?? []).length).toBe(battles)
   const page = battlePage(run, run.log[0])
@@ -36,20 +36,16 @@ test('scale is a percent of the largest or of the sum, and 0 for nothing', () =>
   expect(scale([0, 0], 'sum')).toEqual([0, 0])
 })
 
-test('a hero keeps one colour, and each mark and column tells its exact numbers', () => {
+test('each mark and column tells its exact numbers', () => {
   const { run } = playedRun()
-  const colour = colours(run)
-  const fought = run.log[0]
-  const [damage, tanked] = heroMarks(fought.soldiers, colour)
-  fought.soldiers.forEach((s, i) => {
-    expect(damage.marks[i].value).toBe(s.tally.dealt)
-    expect(damage.marks[i].colour).toBe(colour.get(s.name))
-    expect(tanked.marks[i].tip.join(' ')).toContain(`${s.tally.taken} to health, ${s.tally.blocked} to armor`)
-  })
+  const { tally } = run.log[0]
+  const [damage, tanked] = heroMarks({ name: run.hero.name, cls: run.hero.cls, tally })
+  expect(damage.marks[0].value).toBe(tally.dealt)
+  expect(tanked.marks[0].tip.join(' ')).toContain(`${tally.taken} to health, ${tally.blocked} to armor`)
   const cols = battleColumns(run)
   run.log.forEach((f, i) => {
-    expect(cols[i].up.map((m) => m.value)).toEqual(f.soldiers.map((s) => s.tally.dealt))
-    expect(cols[i].down).toBe(f.soldiers.reduce((sum, s) => sum + s.tally.taken + s.tally.blocked, 0))
+    expect(cols[i].up.map((m) => m.value)).toEqual([f.tally.dealt])
+    expect(cols[i].down).toBe(f.tally.taken + f.tally.blocked)
     expect(cols[i].tip[0]).toContain(f.won ? 'won' : 'lost')
   })
 })

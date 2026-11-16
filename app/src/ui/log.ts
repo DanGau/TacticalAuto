@@ -15,7 +15,7 @@ export type Names = Map<number, string>
 
 /** What a source belongs to, in brackets after its name: a skill's path, a class power's class, a weapon's type. */
 function context(run: Run, src: Src, actor: number | undefined, battle: Battle): string {
-  const soldier = run.soldiers.find((s) => s.id === battle.units.find((u) => u.id === actor)?.soldier)
+  const soldier = battle.units.find((u) => u.id === actor)?.soldier === run.hero.id ? run.hero : undefined
   if (src.kind === 'skill') {
     for (const cls of [...(soldier?.cls ? [soldier.cls] : []), ...(Object.keys(TREES) as ClassId[])]) {
       const id = treeOf(cls).find((id) => SKILLS[id].effect === src.id || id === src.id)
@@ -57,17 +57,17 @@ function outcome(e: GameEvent, names: Names): string {
 export function logLine(run: Run, battle: Battle, names: Names, e: GameEvent): string | null {
   if (!('src' in e) || ((e.type === 'move' || e.type === 'order') && e.src.kind === 'basic')) return null
   // An effect's id is the unit it acts on; its doer is unknown.
-  const actor = e.type === 'effect' || e.type === 'used' || e.type === 'duo' ? undefined : e.id
-  const kit = { skills: run.soldiers.flatMap((s) => s.skills), weapons: run.soldiers.flatMap((s) => s.gear?.weapon ?? []) }
+  const actor = e.type === 'effect' || e.type === 'used' ? undefined : e.id
+  const kit = { skills: run.hero.skills, weapons: run.hero.gear ? [run.hero.gear.weapon] : [] }
   const ctx = context(run, e.src, actor ?? (e.type === 'effect' ? e.id : undefined), battle)
-  const who = e.type === 'duo' ? e.ids.map((id) => names.get(id)).join(' + ') : actor !== undefined && actor >= 0 ? names.get(actor) : ''
+  const who = actor !== undefined && actor >= 0 ? names.get(actor) : ''
   const what = `${tag(e.src.kind, sourceName(e.src, kit))}${ctx ? ` <small>(${ctx})</small>` : ''}`
   return [who, what, outcome(e, names)].filter(Boolean).join(' · ')
 }
 
 /** Learns the names of the battle's units. */
 export function learnNames(run: Run, battle: Battle, names: Names): void {
-  for (const u of battle.units) names.set(u.id, u.soldier !== null ? (run.soldiers.find((s) => s.id === u.soldier)?.name ?? 'Hero') : u.kind ? ALIENS[u.kind].name : u.civilian ? 'Civilian' : 'Mech')
+  for (const u of battle.units) names.set(u.id, u.soldier !== null ? (u.soldier === run.hero.id ? run.hero.name : 'Hero') : u.kind ? ALIENS[u.kind].name : u.civilian ? 'Civilian' : 'Mech')
 }
 
 /** The log panel, collapsed by default; it starts over each battle and shows only in one. */

@@ -57,22 +57,22 @@ function changes(held: Gear | null, next: Gear): string[] {
 }
 
 /**
- * `gear` beside the weapon its owner holds now, what it changes, and two buttons: Equip, and `last`, selling or leaving it.
+ * `gear` beside the weapon the hero holds now, what it changes, and two buttons: Equip, and `last`, selling or leaving it.
  * Unarmed, the gear arrives.
  */
 function gearChoice(run: Run, gear: Gear, armed: string | null, heading: string, equip: string, last: { label: string; attrs: string }): string {
-  const owner = run.soldiers.find((s) => s.id === gear.owner)
-  const held = owner?.gear ?? null
+  const hero = run.hero
+  const held = hero.gear
   const diff = changes(held, gear)
-  return `<div class="gearswap"><h1>${owner ? `<span class="portrait">${badge(owner.cls)}</span> New ${WEAPONS[gear.weapon].name.toLowerCase()} for ${owner.name}` : 'New gear'}</h1><h2>${heading}</h2>
+  return `<div class="gearswap"><h1><span class="portrait">${badge(hero.cls)}</span> New ${WEAPONS[gear.weapon].name.toLowerCase()} for ${hero.name}</h1><h2>${heading}</h2>
     <div class="compare">
       <div class="side now ${held?.rarity ?? ''}"><span class="tag">NOW</span>${held ? `${full(held)}<small>${weaponDoes(held)}</small>` : '<b>Empty hands</b>'}</div>
       <div class="side found${armed ? '' : ' arrive'} ${gear.rarity}"><span class="new">NEW</span>${full(gear)}<small>${weaponDoes(gear)}</small>${diff.length > 0 ? `<ul class="changes">${diff.join('')}</ul>` : ''}</div>
     </div>
-    <div class="actions">${owner ? `<button class="decide confirm" ${equip}>Equip on ${owner.name}</button>` : ''}<button class="confirm" ${last.attrs}>${last.label}</button></div></div>`
+    <div class="actions"><button class="decide confirm" ${equip}>Equip on ${hero.name}</button><button class="confirm" ${last.attrs}>${last.label}</button></div></div>`
 }
 
-/** The find at `index`, with `note` after its heading: equipped on its owner, dropping theirs, or sold. */
+/** The find at `index`, with `note` after its heading: equipped on the hero, dropping its own, or sold. */
 export function findSwap(run: Run, index: number, armed: string | null, note = ''): string {
   const { rarity } = run.finds[index]
   return gearChoice(run, run.finds[index], armed, `Equip it or sell it${note}`, act({ type: 'equip', find: index }), { label: `Sell · <span class="value">+${SELL[rarity]} supplies</span>`, attrs: act({ type: 'sell', find: index }) })

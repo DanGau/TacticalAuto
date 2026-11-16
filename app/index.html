@@ -112,7 +112,7 @@
       .story { max-width: 640px; margin: 8vh auto 0; animation: none; }
       .story p, .story button { font-size: 19px; line-height: 1.6; color: #e8e2c8; animation: rise 1.1s backwards; }
       .story p { margin: 0 0 18px; }
-      /* The recruit choice: three small cards over a swaying globe; one opens into a dossier, the globe sliding behind the hero. */
+      /* The choice of hero: three small cards over a swaying globe; one opens into a dossier, the globe sliding behind the hero. */
       .picking { position: relative; z-index: 1; min-height: calc(100vh / var(--ui, 1) - 40px); display: flex; flex-direction: column; justify-content: flex-end; padding: 0; }
       .picking > h2 { position: fixed; top: 18px; left: 0; right: 0; margin: 0; font-size: 22px; letter-spacing: 2px; text-transform: uppercase; color: #e8e2c8; text-shadow: 0 2px 8px #0a1626; pointer-events: none; }
       #panel:has(.picking) { overflow: hidden; }
@@ -123,23 +123,22 @@
       .picking.opened .cell.chosen { opacity: 0; }
       /* A glow is cut off at the edge of the window the globe slid from. */
       .picking.opened .land { filter: none; }
-      .joined .dossier { background: radial-gradient(circle at 30% 50%, #16324f, #0a1626 70%); }
       .deploying .dossier { background: transparent; transition: background 0.4s; }
       .picking.opened > h2, .picking.opened .choices { opacity: 0; transition: opacity 0.3s; }
       .picking .cell { transform: none; }
       .picking .cell .home { display: block; transform: translate(-50%, -50%); width: 10px; height: 10px; border-radius: 50%; background: #c77dff; box-shadow: 0 0 8px #c77dff; text-indent: 16px; line-height: 10px; white-space: nowrap; font-size: 12px; color: #e8e2c8; text-shadow: 0 0 4px #0a1626, 0 0 4px #0a1626; }
       .picking .cell .home.chosen { background: #ffd166; box-shadow: 0 0 0 6px #ffd16633, 0 0 16px #ffd166; color: #ffd166; font-weight: bold; font-size: 15px; }
       .menu.picking .choices { position: relative; margin: 0 0 12px; gap: 20px; text-align: left; }
-      .choices .recruit { flex: 0 1 260px; display: grid; grid-template-columns: 52px 1fr; grid-template-rows: auto auto auto auto; column-gap: 14px; row-gap: 2px; align-items: center; padding: 16px 18px; border-radius: 14px; border: 1px solid #4a5a7880; background: linear-gradient(160deg, #263553e6, #141b29f0); backdrop-filter: blur(6px); box-shadow: 0 10px 30px #0008; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; animation: rise 0.6s backwards; }
-      .choices .recruit:nth-child(2) { animation-delay: 0.1s; }
-      .choices .recruit:nth-child(3) { animation-delay: 0.2s; }
-      .choices .recruit:hover, .choices .recruit:focus-visible { transform: translateY(-4px); border-color: #ffd84d; box-shadow: 0 14px 34px #000a, 0 0 0 1px #ffd84d55; background: linear-gradient(160deg, #2e4066f0, #171f30f5); }
-      .recruit .emblem { grid-row: 1 / span 2; width: 52px; height: 52px; display: grid; place-items: center; font-size: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #4da3ff55, #10141c); border: 1px solid #4da3ff88; }
-      .recruit .cls, .dossier .cls { color: #ffd84d; text-transform: uppercase; letter-spacing: 1.5px; font-size: 11px; }
-      .recruit .cls { align-self: end; }
-      .recruit .name { font-size: 20px; align-self: start; line-height: 1.2; }
-      .recruit .line { grid-column: 1 / -1; font-size: 13px; color: #c9d2e3; margin-top: 4px; }
-      .recruit .line + .line { margin-top: 0; }
+      .choices .candidate { flex: 0 1 260px; display: grid; grid-template-columns: 52px 1fr; grid-template-rows: auto auto auto auto; column-gap: 14px; row-gap: 2px; align-items: center; padding: 16px 18px; border-radius: 14px; border: 1px solid #4a5a7880; background: linear-gradient(160deg, #263553e6, #141b29f0); backdrop-filter: blur(6px); box-shadow: 0 10px 30px #0008; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; animation: rise 0.6s backwards; }
+      .choices .candidate:nth-child(2) { animation-delay: 0.1s; }
+      .choices .candidate:nth-child(3) { animation-delay: 0.2s; }
+      .choices .candidate:hover, .choices .candidate:focus-visible { transform: translateY(-4px); border-color: #ffd84d; box-shadow: 0 14px 34px #000a, 0 0 0 1px #ffd84d55; background: linear-gradient(160deg, #2e4066f0, #171f30f5); }
+      .candidate .emblem { grid-row: 1 / span 2; width: 52px; height: 52px; display: grid; place-items: center; font-size: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #4da3ff55, #10141c); border: 1px solid #4da3ff88; }
+      .candidate .cls, .dossier .cls { color: #ffd84d; text-transform: uppercase; letter-spacing: 1.5px; font-size: 11px; }
+      .candidate .cls { align-self: end; }
+      .candidate .name { font-size: 20px; align-self: start; line-height: 1.2; }
+      .candidate .line { grid-column: 1 / -1; font-size: 13px; color: #c9d2e3; margin-top: 4px; }
+      .candidate .line + .line { margin-top: 0; }
       .dossier { position: fixed; inset: 0; z-index: 3; display: grid; grid-template-columns: 1fr minmax(360px, 440px); gap: 24px; align-items: center; padding: 32px max(32px, calc(50% - 600px)); background: linear-gradient(90deg, #0a162600 30%, #0a1626cc 62%, #0a1626f2); text-align: left; }
       .dossier .stage { --unit: 1; position: relative; height: min(70vh, 520px); perspective: 700px; }
       .dossier .stage > * { position: absolute; left: 50%; }
@@ -157,7 +156,6 @@
       .dossier .key b { font-size: 16px; }
       .dossier .key span { font-size: 13px; line-height: 1.4; color: #c9d2e3; }
       .dossier .statblock { margin: 0; }
-      .dossier .duos { font-size: 12px; color: #9aa6bd; }
       .dossier .actions { display: flex; gap: 12px; margin-top: 6px; }
       .dossier .actions button { flex: 1; padding: 12px; font-size: 16px; }
       .dossier .actions .decide { flex: 2; }
@@ -166,16 +164,16 @@
       @keyframes idle { 50% { transform: translateY(-6px); } }
       @media (max-width: 700px) {
         .menu.picking .choices { flex-direction: column; align-items: stretch; gap: 10px; margin: 0 4px 8px; }
-        .choices .recruit { flex: none; max-width: none; padding: 12px 14px; }
+        .choices .candidate { flex: none; max-width: none; padding: 12px 14px; }
         .picking.opened .globe { transform: translateY(-11%); }
         .picking > h2 { font-size: 26px; }
-        .recruit .emblem { width: 64px; height: 64px; font-size: 32px; }
-        .choices .recruit { grid-template-columns: 64px 1fr; }
-        .recruit .cls { font-size: 15px; }
-        .recruit .name { font-size: 28px; }
-        .recruit .line { font-size: 19px; }
+        .candidate .emblem { width: 64px; height: 64px; font-size: 32px; }
+        .choices .candidate { grid-template-columns: 64px 1fr; }
+        .candidate .cls { font-size: 15px; }
+        .candidate .name { font-size: 28px; }
+        .candidate .line { font-size: 19px; }
         .dossier h2 { font-size: 40px; }
-        .dossier .cls, .dossier .home, .dossier .key .label, .dossier .duos { font-size: 15px; }
+        .dossier .cls, .dossier .home, .dossier .key .label { font-size: 15px; }
         .dossier .key b { font-size: 21px; }
         .dossier .key span { font-size: 18px; }
         .dossier .statblock small { font-size: 13px; }
@@ -193,7 +191,6 @@
         .dossier .who { position: absolute; top: 10px; left: max(16px, env(safe-area-inset-left)); display: flex; flex-direction: column; text-shadow: 0 2px 6px #000; }
         .dossier .about { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-content: center; }
         .dossier .about > .statblock, .dossier .about > .actions { grid-column: 1 / -1; }
-        .dossier .about > .duos { align-self: center; }
         .dossier h2 { font-size: 24px; margin: 0; }
         .dossier .key { padding: 6px 10px; }
         .dossier .key span { font-size: 12px; line-height: 1.3; }
@@ -225,7 +222,7 @@
       .node.done { opacity: 0.55; }
       .node.here { box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; }
       .globe .cell.choice { z-index: 2; }
-      .globe .cell:not(.choice):not(.squad) .node { transform: scale(0.75); opacity: 0.75; }
+      .globe .cell:not(.choice):not(.stand) .node { transform: scale(0.75); opacity: 0.75; }
       button.option { position: relative; padding: 0; border: none; background: none; border-radius: 50%; }
       button.option .node { width: 40px; height: 40px; line-height: 40px; font-size: 22px; border-color: #ffd166; box-shadow: 0 0 0 3px #ffd166, 0 0 16px #ffd166; animation: pulse 1.6s ease-in-out infinite; }
       button.option::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid #ffd166; animation: ripple 1.6s ease-out infinite; pointer-events: none; }
@@ -246,7 +243,7 @@
       .globe.arrived .isle { animation: fade 0.4s both; }
       .globe.arrived .cell.choice { animation: rise 0.5s 0.3s both; }
       .globe.diving { transition: transform 1.4s cubic-bezier(0.6, 0, 0.9, 0.4); }
-      .globe.diving .trail, .globe.diving .walked, .globe.diving .cell:not(.squad) { opacity: 0; transition: opacity 0.5s; }
+      .globe.diving .trail, .globe.diving .walked, .globe.diving .cell:not(.stand) { opacity: 0; transition: opacity 0.5s; }
       /* Glows blown up fourteen times outgrow what the graphics card draws, and show as black boxes. */
       .globe.diving .land, .globe.diving .walked, .globe.diving .trail { filter: none; }
       .globe.diving .chopper { opacity: 0; transition: opacity 0.4s; }
@@ -268,7 +265,7 @@
       button.travel { min-width: 320px; text-align: left; line-height: 1.5; }
 
 
-      .squad { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+      .fought { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
       .soldier { flex: 1; max-width: 220px; padding: 8px 12px; background: #263042; border: 1px solid #4a5a78; border-radius: 6px; line-height: 1.5; }
       .soldier.died { opacity: 0.6; border-color: #ff6b5e; }
       .soldier .notes { list-style: none; margin: 4px 0 0; padding: 0; font-size: 12px; color: #9aa6bd; }
@@ -349,14 +346,12 @@
       .ricon { width: 1.15em; height: 1.15em; vertical-align: -0.2em; color: #ffd84d; }
       .icon { width: 1.35em; height: 1.35em; vertical-align: -0.32em; flex: none; }
       .sicon { color: #5fd8ec; } .aicon { color: #c79bff; } .wicon { color: #ff9d5c; }
-      .gearswap.relics .side.duo .art .aicon { filter: drop-shadow(0 0 6px #c79bff66); }
       .perkpick button.perk .art .icon { width: 40px; height: 40px; }
       .toffer > b .icon, .pick.skillnode > b .icon { width: 1.9em; height: 1.9em; vertical-align: -0.6em; }
       .charttip > .icon { width: 2em; height: 2em; vertical-align: -0.65em; }
     .gearswap.relics .swap { width: min(900px, 100%); grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
     .gearswap.relics .side { position: relative; align-items: center; text-align: center; border-color: #ffd84d80; }
     .gearswap.relics .side.epic { border-color: #c77dff; } .gearswap.relics .side.common { border-color: #9aa6bd; }
-    .gearswap.relics .side.duo { border-color: #6fc3d0; }
     .gearswap.relics .side .tier { text-transform: capitalize; color: #9aa6bd; }
     .gearswap.relics .side .art { display: grid; place-items: center; width: 84px; height: 84px; margin: 2px 0 6px; border-radius: 50%; background: radial-gradient(circle, #ffd84d22, transparent 70%); }
     .gearswap.relics .side .art :is(.ricon, .icon) { width: 64px; height: 64px; filter: drop-shadow(0 0 6px #ffd84d66); }
@@ -480,9 +475,6 @@
       button.rare small { color: #4da3ff; }
       button.epic { border-color: #c77dff; }
       button.relic, .gear.relic { border-color: #ffd84d; }
-      button.duo { border-color: #ff8ff0; }
-      button.duo small, small.duos { color: #ff8ff0; }
-      small.duos { display: block; margin-top: 4px; }
       button.relic small, .gear.relic > small:first-child, button.skill small { color: #ffd84d; }
       button.skill { border-color: #7ddc5a; }
       button.epic small { color: #c77dff; }
@@ -491,7 +483,7 @@
       /* Debrief: centred, each soldier given room to be seen. */
       .debrief { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 4vh; }
       .debrief h1 { font-size: 40px; margin-bottom: 8px; }
-      .debrief .squad { justify-content: center; gap: 20px; }
+      .debrief .fought { justify-content: center; gap: 20px; }
       .debrief .soldier { width: 280px; padding: 20px; }
       .acquired { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; max-width: 480px; margin: 0 auto; }
       .acquired .up-top { text-transform: uppercase; letter-spacing: 1px; color: #ffd166; }
@@ -578,7 +570,7 @@
         .statblock b { font-size: 11px; }
         body { font-size: 12px; }
         #panel { padding: 8px 12px; }
-        .choices, .squad, .details, .header { flex-wrap: wrap; }
+        .choices, .fought, .details, .header { flex-wrap: wrap; }
         .stash { grid-template-columns: repeat(2, 1fr); }
       }
     </style>

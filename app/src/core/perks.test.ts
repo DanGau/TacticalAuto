@@ -4,17 +4,17 @@ import { arena } from './arena'
 import type { GameEvent } from './combat-event'
 import { GRID } from './battle'
 import { reshaped } from './grid'
-import { costOf, moveOf, walk } from './pathing'
+import { costOf, walk } from './pathing'
 import { PERK, PERK_LEVELS, PERKS, perkOffers, type PerkId } from './perks'
 import { begun } from './roads'
 import { sourceName } from './source-names'
 import { srcOf } from './sources'
-import { charges, minorOffers, soldierStats, xpFor } from './squad'
+import { charges, minorOffers, soldierStats, xpFor } from './hero'
 import { talentDamage, talentKill, talentTurn } from './talents'
 
 test('a perk is owed at each perk level: three different offers, each open to the hero, those passed over left in the pool', () => {
   const run = begun(1)
-  const hero = run.soldiers[0]
+  const hero = run.hero
   expect(minorOffers(hero)).toEqual([])
   for (const at of PERK_LEVELS) {
     hero.xp = xpFor(at)
@@ -27,7 +27,7 @@ test('a perk is owed at each perk level: three different offers, each open to th
         expect([undefined, hero.cls]).toContain(PERKS[id].cls)
         if (PERKS[id].needs) expect(hero.perks).toContain(PERKS[id].needs)
       }
-      expect(apply(run, { type: 'perk', soldier: hero.id, index: 2 }).ok).toBe(true)
+      expect(apply(run, { type: 'perk', index: 2 }).ok).toBe(true)
       expect(hero.perks.at(-1)).toBe(offers[2])
     }
   }
@@ -39,7 +39,7 @@ test('a perk is owed at each perk level: three different offers, each open to th
 
 test('stat perks add to stats, and ability perks to uses', () => {
   const run = begun(1)
-  const hero = run.soldiers[0]
+  const hero = run.hero
   const before = soldierStats(run, hero)
   hero.perks = ['toughness', 'ironGut', 'padding', 'keenEye', 'fleetFoot', 'springLegs', 'scope']
   const after = soldierStats(run, hero)
@@ -70,7 +70,7 @@ test('Crash Landing hurts each alien beside where a jump lands, not a walk', () 
   expect(events).toContainEqual(expect.objectContaining({ type: 'effect', effect: 'crashLanding' }))
 })
 
-test("Freerunner climbs at a tile per tile; Fireman's Carry carries at full move", () => {
+test('Freerunner climbs at a tile per tile', () => {
   const { battle, hero } = arena([], [{ x: 15, y: 15 }])
   battle.height[10 * GRID + 11] = 1
   reshaped(battle)
@@ -78,11 +78,6 @@ test("Freerunner climbs at a tile per tile; Fireman's Carry carries at full move
   expect(costOf(battle, hero, climb)).toBeGreaterThan(1)
   hero.effects.push('freerunner')
   expect(costOf(battle, hero, climb)).toBe(1)
-  hero.stats.move = 4
-  battle.downed.push({ soldier: 99, x: 10, y: 10, carrier: hero.id })
-  expect(moveOf(battle, hero)).toBe(2)
-  hero.effects.push('firemansCarry')
-  expect(moveOf(battle, hero)).toBe(4)
 })
 
 test('First Strike adds to the first hit; Finisher to a hit on a target at half HP', () => {

@@ -57,7 +57,7 @@ test('a flood posts few and sends the most as clumps from the gates; a push post
 
 test('flow follows mission and map', () => {
   for (const goal of ['hold', 'ambush', 'rescue'] as const) expect(flowOf(goal, 'town')).toBe('flood')
-  for (const goal of ['exterminate', 'assassinate', 'recover', 'vip'] as const) expect(flowOf(goal, 'town')).toBe('push')
+  for (const goal of ['exterminate', 'assassinate', 'vip'] as const) expect(flowOf(goal, 'town')).toBe('push')
   expect(flowOf('raid', 'town')).toBe('push')
   expect(flowOf('raid', 'ruins')).toBe('flood')
   expect(flowOf('exterminate', 'hive')).toBe('flood')

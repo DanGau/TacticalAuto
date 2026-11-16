@@ -1,6 +1,5 @@
-// Each ability's icon: line art with a solid heart in a diamond. Class kits single-ruled, ultimates double, duos dashed, bonus attacks thin.
+// Each ability's icon: line art with a solid heart in a diamond. Class kits single-ruled, ultimates double, bonus attacks thin.
 import { CLASSES, type ClassId } from '../core/classes'
-import { DUOS, type DuoId } from '../core/duos'
 import { SECONDARIES, type SecondaryId } from '../core/secondaries'
 import { SKILLS, type SkillId } from '../core/skills'
 import { framed, type Frame } from './icon-frame'
@@ -9,7 +8,6 @@ const DIAMOND = 'M12 1l11 11-11 11L1 12z'
 const TINT = 'fill="currentColor" fill-opacity=".16"'
 const KIT: Frame = { outline: `<path d="${DIAMOND}" ${TINT} stroke-width="1.6"/>`, scale: 0.58, stroke: 2.6 }
 const ULTIMATE: Frame = { outline: `<path d="${DIAMOND}" ${TINT} stroke-width="1.6"/><path d="M12 3.6L20.4 12 12 20.4 3.6 12z" stroke-width=".9"/>`, scale: 0.5, stroke: 2.8 }
-const DUO: Frame = { outline: `<path d="${DIAMOND}" ${TINT} stroke-width="1.5" stroke-dasharray="2.6 1.6"/>`, scale: 0.58, stroke: 2.6 }
 const BONUS: Frame = { outline: `<path d="${DIAMOND}" stroke-width="1"/>`, scale: 0.6, stroke: 2.4 }
 
 /** Each class's kit ability. */
@@ -52,21 +50,6 @@ export const ULTIMATE_ICONS: Partial<Record<SkillId, string>> = {
   phantomLegion: '<path d="M4 19c0-6 2-10 4-10s4 4 4 10M12 19c0-6 2-10 4-10s4 4 4 10"/><path d="M8 19c0-8 2-13 4-13s4 5 4 13z" fill="currentColor"/>',
 }
 
-export const DUO_ICONS: Record<DuoId, string> = {
-  thermalShock: '<path d="M11 5c-3 4-5 6-5 9a5 5 0 0 0 5 5z" fill="currentColor"/><path d="M13 5v14M13 9l5-2M13 13l5 0M13 17l5 2"/>',
-  spotting: '<circle cx="8" cy="12" r="3.5"/><circle cx="16" cy="12" r="3.5"/><circle cx="16" cy="12" r="1.5" fill="currentColor"/><path d="M11.5 12h1"/>',
-  lifeline: '<path d="M7 9h2v2h2v2H9v2H7v-2H5v-2h2z" fill="currentColor"/><path d="M11 12h2l1.5-3 2 6 1.5-3h2"/>',
-  anvil: '<rect x="5" y="4" width="8" height="5" rx="1" fill="currentColor"/><path d="M9 9v4M5 16h14l-2 4H7z"/>',
-  painter: '<circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M4 4l4 4M12 4v2M12 18v2M18 12h2"/>',
-  coldComfort: '<path d="M6 9h3v3h3v3H9v3H6v-3H4v-3h2z" fill="currentColor"/><path d="M17 6v10M13 8.5l8 5M13 13.5l8-5"/>',
-  firefall: '<circle cx="9" cy="10" r="4" fill="currentColor"/><path d="M4 4l2 2"/><path d="M16 12c2 3 3 4 3 5.5a3 3 0 0 1-6 0c0-1.5 1-2.5 3-5.5z"/>',
-  pincer: '<path d="M4 6l7 6M20 6l-7 6M4 18l3-3M20 18l-3-3"/><circle cx="12" cy="13" r="2" fill="currentColor"/>',
-  payload: '<rect x="8" y="9" width="8" height="6" rx="1" fill="currentColor"/><path d="M5 5l2 2M19 5l-2 2M5 19l2-2M19 19l-2-2M12 4v2M12 18v2"/>',
-  flashFreeze: '<path d="M13 4l-5 9h4l-1 7 5-9h-4z" fill="currentColor"/><path d="M5 6v6M3 9h4M19 12v6M17 15h4"/>',
-  crossfire: '<circle cx="12" cy="12" r="5"/><path d="M4 4l16 16M20 4L4 20"/><circle cx="12" cy="12" r="2" fill="currentColor"/>',
-  afterglow: '<path d="M14 5a7 7 0 1 0 5 9 5 5 0 0 1-5-9z" fill="currentColor"/><path d="M17 4v4M15 6h4"/>',
-}
-
 /** Each bonus attack. */
 export const BONUS_ICONS: Record<SecondaryId, string> = {
   sidearm: '<path d="M5 9h12v4h-5l-1 5H8l1-5H5z" fill="currentColor"/><path d="M19 11h1"/>',
@@ -82,5 +65,4 @@ export const BONUS_ICONS: Record<SecondaryId, string> = {
 
 export const kitIcon = (cls: ClassId) => framed('aicon', KIT, KIT_ICONS[cls], CLASSES[cls].abilityName)
 export const ultimateIcon = (id: SkillId) => framed('aicon ult', ULTIMATE, ULTIMATE_ICONS[id]!, SKILLS[id].name)
-export const duoIcon = (id: DuoId) => framed('aicon', DUO, DUO_ICONS[id], DUOS[id].name)
 export const bonusIcon = (id: SecondaryId) => framed('aicon', BONUS, BONUS_ICONS[id], SECONDARIES[id].name)

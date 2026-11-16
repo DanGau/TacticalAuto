@@ -19,7 +19,6 @@ import { cloakLook, create, fade, letter, place, remove, squash, vitals } from '
 import { CAMERA_MS, type Sprite, type Stage } from './stage'
 import { playUltimate } from './ultimates'
 import { playFall, playThrow } from './falls'
-import { playDuo } from './duos'
 
 /** Triggers that ring out when they fire: how far, in what colour. */
 const TRIGGERS = {
@@ -177,8 +176,6 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       await playThrow(s, battle, e, off)
     } else if (e.type === 'ultimate') {
       await playUltimate(s, battle, e)
-    } else if (e.type === 'duo') {
-      await playDuo(s, e)
     } else if (e.type === 'spit' || e.type === 'panic') {
       const from = sprites.get(e.id)
       const to = sprites.get(e.target)
@@ -247,17 +244,6 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       float(s, callout(s, e.type === 'saved' ? 'SAVED' : 'LIFTED OFF', COLOR.heal, sprite))
       await s.tween(PACE.death, (t) => fade(sprite, 1 - t))
       remove(s, e.id)
-    } else if (e.type === 'carried') {
-      const on = sprites.get(e.id)
-      drawMarks(s, battle)
-      if (on) float(s, callout(s, 'CARRYING', COLOR.heal, on))
-    } else if (e.type === 'freed') {
-      const unit = battle.units.find((u) => u.id === e.unit.id)
-      drawMarks(s, battle)
-      if (!unit) continue
-      const freed = create(s, { ...unit, x: e.unit.x, y: e.unit.y }, 0, letter(unit))
-      await s.tween(PACE.reveal, (t) => fade(freed, t))
-      float(s, callout(s, 'FREED', COLOR.heal, freed))
     } else if (e.type === 'extract') {
       drawMarks(s, battle)
     } else if (e.type === 'feed') {
