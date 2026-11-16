@@ -155,7 +155,7 @@ export const RALLY_PATIENCE = 6
 export function rally(battle: Battle): void {
   const soldiers = battle.units.filter(isSoldier)
   // Sentries hold their posts: the hero must go to them.
-  if (soldiers.length === 0 || battle.deadline !== null) return
+  if (soldiers.length === 0 || battle.challenge === 'scattered') return
   if (battle.round - battle.rallied >= (walkersFighting(battle) > 0 ? RALLY_PATIENCE : RALLY_EVERY)) engageNearest(battle, soldiers)
 }
 

@@ -187,11 +187,12 @@ export const isBarrier = (kind: ArenaKind) => !!ARENA_KINDS[kind].opens
 /**
  * Shapes the ground about `spot` for `kind`, its axis heading `f` from the way in toward the objective. Within the
  * shaped ground nothing stands but what the encounter places next; beyond it, the ground slopes back to its own. A
- * barrier's bridge lies on the side of the route with more room, as far out as BRIDGE.
+ * barrier's bridge lies on the side of the route with more room, as far out as BRIDGE. Returns where a barrier's bridge
+ * lands on the far side, in tiles along the axis and across, or null.
  */
-export function shapeArena(battle: Battle, kind: ArenaKind, spot: Tile, [fx, fy]: [number, number]): void {
+export function shapeArena(battle: Battle, kind: ArenaKind, spot: Tile, [fx, fy]: [number, number]): [number, number] | null {
   battle.arenaKind = kind
-  if (kind === 'open') return
+  if (kind === 'open') return null
   const shape = SHAPES[kind]
   const axis = (t: number): [number, number] => {
     const dx = (t % GRID) - spot.x
@@ -242,4 +243,5 @@ export function shapeArena(battle: Battle, kind: ArenaKind, spot: Tile, [fx, fy]
   }
   if (kind === 'swamp') bog(battle, mire, axis, b)
   soften(battle, GRID, (t) => shaped.has(t))
+  return isBarrier(kind) ? [(kind === 'swamp' ? MIRE_BAND : BAND)[1] + 2, b] : null
 }

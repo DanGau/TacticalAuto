@@ -87,7 +87,8 @@ function drop(run: Run, battle: Battle, armed: string | null, rigging: number | 
   const test = battle.challenge ? `<h2 class="challenge" title="${CHALLENGES[battle.challenge].test}">${CHALLENGES[battle.challenge].icon} ${THREATS[battle.challenge]}</h2>` : ''
   const ground = ARENA_KINDS[battle.arenaKind]
   const barrier = ground.opens ? `<h2 class="challenge" title="${ground.text}">🛣️ ${ground.name}: ${ground.opens.map((e) => UTILITIES[e].name).join(' or ')} crosses.</h2>` : ''
-  return `${barrier}${test}${twist}${foes(battle, armed)}${reservoir}${chosen}`
+  const clock = battle.deadline !== null ? `<p>⏱️ Reinforcements arrive in round ${battle.deadline}.</p>` : ''
+  return `${barrier}${test}${clock}${twist}${foes(battle, armed)}${reservoir}${chosen}`
 }
 
 /** What a boon does for this battle: opens the route, answers its challenge, both, or neither. */

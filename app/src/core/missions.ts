@@ -90,7 +90,7 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], cha
 export const HARVESTERS_MORE_FROM = 2
 
 /** What a leg's boss multiplies its health by, and the damage it does less. */
-export const LEG_BOSS = { hp: 3, damage: 4 }
+export const LEG_BOSS = { hp: 2, damage: 4 }
 
 /** What an elite's Big One multiplies its health by, so it lasts long enough for a build to pay. */
 export const ELITE_HP = 1.8

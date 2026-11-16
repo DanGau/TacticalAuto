@@ -44,13 +44,21 @@ const LEGS = [0, 1, 2, 3]
 const cell = (of: Fork[]) => (of.length === 0 ? '-' : `${Math.round((100 * of.filter((f) => f.won).length) / of.length)}/${Math.round((100 * of.reduce((sum, f) => sum + f.lost, 0)) / of.length)}`).padEnd(8)
 
 /**
- * Wins/health lost in percent: overall with a boon that answers what was scouted, with one that answers none, and with
- * none; then by barrier and by challenge and leg, with each answer and with any other.
+ * Wins/health lost in percent: from the second leg, with a boon that answers what was scouted, with one that answers
+ * none, and with none; then by barrier and by challenge and leg, with each answer and with any other.
  */
 export function formatForks(forks: Fork[]): string {
-  const right = forks.filter((f) => f.utility && carries(f.utility, answersOf(f)))
-  const wrong = forks.filter((f) => f.utility && !carries(f.utility, answersOf(f)))
-  const lines = [`scouted pick  right ${cell(right)} wrong ${cell(wrong)} none ${cell(forks.filter((f) => f.utility === null))}`, '']
+  // The first leg's fights pace the run, not test it.
+  const tested = forks.filter((f) => f.leg > 0)
+  const right = tested.filter((f) => f.utility && carries(f.utility, answersOf(f)))
+  const wrong = tested.filter((f) => f.utility && !carries(f.utility, answersOf(f)))
+  const barred = tested.filter((f) => f.barrier)
+  const opener = (f: Fork) => !!f.utility && carries(f.utility, ARENA_KINDS[f.barrier!].opens!)
+  const lines = [
+    `scouted pick, legs 2+  right ${cell(right)} wrong ${cell(wrong)} none ${cell(tested.filter((f) => f.utility === null))}`,
+    `barrier, legs 2+       opener ${cell(barred.filter(opener))} other ${cell(barred.filter((f) => f.utility && !opener(f)))} none ${cell(barred.filter((f) => f.utility === null))}`,
+    '',
+  ]
   lines.push('barrier       leg    battles  none    openers (wins/health lost)                    others')
   for (const barrier of Object.keys(ARENA_KINDS).filter((k) => isBarrier(k as ArenaKind)) as ArenaKind[]) {
     for (const leg of LEGS) {

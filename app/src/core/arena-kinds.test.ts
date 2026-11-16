@@ -14,7 +14,7 @@ const force = (n: number): Alien[] =>
   })
 
 const battles = TERRAIN_KINDS.flatMap((place) => Array.from({ length: 14 }, (_, seed) => createBattle(seed + 1, place, force(10), [], seed % 4 === 3 ? 'hold' : 'cross')))
-const swamps = Array.from({ length: 4 }, (_, seed) => createBattle(seed + 1, 'countryside', force(8), [], 'cross', [], null, undefined, 'slog'))
+const swamps = Array.from({ length: 4 }, (_, seed) => createBattle(seed + 1, 'countryside', force(14), [], 'cross', [], null, undefined, 'slog'))
 battles.push(...swamps)
 
 test('a swamp lays a band of mire across the route, with firm islands and pools, its aliens in three groups or more', () => {

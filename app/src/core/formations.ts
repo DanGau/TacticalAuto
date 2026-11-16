@@ -14,6 +14,8 @@ export interface Plot {
   boss: Tile
   /** What the mission is about. */
   objective: Tile | null
+  /** The far end of a barrier's bridge, the long way round. */
+  bridge: Tile | null
   challenge: ChallengeId | null
 }
 
@@ -25,6 +27,9 @@ const STAGING: Partial<Record<ChallengeId, { sizes: number[]; band: [number, num
   scattered: { sizes: [1], band: [-14, 16], wander: 18, apart: 14 },
   killBox: { sizes: [99], band: [-6, -6], wander: 0, apart: 2, shape: 'crowd' },
 }
+
+/** Aliens that guard a barrier's bridge, when the force has more to spare. */
+const BRIDGE_GUARDS = 2
 
 /** A cluster's size is drawn from these: mostly pairs and trios, some crowds, the odd sentry. */
 const SIZES = [1, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6]
@@ -109,6 +114,7 @@ function groupsOf(battle: Battle, aliens: Alien[], plot: Plot): { members: numbe
   const boss = aliens.findIndex((a, i) => a.boss && left.includes(i))
   if (boss >= 0) groups.push({ members: take(boss, 2 + randomInt(battle, 2)), at: plot.boss, shape: 'retinue' })
   if (plot.objective && left.length > 0) groups.push({ members: left.splice(0, 2 + randomInt(battle, 2)), at: plot.objective, shape: 'ring' })
+  if (plot.bridge && left.length > BRIDGE_GUARDS) groups.push({ members: left.splice(0, BRIDGE_GUARDS), at: plot.bridge, shape: null })
   for (let i = left.length - 1; i > 0; i--) {
     const j = randomInt(battle, i + 1)
     ;[left[i], left[j]] = [left[j], left[i]]

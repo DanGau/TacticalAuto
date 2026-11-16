@@ -88,7 +88,7 @@ function stand(battle: Battle, at: Tile, prop: Prop): boolean {
 /**
  * Sets the arena and lays out the encounter for `challenge`: the crossing runs along its axis from the way in to the
  * objective, over the ground its arena kind shapes. Returns the arena's centre, a post and cluster for each alien;
- * a commander, a boss and the aliens guarding what the mission is about stand at the objective.
+ * a commander, a boss and the aliens guarding what the mission is about stand at the objective, and a few guard a barrier's bridge.
  */
 export function designEncounter(battle: Battle, aliens: Alien[], challenge: ChallengeId | null = null): { spot: Tile; posts: Tile[]; clusters: number[] } {
   const spot = arenaSpot(battle)
@@ -106,7 +106,7 @@ export function designEncounter(battle: Battle, aliens: Alien[], challenge: Chal
     const clamp = (v: number) => Math.max(0, Math.min(GRID - 1, Math.round(v)))
     return { x: clamp(spot.x + fx * along - fy * across), y: clamp(spot.y + fy * along + fx * across) }
   }
-  shapeArena(battle, pickArenaKind(battle, battle.place, challenge, battle.twist), spot, [fx, fy])
+  const bridge = shapeArena(battle, pickArenaKind(battle, battle.place, challenge, battle.twist), spot, [fx, fy])
   if (battle.arenaKind === 'open') rise(battle, raw(OVERLOOK), 3, 1)
   if (challenge === 'firingLine') for (let across = -RIDGE_REACH; across <= RIDGE_REACH; across += 2) rise(battle, raw([RIDGE_ALONG, across]), 2, 1)
   if (battle.arenaKind === 'open') rise(battle, raw(LEDGE), 2, 0)
@@ -127,6 +127,6 @@ export function designEncounter(battle: Battle, aliens: Alien[], challenge: Chal
     }
   }
   const b = battle.objective
-  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: b, boss: b, objective: b, challenge })
+  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: b, boss: b, objective: b, bridge: bridge && openNear(battle, raw(bridge)), challenge })
   return { spot, posts, clusters }
 }

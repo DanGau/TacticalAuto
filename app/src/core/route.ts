@@ -75,5 +75,11 @@ export function routePath(battle: Battle, effects: EffectId[] = [], jump = jumpO
   return path
 }
 
+/** Tiles a hero crosses a round for each of its move, striding and sprinting both. */
+const PACE = 2
+
+/** The round reinforcements pour in on a crossing: when a hero of `move` would reach the objective by the shortest route anything opens, and one more. */
+export const clockFor = (battle: Battle, move: number) => 1 + Math.ceil(routeWalk(battle, ['hover']) / (PACE * move))
+
 /** Whether boon `id` opens a route at least SHORTCUT shorter than the plain one. */
 export const opens = (battle: Battle, id: UtilityId) => routeWalk(battle, effectsOf(id)) <= routeWalk(battle) - SHORTCUT

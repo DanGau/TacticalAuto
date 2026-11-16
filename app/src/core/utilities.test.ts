@@ -98,7 +98,7 @@ test('mending heals the hero each turn it lasts', () => {
   apply(run, { type: 'enter', utility: 0 })
   const battle = run.battle!
   const [hero] = team(run)
-  hero.hp = hero.stats.hp - 5
+  hero.hp = Math.max(1, hero.stats.hp - 9)
   while (battle.turn === 'human' && battle.phase === 'battle') stepBattle(battle)
   const events = []
   while (battle.turn !== 'human' && battle.phase === 'battle') events.push(...stepBattle(battle))
