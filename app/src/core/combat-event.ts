@@ -28,7 +28,7 @@ export type GameEvent =
   | { type: 'ultimate'; src: Src; id: number; effect: Effect; x: number; y: number; radius: number; to?: Tile }
   /** A spitter's spit lands on its target, which takes `damage`, and leaves acid on the tile. */
   | { type: 'spit'; src: Src; id: number; target: number; damage: number }
-  /** A feeder grows on a trick the squad used: its hits do `damage` more than its weapon's. */
+  /** A feeder grows on a trick the hero used: its hits do `damage` more than its weapon's. */
   | { type: 'feed'; src: Src; id: number; damage: number }
   /** A soldier reaches a civilian and gets them out. */
   | { type: 'saved'; id: number }
@@ -48,7 +48,7 @@ export type GameEvent =
   | { type: 'hurt'; id: number; amount: number; cause: 'acid' | 'backlash' | 'impact' }
   /** A hold is done: the extraction zone appears at x, y. */
   | { type: 'extract'; x: number; y: number }
-  /** A wave arrives on a hold, unseen unless the squad already sees where it lands. */
+  /** A wave arrives on a hold, unseen unless the hero already sees where it lands. */
   | { type: 'wave'; units: { id: number; x: number; y: number }[] }
   /** A boss spawns a swarmling, or an engineer deploys a mech. */
   | { type: 'spawn'; src: Src; id: number; unit: { id: number; x: number; y: number } }

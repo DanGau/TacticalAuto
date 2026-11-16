@@ -32,7 +32,7 @@ export async function playFall(s: Stage, battle: Battle, e: Extract<GameEvent, {
   const over = e.drop === 'edge'
   const lost = over && !!e.fatal
   const b = over ? { ...spot(e.to.x, e.to.y), y: a.y } : spot(e.to.x, e.to.y)
-  // The camera takes in the fall with the squad, so a fall at the edge of the frame is not missed.
+  // The camera takes in the fall with the team, so a fall at the edge of the frame is not missed.
   void s.follow([...battle.units.filter((u) => u.side === 'human' && !u.civilian), e.to], CAMERA_MS)
   if (lost) return fallOff(s, e.id, sprite, ballistic(a, b, LEVEL * 0.6, LEVEL * SINK, PACE.fall / 2))
   float(s, callout(s, over ? 'OVER THE EDGE' : 'FALL', COLOR.crit, sprite, 15))

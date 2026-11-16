@@ -99,7 +99,7 @@ export function upkeep(battle: Battle): GameEvent[] {
   }
   if (battle.turn !== 'alien') return events
   battle.round++
-  // A hold counts only the rounds the squad ends standing on it. Once held, the uplink is done and the squad extracts.
+  // A hold counts only the rounds the hero ends standing on it. Once held, the uplink is done and the hero extracts.
   if (battle.uplink && battle.units.some((u) => isSoldier(u) && distance(u, battle.uplink!) <= uplinkReach(battle))) battle.held++
   if (battle.uplink && battle.held >= HOLD_ROUNDS) {
     battle.extract = extractionFrom(battle, battle.uplink)
@@ -114,7 +114,7 @@ export function upkeep(battle: Battle): GameEvent[] {
     events.push({ type: 'wave', units: [{ id: unit.id, x: unit.x, y: unit.y }] })
   }
   rally(battle)
-  // Waves come in a pack at a time, at one of the encounter's two gates nearest the squad yet clear of it; a hold's without end until it is held.
+  // Waves come in a pack at a time, at one of the encounter's two gates nearest the hero yet clear of it; a hold's without end until it is held.
   const soldiers = battle.units.filter(isSoldier)
   if (battle.waves.length > 0 && soldiers.length > 0 && (battle.deadline === null ? battle.challenge === 'swarm' || battle.round % WAVE_EVERY === 0 : battle.round >= battle.deadline)) {
     const from = centreOf(soldiers)
@@ -123,7 +123,7 @@ export function upkeep(battle: Battle): GameEvent[] {
     const centre = openNear(battle, near[randomInt(battle, near.length)] ?? battle.gates.reduce((a, b) => (distance(b, from) > distance(a, from) ? b : a)))
     const wave = battle.waves.shift()!
     if (battle.goal === 'hold' && !battle.extract) battle.waves.push(wave)
-    // It comes in unseen but in the fight, and shows once the squad sights it.
+    // It comes in unseen but in the fight, and shows once the hero sights it.
     const units = freeTilesNear(battle, centre, wave.length).map((tile, i) => placeAlien(battle, wave[i], tile, true, false))
     events.push({ type: 'wave', units: units.map(({ id, x, y }) => ({ id, x, y })) })
   }
@@ -149,17 +149,17 @@ export function upkeep(battle: Battle): GameEvent[] {
   return events
 }
 
-/** The nearest to the squad a wave comes in. */
+/** The nearest to the hero a wave comes in. */
 export const WAVE_CLEAR = 7
 
 /** Rounds without a walker fighting before the next cluster comes on its own, and rounds any fight keeps the next back. */
 export const RALLY_EVERY = 2
 export const RALLY_PATIENCE = 6
 
-/** Nobody left to fight, or a fight dragging on, brings in the cluster nearest the squad, so a battle never stands still. */
+/** Nobody left to fight, or a fight dragging on, brings in the cluster nearest the team, so a battle never stands still. */
 export function rally(battle: Battle): void {
   const soldiers = battle.units.filter(isSoldier)
-  // Sentries hold their posts: the squad must go to them.
+  // Sentries hold their posts: the hero must go to them.
   if (soldiers.length === 0 || battle.deadline !== null) return
   if (battle.round - battle.rallied >= (walkersFighting(battle) > 0 ? RALLY_PATIENCE : RALLY_EVERY)) engageNearest(battle, soldiers)
 }

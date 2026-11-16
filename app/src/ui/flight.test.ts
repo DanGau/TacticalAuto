@@ -27,7 +27,7 @@ function tangled(run: Run, w: number, h: number): string[] {
   return [...off, ...tangles(shown.map((pin) => placed.get(pin.id)!), lines, CLEAR, ROOM)]
 }
 
-/** Every stop the player can tap, as the screen shows it, away from the page's edges, the header and squad strip above, and the stop's card below. */
+/** Every stop the player can tap, as the screen shows it, away from the page's edges, the header and heroes strip above, and the stop's card below. */
 function outOfReach(run: Run, w: number, h: number): string[] {
   const { pins, focus } = flight(run, null)
   const { placed } = layout(flightSize(w, h), run, pins, focus)
@@ -40,7 +40,7 @@ function outOfReach(run: Run, w: number, h: number): string[] {
     .map((pin) => `stop ${pin.id} out of reach at ${Math.round(placed.get(pin.id)!.x)},${Math.round(placed.get(pin.id)!.y)}`)
 }
 
-/** A stop's button reaches this far from its middle, and the header and squad strip this far down the page. */
+/** A stop's button reaches this far from its middle, and the header and heroes strip this far down the page. */
 const TAP = 24
 const CHROME_TOP = 90
 const CLEAR = 22
@@ -96,7 +96,7 @@ test('every stop the player can take next is on screen and clear to tap, at ever
   expect(found).toEqual([])
 })
 
-test('the tunnel, taken at every stop of every leg, leaves the squad at its last stop, trails to every way out, and a map that reads and plays to the leg end', () => {
+test('the tunnel, taken at every stop of every leg, leaves the hero at its last stop, trails to every way out, and a map that reads and plays to the leg end', () => {
   const found: string[] = []
   for (let seed = 0; seed < SEEDS; seed += 5) {
     for (let key = 0; key < KEYS; key++) {

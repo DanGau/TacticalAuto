@@ -54,7 +54,7 @@ interface AlienType {
   name: string
   text: string
   danger: Danger
-  /** What the squad sees the first time one appears: a calm line on what it will do. Only for kinds met later on. */
+  /** What the hero sees the first time one appears: a calm line on what it will do. Only for kinds met later on. */
   intro?: string
   /** Whether it spawns swarmlings. */
   spawns?: boolean
@@ -88,7 +88,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   burster: {
     name: 'Burster',
-    text: 'Runs at the party and explodes, beside a hero or wherever it dies, hurting everything near it',
+    text: 'Runs at the hero and explodes, beside it or wherever it dies, hurting everything near it',
     danger: 'medium',
     hp: 0.6,
     stats: { range: 0, move: 5, strength: 1, jump: 2 },
@@ -145,7 +145,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   burrower: {
     name: 'Burrower',
-    text: 'Moves underground, unseen; once the party comes near or the fight is on, it surfaces beside the hero standing most alone, and attacks up close',
+    text: 'Moves underground, unseen; once the hero comes near or the fight is on, it surfaces beside it, and attacks up close',
     intro: 'Tremors underfoot. It will come up beside whoever stands alone.',
     danger: 'medium',
     hp: 1,
@@ -196,7 +196,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   mirror: {
     name: 'Mirror',
-    text: "Each hit does the damage of the party's hardest hitter",
+    text: "Each hit does the hero's damage",
     intro: 'It studies our strongest. However hard they hit, it hits back.',
     danger: 'large',
     hp: 1,

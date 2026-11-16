@@ -64,7 +64,7 @@ export function plainGear(rng: { rng: number }, id: number): Gear {
   return { id, rarity: 'common', name: WEAPONS[weapon].name, weapon, stats: {}, effect: null }
 }
 
-/** Chance a piece of gear found or stocked feeds what its squad makes or reads, when one of its rarity does. */
+/** Chance a piece of gear found or stocked feeds what its hero makes or reads, when one of its rarity does. */
 export const FEEDING_GEAR = 1 / 3
 
 /** A new piece of gear of the given rarity: `weapon`, or any; at FEEDING_GEAR, with an effect that reads a quantity of `made` or makes one of `read`, if one can. */

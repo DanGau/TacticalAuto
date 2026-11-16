@@ -41,7 +41,7 @@ export interface Toll {
   maxHit: number
   /** Rounds from the boss's first wound to its fall, counting both; null with no boss felled. */
   bossRounds: number | null
-  /** Health the heroes healed in it. */
+  /** Health the hero healed in it. */
   healed: number
 }
 

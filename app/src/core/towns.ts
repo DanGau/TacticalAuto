@@ -1,7 +1,7 @@
 // Towns on each continent where stops fall.
 import type { ContinentId, LonLat } from './world'
 
-/** Towns and cities across each continent, where the squad's stops fall: a name and where it lies. */
+/** Towns and cities across each continent, where the hero's stops fall: a name and where it lies. */
 export const TOWNS: Record<ContinentId, [string, LonLat][]> = {
   northAmerica: [
     ['Buffalo', [-78.9, 42.9]], ['Cincinnati', [-84.5, 39.1]], ['Columbus', [-83, 40]], ['Indianapolis', [-86.2, 39.8]], ['Louisville', [-85.8, 38.25]],

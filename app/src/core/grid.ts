@@ -294,9 +294,9 @@ export function spacedTile(battle: Battle, avoid: Tile[], clearance: number, wit
 }
 
 /**
- * The battlefield's two borders. Its outer border is the edge of the map the squad can walk; its inner border lies
+ * The battlefield's two borders. Its outer border is the edge of the map the hero can walk; its inner border lies
  * INNER tiles within. Inside the inner border stands what the battle is about: the aliens, the uplink, the caches.
- * Civilians may be anywhere. Between the two, the edge, is where the squad comes in and gets out; the outermost tiles are left free.
+ * Civilians may be anywhere. Between the two, the edge, is where the hero comes in and gets out; the outermost tiles are left free.
  */
 export const INNER = 7
 

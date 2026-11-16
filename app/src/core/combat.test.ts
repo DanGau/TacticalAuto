@@ -61,7 +61,7 @@ test('a turn is one move beat, then an attack per beat in id order, two by each 
   expect(twice).toBeGreaterThan(0)
 })
 
-test('no unit moves farther than its move, and one on the squad its sprint', () => {
+test('no unit moves farther than its move, and one on the hero side its sprint', () => {
   play(2, (events, before) => {
     for (const e of events) {
       if (e.type !== 'move') continue
@@ -124,7 +124,7 @@ test('a soldier may walk between and after its attacks, its walks in a turn toge
   expect(strides).toBeGreaterThan(0)
 })
 
-test('with no alien engaged a squad heads for the nearest by the walk, so it never paces between two that take turns being nearest as the crow flies', () => {
+test('with no alien engaged the hero heads for the nearest by the walk, so it never paces between two that take turns being nearest as the crow flies', () => {
   let tried = 0
   for (let seed = 1; seed <= 12; seed++) {
     const state = battle(seed)

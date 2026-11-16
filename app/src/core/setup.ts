@@ -61,7 +61,7 @@ export function placeAlien(battle: Battle, alien: Alien, tile: Tile, engaged = f
   return unit
 }
 
-/** The tiles a squad of the reach of its longest weapon must walk from the way in to shoot each sentry, nearest first. */
+/** The tiles a hero of the reach of the longest weapon must walk from the way in to shoot each sentry, nearest first. */
 function sentryTour(battle: Battle): number {
   const reach = Math.max(...battle.reserve.map((s) => s.stats.range))
   const left = battle.units.filter((u) => u.side === 'alien')
@@ -100,8 +100,8 @@ export const TERROR_REACH = 10
 export const CACHES = 3
 
 /**
- * A battle awaiting the squad's landing, its encounter designed as one piece: see designEncounter. A flood keeps most
- * of its aliens back as waves; a rescue's civilians are scattered about the terror's heart. An ambush has no landing: the squad
+ * A battle awaiting the hero's landing, its encounter designed as one piece: see designEncounter. A flood keeps most
+ * of its aliens back as waves; a rescue's civilians are scattered about the terror's heart. An ambush has no landing: the hero
  * is down in the arena's middle.
  */
 export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale, challenge: ChallengeId | null = null): Battle {

@@ -38,7 +38,7 @@ test.each(battles.map((b, i) => [i, b.place, b.arenaKind, b] as const))('map %i,
   const entry = battle.entry!
   const reached = reachableFrom(battle, entry)
   const walk = walkingDistances(battle, entry)
-  // The squad lands on the arena's ground, not on a pillar: most of the open ground about the fight is in its reach.
+  // The hero lands on the arena's ground, not on a pillar: most of the open ground about the fight is in its reach.
   let open = 0
   let joined = 0
   for (let t = 0; t < GRID * GRID; t++) {

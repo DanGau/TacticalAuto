@@ -23,7 +23,7 @@ function landing(held: UtilityId[], seed = 1): Run {
   return run
 }
 
-const squad = (run: Run) => run.battle!.units.filter(isSoldier)
+const team = (run: Run) => run.battle!.units.filter(isSoldier)
 const aliens = (run: Run) => run.battle!.units.filter((u) => u.side === 'alien')
 
 test('the party starts with no utility, and goes in with a tap', () => {
@@ -37,7 +37,7 @@ test('a picked utility is never used up, and only a held one can be picked', () 
   expect(apply(run, { type: 'enter', utility: 1 }).ok).toBe(false)
   const { damage } = run.battle!.reserve[0].stats
   expect(apply(run, { type: 'enter', utility: 0 })).toEqual({ ok: true })
-  expect(squad(run)[0].stats.damage).toBe(damage + OVERCHARGE)
+  expect(team(run)[0].stats.damage).toBe(damage + OVERCHARGE)
   expect(run.utilities).toEqual(['overcharge'])
 })
 
@@ -45,11 +45,11 @@ test('thrusters add move; armor crack ignores armor; hover flattens steep ground
   const thrust = landing(['thrusters'])
   const move = thrust.battle!.reserve[0].stats.move
   apply(thrust, { type: 'enter', utility: 0 })
-  expect(squad(thrust)[0].stats.move).toBe(move + THRUST)
+  expect(team(thrust)[0].stats.move).toBe(move + THRUST)
   for (const [id, effect] of [['crack', 'piercing'], ['hover', 'hover'], ['rangedShield', 'rangedShield'], ['meleeShield', 'meleeShield']] as const) {
     const run = landing([id])
     apply(run, { type: 'enter', utility: 0 })
-    expect(squad(run)[0].effects).toContain(effect)
+    expect(team(run)[0].effects).toContain(effect)
   }
 })
 
@@ -93,11 +93,11 @@ test('every boon lasts its rounds, then ends on the units it held and gives back
   }
 })
 
-test('mending heals the squad each turn it lasts', () => {
+test('mending heals the hero each turn it lasts', () => {
   const run = landing(['mending'], 2)
   apply(run, { type: 'enter', utility: 0 })
   const battle = run.battle!
-  const [hero] = squad(run)
+  const [hero] = team(run)
   hero.hp = hero.stats.hp - 5
   while (battle.turn === 'human' && battle.phase === 'battle') stepBattle(battle)
   const events = []
@@ -111,7 +111,7 @@ test('a shield halves hits of its own kind and leaves the other kind alone', () 
     const run = landing([id])
     apply(run, { type: 'enter', utility: 0 })
     const battle = run.battle!
-    const [hero] = squad(run)
+    const [hero] = team(run)
     const alien = aliens(run)[0]
     battle.units = [hero, alien]
     Object.assign(hero, { x: 40, y: 40, hp: 99, armor: 0, weapon: undefined, stats: { ...hero.stats, hp: 99, move: 0, range: 0, damage: 0 } })
@@ -133,10 +133,10 @@ test('a rigged tank is picked, stands until aliens crowd it, then blows on them'
   expect(tank).toEqual(fuelTanks(battle)[1])
   const [foe] = aliens(run)
   const crowd = Array.from({ length: RIG.crowd }, (_, i) => ({ ...foe, id: 900 + i, y: tank.y + i - 1 }))
-  battle.units = [...squad(run), foe]
+  battle.units = [...team(run), foe]
   // Not a crowd: it stands.
   Object.assign(foe, { x: tank.x + 1, y: tank.y, hp: 99, armor: 0, engaged: true, surprised: 2, stats: { ...foe.stats, hp: 99, move: 0 } })
-  for (const hero of squad(run)) Object.assign(hero, { x: tank.x - 20, y: tank.y })
+  for (const hero of team(run)) Object.assign(hero, { x: tank.x - 20, y: tank.y })
   battle.turn = 'alien'
   battle.stage = 'move'
   stepBattle(battle)
@@ -199,7 +199,7 @@ test("a combo's effects take hold together, the minor at its lesser strength, an
   const { damage, move } = run.battle!.reserve[0].stats
   apply(run, { type: 'enter', utility: 0 })
   const battle = run.battle!
-  const hero = squad(run)[0]
+  const hero = team(run)[0]
   expect(hero.stats.damage).toBe(damage + OVERCHARGE)
   expect(hero.stats.move).toBe(move + MINOR.thrusters)
   const events: GameEvent[] = []

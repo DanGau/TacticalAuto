@@ -40,8 +40,8 @@ const STACK_LIFT = 26
 /** What a soldier's order says over it. */
 const ORDERS: Record<Order, string> = { prepare: '👁 READY', sprint: '» SPRINT' }
 
-/** Where the squad stands: the camera keeps to it, and never leaves it for action elsewhere. */
-export const squad = (battle: Battle): Tile[] => battle.units.filter((u) => u.side === 'human' && !u.civilian)
+/** Where the hero stands: the camera keeps to it, and never leaves it for action elsewhere. */
+export const team = (battle: Battle): Tile[] => battle.units.filter((u) => u.side === 'human' && !u.civilian)
 
 /** How much a unit stretches into its stride at full speed, and squashes as its weight lands, and for how long, in ms. */
 const LEAN = 0.07
@@ -133,12 +133,12 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       for (const m of group) if (m.type === 'move' && m.with && m.with !== 'dash' && sprites.has(m.id)) float(s, sourceCallout(s, m.src, sprites.get(m.id)!))
       // The camera takes in where each jump leaves from as well as where it lands, rather than chasing the jumper.
       const takeoffs = [...leapers].flatMap((id) => (sprites.has(id) ? [sprites.get(id)!.tile] : []))
-      await Promise.all([s.follow([...squad(battle), ...takeoffs], Math.max(ms, CAMERA_MS)), ...walks])
-      // The fog lifts where the squad arrived, before any alien it uncovered appears.
+      await Promise.all([s.follow([...team(battle), ...takeoffs], Math.max(ms, CAMERA_MS)), ...walks])
+      // The fog lifts where the hero arrived, before any alien it uncovered appears.
       drawFog(s, battle)
       await play(s, battle, group.filter((m) => m.type !== 'move'))
     } else if (e.type === 'reveal' || e.type === 'wave') {
-      // A wave the squad cannot see yet stays off screen, and the camera stays where it is.
+      // A wave the hero cannot see yet stays off screen, and the camera stays where it is.
       if (e.type === 'wave' && !e.units.some((at) => battle.units.some((u) => u.id === at.id && u.revealed))) continue
       const appeared = e.units.flatMap((at) => {
         const unit = battle.units.find((u) => u.id === at.id)

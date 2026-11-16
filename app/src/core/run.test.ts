@@ -314,7 +314,7 @@ test('experience follows what the hero did: kills and damage, feats only the fir
   expect(soldier.feats).toEqual(['hatTrick'])
 })
 
-test('an ambush has no landing: the squad is down at once, every posted alien in the fight, more coming, the Hunter stronger than its best soldier by HUNTER', () => {
+test('an ambush has no landing: the hero is down at once, every posted alien in the fight, more coming, the Hunter stronger than its best soldier by HUNTER', () => {
   const run = travelling(['battle', 'battle'])
   run.threat = THREAT_MAX
   apply(run, { type: 'advance' })
@@ -339,7 +339,7 @@ test.each(['human', 'alien'] as const)('full threat puts an ambush before the ne
   expect(nextStop(run)).toBe('battle')
 })
 
-test.each(['human', 'alien'] as const)('with every key won the squad is three, only the final mission remains, and it decides the run; %s win', (winner) => {
+test.each(['human', 'alien'] as const)('with every key won only the final mission remains, and it decides the run; %s win', (winner) => {
   const run = started()
   for (let key = 0; key < KEYS; key++) {
     atKey(run)
@@ -463,7 +463,7 @@ test('a satellite won offers three relics; a relic held changes the run', () => 
   expect(paid(['contact']).finds.every((find) => find.rarity !== 'common')).toBe(true)
 })
 
-test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the squad lacks, utilities, and a medkit, each sold once and kept in its place; and is left for the road", () => {
+test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the hero lacks, utilities, and a medkit, each sold once and kept in its place; and is left for the road", () => {
   const run = travelling(['shop', 'battle'])
   expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: false, reason: 'not in a shop' })
   apply(run, { type: 'advance' })
@@ -527,7 +527,7 @@ test('an unknown stop turns out a battle, a shop, or an event met once a run, wh
   expect([...kinds].sort()).toEqual(['battle', 'event', 'shop'])
 })
 
-test('every event offers a real choice, ending in one the squad can always take, and no two options say the same', () => {
+test('every event offers a real choice, ending in one the hero can always take, and no two options say the same', () => {
   const options = Object.values(EVENTS).flatMap((event) => {
     expect(event.options.length).toBeGreaterThan(1)
     expect(event.options.at(-1)!.can).toBeUndefined()
@@ -568,7 +568,7 @@ test('under fortification every hit does 1 less damage, on either side', () => {
   expect(odds(battle, alien, soldier)).toBe(plain - FORTIFIED_SOAK)
 })
 
-test("a soldier lands with its class's ability and its uses, the effects of its skills and the squad's relics, and armor from its class's skills", () => {
+test("a soldier lands with its class's ability and its uses, the effects of its skills and the hero's relics, and armor from its class's skills", () => {
   const run = travelling(['battle'])
   run.hero.cls = 'heavy'
   run.hero.skills = ['meteorStrike', 'arsenal', 'shredder', 'reactive']
@@ -580,7 +580,7 @@ test("a soldier lands with its class's ability and its uses, the effects of its 
   expect(unit.hp).toBe(soldierStats(run, run.hero).hp)
 })
 
-test('the first relic offered reads a quantity the squad makes, or makes one it reads', () => {
+test('the first relic offered reads a quantity the hero makes, or makes one it reads', () => {
   for (let seed = 1; seed <= 5; seed++) {
     const run = started()
     run.rng = seed

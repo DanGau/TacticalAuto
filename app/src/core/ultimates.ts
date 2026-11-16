@@ -42,7 +42,7 @@ const halfDown = (unit: Unit) => unit.hp <= unit.stats.hp / 2
 const soldiers = (battle: Battle) => battle.units.filter(isSoldier)
 const near = (battle: Battle, unit: Unit, radius: number) => foes(battle, unit).filter((u) => distance(u, unit) <= radius)
 
-/** The fight has come to it: a crowd, a boss, or a hero of the squad at half HP. */
+/** The fight has come to it: a crowd, a boss, or a hero of the hero at half HP. */
 const moment = (battle: Battle, unit: Unit) => {
   const fight = foes(battle, unit)
   return fight.length >= CROWD || (fight.length > 0 && (fight.some((u) => u.boss || u.target) || soldiers(battle).some(halfDown)))

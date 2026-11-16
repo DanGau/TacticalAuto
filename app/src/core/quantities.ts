@@ -29,7 +29,7 @@ export interface Flow {
 }
 
 /**
- * Opposite effects on one alien, which cancel unless the squad holds the bridge relic, which turns the meeting into a payoff.
+ * Opposite effects on one alien, which cancel unless the hero holds the bridge relic, which turns the meeting into a payoff.
  * `pair` names the quantities whose makers cancel, and `effect` the floating word the cancel shows.
  */
 export const CANCELS = {
@@ -43,13 +43,13 @@ export type Cancel = keyof typeof CANCELS
 /** The cancellation whose floating word is `effect`, if any. */
 export const cancelOf = (effect: string) => Object.values(CANCELS).find((c) => c.effect === effect)
 
-/** The cancellations a squad making `made` sets off: both halves made. */
+/** The cancellations a hero making `made` sets off: both halves made. */
 export const cancelling = (made: readonly Quantity[]): Cancel[] => (Object.keys(CANCELS) as Cancel[]).filter((id) => CANCELS[id].pair.every((q) => made.includes(q)))
 
 /** Whether `flow` reads what `made` holds or makes what `read` holds. */
 export const feeds = (flow: Flow, made: readonly Quantity[], read: readonly Quantity[]) => !!flow.reads?.some((q) => made.includes(q)) || !!flow.makes?.some((q) => read.includes(q))
 
-/** A quantity an alien shrugs off, so a party built on it must answer that alien some other way. */
+/** A quantity an alien shrugs off, so a hero built on it must answer that alien some other way. */
 export type Resist = 'burn' | 'chill' | 'mark' | 'crit' | 'armor'
 
 export const RESISTS: Record<Resist, string> = {

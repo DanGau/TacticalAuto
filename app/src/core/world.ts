@@ -11,7 +11,7 @@ export interface City {
   at: LonLat
 }
 
-/** A continent the squad can cross: the ways its towns are built, and the cities a hero may wait in. */
+/** A continent the hero can cross: the ways its towns are built, and the cities a hero may wait in. */
 interface Continent {
   name: string
   regions: RegionId[]

@@ -29,7 +29,7 @@ export interface Sprite {
   at: Tile
   /** Its size against a soldier's. */
   scale: number
-  /** Whether it fights for the squad, so its health shows in the ally colour. */
+  /** Whether it fights for the team, so its health shows in the ally colour. */
   ally: boolean
   /** Whether it is cloaked, so it shimmers, faint, for the player alone. */
   cloaked: boolean
@@ -116,7 +116,7 @@ export class Stage {
   roofs: { tiles: Set<number>; box: { x1: number; y1: number; x2: number; y2: number }; fade: { value: number }; mesh: Mesh }[] = []
   /** The tile the briefing is lighting, which no roof hides. */
   lit: Tile | null = null
-  /** The tiles the squad sees, by index; null before the landing. */
+  /** The tiles the hero sees, by index; null before the landing. */
   seen: boolean[] | null = null
   /** The battle on screen. */
   shown: Battle | null = null
@@ -254,7 +254,7 @@ export class Stage {
 
   /**
    * Fades away each roof within the circle of the arena, where the fight is staged, and each over a tile that
-   * matters: a unit's, the briefing's lit one, or the landing's before the squad goes in. Thins each wall standing just
+   * matters: a unit's, the briefing's lit one, or the landing's before the hero goes in. Thins each wall standing just
    * before a unit toward the camera, as XCOM cuts its buildings away. The rest fade back.
    */
   private cutAway(ms: number): void {
@@ -263,7 +263,7 @@ export class Stage {
     const toward = (fade: { value: number }, target: number) => (fade.value = fade.value < target ? Math.min(target, fade.value + step) : Math.max(target, fade.value - step))
     const keys = [...this.sprites.values()].map((s) => ({ x: Math.round(s.tile.x), y: Math.round(s.tile.y) }))
     if (this.lit) keys.push({ x: Math.round(this.lit.x), y: Math.round(this.lit.y) })
-    // Before the squad goes in, the landing shows whole.
+    // Before the hero goes in, the landing shows whole.
     if (shown?.phase === 'deploy' && !this.briefing && shown.entry)
       for (const at of [shown.entry]) for (let dy = -ENTRY_RADIUS; dy <= ENTRY_RADIUS; dy++) for (let dx = -ENTRY_RADIUS; dx <= ENTRY_RADIUS; dx++) keys.push({ x: at.x + dx, y: at.y + dy })
     const under = new Set(keys.map((k) => k.y * GRID + k.x))

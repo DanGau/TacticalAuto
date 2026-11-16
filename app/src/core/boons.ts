@@ -1,4 +1,4 @@
-// Boons in a battle: what each picked utility does as the squad lands, each turn it lasts, and as it ends.
+// Boons in a battle: what each picked utility does as the hero lands, each turn it lasts, and as it ends.
 import { fx } from './sources'
 import { isSoldier, type Battle, type Effect, type Stats, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
@@ -41,7 +41,7 @@ const shift = (unit: Unit, delta: Partial<Stats>, sign: number) => {
   unit.stats = stats
 }
 
-/** The utility the player picked takes hold as the squad comes in, each of its parts on the units it acts on. */
+/** The utility the player picked takes hold as the hero comes in, each of its parts on the units it acts on. */
 export function takeBoon(battle: Battle, id: UtilityId | null, tank: number): void {
   if (!id) return
   const boon: Boon = { id, until: battle.round + UTILITIES[id].rounds, deltas: {} }
@@ -65,7 +65,7 @@ export function takeBoon(battle: Battle, id: UtilityId | null, tank: number): vo
   }
 }
 
-/** As the squad's turn begins: each boon under way does its turn's work, and each whose rounds are run ends, said on the units it held. */
+/** As the hero's turn begins: each boon under way does its turn's work, and each whose rounds are run ends, said on the units it held. */
 export function tickBoons(battle: Battle, events: GameEvent[]): void {
   const heroes = battle.units.filter((u) => isSoldier(u) && u.hp > 0)
   const aliens = battle.units.filter((u) => u.side === 'alien' && u.hp > 0)

@@ -11,7 +11,7 @@ import { TUNING } from './tuning'
 import { CANCELS, feeds, type Cancel, type Flow, type Quantity } from './quantities'
 
 /**
- * An artifact the squad keeps for the run, taken from three offered after a satellite, a hold or an ambush is won.
+ * An artifact the hero keeps for the run, taken from three offered after a satellite, a hold or an ambush is won.
  * It changes every hero, or how the run pays; `text` says how.
  */
 export interface Relic extends Flow {
@@ -92,13 +92,13 @@ const relics = {
   net: { name: "Hunter's Net", text: 'Hits on a rooted alien do +2 damage', reads: ['moved'], effect: 'net' },
   glacial: { name: 'Glacial Snare', text: 'Chilling an alien roots it too', reads: ['chill'], effect: 'glacial' },
   juggernaut: { name: 'Juggernaut Servos', text: '+1 damage while the hero has armor left', reads: ['armor'], effect: 'armored' },
-  // Each makes where the squad lands matter more.
+  // Each makes where the hero lands matter more.
   encore: { name: 'Encore', text: `Every landing catches the aliens within ${ENCORE_REACH} tiles of the nearest surprised, holding their fire on their first turn`, effect: 'encore' },
   charges: { name: 'Breaching Charges', text: `Every landing blasts each alien within ${CHARGE_REACH} tiles for ${TUNING.impactDamage + CHARGE_BLAST}`, effect: 'entryBlast' },
   shredder: { name: 'Shredder Charges', text: `Every landing strips the armor from each alien within ${CHARGE_REACH} tiles and hurts it`, effect: 'entryShred' },
   cryo: { name: 'Cryo Charges', text: `Every landing chills each alien within ${CHARGE_REACH} tiles and hurts it`, makes: ['chill'], effect: 'entryFrost' },
   bulwark: { name: 'Pop-up Barricades', text: 'A barricade springs up beside each hero as it comes in, toward the nearest alien', effect: 'entryWall' },
-  turrets: { name: 'Turret Drop', text: 'A turret comes in with the party: it never moves, and attacks far and true', effect: 'entryTurret' },
+  turrets: { name: 'Turret Drop', text: 'A turret comes in with the hero: it never moves, and attacks far and true', effect: 'entryTurret' },
   // The goals.
   beacon: { name: 'Evac Beacon', text: `A hero gets a civilian out from ${BEACON_REACH} tiles away`, effect: 'beacon' },
   charity: { name: 'Refugee Network', text: 'Each civilian saved pays 1 more supply', civilianSupplies: 1 },
@@ -127,7 +127,7 @@ export const RELICS: Record<RelicId, Relic> = relics
 /** The relic each needs held before it is offered: the other charges need Breaching Charges. */
 export const REQUIRES: Partial<Record<RelicId, RelicId>> = { shredder: 'charges', cryo: 'charges' }
 
-/** Relics that may be offered to a squad holding `held`: those it lacks whose requirement it holds. */
+/** Relics that may be offered to a hero holding `held`: those it lacks whose requirement it holds. */
 export function offerable(held: readonly RelicId[]): RelicId[] {
   return (Object.keys(RELICS) as RelicId[]).filter((id) => !held.includes(id) && (!REQUIRES[id] || held.includes(REQUIRES[id])))
 }
@@ -138,13 +138,13 @@ export const RELIC_OFFERS = 3
 /** How often each rarity is drawn against the others. */
 const WEIGHT: Record<Rarity, number> = { common: 3, rare: 2, epic: 1 }
 
-/** How much likelier a relic is drawn that reads what the squad makes or makes what it reads, so offers follow the build. */
+/** How much likelier a relic is drawn that reads what the hero makes or makes what it reads, so offers follow the build. */
 export const FOCUS = 3
 
-/** How much likelier a bridge is drawn once the squad makes both halves of its cancellation. */
+/** How much likelier a bridge is drawn once the hero makes both halves of its cancellation. */
 export const BRIDGE_FOCUS = 4
 
-/** Takes a relic out of `pool`, the commoner the likelier; one that feeds what the squad makes and reads FOCUS times likelier, a bridge it holds both halves of BRIDGE_FOCUS times. */
+/** Takes a relic out of `pool`, the commoner the likelier; one that feeds what the hero makes and reads FOCUS times likelier, a bridge it holds both halves of BRIDGE_FOCUS times. */
 export function drawRelic(rng: { rng: number }, pool: RelicId[], made: readonly Quantity[] = [], read: readonly Quantity[] = []): RelicId {
   const weight = (id: RelicId) => WEIGHT[RELICS[id].rarity ?? 'rare'] * (bridged(id, made) ? BRIDGE_FOCUS : feeds(RELICS[id], made, read) ? FOCUS : 1)
   let roll = random(rng) * pool.reduce((sum, id) => sum + weight(id), 0)
@@ -152,7 +152,7 @@ export function drawRelic(rng: { rng: number }, pool: RelicId[], made: readonly 
   return pool.splice(i, 1)[0]
 }
 
-/** Whether `id` bridges a cancellation both of whose halves the squad makes. */
+/** Whether `id` bridges a cancellation both of whose halves the hero makes. */
 export const bridged = (id: RelicId, made: readonly Quantity[]) => {
   const bridge = RELICS[id].bridge
   return !!bridge && CANCELS[bridge].pair.every((q) => made.includes(q))

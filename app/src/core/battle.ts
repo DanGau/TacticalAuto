@@ -141,9 +141,9 @@ export const PLATING_ARMOR = 3
 export const CLOAK_TURNS = 2
 export const CLOAK_DAMAGE = 3
 export const SHADOW_DAMAGE = 2
-/** Tiles around an landing that are marked as it, and that its squad comes in on. */
+/** Tiles around an landing that are marked as it, and that its hero comes in on. */
 export const ENTRY_RADIUS = 2
-/** Tiles a wave keeps from the squad. */
+/** Tiles a wave keeps from the team. */
 export const POD_CLEARANCE = 7
 /** How near a soldier comes to an alien waiting its turn before its cluster engages. */
 export const ENGAGE_REACH = 5
@@ -176,7 +176,7 @@ export const MECH_STATS: Stats = { ...BASE_STATS, hp: 3, crit: 0.1, range: 4, st
 export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, crit: 0.1, range: 4, move: 6, strength: 1, jump: 4 }
 
 /** Something a unit does unprompted beyond moving and shooting; each is described where combat applies it. */
-export type Ability = 'runAndGun' | 'rocket' | 'squadsight' | 'medic' | 'mech' | 'napalm' | 'cryo' | 'cloak'
+export type Ability = 'runAndGun' | 'rocket' | 'eagleEye' | 'medic' | 'mech' | 'napalm' | 'cryo' | 'cloak'
 
 /** Something a piece of gear does; gear.ts says what each does. */
 export type GearEffect = 'bellows' | 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'snare' | 'booming' | 'tether' | 'shove' | 'cadence' | 'lofty' | 'topple' | 'kiln' | 'quench' | 'twinned' | 'braced' | 'sapping'
@@ -188,7 +188,7 @@ export type RelicEffect = 'domino' | 'opener' | 'rearm' | 'feast' | 'phoenix' | 
 export type Effect = GearEffect | SkillEffect | PerkEffect | RelicEffect | DoctrineEffect | Exam | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning' | 'quenched' | 'thawed' | 'unlocked' | 'glassEdge'
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
-export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff' | 'escort'
+export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff'
 
 /** An alien to place in a battle. A boss is the one a key or final mission is about. */
 export interface Alien {
@@ -235,11 +235,11 @@ export interface Unit {
   stats: Stats
   /** The soldier this unit is; null for aliens. */
   soldier: number | null
-  /** In the fight: an alien coming for the squad. One not engaged stands at its post and holds its fire. Humans always are. */
+  /** In the fight: an alien coming for the team. One not engaged stands at its post and holds its fire. Humans always are. */
   engaged: boolean
   /** The cluster an alien stands in, which engages together; 0 alone. */
   cluster: number
-  /** Seen by the squad: drawn, and shot at. Every alien is but burrowers underground and waves not yet sighted. */
+  /** Seen by the team: drawn, and shot at. Every alien is but burrowers underground and waves not yet sighted. */
   revealed: boolean
   /** Alien turns left caught off guard, doing nothing. */
   surprised: number
@@ -247,7 +247,7 @@ export interface Unit {
   /** Uses of the ability left this battle. */
   charges: number
   stance: Stance
-  /** What the unit's weapon, skills and the squad's relics do. */
+  /** What the unit's weapon, skills and the hero's relics do. */
   effects: Effect[]
   /** Once-per-battle effects already used. */
   spent: Effect[]
@@ -289,7 +289,7 @@ export interface Unit {
   resists: Resist[]
   /**
    * A civilian to rescue, null for any other unit: on the human side, never fights, and is not a soldier. A hider takes
-   * beside the biggest object it can reach and stays; a runner flees the aliens; a VIP waits for the squad, then keeps by it on the way out.
+   * beside the biggest object it can reach and stays; a runner flees the aliens; a VIP waits for the team, then keeps by it on the way out.
    */
   civilian: 'hider' | 'runner' | 'vip' | null
   /** For a mech, the soldier id of the engineer who deployed it, credited with what it does; null for any other unit. */
@@ -359,7 +359,7 @@ export interface Battle {
   actor: number | null
   /** What each soldier did this battle, by soldier id. */
   tally: Record<number, Tally>
-  /** The alien the squad marches on while no alien is in the fight. */
+  /** The alien the hero marches on while no alien is in the fight. */
   marching: number | null
   /** Calls to stepBattle so far. */
   beat: number
@@ -388,9 +388,9 @@ export interface Battle {
   west: Edge[]
   region: Terrain['region']
   city: string
-  /** Once-per-battle effects of the whole squad already used. */
+  /** Once-per-battle effects the heroes have used. */
   used: Effect[]
-  /** Aliens the squad has killed this battle, toward the oath's every-Nth. */
+  /** Aliens the hero has killed this battle, toward the oath's every-Nth. */
   kills: number
   /** What this battle tests; an ambush or a recovery has none. */
   challenge: ChallengeId | null
@@ -417,9 +417,9 @@ export interface Battle {
   held: number
   /** Civilians soldiers have reached and got out, on a rescue. */
   saved: number
-  /** On a VIP rescue, whether the VIP waits for the squad, behind its building's walls or past the breach; keeps by it on the way out; or has lifted off. Null otherwise. */
+  /** On a VIP rescue, whether the VIP waits for the team, behind its building's walls or past the breach; keeps by it on the way out; or has lifted off. Null otherwise. */
   vip: 'held' | 'breached' | 'freed' | 'out' | null
-  /** The one point where the squad lands; an ambush has none. */
+  /** The one point where the hero lands; an ambush has none. */
   entry: Tile | null
   arena: Arena
   /** Where a push's landing means to lie: head on down the fight's axis. */
@@ -428,14 +428,14 @@ export interface Battle {
   gates: Tile[]
   /** The round aliens last joined the fight. */
   rallied: number
-  /** On a hold, the uplink the squad must reach and defend; null otherwise. */
+  /** On a hold, the uplink the hero must reach and defend; null otherwise. */
   uplink: Tile | null
   /** On a hold, once it is held, the extraction zone; null otherwise. */
   extract: Tile | null
   /** Soldiers lifted off from the extraction zone, by soldier id, and the health each left with. */
   escaped: number[]
   lifted: Record<number, number>
-  /** On a raid, the supply caches still on the map, and how many the squad has grabbed. */
+  /** On a raid, the supply caches still on the map, and how many the hero has grabbed. */
   caches: Tile[]
   grabbed: number
   /** Soldiers not yet landed. */
@@ -447,6 +447,6 @@ export interface Battle {
 /** Primary attacks a soldier makes each turn; an alien makes one. */
 export const SOLDIER_ATTACKS = 2
 
-/** A soldier of the squad: not a civilian, nor a mech, which fights for the squad but cannot hold the field alone. */
+/** A soldier of the team: not a civilian, nor a mech, which fights for the hero but cannot hold the field alone. */
 export const isSoldier = (unit: Unit) => unit.side === 'human' && unit.soldier !== null
 

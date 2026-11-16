@@ -1,15 +1,15 @@
 # Combos
 
-Borrowed from Slay the Spire: combos the player finds, not ones an item names. Every skill, gear effect and relic **makes** or **reads** plain quantities of the fight. A reader pays beside any maker, whatever hero or line each was meant for, so a cryo's chill feeds a heavy's knockbacks. Several lines stay open; investing in one pays; scattering stalls; opposites cancel.
+Borrowed from Slay the Spire: combos the player finds, not ones an item names. Every skill, gear effect and relic **makes** or **reads** plain quantities of the fight. A reader pays beside any maker, whatever line each was meant for, so a cryo's chill feeds a hammer's knockbacks; on the one hero, every piece of the build meets every other. Several lines stay open; investing in one pays; scattering stalls; opposites cancel.
 
 ## Rules
 
 1. **Long fights.** Leg Guardians and elites' Big Ones last 3 to 5 rounds, so scaling has time to pay.
 2. **Quantities, not tags.** Items name no build. `makes`/`reads` on each relic, gear effect and skill (`core/quantities.ts`) say what it trades in.
 3. **Frequency.** On-hit effects fire on every shot, so shot makers feed every on-hit reader.
-4. **Cancellations.** Opposites on one alien cancel by default and leave it numb for its next turn: no burn, chill or marks, and 1 less from each hit. Shown as a floating word and in every tooltip of an item that makes a half. A squad that takes both halves by accident gets weaker.
-5. **Bridges.** One epic relic per cancellation turns the meeting into a big payoff. Offers favour it once the squad makes both halves.
-6. **Offers lean, not lock.** One relic in three, and a third of gear, reads what the squad makes or makes what it reads.
+4. **Cancellations.** Opposites on one alien cancel by default and leave it numb for its next turn: no burn, chill or marks, and 1 less from each hit. Shown as a floating word and in every tooltip of an item that makes a half. A hero that takes both halves by accident gets weaker.
+5. **Bridges.** One epic relic per cancellation turns the meeting into a big payoff. Offers favour it once the hero makes both halves.
+6. **Offers lean, not lock.** One relic in three, and a third of gear, reads what the hero makes or makes what it reads.
 7. **Guardians as exams.** Each is answered by three quantities, each a different line.
 
 ## Quantities
@@ -48,6 +48,6 @@ Example chains: Lodestone pulls an alien onto the tank → it hits the tank → 
 
 ## Bots and measure
 
-The strategic bot values an item by what it reads that the squad makes (3), makes that the squad reads (2), loses one for each it reads that nothing makes, four for a cancellation it starts without the bridge; a bridge whose halves the squad makes is worth 6. `npm run -s sim -- --runs=N --loadouts=a+b,...` reports each pair's synergy over its halves on Guardian rounds and wins; a triple `a+b+c` is measured against `a+b` plus `c`.
+The strategic bot values an item by what it reads that the hero makes (3), makes that the hero reads (2), loses one for each it reads that nothing makes, four for a cancellation it starts without the bridge; a bridge whose halves the hero makes is worth 6. `npm run -s sim -- --runs=N --loadouts=a+b,...` reports each pair's synergy over its halves on Guardian rounds and wins; a triple `a+b+c` is measured against `a+b` plus `c`.
 
 Code: `core/quantities.ts`, `core/stacks.ts` (cancels, bridges, displacement), `core/knockback.ts`, `core/exams.ts`, `core/relics.ts`, `core/gear.ts`, `bots/strategic.ts`.

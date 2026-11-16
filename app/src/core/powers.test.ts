@@ -29,7 +29,7 @@ it('states every power in a usage line and at most two lines of effect', () => {
   }
 })
 
-it('speaks of heroes and a party, never soldiers and squads', () => {
+it('speaks of the hero, never soldiers, squads, recruits or duos', () => {
   const told = JSON.stringify([ALIENS, CHALLENGES, CLASSES, DOCTRINES, EVENTS, FEATS, GOALS, EFFECTS, QUANTITIES, CANCELS, RELICS, SECONDARIES, SKILLS, TWISTS, UTILITIES, WEAPONS])
-  expect(told).not.toMatch(/\b(soldiers?|squads?|squadmates?|grenades?|AIM\?)\b/i)
+  expect(told).not.toMatch(/\b(soldiers?|squads?|squadmates?|recruits?|duos?|party|grenades?|AIM\?)\b/i)
 })

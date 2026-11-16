@@ -85,7 +85,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const first = !blow?.nth
   const inReach = (only ? [only] : battle.units).filter((other) => other.side !== unit.side && shootable(battle, aim, unit, other, seen))
   const taunting = inReach.filter((other) => has(other, 'taunt'))
-  // Aliens spread their fire: a healthier soldier is the likelier target, so wounds fall across the squad.
+  // Aliens spread their fire: a healthier soldier is the likelier target, so wounds fall across the team.
   const spread = (other: Unit) => (unit.side === 'alien' && !other.civilian ? SPREAD * (other.hp / other.stats.hp) : 0)
   const landed = (other: Unit) => preyed(other, bite(battle, unit, other, unit.stats)) / (turned(unit, other) ? 2 : 1) + worth(battle, unit, other)
   // Heroes weigh each alien by the harm a shot stops: see threat.
@@ -132,7 +132,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const sure = when(spend(unit, 'opener'), 'opener', 1) + when(enemy.hp === enemy.stats.hp, 'assassinate', 1) + when(!unit.moved, 'sureShot', 1) + when(enemy.mark > 0, 'apex', 1) + when(enemy.hp <= enemy.stats.hp / 2, 'deadeye', 1) + when(unit.hp <= unit.stats.hp / 2, 'berserk', 1) > 0
   const crit = !enemy.resists.includes('crit') && (sure || (blow ? (blow.crit ??= random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)) : random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)))
   unit.hits++
-  // A mirror hits as hard as the squad's hardest hitter; a feeder as hard as it has grown.
+  // A mirror hits as hard as the hardest-hitting hero; a feeder as hard as it has grown.
   const base = unit.kind === 'mirror' ? Math.max(unit.stats.damage, ...battle.units.filter(isSoldier).map((s) => s.stats.damage)) : unit.stats.damage
   const dealt =
     base +
@@ -262,7 +262,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   if (shock) for (const other of battle.units.filter((u) => u.side === enemy.side && distance(u, enemy) <= shock.reach)) stun(other, shock.chance, battle, events)
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
   else if (first && enemy.hp > 0 && damage > 0 && when(true, 'repulse', 1)) knockback(battle, unit, enemy, events, 1, REPULSE_TILES, SLAM_DAMAGE, 'repulse')
-  // A thunder that would hit nothing leaves the alien where the party can finish it.
+  // A thunder that would hit nothing leaves the alien where the hero can finish it.
   else if (first && enemy.hp > 0 && damage > 0 && (unit.side !== 'human' || knocksInto(battle, unit, enemy)) && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
   else if (first && enemy.hp > 0 && damage > 0 && when(true, 'shove', 1)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'shove')
   else if (first && enemy.hp > 0 && damage > 0 && unit.side === 'human' && when(true, 'gravity', 1)) {

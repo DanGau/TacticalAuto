@@ -62,7 +62,7 @@ export const badge = (cls?: ClassId | null) => (cls ? BADGES[cls] : "🦸");
 /** The threat bar. `landed` is how much of the newest threat animates in. */
 export function threatBar(threat: number, landed = 0): string {
   const pct = (n: number) => `${(100 * n) / THREAT_MAX}%`;
-  const meter = `<span class="threat" title="The hunt: the fuller the bar, the more aliens every battle has, up to ${Math.round(100 * TUNING.hunt)}% more. Full, it ambushes the party"><i style="width:${pct(threat - landed)}"></i><i class="landed" style="width:${pct(landed)}"></i></span>`;
+  const meter = `<span class="threat" title="The hunt: the fuller the bar, the more aliens every battle has, up to ${Math.round(100 * TUNING.hunt)}% more. Full, it ambushes the hero"><i style="width:${pct(threat - landed)}"></i><i class="landed" style="width:${pct(landed)}"></i></span>`;
   return `${meter}${threat === THREAT_MAX ? '<b class="up">ambush next</b>' : ""}`;
 }
 
@@ -145,7 +145,7 @@ export const gearName = (gear: Gear) =>
 const tip = (label: string, text: string) =>
   `<span class="tip" title="${text}">${label}</span>`;
 
-/** A quantity's chip: its icon and name, lit if the squad makes it, explained on hover. */
+/** A quantity's chip: its icon and name, lit if the hero makes it, explained on hover. */
 const quantityChip = (q: Quantity, held = false) =>
   `<span class="kw ${q} ${held ? "held" : ""}" title="${QUANTITIES[q].name}: ${QUANTITIES[q].text}">${QUANTITIES[q].icon} ${QUANTITIES[q].name}</span>`;
 
@@ -186,7 +186,7 @@ const cancelsOf = (flow: Flow & { bridge?: Cancel }): Cancel[] =>
   );
 
 /**
- * A description as Slay the Spire writes a card: each quantity in it coloured in place, lit if the squad makes it,
+ * A description as Slay the Spire writes a card: each quantity in it coloured in place, lit if the hero makes it,
  * and on hover a box beside it defining every quantity it names, makes or reads, and each cancellation it is part of.
  */
 export function describe(
@@ -214,7 +214,7 @@ export function describe(
   return `<span>${rich}</span>${defs.length > 0 ? `<span class="defs">${defs.join("")}</span>` : ""}`;
 }
 
-/** Quantity chips; one the squad makes, in `held`, is lit. */
+/** Quantity chips; one the hero makes, in `held`, is lit. */
 export const quantityChips = (qs: Quantity[] = [], held: Quantity[] = []) =>
   qs.length === 0
     ? ""

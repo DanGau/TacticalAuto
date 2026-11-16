@@ -1,4 +1,4 @@
-// Test helper: a squad of one on open ground, against aliens where a test puts them.
+// Test helper: one hero on open ground, against aliens where a test puts them.
 import { apply } from './apply'
 import { alienStats } from './aliens'
 import { type Battle, type Effect, type Tile, type Unit } from './battle'

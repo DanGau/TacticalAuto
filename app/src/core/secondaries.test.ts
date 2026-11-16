@@ -119,7 +119,7 @@ test("a combo's blows are closer together than two heroes' attacks", () => {
 
 test('Squadsight carries the secondary to any spotted alien, never the weapon', () => {
   const { b, hero } = duel(20)
-  Object.assign(hero, { ability: 'squadsight', stats: { ...hero.stats, range: 1 } })
+  Object.assign(hero, { ability: 'eagleEye', stats: { ...hero.stats, range: 1 } })
   expect(shoot(b, hero, spotted(b))).toEqual([])
   const seen = new Set(b.units.filter((u) => u.side === 'alien').map((u) => u.id))
   expect(shots(shoot(b, hero, seen, undefined, undefined, SECONDARIES.pistol))).toHaveLength(1)

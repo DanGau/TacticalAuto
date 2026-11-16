@@ -12,7 +12,7 @@ import { TILE_H, TILE_W } from './space'
 import { grow, vitals } from './sprites'
 import type { Stage } from './stage'
 
-/** What it draws: a ring racing out, a beam, streaks falling, a dome over the squad, or a flash of the whole arena. */
+/** What it draws: a ring racing out, a beam, streaks falling, a dome over the team, or a flash of the whole arena. */
 type Shape = 'ring' | 'beam' | 'rain' | 'dome' | 'flash'
 
 const LOOKS: Record<UltimateEffect, { color: number; shape: Shape; tint?: number }> = {

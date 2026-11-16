@@ -10,7 +10,7 @@ import { lineOfSight, canShoot, sees } from './sight'
 
 /**
  * The enemies a unit acts against, cloaked ones aside. Aliens know every soldier. Soldiers know the revealed aliens;
- * with none revealed they track every alien, which leads the squad to a contact.
+ * with none revealed they track every alien, which leads the hero to a contact.
  */
 export function enemiesOf(battle: Battle, unit: Unit): Unit[] {
   const others = battle.units.filter((u) => u.side !== unit.side && !u.cloaked)
@@ -30,7 +30,7 @@ export const has = (unit: Unit, effect: Effect) => unit.effects.includes(effect)
 /** The jump a unit's ways are found with: HOVER while it levitates. */
 export const leap = (unit: Unit) => (has(unit, 'hover') ? HOVER : unit.stats.jump)
 
-/** Whether a unit's foes include one with `effect`: a squad relic, or a soldier's gear, working on the aliens. */
+/** Whether a unit's foes include one with `effect`: a relic, or a soldier's gear, working on the aliens. */
 export const foeHas = (battle: Battle, unit: Unit, effect: Effect) => battle.units.some((u) => u.side !== unit.side && u.hp > 0 && has(u, effect))
 
 /** Whether an alien stands in a null field, where it cannot spit, panic, spawn or burst. */
@@ -65,7 +65,7 @@ const LONGSHOT_REACH = 2
 
 /** The unit as it aims a secondary: that reach counts, not its weapon's. */
 export const aiming = (unit: Unit, secondary?: Secondary): Unit =>
-  secondary ? { ...unit, stats: { ...unit.stats, range: unit.ability === 'squadsight' ? SPOTTED_REACH : secondary.range + (has(unit, 'longshot') ? LONGSHOT_REACH : 0) } } : unit
+  secondary ? { ...unit, stats: { ...unit.stats, range: unit.ability === 'eagleEye' ? SPOTTED_REACH : secondary.range + (has(unit, 'longshot') ? LONGSHOT_REACH : 0) } } : unit
 
 /** The unit as each of its attacks aims: its weapon, thrown or rocketed, and its secondary. */
 function reaches(unit: Unit): Unit[] {
@@ -142,7 +142,7 @@ export const uplinkReach = (battle: Battle) => UPLINK_REACH + (battle.units.some
 /** How far from the uplink a hold's extraction zone appears. */
 export const EXTRACT_CLEARANCE = 12
 
-/** About how far a walk from where the squad stands the extraction zone lies. */
+/** About how far a walk from where the hero stands the extraction zone lies. */
 const EXTRACT_WALK = 24
 
 /** An extraction zone at the edge: of tiles drawn clear of `start`, the one whose walk from it is nearest EXTRACT_WALK. */

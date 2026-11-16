@@ -394,7 +394,7 @@ test('burrowers stay unseen underground, then once engaged surface beside the so
   for (const b of aliens) expect(Math.max(Math.abs(b.x - loner.x), Math.abs(b.y - loner.y))).toBe(1)
 })
 
-test('a feeder in sight grows on each trick the squad uses; a mirror hits as hard as the hardest-hitting soldier', () => {
+test('a feeder in sight grows on each trick the hero uses; a mirror hits as hard as the hardest-hitting soldier', () => {
   const { battle, soldier, aliens, until } = arena([{ kind: 'feeder', x: 10, y: 13 }])
   Object.assign(soldier, { ability: 'rocket', charges: 1 })
   soldier.stats = { ...soldier.stats, move: 0 }
@@ -519,7 +519,7 @@ test('Ground Slam hurts every alien beside the soldier and hurls each back; Hurl
   expect(hurl.aliens[0]).toMatchObject({ x: 10, y: 12, hp: 99 - 1 - HURL_DAMAGE })
 })
 
-test('EMP Pulse stuns every alien near the soldier but a boss; Force Field armors a squadmate in trouble', () => {
+test('EMP Pulse stuns every alien near the soldier but a boss; Force Field armors an ally in trouble', () => {
   const { soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 12 }, { kind: 'trooper', x: 12, y: 10 }, { kind: 'trooper', x: 8, y: 10, boss: true }])
   Object.assign(soldier, { effects: ['emp'], stats: { ...soldier.stats, move: 0 } })
   const events = until((all) => all.some((e) => e.type === 'effect' && e.effect === 'emp'))

@@ -155,7 +155,7 @@ export function stepBattle(battle: Battle): GameEvent[] {
   const lost = battle.vip !== null && battle.vip !== 'out' && !vipOf(battle)
   if (!humans || !aliens || emptied || loaded || lost || battle.beat >= MAX_BEATS) {
     battle.phase = 'over'
-    // With every alien beaten the squad has won, even if its last soldier fell to the same blast.
+    // With every alien beaten the hero has won, even if its last soldier fell to the same blast.
     battle.winner = lost ? 'alien' : !aliens || loaded || emptied || (!humans && battle.escaped.length > 0) ? 'human' : humans ? null : 'alien'
     // A rescue is won only by saving more than RESCUE_QUORUM: those got out, and those alive once no alien is left.
     if (battle.goal === 'rescue' && battle.winner === 'human' && battle.saved + battle.units.filter((u) => u.civilian).length <= RESCUE_QUORUM) battle.winner = 'alien'

@@ -85,8 +85,8 @@ export function sight(battle: Battle): GameEvent[] {
     events.push({ type: 'grabbed', id: grabbers.find((s) => distance(s, cache) <= 1)!.id, x: cache.x, y: cache.y })
   }
   // A soldier, or a mech it called down, beside a civilian gets them out.
-  const squad = battle.units.filter((u) => u.side === 'human' && !u.civilian)
-  for (const civilian of battle.units.filter((u) => u.civilian && u.civilian !== 'vip' && squad.some((s) => distance(s, u) <= (has(s, 'beacon') ? BEACON_REACH : 1)))) {
+  const team = battle.units.filter((u) => u.side === 'human' && !u.civilian)
+  for (const civilian of battle.units.filter((u) => u.civilian && u.civilian !== 'vip' && team.some((s) => distance(s, u) <= (has(s, 'beacon') ? BEACON_REACH : 1)))) {
     battle.units.splice(battle.units.indexOf(civilian), 1)
     battle.saved++
     events.push({ type: 'saved', id: civilian.id })
@@ -94,27 +94,27 @@ export function sight(battle: Battle): GameEvent[] {
   return events
 }
 
-/** Whether `unit` is in the extraction zone or joined to it, side by side, through the squad: the squad's own bodies cannot wall anyone off from it. */
+/** Whether `unit` is in the extraction zone or joined to it, side by side, through the team: the hero's own bodies cannot wall anyone off from it. */
 function atExtraction(battle: Battle, unit: Unit): boolean {
-  const squad = battle.units.filter((u) => u.side === 'human' && !u.civilian)
+  const team = battle.units.filter((u) => u.side === 'human' && !u.civilian)
   const crowd = [unit]
-  for (const u of crowd) crowd.push(...squad.filter((o) => !crowd.includes(o) && distance(o, u) <= 1))
+  for (const u of crowd) crowd.push(...team.filter((o) => !crowd.includes(o) && distance(o, u) <= 1))
   return crowd.some((u) => distance(u, battle.extract!) <= extractReach(battle))
 }
 
 /**
- * A VIP rescue's steps. The first of the squad within BREACH_REACH of the VIP blows in the wall between them, catching the
- * guards: they engage, but do not shoot on their next turn. One of the squad beside the VIP, once no alien in the fight stands
+ * A VIP rescue's steps. The first of the hero within BREACH_REACH of the VIP blows in the wall between them, catching the
+ * guards: they engage, but do not shoot on their next turn. One of the hero beside the VIP, once no alien in the fight stands
  * within FREE_REACH of it, frees them: the extraction zone
  * appears at the edge. A VIP at the extraction zone lifts off.
  */
 export function escortVip(battle: Battle): GameEvent[] {
   const vip = vipOf(battle)
   if (!vip) return []
-  // A drone or mech beside the VIP will do, so the squad's own machines never stand in its way.
-  const squad = battle.units.filter((u) => u.side === 'human' && !u.civilian)
+  // A drone or mech beside the VIP will do, so the hero's own machines never stand in its way.
+  const team = battle.units.filter((u) => u.side === 'human' && !u.civilian)
   const events: GameEvent[] = []
-  const breacher = battle.vip === 'held' && nearest(squad.filter((s) => distance(s, vip) <= BREACH_REACH), vip)
+  const breacher = battle.vip === 'held' && nearest(team.filter((s) => distance(s, vip) <= BREACH_REACH), vip)
   if (breacher) {
     battle.vip = 'breached'
     const at = { x: vip.x + Math.sign(breacher.x - vip.x), y: vip.y + Math.sign(breacher.y - vip.y) }
@@ -124,7 +124,7 @@ export function escortVip(battle: Battle): GameEvent[] {
     events.push({ type: 'rocket', src: { kind: 'basic', id: 'attack' }, id: breacher.id, x: at.x, y: at.y, hits: [] })
   }
   const guarded = pursuers(battle, vip).some((u) => u.engaged && distance(u, vip) <= FREE_REACH)
-  if (battle.vip === 'breached' && !guarded && squad.some((s) => distance(s, vip) <= BREACH_REACH)) {
+  if (battle.vip === 'breached' && !guarded && team.some((s) => distance(s, vip) <= BREACH_REACH)) {
     battle.vip = 'freed'
     // A VIP still walled in is broken out.
     if (walkingDistances(battle, vip).filter(Number.isFinite).length < POCKET) breach(battle, vip)
@@ -243,7 +243,7 @@ export function armed(unit: Unit): boolean {
   return unit.engaged && !unit.surprised
 }
 
-/** Burrowers underground surface once engaged: beside the soldier with the fewest squadmates near, ready to strike this turn. */
+/** Burrowers underground surface once engaged: beside the soldier with the fewest allies near, ready to strike this turn. */
 export function surface(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
   const soldiers = battle.units.filter(isSoldier)

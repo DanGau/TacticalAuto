@@ -1,4 +1,4 @@
-// The squad's arrival: the one point the encounter chooses, the plain landing there, and what relics and the picked utility set off.
+// The hero's arrival: the one point the encounter chooses, the plain landing there, and what relics and the picked utility set off.
 import { chillUnit } from './stacks'
 import { BARRIER_ARMOR, GRID, isSoldier, type Battle, type Effect, type Tile, type Unit } from './battle'
 import { CHALLENGES, type ChallengeId } from './challenges'
@@ -28,11 +28,11 @@ const CONTACT = [5, 9]
 /** Challenges whose test is the ground between the way in and the aliens. */
 const FROM_AFAR: ChallengeId[] = ['slog', 'firingLine', 'scattered']
 
-/** The aliens a landing is placed by: those the squad can see coming, not burrowers underground. */
+/** The aliens a landing is placed by: those the hero can see coming, not burrowers underground. */
 const inView = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.kind !== 'burrower')
 
 /**
- * Chooses where the squad lands: a push's head on down the axis, never near an assassination's commander, a VIP
+ * Chooses where the hero lands: a push's head on down the axis, never near an assassination's commander, a VIP
  * rescue's by the VIP; a flood's by the uplink or among the civilians.
  */
 export function planEntry(battle: Battle, heart: Tile | null): void {
@@ -57,7 +57,7 @@ export function planEntry(battle: Battle, heart: Tile | null): void {
     if (vip && distance(tile, vip) > 11) continue
     open.push(tile)
   }
-  // Should the goal's ground leave no room, any the squad can walk in by will do.
+  // Should the goal's ground leave no room, any the hero can walk in by will do.
   const supported = open.length > 0 ? open : walkable
   const contact = (t: Tile) => (aliens.length > 0 ? Math.min(...aliens.map((a) => distance(a, t))) : CONTACT[0])
   let options: Tile[] = battle.challenge && FROM_AFAR.includes(battle.challenge) ? supported : []
@@ -67,39 +67,39 @@ export function planEntry(battle: Battle, heart: Tile | null): void {
   battle.entry = options.reduce((a, b) => (distance(b, approach) < distance(a, approach) ? b : a))
 }
 
-/** The squad lands, with the utility the player picked and any second from the reservoir, and the battle begins. What it sets off lands as the first beat; see opening. */
+/** The hero lands, with the utility the player picked and any second from the reservoir, and the battle begins. What it sets off lands as the first beat; see opening. */
 export function land(battle: Battle, utility: UtilityId | null = null, tank = 0, second: UtilityId | null = null): void {
   const at = battle.entry!
   deploy(battle, at)
   if (battle.challenge && CHALLENGES[battle.challenge].volley) for (const u of battle.units) if (u.side === 'alien') u.engaged = true
-  const squad = battle.units.filter(isSoldier)
-  const held = (effect: Effect) => squad.some((u) => has(u, effect))
+  const team = battle.units.filter(isSoldier)
+  const held = (effect: Effect) => team.some((u) => has(u, effect))
   const closest = nearest(battle.units.filter((u) => u.side === 'alien'), at)
   if (held('encore') && closest) for (const alien of battle.units.filter((u) => u.side === 'alien' && distance(u, closest) <= ENCORE_REACH)) alien.surprised = Math.max(alien.surprised, 1)
   for (const alien of battle.units.filter((u) => u.side === 'alien' && distance(u, at) <= CHARGE_REACH)) {
     if (held('entryShred')) alien.armor = 0
     if (held('entryFrost')) chillUnit(battle, alien, 1, [])
   }
-  if (held('entryTurret')) dropUnit(battle, squad[0], TURRET, at)
-  if (held('entryWall')) for (const soldier of squad) barricade(battle, soldier)
+  if (held('entryTurret')) dropUnit(battle, team[0], TURRET, at)
+  if (held('entryWall')) for (const soldier of team) barricade(battle, soldier)
   battle.utility = utility
   battle.second = second
   takeBoon(battle, utility, tank)
   takeBoon(battle, second, tank)
 }
 
-/** Puts the whole squad down on the free tiles nearest `at` and begins the battle, the cluster nearest engaging. */
+/** Puts the heroes down on the free tiles nearest `at` and begins the battle, the cluster nearest engaging. */
 export function deploy(battle: Battle, at: Tile): void {
   const tiles = freeTilesNear(battle, at, battle.reserve.length)
   battle.reserve.forEach((soldier, i) => battle.units.push(soldierUnit(battle, soldier, tiles[i])))
   battle.reserve = []
   battle.phase = 'battle'
   battle.opening = true
-  const squad = battle.units.filter(isSoldier)
+  const team = battle.units.filter(isSoldier)
   engageNearest(battle, [at])
   // Each Shield of Faith armors its holder and every ally.
-  const shields = squad.filter((u) => u.effects.includes('barrier')).length
-  for (const mate of squad) mate.armor += shields * BARRIER_ARMOR
+  const shields = team.filter((u) => u.effects.includes('barrier')).length
+  for (const mate of team) mate.armor += shields * BARRIER_ARMOR
 }
 
 /** Stands a barricade on the free tile beside `soldier` nearest the nearest alien, unless it would cut ground off. */
@@ -120,7 +120,7 @@ function barricade(battle: Battle, soldier: Unit): void {
   walks.delete(battle)
 }
 
-/** The battle's first beat: the utility taking hold, and what the squad's charges do. */
+/** The battle's first beat: the utility taking hold, and what the hero's charges do. */
 export function opening(battle: Battle): GameEvent[] {
   battle.opening = false
   const events: GameEvent[] = []

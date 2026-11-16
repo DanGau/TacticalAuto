@@ -10,7 +10,7 @@ import { axes, bestTurn, clamped, DECAL_LIFT, framing, panned, setHeights, setRi
 import { callout, chest, effectCallout, shotCallout, sourceCallout, tagText } from './effects'
 import { drawFog, drawMarks } from './marks'
 import { COLOR, SOURCE } from './palette'
-import { play, squad } from './play'
+import { play, team } from './play'
 import { ACROSS, PITCH, TILE_H, TILE_W, YAW } from './space'
 import { remove, sync } from './sprites'
 import { Stage } from './stage'
@@ -106,7 +106,7 @@ export async function createView(): Promise<View> {
     Object.assign(drag, { x: e.clientX, y: e.clientY })
   })
   /**
-   * The camera framing what is in play: before the landing it, the aliens and goals; after it, the squad and the
+   * The camera framing what is in play: before the landing it, the aliens and goals; after it, the hero and the
    * aliens it has found.
    */
   function inPlay(yaw = YAW): Camera {
@@ -183,8 +183,8 @@ export async function createView(): Promise<View> {
         s.look(above(null, OPENING))
         void s.follow(above(null), FLY_MS)
       }
-      // An ambush opens already in the fight, on the squad.
-      if (fresh && battle.phase !== 'deploy') s.look(clamped(inPlay(), squad(battle)))
+      // An ambush opens already in the fight, on the team.
+      if (fresh && battle.phase !== 'deploy') s.look(clamped(inPlay(), team(battle)))
       if (animate && overlaps(events) && !events.some((e) => e.type === 'end')) {
         // An attack lets the next start a stagger later, so a side's attacks land one after another; the beat after them settles the picture.
         const playing = play(s, battle, events)
@@ -200,7 +200,7 @@ export async function createView(): Promise<View> {
       if (events.some((e) => e.type === 'rocket' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(s, battle)
       drawFog(s, battle, true)
       if (!animate) {
-        if (battle.phase !== 'deploy') s.look(clamped(inPlay(), squad(battle)))
+        if (battle.phase !== 'deploy') s.look(clamped(inPlay(), team(battle)))
         s.labels.clear()
         for (const e of events) {
           if (e.type === 'effect' && sprites.has(e.id)) effectCallout(s, e, sprites.get(e.id)!)

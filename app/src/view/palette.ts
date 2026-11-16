@@ -32,7 +32,7 @@ export const COLOR = {
   zone: 0x2f6fb0,
   zoneHover: 0x4d9be6,
   fog: 0x05070b,
-  /** Glow under an alien the squad hasn't found, so the player sees trouble coming. */
+  /** Glow under an alien the hero hasn't found, so the player sees trouble coming. */
   lurk: 0xff3030,
   /** Tint of an object or unit standing in fog. */
   dim: 0x5a5f6b,

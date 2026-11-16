@@ -61,7 +61,7 @@ test("an assassination never stages its landing near the commander", () => {
   }
 })
 
-test('entering puts the whole squad down by the landing and engages only the cluster nearest', () => {
+test('entering puts the whole heroes down by the landing and engages only the cluster nearest', () => {
   const run = entering()
   const at = run.battle.entry!
   expect(enterAt(run)).toEqual({ ok: true })
@@ -94,7 +94,7 @@ test('with nobody left fighting, the next cluster comes whole after RALLY_EVERY 
   expect(new Set(engaged.map((u) => u.cluster)).size).toBe(1)
 })
 
-test('Encore catches the aliens nearest surprised as the squad lands', () => {
+test('Encore catches the aliens nearest surprised as the hero lands', () => {
   const run = begun(1)
   run.relics = ['encore']
   apply(run, { type: 'go', index: 1 })

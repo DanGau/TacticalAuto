@@ -56,7 +56,7 @@ export function soldierUnit(battle: Battle, soldier: Reserve, tile: Tile): Unit 
 
 /**
  * Lands a unit of `stats` that never moves, fighting for `owner`'s side, on the free tile nearest `spot` where it cuts no
- * ground off from `owner` nor cuts a squadmate off from it; none if there is no such tile.
+ * ground off from `owner` nor cuts an ally off from it; none if there is no such tile.
  */
 export function dropUnit(battle: Battle, owner: Unit, stats: Stats, spot: Tile, effects: Effect[] = []): Unit | undefined {
   const open = walkingDistances(battle, owner).filter(Number.isFinite).length

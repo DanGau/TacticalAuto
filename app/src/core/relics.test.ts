@@ -25,7 +25,7 @@ function landed(relics: RelicId[]): Run {
   return run
 }
 
-test('landing relics strip, chill and wall in where the squad comes in, and bring a turret', () => {
+test('landing relics strip, chill and wall in where the hero comes in, and bring a turret', () => {
   const plain = landed([]).battle!
   const battle = landed(['shredder', 'cryo', 'bulwark', 'turrets']).battle!
   const near = battle.units.filter((u) => u.side === 'alien' && distance(u, battle.entry!) <= CHARGE_REACH)

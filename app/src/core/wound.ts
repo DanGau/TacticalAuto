@@ -60,7 +60,7 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
     if (damage >= OVERKILL) feat(tally, 'overkill')
   }
   if (target.hp > 0) return
-  // An alien that dies burning spreads the fire, if the squad carries wildfire or its killer backdraft.
+  // An alien that dies burning spreads the fire, if the hero carries wildfire or its killer backdraft.
   const wildfire = battle.units.some((u) => u.side !== target.side && has(u, 'wildfire'))
   const killer = by && by.side !== target.side ? by : null
   const beside = battle.units.filter((u) => u.side === target.side && u !== target && distance(u, target) <= 1)

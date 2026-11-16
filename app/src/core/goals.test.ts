@@ -43,7 +43,7 @@ test('every challenge on the leg under way has its aliens mustered in advance; n
   for (const node of run.legs[0].columns.flat()) expect(node.stop!.aliens.length > 0).toBe(node.stop!.challenge !== null)
 })
 
-test('a hold sets its uplink within, its landing by it; once held, it is won only when the squad left reaches the extraction zone in the edge', () => {
+test('a hold sets its uplink within, its landing by it; once held, it is won only when the hero left reaches the extraction zone in the edge', () => {
   const run = before('hold')
   const battle = run.battle!
   expect(battle.uplink).not.toBeNull()
@@ -56,7 +56,7 @@ test('a hold sets its uplink within, its landing by it; once held, it is won onl
   expect(battle.uplink).toBeNull()
   const depth = edgeDepths(battle)[battle.extract.y * GRID + battle.extract.x]
   expect(depth).toBeLessThanOrEqual(INNER)
-  // Waves keep coming as the squad extracts.
+  // Waves keep coming as the hero extracts.
   expect(battle.waves.length).toBeGreaterThan(0)
   const soldiers = battle.units.filter(isSoldier)
   freeTilesNear(battle, battle.extract, soldiers.length).forEach((tile, i) => Object.assign(soldiers[i], tile))
@@ -68,11 +68,11 @@ test('a hold sets its uplink within, its landing by it; once held, it is won onl
   expect(run.finds).toEqual([])
 })
 
-test("a hold's waves come in clumps, a short way off the squad, without end", () => {
+test("a hold's waves come in clumps, a short way off the team, without end", () => {
   const run = before('hold')
   const battle = run.battle!
   enterAt(run)
-  // The squad holds out for as many waves as it takes.
+  // The hero holds out for as many waves as it takes.
   for (const soldier of battle.units.filter(isSoldier)) soldier.hp = 999
   for (let wave = 0; wave < 2 && battle.phase === 'battle'; ) {
     for (const e of stepBattle(battle)) {
@@ -85,7 +85,7 @@ test("a hold's waves come in clumps, a short way off the squad, without end", ()
   expect(battle.waves.length).toBeGreaterThan(0)
 })
 
-test('a hold counts only the rounds the squad ends inside the uplink zone', () => {
+test('a hold counts only the rounds the hero ends inside the uplink zone', () => {
   const run = before('hold')
   const battle = run.battle!
   enterAt(run)
@@ -152,7 +152,7 @@ test('a rescue is won, and pays, only with more than RESCUE_QUORUM civilians sav
   }
 })
 
-/** A rescue whose squad has landed rooted and harmless, so only the aliens act on the civilians. */
+/** A rescue whose hero has landed rooted and harmless, so only the aliens act on the civilians. */
 function terror(seed: number): Run {
   const run = before('rescue')
   run.battle!.rng = seed
@@ -223,7 +223,7 @@ test('a civilian a harvester kills rises on the next alien turn as a husk', () =
   const harvester = battle.units.find((u) => u.kind === 'harvester')!
   expect(harvester).toBeDefined()
   battle.units = battle.units.filter((u) => u.side !== 'alien' || u === harvester)
-  // Beside the hider farthest from the squad, which stays put.
+  // Beside the hider farthest from the team, which stays put.
   const soldier = battle.units.find(isSoldier)!
   const prey = battle.units.filter((u) => u.civilian === 'hider').sort((a, b) => distance(b, soldier) - distance(a, soldier))[0]
   // Neither falls before the harvest.
@@ -348,7 +348,7 @@ test('a VIP rescue is lost with the VIP, and won once the VIP lifts off, for a r
   const battle = run.battle!
   enterAt(run)
   battle.units = battle.units.filter((u) => u.side !== 'alien')
-  // With no alien left the squad still has to get the VIP out.
+  // With no alien left the hero still has to get the VIP out.
   stepBattle(battle)
   expect(battle.phase).toBe('battle')
   while (battle.phase === 'battle' && battle.beat < 900) stepBattle(battle)
@@ -397,7 +397,7 @@ test('a turret holds no column together: a freed VIP walks on, far from any sold
   expect(toExtract[end.y * GRID + end.x]).toBeLessThan(toExtract[vip.y * GRID + vip.x])
 })
 
-test('a VIP joined to the zone through a crowd of the squad lifts off', () => {
+test('a VIP joined to the zone through a crowd of the hero lifts off', () => {
   const { battle, soldier } = gettingOut('vip')
   const vip = vipOf(battle)!
   battle.vip = 'freed'

@@ -211,7 +211,7 @@ export interface Run {
   relicOffers: RelicId[]
   /** Relics offered and turned down, not offered again until every other is spent. */
   passed: RelicId[]
-  /** At the run's start, the heroes to choose the run's one from. */
+  /** At the run's start, the hero to choose the run's one from. */
   candidates: Soldier[]
   /** The journey across the globe, a stage for each leg; set once the hero is chosen, from its home. */
   route: Stage[]

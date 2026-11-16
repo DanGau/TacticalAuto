@@ -36,7 +36,7 @@ const PUSH_BAND = [-3, 11]
 const WANDER = 9
 const SETTLE = 6
 const SPAN = 8
-/** The nearest an ambush's aliens stand to the squad in the arena's middle. */
+/** The nearest an ambush's aliens stand to the hero in the arena's middle. */
 const AMBUSH_CLEAR = 6
 
 type Feature = 'height' | 'wall' | 'object' | 'road' | 'open'
@@ -70,7 +70,7 @@ const SHAPES = {
   line: (n: number, r: () => number) => { const stride = Math.min(1.2 + r() * 1.8, SPAN / n); return Array.from({ length: n }, (_, i) => [0.8 * (r() - 0.5), (i - (n - 1) / 2) * stride]) },
   /** File along `run`, meandering. */
   stream: (n: number, r: () => number) => { const stride = Math.min(1.5 + r() * 1.5, SPAN / n); const bend = r() * 6.28; return Array.from({ length: n }, (_, i) => [(i - (n - 1) / 2) * stride, 1.3 * Math.sin(bend + i)]) },
-  /** A bow, its open side toward the heroes. */
+  /** A bow, its open side toward the hero. */
   arc: (n: number, r: () => number) => { const radius = 2.5 + r() * 2; return Array.from({ length: n }, (_, i) => polar(Math.PI / 2 + (Math.PI * (i + 0.5)) / n, radius)) },
   /** Around the centre, leaving a gap at random. */
   ring: (n: number, r: () => number) => { const radius = 1.3 + r() * 1.2; const start = r() * 6.28; const sweep = 4.6 + r() * 1.6; return Array.from({ length: n }, (_, i) => polar(start + (sweep * i) / n, radius)) },

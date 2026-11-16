@@ -1,7 +1,7 @@
 // How far along the run is, and the threat that builds as it goes.
 import { type Run } from './run-state'
 
-/** Stops on each leg before its satellite, whichever way the squad goes. */
+/** Stops on each leg before its satellite, whichever way the hero goes. */
 export const LEG_STOPS = 9
 
 /** Columns at the start of the first leg that are all battles, and normal ones: time to build a kit before the first challenge. */
@@ -15,10 +15,10 @@ export const STOP_THREAT = 2
 
 export const LOSS_THREAT = 1
 
-/** Whether the squad is in the second half of its leg, where aliens are stronger. */
+/** Whether the hero is in the second half of its leg, where aliens are stronger. */
 export const late = (run: Run) => run.stop >= LEG_STOPS / 2
 
-/** How far along the road the squad is, which sets which packs appear and how much armor aliens wear: two steps a leg, the second halfway. */
+/** How far along the road the hero is, which sets which packs appear and how much armor aliens wear: two steps a leg, the second halfway. */
 export function depth(run: Run): number {
   return run.keys * 2 + (late(run) ? 1 : 0)
 }

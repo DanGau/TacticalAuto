@@ -1,4 +1,4 @@
-// Party utilities: what each does, how long it lasts, how rare it is, how many the party holds, and where it finds them.
+// Boons: what each does, how long it lasts, how rare it is, how many the hero holds, and where it finds them.
 import type { Rarity } from './base'
 
 /** What a boon can do: a common boon does one; a combo one at full strength and one or two MinorIds at less. */
@@ -60,7 +60,7 @@ const SINGLES: Record<EffectId, Kind> = {
   crack: { name: 'Sunder', icon: '🔨', text: "Heroes' attacks ignore armor", rounds: 2, rarity: 'rare' },
   tank: { name: 'Rigged Tank', icon: '🛢️', text: `Pick a fuel tank: it blows once ${RIG.crowd} aliens are within ${RIG.near} tiles, ${RIG.damage} damage to every alien within ${RIG.radius} and any hero within ${RIG.close}, and leaves fire`, rounds: 4, rarity: 'rare' },
   smoke: { name: 'Obscuring Mist', icon: '🌫️', text: `No alien shoots farther than ${SMOKE_REACH} tiles`, rounds: 3, rarity: 'common' },
-  flashbang: { name: 'Blinding Flash', icon: '✴️', text: 'The first cluster is stunned as the party comes in; a boss a round less', rounds: STUN_TURNS, rarity: 'rare' },
+  flashbang: { name: 'Blinding Flash', icon: '✴️', text: 'The first cluster is stunned as the hero comes in; a boss a round less', rounds: STUN_TURNS, rarity: 'rare' },
   rangedShield: { name: 'Ranged Shield', icon: '🛡️', text: "Attacks from beyond arm's reach do half damage, rounded up", rounds: 3, rarity: 'common' },
   meleeShield: { name: 'Melee Shield', icon: '🔰', text: "Attacks and blasts from arm's reach do half damage, rounded up", rounds: 3, rarity: 'common' },
   mending: { name: 'Mending', icon: '💚', text: full('mending'), rounds: 4, rarity: 'common' },
@@ -120,7 +120,7 @@ export const boonText = (id: UtilityId) => `${UTILITIES[id].text}, for ${UTILITI
 
 export const UTILITY_IDS = Object.keys(UTILITIES) as UtilityId[]
 
-/** Utilities the party holds at most, those a shop stocks, and what one costs. */
+/** Utilities the hero holds at most, those a shop stocks, and what one costs. */
 export const UTILITY_SLOTS = 3
 export const SHOP_UTILITIES = 1
 export const UTILITY_PRICE = 6
@@ -128,6 +128,6 @@ export const UTILITY_PRICE = 6
 /** How often each rarity of boon is drawn against the others. */
 export const BOON_WEIGHT: Record<Rarity, number> = { common: 6, rare: 3, epic: 1 }
 
-/** Commons offered at the run's start, and how many the party takes. */
+/** Commons offered at the run's start, and how many the hero takes. */
 export const START_OFFERS = 3
 export const START_PICKS = 2
