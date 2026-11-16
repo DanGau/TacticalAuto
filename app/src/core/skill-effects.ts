@@ -13,7 +13,7 @@ export const SKILL_EFFECTS = [
   'plating', 'servos', 'detonate', 'swarm', 'spotter', 'linked', 'hive', 'frenzy', 'backstab', 'rage',
   'dodge', 'longshot', 'shred', 'suppress', 'bulwark', 'steady', 'headshot', 'mark', 'doubleTap',
   'pierce', 'revive', 'inspire', 'barrier', 'surgeon', 'surge', 'secondWind', 'skirmish', 
-  'cleave', 'taunt', 'steadfast', 'bigBlast', 'concussion', 'assassinate', 'slayer', 'volley', 'elusive', 'haste',
+  'cleave', 'steadfast', 'bigBlast', 'concussion', 'assassinate', 'slayer', 'volley', 'elusive', 'haste',
   'vitality', 'bane', 'ward', 'drone', 'inferno', 'fireSuit', 'tinder', 'searing', 'backdraft', 'smolder',
   'icebreak', 'deepFreeze', 'permafrost', 'rimeLock', 'leap', 'hurl', 'slam',
   'emp', 'flashbang', 'forceField', 'shadowStrike', 'vanish', 'daze', 'afterimage', 'bloodbath',

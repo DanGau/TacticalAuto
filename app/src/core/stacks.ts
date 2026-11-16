@@ -267,14 +267,14 @@ function fault(battle: Battle, unit: Unit, at: Unit, events: GameEvent[]): void 
   }
 }
 
-/** Every 3rd human turn with Chrono Coil, the hardest-hitting hero attacks twice over. */
+/** Every 3rd human turn, the hero with Chrono Coil doubles its attacks. */
 export function chrono(battle: Battle, events: GameEvent[]): void {
   for (const u of battle.units) u.twice = false
-  const heroes = battle.units.filter((u) => isSoldier(u) && u.hp > 0)
-  if ((battle.round + 1) % 3 !== 0 || !heroes.some((u) => has(u, 'chrono'))) return
-  const pick = heroes.reduce((a, b) => (b.stats.damage > a.stats.damage ? b : a))
-  pick.twice = true
-  events.push(fx(pick.id, 'chrono', 0))
+  if ((battle.round + 1) % 3 !== 0) return
+  for (const hero of battle.units.filter((u) => isSoldier(u) && u.hp > 0 && has(u, 'chrono'))) {
+    hero.twice = true
+    events.push(fx(hero.id, 'chrono', 0))
+  }
 }
 
 /** What a death sets off by the stacks: a frozen alien shatters, its stacks pass on by Witch's Hex, and the oath counts the kill. */

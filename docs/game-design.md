@@ -15,7 +15,7 @@ Theme: superheroes on D&D-style rules; see [premise](premise.md). Test every new
 11. **One hero.** The run has one hero, so the player always knows who is doing what, and the build has room for depth: skills, perks, relics and weapon all stack on the one hero.
 12. **Cut to the fight.** No walk to find the aliens: the game cuts to the hero landing at the fight, and the fight is plainly one of two flows by mission and map: a push, the hero knocking down clusters one at a time, or a flood, the hero holding its ground as clumps pour in. The way in shows with every alien but burrowers in sight. [3] [8]
 
-How combos form, and the bosses that test them: [combos](combos.md).
+How combos form, and the bosses that test them: [combos](combos.md). How game text reads: [text style](text-style.md).
 
 ## Events
 

@@ -208,7 +208,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const on = sprites.get(e.id)
       if (!on) continue
       if (e.type === 'hurt') on.drawHp(...shown(e.id))
-      float(s, e.type === 'frozen' ? callout(s, battle.units.find((u) => u.id === e.id)?.side === 'alien' ? 'STUNNED' : 'TOO SHAKEN TO ACT', COLOR.psi, on) : callout(s, `${e.cause.toUpperCase()} -${e.amount}`, e.cause === 'acid' ? COLOR.acid : e.cause === 'impact' ? COLOR.crit : COLOR.psi, on))
+      float(s, e.type === 'frozen' ? callout(s, battle.units.find((u) => u.id === e.id)?.side === 'alien' ? 'FROZEN' : 'PANICKED', COLOR.psi, on) : callout(s, `${e.cause.toUpperCase()} -${e.amount}`, e.cause === 'acid' ? COLOR.acid : e.cause === 'impact' ? COLOR.crit : COLOR.psi, on))
     } else if (e.type === 'spawn') {
       const unit = battle.units.find((u) => u.id === e.unit.id)
       if (!unit || !unit.revealed) continue

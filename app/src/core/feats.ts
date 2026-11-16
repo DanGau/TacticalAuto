@@ -6,12 +6,12 @@ export interface Feat {
 }
 
 const feats = {
-  oneShot: { name: 'Clean Kill', text: 'Killed an alien at full HP with one hit' },
-  overkill: { name: 'Overkill', text: 'Did 8 or more damage with one hit' },
-  hatTrick: { name: 'Hat Trick', text: 'Killed 3 aliens in one battle' },
-  giantSlayer: { name: 'Giant Slayer', text: 'Landed the killing blow on a boss or commander' },
-  untouched: { name: 'Untouched', text: 'Won a battle without losing any health' },
-  lastLegs: { name: 'Last Legs', text: 'Won a battle on 2 HP or less' },
+  oneShot: { name: 'Clean Kill', text: 'Kill an alien at full HP with 1 hit.' },
+  overkill: { name: 'Heavy Hitter', text: 'Deal 8+ damage with 1 hit.' },
+  hatTrick: { name: 'Hat Trick', text: 'Kill 3 aliens in 1 battle.' },
+  giantSlayer: { name: 'Giant Slayer', text: 'Kill a boss or commander.' },
+  untouched: { name: 'Untouched', text: 'Win a battle without losing HP.' },
+  lastLegs: { name: 'Last Legs', text: 'Win a battle at 2 HP or less.' },
 } satisfies Record<string, Feat>
 
 export type FeatId = keyof typeof feats

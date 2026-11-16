@@ -127,12 +127,10 @@ test('Font of Life heals every wounded ally in reach at one use', () => {
   expect(hero.charges).toBe(1)
 })
 
-test('Command: the ally who hits hardest attacks after the hero acts', () => {
-  const { battle, hero, beats } = arena(['command'], [{ x: 11, y: 10 }])
+test('Command: the hero attacks again after it acts', () => {
+  const { hero, beats } = arena(['command'], [{ x: 11, y: 10 }])
   hero.secondary = 'pistol'
-  const mate = { ...hero, id: 500, soldier: 99, x: 11, y: 11, effects: [], secondary: undefined }
-  battle.units.push(mate)
-  expect(shots(beats(2)).some((s) => s.id === mate.id)).toBe(true)
+  expect(beats(2).some((e) => e.type === 'shot' && e.with.includes('command'))).toBe(true)
 })
 
 test('Firestorm gives a Fireball back on a kill', () => {

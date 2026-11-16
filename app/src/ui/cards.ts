@@ -87,7 +87,7 @@ export function shopSwap(run: Run, index: number, price: number, armed: string |
 /** A utility as a card: `top` says what tapping it means, `go` what the second tap does. */
 export function utilityPick(key: string, action: Action | undefined, id: UtilityId, top: string, go: string, extra: Partial<Pick> = {}): Pick {
   const { icon, name, rounds, rarity } = UTILITIES[id]
-  return { key, action, look: `utility ${rarity}`, body: `<small>${top}</small><b>${icon} ${name}</b><small class="rounds"><span class="tier ${rarity}">${rarity}</span> · ⏳ ${rounds}</small>`, detail: `<p><b>${name}</b> <span class="tier ${rarity}">${rarity}</span>. ${boonText(id)}.</p>`, go, ...extra }
+  return { key, action, look: `utility ${rarity}`, body: `<small>${top}</small><b>${icon} ${name}</b><small class="rounds"><span class="tier ${rarity}">${rarity}</span> · ⏳ ${rounds}</small>`, detail: `<p><b>${name}</b> <span class="tier ${rarity}">${rarity}</span>. ${boonText(id)}</p>`, go, ...extra }
 }
 
 /** The arm key of the starting offers picked, by index. */
@@ -106,7 +106,7 @@ export function startChoice(run: Run, armed: string | null): string {
     return `<button class="side ${on ? 'keep' : 'sell'}" role="checkbox" aria-checked="${on}" data-arm="${startKey(next)}"><small class="verb">${on ? 'take' : 'leave'}</small><small class="tier ${rarity}">${rarity} · ⏳ ${rounds} rounds</small><b>${icon} ${name}</b><span>${UTILITIES[id].text}</span></button>`
   }
   const ready = picks.length === START_PICKS
-  return `<div class="gearswap boons"><h1>Starting boons</h1><h2>Take ${START_PICKS}: each lasts the run, and one goes into each fight</h2>
+  return `<div class="gearswap boons"><h1>Starting boons</h1><h2>Take ${START_PICKS}. Each lasts the run. Bring 1 into each battle.</h2>
     <div class="swap">${run.boonOffers.map(card).join('')}</div>
     <button class="decide confirm"${ready ? ` data-action='${JSON.stringify({ type: 'boons', picks })}'` : ' disabled'}>${ready ? 'Confirm' : `Pick ${START_PICKS - picks.length} more`}</button></div>`
 }

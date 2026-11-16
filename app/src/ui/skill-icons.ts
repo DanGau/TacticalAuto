@@ -50,7 +50,7 @@ export const SKILL_ICONS: Partial<Record<SkillId, string>> = {
   bulwark: '<path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/><path d="M9 11h6"/>',
   reactive: '<path d="M4 8l8-5 8 5v8l-8 5-8-5z"/><path d="M9 12l3 3 3-3M12 9v6"/>',
   standAlone: '<circle cx="12" cy="9" r="3"/><path d="M7 20c0-4 2-6 5-6s5 2 5 6"/><circle cx="12" cy="12" r="10"/>',
-  taunt: '<circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><path d="M3 3l4 4M21 3l-4 4M3 21l4-4M21 21l-4-4"/>',
+  spikes: '<circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><path d="M3 3l4 4M21 3l-4 4M3 21l4-4M21 21l-4-4"/>',
   fortress: '<path d="M4 21V8h3v3h3V8h4v3h3V8h3v13z"/><path d="M10 21v-5h4v5"/>',
   lasting: '<path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/><path d="M15 10a3 3 0 1 0 0 4M15 7v3h-3"/>',
   steadfast: '<path d="M12 3v14M7 17h10M5 21h14"/><path d="M8 7h8"/>',

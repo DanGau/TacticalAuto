@@ -72,7 +72,7 @@ const list = (name: string, items: string[]) => (items.length > 0 ? `<section><h
 export function runSummary(run: Run): string {
   const won = run.phase === 'won'
   const last = run.log.at(-1)
-  const ended = won ? 'The source is destroyed. Earth is saved.' : 'Earth has fallen'
+  const ended = won ? 'The source is destroyed. Earth is saved.' : 'Earth has fallen.'
   const cause = won || !last ? '' : `<p>Ended by: ${foughtName(last)}, round ${last.rounds}.</p>`
   const hero = run.hero
   const card = `<div class="endhero"><span class="portrait">${badge(hero.cls)}</span><div><b>${hero.name}</b> <small>Level ${level(hero)}${hero.cls ? ` ${CLASSES[hero.cls].name}` : ''}</small><br>

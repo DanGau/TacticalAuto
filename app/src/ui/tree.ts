@@ -4,7 +4,7 @@ import type { Soldier } from '../core/run-state'
 import { PERKS } from '../core/perks'
 import { committed, pathOf, powerOf, SKILLS, TREES, type Path, type SkillId } from '../core/skills'
 import { skillOffers } from '../core/hero'
-import { describe } from './html'
+import { describe, sentence } from './html'
 import { basicsOf, tag } from './kit'
 import { perkIcon, skillIcon } from './skill-icons'
 
@@ -20,11 +20,11 @@ export function skillState(hero: Soldier, id: SkillId): SkillState {
 export function rule(hero: Soldier, id: SkillId): string {
   const cls = hero.cls!
   const path = pathOf(cls, id)
-  if (!path) return 'Free on recruit'
+  if (!path) return 'Free at start'
   const row = path.rows.findIndex((r) => r.includes(id))
   const took = committed(cls, hero.skills)
   if (took && took !== path) return `Locked: ${hero.name} took ${took.name}`
-  if (row === 0) return `First pick: takes ${path.name}, and the other paths lock`
+  if (row === 0) return `First pick. Take ${path.name}; the other paths lock`
   return `Pick ${row + 1} of ${path.name}${row === path.rows.length - 1 ? ', a capstone' : ''}`
 }
 
@@ -33,7 +33,7 @@ const attr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
 /** A skill's name as a chip, its use and text in its tip. */
 export const chip = (hero: Soldier, id: SkillId) => {
   const skill = SKILLS[id]
-  return `<span class="tchip ${skillState(hero, id)}" tabindex="0" data-tip="${attr(`${skill.name} · ${usage(skill)}: ${skill.text}. ${rule(hero, id)}.`)}">${skillIcon(id)} ${skill.name}</span>`
+  return `<span class="tchip ${skillState(hero, id)}" tabindex="0" data-tip="${attr(`${skill.name} · ${usage(skill)}: ${sentence(skill.text)} ${rule(hero, id)}.`)}">${skillIcon(id)} ${skill.name}</span>`
 }
 
 /** An offered skill in full, for the sheet: name, use and text. */
@@ -75,7 +75,7 @@ export function treeMap(hero: Soldier, offer?: (id: SkillId) => string, held?: P
       const entry = p.rows[0][0]
       return `<div class="tcol"><b class="thead">${p.name}</b>${skillState(hero, entry) === 'offered' ? draw(entry) : chip(hero, entry)}${ticks(p.rows.length - 1)}${leads(p)}</div>`
     }
-    return `<div class="tree">${head}<small class="tnote">First pick chooses a path; the others close.</small><div class="tcols">${view.paths.map(col).join('')}</div>${fullTree(hero)}</div>`
+    return `<div class="tree">${head}<small class="tnote">Your first pick chooses a path. The others lock.</small><div class="tcols">${view.paths.map(col).join('')}</div>${fullTree(hero)}</div>`
   }
   const lost = (row: SkillId[]) => row.filter((id) => hero.lost.includes(id)).map((id) => `<s>${SKILLS[id].name}</s>`).join('')
   const done = view.taken.map((row) => `<div class="tdone">${row.filter((id) => hero.skills.includes(id)).map((id) => chip(hero, id)).join('')}${lost(row)}</div>`).join('')

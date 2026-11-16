@@ -186,7 +186,7 @@ function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
       spent: sold,
     }),
   )
-  const medkit: Pick = { key: 'm', action: { type: 'medkit' }, look: 'medkit', body: card('medkit', '✚ Medkit', `${MEDKIT.price} supplies`, shop.medkit), detail: `<p><b>Medkit.</b> Your hero heals ${MEDKIT.heal}, once. A safehouse heals fully.</p>`, go: `Tap again to pay ${MEDKIT.price} supplies`, block: wounded(run) ? poor(MEDKIT.price) : 'Not hurt', spent: shop.medkit }
+  const medkit: Pick = { key: 'm', action: { type: 'medkit' }, look: 'medkit', body: card('medkit', '✚ Medkit', `${MEDKIT.price} supplies`, shop.medkit), detail: `<p><b>Medkit.</b> Heal ${MEDKIT.heal}, once. A safehouse heals you fully.</p>`, go: `Tap again to pay ${MEDKIT.price} supplies`, block: wounded(run) ? poor(MEDKIT.price) : 'Full health', spent: shop.medkit }
   return [{ name: 'Weapons', picks: gear }, { name: 'Relics', picks: relics }, { name: 'Boons and the medkit', picks: [...utilities, medkit] }]
 }
 

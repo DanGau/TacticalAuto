@@ -18,7 +18,7 @@ export const SMOKE_REACH = 2
 export const STUN_TURNS = 2
 /** A rigged tank: blows once `crowd` aliens stand within `near` tiles of it; `damage` to every alien within `radius` and every hero within `close`, and fire within `fireReach` for `fireTurns`. */
 export const RIG = { crowd: 3, near: 4, radius: 6, close: 2, damage: 10, fireReach: 4, fireTurns: 4 }
-/** Health Mending gives back a turn; armor Iron Skin adds; range Farsight adds; crit Keen adds; move Gravity Well and damage Dampener take. */
+/** Health Mending gives back a turn; armor Stoneskin adds; range Farsight adds; crit Keen adds; move Gravity Well and damage Dampener take. */
 export const MEND = 2
 export const IRON_SKIN = 3
 export const FARSIGHT = 2
@@ -34,16 +34,16 @@ export type MinorId = keyof typeof STRENGTH
 export const MINOR: Record<MinorId, number> = { thrusters: 2, overcharge: 1, ironSkin: 2, farsight: 1, keen: 0.15, gravity: 1, dampener: 1, mending: 1 }
 
 const SCALED: Record<MinorId, (n: number) => string> = {
-  thrusters: (n) => `heroes have +${n} move`,
-  overcharge: (n) => `heroes have +${n} damage`,
-  ironSkin: (n) => `heroes have +${n} armor`,
-  farsight: (n) => `heroes have +${n} range`,
-  keen: (n) => `heroes have +${Math.round(n * 100)}% crit chance`,
-  gravity: (n) => `aliens have -${n} move`,
-  dampener: (n) => `aliens have -${n} damage, to at least 1`,
-  mending: (n) => `heroes heal ${n} each turn`,
+  thrusters: (n) => `Have ${n} more move.`,
+  overcharge: (n) => `Deal ${n} more damage.`,
+  ironSkin: (n) => `Have ${n} more Armor.`,
+  farsight: (n) => `Have ${n} more range.`,
+  keen: (n) => `Have ${Math.round(n * 100)}% more Crit chance.`,
+  gravity: (n) => `Aliens have ${n} less move.`,
+  dampener: (n) => `Aliens deal ${n} less damage, down to 1.`,
+  mending: (n) => `At the start of your turn, heal ${n}.`,
 }
-const full = (id: MinorId) => SCALED[id](STRENGTH[id]).replace(/^./, (c) => c.toUpperCase())
+const full = (id: MinorId) => SCALED[id](STRENGTH[id])
 
 interface Kind {
   name: string
@@ -55,21 +55,21 @@ interface Kind {
 
 const SINGLES: Record<EffectId, Kind> = {
   thrusters: { name: 'Swiftness', icon: '💨', text: full('thrusters'), rounds: 3, rarity: 'common' },
-  hover: { name: 'Levitation', icon: '🪽', text: 'Heroes cross difficult terrain and steep ground at no extra cost, float over chasms and never fall', rounds: 3, rarity: 'common' },
+  hover: { name: 'Levitation', icon: '🪽', text: 'Cross difficult terrain and steep ground at no extra cost. Float over chasms.', rounds: 3, rarity: 'common' },
   overcharge: { name: 'Overcharge', icon: '⚡', text: full('overcharge'), rounds: 3, rarity: 'common' },
-  crack: { name: 'Sunder', icon: '🔨', text: "Heroes' attacks ignore armor", rounds: 2, rarity: 'rare' },
-  tank: { name: 'Rigged Tank', icon: '🛢️', text: `Pick a fuel tank: it blows once ${RIG.crowd} aliens are within ${RIG.near} tiles, ${RIG.damage} damage to every alien within ${RIG.radius} and any hero within ${RIG.close}, and leaves fire`, rounds: 4, rarity: 'rare' },
-  smoke: { name: 'Obscuring Mist', icon: '🌫️', text: `No alien shoots farther than ${SMOKE_REACH} tiles`, rounds: 3, rarity: 'common' },
-  flashbang: { name: 'Blinding Flash', icon: '✴️', text: 'The first cluster is stunned as the hero comes in; a boss a round less', rounds: STUN_TURNS, rarity: 'rare' },
-  rangedShield: { name: 'Ranged Shield', icon: '🛡️', text: "Attacks from beyond arm's reach do half damage, rounded up", rounds: 3, rarity: 'common' },
-  meleeShield: { name: 'Melee Shield', icon: '🔰', text: "Attacks and blasts from arm's reach do half damage, rounded up", rounds: 3, rarity: 'common' },
+  crack: { name: 'Sunder', icon: '🔨', text: 'Ignore Armor.', rounds: 2, rarity: 'rare' },
+  tank: { name: 'Rigged Tank', icon: '🛢️', text: `Choose a fuel tank. Once ${RIG.crowd} aliens are within ${RIG.near} tiles of it, it explodes: ${RIG.damage} damage to each alien within ${RIG.radius} tiles and to you within ${RIG.close}, and fire.`, rounds: 4, rarity: 'rare' },
+  smoke: { name: 'Obscuring Mist', icon: '🌫️', text: `Aliens cannot shoot farther than ${SMOKE_REACH} tiles.`, rounds: 3, rarity: 'common' },
+  flashbang: { name: 'Blinding Flash', icon: '✴️', text: `When you land, Stun the nearest cluster for ${STUN_TURNS} rounds, a boss for ${STUN_TURNS - 1}.`, rounds: STUN_TURNS, rarity: 'rare' },
+  rangedShield: { name: 'Ranged Shield', icon: '🛡️', text: "Hits on you from beyond arm's reach deal half damage, rounded up.", rounds: 3, rarity: 'common' },
+  meleeShield: { name: 'Melee Shield', icon: '🔰', text: "Hits and blasts on you from arm's reach deal half damage, rounded up.", rounds: 3, rarity: 'common' },
   mending: { name: 'Mending', icon: '💚', text: full('mending'), rounds: 4, rarity: 'common' },
-  ironSkin: { name: 'Iron Skin', icon: '🪨', text: full('ironSkin'), rounds: 3, rarity: 'common' },
+  ironSkin: { name: 'Stoneskin', icon: '🪨', text: full('ironSkin'), rounds: 3, rarity: 'common' },
   farsight: { name: 'Farsight', icon: '🔭', text: full('farsight'), rounds: 3, rarity: 'common' },
   keen: { name: 'Keen Eye', icon: '👁️', text: full('keen'), rounds: 3, rarity: 'common' },
-  coldSnap: { name: 'Cold Snap', icon: '❄️', text: 'Each turn every alien in the fight takes a stack of chill', rounds: 3, rarity: 'rare' },
-  blaze: { name: 'Wildfire', icon: '🔥', text: `Each turn aliens within ${BLAZE_REACH} tiles of the way in catch fire`, rounds: 2, rarity: 'common' },
-  hunted: { name: "Hunter's Mark", icon: '🎯', text: 'The toughest alien is exposed: hits on it do half again', rounds: 3, rarity: 'common' },
+  coldSnap: { name: 'Cold Snap', icon: '❄️', text: 'At the start of your turn, apply 1 Chill to each alien in the fight.', rounds: 3, rarity: 'rare' },
+  blaze: { name: 'Wildfire', icon: '🔥', text: `At the start of your turn, apply 1 Burn to each alien within ${BLAZE_REACH} tiles of your landing.`, rounds: 2, rarity: 'common' },
+  hunted: { name: 'Prey', icon: '🎯', text: 'The alien with the most max HP takes 50% more damage.', rounds: 3, rarity: 'common' },
   gravity: { name: 'Gravity Well', icon: '🌀', text: full('gravity'), rounds: 3, rarity: 'common' },
   dampener: { name: 'Dampener', icon: '🔇', text: full('dampener'), rounds: 2, rarity: 'rare' },
 }
@@ -104,7 +104,7 @@ export const UTILITIES = {
   ...Object.fromEntries(
     Object.entries(COMBOS).map(([id, { major, minor, ...kind }]) => [
       id,
-      { ...kind, rarity: minor.length > 1 ? 'epic' : 'rare', parts: [{ id: major }, ...minor.map((m) => ({ id: m, minor: true }))], text: [SINGLES[major].text, ...minor.map((m) => SCALED[m](MINOR[m]))].join('; ') },
+      { ...kind, rarity: minor.length > 1 ? 'epic' : 'rare', parts: [{ id: major }, ...minor.map((m) => ({ id: m, minor: true }))], text: [SINGLES[major].text, ...minor.map((m) => SCALED[m](MINOR[m]))].join(' ') },
     ]),
   ),
 } as Record<UtilityId, Utility>
@@ -116,7 +116,7 @@ export const effectsOf = (id: UtilityId): EffectId[] => UTILITIES[id].parts.map(
 export const carries = (id: UtilityId, of: readonly EffectId[]) => effectsOf(id).some((e) => of.includes(e))
 
 /** What a boon does, and for how long. */
-export const boonText = (id: UtilityId) => `${UTILITIES[id].text}, for ${UTILITIES[id].rounds} rounds`
+export const boonText = (id: UtilityId) => `${UTILITIES[id].text} Lasts ${UTILITIES[id].rounds} rounds.`
 
 export const UTILITY_IDS = Object.keys(UTILITIES) as UtilityId[]
 

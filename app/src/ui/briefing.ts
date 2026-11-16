@@ -8,6 +8,7 @@ import { TWISTS } from '../core/twists'
 import { YAW } from '../view/space'
 import type { Shot as CameraShot } from '../view/camera'
 import type { View } from '../view/view'
+import { sentence } from './html'
 
 /** How long the briefing holds on each thing it shows. */
 const DWELL_MS = 1800
@@ -116,7 +117,7 @@ export function shots(battle: Battle, order: string): Shot[] {
   const where = `${battle.city}, ${REGIONS[battle.region].name.toLowerCase()}. `
   const lines = at.map((t, i) => `${i === 0 ? `${where}${order}. ` : ''}${nearby(battle, t)}${ground(battle, t)}.`)
   const twist = battle.twist && TWISTS[battle.twist]
-  const last = `${twist ? `${twist.icon} ${twist.name}: ${twist.text}.` : ''}`
+  const last = `${twist ? `${twist.icon} ${twist.name}: ${sentence(twist.text)}` : ''}`
   return [...at.map((t, i): Shot => ({ tiles: around(t), line: lines[i] })), { tiles: null, line: at.length === 0 ? `${where}${order}. ${last}` : last, landing: true }]
 }
 

@@ -177,7 +177,7 @@ test('Cadenced gear: every CADENCE-th shot does double damage', () => {
   expect(second.damage).toBe(4)
 })
 
-test('Chrono Coil: every 3rd human turn the hardest-hitting hero attacks twice over', () => {
+test('Chrono Coil: every 3rd human turn the hero doubles its attacks', () => {
   const { battle, hero } = arena(['chrono'], [{ x: 11, y: 10 }])
   battle.round = 1
   chrono(battle, [])
@@ -203,7 +203,7 @@ test('Boon Reservoir: a fight won with no boon adds a charge; BOON_CHARGES take 
   expect(run.boons).toBe(1)
 })
 
-test('Unbroken Line: every STREAK_FIGHTS fights in a row won with no hero down pay more', () => {
+test('Unbroken Line: every STREAK_FIGHTS fights in a row won pay more', () => {
   const run = begun(1)
   gainRelic(run, 'streak', true)
   const pays: number[] = []

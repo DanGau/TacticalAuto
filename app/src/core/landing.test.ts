@@ -94,7 +94,7 @@ test('with nobody left fighting, the next cluster comes whole after RALLY_EVERY 
   expect(new Set(engaged.map((u) => u.cluster)).size).toBe(1)
 })
 
-test('Encore catches the aliens nearest surprised as the hero lands', () => {
+test('Surprise Drop catches the aliens nearest as the hero lands', () => {
   const run = begun(1)
   run.relics = ['encore']
   apply(run, { type: 'go', index: 1 })

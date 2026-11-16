@@ -18,11 +18,11 @@ Borrowed from Slay the Spire: combos the player finds, not ones an item names. E
 |---|---|---|
 | Burn | Scorching, Billowing, Kilned gear; Salamander Sigil, Kindling Plates, Pyre Censer, Wildfire Spores; Pyro; fire tiles | Accelerant Gel, Eternal Flame, Witch's Hex, Catalyst Prism; Stoke and Pyro talents |
 | Chill | Rimed, Hailing gear; Frost Lattice, Cryo Charges, Cryo Conductor; Cryo | Brittle Frost, Glacial Snare, Frost Fracture, Permafrost Heart; Glass Edge; knockbacks (a chilled alien slides up to 3 tiles more, and one that slides into something takes the hero's blow) |
-| Mark | Seeking gear; Eye of the Hunt; Sniper, Engineer | Spotter Network, Dead Eye Ledger; Called Shot; every hit (+1) |
-| Moved (cannot walk on its next turn, bar a boss; Gravity Lens makes a boss reel in place) | Shoving, Thundering, Tethered gear; Gravity Lens, Lodestone Harness; Heavy skills; chill slides | Stagger Sights, Hunter's Net, Booming gear, Pyre Censer (driven onto fire burns), Domino Rig |
+| Mark | Seeking gear; Hunter's Eye; Sniper, Engineer | Spotter Network, Dead Eye Ledger; Called Shot; every hit (+1) |
+| Displace (cannot walk on its next turn, bar a boss; Gravity Lens makes a boss reel in place) | Shoving, Thundering, Tethered gear; Gravity Lens, Lodestone Harness; Heavy skills; chill slides | Stagger Sights, Hunter's Net, Booming gear, Pyre Censer (driven onto fire burns), Domino Rig |
 | Impact | Shoving, Thundering gear; Gravity Lens, Domino Rig; ledges | Kinetic Engine, Kinetic Core, Toppling, Kilned, Hailing gear |
 | Shots | multi-shot weapons; Hair Trigger, Twinned gear, Split Rounds, Flurry | every on-hit maker: Scorching, Rimed, Seeking, Bracing, Leeching, Sapping, Cadenced |
-| Crit | Focusing Lens, Kinetic Capacitor, Lofty gear; Sniper skills | Salamander Sigil, Frost Lattice, Eye of the Hunt, Arcing gear |
+| Crit | Focusing Lens, Kinetic Capacitor, Lofty gear; Sniper skills | Salamander Sigil, Frost Lattice, Hunter's Eye, Arcing gear |
 | Overkill (a hit's damage past 6) | Glass Cannon, Blood Rite, Adrenal Pump, Ram Plating, Bounty Sigil, Cadenced, Merciless gear | Overkill Coils (a hit's damage past 6 also hits the nearest other alien), Volatile gear (kills burst for the rest) |
 | Armor | Alien Alloys, Adaptive Plating, Bloodforged Plate, Overflow Capacitor, Reactive Shell, Bracing gear | Ram Plating, Juggernaut Servos, Kindling Plates, Ironclad Lattice; Shield Slam |
 | Hurt | aliens; Lodestone Harness pulls them onto the tank | Reactive Shell, Kindling Plates; Hardened |
@@ -33,17 +33,17 @@ Example chains: Lodestone pulls an alien onto the tank → it hits the tank → 
 
 | Cancel | Halves | Default | Bridge |
 |---|---|---|---|
-| Quenched | burn, chill | both go out; numb | Thermal Shock Core: detonates for 3 times the hero's damage a stack of both, half to those beside |
-| Thawed | moved, chill | a frozen alien moved thaws and acts; numb | Shatterglass Edge: any chilled alien moved takes twice the hero's damage a chill stack; a frozen one stays frozen |
-| Lock lost | moved, mark | a marked alien moved loses its marks; numb | Lock-On Rig: marks kept, twice the hero's damage a mark |
+| Quench | burn, chill | both go out; numb | Thermal Shock Core: detonates for 3 times the hero's damage a stack of both, half to those beside |
+| Thaw | moved, chill | a frozen alien moved thaws and acts; numb | Shatterglass Edge: any chilled alien moved takes twice the hero's damage a chill stack; a frozen one stays frozen |
+| Lock Lost | moved, mark | a marked alien moved loses its marks; numb | Lock-On Rig: marks kept, twice the hero's damage a mark |
 
 ## Exams
 
 | Trait | What it does | Answered by |
 |---|---|---|
 | Plated | Hits under 6 do half; slams and falls do full | overkill, marks, impact |
-| Regenerator | Heals a tenth of its health a turn unless burning or chilled, up to 60% a battle | burn, chill, shots |
-| Berserker | Gains 1 Might a turn unless moved since its last | moved, chill, armor |
+| Regrowth | Heals a tenth of its health a turn unless burning or chilled, up to 60% a battle | burn, chill, shots |
+| Rampager | Gains 1 Might a turn unless moved since its last | moved, chill, armor |
 | Thorned | Each hit hurts the attacker 1; slams and falls do not | armor, impact, overkill |
 
 ## Bots and measure

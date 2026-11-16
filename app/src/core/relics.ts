@@ -1,18 +1,16 @@
 // Relics: what each does, and which may be offered.
-import { ADRENAL_FROM, ADRENAL_MAX, OVERKILL_FROM, BRIDGE_FACTOR, THERMAL_FACTOR, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, GUARD_MAX, LODESTONE_REACH, MIGHT_MAX, SHELL_MAX, STAGGER_DAMAGE, type RelicEffect, type Stats } from './battle'
+import { ADRENAL_FROM, ADRENAL_MAX, BRIDGE_FACTOR, THERMAL_FACTOR, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, GUARD_MAX, LODESTONE_REACH, MIGHT_MAX, PHOENIX_HEALTH, SHELL_MAX, STAGGER_DAMAGE, type RelicEffect, type Stats } from './battle'
 import type { Rarity } from './base'
 import { random } from './rng'
 import { MOMENTUM_MAX } from './attack'
 import { CHARGE_BLAST, CHARGE_REACH, ENCORE_REACH } from './landing'
-import { BEACON_REACH } from './fighters'
-import { BOUNTY_DAMAGE } from './fighters'
-import { RELAY_REACH } from './fighters'
+import { BEACON_REACH, BOUNTY_DAMAGE, FLARE_REACH, RELAY_REACH } from './fighters'
 import { TUNING } from './tuning'
 import { CANCELS, feeds, type Cancel, type Flow, type Quantity } from './quantities'
 
 /**
  * An artifact the hero keeps for the run, taken from three offered after a satellite, a hold or an ambush is won.
- * It changes every hero, or how the run pays; `text` says how.
+ * It changes the hero, or how the run pays; `text` says how.
  */
 export interface Relic extends Flow {
   name: string
@@ -21,9 +19,9 @@ export interface Relic extends Flow {
   bridge?: Cancel
   /** How seldom it is offered; rare unless set. */
   rarity?: Rarity
-  /** Added to every hero's stats. */
+  /** Added to the hero's stats. */
   stats?: Partial<Stats>
-  /** Given to every hero. */
+  /** Given to the hero. */
   effect?: RelicEffect
   /** Added to the uses of every class ability that has uses. */
   charges?: number
@@ -37,7 +35,7 @@ export interface Relic extends Flow {
   civilianSupplies?: number
   /** Whether a fight won with no boon charges the reservoir, which spends BOON_CHARGES to take a second boon in. */
   boons?: true
-  /** Supplies each STREAK_FIGHTS fights in a row won with no hero down pay. */
+  /** Supplies each STREAK_FIGHTS fights in a row won pay. */
   streak?: number
 }
 
@@ -48,77 +46,77 @@ export const STREAK_FIGHTS = 2
 export const ZENITH_EVERY = 3
 
 /** What each stack a payoff spends adds, in words. */
-const SPENT = TUNING.spend.factor === 1 ? "the hero's damage" : `${100 * TUNING.spend.factor}% of the hero's damage`
+const SPENT = TUNING.spend.factor === 1 ? 'your damage' : `${100 * TUNING.spend.factor}% of your damage`
 
 const relics = {
-  plasma: { name: 'Plasma Core', text: 'Every hero does +1 damage', rarity: 'common', stats: { damage: 1 } },
-  alloys: { name: 'Alien Alloys', text: 'Every hero has +3 armor', makes: ['armor'], rarity: 'common', stats: { armor: 3 } },
-  servos: { name: 'Overclocked Servos', text: 'Every hero has +1 move', rarity: 'common', stats: { move: 1 } },
-  lens: { name: 'Focusing Lens', text: 'Every hero has +1 range and +10% crit', makes: ['crit'], stats: { range: 1, crit: 0.1 } },
-  glassCannon: { name: 'Glass Cannon Protocol', text: 'Every hero does +2 damage and has 3 less HP', makes: ['overkill'], stats: { damage: 2, hp: -3 } },
-  capacitor: { name: 'Kinetic Capacitor', text: "Each hero's first hit of a battle is a crit", makes: ['crit'], rarity: 'common', effect: 'opener' },
-  plating: { name: 'Adaptive Plating', text: 'Each hero regrows 1 armor at the start of its turn', makes: ['armor'], effect: 'rearm' },
-  nanites: { name: 'Hunger Nanites', text: `A hero who kills heals 2, up to ${TUNING.healCap} a battle`, reads: ['kill'], effect: 'feast' },
-  phoenix: { name: 'Phoenix Protocol', text: '1/battle: the first hero to fall gets up with 5 HP', effect: 'phoenix' },
-  echo: { name: 'Echo Chamber', text: 'Every class ability with limited uses has one more', charges: 1 },
-  drones: { name: 'Scavenger Drones', text: 'Each won battle pays 1 more supply', supplies: 1 },
-  contact: { name: 'Black Market Contact', text: 'Every piece of gear found is rare or better', rareGear: true },
-  uplink: { name: "Seer's Uplink", text: 'The flight map names the aliens of each stop, not only how dangerous they are', recon: true },
-  accelerant: { name: 'Accelerant Gel', text: `Hits on a target with ${TUNING.spend.burns} or more burn spend it: +${SPENT} a stack to it, half that to each alien beside it; the hero gains a temp HP a stack`, reads: ['burn'], rarity: 'epic', effect: 'accelerant' },
-  wildfire: { name: 'Wildfire Spores', text: 'An alien that dies burning gives its burn to every alien beside it', reads: ['burn', 'kill'], makes: ['burn'], effect: 'wildfire' },
-  salamander: { name: 'Salamander Sigil', text: `Crits add ${BURN_STACKS} burn stacks to the target`, reads: ['crit'], makes: ['burn'], rarity: 'common', effect: 'ignite' },
-  lattice: { name: 'Frost Lattice', text: 'Crits add a chill stack to the target', reads: ['crit'], makes: ['chill'], rarity: 'common', effect: 'freeze' },
-  shatter: { name: 'Shatterglass Edge', text: `Moving a chilled alien shatters it: ${BRIDGE_FACTOR} times the hero's damage for each chill stack on it; a frozen one stays frozen`, reads: ['moved', 'chill'], bridge: 'thaw', rarity: 'epic', effect: 'shatter' },
-  thermal: { name: 'Thermal Shock Core', text: `Burn meeting chill on an alien detonates in place of cancelling: ${THERMAL_FACTOR} times the hero's damage for each stack of both, to it, and half that to each alien beside it`, reads: ['burn', 'chill'], bridge: 'quench', rarity: 'epic', effect: 'thermal' },
-  spotter: { name: 'Spotter Network', text: `Hits on a target with ${TUNING.spend.marks} or more marks spend them: +${SPENT} a mark to it, half that to each alien beside it; the target is weakened`, reads: ['mark'], effect: 'spotter' },
-  hunt: { name: 'Eye of the Hunt', text: 'Crits add a mark to the target', reads: ['crit'], makes: ['mark'], rarity: 'common', effect: 'exploit' },
-  bloodforged: { name: 'Bloodforged Plate', text: `A kill gives the hero 1 armor, up to ${MOMENTUM_MAX}`, reads: ['kill'], makes: ['armor'], effect: 'momentum' },
-  rite: { name: 'Blood Rite', text: `Each kill gives the hero 1 Might, to at most ${MIGHT_MAX}`, reads: ['kill'], makes: ['overkill'], effect: 'bloodRite' },
-  impetus: { name: 'Kinetic Engine', text: "An alien a hero knocks into something or off a ledge takes the hero's damage again", reads: ['impact'], effect: 'impetus' },
-  catalyst: { name: 'Catalyst Prism', text: `Every ${CATALYST_EVERY}rd hit a hero lands doubles the burn, chill and marks on its target`, reads: ['burn', 'chill', 'mark', 'shots'], rarity: 'epic', effect: 'catalyst' },
-  chrono: { name: 'Chrono Coil', text: 'Every 3rd turn, the hardest-hitting hero attacks twice over', effect: 'chrono' },
-  reservoir: { name: 'Boon Reservoir', text: `Each fight won with no boon adds a charge; at the deploy screen, ${BOON_CHARGES} charges take a second boon in`, boons: true },
-  zenith: { name: 'Zenith Chronometer', text: `Every ${ZENITH_EVERY}rd battle, each hero's tier 4 fires twice`, rarity: 'epic', effect: 'zenith' },
-  streak: { name: 'Unbroken Line', text: `Every ${STREAK_FIGHTS} fights in a row won with no hero down pay 3 more supplies`, rarity: 'common', streak: 3 },
-  fracture: { name: 'Frost Fracture', text: `A frozen alien that dies shatters: ${FRACTURE_DAMAGE} damage for each chill stack on it to every alien beside it`, reads: ['chill', 'kill'], rarity: 'epic', effect: 'fracture' },
-  conductor: { name: 'Cryo Conductor', text: 'Hits on a chilled target give half its chill to every alien beside it', reads: ['chill'], makes: ['chill'], effect: 'conductor' },
-  kindling: { name: 'Kindling Plates', text: `Whoever hits a hero who has armor left takes ${BURN_STACKS} burn stacks`, reads: ['armor', 'hurt'], makes: ['burn'], effect: 'kindling' },
-  overkill: { name: 'Overkill Coils', text: `A hit's damage past ${OVERKILL_FROM} also hits the nearest other alien`, reads: ['overkill'], effect: 'overkill' },
-  brittle: { name: 'Brittle Frost', text: 'Hits on a chilled target ignore its armor', reads: ['chill'], effect: 'brittle' },
-  pyre: { name: 'Pyre Censer', text: `A burning alien sets its tile ablaze for 2 turns; an alien that ends its move in fire, or is driven onto it, has at least ${BURN_STACKS} burn stacks`, reads: ['burn', 'moved'], makes: ['burn'], effect: 'pyre' },
-  hex: { name: "Witch's Hex", text: 'An alien that dies passes its burn, chill and marks to the nearest alien', reads: ['kill', 'burn', 'chill', 'mark'], effect: 'hex' },
-  domino: { name: 'Domino Rig', text: 'An alien knocked into another alien knocks that one back too', reads: ['moved'], makes: ['impact'], effect: 'domino' },
-  sentinel: { name: 'Sentinel Protocol', text: 'A hero attacks at once an alien that walks away from beside it', effect: 'sentinel' },
-  net: { name: "Hunter's Net", text: 'Hits on a rooted alien do +2 damage', reads: ['moved'], effect: 'net' },
-  glacial: { name: 'Glacial Snare', text: 'Chilling an alien roots it too', reads: ['chill'], effect: 'glacial' },
-  juggernaut: { name: 'Juggernaut Servos', text: '+1 damage while the hero has armor left', reads: ['armor'], effect: 'armored' },
+  plasma: { name: 'Plasma Core', text: 'Deal 1 more damage.', rarity: 'common', stats: { damage: 1 } },
+  alloys: { name: 'Alien Alloys', text: 'Have 3 more Armor.', makes: ['armor'], rarity: 'common', stats: { armor: 3 } },
+  servos: { name: 'Overclocked Servos', text: 'Have 1 more move.', rarity: 'common', stats: { move: 1 } },
+  lens: { name: 'Focusing Lens', text: 'Have 1 more range and 10% more Crit chance.', makes: ['crit'], stats: { range: 1, crit: 0.1 } },
+  glassCannon: { name: 'Glass Cannon Protocol', text: 'Deal 2 more damage. Have 3 less HP.', makes: ['overkill'], stats: { damage: 2, hp: -3 } },
+  capacitor: { name: 'Kinetic Capacitor', text: 'Your first hit each battle is a Crit.', makes: ['crit'], rarity: 'common', effect: 'opener' },
+  plating: { name: 'Adaptive Plating', text: 'At the start of your turn, regain 1 Armor.', makes: ['armor'], effect: 'rearm' },
+  nanites: { name: 'Hunger Nanites', text: `Whenever you kill an alien, heal 2, up to ${TUNING.healCap} each battle.`, reads: ['kill'], effect: 'feast' },
+  phoenix: { name: 'Phoenix Protocol', text: `The first time you would fall each battle, get up with ${PHOENIX_HEALTH} HP.`, effect: 'phoenix' },
+  echo: { name: 'Echo Chamber', text: 'Each class ability with limited uses gains 1 use.', charges: 1 },
+  drones: { name: 'Scavenger Drones', text: 'Each battle won pays 1 more supply.', supplies: 1 },
+  contact: { name: 'Black Market Contact', text: 'Every piece of gear you find is rare or better.', rareGear: true },
+  uplink: { name: "Seer's Uplink", text: 'The flight map names the aliens at each stop.', recon: true },
+  accelerant: { name: 'Accelerant Gel', text: `Whenever you hit an alien with ${TUNING.spend.burns} or more Burn, consume it. Per Burn, deal ${SPENT} to it and half to each alien beside it, and gain 1 Temp HP.`, reads: ['burn'], rarity: 'epic', effect: 'accelerant' },
+  wildfire: { name: 'Wildfire Spores', text: 'Whenever a Burning alien dies, apply its Burn to each alien beside it.', reads: ['burn', 'kill'], makes: ['burn'], effect: 'wildfire' },
+  salamander: { name: 'Salamander Sigil', text: `Whenever you Crit, apply ${BURN_STACKS} Burn.`, reads: ['crit'], makes: ['burn'], rarity: 'common', effect: 'ignite' },
+  lattice: { name: 'Frost Lattice', text: 'Whenever you Crit, apply 1 Chill.', reads: ['crit'], makes: ['chill'], rarity: 'common', effect: 'freeze' },
+  shatter: { name: 'Shatterglass Edge', text: `Whenever you Displace a Chilled alien, deal ${BRIDGE_FACTOR} times your damage per Chill to it. A Frozen alien stays Frozen.`, reads: ['moved', 'chill'], bridge: 'thaw', rarity: 'epic', effect: 'shatter' },
+  thermal: { name: 'Thermal Shock Core', text: `When Burn meets Chill on an alien, they explode instead of Quenching. Per stack of each, deal ${THERMAL_FACTOR} times your damage to it and half to each alien beside it.`, reads: ['burn', 'chill'], bridge: 'quench', rarity: 'epic', effect: 'thermal' },
+  spotter: { name: 'Spotter Network', text: `Whenever you hit an alien with ${TUNING.spend.marks} or more Mark, consume it and apply Weak. Per Mark, deal ${SPENT} to it and half to each alien beside it.`, reads: ['mark'], effect: 'spotter' },
+  hunt: { name: "Hunter's Eye", text: 'Whenever you Crit, apply 1 Mark.', reads: ['crit'], makes: ['mark'], rarity: 'common', effect: 'exploit' },
+  bloodforged: { name: 'Bloodforged Plate', text: `Whenever you kill an alien, gain 1 Armor, up to ${MOMENTUM_MAX}.`, reads: ['kill'], makes: ['armor'], effect: 'momentum' },
+  rite: { name: 'Blood Rite', text: `Whenever you kill an alien, gain 1 Might, up to ${MIGHT_MAX}.`, reads: ['kill'], makes: ['overkill'], effect: 'bloodRite' },
+  impetus: { name: 'Kinetic Engine', text: 'Whenever you knock an alien into something or off a ledge, deal your damage to it again.', reads: ['impact'], effect: 'impetus' },
+  catalyst: { name: 'Catalyst Prism', text: `Every ${CATALYST_EVERY}rd hit you land doubles the Burn, Chill and Mark on its target.`, reads: ['burn', 'chill', 'mark', 'shots'], rarity: 'epic', effect: 'catalyst' },
+  chrono: { name: 'Chrono Coil', text: 'Every 3rd turn, double your attacks.', effect: 'chrono' },
+  reservoir: { name: 'Boon Reservoir', text: `Each battle won with no boon adds 1 charge. At ${BOON_CHARGES} charges, take a second boon into a battle.`, boons: true },
+  zenith: { name: 'Zenith Chronometer', text: `Every ${ZENITH_EVERY}rd battle, your tier 4 skill has 2 uses.`, rarity: 'epic', effect: 'zenith' },
+  streak: { name: 'Unbroken Line', text: `Every ${STREAK_FIGHTS}nd battle won in a row pays 3 more supplies.`, rarity: 'common', streak: 3 },
+  fracture: { name: 'Frost Fracture', text: `Whenever a Frozen alien dies, deal ${FRACTURE_DAMAGE} damage per Chill on it to each alien beside it.`, reads: ['chill', 'kill'], rarity: 'epic', effect: 'fracture' },
+  conductor: { name: 'Cryo Conductor', text: 'Whenever you hit a Chilled alien, apply half its Chill to each alien beside it.', reads: ['chill'], makes: ['chill'], effect: 'conductor' },
+  kindling: { name: 'Kindling Plates', text: `Whenever an alien hits you while you have Armor, apply ${BURN_STACKS} Burn to it.`, reads: ['armor', 'hurt'], makes: ['burn'], effect: 'kindling' },
+  overkill: { name: 'Overkill Coils', text: 'Your Overkill also hits the nearest other alien.', reads: ['overkill'], effect: 'overkill' },
+  brittle: { name: 'Brittle Frost', text: 'Ignore the Armor of Chilled aliens.', reads: ['chill'], effect: 'brittle' },
+  pyre: { name: 'Pyre Censer', text: `Burning aliens set their tile on fire for 2 turns. An alien that ends its move on fire, or is driven onto it, has at least ${BURN_STACKS} Burn.`, reads: ['burn', 'moved'], makes: ['burn'], effect: 'pyre' },
+  hex: { name: "Witch's Hex", text: 'Whenever an alien dies, its Burn, Chill and Mark pass to the nearest alien.', reads: ['kill', 'burn', 'chill', 'mark'], effect: 'hex' },
+  domino: { name: 'Domino Rig', text: 'Whenever an alien is knocked into another alien, knock that alien back too.', reads: ['moved'], makes: ['impact'], effect: 'domino' },
+  sentinel: { name: 'Sentinel Protocol', text: 'Whenever an alien walks away from beside you, attack it.', effect: 'sentinel' },
+  net: { name: "Hunter's Net", text: 'Deal 2 more damage to Rooted aliens.', reads: ['moved'], effect: 'net' },
+  glacial: { name: 'Glacial Snare', text: 'Whenever you apply Chill, apply Root.', reads: ['chill'], effect: 'glacial' },
+  juggernaut: { name: 'Juggernaut Servos', text: 'While you have Armor, deal 1 more damage.', reads: ['armor'], effect: 'armored' },
   // Each makes where the hero lands matter more.
-  encore: { name: 'Encore', text: `Every landing catches the aliens within ${ENCORE_REACH} tiles of the nearest surprised, holding their fire on their first turn`, effect: 'encore' },
-  charges: { name: 'Breaching Charges', text: `Every landing blasts each alien within ${CHARGE_REACH} tiles for ${TUNING.impactDamage + CHARGE_BLAST}`, effect: 'entryBlast' },
-  shredder: { name: 'Shredder Charges', text: `Every landing strips the armor from each alien within ${CHARGE_REACH} tiles and hurts it`, effect: 'entryShred' },
-  cryo: { name: 'Cryo Charges', text: `Every landing chills each alien within ${CHARGE_REACH} tiles and hurts it`, makes: ['chill'], effect: 'entryFrost' },
-  bulwark: { name: 'Pop-up Barricades', text: 'A barricade springs up beside each hero as it comes in, toward the nearest alien', effect: 'entryWall' },
-  turrets: { name: 'Turret Drop', text: 'A turret comes in with the hero: it never moves, and attacks far and true', effect: 'entryTurret' },
+  encore: { name: 'Surprise Drop', text: `When you land, Surprise the nearest alien and each alien within ${ENCORE_REACH} tiles of it.`, effect: 'encore' },
+  charges: { name: 'Breaching Charges', text: `When you land, deal ${TUNING.impactDamage + CHARGE_BLAST} damage to each alien within ${CHARGE_REACH} tiles.`, effect: 'entryBlast' },
+  shredder: { name: 'Shredder Charges', text: `When you land, remove the Armor of each alien within ${CHARGE_REACH} tiles and deal ${TUNING.impactDamage} damage to it.`, effect: 'entryShred' },
+  cryo: { name: 'Cryo Charges', text: `When you land, apply 1 Chill to each alien within ${CHARGE_REACH} tiles and deal ${TUNING.impactDamage} damage to it.`, makes: ['chill'], effect: 'entryFrost' },
+  bulwark: { name: 'Pop-up Barricades', text: 'When you land, raise a barricade beside you, toward the nearest alien.', effect: 'entryWall' },
+  turrets: { name: 'Turret Drop', text: 'When you land, drop a turret beside you. It never moves and has long range.', effect: 'entryTurret' },
   // The goals.
-  beacon: { name: 'Evac Beacon', text: `A hero gets a civilian out from ${BEACON_REACH} tiles away`, effect: 'beacon' },
-  charity: { name: 'Refugee Network', text: 'Each civilian saved pays 1 more supply', civilianSupplies: 1 },
-  relay: { name: 'Relay Booster', text: `The uplink's zone reaches ${RELAY_REACH} tiles farther`, effect: 'relay' },
-  flare: { name: 'Signal Flare', text: 'A hero lifts off from farther from the extraction zone', effect: 'flare' },
-  bounty: { name: 'Bounty Sigil', text: `Hits on a boss, a Guardian or the Hunter, do +${BOUNTY_DAMAGE} damage`, makes: ['overkill'], effect: 'bounty' },
-  eternal: { name: 'Eternal Flame', text: 'Burn never fades: a burning alien keeps its stacks', reads: ['burn'], rarity: 'epic', effect: 'eternal' },
-  frostHeart: { name: 'Permafrost Heart', text: 'Bosses freeze too, and a frozen alien keeps its chill', reads: ['chill'], rarity: 'epic', effect: 'frostHeart' },
-  ledger: { name: 'Dead Eye Ledger', text: 'Payoffs read marks without spending them', reads: ['mark'], rarity: 'epic', effect: 'ledger' },
-  gravity: { name: 'Gravity Lens', text: "Each hero's first hit of an attack knocks its target back a tile; a boss reels in place, counting as moved", makes: ['moved', 'impact'], rarity: 'epic', effect: 'gravity' },
-  ironclad: { name: 'Ironclad Lattice', text: 'Whatever builds armor builds it twice as high', reads: ['armor'], rarity: 'epic', effect: 'ironclad' },
-  split: { name: 'Split Rounds', text: 'Every attack fires twice the shots, each at half power', reads: ['shots'], makes: ['shots'], rarity: 'epic', effect: 'split' },
-  ram: { name: 'Ram Plating', text: "Every hit does the hero's armor more, up to its damage", reads: ['armor'], makes: ['overkill'], effect: 'ram' },
-  overflow: { name: 'Overflow Capacitor', text: `Healing past full health, or past its cap, becomes armor, up to ${GUARD_MAX} past the hero's own`, makes: ['armor'], effect: 'overflow' },
-  adrenal: { name: 'Adrenal Pump', text: `On its ${ADRENAL_FROM + 1}rd turn, each hero gains ${ADRENAL_MAX} Might`, makes: ['overkill'], effect: 'adrenal' },
-  hairTrigger: { name: 'Hair Trigger', text: 'A weapon of 2 or more shots fires one more', makes: ['shots'], rarity: 'common', effect: 'hairTrigger' },
-  stagger: { name: 'Stagger Sights', text: `Hits on an alien knocked back, pulled or slid since its last turn do +${STAGGER_DAMAGE} damage`, reads: ['moved'], effect: 'stagger' },
-  lodestone: { name: 'Lodestone Harness', text: `As each turn begins, the hero with the most armor pulls the nearest alien within ${LODESTONE_REACH} tiles to beside it`, makes: ['moved', 'hurt'], effect: 'lodestone' },
-  shell: { name: 'Reactive Shell', text: `The first hit a hero takes each round gives it 1 armor, up to ${SHELL_MAX} past its own`, reads: ['hurt'], makes: ['armor'], rarity: 'common', effect: 'shell' },
-  lockOn: { name: 'Lock-On Rig', text: `Moving a marked alien keeps its marks, and it takes ${BRIDGE_FACTOR} times the hero's damage for each`, reads: ['moved', 'mark'], bridge: 'unlock', rarity: 'epic', effect: 'lockOn' },
+  beacon: { name: 'Evac Beacon', text: `Rescue civilians from ${BEACON_REACH} tiles away.`, effect: 'beacon' },
+  charity: { name: 'Refugee Network', text: 'Each civilian saved pays 1 more supply.', civilianSupplies: 1 },
+  relay: { name: 'Relay Booster', text: `The uplink zone reaches ${RELAY_REACH} more tiles.`, effect: 'relay' },
+  flare: { name: 'Signal Flare', text: `Lift off from ${FLARE_REACH} more tiles from the extraction zone.`, effect: 'flare' },
+  bounty: { name: 'Bounty Sigil', text: `Deal ${BOUNTY_DAMAGE} more damage to bosses, Guardians and the Hunter.`, makes: ['overkill'], effect: 'bounty' },
+  eternal: { name: 'Eternal Flame', text: 'Burn on aliens never fades.', reads: ['burn'], rarity: 'epic', effect: 'eternal' },
+  frostHeart: { name: 'Permafrost Heart', text: 'Bosses can be Frozen. Frozen aliens keep their Chill.', reads: ['chill'], rarity: 'epic', effect: 'frostHeart' },
+  ledger: { name: 'Dead Eye Ledger', text: 'Consuming Mark leaves it in place.', reads: ['mark'], rarity: 'epic', effect: 'ledger' },
+  gravity: { name: 'Gravity Lens', text: 'Your first hit each attack knocks its target back 1 tile. A boss counts as Displaced instead.', makes: ['moved', 'impact'], rarity: 'epic', effect: 'gravity' },
+  ironclad: { name: 'Ironclad Lattice', text: 'Double every Armor cap.', reads: ['armor'], rarity: 'epic', effect: 'ironclad' },
+  split: { name: 'Split Rounds', text: 'Your attacks fire double the shots, each at half power.', reads: ['shots'], makes: ['shots'], rarity: 'epic', effect: 'split' },
+  ram: { name: 'Ram Plating', text: 'Your hits deal extra damage equal to your Armor, up to your damage.', reads: ['armor'], makes: ['overkill'], effect: 'ram' },
+  overflow: { name: 'Overflow Capacitor', text: `Healing past full HP or its cap becomes Armor, up to ${GUARD_MAX} above your own.`, makes: ['armor'], effect: 'overflow' },
+  adrenal: { name: 'Adrenal Pump', text: `On your ${ADRENAL_FROM + 1}rd turn, gain ${ADRENAL_MAX} Might.`, makes: ['overkill'], effect: 'adrenal' },
+  hairTrigger: { name: 'Hair Trigger', text: 'Weapons with 2 or more shots fire 1 more.', makes: ['shots'], rarity: 'common', effect: 'hairTrigger' },
+  stagger: { name: 'Stagger Sights', text: `Deal ${STAGGER_DAMAGE} more damage to aliens Displaced since their last turn.`, reads: ['moved'], effect: 'stagger' },
+  lodestone: { name: 'Lodestone Harness', text: `At the start of your turn, pull the nearest alien within ${LODESTONE_REACH} tiles to beside you.`, makes: ['moved', 'hurt'], effect: 'lodestone' },
+  shell: { name: 'Reactive Shell', text: `The first time you are hit each round, gain 1 Armor, up to ${SHELL_MAX} above your own.`, reads: ['hurt'], makes: ['armor'], rarity: 'common', effect: 'shell' },
+  lockOn: { name: 'Lock-On Rig', text: `Displacing a Marked alien keeps its Mark and deals ${BRIDGE_FACTOR} times your damage per Mark to it.`, reads: ['moved', 'mark'], bridge: 'unlock', rarity: 'epic', effect: 'lockOn' },
 } satisfies Record<string, Relic>
 
 export type RelicId = keyof typeof relics

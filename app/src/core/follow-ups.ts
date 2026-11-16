@@ -1,4 +1,4 @@
-// What a hero's turn can set off beyond its own attacks: Command's ally attack, Blade Dance's extra strikes.
+// What a hero's turn can set off beyond its own attacks: Command's second attack, Blade Dance's extra strikes.
 import { shoot, weaponAttack } from './attack'
 import { type Battle, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
@@ -6,22 +6,9 @@ import { aiming, has, shootable } from './fighters'
 import { FAN_TARGETS } from './keystones'
 import type { Secondary } from './secondaries'
 
-/** Command: after a hero acts, the ally hitting hardest that has a shot makes an attack with its weapon; with none, the hero does. */
+/** Command: after a hero acts, it attacks again with its weapon. */
 export function command(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
-  if (!has(unit, 'command')) return []
-  const allies = battle.units.filter((u) => u.side === unit.side && u !== unit && u.hp > 0 && !u.civilian).sort((a, b) => b.stats.damage - a.stats.damage)
-  const mates = [...allies, unit]
-  const actor = battle.actor
-  for (const mate of mates) {
-    battle.actor = mate.id
-    const events = weaponAttack(battle, mate, seen, 'command')
-    if (events.length > 0) {
-      battle.actor = actor
-      return events
-    }
-  }
-  battle.actor = actor
-  return []
+  return has(unit, 'command') ? weaponAttack(battle, unit, seen, 'command') : []
 }
 
 /** Blade Dance: a bonus attack that landed, `first`, goes on to strike more aliens in its reach. */

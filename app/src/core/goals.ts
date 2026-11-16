@@ -5,7 +5,7 @@ import type { ChallengeId } from './challenges'
 
 export type Goal = 'exterminate' | 'assassinate' | 'hold' | 'rescue' | 'vip' | 'raid' | 'ambush'
 
-/** How a battle plays: heroes push through clusters one at a time, or hold their ground as aliens flood in. */
+/** How a battle plays: the hero pushes through clusters one at a time, or holds its ground as aliens flood in. */
 export type Flow = 'push' | 'flood'
 
 /** The flow of a battle: a swarm floods, and with no challenge to stage it, a hive's clearing and open or ruined raids too, for nothing there stands in the aliens' way. */
@@ -39,26 +39,26 @@ export const ESCORT_REACH = 2
 
 /** `from` is the leg a goal is first drawn on: a fresh hero meets no hold or assassination. */
 export const GOALS: Record<Goal, { name: string; text: string; reward: string; force: number; weight: number; from: number }> = {
-  exterminate: { name: 'Clear them out', text: 'Kill every alien', reward: 'supplies and gear', force: 2, weight: 3, from: 0 },
-  assassinate: { name: 'Takedown', text: 'Kill the commander, armored and guarded, which blinks away when wounded; the rest flee', reward: 'supplies and rare gear', force: -3, weight: 1, from: 1 },
-  hold: { name: 'Hold the uplink', text: `Reach the uplink and stand in its zone for ${HOLD_ROUNDS} rounds as aliens pour in, then get to the extraction zone`, reward: 'a relic, no gear', force: -6, weight: 1, from: 1 },
+  exterminate: { name: 'Clear Out', text: 'Kill every alien.', reward: 'supplies and gear', force: 2, weight: 3, from: 0 },
+  assassinate: { name: 'Takedown', text: 'Kill the commander. It has Armor and guards, and blinks away when hurt. When it dies, the rest flee.', reward: 'supplies and rare gear', force: -3, weight: 1, from: 1 },
+  hold: { name: 'Hold the Uplink', text: `Stand in the uplink zone for ${HOLD_ROUNDS} rounds as aliens pour in. Then reach the extraction zone.`, reward: 'a relic, no gear', force: -6, weight: 1, from: 1 },
   rescue: {
     name: 'Rescue',
-    text: `A terror site: aliens are killing ${CIVILIANS} civilians. Hiders, squat and amber, huddle and stay put; runners, tall and pale, flee the aliens; and harvesters raise the dead as husks. The hero bursts in among them: aliens shoot civilians when they have no good shot at it, so push in. Reaching a civilian gets them out. Save more than half or it is lost and pays nothing; then each saved pays ${CIVILIAN_SUPPLIES} supplies and 1 experience; every ${CIVILIANS_PER_THREAT} left behind add a threat`,
+    text: `Save more than half of the ${CIVILIANS} civilians, or the mission is lost. Reach a civilian to save it. Aliens shoot civilians when they have no shot at you. Hiders stay put, runners flee, and Harvesters raise the dead as Husks. Each civilian saved pays ${CIVILIAN_SUPPLIES} supplies and 1 XP. Every ${CIVILIANS_PER_THREAT} left behind add 1 threat.`,
     reward: 'supplies and experience, no gear',
     force: 1,
     weight: 1,
     from: 0,
   },
   vip: {
-    name: 'VIP rescue',
-    text: `A VIP is trapped in a building, under guard. Breach it, clear the aliens fighting near them, reach them, and escort them to the extraction zone that then appears. The aliens shoot the VIP whenever they can. Lose the VIP and the mission is lost`,
+    name: 'VIP Rescue',
+    text: `Reach the VIP in the guarded building. Then escort it to the extraction zone. Aliens shoot the VIP whenever they can. If the VIP dies, the mission is lost.`,
     reward: 'supplies and a relic, no gear',
     force: 2,
     weight: 1,
     from: 1,
   },
-  raid: { name: 'Smash and grab', text: 'Guarded supply caches. Grab them all; each pays supplies', reward: 'supplies by the cache, no gear', force: 1, weight: 1, from: 0 },
+  raid: { name: 'Smash and Grab', text: 'Grab every supply cache. Each pays supplies.', reward: 'supplies by the cache, no gear', force: 1, weight: 1, from: 0 },
   // Never drawn: a full threat turns the next stop into an ambush.
-  ambush: { name: 'Hunted', text: 'Hunted down on the road, with no time to plan. Stand and fight the Hunter and the aliens flooding in to the last one', reward: 'the threat emptied', force: -7, weight: 0, from: 0 },
+  ambush: { name: 'Hunted', text: 'Kill the Hunter and every alien that floods in.', reward: 'the threat emptied', force: -7, weight: 0, from: 0 },
 }

@@ -41,18 +41,7 @@ export const ZONE_TERRAINS = ['town', 'city', 'countryside', 'industrial', 'ruin
 /** The kind of place a battle is fought in. A satellite stands in a compound; the alien source is a hive. */
 export type TerrainKind = (typeof ZONE_TERRAINS)[number] | 'compound' | 'hive'
 
-/** What the player is told about each kind of place. */
-const TERRAIN_TEXT: Record<TerrainKind, { name: string; text: string }> = {
-  town: { name: 'Town', text: 'houses, parks, a market or a square' },
-  city: { name: 'City', text: 'buildings close together; things to smash everywhere' },
-  countryside: { name: 'Countryside', text: 'open fields and orchards' },
-  industrial: { name: 'Industrial yard', text: 'warehouses, crates and trucks' },
-  ruins: { name: 'Ruins', text: 'fallen buildings; broken walls and rubble' },
-  compound: { name: 'Satellite compound', text: 'a walled yard around the dish' },
-  hive: { name: 'Alien hive', text: 'spires and growths; nothing human' },
-}
-
-export const TERRAIN_KINDS = Object.keys(TERRAIN_TEXT) as TerrainKind[]
+export const TERRAIN_KINDS: TerrainKind[] = [...ZONE_TERRAINS, 'compound', 'hive']
 
 /** Where in the world a battlefield lies: how its region builds, and the place it is named for. */
 export interface Locale {

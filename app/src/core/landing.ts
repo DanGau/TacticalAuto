@@ -12,7 +12,7 @@ import type { UtilityId } from './utilities'
 import { takeBoon } from './boons'
 import { wound } from './wound'
 
-/** How near the landing Breaching Charges reach aliens, the damage they add, and how near the aliens stand that Encore catches. */
+/** How near the landing Breaching Charges reach aliens, the damage they add, and how near the aliens stand that Surprise Drop catches. */
 export const CHARGE_REACH = 8
 export const CHARGE_BLAST = 3
 export const ENCORE_REACH = 5

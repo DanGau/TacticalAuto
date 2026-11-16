@@ -37,7 +37,7 @@ const toggle = document.getElementById('fullscreen')!
 toggle.addEventListener('pointerdown', (e) => e.stopPropagation())
 toggle.addEventListener('click', () => {
   // A browser opened inside another app, as a link from a chat often is, has no full screen.
-  if (!document.fullscreenEnabled) report("this browser can't go full screen. Open the page in Chrome or Safari itself, then tap ⛶")
+  if (!document.fullscreenEnabled) report("This browser cannot go full screen. Open the page in Chrome or Safari, then tap ⛶.")
   else if (document.fullscreenElement) void document.exitFullscreen()
   else void enter()
 })

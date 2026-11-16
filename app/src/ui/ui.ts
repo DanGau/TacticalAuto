@@ -78,7 +78,7 @@ function drop(run: Run, battle: Battle, armed: string | null, rigging: number | 
       : run.utilities.length === 0
         ? button({ type: 'enter' }, 'Go in')
         : go(
-            'Pick a boon for this fight.',
+            'Pick a boon for this battle.',
             run.utilities.map((id, i): Pick =>
               utilityPick(`u${i}`, id === 'tank' || charged ? undefined : { type: 'enter', utility: i }, id, challenge && carries(id, challenge.answers) ? 'answers this' : 'boon', id === 'tank' ? 'Tap again to choose a tank' : charged ? 'Tap again, then choose a second' : `Tap again to go in with ${UTILITIES[id].name}`, id === 'tank' ? { attrs: `data-rig="${i}"`, block: tanks.length === 0 ? 'No fuel tanks on this ground' : null } : charged ? { attrs: `data-double="${i}"` } : {}),
             ),

@@ -19,7 +19,7 @@ export interface Src {
 }
 
 /** Actions and states every unit has. */
-export const BASICS = { attack: 'Attack', throw: 'Throw', jump: 'Jump', move: 'Move', dash: 'Dash', order: 'Order', stun: 'Stunned', frozen: 'Frozen', surge: 'Temp HP', overwatch: 'Overwatch', rangedShield: 'Shield', meleeShield: 'Shield', hover: 'Hover' } as const
+export const BASICS = { attack: 'Attack', throw: 'Throw', jump: 'Jump', move: 'Move', dash: 'Dash', order: 'Order', stun: 'Stunned', frozen: 'Frozen', surge: 'Temp HP', overwatch: 'Overwatch', rangedShield: 'Shield', meleeShield: 'Shield', hover: 'Hover', taunt: 'Decoy' } as const
 
 export const has = <T extends object>(table: T, id: string): id is Extract<keyof T, string> => Object.hasOwn(table, id)
 

@@ -33,7 +33,7 @@ export function kitOf(run: Run, hero: Soldier, battle: Battle | null): [SrcKind,
   const groups: [SrcKind, { name: string; text: string }[]][] = [
     ['basic', basicsOf(hero).map((name) => ({ name, text: '' }))],
     ['perk', hero.perks.map((id) => ({ name: `${perkIcon(id)} ${PERKS[id].name}`, text: PERKS[id].text }))],
-    ['class', [...(ability ? [{ name: `${kitIcon(hero.cls!)} ${CLASSES[hero.cls!].abilityName}`, text: CLASSES[hero.cls!].abilityText }] : []), { name: `${bonusIcon(secondaryOf(hero))} ${SECONDARIES[secondaryOf(hero)].name}`, text: SECONDARIES[secondaryOf(hero)].text }]],
+    ['class', [...(ability ? [{ name: `${kitIcon(hero.cls!)} ${CLASSES[hero.cls!].abilityName}`, text: CLASSES[hero.cls!].abilityText }] : []), { name: `${bonusIcon(secondaryOf(hero))} ${SECONDARIES[secondaryOf(hero)].name}`, text: SECONDARIES[secondaryOf(hero)].text ?? '' }]],
     ['skill', hero.skills.filter((id) => !SKILLS[id].teaches).map((id) => ({ name: `${skillIcon(id)} ${SKILLS[id].name}`, text: SKILLS[id].text }))],
     ['weapon', weapon ? [{ name: `${weaponIcon(hero.gear!.weapon)} ${weapon.name}`, text: weapon.special ?? '' }] : []],
     ['gear', hero.gear?.effect ? [{ name: EFFECTS[hero.gear.effect].prefix, text: EFFECTS[hero.gear.effect].text }] : []],

@@ -12,8 +12,8 @@ export const REGROWTH = { turn: 0.1, most: 0.6 }
 
 /** `answers`: the quantities whose makers pass it, each a different line. */
 export const EXAMS: Record<Exam, { name: string; icon: string; text: string; answer: string; answers: Quantity[] }> = {
-  plates: { name: 'Plated', icon: '🪨', text: `Hits under ${PLATES_UNDER} damage do half; slams and falls do full`, answer: 'big hits, marks, or knocking it into things', answers: ['overkill', 'mark', 'impact'] },
-  regrowth: { name: 'Regenerator', icon: '🧬', text: `Heals ${100 * REGROWTH.turn}% of its health each turn unless burning or chilled, up to ${100 * REGROWTH.most}% a battle`, answer: 'burn, chill, or many shots', answers: ['burn', 'chill', 'shots'] },
-  rampage: { name: 'Berserker', icon: '😡', text: 'Gains 1 Might each of its turns, unless moved since its last', answer: 'knocking or pulling it, chill, or armor', answers: ['moved', 'chill', 'armor'] },
-  thorns: { name: 'Thorned', icon: '🌵', text: 'Each hit on it hurts the attacker 1; slams and falls do not', answer: 'armor, knocking it into things, or few big hits', answers: ['armor', 'impact', 'overkill'] },
+  plates: { name: 'Plated', icon: '🪨', text: `Hits under ${PLATES_UNDER} damage deal half. Slams and falls deal full damage.`, answer: 'Overkill, Mark, or Impact', answers: ['overkill', 'mark', 'impact'] },
+  regrowth: { name: 'Regrowth', icon: '🧬', text: `At the start of its turn, unless it has Burn or Chill, it heals ${100 * REGROWTH.turn}% of its max HP, up to ${100 * REGROWTH.most}% each battle.`, answer: 'Burn, Chill, or many shots', answers: ['burn', 'chill', 'shots'] },
+  rampage: { name: 'Rampager', icon: '😡', text: 'At the start of its turn, unless Displaced since its last, it gains 1 Might.', answer: 'Displace, Chill, or Armor', answers: ['moved', 'chill', 'armor'] },
+  thorns: { name: 'Thorned', icon: '🌵', text: 'Whenever a hit lands on it, deal 1 damage to the attacker. Slams and falls do not count.', answer: 'Armor, Impact, or few big hits', answers: ['armor', 'impact', 'overkill'] },
 }

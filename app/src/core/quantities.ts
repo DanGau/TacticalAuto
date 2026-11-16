@@ -1,6 +1,6 @@
 // The plain game quantities items make and read, the cancellations between them, and the resists aliens have.
 import { TUNING } from './tuning'
-import { BURN_MAX, CHILL_FREEZE, CHILL_MAX, CHILL_SLIDE, MARK_MAX, NUMB_SOAK, NUMB_TURNS, OVERKILL_FROM } from './battle'
+import { BURN_MAX, CHILL_FREEZE, CHILL_MAX, CHILL_SLIDE, MARK_MAX, NUMB_TURNS, OVERKILL_FROM } from './battle'
 
 /**
  * A quantity the fight has that items make more of or read: an item that reads one pays beside any item that makes it,
@@ -9,17 +9,17 @@ import { BURN_MAX, CHILL_FREEZE, CHILL_MAX, CHILL_SLIDE, MARK_MAX, NUMB_SOAK, NU
 export type Quantity = 'burn' | 'chill' | 'mark' | 'moved' | 'impact' | 'shots' | 'crit' | 'kill' | 'overkill' | 'armor' | 'hurt'
 
 export const QUANTITIES: Record<Quantity, { name: string; icon: string; text: string }> = {
-  burn: { name: 'Burn', icon: '🔥', text: `Burn stacks: at the start of each of its turns a unit takes its stacks in damage, then loses one; at most ${BURN_MAX}. Burn and chill on one alien cancel: both go out, and for ${NUMB_TURNS} of its turns it takes no burn, chill or marks and ${NUMB_SOAK} less from each hit` },
-  chill: { name: 'Chill', icon: '❄️', text: `Chill stacks: -2 move and 1 less damage, a stack lost each turn; at ${CHILL_FREEZE} it freezes, losing its next action, bar a boss; at most ${CHILL_MAX}. A chilled alien knocked back slides up to ${CHILL_SLIDE} tiles more, and one that slides into something takes the hero's blow. Burn cancels chill; moving a frozen alien thaws it` },
-  mark: { name: 'Mark', icon: '🎯', text: `Mark stacks: every hit on a marked unit does ${TUNING.markDamage} more damage; at most ${MARK_MAX}. Moving a marked alien clears its marks and numbs it` },
-  moved: { name: 'Moved', icon: '↔️', text: "Knocked back, pulled, or slid since its last turn: it cannot walk on its next, bar a boss. An alien driven onto fire catches it. Moving a marked alien clears its marks, and a frozen one thaws" },
-  impact: { name: 'Impact', icon: '💢', text: 'Knocked into something, or off a ledge' },
-  shots: { name: 'Shots', icon: '🔫', text: 'Shots an attack fires: every on-hit effect fires on each' },
-  crit: { name: 'Crit', icon: '💥', text: 'A crit does 2 more damage' },
-  kill: { name: 'Kill', icon: '💀', text: 'An alien felled' },
-  overkill: { name: 'Overkill', icon: '🔨', text: `Damage a hit does past ${OVERKILL_FROM}: big single hits make it` },
-  armor: { name: 'Armor', icon: '🛡️', text: 'Takes damage before health, and is whole again each fight' },
-  hurt: { name: 'Hurt', icon: '🩸', text: 'Hits a hero takes' },
+  burn: { name: 'Burn', icon: '🔥', text: `At the start of its turn, a unit takes 1 damage for each Burn, then loses 1 Burn. Stacks to ${BURN_MAX}. Quench: Burn and Chill on an alien cancel.` },
+  chill: { name: 'Chill', icon: '❄️', text: `Each Chill gives 2 less move and 1 less damage, and 1 fades each turn. At ${CHILL_FREEZE} Chill, Freeze it. Stacks to ${CHILL_MAX}. A Chilled alien knocked back slides ${CHILL_SLIDE} more tiles.` },
+  mark: { name: 'Mark', icon: '🎯', text: `Each hit on a Marked unit deals ${TUNING.markDamage} more damage. Stacks to ${MARK_MAX}. Lock Lost: Displacing it clears its Mark.` },
+  moved: { name: 'Displace', icon: '↔️', text: 'Knock back, pull or slide a unit. A Displaced alien cannot walk on its next turn, bar a boss. Driven onto fire, it Burns.' },
+  impact: { name: 'Impact', icon: '💢', text: 'An alien knocked into something, or off a ledge.' },
+  shots: { name: 'Shots', icon: '🔫', text: 'Each shot an attack fires. Every on-hit effect triggers on each.' },
+  crit: { name: 'Crit', icon: '💥', text: 'A Crit deals 2 more damage.' },
+  kill: { name: 'Kill', icon: '💀', text: 'An alien felled.' },
+  overkill: { name: 'Overkill', icon: '🔨', text: `Damage a hit deals past ${OVERKILL_FROM}.` },
+  armor: { name: 'Armor', icon: '🛡️', text: 'Takes damage before HP. Restored at the start of each battle.' },
+  hurt: { name: 'Hurt', icon: '🩸', text: 'Each hit you take.' },
 }
 
 /** What makes and reads a quantity: an item, skill or gear effect. */
@@ -33,9 +33,9 @@ export interface Flow {
  * `pair` names the quantities whose makers cancel, and `effect` the floating word the cancel shows.
  */
 export const CANCELS = {
-  quench: { pair: ['burn', 'chill'], effect: 'quenched', name: 'Quenched', text: `Burn and chill on one alien cancel: both go out, and for ${NUMB_TURNS} of its turns it is numb: no burn, chill or marks, and ${NUMB_SOAK} less from each hit`, bridge: 'thermal' },
-  thaw: { pair: ['moved', 'chill'], effect: 'thawed', name: 'Thawed', text: `Moving a frozen alien thaws it: its chill is lost, it acts again, and it is numb as a quench leaves it`, bridge: 'shatter' },
-  unlock: { pair: ['moved', 'mark'], effect: 'unlocked', name: 'Lock lost', text: `Moving a marked alien clears its marks, and it is numb as a quench leaves it`, bridge: 'lockOn' },
+  quench: { pair: ['burn', 'chill'], effect: 'quenched', name: 'Quench', text: `Burn and Chill on an alien cancel: both go out and it is Numb for ${NUMB_TURNS} turn.`, bridge: 'thermal' },
+  thaw: { pair: ['moved', 'chill'], effect: 'thawed', name: 'Thaw', text: 'Displacing a Frozen alien thaws it: it loses its Chill, acts, and is Numb.', bridge: 'shatter' },
+  unlock: { pair: ['moved', 'mark'], effect: 'unlocked', name: 'Lock Lost', text: 'Displacing a Marked alien clears its Mark, and it is Numb.', bridge: 'lockOn' },
 } as const satisfies Record<string, { pair: [Quantity, Quantity]; effect: string; name: string; text: string; bridge: string }>
 
 export type Cancel = keyof typeof CANCELS
@@ -53,9 +53,9 @@ export const feeds = (flow: Flow, made: readonly Quantity[], read: readonly Quan
 export type Resist = 'burn' | 'chill' | 'mark' | 'crit' | 'armor'
 
 export const RESISTS: Record<Resist, string> = {
-  burn: 'Cannot burn',
-  chill: 'Cannot be chilled',
-  mark: 'Cannot be marked',
-  crit: 'Cannot be crit',
-  armor: 'Its attacks ignore armor',
+  burn: 'Cannot burn.',
+  chill: 'Cannot be chilled.',
+  mark: 'Cannot be marked.',
+  crit: 'Cannot be crit.',
+  armor: 'Its attacks ignore armor.',
 }

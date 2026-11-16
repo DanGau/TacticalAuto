@@ -134,7 +134,6 @@ export const SLAM_HIT = 3
 export const SLAM_TILES = 2
 export const STUN_REACH = 3
 export const FORCE_FIELD_ARMOR = 4
-export const FORCE_FIELD_REACH = 4
 export const TITAN_HEALTH = 3
 export const PLATING_ARMOR = 3
 /** Own turns a cloak lasts unbroken, and the damage an attack out of cloak adds, and Shadow Strike on top. */
@@ -185,7 +184,7 @@ export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */
 export type RelicEffect = 'domino' | 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'zenith' | 'fracture' | 'eternal' | 'frostHeart' | 'ledger' | 'gravity' | 'ironclad' | 'split' | 'ram' | 'overflow' | 'adrenal' | 'hairTrigger' | 'stagger' | 'lodestone' | 'shell' | 'lockOn'
 /** Anything a unit's gear, skills, relics or weapon doctrine do. Combat applies them. */
-export type Effect = GearEffect | SkillEffect | PerkEffect | RelicEffect | DoctrineEffect | Exam | 'block' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning' | 'quenched' | 'thawed' | 'unlocked' | 'glassEdge'
+export type Effect = GearEffect | SkillEffect | PerkEffect | RelicEffect | DoctrineEffect | Exam | 'block' | 'taunt' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning' | 'quenched' | 'thawed' | 'unlocked' | 'glassEdge'
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff'

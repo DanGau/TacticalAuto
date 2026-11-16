@@ -13,13 +13,13 @@ export type ChallengeId = 'slog' | 'firingLine' | 'ironWall' | 'swarm' | 'scatte
  * `grim`: the alien force, by leg and then by rung, each rung harder; the hub reads the last leg's.
  */
 export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test: string; answers: EffectId[]; volley?: true; grim: number[][] }> = {
-  slog: { name: 'Slog', icon: '🌿', test: 'Small groups of shooters scattered across a swamp, firing from the start; its mire takes three times the move to cross', answers: ['hover', 'rangedShield', 'thrusters', 'farsight'], volley: true, grim: [[2, 3, 4], [3, 4, 6], [5, 7, 8]] },
-  firingLine: { name: 'Firing line', icon: '🎯', test: 'Long-range shooters along a ridge, firing from the moment the hero lands', answers: ['smoke', 'rangedShield', 'dampener', 'farsight'], volley: true, grim: [[2, 3, 4], [3, 5, 6], [6, 7, 9]] },
-  ironWall: { name: 'Iron wall', icon: '🧱', test: 'Heavily armored aliens that shrug off small hits', answers: ['crack', 'overcharge', 'blaze'], grim: [[2, 3, 4], [4, 6, 8], [7, 9, 11]] },
-  swarm: { name: 'Swarm', icon: '🐜', test: 'Bodies flood in from every side, and keep coming', answers: ['meleeShield', 'tank', 'coldSnap', 'gravity'], grim: [[8, 12, 16], [14, 18, 22], [20, 24, 30]] },
-  scattered: { name: 'Scattered', icon: '🗺️', test: 'Sentries spread far apart: clear them before the clock runs out and reinforcements pour in', answers: ['thrusters', 'farsight'], grim: [[8, 12, 16], [12, 16, 20], [16, 20, 24]] },
-  bigOne: { name: 'Big one', icon: '👹', test: 'One huge, armored alien and its escort', answers: ['overcharge', 'crack', 'hunted', 'keen'], grim: [[1, 1, 2], [2, 3, 3], [3, 4, 5]] },
-  killBox: { name: 'Kill box', icon: '💥', test: 'The way in lands right beside a packed cluster that hits first', answers: ['flashbang', 'smoke', 'meleeShield', 'dampener', 'ironSkin'], grim: [[3, 5, 6], [6, 8, 10], [9, 12, 15]] },
+  slog: { name: 'Slog', icon: '🌿', test: 'Small groups of shooters across a swamp fire from the start. Mire costs 3 times the move to cross.', answers: ['hover', 'rangedShield', 'thrusters', 'farsight'], volley: true, grim: [[2, 3, 4], [3, 4, 6], [5, 7, 8]] },
+  firingLine: { name: 'Firing Line', icon: '🎯', test: 'Long-range shooters along a ridge fire from the moment you land.', answers: ['smoke', 'rangedShield', 'dampener', 'farsight'], volley: true, grim: [[2, 3, 4], [3, 5, 6], [6, 7, 9]] },
+  ironWall: { name: 'Iron Wall', icon: '🧱', test: 'Aliens with heavy Armor shrug off small hits.', answers: ['crack', 'overcharge', 'blaze'], grim: [[2, 3, 4], [4, 6, 8], [7, 9, 11]] },
+  swarm: { name: 'Swarm', icon: '🐜', test: 'Aliens flood in from every side and keep coming.', answers: ['meleeShield', 'tank', 'coldSnap', 'gravity'], grim: [[8, 12, 16], [14, 18, 22], [20, 24, 30]] },
+  scattered: { name: 'Scattered', icon: '🗺️', test: 'Kill the far-flung sentries before the clock runs out and reinforcements pour in.', answers: ['thrusters', 'farsight'], grim: [[8, 12, 16], [12, 16, 20], [16, 20, 24]] },
+  bigOne: { name: 'Big One', icon: '👹', test: 'A huge alien with heavy Armor, and its escort.', answers: ['overcharge', 'crack', 'hunted', 'keen'], grim: [[1, 1, 2], [2, 3, 3], [3, 4, 5]] },
+  killBox: { name: 'Kill Box', icon: '💥', test: 'You land beside a packed cluster of aliens that strikes first.', answers: ['flashbang', 'smoke', 'meleeShield', 'dampener', 'ironSkin'], grim: [[3, 5, 6], [6, 8, 10], [9, 12, 15]] },
 }
 
 /** The challenges the hero meets, by leg and rung: harder ones arrive up each tier. */

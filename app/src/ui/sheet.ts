@@ -26,6 +26,7 @@ import {
   gearText,
   gearName,
   resistChip,
+  sentence,
   weaponDoes,
 } from "./html";
 import { tip as markTip } from "./charts";
@@ -58,7 +59,7 @@ const heroStats = (run: Run, hero: Soldier) => {
 
 /** A hero's weapon: its name and special. */
 const kit = ({ gear }: Soldier) =>
-  gear ? `${gearName(gear)}. ${gearText(gear)}` : "";
+  gear ? `${gearName(gear)}: ${gearText(gear)}` : "";
 
 /** A hero's powers: its bonus attack, then those it learned, its class's ability with its uses worked out. */
 const powers = (run: Run, hero: Soldier): [string, Power & Flow][] => [
@@ -103,10 +104,10 @@ export function heroDossier(run: Run, hero: Soldier, actions: string): string {
       <h2 id="dossier-name">${hero.name}</h2>
       <small class="home">🌍 ${hero.home.name}, ${hero.home.country}</small></div>
       <div class="key"><small class="label">Weapon</small>${weapon}</div>
-      <div class="key"><small class="label">Ability · ${usage(ability)}</small><b>${kitIcon(hero.cls!)} ${ability.name}</b><span>${ability.text}.</span></div>
+      <div class="key"><small class="label">Ability · ${usage(ability)}</small><b>${kitIcon(hero.cls!)} ${ability.name}</b><span>${sentence(ability.text)}</span></div>
       ${picksTaken(hero)}
       ${heroStats(run, hero)}
-      <div class="key"><small class="label">Bonus attack · ${usage(bonus)}</small><b>${bonusIcon(secondaryOf(hero))} ${bonus.name}</b><span>${bonus.text}.</span></div>
+      <div class="key"><small class="label">Bonus attack · ${usage(bonus)}</small><b>${bonusIcon(secondaryOf(hero))} ${bonus.name}</b><span>${sentence(bonus.text)}</span></div>
       <div class="actions">${actions}</div>
     </div>
   </div>`;
@@ -144,4 +145,4 @@ export const alienBlock = (
     ["Strength", stats.strength],
     ["Jump", stats.jump],
   ])}
-  <small>${ALIENS[kind].text}.</small></div>`;
+  <small>${sentence(ALIENS[kind].text)}</small></div>`;

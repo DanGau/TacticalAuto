@@ -20,7 +20,7 @@ import { SKILLS, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
 import { findSwap, pickCard, pickDetail, startChoice, utilityPick, type Pick } from './cards'
 import { treeMap } from './tree'
-import { badge, button, describe, gearText, gearName, healthBar, signed, STOP_NAMES, threatBar } from './html'
+import { badge, button, describe, gearText, gearName, healthBar, sentence, signed, STOP_NAMES, threatBar } from './html'
 
 /**
  * The hero's card: class badge, name, weapon, and an experience bar filling with what the battle earned, flaring on a
@@ -43,7 +43,7 @@ function heroCard(run: Run, fought: NonNullable<Report['hero']>): string {
     <div class="bar"><div class="fill" style="--from: ${filled(fought.xpBefore)}%; --to: ${filled(fought.xpAfter)}%"></div></div>
     ${healthBar(fought.hp, fought.maxHp, soldierStats(run, hero).armor)}
     ${weapon ? `<small class="gear ${weapon.rarity}" title="${gearText(weapon)}">${gearName(weapon)}</small>` : ''}
-    ${gained > 0 ? `<small class="gained" title="${fought.earned.map((e) => `${e.label}: +${e.xp}`).join('&#10;')}">+${gained} xp</small>` : ''} ${note}
+    ${gained > 0 ? `<small class="gained" title="${fought.earned.map((e) => `${e.label}: +${e.xp}`).join('&#10;')}">+${gained} XP</small>` : ''} ${note}
     ${feats.length > 0 ? `<ul class="notes">${feats.join('')}</ul>` : ''}
     ${choose}
   </div>`
@@ -103,7 +103,7 @@ export const pickChoice = (run: Run, soldier: Soldier, armed: string | null) => 
 export function spareChoice(run: Run, armed: string | null): string {
   const spare = UTILITIES[run.spare!]
   const picks = [...run.utilities.map((id, i) => utilityPick(`d${i}`, { type: 'keep', drop: i }, id, 'drop', `Tap again to drop ${UTILITIES[id].name} for ${spare.name}`)), utilityPick('d', { type: 'keep', drop: -1 }, run.spare!, run.shop ? 'put back' : 'leave', run.shop ? `Tap again to put ${spare.name} back, your supplies repaid` : `Tap again to leave ${spare.name} behind`)]
-  return modal(`<h2>${spare.icon} ${spare.name}: ${spare.text}. You hold three: drop which?</h2><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a card for its details; tap it again to choose it.')}`)
+  return modal(`<h2>${spare.icon} ${spare.name}: ${sentence(spare.text)} You hold 3. Drop 1.</h2><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a card for its details; tap it again to choose it.')}`)
 }
 
 /** The relics offered, as cards with their icons: one tapped is armed, then Take carries it. */

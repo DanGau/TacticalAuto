@@ -1,6 +1,6 @@
 // Actions in place of a shot: alien powers, and soldier skills and gear.
 import { alienSrc, fx, srcOf } from './sources'
-import { type Battle, type Effect, type Unit, BLAST_RADIUS, CLOAK_TURNS, isSoldier, FORCE_FIELD_REACH, FORCE_FIELD_ARMOR, SLAM_HIT, SLAM_TILES, STUN_REACH, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN, SURGEON_HEAL, MEDIC_REACH, MEDIC_HEAL, SECOND_WIND_HEAL, DRONE_REACH, DRONE_DAMAGE, SKIRMISH_MOVE, TITAN_HEALTH, PLATING_ARMOR, MECH_STATS, DRONE_STATS, type Stats, type SkillEffect } from './battle'
+import { type Battle, type Effect, type Unit, BLAST_RADIUS, CLOAK_TURNS, FORCE_FIELD_ARMOR, SLAM_HIT, SLAM_TILES, STUN_REACH, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN, SURGEON_HEAL, MEDIC_REACH, MEDIC_HEAL, SECOND_WIND_HEAL, DRONE_REACH, DRONE_DAMAGE, SKIRMISH_MOVE, TITAN_HEALTH, PLATING_ARMOR, MECH_STATS, DRONE_STATS, type Stats, type SkillEffect } from './battle'
 import { mechUnit } from './spawn'
 import { freeTilesNear } from './grid'
 import { onGrid } from './grid'
@@ -60,16 +60,13 @@ export function flashbang(battle: Battle, unit: Unit, seen: Set<number>): GameEv
   return stun(caught, 'flashbang')
 }
 
-/** Force Field: once per battle, the most wounded soldier within reach at half health or less gains armor. */
-export function forceField(battle: Battle, unit: Unit): GameEvent[] {
+/** Sanctuary: once per battle, at half health or less, the hero gains armor. */
+export function forceField(unit: Unit): GameEvent[] {
   if (!has(unit, 'forceField') || unit.spent.includes('forceField')) return []
-  const mate = battle.units
-    .filter((u) => isSoldier(u) && u.side === unit.side && u.hp <= u.stats.hp / 2 && distance(u, unit) <= FORCE_FIELD_REACH)
-    .reduce<Unit | undefined>((worst, u) => (!worst || u.hp < worst.hp ? u : worst), undefined)
-  if (!mate) return []
+  if (unit.hp > unit.stats.hp / 2) return []
   unit.spent.push('forceField')
-  mate.armor += FORCE_FIELD_ARMOR
-  return [fx(mate.id, 'forceField', 0)]
+  unit.armor += FORCE_FIELD_ARMOR
+  return [fx(unit.id, 'forceField', 0)]
 }
 
 /** Spit: the nearest unit but a hostage the spitter can shoot is hit, and acid is left on its tile. */
@@ -117,7 +114,7 @@ export function heal(battle: Battle, unit: Unit): GameEvent[] {
   const boost = has(unit, 'surgeon') ? SURGEON_HEAL : 0
   if (has(unit, 'fontOfLife')) {
     const hurt = battle.units.filter((u) => u.side === unit.side && u.hp > 0 && u.hp < u.stats.hp && distance(unit, u) <= FONT_REACH)
-    if (hurt.length < 2 && !hurt.some((u) => u.hp <= u.stats.hp / 2)) return []
+    if (hurt.length === 0) return []
     return hurt.map((u) => {
       const amount = Math.min(MEDIC_HEAL + boost, u.stats.hp - u.hp)
       u.hp += amount

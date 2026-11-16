@@ -67,10 +67,10 @@ interface AlienType {
 }
 
 export const ALIENS: Record<AlienKind, AlienType> = {
-  trooper: { name: 'Grunt', text: 'Shoots from range, picking its ground', danger: 'small', hp: 1, stats: { strength: 2, jump: 2 }, stance: 'balanced', resists: [] },
+  trooper: { name: 'Grunt', text: 'Shoots from range and picks its ground.', danger: 'small', hp: 1, stats: { strength: 2, jump: 2 }, stance: 'balanced', resists: [] },
   swarmling: {
     name: 'Swarmling',
-    text: 'Weak and fast; attacks only up close, and comes in numbers',
+    text: 'Frail and fast. Attacks only up close, and comes in numbers.',
     danger: 'small',
     hp: 0.4,
     stats: { range: 1, move: 6, damage: 2, strength: 1, jump: 3 },
@@ -79,7 +79,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   spitter: {
     name: 'Spitter',
-    text: 'Its spit leaves acid on the tile, which burns whoever is still in it after their side moves',
+    text: 'Its spit leaves acid on the tile. The acid hurts whoever is still on it after their side moves.',
     danger: 'medium',
     hp: 0.8,
     stats: { range: 6, strength: 1, jump: 2 },
@@ -88,7 +88,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   burster: {
     name: 'Burster',
-    text: 'Runs at the hero and explodes, beside it or wherever it dies, hurting everything near it',
+    text: 'Runs at you and explodes beside you or where it dies, hurting everything near it.',
     danger: 'medium',
     hp: 0.6,
     stats: { range: 0, move: 5, strength: 1, jump: 2 },
@@ -97,7 +97,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   brute: {
     name: 'Brute',
-    text: 'Tough, and attacks only up close; each hit it survives sends it charging at the attacker',
+    text: 'Tough. Attacks only up close. Whenever it survives a hit, it charges the attacker.',
     danger: 'large',
     hp: 2,
     stats: { range: 1, move: 3, damage: 5, strength: 4, jump: 2 },
@@ -106,7 +106,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   psion: {
     name: 'Psion',
-    text: 'Panics a hero, who loses a turn of action; when it dies, the aliens near it are hurt',
+    text: 'Applies Panic to the hardest hitter in reach. When it dies, it hurts the aliens near it.',
     danger: 'medium',
     hp: 0.8,
     stats: { damage: 2, strength: 1, jump: 2 },
@@ -115,7 +115,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   juggernaut: {
     name: 'Juggernaut',
-    text: `Plated: while it has armor, each hit is stopped whole and costs it one plate, however hard. It has ${PLATES} plates over its armor`,
+    text: `Has ${PLATES} plates on top of its Armor. While it has a plate, each hit only breaks 1 plate, however hard.`,
     intro: 'Heavy plating. Every hit chips off one plate, no matter how hard it lands.',
     danger: 'large',
     hp: 1.4,
@@ -125,7 +125,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   incubator: {
     name: 'Incubator',
-    text: `Does nothing; ${HATCH_TURNS} alien turns after it is seen, it hatches into two Brutes`,
+    text: `Does nothing. ${HATCH_TURNS} alien turns after it is seen, it hatches into 2 Brutes.`,
     intro: 'Something is growing in there. We have four turns, maybe less.',
     danger: 'medium',
     hp: 1.6,
@@ -135,7 +135,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   wraith: {
     name: 'Wraith',
-    text: 'Only a crit hurts it in full; any other damage does 1',
+    text: 'Only a Crit deals full damage to it. Any other hit deals 1.',
     intro: 'Only half here. Ordinary blows pass straight through. A critical hit might not.',
     danger: 'medium',
     hp: 0.6,
@@ -145,7 +145,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   burrower: {
     name: 'Burrower',
-    text: 'Moves underground, unseen; once the hero comes near or the fight is on, it surfaces beside it, and attacks up close',
+    text: 'Moves underground, unseen. When you come near or the fight starts, it surfaces beside you and attacks up close.',
     intro: 'Tremors underfoot. It will come up beside whoever stands alone.',
     danger: 'medium',
     hp: 1,
@@ -155,7 +155,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   feeder: {
     name: 'Feeder',
-    text: 'Gains 1 damage each time a hero uses a per-battle power or its class power, while it is in sight',
+    text: 'While in sight, gains 1 damage whenever you use a per-battle power or your class ability.',
     intro: 'It feeds on our tricks. Every one we pull, it grows.',
     danger: 'medium',
     hp: 1.2,
@@ -165,7 +165,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   regenerator: {
     name: 'Regenerator',
-    text: `Heals ${REGEN_HEAL} each turn it is not burning`,
+    text: `At the start of its turn, unless it has Burn, heals ${REGEN_HEAL}.`,
     intro: 'Its wounds close as we watch. Fire seems to stop that.',
     danger: 'medium',
     hp: 1.4,
@@ -175,7 +175,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   sprinter: {
     name: 'Sprinter',
-    text: 'Very fast, and attacks up close; while chilled it cannot move at all',
+    text: 'Very fast. Attacks up close. While it has Chill, it cannot move.',
     intro: 'Fast. Very fast. It will be on us before we blink, unless something slows it.',
     danger: 'small',
     hp: 0.7,
@@ -185,7 +185,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   hiveNode: {
     name: 'Hive Node',
-    text: `Never moves or shoots; spawns a swarmling every ${NODE_EVERY} alien turns, up to ${NODE_SPAWNS}`,
+    text: `Never moves or shoots. Spawns a Swarmling every ${NODE_EVERY} alien turns, up to ${NODE_SPAWNS}.`,
     intro: 'A living nest, full of swarmlings. Kill it before it empties.',
     danger: 'large',
     hp: 1.5,
@@ -196,7 +196,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   mirror: {
     name: 'Mirror',
-    text: "Each hit does the hero's damage",
+    text: 'Its hits deal your damage, if that is higher.',
     intro: 'It studies our strongest. However hard they hit, it hits back.',
     danger: 'large',
     hp: 1,
@@ -206,7 +206,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   turret: {
     name: 'Turret',
-    text: 'An automated gun: never moves, and shoots any hero in range it can see',
+    text: 'An automated gun. Never moves. Shoots anyone in range it can see.',
     intro: 'An automated gun. It will not move, so do not stand in its sights.',
     danger: 'medium',
     hp: 1.5,
@@ -216,7 +216,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   harvester: {
     name: 'Harvester',
-    text: 'Fast, and attacks up close; a civilian it kills rises the next alien turn as a husk that fights for the aliens',
+    text: 'Fast. Attacks up close. A civilian it kills rises on the next alien turn as a Husk.',
     intro: 'It is not killing them. It is harvesting them. Whoever it takes gets back up, on its side.',
     danger: 'medium',
     hp: 1,
@@ -226,7 +226,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   husk: {
     name: 'Husk',
-    text: 'A civilian a harvester killed, risen: weak, and attacks up close',
+    text: 'A civilian a Harvester killed, risen. Frail. Attacks up close.',
     danger: 'small',
     hp: 0.5,
     stats: { range: 1, move: 4, damage: 2, strength: 1, jump: 1 },
@@ -235,7 +235,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   leaper: {
     name: 'Leaper',
-    text: `Attacks up close. Once a fight, it pounces up to ${POUNCE_REACH} tiles, over walls and heights, onto the hero who shoots farthest`,
+    text: `Attacks up close. The first time it can each battle, it pounces up to ${POUNCE_REACH} tiles over walls and heights onto whoever shoots farthest.`,
     intro: 'It does not come through the front line. It comes over it, for whoever hangs back.',
     danger: 'medium',
     hp: 0.8,
@@ -245,7 +245,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   vise: {
     name: 'Vise',
-    text: 'Attacks up close; its hit holds the hero where they stand through their next turn',
+    text: 'Attacks up close. Its hit applies Root.',
     intro: 'Claws like a clamp. Whoever it grabs is going nowhere.',
     danger: 'medium',
     hp: 1.2,
@@ -255,7 +255,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   dreadhorn: {
     name: 'Dreadhorn',
-    text: `Attacks up close; a hit after it moves rams for ${RAM_DAMAGE} more, and drives the hero 2 tiles back, off a ledge if one is near`,
+    text: `Attacks up close. If it moved this turn, its hit deals ${RAM_DAMAGE} more damage and Displaces the target 2 tiles back, off a ledge if one is near.`,
     intro: 'It needs a run-up. Meet it before it gets one, and keep away from the edge.',
     danger: 'large',
     hp: 1.6,
@@ -265,7 +265,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   aegis: {
     name: 'Aegis',
-    text: 'Attacks up close; its shield halves every hit but one from beside it',
+    text: 'Attacks up close. Its shield halves every hit except from beside it.',
     intro: 'A living shield. Shots glance off; someone has to get in close.',
     danger: 'medium',
     hp: 1.2,
@@ -275,7 +275,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   kinhound: {
     name: 'Kinhound',
-    text: `Fast, and attacks up close; each other alien beside its prey adds 1 to its hit, up to ${PACK_MAX}`,
+    text: `Fast. Attacks up close. Each other alien beside its target adds 1 damage to its hit, up to ${PACK_MAX}.`,
     danger: 'small',
     hp: 0.6,
     stats: { range: 1, move: 6, damage: 2, strength: 2, jump: 3 },
@@ -284,7 +284,7 @@ export const ALIENS: Record<AlienKind, AlienType> = {
   },
   zealot: {
     name: 'Zealot',
-    text: 'Attacks up close; each quarter of its health lost adds 1 to its hit',
+    text: 'Attacks up close. Each quarter of its HP lost adds 1 damage to its hit.',
     intro: 'Wounding it only makes it angrier. Finish what you start.',
     danger: 'medium',
     hp: 1.2,
