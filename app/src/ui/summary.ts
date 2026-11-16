@@ -5,6 +5,7 @@ import type { Tally } from '../core/feats'
 import { GOALS } from '../core/goals'
 import { RELICS } from '../core/relics'
 import { relicIcon } from './relic-icons'
+import { skillIcon } from './skill-icons'
 import type { Fought, Run } from '../core/run-state'
 import { SKILLS } from '../core/skills'
 import { level, MAX_SQUAD } from '../core/squad'
@@ -85,7 +86,7 @@ export function runSummary(run: Run): string {
   const cause = won || !last ? '' : `<p>Ended by: ${foughtName(last)}, round ${last.rounds}, with ${run.soldiers.length} of ${MAX_SQUAD} heroes.</p>`
   const heroes = run.soldiers.map((hero) => `<div class="endhero"><span class="portrait">${badge(hero.cls)}</span><div><b>${hero.name}</b> <small>Level ${level(hero)}${hero.cls ? ` ${CLASSES[hero.cls].name}` : ''}</small><br>
     <small class="tier ${hero.gear?.rarity ?? ''}">${hero.gear ? `${gearName(hero.gear)}` : 'Empty hands'}</small><br>
-    <small>${hero.skills.map((id) => SKILLS[id].name).join(' · ') || 'No powers'}</small></div></div>`)
+    <small>${hero.skills.map((id) => `${skillIcon(id)} ${SKILLS[id].name}`).join(' · ') || 'No powers'}</small></div></div>`)
   const colour = colours(run)
   return `<div class="summary">
     <h1 class="${won ? 'down' : 'up'}">${ended}</h1>${cause}

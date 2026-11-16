@@ -30,6 +30,9 @@ import {
 } from "./html";
 import { tip as markTip } from "./charts";
 import { DUOS, duosFor } from "../core/duos";
+import { bonusIcon, duoIcon, kitIcon } from "./ability-icons";
+import { perkIcon, skillIcon } from "./skill-icons";
+import { weaponIcon } from "./weapon-icons";
 
 /** The duos a hero forms with the squad, or with no squad yet, the classes it can: each by name and partner, its effect on hover. */
 export function duoHint(run: Run, hero: Soldier): string {
@@ -38,18 +41,18 @@ export function duoHint(run: Run, hero: Soldier): string {
   const alone = run.soldiers.every((s) => s === hero);
   const chips = duos.map(
     ({ id, partner }) =>
-      `<span title="${DUOS[id].text}">${alone ? partner : `${DUOS[id].name} with ${partner}${run.duos.includes(id) ? " ✓" : ""}`}</span>`,
+      `<span title="${DUOS[id].text}">${duoIcon(id)} ${alone ? partner : `${DUOS[id].name} with ${partner}${run.duos.includes(id) ? " ✓" : ""}`}</span>`,
   );
-  return `<small class="duos">✦ Duos${alone ? " with" : ":"} ${chips.join(", ")}</small>`;
+  return `<small class="duos">Duos${alone ? " with" : ":"} ${chips.join(", ")}</small>`;
 }
 
 /** A row of named numbers. */
 export const statBlock = (cells: [string, string | number][]) =>
   `<div class="statblock">${cells.map(([name, value]) => `<span><small>${name}</small><b>${value}</b></span>`).join("")}</div>`;
 
-/** A power in full: its name, usage line and effect. */
-export const powerBlock = (power: Power, flow?: Flow, held?: Quantity[]) =>
-  `<div class="power described"><b>${power.name}</b> <small class="use">${usage(power)}</small><div>${describe(power.text, flow, held)}</div></div>`;
+/** A power in full: its icon, name, usage line and effect. */
+export const powerBlock = (icon: string, power: Power, flow?: Flow, held?: Quantity[]) =>
+  `<div class="power described"><b>${icon} ${power.name}</b> <small class="use">${usage(power)}</small><div>${describe(power.text, flow, held)}</div></div>`;
 
 /** A hero's numbers. */
 const heroStats = (run: Run, hero: Soldier) => {
@@ -71,13 +74,14 @@ const kit = ({ gear }: Soldier) =>
   gear ? `${gearName(gear)}. ${gearText(gear)}` : "";
 
 /** A hero's powers: its bonus attack, then those it learned, its class's ability with its uses worked out. */
-const powers = (run: Run, hero: Soldier): (Power & Flow)[] => [
-  secondaryPower(SECONDARIES[secondaryOf(hero)]),
-  ...hero.skills.map((id) =>
+const powers = (run: Run, hero: Soldier): [string, Power & Flow][] => [
+  [bonusIcon(secondaryOf(hero)), secondaryPower(SECONDARIES[secondaryOf(hero)])],
+  ...hero.skills.map((id): [string, Power & Flow] => [
+    skillIcon(id),
     id === powerOf(hero.cls!)
       ? classPower(CLASSES[hero.cls!], charges(run, hero))
       : SKILLS[id],
-  ),
+  ]),
 ];
 
 /** Class and level, as a sheet heads them. */
@@ -86,7 +90,7 @@ const heading = (hero: Soldier) =>
 
 /** A hero's picks made: skills learned past its class power, then perks. */
 function picksTaken(hero: Soldier): string {
-  const names = [...hero.skills.filter((id) => id !== powerOf(hero.cls!)).map((id) => SKILLS[id].name), ...hero.perks.map((id) => PERKS[id].name)];
+  const names = [...hero.skills.filter((id) => id !== powerOf(hero.cls!)).map((id) => `${skillIcon(id)} ${SKILLS[id].name}`), ...hero.perks.map((id) => `${perkIcon(id)} ${PERKS[id].name}`)];
   return names.length > 0 ? `<div class="key"><small class="label">Picks taken</small><span>${names.join(" · ")}</span></div>` : "";
 }
 
@@ -99,7 +103,7 @@ export function heroDossier(run: Run, hero: Soldier, actions: string): string {
   const ability = classPower(cls, charges(run, hero));
   const bonus = secondaryPower(SECONDARIES[secondaryOf(hero)]);
   const weapon = hero.gear
-    ? `<b class="tip" ${markTip([hero.gear.name, ...gearStats(hero.gear)])}>${hero.gear.name}</b><span>${weaponDoes(hero.gear)}</span>${gearText(hero.gear) ? `<span>${gearText(hero.gear)}</span>` : ""}`
+    ? `<b class="tip" ${markTip([hero.gear.name, ...gearStats(hero.gear)])}>${weaponIcon(hero.gear.weapon)} ${hero.gear.name}</b><span>${weaponDoes(hero.gear)}</span>${gearText(hero.gear) ? `<span>${gearText(hero.gear)}</span>` : ""}`
     : "<b>Empty hands</b>";
   return `<div class="dossier" role="dialog" aria-modal="true" aria-labelledby="dossier-name">
     <div class="stage" aria-hidden="true">
@@ -112,10 +116,10 @@ export function heroDossier(run: Run, hero: Soldier, actions: string): string {
       <h2 id="dossier-name">${hero.name}</h2>
       <small class="home">🌍 ${hero.home!.name}, ${hero.home!.country}</small></div>
       <div class="key"><small class="label">Weapon</small>${weapon}</div>
-      <div class="key"><small class="label">Ability · ${usage(ability)}</small><b>${ability.name}</b><span>${ability.text}.</span></div>
+      <div class="key"><small class="label">Ability · ${usage(ability)}</small><b>${kitIcon(hero.cls!)} ${ability.name}</b><span>${ability.text}.</span></div>
       ${picksTaken(hero)}
       ${heroStats(run, hero)}
-      <div class="key"><small class="label">Bonus attack · ${usage(bonus)}</small><b>${bonus.name}</b><span>${bonus.text}.</span></div>
+      <div class="key"><small class="label">Bonus attack · ${usage(bonus)}</small><b>${bonusIcon(secondaryOf(hero))} ${bonus.name}</b><span>${bonus.text}.</span></div>
       ${duoHint(run, hero)}
       <div class="actions">${actions}</div>
     </div>
@@ -125,7 +129,7 @@ export function heroDossier(run: Run, hero: Soldier, actions: string): string {
 /** A hero's powers in full. */
 export const powerList = (run: Run, hero: Soldier, held?: Quantity[]) =>
   `<div class="powers">${powers(run, hero)
-    .map((p) => powerBlock(p, p, held))
+    .map(([icon, p]) => powerBlock(icon, p, p, held))
     .join("")}</div>`;
 
 /** A hero's whole sheet: numbers, weapon and kit, how it fights, and its powers in full. */
@@ -135,7 +139,7 @@ export function heroSheet(run: Run, hero: Soldier): string {
       ? `<small>${CLASSES[hero.cls].stanceText}.</small>`
       : "";
   return `<div class="charsheet"><small>${heading(hero)}</small>${heroStats(run, hero)}
-    <div class="weapon"><b>${hero.gear?.name ?? "Empty hands"}</b><small>${kit(hero)}</small></div>${stance}
+    <div class="weapon"><b>${hero.gear ? `${weaponIcon(hero.gear.weapon)} ${hero.gear.name}` : "Empty hands"}</b><small>${kit(hero)}</small></div>${stance}
     ${powerList(run, hero)}${duoHint(run, hero)}${hero.cls ? treeMap(hero) : ""}</div>`;
 }
 

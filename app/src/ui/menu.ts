@@ -5,6 +5,8 @@ import { charges } from "../core/squad";
 import { places } from "./globe";
 import { badge } from "./html";
 import { heroDossier } from "./sheet";
+import { kitIcon } from "./ability-icons";
+import { weaponIcon } from "./weapon-icons";
 
 /** The title screen, before a run begins. */
 export function title(): string {
@@ -37,8 +39,8 @@ export const recruitCard = (run: Run, recruit: Soldier, index: number) =>
     <span class="emblem" aria-hidden="true">${badge(recruit.cls)}</span>
     <small class="cls">${CLASSES[recruit.cls!].name}</small>
     <b class="name">${recruit.name}</b>
-    <span class="line"><i aria-hidden="true">⚔</i> ${recruit.gear?.name ?? "Empty hands"}</span>
-    <span class="line"><i aria-hidden="true">✦</i> ${classPower(CLASSES[recruit.cls!], charges(run, recruit)).name}</span>
+    <span class="line">${recruit.gear ? `${weaponIcon(recruit.gear.weapon)} ${recruit.gear.name}` : "Empty hands"}</span>
+    <span class="line">${kitIcon(recruit.cls!)} ${classPower(CLASSES[recruit.cls!], charges(run, recruit)).name}</span>
   </button>`;
 
 /** Recruit `index` in full, with the way back or to deploy with them. */

@@ -1,4 +1,4 @@
-// The floating tip over any `[data-tip]` mark: shown on hover, focus, or tap, kept inside the screen.
+// The floating tip over any `[data-tip]` mark, led by the mark's icon: shown on hover, focus, or tap, kept inside the screen.
 
 export function installTips(root: HTMLElement): void {
   const box = document.createElement('div')
@@ -10,6 +10,8 @@ export function installTips(root: HTMLElement): void {
   const show = (mark: HTMLElement) => {
     held = mark
     box.textContent = mark.dataset.tip!
+    const icon = mark.querySelector('svg.icon')
+    if (icon) box.prepend(icon.cloneNode(true), ' ')
     box.hidden = false
     // Zoomed as the panel is, so it reads at the panel's size; placed in screen pixels over the zoom.
     const zoom = Number(getComputedStyle(root).zoom) || 1

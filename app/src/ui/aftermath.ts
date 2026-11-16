@@ -5,6 +5,8 @@ import type { Quantity } from '../core/quantities'
 import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { relicIcon } from './relic-icons'
+import { perkIcon, skillIcon } from './skill-icons'
+import { duoIcon } from './ability-icons'
 import { DUOS } from '../core/duos'
 import { boonText, UTILITIES } from '../core/utilities'
 import { type Gain, type Run } from '../core/run-state'
@@ -93,7 +95,7 @@ export function skillChoice(run: Run, soldier: Soldier, armed: string | null = n
   const held = squadMakes(run)
   const pick = (id: SkillId, index: number): Pick => {
     const skill = SKILLS[id]
-    return { key: id, action: { type: 'skill', soldier: soldier.id, index }, look: 'skillnode offered', body: `<b>${skill.name}</b><small class="use">${usage(skill)}</small><span>${describe(skill.text, skill, held)}</span>`, detail: `<p><b>${skill.name}</b></p>`, go: `Tap again to learn ${skill.name}` }
+    return { key: id, action: { type: 'skill', soldier: soldier.id, index }, look: 'skillnode offered', body: `<b>${skillIcon(id)} ${skill.name}</b><small class="use">${usage(skill)}</small><span>${describe(skill.text, skill, held)}</span>`, detail: `<p><b>${skill.name}</b></p>`, go: `Tap again to learn ${skill.name}` }
   }
   const picks = skillOffers(soldier).map(pick)
   return `<h2><b class="supplies">${soldier.name}</b>, ${CLASSES[soldier.cls!].name} level ${level(soldier)}. Choose one of the powers offered; those turned down are lost for the run.</h2>
@@ -103,8 +105,8 @@ export function skillChoice(run: Run, soldier: Soldier, armed: string | null = n
 
 /** A soldier's perk pick: three small cards, one tap to take; those passed over may come again. */
 export function perkChoice(soldier: Soldier): string {
-  const card = (id: PerkId, index: number) => button({ type: 'perk', soldier: soldier.id, index }, `<b>${PERKS[id].name}</b><small>${PERKS[id].text}</small>`, 'perk')
-  const held = soldier.perks.length > 0 ? `<small class="held">Has: ${soldier.perks.map((id) => PERKS[id].name).join(', ')}</small>` : ''
+  const card = (id: PerkId, index: number) => button({ type: 'perk', soldier: soldier.id, index }, `<span class="art">${perkIcon(id)}</span><b>${PERKS[id].name}</b><small>${PERKS[id].text}</small>`, 'perk')
+  const held = soldier.perks.length > 0 ? `<small class="held">Has: ${soldier.perks.map((id) => `${perkIcon(id)} ${PERKS[id].name}`).join(', ')}</small>` : ''
   return `<div class="perkpick"><h2><b class="supplies">${soldier.name}</b>, level ${level(soldier)}: pick a perk. The others may come again.</h2><div class="perks">${minorOffers(soldier).map(card).join('')}</div>${held}</div>`
 }
 
@@ -125,7 +127,7 @@ function relicChoice(run: Run, duo: (typeof DUOS)[keyof typeof DUOS] | null, arm
     `<button class="side ${look}${armed === key ? ' keep' : ''}" role="radio" aria-checked="${armed === key}" data-arm="${key}"><span class="art">${icon}</span><small class="tier">${top}</small><b>${name}</b><span>${text}</span></button>`
   const relics = run.relicOffers.map((id, i) => card(`r${i}`, relicIcon(id), `${RELICS[id].rarity ?? 'rare'} relic`, RELICS[id].name, describe(RELICS[id].text, RELICS[id], held), `relic ${RELICS[id].rarity ?? 'rare'}`))
   const pair = duo?.pair.map((cls) => CLASSES[cls].name)
-  const bond = duo ? [card('duo', '<span class="glyph">✦</span>', `duo · ${pair!.join(' + ')}`, duo.name, describe(duo.text, {}, held), 'duo')] : []
+  const bond = duo ? [card('duo', duoIcon(run.duoOffer!), `duo · ${pair!.join(' + ')}`, duo.name, describe(duo.text, {}, held), 'duo')] : []
   const pick = armed === 'duo' && duo ? { type: 'duo' as const } : armed?.match(/^r\d$/) ? { type: 'relic' as const, index: Number(armed.slice(1)) } : null
   return `<div class="gearswap relics"><h1>Alien artifacts</h1><h2>Carry one for the run${pair ? `, or ${pair.join(' and ')} train as a duo` : ''}</h2>
     <div class="swap" style="--n:${relics.length + bond.length}">${[...relics, ...bond].join('')}</div>

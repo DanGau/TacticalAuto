@@ -1,4 +1,5 @@
 // Shared HTML pieces: buttons, bars, chips, gear cards and descriptions.
+import { weaponIcon } from "./weapon-icons";
 import { EXAMS, type Exam } from "../core/exams";
 import type { Action } from "../core/apply";
 import { EFFECTS, type Gear } from "../core/gear";
@@ -139,7 +140,7 @@ export function weaponDoes(gear: Gear): string {
 
 /** A piece of gear's name, its numbers shown on hover, focus or tap. */
 export const gearName = (gear: Gear) =>
-  `<span class="tip" ${markTip([gear.name, ...gearStats(gear)])}>${gear.name}</span>`;
+  `<span class="tip" ${markTip([gear.name, ...gearStats(gear)])}>${weaponIcon(gear.weapon)} ${gear.name}</span>`;
 
 /** Words that explain themselves on hover. */
 const tip = (label: string, text: string) =>

@@ -6,6 +6,7 @@ import { committed, pathOf, powerOf, SKILLS, TREES, type Path, type SkillId } fr
 import { skillOffers } from '../core/squad'
 import { describe } from './html'
 import { basicsOf, tag } from './kit'
+import { perkIcon, skillIcon } from './skill-icons'
 
 /** Whether a hero knows a skill, is offered it now, turned it down for good, could be offered it later, or stands in a path it did not take. */
 export type SkillState = 'taken' | 'offered' | 'lost' | 'open' | 'locked'
@@ -32,12 +33,12 @@ const attr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
 /** A skill's name as a chip, its use and text in its tip. */
 export const chip = (hero: Soldier, id: SkillId) => {
   const skill = SKILLS[id]
-  return `<span class="tchip ${skillState(hero, id)}" tabindex="0" data-tip="${attr(`${skill.name} · ${usage(skill)}: ${skill.text}. ${rule(hero, id)}.`)}">${skill.name}</span>`
+  return `<span class="tchip ${skillState(hero, id)}" tabindex="0" data-tip="${attr(`${skill.name} · ${usage(skill)}: ${skill.text}. ${rule(hero, id)}.`)}">${skillIcon(id)} ${skill.name}</span>`
 }
 
 /** An offered skill in full, for the sheet: name, use and text. */
 const offerCard = (id: SkillId, held?: Parameters<typeof describe>[2]) =>
-  `<div class="toffer"><b>${SKILLS[id].name}</b><small class="use">${usage(SKILLS[id])}</small><span>${describe(SKILLS[id].text, SKILLS[id], held)}</span></div>`
+  `<div class="toffer"><b>${skillIcon(id)} ${SKILLS[id].name}</b><small class="use">${usage(SKILLS[id])}</small><span>${describe(SKILLS[id].text, SKILLS[id], held)}</span></div>`
 
 /** Depth still ahead, as faint ticks. */
 const ticks = (n: number) => `<span class="tticks" aria-hidden="true">${'<i></i>'.repeat(n)}</span>`
@@ -65,7 +66,7 @@ function fullTree(hero: Soldier): string {
 export function treeMap(hero: Soldier, offer?: (id: SkillId) => string, held?: Parameters<typeof describe>[2]): string {
   const cls = hero.cls!
   const draw = offer ?? ((id: SkillId) => offerCard(id, held))
-  const basics = [...basicsOf(hero).map((name) => tag('basic', name)), ...hero.perks.map((id) => tag('perk', PERKS[id].name, PERKS[id].text))].map((t) => `<span class="basic-chip">${t}</span>`).join('')
+  const basics = [...basicsOf(hero).map((name) => tag('basic', name)), ...hero.perks.map((id) => tag('perk', `${perkIcon(id)} ${PERKS[id].name}`, PERKS[id].text))].map((t) => `<span class="basic-chip">${t}</span>`).join('')
   const head = `<div class="tbasics"><small>Basics</small>${basics}</div><div class="tpower">${chip(hero, powerOf(cls))}</div>`
   const view = treeView(hero)
   if (view.kind === 'choose') {
