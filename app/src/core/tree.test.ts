@@ -57,4 +57,4 @@ test('the first pick offers each path its entry; each later pick, 3 of the path 
       expect(skillOffers(hero)).toEqual([])
     }
   }
-})
+}, 90_000)

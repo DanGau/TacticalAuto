@@ -16,8 +16,7 @@ const KEY_BOON = 0.25
 
 /**
  * Settles a finished battle: experience, threat, rewards, and where the hero stands on the road. The hero earns
- * experience, won or lost. Fallen in a battle on the road, it is flown out and the battle is lost; fallen in an
- * ambush, at a satellite or at the hub, the run is.
+ * experience, won or lost. Fallen in any battle, the run is lost.
  */
 export function endBattle(run: Run): void {
   const battle = run.battle!
@@ -28,9 +27,10 @@ export function endBattle(run: Run): void {
   const xpBefore = s.xp
   const { earned: xp, feats, tally } = earn(battle, s, won, rescued)
   s.xp += xp.reduce((sum, e) => sum + e.xp, 0)
-  // Health carries on: what it ends standing or lifted off with; fallen, it comes back at 1.
+  // Health carries on: what it ends standing or lifted off with.
   const maxHp = soldierStats(run, s).hp
-  const hp = Math.max(1, Math.min(maxHp, battle.units.find((u) => u.soldier === s.id)?.hp ?? battle.lifted[s.id] ?? 0))
+  const hp = Math.max(0, Math.min(maxHp, battle.units.find((u) => u.soldier === s.id)?.hp ?? battle.lifted[s.id] ?? 0))
+  const fell = hp === 0
   s.wounds = maxHp - hp
   const hero = { xpBefore, xpAfter: s.xp, earned: xp, feats, hp, maxHp, tally }
 
@@ -57,8 +57,8 @@ export function endBattle(run: Run): void {
   const key = won && mission.kind === 'key'
   run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, hero, rescued }
 
-  // Losing a satellite, an ambush or the hub loses the run.
-  if (mission.kind === 'final' || (mission.kind !== 'battle' && !won)) {
+  // Falling anywhere, or losing a satellite, an ambush or the hub, loses the run.
+  if (fell || mission.kind === 'final' || (mission.kind !== 'battle' && !won)) {
     run.phase = mission.kind === 'final' && won ? 'won' : 'lost'
     return
   }

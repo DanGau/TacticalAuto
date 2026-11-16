@@ -44,7 +44,6 @@ import { MAX_SKILLS, minorOffers, PICK_LEVELS, picksEarned } from './hero'
 import { XP } from './hero'
 import { level } from './hero'
 import { xpFor } from './hero'
-import { LOSS_THREAT } from './progress'
 import { STOP_THREAT } from './progress'
 import { THREAT_MAX } from './progress'
 import { LEG_STOPS } from './progress'
@@ -178,12 +177,11 @@ test("a find is a piece of the hero's weapon: equipped, replacing and discarding
   expect(run).toMatchObject({ finds: [] })
 })
 
-test('a battle on the road lost with the hero down pays nothing and adds threat; the hero is flown out at 1 HP and still earns experience', () => {
+test('the hero falling in a battle on the road loses the run', () => {
   const run = travelling(['battle', 'battle'])
   fight(run, 'alien')
-  expect(run).toMatchObject({ phase: 'overworld', threat: STOP_THREAT + LOSS_THREAT, supplies: START_SUPPLIES, stop: 1 })
-  expect(health(run, run.hero)).toBe(1)
-  expect(run.report!.hero).toMatchObject({ hp: 1, xpBefore: xpFor(1), earned: [{ label: 'fought', xp: XP.fought }] })
+  expect(run.phase).toBe('lost')
+  expect(run.report!.hero).toMatchObject({ hp: 0, xpBefore: xpFor(1), earned: [{ label: 'fought', xp: XP.fought }] })
 })
 
 test('the hero falling at a satellite loses the run', () => {
