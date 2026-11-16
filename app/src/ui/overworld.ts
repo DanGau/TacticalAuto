@@ -144,7 +144,7 @@ function heroStrip(run: Run): string {
 
 /** The alien force at the hero's stop. */
 function travelLabel(run: Run, stop: Stop, next: 'battle' | 'key' | 'final'): string {
-  const hunt = huntForce(run, missionAt(run, next, stop.risk, next === 'battle' ? stop.goal : 'exterminate'))
+  const hunt = huntForce(run, missionAt(run, next, stop.risk, next === 'battle' ? stop.goal : 'cross'))
   return `${stop.aliens.length} aliens${hunt > 0 ? ` + ${hunt} hunting` : ''}${stop.challenge === 'bigOne' ? ' + boss' : ''}`
 }
 
@@ -161,7 +161,7 @@ function where(run: Run, stop: Stop): string {
   // A stop's icon tells what it is; only a fight or a safehouse says more.
   if (stop.kind === 'safehouse') return `<b>🏠 Safehouse</b>: ${SAFEHOUSE}`
   if (stop.kind !== 'battle' && stop.kind !== 'key' && stop.kind !== 'final') return ''
-  const order = `<b title="${GOALS[stop.goal].text}">${objective(stop.kind, stop.goal, stop.challenge, stop.terrain)}</b>`
+  const order = `<b title="${GOALS[stop.goal].text}">${objective(stop.kind, stop.goal, stop.challenge)}</b>`
   const extras = stop.kind === 'battle' ? ` · ${RISKS[stop.risk].name}${stop.twist ? ` · <span title="${TWISTS[stop.twist].text}">${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}</span>` : ''}` : ''
   return `${order}${extras}<br>${readChallenge(run, stop)}`
 }
@@ -226,7 +226,7 @@ function mapView(run: Run, picked: number | null, armed: string | null, ware: nu
   if (!node) return `${brief(where(run, ahead!))}${runMap(run, picked)}`
   const next = nextStop(run)!
   const here = node.stop!
-  return `${brief(next === 'ambush' ? `<b class="up">${objective(next, 'ambush', null, here.terrain)}</b>` : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
+  return `${brief(next === 'ambush' ? `<b class="up">${objective(next, 'ambush')}</b>` : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
     ${runMap(run, null)}`
 }
 

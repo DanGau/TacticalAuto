@@ -12,7 +12,7 @@ import { FUEL_DAMAGE } from './twists'
 function duel() {
   const run = begun(1)
   apply(run, { type: 'go', index: 1 })
-  current(run)!.stop!.goal = 'exterminate'
+  current(run)!.stop!.goal = 'cross'
   apply(run, { type: 'advance' })
   const clear = run.battle!
   const walled = clear.north.some((e, t) => e !== 'none' && distance({ x: t % GRID, y: Math.floor(t / GRID) }, clear.arena) < ARENA_REACH / 2)

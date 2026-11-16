@@ -20,7 +20,7 @@ function duel(twist: Twist | null): Battle {
   apply(run, { type: 'advance' })
   enterAt(run)
   const battle = run.battle!
-  Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist })
+  Object.assign(battle, { goal: 'cross', uplink: null, extract: null, quarry: false, waves: [], twist })
   battle.ground.fill('pavement')
   battle.bulk.fill(0)
   battle.props.fill('none')

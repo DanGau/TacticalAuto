@@ -11,7 +11,7 @@ function play(seed: number, check: (events: GameEvent[], before: Battle) => void
   const run = begun(seed)
   Object.assign(run.hero, { cls: 'phantom', skills: ['cloak', 'shadowStrike'], gear: { ...run.hero.gear, weapon: null } })
   apply(run, { type: 'go', index: 1 })
-  current(run)!.stop!.goal = 'exterminate'
+  current(run)!.stop!.goal = 'cross'
   apply(run, { type: 'advance' })
   enterAt(run)
   const state = run.battle!

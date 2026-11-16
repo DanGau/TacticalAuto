@@ -17,7 +17,7 @@ import { minorOffers, skillOffers, soldierStats, xpFor } from '../core/hero'
 import { timedFlow } from '../core/step'
 import { carries, UTILITY_IDS, type UtilityId } from '../core/utilities'
 
-const { values } = parseArgs({ options: { runs: { type: 'string', default: '30' }, challenge: { type: 'string', default: '' }, leg: { type: 'string', default: '0,1,2' }, rung: { type: 'string', default: '0,1,2' }, goal: { type: 'string', default: 'exterminate' }, cls: { type: 'string', default: '' }, none: { type: 'boolean', default: false } } })
+const { values } = parseArgs({ options: { runs: { type: 'string', default: '30' }, challenge: { type: 'string', default: '' }, leg: { type: 'string', default: '0,1,2' }, rung: { type: 'string', default: '0,1,2' }, goal: { type: 'string', default: 'cross' }, cls: { type: 'string', default: '' }, none: { type: 'boolean', default: false } } })
 
 /** The level the hero has reached by the time it meets a rung of a leg, about what a careful run has. */
 const levelAt = (leg: number, rung: number) => leg * 3 + 2 + rung

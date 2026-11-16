@@ -10,12 +10,12 @@ import { offerRelics } from './debrief'
 import { takeRelic } from './rewards'
 import { begun, enterAt } from './roads'
 
-/** A run entering an exterminate battle with `relics`. */
+/** A run entering a crossing with `relics`. */
 function landed(relics: RelicId[]): Run {
   const run = begun(1)
   run.relics = relics
   apply(run, { type: 'go', index: 1 })
-  current(run)!.stop!.goal = 'exterminate'
+  current(run)!.stop!.goal = 'cross'
   apply(run, { type: 'advance' })
   const { entry, units } = run.battle!
   // Some alien stands within the charges' reach.

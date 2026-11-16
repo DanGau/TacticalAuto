@@ -34,8 +34,6 @@ export type GameEvent =
   | { type: 'saved'; id: number }
   /** A soldier reaches the extraction zone and lifts off. */
   | { type: 'escaped'; id: number }
-  /** A soldier grabs a raid's supply cache. */
-  | { type: 'grabbed'; id: number; x: number; y: number }
   /** A psion panics a soldier, who loses its next action. */
   | { type: 'panic'; src: Src; id: number; target: number }
   /** A soldier with no shot takes a standard action in place of attacking. */
@@ -46,8 +44,8 @@ export type GameEvent =
   | { type: 'frozen'; id: number }
   /** A unit is hurt by acid underfoot, or by the death of a psion near it. */
   | { type: 'hurt'; id: number; amount: number; cause: 'acid' | 'backlash' | 'impact' }
-  /** A hold is done: the extraction zone appears at x, y. */
-  | { type: 'extract'; x: number; y: number }
+  /** Water on the route froze to ice. */
+  | { type: 'freeze' }
   /** A wave arrives on a hold, unseen unless the hero already sees where it lands. */
   | { type: 'wave'; units: { id: number; x: number; y: number }[] }
   /** A boss spawns a swarmling, or an engineer deploys a mech. */

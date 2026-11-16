@@ -30,7 +30,7 @@ export const COMMANDER = { hp: 6, armor: 2, guards: 2, moreFrom: 3 }
 export const huntForce = (run: Run, mission: Mission) => Math.round((mission.force * TUNING.hunt * run.threat) / THREAT_MAX)
 
 /** The mission the hero would fight at a stop of the given kind now. Its force follows the leg. */
-export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goal = 'exterminate'): Mission {
+export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goal = 'cross'): Mission {
   const extra = { battle: 0, key: 0, final: 0, ambush: 0 }[kind]
   return { kind, goal, risk, force: Math.max(1, TUNING.legForce[run.keys] + (late(run) ? 1 : 0) + extra + RISKS[risk].aliens + GOALS[goal].force) }
 }
@@ -66,7 +66,7 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], cha
     const best = soldierStats(run, run.hero)
     const trooper = alien('trooper')
     const stats = { ...best, hp: Math.round(best.hp * HUNTER.hp), damage: Math.ceil(best.damage * HUNTER.damage), armor: Math.max(best.armor, trooper.stats.armor) + 1, move: best.move + 1 }
-    aliens.unshift({ ...trooper, stats, boss: true, stance: 'rush' })
+    aliens.unshift({ ...trooper, stats, boss: true, target: true, stance: 'rush' })
   }
   const stiff = challenge && STIFFEN[challenge]
   if (stiff) {
@@ -81,7 +81,7 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], cha
     // A leg's boss is the build's test: long to kill, so a hero whose pieces pay off ends it sooner, but no harder hitting.
     const stats = { ...big, ...(extraction ? { hp: Math.round(big.hp * LEG_BOSS.hp), damage: big.damage - LEG_BOSS.damage } : { hp: Math.round(big.hp * ELITE_HP) }), range: BASE_STATS.range + (k >= 2 ? 1 : 0) }
     const escorts = Array.from({ length: escort }, (_, i) => alien(i % 2 === 0 ? 'zealot' : 'vise'))
-    aliens.unshift({ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: extraction && k >= 1, target: false, resists: [], exam: run.bosses[k] }, ...escorts)
+    aliens.unshift({ kind: 'trooper', stats, stance: 'balanced', boss: true, spawns: extraction && k >= 1, target: true, resists: [], exam: run.bosses[k] }, ...escorts)
   }
   return aliens
 }
@@ -102,7 +102,7 @@ export const HUNTER = { hp: 1.3, damage: 1 }
 export function drawGoal(run: Run, when: Run): Goal {
   const goals = (Object.keys(GOALS) as Goal[]).filter((goal) => GOALS[goal].from <= when.keys)
   let roll = random(run) * goals.reduce((sum, goal) => sum + GOALS[goal].weight, 0)
-  return goals.find((goal) => (roll -= GOALS[goal].weight) < 0) ?? 'exterminate'
+  return goals.find((goal) => (roll -= GOALS[goal].weight) < 0) ?? 'cross'
 }
 
 /** Where on the continent under way a battle of `kind` is fought: a region it is built like there, and a city of it. */

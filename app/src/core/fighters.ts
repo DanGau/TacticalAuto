@@ -2,7 +2,7 @@
 import { SECONDARIES, type Secondary } from './secondaries'
 import { WEAPONS } from './weapons'
 import { AURA_REACH, type Battle, type Effect, ELUSIVE_REACH, GRID, type Tile, type Unit, isSoldier } from './battle'
-import { HOVER, onGrid, spacedTile, walkingDistances } from './grid'
+import { HOVER, onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import { EXTRACT_REACH } from './goals'
@@ -53,8 +53,6 @@ export function spotted(battle: Battle): Set<number> {
   return new Set(battle.units.filter((u) => u.side === 'alien' && u.revealed && soldiers.some((s) => sees(battle, s, u))).map((u) => u.id))
 }
 
-/** Whether `unit` is a VIP not yet freed: a hostage, kept alive. */
-export const hostage = (battle: Battle, unit: Unit) => unit.civilian === 'vip' && battle.vip !== 'freed'
 
 /** Whether `unit`, standing on `from`, may shoot `target`. An elusive target is safe from far off, and a cloaked one from all. */
 /** A secondary's reach under Far Sight: any alien in sight and a clear line. */
@@ -84,7 +82,6 @@ const POWER_REACH = 5
 export const powering = (unit: Unit): Unit => ({ ...unit, stats: { ...unit.stats, range: POWER_REACH } })
 
 export function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: Set<number>): boolean {
-  if (hostage(battle, target)) return false
   if (target.cloaked) return false
   if (has(target, 'elusive') && distance(from, target) > ELUSIVE_REACH) return false
   // A psionic attack needs no line of sight, only an alien revealed.
@@ -129,33 +126,12 @@ export function inAura(battle: Battle, unit: Unit, effect: Effect): boolean {
   return battle.units.some((u) => u.side === unit.side && has(u, effect) && distance(u, unit) <= AURA_REACH)
 }
 
-/** A VIP rescue's VIP, while on the field. */
-export const vipOf = (battle: Battle) => battle.units.find((u) => u.civilian === 'vip')
-
 /** On a hold, how far from the uplink a soldier may stand and still defend it; Relay Booster widens it. */
 export const UPLINK_REACH = 3
 
 export const RELAY_REACH = 2
 
 export const uplinkReach = (battle: Battle) => UPLINK_REACH + (battle.units.some((u) => isSoldier(u) && has(u, 'relay')) ? RELAY_REACH : 0)
-
-/** How far from the uplink a hold's extraction zone appears. */
-export const EXTRACT_CLEARANCE = 12
-
-/** About how far a walk from where the hero stands the extraction zone lies. */
-const EXTRACT_WALK = 24
-
-/** An extraction zone at the edge: of tiles drawn clear of `start`, the one whose walk from it is nearest EXTRACT_WALK. */
-export function extractionFrom(battle: Battle, start: Tile): Tile {
-  const walk = walkingDistances(battle, start)
-  const off = (t: Tile) => Math.abs(walk[t.y * GRID + t.x] - EXTRACT_WALK)
-  return Array.from({ length: 40 }, () => spacedTile(battle, [start], EXTRACT_CLEARANCE, 'edge')).reduce((a, b) => (off(b) < off(a) ? b : a))
-}
-
-/** Aliens in sight that can walk to `vip`, and so make its column keep together. A turret, or an alien walled off, never comes. */
-export const pursuers = (battle: Battle, vip: Unit) => {
-  return battle.units.filter((u) => u.side === 'alien' && u.revealed && u.stats.move > 0 && walkingDistances(battle, vip, u.stats.jump)[u.y * GRID + u.x] < Infinity)
-}
 
 /** How near the extraction zone lifts a soldier off; a Signal Flare widens it. */
 export const FLARE_REACH = 3

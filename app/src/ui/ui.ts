@@ -16,7 +16,9 @@ import { HOLD_ROUNDS } from '../core/goals'
 import { missionOrder, THREATS } from '../core/objectives'
 import { button, STOP_NAMES } from './html'
 import { fuelTanks } from '../core/objects'
-import { carries, UTILITIES } from '../core/utilities'
+import { carries, UTILITIES, type UtilityId } from '../core/utilities'
+import { ARENA_KINDS } from '../core/arena-kinds'
+import { opens } from '../core/route'
 import { BOON_CHARGES } from '../core/relics'
 import { relicIcon } from './relic-icons'
 import { RECKONING_KILLS } from '../core/doctrines'
@@ -41,9 +43,8 @@ function status(run: Run): string {
   if (battle.phase === 'deploy') return title
   const rounds = battle.extract ? ' · make for the extraction zone' : battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
   const clock = battle.deadline !== null && battle.round < battle.deadline ? ` · reinforcements in ${battle.deadline - battle.round} rounds` : ''
-  const vip = battle.vip ? ` · the VIP ${{ held: 'held', breached: 'held', freed: 'with you', out: 'lifted off' }[battle.vip]}` : ''
   const boons = battle.boons.filter((b) => b.until > battle.round).map((b) => ` · ${UTILITIES[b.id].icon} ${UTILITIES[b.id].name} ⏳${b.until - battle.round}`).join('')
-  return `${title}${vip}${rounds}${clock}${boons}${counts(run, battle)}`
+  return `${title}${rounds}${clock}${boons}${counts(run, battle)}`
 }
 
 /** The hero's counts toward its every-Nth triggers. */
@@ -62,7 +63,6 @@ function counts(run: Run, battle: Battle): string {
 function drop(run: Run, battle: Battle, armed: string | null, rigging: number | null, doubling: number | null): string {
   const twist = battle.twist ? `<p title="${TWISTS[battle.twist].text}">${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}</b></p>` : ''
   const tanks = fuelTanks(battle)
-  const challenge = battle.challenge && CHALLENGES[battle.challenge]
   const go = (detail: string, picks: Pick[], idle: string) => `<p>${detail}</p><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, idle)}`
   const charged = run.relics.includes('reservoir') && run.boons >= BOON_CHARGES && run.utilities.filter((id) => id !== 'tank').length >= 2
   const reservoir = run.relics.includes('reservoir') ? `<p class="reservoir">${relicIcon('reservoir')} Boon Reservoir: ${run.boons} charge${run.boons === 1 ? '' : 's'}${charged ? `; ${BOON_CHARGES} take a second boon in` : `; go in with no boon to charge it`}.</p>` : ''
@@ -80,12 +80,21 @@ function drop(run: Run, battle: Battle, armed: string | null, rigging: number | 
         : go(
             'Pick a boon for this battle.',
             run.utilities.map((id, i): Pick =>
-              utilityPick(`u${i}`, id === 'tank' || charged ? undefined : { type: 'enter', utility: i }, id, challenge && carries(id, challenge.answers) ? 'answers this' : 'boon', id === 'tank' ? 'Tap again to choose a tank' : charged ? 'Tap again, then choose a second' : `Tap again to go in with ${UTILITIES[id].name}`, id === 'tank' ? { attrs: `data-rig="${i}"`, block: tanks.length === 0 ? 'No fuel tanks on this ground' : null } : charged ? { attrs: `data-double="${i}"` } : {}),
+              utilityPick(`u${i}`, id === 'tank' || charged ? undefined : { type: 'enter', utility: i }, id, tagOf(battle, id), id === 'tank' ? 'Tap again to choose a tank' : charged ? 'Tap again, then choose a second' : `Tap again to go in with ${UTILITIES[id].name}`, id === 'tank' ? { attrs: `data-rig="${i}"`, block: tanks.length === 0 ? 'No fuel tanks on this ground' : null } : charged ? { attrs: `data-double="${i}"` } : {}),
             ),
             'Tap a boon or an alien to read it; tap a boon again to go in with it.',
           )
   const test = battle.challenge ? `<h2 class="challenge" title="${CHALLENGES[battle.challenge].test}">${CHALLENGES[battle.challenge].icon} ${THREATS[battle.challenge]}</h2>` : ''
-  return `${test}${twist}${foes(battle, armed)}${reservoir}${chosen}`
+  const ground = ARENA_KINDS[battle.arenaKind]
+  const barrier = ground.opens ? `<h2 class="challenge" title="${ground.text}">🛣️ ${ground.name}: ${ground.opens.map((e) => UTILITIES[e].name).join(' or ')} crosses.</h2>` : ''
+  return `${barrier}${test}${twist}${foes(battle, armed)}${reservoir}${chosen}`
+}
+
+/** What a boon does for this battle: opens the route, answers its challenge, both, or neither. */
+function tagOf(battle: Battle, id: UtilityId): string {
+  const route = opens(battle, id)
+  const answers = !!battle.challenge && carries(id, CHALLENGES[battle.challenge].answers)
+  return route && answers ? 'answers both' : route ? 'opens the route' : answers ? 'answers this' : 'boon'
 }
 
 /** The encounter: each alien kind on the deploy screen and how many; tapped, its stat block. Burrowers stay hidden. */

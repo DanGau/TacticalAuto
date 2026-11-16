@@ -20,7 +20,7 @@ const gap = (a: Unit[], b: Unit[]) => Math.min(...a.flatMap((u) => b.map((v) => 
 const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length
 
 test('spacing is uneven: within a layout the nearest-mate distances vary widely', () => {
-  const spreads = layouts('exterminate', 14).map((aliens) => {
+  const spreads = layouts('cross', 14).map((aliens) => {
     const near = aliens.map((a) => nearestMate(a, aliens))
     const all = aliens.flatMap((a) => aliens.filter((b) => b !== a).map((b) => distance(a, b)))
     return Math.sqrt(mean(all.map((d) => (d - mean(all)) ** 2))) / mean(all) + Math.max(...near) - Math.min(...near)
@@ -29,7 +29,7 @@ test('spacing is uneven: within a layout the nearest-mate distances vary widely'
 })
 
 test('most aliens stand in clusters of two or more, close by a mate, and sizes differ map to map', () => {
-  const all = layouts('exterminate', 14)
+  const all = layouts('cross', 14)
   const grouped = all.flat().filter((a) => clustersOf(all.find((l) => l.includes(a))!).find((c) => c.includes(a))!.length >= 2)
   expect(grouped.length / all.flat().length).toBeGreaterThan(0.8)
   const close = all.flatMap((aliens) => aliens.filter((a) => nearestMate(a, aliens) <= 3))
@@ -40,7 +40,7 @@ test('most aliens stand in clusters of two or more, close by a mate, and sizes d
 })
 
 test("a push's clusters stand apart, so nearing one need not draw the next", () => {
-  const gaps = layouts('exterminate', 12).flatMap((aliens) => clustersOf(aliens).map((c) => gap(c, aliens.filter((a) => !c.includes(a)))))
+  const gaps = layouts('cross', 12).flatMap((aliens) => clustersOf(aliens).map((c) => gap(c, aliens.filter((a) => !c.includes(a)))))
   expect(gaps.filter((g) => g >= 3).length / gaps.length).toBeGreaterThan(0.8)
 })
 
@@ -49,22 +49,20 @@ test('a flood posts few and sends the most as clumps from the gates; a push post
   expect(flood.flow).toBe('flood')
   expect(flood.units.filter((u) => u.side === 'alien').length).toBe(5)
   expect(flood.waves.flat().length).toBe(10)
-  const push = createBattle(3, 'city', force(15), [], 'exterminate')
+  const push = createBattle(3, 'city', force(15), [], 'cross')
   expect(push.flow).toBe('push')
   expect(push.waves).toEqual([])
   expect(push.units.filter((u) => u.side === 'alien').length).toBe(15)
 })
 
-test('flow follows mission and map', () => {
-  for (const goal of ['hold', 'ambush', 'rescue'] as const) expect(flowOf(goal, 'town')).toBe('flood')
-  for (const goal of ['exterminate', 'assassinate', 'vip'] as const) expect(flowOf(goal, 'town')).toBe('push')
-  expect(flowOf('raid', 'town')).toBe('push')
-  expect(flowOf('raid', 'ruins')).toBe('flood')
-  expect(flowOf('exterminate', 'hive')).toBe('flood')
+test('flow follows mission and challenge', () => {
+  for (const goal of ['hold', 'ambush', 'rescue'] as const) expect(flowOf(goal)).toBe('flood')
+  for (const goal of ['cross', 'assassinate'] as const) expect(flowOf(goal)).toBe('push')
+  expect(flowOf('cross', 'swarm')).toBe('flood')
 })
 
 test('a push stands its clusters beyond the wake range of each other, so nearing one wakes only it', () => {
-  for (const aliens of layouts('exterminate', 14)) {
+  for (const aliens of layouts('cross', 14)) {
     for (const a of aliens) for (const b of aliens) if (a.cluster !== b.cluster) expect(distance(a, b)).toBeGreaterThan(ENGAGE_REACH)
   }
 })

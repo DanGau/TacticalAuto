@@ -7,7 +7,7 @@ import { shots, STOPS } from './briefing'
 
 const trooper = (target = false): Alien => ({ kind: 'trooper', stats: BASE_STATS, stance: ALIENS.trooper.stance, boss: false, spawns: false, target, resists: [] })
 
-test('a briefing makes one to three stops, the last over the whole map', () => {
+test('a briefing makes one or two stops, the last over the whole map', () => {
   for (const goal of Object.keys(GOALS) as Goal[]) {
     for (let seed = 1; seed <= 2; seed++) {
       const all = shots(createBattle(seed, 'town', [trooper(goal === 'assassinate'), trooper(), trooper()], [], goal), 'Clear the streets')

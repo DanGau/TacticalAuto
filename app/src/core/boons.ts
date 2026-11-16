@@ -1,12 +1,13 @@
 // Boons in a battle: what each picked utility does as the hero lands, each turn it lasts, and as it ends.
 import { fx } from './sources'
-import { isSoldier, type Battle, type Effect, type Stats, type Unit } from './battle'
+import { GRID, isSoldier, type Battle, type Effect, type Stats, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { nearest } from './fighters'
-import { distance } from './grid'
+import { distance, floats } from './grid'
+import { freeze, waterOnRoute } from './route'
 import { fuelTanks } from './objects'
 import { chillUnit, kindle } from './stacks'
-import { BLAZE_REACH, effectsOf, MINOR, SMOKE_REACH, STRENGTH, STUN_TURNS, UTILITIES, type EffectId, type MinorId, type Part, type UtilityId } from './utilities'
+import { BLAZE_REACH, carries, effectsOf, MINOR, SMOKE_REACH, STRENGTH, STUN_TURNS, UTILITIES, type EffectId, type MinorId, type Part, type UtilityId } from './utilities'
 
 /** A boon under way: the round all its parts end, and what they added to each unit's stats, taken back then. */
 export interface Boon {
@@ -58,6 +59,7 @@ export function takeBoon(battle: Battle, id: UtilityId | null, tank: number): vo
       for (const [key, value] of Object.entries(delta) as [keyof Stats, number][]) sum[key] = (sum[key] ?? 0) + value
     }
     if (part.id === 'tank') battle.rigged = fuelTanks(battle)[tank] ?? null
+    if (part.id === 'coldSnap') freeze(battle, waterOnRoute(battle))
     if (part.id === 'flashbang') {
       const first = nearest(battle.units.filter((u) => u.side === 'alien' && u.engaged), battle.entry!)
       for (const u of battle.units.filter((a) => a.side === 'alien' && first && a.cluster === first.cluster)) u.surprised = u.boss ? STUN_TURNS - 1 : STUN_TURNS
@@ -70,6 +72,8 @@ export function tickBoons(battle: Battle, events: GameEvent[]): void {
   const heroes = battle.units.filter((u) => isSoldier(u) && u.hp > 0)
   const aliens = battle.units.filter((u) => u.side === 'alien' && u.hp > 0)
   for (const boon of battle.boons) {
+    // Levitation holds while the hero floats over the void or water, so it never drops the hero in.
+    if (boon.until <= battle.round && carries(boon.id, ['hover']) && heroes.some((u) => floats(battle, u.y * GRID + u.x))) boon.until = battle.round + 1
     if (boon.until <= battle.round) {
       end(battle, boon, events)
       continue

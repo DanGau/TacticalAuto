@@ -7,7 +7,7 @@ import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import type { GameEvent, ShotEvent } from './combat-event'
-import { has, hostage, foes, powering, shootable, nearest, immune, silenced, spend, enemiesOf, onTile } from './fighters'
+import { has, foes, powering, shootable, nearest, immune, silenced, spend, enemiesOf, onTile } from './fighters'
 import { walk, bestPath, paths } from './pathing'
 import { canShoot, lineOfSight } from './sight'
 import { FONT_REACH, SWARM_BUILDS, SWARM_LIMIT, WAR_MACHINE } from './keystones'
@@ -69,10 +69,10 @@ export function forceField(unit: Unit): GameEvent[] {
   return [fx(unit.id, 'forceField', 0)]
 }
 
-/** Spit: the nearest unit but a hostage the spitter can shoot is hit, and acid is left on its tile. */
+/** Spit: the nearest unit the spitter can shoot is hit, and acid is left on its tile. */
 export function spit(battle: Battle, unit: Unit): GameEvent[] {
   const target = nearest(
-    battle.units.filter((u) => u.side !== unit.side && !u.cloaked && !hostage(battle, u) && canShoot(battle, unit, u, unit.stats.range)),
+    battle.units.filter((u) => u.side !== unit.side && !u.cloaked && canShoot(battle, unit, u, unit.stats.range)),
     unit,
   )
   if (!target) return []

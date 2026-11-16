@@ -17,7 +17,7 @@ function landing(held: UtilityId[], seed = 1): Run {
   const run = begun(seed)
   run.utilities = held
   let stop = drawBattle(run, 'standard')
-  for (let tries = 0; stop.goal !== 'exterminate' || stop.terrain === 'hive'; tries++) stop = drawBattle(run, 'standard')
+  for (let tries = 0; stop.goal !== 'cross' || stop.terrain === 'hive'; tries++) stop = drawBattle(run, 'standard')
   road(run, [stop])
   apply(run, { type: 'advance' })
   return run

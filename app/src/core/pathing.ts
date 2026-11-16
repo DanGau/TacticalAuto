@@ -2,8 +2,7 @@
 import { type Battle, type Unit, type Tile, GRID, type Stance, isSoldier, STANDOFF, HASTE_MOVE, CHILL_MOVE, type Order, ENGAGE_REACH } from './battle'
 import { barred, blocked, breach, walkingDistances, bulkAt, stepCost, onGrid, NEIGHBORS, distance, strides, jumps } from './grid'
 import type { GameEvent } from './combat-event'
-import { hasAttack, vipOf, pursuers, nearest, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes, leap } from './fighters'
-import { ESCORT_REACH } from './goals'
+import { hasAttack, nearest, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes, leap } from './fighters'
 import { canHurlFrom } from './objects'
 import { pushesOff } from './knockback'
 import { bite, canShoot, sees } from './sight'
@@ -161,24 +160,17 @@ export function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
 }
 
 /**
- * Where a side's units close on when they have no shot, by the battle's goal. Soldiers share one, so the hero moves
- * together: on a hold, the uplink, then the extraction zone; on a VIP rescue, the VIP, then the extraction zone; on an
- * assassination, the commander once sighted; else the alien in the fight nearest the hero's centre; on a rescue, the
- * alien nearest a civilian, or with none near one, the civilian nearest the team. Aliens close on a soldier in the
- * else on a hold the uplink, then the hero; otherwise the soldier nearest, shooting civilians on the way.
+ * Where a side's units close on when they have no shot, by the battle's goal. The hero makes for the objective: the
+ * extraction zone; the uplink; a target once sighted; on a rescue, the alien nearest a civilian, or with none near one,
+ * the civilian nearest the hero. Failing those, the alien in the fight nearest the hero. Aliens close on the hero, but
+ * on a hold the uplink first; shooting civilians on the way.
  */
 export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | undefined {
-  // The hero goes for the VIP until it reaches them; with its guard out of reach and the battle dragging on, it goes for the guard.
-  const vip = vipOf(battle)
-  if (vip && unit.side === 'human' && battle.vip !== 'freed' && !(battle.vip === 'breached' && battle.round >= RESTLESS_ROUND && enemies.length > 0)) return vip
-  if (enemies.length === 0 && !(battle.extract && unit.side === 'human')) return undefined
   if (battle.extract && unit.side === 'human') return battle.extract
-  // A raider makes for the nearest cache it can walk to until it has as many as it came for; walled off from all, it fights.
-  const caches = battle.goal === 'raid' && unit.side === 'human' ? battle.caches.filter((c) => walkingDistances(battle, c, leap(unit))[unit.y * GRID + unit.x] < Infinity) : []
-  if (caches.length > 0) return caches.reduce((a, b) => (walkingDistances(battle, b, leap(unit))[unit.y * GRID + unit.x] < walkingDistances(battle, a, leap(unit))[unit.y * GRID + unit.x] ? b : a))
-  // On a hold an alien makes for the uplink, then from its zone goes for the team, so no stand-off lasts.
-  if (battle.uplink) return unit.side === 'alien' && distance(unit, battle.uplink) <= UPLINK_REACH ? nearest(enemies, unit) : battle.uplink
-  const civilians = battle.units.filter((u) => u.civilian && u.civilian !== 'vip')
+  if (enemies.length === 0) return undefined
+  // On a hold an alien makes for the uplink, then from its zone, or once the battle drags on, goes for the hero, so no stand-off lasts.
+  if (battle.uplink) return unit.side === 'alien' && (distance(unit, battle.uplink) <= UPLINK_REACH || battle.round >= RESTLESS_ROUND) ? nearest(enemies, unit) : battle.uplink
+  const civilians = battle.units.filter((u) => u.civilian)
   if (unit.side === 'alien') return nearest(enemies.filter((e) => !e.civilian), unit) ?? nearest(enemies, unit)
   const team = centreOf(battle.units.filter(isSoldier))
   if (civilians.length > 0) {
@@ -215,11 +207,8 @@ const EDGE_RISK = 30
  */
 export const PREY_WORTH = 0.25
 
-/** What a shot at a VIP is worth to an alien beside the same chance at a soldier: it takes any it can get. */
-export const VIP_WORTH = 1.5
-
 /** What `hit`, a share of a shot's damage, is worth to an alien against `target`. */
-export const preyed = (target: Unit, hit: number) => (target.civilian === 'vip' ? VIP_WORTH * hit : target.civilian ? PREY_WORTH * hit : hit)
+export const preyed = (target: Unit, hit: number) => (target.civilian ? PREY_WORTH * hit : hit)
 
 /**
  * The path a fighting unit takes in its move stage: to the tile its stance ranks best, preferring any tile with a
@@ -288,14 +277,8 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   /** Tiles `end` is ahead of the unit's place in the formation. */
   const ahead = (end: Tile) => Math.max(0, slot - toGoal[end.y * GRID + end.x])
   /** 0 if a soldier ending its move on `end` gets a civilian out, else 1: a rescuer takes that chance over a shot. */
-  const rescuable = unit.side === 'human' ? battle.units.filter((u) => u.civilian && u.civilian !== 'vip') : []
+  const rescuable = unit.side === 'human' ? battle.units.filter((u) => u.civilian) : []
   const saves = (end: Tile) => (rescuable.some((c) => distance(c, end) <= 1) ? 0 : 1)
-  const freed = battle.vip === 'freed' && unit.side === 'human' ? vipOf(battle) : undefined
-  const ward = freed && pursuers(battle, freed).length > 0 ? freed : undefined
-  /** Who keeps the VIP company: the VIP, and allies within ESCORT_REACH of it, so a column in a narrow way can lead it on. */
-  const escorts = ward ? [ward, ...allies.filter((u) => distance(u, ward) <= ESCORT_REACH)] : []
-  /** Tiles `end` is more than a step beyond ESCORT_REACH of the nearest escort. */
-  const escort = (end: Tile) => (ward ? Math.max(0, Math.min(...escorts.map((u) => distance(end, u))) - ESCORT_REACH - 1) : 0)
   const choose = (move: number) => {
     const reach = paths(battle, unit, move)
     return bestPath(reach, unit, (end, steps) => {
@@ -316,8 +299,7 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
       // No unit ends its move in acid if it can help it.
       // On a hold, a soldier stands its ground at the uplink before anything else.
       // Getting out, a soldier makes for the way out as fast as it can.
-      // Escorting, a soldier keeps by the VIP.
-      const first = [escort(end), battle.extract && unit.side === 'human' ? spot.toGoal : 0, leash(end), acid(end), provokes(end), saves(end)]
+      const first = [battle.extract && unit.side === 'human' ? spot.toGoal : 0, leash(end), acid(end), provokes(end), saves(end)]
       return spot.mine > 0 ? [...first, 0, wary ? spot.crowded : 0, ...WITH_SHOT[unit.stance](spot), steps] : [...first, 1, ahead(end), ...NO_SHOT[unit.stance](spot)]
     })
   }
@@ -387,29 +369,12 @@ export const hideout = (battle: Battle, tile: Tile) =>
 
 /** A civilian's path. A hider makes for the biggest object in reach and stays there; a runner goes away from the nearest alien until SAFE from all, then toward the nearest soldier. */
 export function fleePath(battle: Battle, unit: Unit): Tile[] {
-  if (unit.civilian === 'vip') return battle.vip === 'freed' ? escapePath(battle, unit) : []
   if (unit.civilian === 'hider') return hideout(battle, unit) > 0 ? [] : bestPath(paths(battle, unit, unit.stats.move), unit, (end, steps) => [-hideout(battle, end), steps])
   const aliens = battle.units.filter((u) => u.side === 'alien')
   const soldier = nearest(battle.units.filter(isSoldier), unit)
   const toSquad = soldier ? walkingDistances(battle, soldier, leap(unit)) : null
   return bestPath(paths(battle, unit, unit.stats.move), unit, (end) => [SAFE - Math.min(SAFE, ...aliens.map((a) => distance(a, end))), toSquad ? toSquad[end.y * GRID + end.x] : 0])
 }
-
-/** A freed VIP's path: toward the extraction zone, away from the aliens' shots and, while hunted and before RESTLESS_ROUND, never beyond ESCORT_REACH of a hero or summon. */
-export function escapePath(battle: Battle, unit: Unit): Tile[] {
-  const toExtract = walkingDistances(battle, battle.extract!, leap(unit))
-  const guards = battle.units.filter((u) => u.side === 'human' && !u.civilian && u.hp > 0)
-  const aliens = battle.units.filter((u) => u.side === 'alien' && u.revealed)
-  // Hunted, it keeps by a hero or a summon, until the battle drags on: then it makes its own way, so it and its escort never wait on each other.
-  const hunted = pursuers(battle, unit).length > 0 && battle.round < RESTLESS_ROUND
-  // Fire shapes its way only among tiles nearer the way out, so a turret's field cannot pen it.
-  return bestPath(paths(battle, unit, unit.stats.move), unit, (end) => [
-    hunted ? Math.max(0, Math.min(...guards.map((s) => distance(s, end))) - ESCORT_REACH) : 0,
-    toExtract[end.y * GRID + end.x] < toExtract[unit.y * GRID + unit.x] ? 0 : 1,
-    toExtract[end.y * GRID + end.x] + Math.round(exposure(battle, aliens, end) / 10),
-  ])
-}
-
 
 /** The move a path costs, climbing costing more. */
 export function costOf(battle: Battle, unit: Unit, path: Tile[]): number {

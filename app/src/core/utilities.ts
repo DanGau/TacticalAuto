@@ -55,7 +55,7 @@ interface Kind {
 
 const SINGLES: Record<EffectId, Kind> = {
   thrusters: { name: 'Swiftness', icon: '💨', text: full('thrusters'), rounds: 3, rarity: 'common' },
-  hover: { name: 'Levitation', icon: '🪽', text: 'Cross difficult terrain and steep ground at no extra cost. Float over chasms.', rounds: 3, rarity: 'common' },
+  hover: { name: 'Levitation', icon: '🪽', text: 'Cross mire, cliffs and steep ground at no extra cost. Float over chasms and water.', rounds: 6, rarity: 'common' },
   overcharge: { name: 'Overcharge', icon: '⚡', text: full('overcharge'), rounds: 3, rarity: 'common' },
   crack: { name: 'Sunder', icon: '🔨', text: 'Ignore Armor.', rounds: 2, rarity: 'rare' },
   tank: { name: 'Rigged Tank', icon: '🛢️', text: `Choose a fuel tank. Once ${RIG.crowd} aliens are within ${RIG.near} tiles of it, it explodes: ${RIG.damage} damage to each alien within ${RIG.radius} tiles and to you within ${RIG.close}, and fire.`, rounds: 4, rarity: 'rare' },
@@ -67,7 +67,7 @@ const SINGLES: Record<EffectId, Kind> = {
   ironSkin: { name: 'Stoneskin', icon: '🪨', text: full('ironSkin'), rounds: 3, rarity: 'common' },
   farsight: { name: 'Farsight', icon: '🔭', text: full('farsight'), rounds: 3, rarity: 'common' },
   keen: { name: 'Keen Eye', icon: '👁️', text: full('keen'), rounds: 3, rarity: 'common' },
-  coldSnap: { name: 'Cold Snap', icon: '❄️', text: 'At the start of your turn, apply 1 Chill to each alien in the fight.', rounds: 3, rarity: 'rare' },
+  coldSnap: { name: 'Cold Snap', icon: '❄️', text: 'Turn the water on your route to ice. At the start of your turn, apply 1 Chill to each alien in the fight.', rounds: 3, rarity: 'rare' },
   blaze: { name: 'Wildfire', icon: '🔥', text: `At the start of your turn, apply 1 Burn to each alien within ${BLAZE_REACH} tiles of your landing.`, rounds: 2, rarity: 'common' },
   hunted: { name: 'Prey', icon: '🎯', text: 'The alien with the most max HP takes 50% more damage.', rounds: 3, rarity: 'common' },
   gravity: { name: 'Gravity Well', icon: '🌀', text: full('gravity'), rounds: 3, rarity: 'common' },
@@ -81,7 +81,7 @@ const COMBOS: Record<ComboId, { name: string; icon: string; rounds: number; majo
   warpath: { name: 'Warpath', icon: '🐗', rounds: 3, major: 'overcharge', minor: ['thrusters'] },
   deadeye: { name: 'Deadeye', icon: '🦅', rounds: 3, major: 'farsight', minor: ['keen'] },
   smokescreen: { name: 'Smokescreen', icon: '☁️', rounds: 3, major: 'smoke', minor: ['dampener'] },
-  skyborne: { name: 'Skyborne', icon: '🪂', rounds: 3, major: 'hover', minor: ['farsight'] },
+  skyborne: { name: 'Skyborne', icon: '🪂', rounds: 6, major: 'hover', minor: ['farsight'] },
   executioner: { name: 'Executioner', icon: '🪓', rounds: 3, major: 'hunted', minor: ['overcharge'] },
   inferno: { name: 'Inferno', icon: '🌋', rounds: 2, major: 'blaze', minor: ['overcharge', 'keen'] },
   siegebreaker: { name: 'Siegebreaker', icon: '⚒️', rounds: 2, major: 'crack', minor: ['overcharge', 'keen'] },

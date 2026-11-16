@@ -1,7 +1,6 @@
-// Designs a battle's encounter as one set-piece, as a DM prepares one: the ground, the overlook, the hazard, the objects, where each alien posts, the way in and where reinforcements arrive.
+// Designs a battle's encounter as one set-piece, as a DM prepares one: the crossing from the way in to the objective, the ground between, the objects, where each alien posts, and where reinforcements arrive.
 import { GRID, type Alien, type Arena, type Battle, type Tile } from './battle'
-import type { Goal } from './goals'
-import { blocked, distance, edgeDepths, NEIGHBORS, onGrid, openNear, walkingDistances, walks } from './grid'
+import { blocked, depths, distance, edgeDepths, NEIGHBORS, onGrid, openNear, walkingDistances, walks } from './grid'
 import { gather } from './formations'
 import { randomInt } from './rng'
 import { PROP_BULK, type Prop, type TerrainKind } from './terrain'
@@ -9,7 +8,7 @@ import { pickArenaKind, shapeArena } from './arena-kinds'
 import { CHALLENGES, type ChallengeId } from './challenges'
 
 /** How far from its centre the arena reaches, and how far out the camera shows it clear of props. */
-export const ARENA_REACH = 14
+export const ARENA_REACH = 15
 const SIGHT_CLEAR = 22
 
 /** Where an encounter's fight flows, in tiles along its axis from the way in toward the overlook, and across it. */
@@ -18,70 +17,50 @@ type Mark = [along: number, across: number]
 /** The objects heroes find in the heaps, low and tall, by where the fight is. */
 const SCATTER: Partial<Record<TerrainKind, [Prop, Prop]>> = { countryside: ['crate', 'tree'], hive: ['growth', 'spire'], city: ['car', 'stack'], town: ['car', 'crate'] }
 
-/** The overlook, a rise the aliens hold; the ledge, a low rise by a flank way in; the fuel tanks out in the open. */
+/** The overlook, a rise by the objective; the ledge, a low rise by a flank way in; the fuel tanks out in the open. */
 const OVERLOOK: Mark = [9, 0]
 const LEDGE: Mark = [-8, -9]
 const HAZARD: Mark[] = [[1, -7], [5, 0], [1, 7]]
 /** Heaps of things to hurl, beside each flank and down the middle. */
 const HEAPS: Mark[] = [[-6, -6], [-6, 6], [-2, -8], [-2, 8], [6, -5], [6, 5]]
-/** The way in, head on. */
-const APPROACH: Mark = [-12, 0]
+/** The crossing's two ends: the way in, A, and the objective, B. */
+const APPROACH: Mark = [-13, 0]
+const OBJECTIVE: Mark = [13, 0]
 /** Where reinforcements arrive: behind the aliens, and on each far flank. */
 const GATES: Mark[] = [[13, 0], [8, -12], [8, 12], [-2, -13], [-2, 13]]
-
-/** The rescue's terror's heart; where a commander, a boss and an ambush's Hunter post. */
-const HEART: Mark = [2, 0]
-const COMMANDER_POST: Mark = [11, 0]
-const BOSS_POST: Mark = [9, 0]
 
 /** A Firing line's ridge: how far along it runs and how far to each side. */
 const RIDGE_ALONG = 9
 const RIDGE_REACH = 12
 
-/** A random open tile far enough within the map's edge to hold the arena; in a building if `roofed` and one stands there. */
-function arenaSpot(battle: Battle, roofed: boolean): Tile {
+/** How far within the map's edge the arena's centre wants to lie, so a barrier's bridge has room. */
+const SPOT_MARGIN = 22
+
+/** A random open tile as far within the map's edge as there is. */
+function arenaSpot(battle: Battle): Tile {
   const depth = edgeDepths(battle)
-  const open = (margin: number, roof: boolean) =>
-    battle.ground.flatMap((g, t) => (g !== 'void' && (!roof || g === 'floor') && depth[t] > margin && battle.bulk[t] === 0 ? [{ x: t % GRID, y: Math.floor(t / GRID) }] : []))
-  for (let margin = ARENA_REACH; ; margin--) {
-    const under = roofed ? open(margin, true) : []
-    const spots = under.length > 0 ? under : open(margin, false)
+  for (let margin = SPOT_MARGIN; ; margin--) {
+    const spots = battle.ground.flatMap((g, t) => (g !== 'void' && depth[t] > margin && battle.bulk[t] === 0 ? [{ x: t % GRID, y: Math.floor(t / GRID) }] : []))
     if (spots.length > 0) return spots[randomInt(battle, spots.length)]
   }
 }
 
-/** The floor tiles joined to `at`, if it stands on floor: the building it is in. */
-function buildingAt(battle: Battle, at: Tile): Set<number> {
-  const building = new Set<number>()
-  const queue = [at]
-  for (const { x, y } of queue) {
-    const t = y * GRID + x
-    if (!onGrid(x, y) || battle.ground[t] !== 'floor' || building.has(t)) continue
-    building.add(t)
-    queue.push(...NEIGHBORS.slice(0, 4).map(([dx, dy]) => ({ x: x + dx, y: y + dy })))
-  }
-  return building
-}
-
-/**
- * Opens the ground for the fight. Outdoor props come down out to SIGHT_CLEAR, water and the void aside; so, within the
- * arena, do buildings, but for `kept` and a compound's walls.
- */
-function clearArena(battle: Battle, arena: Arena, kept: Set<number>): void {
+/** Opens the ground for the fight. Outdoor props come down out to SIGHT_CLEAR, water and the void aside; within the arena, so do buildings, but a compound's walls, and water and the void are filled. */
+function clearArena(battle: Battle, arena: Arena): void {
   for (let y = arena.y - SIGHT_CLEAR; y <= arena.y + SIGHT_CLEAR; y++) {
     for (let x = arena.x - SIGHT_CLEAR; x <= arena.x + SIGHT_CLEAR; x++) {
       const d = Math.hypot(x - arena.x, y - arena.y)
       if (!onGrid(x, y) || d > SIGHT_CLEAR) continue
       const t = y * GRID + x
       const indoors = battle.ground[t] === 'floor'
-      const razed = d <= ARENA_REACH && battle.place !== 'compound' && !kept.has(t)
-      // A tile's north and west edges may be the walls of a kept building beside it.
-      if (razed && !kept.has(t - GRID)) battle.north[t] = 'none'
-      if (razed && !kept.has(t - 1)) battle.west[t] = 'none'
-      if (battle.ground[t] === 'void' || battle.ground[t] === 'water' || (indoors && !razed)) continue
+      const razed = d <= ARENA_REACH && battle.place !== 'compound'
+      if (razed) battle.north[t] = battle.west[t] = 'none'
+      // Within the arena the ground is firm: only its kind lays a barrier across the route.
+      const filled = d <= ARENA_REACH && (battle.ground[t] === 'void' || battle.ground[t] === 'water')
+      if (!filled && (battle.ground[t] === 'void' || battle.ground[t] === 'water' || (indoors && !razed))) continue
       battle.props[t] = 'none'
       battle.bulk[t] = 0
-      if (indoors) battle.ground[t] = 'pavement'
+      if (indoors || filled) battle.ground[t] = filled && battle.place === 'hive' ? 'hive' : filled ? 'grass' : 'pavement'
     }
   }
 }
@@ -107,16 +86,17 @@ function stand(battle: Battle, at: Tile, prop: Prop): boolean {
 }
 
 /**
- * Sets the arena and lays out the encounter for `goal`. Returns the arena's centre, a post and cluster for each alien, and on a
- * rescue the terror's heart. A VIP's building and a satellite's compound stay standing; all else in the arena comes down, and the props around it.
+ * Sets the arena and lays out the encounter for `challenge`: the crossing runs along its axis from the way in to the
+ * objective, over the ground its arena kind shapes. Returns the arena's centre, a post and cluster for each alien;
+ * a commander, a boss and the aliens guarding what the mission is about stand at the objective.
  */
-export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal, challenge: ChallengeId | null = null): { spot: Tile; posts: Tile[]; clusters: number[]; heart: Tile | null } {
-  const spot = arenaSpot(battle, goal === 'vip')
+export function designEncounter(battle: Battle, aliens: Alien[], challenge: ChallengeId | null = null): { spot: Tile; posts: Tile[]; clusters: number[] } {
+  const spot = arenaSpot(battle)
   const arena = { x: spot.x, y: spot.y, reach: ARENA_REACH }
   battle.arena = arena
-  const standing = goal === 'vip' ? buildingAt(battle, spot) : new Set<number>()
-  clearArena(battle, arena, standing)
-  // The axis the fight flows along: of eight headings, the first whose both ends lie on the map, from a random start.
+  clearArena(battle, arena)
+  depths.delete(battle)
+  // The axis the crossing runs along: of eight headings, the first whose both ends lie on the map, from a random start.
   const start = randomInt(battle, 8)
   const headings = Array.from({ length: 8 }, (_, i) => ((start + i) * Math.PI) / 4)
   const inMap = (a: number) => [1, -1].every((s) => onGrid(Math.round(spot.x + s * ARENA_REACH * Math.cos(a)), Math.round(spot.y + s * ARENA_REACH * Math.sin(a))))
@@ -126,7 +106,7 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal, cha
     const clamp = (v: number) => Math.max(0, Math.min(GRID - 1, Math.round(v)))
     return { x: clamp(spot.x + fx * along - fy * across), y: clamp(spot.y + fy * along + fx * across) }
   }
-  shapeArena(battle, pickArenaKind(battle, battle.place, goal, challenge, battle.twist), spot, [fx, fy])
+  shapeArena(battle, pickArenaKind(battle, battle.place, challenge, battle.twist), spot, [fx, fy])
   if (battle.arenaKind === 'open') rise(battle, raw(OVERLOOK), 3, 1)
   if (challenge === 'firingLine') for (let across = -RIDGE_REACH; across <= RIDGE_REACH; across += 2) rise(battle, raw([RIDGE_ALONG, across]), 2, 1)
   if (battle.arenaKind === 'open') rise(battle, raw(LEDGE), 2, 0)
@@ -137,8 +117,8 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal, cha
   for (const [i, mark] of HEAPS.entries()) stand(battle, raw(mark), i % 3 === 2 ? tall : low)
   walks.delete(battle)
   battle.approach = raw(APPROACH)
+  battle.objective = openNear(battle, raw(OBJECTIVE))
   battle.gates = GATES.map((m) => openNear(battle, raw(m)))
-  const heart = goal === 'rescue' ? raw(HEART) : null
   const walk = walkingDistances(battle, openNear(battle, spot))
   const ground: Tile[] = []
   for (let y = spot.y - ARENA_REACH; y <= spot.y + ARENA_REACH; y++) {
@@ -146,7 +126,7 @@ export function designEncounter(battle: Battle, aliens: Alien[], goal: Goal, cha
       if (onGrid(x, y) && !blocked(battle, x, y) && walk[y * GRID + x] < Infinity && distance({ x, y }, spot) <= ARENA_REACH - 1 && battle.ground[y * GRID + x] !== 'void' && battle.ground[y * GRID + x] !== 'water') ground.push({ x, y })
     }
   }
-  const objective = goal === 'vip' || goal === 'hold' ? spot : heart
-  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: openNear(battle, raw(COMMANDER_POST)), boss: openNear(battle, raw(goal === 'ambush' ? OVERLOOK : BOSS_POST)), objective, challenge })
-  return { spot, posts, clusters, heart }
+  const b = battle.objective
+  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: b, boss: b, objective: b, challenge })
+  return { spot, posts, clusters }
 }

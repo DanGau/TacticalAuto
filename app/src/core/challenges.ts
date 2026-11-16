@@ -17,7 +17,7 @@ export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test:
   firingLine: { name: 'Firing Line', icon: '🎯', test: 'Long-range shooters along a ridge fire from the moment you land.', answers: ['smoke', 'rangedShield', 'dampener', 'farsight'], volley: true, grim: [[2, 3, 4], [3, 5, 6], [6, 7, 9]] },
   ironWall: { name: 'Iron Wall', icon: '🧱', test: 'Aliens with heavy Armor shrug off small hits.', answers: ['crack', 'overcharge', 'blaze'], grim: [[2, 3, 4], [4, 6, 8], [7, 9, 11]] },
   swarm: { name: 'Swarm', icon: '🐜', test: 'Aliens flood in from every side and keep coming.', answers: ['meleeShield', 'tank', 'coldSnap', 'gravity'], grim: [[8, 12, 16], [14, 18, 22], [20, 24, 30]] },
-  scattered: { name: 'Scattered', icon: '🗺️', test: 'Kill the far-flung sentries before the clock runs out and reinforcements pour in.', answers: ['thrusters', 'farsight'], grim: [[8, 12, 16], [12, 16, 20], [16, 20, 24]] },
+  scattered: { name: 'Scattered', icon: '🗺️', test: 'Sentries stand far apart. When the clock runs out, reinforcements pour in.', answers: ['thrusters', 'farsight'], grim: [[8, 12, 16], [12, 16, 20], [16, 20, 24]] },
   bigOne: { name: 'Big One', icon: '👹', test: 'A huge alien with heavy Armor, and its escort.', answers: ['overcharge', 'crack', 'hunted', 'keen'], grim: [[1, 1, 2], [2, 3, 3], [3, 4, 5]] },
   killBox: { name: 'Kill Box', icon: '💥', test: 'You land beside a packed cluster of aliens that strikes first.', answers: ['flashbang', 'smoke', 'meleeShield', 'dampener', 'ironSkin'], grim: [[3, 5, 6], [6, 8, 10], [9, 12, 15]] },
 }
@@ -84,5 +84,5 @@ export function bigOneStats(leg: number, rung: number, base: Stats): Stats {
 
 /** Of a Scattered's force of `count`, the sentries posted; the rest are the reinforcements. */
 export const sentries = (count: number) => Math.ceil(count * 0.3)
-/** The round a Scattered's reinforcements start: what walking and dashing `tour` tiles takes a hero of `move` with Thrusters on, and a round for each pair of its `posted` sentries to fall. */
+/** The round a Scattered's reinforcements start: what walking and dashing the route's `tour` tiles takes a hero of `move` with Swiftness on, and a round for each pair of its `posted` sentries to fall. */
 export const deadlineFor = (tour: number, move: number, posted: number) => 1 + Math.ceil(posted / 2) + Math.ceil(tour / (1.6 * (move + THRUST)))

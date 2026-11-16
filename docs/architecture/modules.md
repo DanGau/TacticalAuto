@@ -9,8 +9,9 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `battle.ts` | Battle state types (`Battle`, `Unit`) and the numbers rules share |
 | `grid.ts` | The board: distance, objects, walls, walking costs and routes, free tiles |
 | `setup.ts` | `createBattle`: battle state, placing aliens, civilians, goals by the encounter |
-| `encounter.ts` | `designEncounter`: the set-piece: arena, overlook, hazard, ridge, objects, posts, approaches, gates |
-| `arena-kinds.ts` | The arena's shape by encounter: skyscraper roof, overpass, quarry, mesa, chasm, swamp; ledges, ramps, drops |
+| `route.ts` | The crossing's route from the landing to the objective, plain and with what a boon opens; Cold Snap's ice |
+| `encounter.ts` | `designEncounter`: the set-piece: the crossing's ends, arena, overlook, hazard, ridge, objects, posts, gates |
+| `arena-kinds.ts` | The ground a crossing runs over: skyscraper roof, overpass, quarry; barriers across the route, chasm, river, swamp, cliff, and what opens each |
 | `levels.ts` | Smoothing heights so ledges stand only where meant |
 | `knockback.ts` | Knockback and falls: off a ledge, through glass, over the edge |
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |

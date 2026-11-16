@@ -6,6 +6,8 @@ import { MEDKIT, EVENTS, RELIC_PRICE } from '../core/events'
 import { EFFECTS, type Gear } from '../core/gear'
 import { distance } from '../core/grid'
 import { fuelTanks } from '../core/objects'
+import { opens } from '../core/route'
+import { ARENA_KINDS, isBarrier, type ArenaKind } from '../core/arena-kinds'
 import { GEAR_PRICE } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
@@ -33,10 +35,14 @@ function fit(id: UtilityId, challenge: ChallengeId | null): number {
   }, 0)
 }
 
-/** The utility held best for `challenge`, if any is worth taking. */
+/** What opening a shorter route is worth, as much as a challenge's best answer. */
+const ROUTE_WORTH = 10
+
+/** The utility held best for `challenge` and the route scouted, if any is worth taking. */
 export function answerFor(run: Run, challenge: ChallengeId | null): number {
-  const usable = (id: UtilityId) => id !== 'tank' || fuelTanks(run.battle!).length > 0
-  const scores = run.utilities.map((id) => (usable(id) ? fit(id, challenge) : 0))
+  const battle = run.battle
+  const usable = (id: UtilityId) => id !== 'tank' || (!!battle && fuelTanks(battle).length > 0)
+  const scores = run.utilities.map((id) => (usable(id) ? fit(id, challenge) + (battle?.phase === 'deploy' && opens(battle, id) ? ROUTE_WORTH : 0) : 0))
   const best = scores.indexOf(Math.max(0, ...scores))
   return scores[best] > 0 ? best : -1
 }
@@ -62,7 +68,7 @@ function deploy(run: Run): Action {
   const index = answerFor(run, battle.challenge)
   if (index < 0) return { type: 'enter' }
   if (run.utilities[index] === 'tank') return { type: 'enter', utility: index, tank: tankFor(run) }
-  const second = reservoir && run.boons >= BOON_CHARGES && battle.challenge ? answerFor({ ...run, utilities: run.utilities.map((id, i) => (i === index ? 'tank' : id)) }, battle.challenge) : -1
+  const second = reservoir && run.boons >= BOON_CHARGES ? answerFor({ ...run, utilities: run.utilities.map((id, i) => (i === index ? 'tank' : id)) }, battle.challenge) : -1
   return second >= 0 && !['tank', run.utilities[index]].includes(run.utilities[second]) ? { type: 'enter', utility: index, second } : { type: 'enter', utility: index }
 }
 
@@ -80,7 +86,11 @@ function ahead(run: Run, depth = 3): Stop[] {
   return stops
 }
 
-/** How much the utilities `held` answer: stops in sight count most, then what the leg's tier has in store. */
+/** The barriers a route may cross, and what answering one in case is worth beside a challenge in the leg's tier. */
+const BARRIERS = (Object.keys(ARENA_KINDS) as ArenaKind[]).filter(isBarrier)
+const BARRIER_WORTH = 0.5
+
+/** How much the utilities `held` answer: stops in sight count most, then what the leg's tier has in store, then the barriers a route may cross. */
 function coverage(run: Run, held: UtilityId[]): number {
   const seen = ahead(run).flatMap((stop) => (stop.challenge ? [stop.challenge] : []))
   const tier = Math.min(run.keys, TIERS.length - 1)
@@ -90,7 +100,9 @@ function coverage(run: Run, held: UtilityId[]): number {
   // A challenge's first answer is its best; a combo does more beside it.
   const best = (id: ChallengeId) => (held.some((u) => UTILITIES[u].parts[0].id === CHALLENGES[id].answers[0]) ? 0.25 : 0)
   const breadth = held.reduce((sum, u) => sum + 0.2 * (UTILITIES[u].parts.length - 1), 0)
-  return breadth + seen.reduce((sum, id) => sum + (answered(id) ? 2 + best(id) : 0), 0) + coming.reduce((sum, id) => sum + (answered(id) ? 1 + best(id) : 0), 0)
+  // Barriers are scouted only at the deploy screen: each is worth answering in case.
+  const crossing = BARRIERS.filter((kind) => held.some((u) => carries(u, ARENA_KINDS[kind].opens!))).length * BARRIER_WORTH
+  return breadth + crossing + seen.reduce((sum, id) => sum + (answered(id) ? 2 + best(id) : 0), 0) + coming.reduce((sum, id) => sum + (answered(id) ? 1 + best(id) : 0), 0)
 }
 
 /** With a utility to spare, keeps the three that answer the most. */
@@ -154,7 +166,8 @@ function shop(run: Run): Action {
   const relic = relics.findIndex((r) => !r.sold && RELIC_PRICE <= run.supplies && relicWorth(run, r.id) >= 0)
   if (relic >= 0) return { type: 'buy', index: relic }
   const gaps = unanswered(run)
-  const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && gaps.some((c) => carries(id, CHALLENGES[c].answers)) && (run.utilities.length < UTILITY_SLOTS || keep({ ...run, spare: id }).drop !== -1))
+  const crosses = (id: UtilityId) => !run.utilities.some((u) => carries(u, ['hover'])) && carries(id, ['hover'])
+  const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && (gaps.some((c) => carries(id, CHALLENGES[c].answers)) || crosses(id)) && (run.utilities.length < UTILITY_SLOTS || keep({ ...run, spare: id }).drop !== -1))
   if (answer >= 0) return { type: 'utility', index: answer }
   if (heal(0.75)) return { type: 'medkit' }
   for (const [index, { gear, sold }] of wares.entries()) {

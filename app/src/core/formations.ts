@@ -30,14 +30,12 @@ const STAGING: Partial<Record<ChallengeId, { sizes: number[]; band: [number, num
 const SIZES = [1, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6]
 /** Tiles apart a push's clusters want their centres, and a flood's; both give way when the ground runs out. */
 const SEPARATION = { push: 10, flood: 6 }
-/** The stretch of the axis a push's clusters fill, from nearest the ways in. */
-const PUSH_BAND = [-3, 11]
+/** The stretch of the crossing a push's clusters fill, from nearest the way in. */
+const PUSH_BAND = [-7, 10]
 /** How far off the axis a push's clusters wander, how far from what it wanted a cluster settles, and the widest a shape runs. */
 const WANDER = 9
 const SETTLE = 6
 const SPAN = 8
-/** The nearest an ambush's aliens stand to the hero in the arena's middle. */
-const AMBUSH_CLEAR = 6
 
 type Feature = 'height' | 'wall' | 'object' | 'road' | 'open'
 const FEATURES: Feature[] = ['height', 'wall', 'object', 'road', 'open', 'open']
@@ -132,8 +130,7 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
   const r = () => random(battle)
   const { spot, heading: [fx, fy] } = plot
   const along = (t: Tile) => (t.x - spot.x) * fx + (t.y - spot.y) * fy
-  const clear = battle.goal === 'ambush' ? AMBUSH_CLEAR : 0
-  const outdoors = plot.ground.filter((t) => battle.ground[t.y * GRID + t.x] !== 'floor' && distance(t, spot) >= clear)
+  const outdoors = plot.ground.filter((t) => battle.ground[t.y * GRID + t.x] !== 'floor')
   const open = outdoors.length > 0 ? outdoors : plot.ground
   const groups = groupsOf(battle, aliens, plot)
   // On shaped ground, clusters gather by the drops, where a knockback sends them over.

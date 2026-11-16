@@ -11,7 +11,7 @@ import type { Stage } from './stage'
 /** The first battle of each seed's run, by arena kind. */
 function battles(): Map<ArenaKind, Battle> {
   const out = new Map<ArenaKind, Battle>()
-  for (let seed = 0; seed < 60 && out.size < 6; seed++) {
+  for (let seed = 0; seed < 90 && out.size < 6; seed++) {
     const run = createRun(seed)
     apply(run, { type: 'hero', index: 0 })
     apply(run, { type: 'boons', picks: [0, 1] })
@@ -32,7 +32,10 @@ describe('terrain', () => {
       const lines = edgeLines(battle)
       const keys = lines.map((e) => [e.x1 + e.x2, e.z1 + e.z2].join())
       expect(new Set(keys).size).toBe(keys.length)
-      const at = (x: number, z: number) => battle.ground[Math.round(z) * GRID + Math.round(x)]
+      const at = (x: number, z: number) => {
+        const [tx, tz] = [Math.round(x), Math.round(z)]
+        return tx < 0 || tz < 0 || tx >= GRID || tz >= GRID ? 'off' : battle.ground[tz * GRID + tx]
+      }
       for (const e of lines) {
         const mx = (e.x1 + e.x2) / 2
         const mz = (e.z1 + e.z2) / 2

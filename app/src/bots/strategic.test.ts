@@ -17,7 +17,7 @@ import type { WeaponId } from '../core/weapons'
 function deploying(challenge: ChallengeId, held: Run['utilities']): Run {
   const run = begun(3)
   run.utilities = held
-  road(run, [{ ...drawBattle(run, 'standard'), goal: 'exterminate', terrain: 'town', challenge, aliens: ['trooper', 'trooper'] }])
+  road(run, [{ ...drawBattle(run, 'standard'), goal: 'cross', terrain: 'town', challenge, aliens: ['trooper', 'trooper'] }])
   apply(run, { type: 'advance' })
   return run
 }
@@ -52,7 +52,7 @@ test('with a utility to spare, it keeps what answers the most, and plays a run t
   expect(['won', 'lost']).toContain(runWith(5, strategic).won ? 'won' : 'lost')
 })
 
-const toll = (challenge: ChallengeId, answer: Toll['answer'], won: boolean, lost: number): Toll => ({ nth: 1, leg: 0, kind: 'battle', elite: false, won, goal: 'exterminate', challenge, answer, most: 100, before: 100, after: 100 - lost, downed: 0, maxHit: 0, bossRounds: null, healed: 0 })
+const toll = (challenge: ChallengeId, answer: Toll['answer'], won: boolean, lost: number): Toll => ({ nth: 1, leg: 0, kind: 'battle', elite: false, won, goal: 'cross', challenge, answer, barrier: null, crossed: 'none', most: 100, before: 100, after: 100 - lost, downed: 0, maxHit: 0, bossRounds: null, healed: 0 })
 const of = (tolls: Toll[]) => rows([{ tolls } as RunResult])
 
 test('the diagnosis tells the game from the bot', () => {

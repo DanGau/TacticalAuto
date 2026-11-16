@@ -42,8 +42,11 @@ export const MIRE_COST = 2
 /** The jump a hovering unit strides with: onto any neighbour, up or down any ledge, out over the void. */
 export const HOVER = 99
 
-/** Whether a unit may not stand on the tile; one that `hovers` may stand over the void. */
-export const barred = (battle: Battle, x: number, y: number, hovers = false) => blocked(battle, x, y) && !(hovers && battle.ground[y * GRID + x] === 'void' && !unitAt(battle, x, y))
+/** Whether a hovering unit may float over the tile: the void, or water. */
+export const floats = (battle: Battle, t: number) => battle.ground[t] === 'void' || battle.ground[t] === 'water'
+
+/** Whether a unit may not stand on the tile; one that `hovers` may stand over the void or water. */
+export const barred = (battle: Battle, x: number, y: number, hovers = false) => blocked(battle, x, y) && !(hovers && floats(battle, y * GRID + x) && !unitAt(battle, x, y))
 
 /** Whether a stride from `from` to `to` is a jump: up or down a ledge, or across a gap. */
 export const jumps = (battle: Battle, from: Tile, to: Tile) => distance(from, to) > 1 || ledge(battle, from, to)
@@ -188,7 +191,7 @@ export function walkGraph(battle: Battle, jump = 0) {
   const into: number[][] = Array.from({ length: GRID * GRID }, () => [])
   for (let f = 0; f < GRID * GRID; f++) {
     const from = { x: f % GRID, y: Math.floor(f / GRID) }
-    if ((battle.bulk[f] > 0 && !(jump >= HOVER && battle.ground[f] === 'void')) || walls.has(f)) continue
+    if ((battle.bulk[f] > 0 && !(jump >= HOVER && floats(battle, f))) || walls.has(f)) continue
     for (const to of strides(battle, from, jump)) into[to.y * GRID + to.x].push(f, stepCost(battle, from, to, jump >= HOVER))
   }
   const graph = { into, fields: new Map<number, number[]>() }

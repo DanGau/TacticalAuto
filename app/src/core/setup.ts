@@ -5,12 +5,13 @@ import { onGrid, distance, freeTilesNear, walkingDistances, spacedTile, NEIGHBOR
 import { alienUnit, civilianUnit } from './spawn'
 import { PROP_BULK, type TerrainKind, type Locale } from './terrain'
 import type { Rule } from './doctrines'
-import { flowOf, type Goal, VIP_HP, CIVILIANS, CIVILIAN_HP } from './goals'
+import { flowOf, type Goal, CIVILIANS, CIVILIAN_HP } from './goals'
 import { generateTerrain } from './terrain-gen'
 import type { Twist } from './twists'
 import { deploy, planEntry } from './landing'
 import { ARENA_REACH, designEncounter } from './encounter'
 import { deadlineFor, sentries, type ChallengeId } from './challenges'
+import { routeWalk } from './route'
 
 /** Fills every open tile outside the walkable area holding `keep`, or else the largest, with stacks, so any open tile can reach any other. */
 export function sealPockets(battle: Battle, keep?: Tile): void {
@@ -61,20 +62,6 @@ export function placeAlien(battle: Battle, alien: Alien, tile: Tile, engaged = f
   return unit
 }
 
-/** The tiles a hero of the reach of the longest weapon must walk from the way in to shoot each sentry, nearest first. */
-function sentryTour(battle: Battle): number {
-  const reach = Math.max(...battle.reserve.map((s) => s.stats.range))
-  const left = battle.units.filter((u) => u.side === 'alien')
-  let at: Tile = battle.entry!
-  let tour = 0
-  while (left.length > 0) {
-    const next = left.reduce((a, b) => (distance(b, at) < distance(a, at) ? b : a))
-    tour += Math.max(0, distance(next, at) - reach)
-    left.splice(left.indexOf(next), 1)
-    at = next
-  }
-  return tour
-}
 
 /** The fewest aliens a wave brings, and how many more it may. */
 const WAVE_LEAST = 2
@@ -96,15 +83,12 @@ export const CIVILIAN_CLEARANCE = 4
 
 export const TERROR_REACH = 10
 
-/** The supply caches a raid goes for. */
-export const CACHES = 3
-
 /**
  * A battle awaiting the hero's landing, its encounter designed as one piece: see designEncounter. A flood keeps most
- * of its aliens back as waves; a rescue's civilians are scattered about the terror's heart. An ambush has no landing: the hero
- * is down in the arena's middle.
+ * of its aliens back as waves; a rescue's civilians are scattered about the objective. A crossing's and an ambush's
+ * objective is the extraction zone. An ambush has no deploy screen: the hero is down at once.
  */
-export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[], goal: Goal = 'exterminate', rules: Rule[] = [], twist: Twist | null = null, place?: Locale, challenge: ChallengeId | null = null): Battle {
+export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[], goal: Goal = 'cross', rules: Rule[] = [], twist: Twist | null = null, place?: Locale, challenge: ChallengeId | null = null): Battle {
   const holder = { rng: seed }
   const terrain = generateTerrain(holder, GRID, kind, twist, place)
   const battle: Battle = {
@@ -113,7 +97,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     rules,
     twist,
     round: 0,
-    flow: flowOf(goal, kind, challenge),
+    flow: flowOf(goal, challenge),
     waves: [],
     beat: 0,
     phase: 'deploy',
@@ -142,12 +126,13 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     caltrops: [],
     husks: [],
     saved: 0,
-    vip: goal === 'vip' ? 'held' : null,
     held: 0,
     actor: null,
     tally: {},
     marching: null,
     entry: null,
+    objective: { x: 0, y: 0 },
+    quarry: aliens.some((a) => a.target),
     arena: { x: 0, y: 0, reach: ARENA_REACH },
     approach: { x: 0, y: 0 },
     gates: [],
@@ -156,8 +141,6 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     extract: null,
     escaped: [],
     lifted: {},
-    caches: [],
-    grabbed: 0,
     opening: false,
     reserve,
     downed: [],
@@ -165,36 +148,26 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
   sealPockets(battle)
   const flood = battle.flow === 'flood'
   const posted = flood ? aliens.slice(0, Math.ceil(aliens.length * FLOOD_POSTED)) : battle.deadline !== null ? aliens.slice(0, sentries(aliens.length)) : aliens
-  const { spot, posts, clusters, heart } = designEncounter(battle, posted, goal, challenge)
+  const { spot, posts, clusters } = designEncounter(battle, posted, challenge)
   if (flood || battle.deadline !== null) battle.waves = clumps(battle, goal === 'hold' && posted.length === aliens.length ? aliens : aliens.slice(posted.length))
   sealPockets(battle, openNear(battle, spot))
-  const centre = openNear(battle, spot)
-  const vip = goal === 'vip' ? centre : null
-  if (goal === 'hold') battle.uplink = centre
-  if (vip) battle.units.push(civilianUnit(battle, vip, VIP_HP, 'vip'))
-  const ambush = goal === 'ambush'
+  const b = battle.objective
+  if (goal === 'hold') battle.uplink = b
+  // Where a target waits at the objective, felling it is the way through.
+  if (goal === 'ambush' || (goal === 'cross' && !battle.quarry)) battle.extract = b
   posted.forEach((alien, i) => {
     placeAlien(battle, alien, posts[i]).cluster = clusters[i]
   })
-  if (ambush) {
-    deploy(battle, centre)
-    return battle
-  }
-  // A rescue's civilians are scattered about the terror's heart, half hiding where they are, half running from the aliens.
-  if (heart) {
+  // A rescue's civilians are scattered about the objective, half hiding where they are, half running from the aliens.
+  if (goal === 'rescue') {
     for (let i = 0; i < CIVILIANS; i++) {
       let tile = spacedTile(battle, battle.units, CIVILIAN_CLEARANCE)
-      for (let tries = 0; distance(tile, heart) > TERROR_REACH && tries < 500; tries++) tile = spacedTile(battle, battle.units, CIVILIAN_CLEARANCE - Math.floor(tries / 100))
+      for (let tries = 0; distance(tile, b) > TERROR_REACH && tries < 500; tries++) tile = spacedTile(battle, battle.units, CIVILIAN_CLEARANCE - Math.floor(tries / 100))
       battle.units.push(civilianUnit(battle, tile, CIVILIAN_HP, i % 2 === 0 ? 'hider' : 'runner'))
     }
   }
-  // A raid's caches each stand by an alien, guarded.
-  if (goal === 'raid') battle.caches = Array.from({ length: CACHES }, (_, i) => {
-    const guards = posts.filter((_, p) => clusters.indexOf(clusters[p]) === p)
-    const guard = guards[i] ?? posts[i] ?? null
-    return guard ? (freeTilesNear(battle, guard, 4)[3] ?? guard) : freeTilesNear(battle, spot, 40)[10 * i]
-  })
-  planEntry(battle, heart)
-  if (battle.deadline !== null) battle.deadline = deadlineFor(sentryTour(battle), Math.max(...reserve.map((s) => s.stats.move)), posted.length)
+  planEntry(battle)
+  if (goal === 'ambush') deploy(battle, battle.entry!)
+  if (battle.deadline !== null) battle.deadline = deadlineFor(routeWalk(battle), Math.max(...reserve.map((s) => s.stats.move)), posted.length)
   return battle
 }

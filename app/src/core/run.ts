@@ -295,7 +295,7 @@ export function drawStops(run: Run): void {
 }
 
 /** A stop with no aliens drawn ahead: any but a battle. */
-const fixed = (kind: StopKind, terrain: TerrainKind): Stop => ({ kind, risk: 'standard', goal: 'exterminate', terrain, challenge: null, twist: null, aliens: [] })
+const fixed = (kind: StopKind, terrain: TerrainKind): Stop => ({ kind, risk: 'standard', goal: 'cross', terrain, challenge: null, twist: null, aliens: [] })
 
 /** The leg under way. */
 export const legOf = (run: Run) => run.legs[run.keys]
@@ -391,7 +391,7 @@ export function advance(run: Run): void {
     settle(run)
     return
   }
-  const goal = stop === 'battle' ? here.goal : stop === 'ambush' ? 'ambush' : 'exterminate'
+  const goal = stop === 'battle' ? here.goal : stop === 'ambush' ? 'ambush' : 'cross'
   const mission = missionAt(run, stop, here.risk, goal)
   const rules = run.doctrines.map((id) => (DOCTRINES[id] as Doctrine).rule).filter((rule): rule is Rule => !!rule)
   run.mission = mission

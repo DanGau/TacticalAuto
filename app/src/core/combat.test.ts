@@ -15,9 +15,11 @@ function battle(seed: number): Battle {
   const run = begun(seed)
   run.hero.skills = [powerOf(run.hero.cls!)]
   apply(run, { type: 'go', index: 1 })
-  current(run)!.stop!.goal = 'exterminate'
+  current(run)!.stop!.goal = 'cross'
   apply(run, { type: 'advance' })
   enterAt(run)
+  // The hero fights the aliens here, not makes for the extraction zone.
+  run.battle!.extract = null
   return run.battle!
 }
 

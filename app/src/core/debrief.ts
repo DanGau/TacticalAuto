@@ -41,14 +41,14 @@ export function endBattle(run: Run): void {
   if (mission.kind === 'ambush') run.threat = won ? 0 : run.threat
   else run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT) + (rescued === null ? 0 : Math.floor((CIVILIANS - (won ? rescued : 0)) / CIVILIANS_PER_THREAT)), THREAT_MAX)
   const held = run.relics.map((id): Relic => RELICS[id])
-  const earned = won ? risk.supplies * (mission.goal === 'raid' ? battle.grabbed : 1) + (rescued ?? 0) * (CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.civilianSupplies ?? 0), 0)) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
+  const earned = won ? risk.supplies + (rescued ?? 0) * (CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.civilianSupplies ?? 0), 0)) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
   // The reservoir charges on a fight won with no boon; a clean streak pays every STREAK_FIGHTS fights.
   if (won && battle.utility === null && held.some((relic) => relic.boons)) run.boons++
   run.streak = won ? run.streak + 1 : 0
   const supplies = earned + (run.streak > 0 && run.streak % STREAK_FIGHTS === 0 ? held.reduce((sum, relic) => sum + (relic.streak ?? 0), 0) : 0)
   run.supplies += supplies
   // At most a piece of gear: a key mission always drops one, rare or better; a battle by its goal and risk; nothing else does.
-  const byGoal = { exterminate: risk.gear, assassinate: 1, hold: 0, rescue: 0, vip: 0, raid: 0, ambush: 0 }[mission.goal]
+  const byGoal = { cross: risk.gear, assassinate: 1, hold: 0, rescue: 0, ambush: 0 }[mission.goal]
   const chance = mission.kind === 'key' ? 1 : mission.kind === 'battle' ? byGoal : 0
   if (won && chance > 0 && random(run) < chance) dropGear(run, risk.rareGear || mission.kind === 'key' || held.some((relic) => relic.rareGear))
   // A win with none held always turns up a utility; a key mission, an ambush or a battle by chance.
@@ -69,8 +69,8 @@ export function endBattle(run: Run): void {
     drawStops(run)
   }
   if (mission.kind === 'battle') passStop(run)
-  // A satellite, an ambush, a hold, a VIP rescue or an Overrun battle won offers relics.
-  if (won && (mission.kind === 'key' || mission.kind === 'ambush' || (mission.kind === 'battle' && (mission.goal === 'hold' || mission.goal === 'vip' || mission.risk === 'dangerous')))) {
+  // A satellite, an ambush, a hold or an Overrun battle won offers relics.
+  if (won && (mission.kind === 'key' || mission.kind === 'ambush' || (mission.kind === 'battle' && (mission.goal === 'hold' || mission.risk === 'dangerous')))) {
     offerRelics(run)
   }
   settle(run)

@@ -12,7 +12,7 @@ function entering(seed = 1): Run & { battle: Battle } {
   const run = begun(seed)
   run.hero.skills = [powerOf(run.hero.cls!)]
   apply(run, { type: 'go', index: 1 })
-  current(run)!.stop!.goal = 'exterminate'
+  current(run)!.stop!.goal = 'cross'
   apply(run, { type: 'advance' })
   return run as Run & { battle: Battle }
 }

@@ -1,20 +1,17 @@
 // A side's simultaneous move: sighting aliens, walking, sentries, overwatch, burrowers.
-import { alienSrc, BASIC_MOVE, fx } from './sources'
+import { alienSrc, fx } from './sources'
 import type { Secondary } from './secondaries'
 import { aiming } from './fighters'
 import { weaponAttack } from './attack'
 import { WEAPONS } from './weapons'
-import { GRID, type Battle, ACID_DAMAGE, BURN_STACKS, isSoldier, type Unit, type Tile, ENGAGE_REACH, STANDOFF } from './battle'
+import { type Battle, ACID_DAMAGE, BURN_STACKS, isSoldier, type Unit, type Tile, ENGAGE_REACH, STANDOFF } from './battle'
 import { opening } from './landing'
-import { breach } from './grid'
 import { freeTilesNear } from './grid'
-import { walkingDistances } from './grid'
 import { blowRigged } from './objects'
-import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { engage, immune, onTile, fireproof, foeHas, has, extractReach, BEACON_REACH, vipOf, nearest, extractionFrom, pursuers, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
-import { fleePath, fightPath, walk, paths, costOf, bestPath, COHESION, POCKET } from './pathing'
+import { engage, immune, onTile, fireproof, foeHas, has, extractReach, BEACON_REACH, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
+import { fleePath, fightPath, walk, paths, costOf, bestPath, COHESION } from './pathing'
 import { detects, sees } from './sight'
 import { upkeep } from './upkeep'
 import { moved, wound } from './wound'
@@ -30,7 +27,6 @@ export function moveSide(battle: Battle): GameEvent[] {
   for (const unit of battle.units) {
     if (unit.side !== battle.turn || unit.hp <= 0) continue
     const path = unit.civilian ? fleePath(battle, unit) : unit.engaged ? fightPath(battle, unit) : []
-    if (path.length === 0 && unit.civilian === 'vip') events.push(...squeezePast(battle, unit))
     if (path.length === 0 && unit.order) events.push({ type: 'order', src: { kind: 'basic', id: 'order' }, id: unit.id, order: unit.order })
     if (path.length === 0) continue
     // A sentry fires as the alien turns to go.
@@ -69,24 +65,16 @@ export function sight(battle: Battle): GameEvent[] {
   const sighted = aliens.filter((u) => !u.revealed && soldiers.some((s) => detects(battle, s, u)))
   for (const alien of sighted) alien.revealed = true
   if (sighted.length > 0) events.push({ type: 'reveal', units: sighted.map(({ id, x, y }) => ({ id, x, y })) })
-  events.push(...escortVip(battle))
-  // A soldier at the extraction zone, or in the crowd at it, lifts off, once any VIP has.
-  for (const soldier of battle.extract && battle.vip !== 'freed' ? soldiers.filter((s) => atExtraction(battle, s)) : []) {
+  // A soldier at the extraction zone, or in the crowd at it, lifts off.
+  for (const soldier of battle.extract ? soldiers.filter((s) => atExtraction(battle, s)) : []) {
     battle.units.splice(battle.units.indexOf(soldier), 1)
     battle.escaped.push(soldier.soldier!)
     battle.lifted[soldier.soldier!] = soldier.hp
     events.push({ type: 'escaped', id: soldier.id })
   }
-  // A soldier or its mech beside a raid's cache grabs it, so a crowd of mechs cannot bar the way.
-  const grabbers = battle.units.filter((u) => u.side === 'human' && !u.civilian)
-  for (const cache of battle.caches.filter((c) => grabbers.some((s) => distance(s, c) <= 1))) {
-    battle.caches.splice(battle.caches.indexOf(cache), 1)
-    battle.grabbed++
-    events.push({ type: 'grabbed', id: grabbers.find((s) => distance(s, cache) <= 1)!.id, x: cache.x, y: cache.y })
-  }
   // A soldier, or a mech it called down, beside a civilian gets them out.
   const team = battle.units.filter((u) => u.side === 'human' && !u.civilian)
-  for (const civilian of battle.units.filter((u) => u.civilian && u.civilian !== 'vip' && team.some((s) => distance(s, u) <= (has(s, 'beacon') ? BEACON_REACH : 1)))) {
+  for (const civilian of battle.units.filter((u) => u.civilian && team.some((s) => distance(s, u) <= (has(s, 'beacon') ? BEACON_REACH : 1)))) {
     battle.units.splice(battle.units.indexOf(civilian), 1)
     battle.saved++
     events.push({ type: 'saved', id: civilian.id })
@@ -102,49 +90,6 @@ function atExtraction(battle: Battle, unit: Unit): boolean {
   return crowd.some((u) => distance(u, battle.extract!) <= extractReach(battle))
 }
 
-/**
- * A VIP rescue's steps. The first of the hero within BREACH_REACH of the VIP blows in the wall between them, catching the
- * guards: they engage, but do not shoot on their next turn. One of the hero beside the VIP, once no alien in the fight stands
- * within FREE_REACH of it, frees them: the extraction zone
- * appears at the edge. A VIP at the extraction zone lifts off.
- */
-export function escortVip(battle: Battle): GameEvent[] {
-  const vip = vipOf(battle)
-  if (!vip) return []
-  // A drone or mech beside the VIP will do, so the hero's own machines never stand in its way.
-  const team = battle.units.filter((u) => u.side === 'human' && !u.civilian)
-  const events: GameEvent[] = []
-  const breacher = battle.vip === 'held' && nearest(team.filter((s) => distance(s, vip) <= BREACH_REACH), vip)
-  if (breacher) {
-    battle.vip = 'breached'
-    const at = { x: vip.x + Math.sign(breacher.x - vip.x), y: vip.y + Math.sign(breacher.y - vip.y) }
-    wreck(battle, at)
-    const guards = battle.units.filter((u) => u.side === 'alien' && distance(u, vip) <= BREACH_REACH + 2)
-    for (const guard of guards) Object.assign(guard, { revealed: true, engaged: true, surprised: 1 })
-    events.push({ type: 'rocket', src: { kind: 'basic', id: 'attack' }, id: breacher.id, x: at.x, y: at.y, hits: [] })
-  }
-  const guarded = pursuers(battle, vip).some((u) => u.engaged && distance(u, vip) <= FREE_REACH)
-  if (battle.vip === 'breached' && !guarded && team.some((s) => distance(s, vip) <= BREACH_REACH)) {
-    battle.vip = 'freed'
-    // A VIP still walled in is broken out.
-    if (walkingDistances(battle, vip).filter(Number.isFinite).length < POCKET) breach(battle, vip)
-    battle.extract = extractionFrom(battle, vip)
-    events.push({ type: 'extract', ...battle.extract })
-  }
-  if (battle.vip === 'freed' && atExtraction(battle, vip)) {
-    battle.vip = 'out'
-    battle.units.splice(battle.units.indexOf(vip), 1)
-    events.push({ type: 'escaped', id: vip.id })
-  }
-  return events
-}
-
-
-/** How near the VIP a soldier must come to breach its building, and how near no alien in the fight may stand to free them. */
-export const BREACH_REACH = 3
-
-export const FREE_REACH = 10
-
 /** Each soldier with the sentinel protocol beside an alien about to walk shoots it, once a turn each. */
 export function sentries(battle: Battle, unit: Unit, watched: Set<number>): GameEvent[] {
   const events: GameEvent[] = []
@@ -157,19 +102,6 @@ export function sentries(battle: Battle, unit: Unit, watched: Set<number>): Game
     events.push(...shot)
   }
   return events
-}
-
-/** A freed VIP with no way on in a narrow way swaps places with the soldier beside it who stands nearer the way out. */
-function squeezePast(battle: Battle, vip: Unit): GameEvent[] {
-  if (battle.vip !== 'freed' || !battle.extract) return []
-  const toExtract = walkingDistances(battle, battle.extract)
-  const score = (t: Tile) => toExtract[t.y * GRID + t.x]
-  const soldier = battle.units.find((u) => isSoldier(u) && distance(u, vip) <= 1 && score(u) < score(vip))
-  if (!soldier) return []
-  const [was, to] = [{ x: vip.x, y: vip.y }, { x: soldier.x, y: soldier.y }]
-  Object.assign(vip, to)
-  Object.assign(soldier, was)
-  return [{ type: 'move', src: BASIC_MOVE, id: vip.id, path: [to] }, { type: 'move', src: BASIC_MOVE, id: soldier.id, path: [was] }]
 }
 
 /**

@@ -64,7 +64,7 @@ function started(): Run {
 const stopOf = (kind: StopKind, risk: Risk = 'standard'): Stop => ({
   kind,
   risk,
-  goal: 'exterminate',
+  goal: 'cross',
   terrain: kind === 'key' ? 'compound' : 'town',
   challenge: null,
   twist: null,

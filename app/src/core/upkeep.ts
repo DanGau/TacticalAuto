@@ -14,8 +14,8 @@ import { openNear } from './grid'
 import { freeTilesNear } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { engageNearest, walkersFighting, has, nearest, fireproof, foeHas, onTile, FIRE_TURNS, uplinkReach, extractionFrom, silenced, centreOf } from './fighters'
-import { HOLD_ROUNDS, WAVE_EVERY } from './goals'
+import { engageNearest, walkersFighting, has, nearest, fireproof, foeHas, onTile, FIRE_TURNS, uplinkReach, silenced, centreOf } from './fighters'
+import { WAVE_EVERY } from './goals'
 import { randomInt } from './rng'
 import { tickBoons } from './boons'
 import { mend, wound } from './wound'
@@ -99,13 +99,8 @@ export function upkeep(battle: Battle): GameEvent[] {
   }
   if (battle.turn !== 'alien') return events
   battle.round++
-  // A hold counts only the rounds the hero ends standing on it. Once held, the uplink is done and the hero extracts.
+  // A hold counts only the rounds the hero ends standing on it.
   if (battle.uplink && battle.units.some((u) => isSoldier(u) && distance(u, battle.uplink!) <= uplinkReach(battle))) battle.held++
-  if (battle.uplink && battle.held >= HOLD_ROUNDS) {
-    battle.extract = extractionFrom(battle, battle.uplink)
-    battle.uplink = null
-    events.push({ type: 'extract', ...battle.extract })
-  }
   for (const husk of battle.husks.splice(0)) {
     const [tile] = freeTilesNear(battle, husk, 1)
     if (!tile) continue
@@ -122,7 +117,7 @@ export function upkeep(battle: Battle): GameEvent[] {
     const near = [...clear].sort((a, b) => distance(a, from) - distance(b, from)).slice(0, 2)
     const centre = openNear(battle, near[randomInt(battle, near.length)] ?? battle.gates.reduce((a, b) => (distance(b, from) > distance(a, from) ? b : a)))
     const wave = battle.waves.shift()!
-    if (battle.goal === 'hold' && !battle.extract) battle.waves.push(wave)
+    if (battle.goal === 'hold') battle.waves.push(wave)
     // It comes in unseen but in the fight, and shows once the hero sights it.
     const units = freeTilesNear(battle, centre, wave.length).map((tile, i) => placeAlien(battle, wave[i], tile, true, false))
     events.push({ type: 'wave', units: units.map(({ id, x, y }) => ({ id, x, y })) })

@@ -63,7 +63,7 @@ function duel(gear: Omit<Gear, 'id'>): { battle: Battle; soldier: Unit; alien: U
   // War drums pay off only on a kill, so they leave a duel as it is.
   enterAt(run)
   const battle = run.battle!
-  Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist: null })
+  Object.assign(battle, { goal: 'cross', uplink: null, extract: null, quarry: false, waves: [], twist: null })
   battle.ground.fill('pavement')
   battle.props.fill('none')
   battle.bulk.fill(0)

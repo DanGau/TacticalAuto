@@ -40,7 +40,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }
   apply(run, { type: 'advance' })
   enterAt(run)
   const battle = run.battle!
-  Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [] })
+  Object.assign(battle, { goal: 'cross', uplink: null, extract: null, quarry: false, waves: [] })
   battle.ground.fill('pavement')
   battle.bulk.fill(0)
   battle.height.fill(0)

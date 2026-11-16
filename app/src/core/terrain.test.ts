@@ -59,12 +59,12 @@ test('a building has walls with windows and a way in', () => {
   expect(battle.ground.some((g, i) => g === 'floor' && battle.bulk[i] === 0)).toBe(true)
 })
 
-test('a satellite stands in a walled compound with a gate on every side, and the hive has nothing human in it', () => {
+test('a satellite stands in a walled compound with a gate on every side, and the hive has nothing human in it, but trees and water', () => {
   const compound = createBattle(2, 'compound', [], [])
   expect([...compound.north, ...compound.west].filter((edge) => edge === 'wall').length).toBeGreaterThan(40)
   const hive = createBattle(2, 'hive', [], [])
-  expect(hive.ground.every((ground) => ground === 'hive')).toBe(true)
-  expect(hive.props.every((prop) => prop === 'none' || prop === 'spire' || prop === 'growth')).toBe(true)
+  expect(hive.ground.every((ground) => ['hive', 'void', 'water', 'mire'].includes(ground))).toBe(true)
+  expect(hive.props.every((prop) => ['none', 'spire', 'growth', 'water', 'tree', 'void'].includes(prop))).toBe(true)
   expect([...hive.north, ...hive.west].every((edge) => edge === 'none')).toBe(true)
 })
 

@@ -111,7 +111,7 @@ export async function createView(): Promise<View> {
    */
   function inPlay(yaw = YAW): Camera {
     const battle = s.shown!
-    const goals = [battle.uplink, battle.extract, ...battle.caches].filter((t): t is Tile => t !== null)
+    const goals = [battle.objective]
     const units = battle.units.filter((u) => u.side === 'human' || battle.phase === 'deploy' || u.revealed)
     return framing([...(battle.phase === 'deploy' && battle.entry ? [battle.entry] : []), ...goals, ...units], yaw, WHOLE_MARGIN)
   }
@@ -170,6 +170,7 @@ export async function createView(): Promise<View> {
       const { fx, sprites } = s
       s.hero = run.hero
       s.rigging = run.utilities.includes('tank')
+      s.boonsHeld = run.utilities
       fx.clear()
       const battle = run.battle
       if (!battle) return
@@ -197,7 +198,7 @@ export async function createView(): Promise<View> {
         await play(s, battle, events)
       }
       sync(s, run, battle)
-      if (events.some((e) => e.type === 'rocket' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(s, battle)
+      if (events.some((e) => e.type === 'rocket' || e.type === 'freeze' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(s, battle)
       drawFog(s, battle, true)
       if (!animate) {
         if (battle.phase !== 'deploy') s.look(clamped(inPlay(), team(battle)))

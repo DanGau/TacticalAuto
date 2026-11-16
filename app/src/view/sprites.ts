@@ -188,13 +188,6 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
       else if (unit.civilian === 'runner') g.roundRect(-6, -34, 12, 34, 6)
       else g.roundRect(-9, -30, 18, 30, 6)
       g.fill()
-      // A VIP wears a gold star.
-      if (unit.civilian === 'vip') {
-        g.fillStyle = css(COLOR.uplink)
-        g.beginPath()
-        for (let i = 0; i < 10; i++) g.lineTo((i % 2 ? 3 : 7) * Math.sin((i * Math.PI) / 5), -17 - (i % 2 ? 3 : 7) * Math.cos((i * Math.PI) / 5))
-        g.fill()
-      }
       g.fillStyle = css(COLOR.human)
       for (let i = 0; i < pips; i++) {
         g.beginPath()

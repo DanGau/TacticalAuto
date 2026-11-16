@@ -14,7 +14,7 @@ export function arena(effects: Effect[], spots: Tile[]): { battle: Battle; hero:
   apply(run, { type: 'advance' })
   enterAt(run)
   const battle = run.battle!
-  Object.assign(battle, { goal: 'exterminate', uplink: null, waves: [], twist: null, deadline: null, opening: false, phase: 'battle' })
+  Object.assign(battle, { goal: 'cross', uplink: null, extract: null, quarry: false, waves: [], twist: null, deadline: null, opening: false, phase: 'battle' })
   battle.ground.fill('pavement')
   battle.props.fill('none')
   battle.bulk.fill(0)

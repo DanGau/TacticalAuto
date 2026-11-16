@@ -92,28 +92,16 @@ function nearby(battle: Battle, at: Tile): string {
 /** Tiles about a thing the briefing counts aliens in. */
 const NEARBY = 5
 
-/** The most stops a briefing makes, the whole map among them. */
-export const STOPS = 3
+/** The stops a briefing makes: the objective, then the whole map. */
+export const STOPS = 2
 
 /**
- * What to show before the landing: tight on the objective, at most two things, naming the ground there, then the whole
+ * What to show before the landing: tight on the objective, naming the ground there, then the whole
  * map, where the landing shows. The first line gives the order; the last any twist and the way in.
  */
 export function shots(battle: Battle, order: string): Shot[] {
-  const aliens = battle.units.filter((u) => u.side === 'alien')
-  const commander = aliens.find((u) => u.target)
-  // The objective: the uplink, the commander, the caches, or failing those the alien most surrounded.
-  const company = (a: Tile) => aliens.filter((u) => Math.hypot(u.x - a.x, u.y - a.y) <= NEARBY).length
-  const biggest = aliens.filter((u) => u.revealed).reduce<Tile | undefined>((a, b) => (!a || company(b) > company(a) ? b : a), undefined)
-  const at: Tile[] = battle.uplink
-      ? [battle.uplink]
-      : commander
-        ? [commander]
-        : battle.caches.length > 0
-          ? battle.caches.slice(0, STOPS - 1)
-          : biggest
-            ? [biggest]
-            : []
+  // The crossing's objective, B.
+  const at: Tile[] = [battle.objective]
   const where = `${battle.city}, ${REGIONS[battle.region].name.toLowerCase()}. `
   const lines = at.map((t, i) => `${i === 0 ? `${where}${order}. ` : ''}${nearby(battle, t)}${ground(battle, t)}.`)
   const twist = battle.twist && TWISTS[battle.twist]

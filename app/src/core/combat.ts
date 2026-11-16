@@ -1,6 +1,6 @@
 // A battle's beat: whose turn it is, and the next unit's action.
 import { settle } from './knockback'
-import { RESCUE_QUORUM } from './goals'
+import { HOLD_ROUNDS, RESCUE_QUORUM } from './goals'
 import {
   BIG_BLAST_RADIUS,
   BLAST_RADIUS,
@@ -10,7 +10,7 @@ import {
   type Battle,
 } from './battle'
 import type { GameEvent } from './combat-event'
-import { has, spotted, vipOf } from './fighters'
+import { has, spotted } from './fighters'
 import { SECONDARIES } from './secondaries'
 import { attacksOf, blast, leap, napalm, shoot, weaponAttack } from './attack'
 import { leverage } from './objects'
@@ -144,19 +144,16 @@ export function stepBattle(battle: Battle): GameEvent[] {
   const humans = battle.units.some(isSoldier)
   // Every sentry down before the clock runs out: no reinforcements come.
   if (battle.deadline !== null && battle.round < battle.deadline && !battle.units.some((u) => u.side === 'alien')) battle.waves = []
-  // Aliens left to beat: none once the commander falls, for the rest flee.
-  const fled = battle.goal === 'assassinate' && !battle.units.some((u) => u.target)
-  // A VIP rescue is done once the VIP is out, and not before.
-  const aliens = !fled && battle.vip !== 'out' && (battle.units.some((u) => u.side === 'alien') || battle.waves.length > 0 || battle.vip !== null)
-  // A rescue is over once no civilian is left to save: won if any were. A raid is won once it has every cache.
+  // Aliens left to beat: none once the targets fall, for the rest flee.
+  const fled = battle.quarry && !battle.units.some((u) => u.target)
+  const aliens = !fled && (battle.units.some((u) => u.side === 'alien') || battle.waves.length > 0)
+  // A rescue is over once no civilian is left to save: won if any were. A hold is won once held.
   const emptied = battle.goal === 'rescue' && !battle.units.some((u) => u.civilian)
-  const loaded = battle.goal === 'raid' && battle.caches.length === 0
-  // A VIP rescue is lost with the VIP.
-  const lost = battle.vip !== null && battle.vip !== 'out' && !vipOf(battle)
-  if (!humans || !aliens || emptied || loaded || lost || battle.beat >= MAX_BEATS) {
+  const held = battle.goal === 'hold' && battle.held >= HOLD_ROUNDS
+  if (!humans || !aliens || emptied || held || battle.beat >= MAX_BEATS) {
     battle.phase = 'over'
     // With every alien beaten the hero has won, even if its last soldier fell to the same blast.
-    battle.winner = lost ? 'alien' : !aliens || loaded || emptied || (!humans && battle.escaped.length > 0) ? 'human' : humans ? null : 'alien'
+    battle.winner = !aliens || emptied || held || (!humans && battle.escaped.length > 0) ? 'human' : humans ? null : 'alien'
     // A rescue is won only by saving more than RESCUE_QUORUM: those got out, and those alive once no alien is left.
     if (battle.goal === 'rescue' && battle.winner === 'human' && battle.saved + battle.units.filter((u) => u.civilian).length <= RESCUE_QUORUM) battle.winner = 'alien'
     events.push({ type: 'end', winner: battle.winner })

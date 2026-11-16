@@ -2,24 +2,15 @@ import { powerOf } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { stepBattle } from './combat'
-import { escapePath, fightPath, goalOf } from './pathing'
-import { pursuers, UPLINK_REACH } from './fighters'
-import { vipOf } from './fighters'
-import { escortVip, FREE_REACH } from './sides'
-import { wound } from './wound'
+import { fightPath, goalOf } from './pathing'
 import { skirmish } from './abilities'
-import { alienStats } from './aliens'
-import { alienUnit, soldierUnit } from './spawn'
-import { upkeep } from './upkeep'
+import { soldierUnit } from './spawn'
 import type { GameEvent } from './combat-event'
 import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, RESCUE_QUORUM, type Goal } from './goals'
 import { GRID, isSoldier } from './battle'
-import { edgeDepths } from './grid'
-import { INNER } from './grid'
 import { freeTilesNear, walkingDistances } from './grid'
 import { distance } from './grid'
 import { road, enterAt, begun } from './roads'
-import { START_SUPPLIES } from './run'
 import { type Run } from './run-state'
 import { endBattle } from './debrief'
 import { RISKS } from './missions'
@@ -43,75 +34,33 @@ test('every challenge on the leg under way has its aliens mustered in advance; n
   for (const node of run.legs[0].columns.flat()) expect(node.stop!.aliens.length > 0).toBe(node.stop!.challenge !== null)
 })
 
-test('a hold sets its uplink within, its landing by it; once held, it is won only when the hero left reaches the extraction zone in the edge', () => {
+test('a hold sets its uplink at the objective, the landing at the far end; held, it is won', () => {
   const run = before('hold')
   const battle = run.battle!
-  expect(battle.uplink).not.toBeNull()
-  expect(distance(battle.entry!, battle.uplink!)).toBeLessThanOrEqual(9)
+  expect(battle.uplink).toEqual(battle.objective)
+  expect(Math.hypot(battle.entry!.x - battle.uplink!.x, battle.entry!.y - battle.uplink!.y)).toBeGreaterThanOrEqual(22)
   expect(battle.waves.length).toBeGreaterThan(0)
   enterAt(run)
   battle.held = HOLD_ROUNDS
-  while (!battle.extract) stepBattle(battle)
-  expect(battle.phase).toBe('battle')
-  expect(battle.uplink).toBeNull()
-  const depth = edgeDepths(battle)[battle.extract.y * GRID + battle.extract.x]
-  expect(depth).toBeLessThanOrEqual(INNER)
-  // Waves keep coming as the hero extracts.
-  expect(battle.waves.length).toBeGreaterThan(0)
-  const soldiers = battle.units.filter(isSoldier)
-  freeTilesNear(battle, battle.extract, soldiers.length).forEach((tile, i) => Object.assign(soldiers[i], tile))
-  while (battle.phase === 'battle') stepBattle(battle)
-  expect(battle.winner).toBe('human')
-  expect(battle.escaped).toHaveLength(soldiers.length)
-  endBattle(run)
-  expect(run.relicOffers).toHaveLength(3)
-  expect(run.finds).toEqual([])
-})
-
-test("a hold's waves come in clumps, a short way off the team, without end", () => {
-  const run = before('hold')
-  const battle = run.battle!
-  enterAt(run)
-  // The hero holds out for as many waves as it takes.
-  for (const soldier of battle.units.filter(isSoldier)) soldier.hp = 999
-  for (let wave = 0; wave < 2 && battle.phase === 'battle'; ) {
-    for (const e of stepBattle(battle)) {
-      if (e.type !== 'wave') continue
-      wave++
-      expect(e.units.length).toBeGreaterThanOrEqual(1)
-      for (const at of e.units) expect(Math.min(...battle.gates.map((g) => distance(g, at)))).toBeLessThanOrEqual(4)
-    }
-  }
-  expect(battle.waves.length).toBeGreaterThan(0)
-})
-
-test('a hold counts only the rounds the hero ends inside the uplink zone', () => {
-  const run = before('hold')
-  const battle = run.battle!
-  enterAt(run)
-  while (battle.round < 3 && battle.phase === 'battle') {
-    const [round, held] = [battle.round, battle.held]
-    stepBattle(battle)
-    if (battle.round > round) expect(battle.held - held).toBe(battle.units.some((u) => isSoldier(u) && Math.max(Math.abs(u.x - battle.uplink!.x), Math.abs(u.y - battle.uplink!.y)) <= UPLINK_REACH) ? 1 : 0)
-  }
-  expect(battle.held).toBeLessThan(battle.round + 1)
-})
-
-test('an assassination is won when the commander falls, though its guard lives', () => {
-  const run = before('assassinate')
-  const battle = run.battle!
-  enterAt(run)
-  const commander = battle.units.filter((u) => u.target)
-  expect(commander).toHaveLength(1)
-  expect(battle.units.filter((u) => u.side === 'alien' && !u.target && distance(u, commander[0]) <= 10).length).toBeGreaterThanOrEqual(2)
-  battle.units = battle.units.filter((u) => !u.target)
   stepBattle(battle)
   expect(battle.winner).toBe('human')
   endBattle(run)
-  expect(run.finds.length).toBeGreaterThan(0)
+  expect(run.relicOffers).toHaveLength(3)
 })
 
-test('a rescue pays supplies and experience for each civilian saved or alive; a raid pays by the cache grabbed', () => {
+test('a crossing is won once the hero reaches the extraction zone at the objective, aliens or not', () => {
+  const run = before('cross')
+  const battle = run.battle!
+  expect(battle.extract).toEqual(battle.objective)
+  enterAt(run)
+  const soldier = battle.units.find(isSoldier)!
+  Object.assign(soldier, freeTilesNear(battle, battle.extract!, 3)[1])
+  while (battle.phase === 'battle' && battle.beat < 20) stepBattle(battle)
+  expect(battle.units.some((u) => u.side === 'alien')).toBe(true)
+  expect(battle.winner).toBe('human')
+})
+
+test('a rescue pays supplies and experience for each civilian saved or alive', () => {
   const rescue = before('rescue')
   enterAt(rescue)
   expect(rescue.battle!.units.filter((u) => u.civilian)).toHaveLength(CIVILIANS)
@@ -126,15 +75,6 @@ test('a rescue pays supplies and experience for each civilian saved or alive; a 
   expect(rescue.report!.hero!.earned).toContainEqual({ label: `${alive} civilians saved`, xp: alive * XP.civilian })
   expect(rescue.supplies).toBe(supplies + RISKS.standard.supplies + alive * CIVILIAN_SUPPLIES)
 
-  const raid = before('raid')
-  apply(raid, { type: 'enter' })
-  const threat = raid.threat
-  raid.battle!.grabbed = 2
-  raid.battle!.winner = 'human'
-  endBattle(raid)
-  expect(raid.supplies).toBe(START_SUPPLIES + 2 * RISKS.standard.supplies)
-  expect(raid.threat).toBe(threat + STOP_THREAT)
-  expect(raid.finds).toEqual([])
 })
 
 test('a rescue is won, and pays, only with more than RESCUE_QUORUM civilians saved', () => {
@@ -152,27 +92,27 @@ test('a rescue is won, and pays, only with more than RESCUE_QUORUM civilians sav
   }
 })
 
-/** A rescue whose hero has landed rooted and harmless, so only the aliens act on the civilians. */
+/** A rescue whose hero has crossed to the objective and stands there rooted and harmless, so only the aliens act on the civilians. */
 function terror(seed: number): Run {
   const run = before('rescue')
   run.battle!.rng = seed
   enterAt(run)
-  for (const s of run.battle!.units.filter(isSoldier)) Object.assign(s, { rooted: 999, ability: null, effects: [], hp: 500, spent: ['throw', 'throw', 'throw'], stats: { ...s.stats, damage: 0, hp: 500 } })
+  for (const s of run.battle!.units.filter(isSoldier)) Object.assign(s, freeTilesNear(run.battle!, run.battle!.objective, 9)[8], { rooted: 999, ability: null, effects: [], hp: 500, spent: ['throw', 'throw', 'throw'], stats: { ...s.stats, damage: 0, hp: 500 } })
   return run
 }
 
-test('a rescue goes in among the civilians, every alien in sight', () => {
+test('a rescue scatters its civilians about the objective, every alien in sight', () => {
   const run = before('rescue')
   const battle = run.battle!
   const civilians = battle.units.filter((u) => u.civilian)
-  const at = battle.entry!
-  expect(Math.min(...civilians.map((c) => distance(c, at)))).toBeLessThanOrEqual(14)
+  expect(Math.min(...civilians.map((c) => distance(c, battle.objective)))).toBeLessThanOrEqual(10)
   expect(battle.units.filter((u) => u.side === 'alien').every((u) => u.revealed)).toBe(true)
 })
 
 test('on a rescue aliens with no soldier to fight kill civilians', () => {
   const battle = terror(1).battle!
   for (const s of battle.units.filter(isSoldier)) Object.assign(s, { cloaked: 99, stats: { ...s.stats, range: 0 } })
+  for (const u of battle.units.filter((u) => u.side === 'alien')) u.engaged = true
   const civilians = new Set(battle.units.filter((u) => u.civilian).map((u) => u.id))
   let killed = 0
   while (battle.phase === 'battle' && battle.round < 10) for (const e of stepBattle(battle)) if (e.type === 'death' && civilians.has(e.id)) killed++
@@ -247,8 +187,9 @@ test('on a rescue soldiers reach civilians to get them out', () => {
     run.battle!.rng = seed
     enterAt(run)
     const battle = run.battle!
-    // Only the harvesters, sighted, so a lone soldier lives long enough.
+    // Only the harvesters, sighted, so a lone soldier lives long enough; the hero already across.
     battle.units = battle.units.filter((u) => u.side !== 'alien' || u.kind === 'harvester')
+    for (const s of battle.units.filter(isSoldier)) Object.assign(s, freeTilesNear(battle, battle.objective, 9)[8])
     for (const u of battle.units) Object.assign(u, { revealed: true, engaged: true })
     while (battle.phase === 'battle') for (const e of stepBattle(battle)) if (e.type === 'saved') saved++
     expect(battle.saved).toBeLessThanOrEqual(CIVILIANS)
@@ -286,79 +227,6 @@ test('no one shot kills a commander from full health; brought low, it blinks awa
   expect(events).toContainEqual(expect.objectContaining({ type: 'move', id: commander.id, with: 'blink' }))
 })
 
-test('a VIP rescue: the VIP waits within under guard, the landing by them; the aliens leave a held VIP be', () => {
-  const run = before('vip')
-  const battle = run.battle!
-  const vip = vipOf(battle)!
-  expect(battle.vip).toBe('held')
-  expect(edgeDepths(battle)[vip.y * GRID + vip.x]).toBeGreaterThan(INNER)
-  expect(Math.min(...battle.units.filter((u) => u.side === 'alien').map((u) => distance(u, vip)))).toBeLessThanOrEqual(2)
-  expect(distance(battle.entry!, vip)).toBeLessThanOrEqual(11)
-  enterAt(run)
-  for (const u of battle.units) if (u.side === 'alien') u.engaged = true
-  while (battle.round < 4 && battle.phase === 'battle') for (const e of stepBattle(battle)) expect(e.type === 'shot' && e.target === vip.id).toBe(false)
-  expect(battle.units).toContain(vip)
-})
-
-test('a soldier near the VIP breaches, catching the guards; beside them it frees them, and the extraction zone appears', () => {
-  const run = before('vip')
-  const battle = run.battle!
-  enterAt(run)
-  const vip = vipOf(battle)!
-  const soldier = battle.units.find(isSoldier)!
-  Object.assign(soldier, freeTilesNear(battle, vip, 30).find((t) => distance(t, vip) === 3), { rooted: 999, hp: 500, stats: { ...soldier.stats, damage: 50, hp: 500 } })
-  const events: GameEvent[] = []
-  while (battle.vip === 'held' && battle.phase === 'battle') events.push(...stepBattle(battle))
-  expect(events).toContainEqual(expect.objectContaining({ type: 'rocket', id: soldier.id, hits: [] }))
-  expect(battle.units.find((u) => u.side === 'alien')).toMatchObject({ revealed: true, engaged: true })
-  Object.assign(soldier, freeTilesNear(battle, vip, 9).find((t) => distance(t, vip) === 1))
-  while (battle.vip === 'breached' && battle.phase === 'battle') stepBattle(battle)
-  expect(battle.vip).toBe('freed')
-  expect(edgeDepths(battle)[battle.extract!.y * GRID + battle.extract!.x]).toBeLessThanOrEqual(INNER)
-})
-
-test('a held VIP takes no harm, and no one frees a VIP while an alien in the fight stands near', () => {
-  const run = before('vip')
-  const battle = run.battle!
-  enterAt(run)
-  const vip = vipOf(battle)!
-  wound(battle, vip, 99, [])
-  expect(vip.hp).toBe(vip.stats.hp)
-  const soldier = battle.units.find(isSoldier)!
-  Object.assign(soldier, freeTilesNear(battle, vip, 9).find((t) => distance(t, vip) === 1))
-  const guard = battle.units.find((u) => u.side === 'alien')!
-  Object.assign(guard, freeTilesNear(battle, vip, 30).find((t) => distance(t, vip) === FREE_REACH))
-  battle.units = battle.units.filter((u) => u.side !== 'alien' || u === guard)
-  guard.engaged = true
-  battle.vip = 'breached'
-  escortVip(battle)
-  expect(battle.vip).toBe('breached')
-  battle.units = battle.units.filter((u) => u !== guard)
-  escortVip(battle)
-  expect(battle.vip).toBe('freed')
-})
-
-test('a VIP rescue is lost with the VIP, and won once the VIP lifts off, for a relic', () => {
-  const lost = before('vip')
-  enterAt(lost)
-  lost.battle!.units = lost.battle!.units.filter((u) => u.civilian !== 'vip')
-  stepBattle(lost.battle!)
-  expect(lost.battle!.winner).toBe('alien')
-
-  const run = before('vip')
-  const battle = run.battle!
-  enterAt(run)
-  battle.units = battle.units.filter((u) => u.side !== 'alien')
-  // With no alien left the hero still has to get the VIP out.
-  stepBattle(battle)
-  expect(battle.phase).toBe('battle')
-  while (battle.phase === 'battle' && battle.beat < 900) stepBattle(battle)
-  expect(battle.vip).toBe('out')
-  expect(battle.winner).toBe('human')
-  endBattle(run)
-  expect(run.relicOffers).toHaveLength(3)
-})
-
 /** A battle of `goal` with its aliens gone but for what the test adds, and the extraction zone a long walk from its soldier. */
 function gettingOut(goal: Goal) {
   const run = before(goal)
@@ -385,38 +253,3 @@ test('getting out, a slow hero leaves what it would stand beside, and takes no s
   expect(skirmish(battle, soldier)).toEqual([])
 })
 
-test('a turret holds no column together: a freed VIP walks on, far from any soldier', () => {
-  const { battle, soldier } = gettingOut('vip')
-  const vip = vipOf(battle)!
-  battle.vip = 'freed'
-  battle.units.push(alienUnit(battle, { kind: 'turret', stats: alienStats('turret', 0, 0), stance: 'anchor', boss: false, spawns: false, target: false, resists: [] }, freeTilesNear(battle, vip, 8)[0], true))
-  for (const u of battle.units) u.revealed = true
-  expect(pursuers(battle, vip)).toEqual([])
-  Object.assign(soldier, freeTilesNear(battle, vip, 2000).find((t) => distance(t, vip) === 15))
-  const toExtract = walkingDistances(battle, battle.extract!)
-  const end = escapePath(battle, vip).at(-1)!
-  expect(toExtract[end.y * GRID + end.x]).toBeLessThan(toExtract[vip.y * GRID + vip.x])
-})
-
-test('a VIP joined to the zone through a crowd of the hero lifts off', () => {
-  const { battle, soldier } = gettingOut('vip')
-  const vip = vipOf(battle)!
-  battle.vip = 'freed'
-  const along = (tiles: number) => ({ x: vip.x + (vip.x < GRID / 2 ? tiles : -tiles), y: vip.y })
-  battle.extract = along(5)
-  Object.assign(soldier, along(2))
-  battle.units.push({ ...soldier, id: battle.nextId++, soldier: null, ...along(1) })
-  escortVip(battle)
-  expect(battle.vip).toBe('out')
-})
-
-test('a hold puts its extraction zone a fair walk from the uplink', () => {
-  const run = before('hold')
-  const battle = run.battle!
-  enterAt(run)
-  const uplink = battle.uplink!
-  battle.held = HOLD_ROUNDS
-  battle.turn = 'alien'
-  upkeep(battle)
-  expect(walkingDistances(battle, uplink)[battle.extract!.y * GRID + battle.extract!.x]).toBeLessThan(40)
-})

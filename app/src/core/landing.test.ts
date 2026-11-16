@@ -2,8 +2,8 @@ import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { GRID, isSoldier, type Battle } from './battle'
 import { stepBattle } from './combat'
-import { COMMANDER_GAP, ENTRY_MARGIN } from './landing'
-import { distance, edgeDepths, nearestAlien } from './grid'
+import { ENTRY_MARGIN } from './landing'
+import { distance, edgeDepths, freeTilesNear, nearestAlien } from './grid'
 import type { Goal } from './goals'
 import { current } from './run'
 import { type Run } from './run-state'
@@ -11,7 +11,7 @@ import { begun, enterAt, road } from './roads'
 import { RALLY_EVERY, rally } from './upkeep'
 
 /** A run about to make its landing in its first battle, of `goal`. */
-function entering(seed = 1, goal: Goal = 'exterminate'): Run & { battle: Battle } {
+function entering(seed = 1, goal: Goal = 'cross'): Run & { battle: Battle } {
   const run = begun(seed)
   apply(run, { type: 'go', index: 1 })
   Object.assign(current(run)!.stop!, { goal, challenge: null })
@@ -27,20 +27,16 @@ test('a battle stages one landing, by the fight, with every alien but burrowers 
   }
 })
 
-test("a push's landing lies ahead of its clusters on the axis; a flood's by what it holds", () => {
-  for (let seed = 1; seed <= 12; seed++) {
-    const push = entering(seed).battle
-    const aliens = push.units.filter((u) => u.side === 'alien')
-    const near = (t: { x: number; y: number }) => Math.min(...aliens.map((a) => distance(a, t)))
-    expect(near(push.entry!)).toBeGreaterThanOrEqual(2)
-    expect(distance(push.entry!, push.approach)).toBeLessThan(distance(push.entry!, push.arena) + 12)
-    const hold = entering(seed, 'hold').battle
-    expect(distance(hold.entry!, hold.uplink!)).toBeLessThanOrEqual(9)
+test('the landing lies at the far end of the crossing from the objective', () => {
+  for (let seed = 1; seed <= 12; seed++) for (const goal of ['cross', 'hold'] as Goal[]) {
+    const { battle } = entering(seed, goal)
+    expect(distance(battle.entry!, battle.approach)).toBeLessThanOrEqual(4)
+    expect(Math.hypot(battle.entry!.x - battle.objective.x, battle.entry!.y - battle.objective.y)).toBeGreaterThanOrEqual(20)
   }
 })
 
 test('the arena and every landing lie inside the map, clear of its edge', () => {
-  for (const goal of ['exterminate', 'vip', 'hold', 'rescue', 'assassinate'] as Goal[]) {
+  for (const goal of ['cross', 'hold', 'rescue', 'assassinate'] as Goal[]) {
     for (let seed = 1; seed <= 12; seed++) {
       const { battle } = entering(seed, goal)
       const { x, y, reach } = battle.arena
@@ -50,14 +46,6 @@ test('the arena and every landing lie inside the map, clear of its edge', () => 
       const at = battle.entry!
       expect(depth[at.y * GRID + at.x]).toBeGreaterThan(ENTRY_MARGIN)
     }
-  }
-})
-
-test("an assassination never stages its landing near the commander", () => {
-  for (let seed = 1; seed <= 8; seed++) {
-    const { battle } = entering(seed, 'assassinate')
-    const commander = battle.units.find((u) => u.target)!
-    expect(distance(battle.entry!, commander)).toBeGreaterThanOrEqual(COMMANDER_GAP)
   }
 })
 
@@ -77,7 +65,7 @@ test('entering puts the whole heroes down by the landing and engages only the cl
 test('with nobody left fighting, the next cluster comes whole after RALLY_EVERY rounds', () => {
   const run = begun(1)
   apply(run, { type: 'go', index: 1 })
-  road(run, [{ kind: 'battle', risk: 'standard', goal: 'exterminate', terrain: 'town', challenge: null, twist: null, aliens: Array.from({ length: 12 }, () => 'trooper' as const) }])
+  road(run, [{ kind: 'battle', risk: 'standard', goal: 'cross', terrain: 'town', challenge: null, twist: null, aliens: Array.from({ length: 12 }, () => 'trooper' as const) }])
   apply(run, { type: 'advance' })
   enterAt(run)
   const battle = run.battle!
@@ -98,7 +86,7 @@ test('Surprise Drop catches the aliens nearest as the hero lands', () => {
   const run = begun(1)
   run.relics = ['encore']
   apply(run, { type: 'go', index: 1 })
-  Object.assign(current(run)!.stop!, { goal: 'exterminate', challenge: null })
+  Object.assign(current(run)!.stop!, { goal: 'cross', challenge: null })
   apply(run, { type: 'advance' })
   const battle = run.battle!
   const near = nearestAlien(battle, battle.entry!)!
@@ -107,12 +95,12 @@ test('Surprise Drop catches the aliens nearest as the hero lands', () => {
 })
 
 test('every flow ends with nothing to choose: bots play each goal to a winner, under the beat limit', () => {
-  for (const goal of ['exterminate', 'hold', 'rescue', 'raid', 'vip', 'assassinate'] as Goal[]) {
+  for (const goal of ['cross', 'hold', 'rescue', 'assassinate'] as Goal[]) {
     for (let seed = 1; seed <= 3; seed++) {
       const run = entering(seed, goal)
       apply(run, { type: 'enter' })
-      // Heroes that never move: rally and waves must still settle it.
-      for (const u of run.battle.units.filter(isSoldier)) u.stats = { ...u.stats, move: 0, range: 0 }
+      // Heroes that never move, already across: rally and waves must still settle it.
+      for (const u of run.battle.units.filter(isSoldier)) Object.assign(u, freeTilesNear(run.battle, run.battle.objective, 12)[11], { stats: { ...u.stats, move: 0, range: 0 } })
       while (run.battle.phase === 'battle') stepBattle(run.battle)
       expect(run.battle.phase).toBe('over')
     }

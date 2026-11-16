@@ -28,7 +28,7 @@ function field(weapon: WeaponId, at: [number, number][], range = WEAPONS[weapon]
   b.height.fill(0)
   b.north.fill('none' as never)
   b.west.fill('none' as never)
-  Object.assign(b, { goal: 'exterminate', uplink: null, waves: [], twist: null, opening: false })
+  Object.assign(b, { goal: 'cross', uplink: null, extract: null, quarry: false, waves: [], twist: null, opening: false })
   Object.assign(hero, { x: 10, y: 10, weapon, effects: [], ability: null, secondary: 'frag', stats: { ...hero.stats, damage: 10, crit: 0, range, move: 0 }, stance: 'anchor' })
   return { b, hero, aliens }
 }

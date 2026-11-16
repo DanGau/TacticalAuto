@@ -12,8 +12,8 @@ import type { RelicId } from '../core/relics'
 import type { GearEffect } from '../core/battle'
 import { CHALLENGES, type ChallengeId } from '../core/challenges'
 import type { Goal } from '../core/goals'
-import type { ArenaKind } from '../core/arena-kinds'
-import { carries, type UtilityId } from '../core/utilities'
+import { ARENA_KINDS, isBarrier, type ArenaKind } from '../core/arena-kinds'
+import { carries, type EffectId, type UtilityId } from '../core/utilities'
 import { forksOf, type Fork } from './forks'
 import { restForks, type RestFork } from './rest'
 
@@ -33,6 +33,9 @@ export interface Toll {
   goal: Goal
   challenge: ChallengeId | null
   answer: Answer
+  /** The barrier across the route, if any, and how the hero met it. */
+  barrier: ArenaKind | null
+  crossed: Answer
   most: number
   before: number
   after: number
@@ -82,9 +85,8 @@ export interface RunResult {
   rests: { safehouses: number; medkits: number }
 }
 
-/** How the hero met the battle's challenge, given the utilities it held going in. */
-function answerOf(battle: NonNullable<Run['battle']>, held: UtilityId[]): Answer {
-  const answers = battle.challenge ? CHALLENGES[battle.challenge].answers : []
+/** How the hero met `answers`, given the utilities it held going in. */
+function answerOf(battle: NonNullable<Run['battle']>, held: UtilityId[], answers: EffectId[]): Answer {
   if (battle.utility && carries(battle.utility, answers)) return 'picked'
   return held.some((id) => carries(id, answers)) ? 'held' : 'none'
 }
@@ -143,7 +145,7 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
         const fought = run.report!.hero!
-        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[4], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3]), most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
+        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[4], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3], battle!.challenge ? CHALLENGES[battle!.challenge].answers : []), barrier: isBarrier(battle!.arenaKind) ? battle!.arenaKind : null, crossed: answerOf(battle!, begun[3], ARENA_KINDS[battle!.arenaKind].opens ?? []), most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
         clock = { next: 0, done: 0 }
       }
       continue

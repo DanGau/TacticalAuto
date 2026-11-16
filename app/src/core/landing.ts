@@ -1,14 +1,14 @@
 // The hero's arrival: the one point the encounter chooses, the plain landing there, and what relics and the picked utility set off.
 import { chillUnit } from './stacks'
 import { BARRIER_ARMOR, GRID, isSoldier, type Battle, type Effect, type Tile, type Unit } from './battle'
-import { CHALLENGES, type ChallengeId } from './challenges'
+import { CHALLENGES } from './challenges'
 import type { GameEvent } from './combat-event'
 import { engageNearest, has, nearest } from './fighters'
-import { blocked, distance, edgeDepths, freeTilesNear, NEIGHBORS, onGrid, openNear, reachableFrom, walkingDistances, walks } from './grid'
+import { blocked, distance, edgeDepths, freeTilesNear, NEIGHBORS, onGrid, openNear, walkingDistances, walks } from './grid'
 import { dropUnit, soldierUnit, TURRET } from './spawn'
 import { PROP_BULK } from './terrain'
 import { TUNING } from './tuning'
-import type { UtilityId } from './utilities'
+import { carries, type UtilityId } from './utilities'
 import { takeBoon } from './boons'
 import { wound } from './wound'
 
@@ -17,54 +17,20 @@ export const CHARGE_REACH = 8
 export const CHARGE_BLAST = 3
 export const ENCORE_REACH = 5
 
-/** The nearest a landing comes to an assassination's commander. */
-export const COMMANDER_GAP = 12
-
-/** How far within the map's edge a landing lies, the longest walk from it to the arena's centre, and how far from the nearest alien it wants to be. */
+/** How far within the map's edge a landing lies. */
 export const ENTRY_MARGIN = 4
-const ENTRY_WALK = 40
-const CONTACT = [5, 9]
 
-/** Challenges whose test is the ground between the way in and the aliens. */
-const FROM_AFAR: ChallengeId[] = ['slog', 'firingLine', 'scattered']
-
-/** The aliens a landing is placed by: those the hero can see coming, not burrowers underground. */
-const inView = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.kind !== 'burrower')
-
-/**
- * Chooses where the hero lands: a push's head on down the axis, never near an assassination's commander, a VIP
- * rescue's by the VIP; a flood's by the uplink or among the civilians.
- */
-export function planEntry(battle: Battle, heart: Tile | null): void {
-  const centre = openNear(battle, battle.arena)
-  const toCentre = walkingDistances(battle, centre)
-  const fromCentre = reachableFrom(battle, centre)
-  const aliens = inView(battle)
-  const commander = battle.units.find((u) => u.target)
-  const vip = battle.units.find((u) => u.civilian === 'vip')
+/** Where the hero lands: the open tile nearest the way in from which it can walk to the objective. */
+export function planEntry(battle: Battle): void {
+  const toObjective = walkingDistances(battle, battle.objective)
   const depth = edgeDepths(battle)
-  const walkable: Tile[] = []
-  const open: Tile[] = []
+  let best: Tile | null = null
   for (let t = 0; t < GRID * GRID; t++) {
     const tile = { x: t % GRID, y: Math.floor(t / GRID) }
-    if (blocked(battle, tile.x, tile.y) || depth[t] <= ENTRY_MARGIN || toCentre[t] === Infinity || !fromCentre[t] || distance(tile, centre) > battle.arena.reach + 8) continue
-    walkable.push(tile)
-    // Across a river, a tile near as the crow flies can be a long way round.
-    if (toCentre[t] > ENTRY_WALK) continue
-    if (commander && distance(tile, commander) < COMMANDER_GAP) continue
-    if (heart && distance(tile, heart) > 10) continue
-    if (battle.uplink && distance(tile, battle.uplink) > 9) continue
-    if (vip && distance(tile, vip) > 11) continue
-    open.push(tile)
+    if (blocked(battle, tile.x, tile.y) || toObjective[t] === Infinity || depth[t] <= ENTRY_MARGIN || battle.ground[t] === 'mire') continue
+    if (!best || distance(tile, battle.approach) < distance(best, battle.approach)) best = tile
   }
-  // Should the goal's ground leave no room, any the hero can walk in by will do.
-  const supported = open.length > 0 ? open : walkable
-  const contact = (t: Tile) => (aliens.length > 0 ? Math.min(...aliens.map((a) => distance(a, t))) : CONTACT[0])
-  let options: Tile[] = battle.challenge && FROM_AFAR.includes(battle.challenge) ? supported : []
-  for (let widen = 0; options.length === 0 && widen < 8; widen++) options = supported.filter((t) => contact(t) >= Math.max(3, CONTACT[0] - widen) && contact(t) <= CONTACT[1] + 2 * widen)
-  if (options.length === 0) options = supported
-  const approach = battle.flow === 'push' ? battle.approach : (battle.uplink ?? heart ?? centre)
-  battle.entry = options.reduce((a, b) => (distance(b, approach) < distance(a, approach) ? b : a))
+  battle.entry = best ?? openNear(battle, battle.approach)
 }
 
 /** The hero lands, with the utility the player picked and any second from the reservoir, and the battle begins. What it sets off lands as the first beat; see opening. */
@@ -126,6 +92,7 @@ export function opening(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
   const soldiers = battle.units.filter(isSoldier)
   for (const utility of [battle.utility, battle.second]) if (utility) events.push({ type: 'used', src: { kind: 'boon', id: utility }, utility, on: utility === 'flashbang' ? battle.units.filter((u) => u.surprised > 0).map((u) => u.id) : soldiers.map((u) => u.id) })
+  if ([battle.utility, battle.second].some((u) => u && carries(u, ['coldSnap']))) events.push({ type: 'freeze' })
   const held = (effect: Effect) => soldiers.some((s) => has(s, effect))
   const at = battle.entry
   if (at && (held('entryBlast') || held('entryShred') || held('entryFrost'))) {

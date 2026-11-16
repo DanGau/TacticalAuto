@@ -2,38 +2,14 @@
 import type { ChallengeId } from './challenges'
 import type { Goal } from './goals'
 import type { Mission, Run } from './run-state'
-import { ZONE_TERRAINS, type TerrainKind } from './terrain'
 
-/** What a goal orders, but a clear-out, whose order follows its challenge or ground. */
-const GOAL_ORDERS: Record<Exclude<Goal, 'exterminate'>, string> = {
+/** What each goal orders: every crossing ends at its objective. */
+const GOAL_ORDERS: Record<Goal, string> = {
+  cross: 'Reach the extraction zone',
   assassinate: 'Kill the commander',
   hold: 'Hold the uplink',
   rescue: 'Save the civilians',
-  vip: 'Extract the VIP',
-  raid: 'Seize the caches',
   ambush: 'Survive the hunt',
-}
-
-/** A clear-out's orders by its challenge, one chosen by the ground. */
-const CHALLENGE_ORDERS: Record<ChallengeId, string[]> = {
-  slog: ['Wade the swamp', 'Clear the swamp'],
-  firingLine: ['Take the ridge', 'Silence the guns'],
-  ironWall: ['Break the wall', 'Crack the armor'],
-  swarm: ['Stem the swarm', 'Burn the brood'],
-  scattered: ['Hunt the sentries', 'Sweep the outposts'],
-  bigOne: ['Fell the giant', 'Slay the giant'],
-  killBox: ['Break the ambush', 'Survive the trap'],
-}
-
-/** A clear-out's order with no challenge, by its ground. */
-const GROUND_ORDERS: Record<TerrainKind, string> = {
-  town: 'Clear the streets',
-  city: 'Clear the blocks',
-  countryside: 'Sweep the fields',
-  industrial: 'Clear the yards',
-  ruins: 'Purge the ruins',
-  compound: 'Storm the compound',
-  hive: 'Purge the hive',
 }
 
 /** What a challenge throws at the hero, and how to meet it. */
@@ -47,15 +23,13 @@ export const THREATS: Record<ChallengeId, string> = {
   killBox: 'Hot landing. Flash, mist, shield or dampener.',
 }
 
-/** The hero's order at a battle: a key storms the satellite, the final takes the hub. */
-export function objective(kind: Mission['kind'], goal: Goal, challenge: ChallengeId | null, place: TerrainKind): string {
+/** The hero's order at a battle: a key storms the satellite, the final takes the hub; a crossing a Big One guards fells it. */
+export function objective(kind: Mission['kind'], goal: Goal, challenge: ChallengeId | null = null): string {
   if (kind === 'final') return 'Take the hub'
   if (kind === 'key') return 'Storm the satellite'
-  if (goal !== 'exterminate') return GOAL_ORDERS[goal]
-  if (!challenge) return GROUND_ORDERS[place]
-  const orders = CHALLENGE_ORDERS[challenge]
-  return orders[Math.max(0, (ZONE_TERRAINS as readonly string[]).indexOf(place)) % orders.length]
+  if (goal === 'cross' && challenge === 'bigOne') return 'Fell the giant'
+  return GOAL_ORDERS[goal]
 }
 
 /** The order for the battle under way. */
-export const missionOrder = (run: Run): string => objective(run.mission!.kind, run.mission!.goal, run.battle!.challenge, run.battle!.place)
+export const missionOrder = (run: Run): string => objective(run.mission!.kind, run.mission!.goal, run.battle!.challenge)

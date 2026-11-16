@@ -288,9 +288,9 @@ export interface Unit {
   resists: Resist[]
   /**
    * A civilian to rescue, null for any other unit: on the human side, never fights, and is not a soldier. A hider takes
-   * beside the biggest object it can reach and stays; a runner flees the aliens; a VIP waits for the team, then keeps by it on the way out.
+   * beside the biggest object it can reach and stays; a runner flees the aliens.
    */
-  civilian: 'hider' | 'runner' | 'vip' | null
+  civilian: 'hider' | 'runner' | null
   /** For a mech, the soldier id of the engineer who deployed it, credited with what it does; null for any other unit. */
   summoner: number | null
   /** A hero's attack after its weapon's. */
@@ -416,12 +416,14 @@ export interface Battle {
   held: number
   /** Civilians soldiers have reached and got out, on a rescue. */
   saved: number
-  /** On a VIP rescue, whether the VIP waits for the team, behind its building's walls or past the breach; keeps by it on the way out; or has lifted off. Null otherwise. */
-  vip: 'held' | 'breached' | 'freed' | 'out' | null
-  /** The one point where the hero lands; an ambush has none. */
+  /** The one point where the hero lands, A. */
   entry: Tile | null
+  /** Where the crossing ends, B: the extraction zone, the uplink, the civilians, or what the hero must kill. */
+  objective: Tile
+  /** Whether the battle is won once its targets fall: a commander, a Guardian, a big one or the Hunter. */
+  quarry: boolean
   arena: Arena
-  /** Where a push's landing means to lie: head on down the fight's axis. */
+  /** Where the landing means to lie: head on down the fight's axis, the far end from the objective. */
   approach: Tile
   /** Where reinforcements arrive. */
   gates: Tile[]
@@ -429,14 +431,11 @@ export interface Battle {
   rallied: number
   /** On a hold, the uplink the hero must reach and defend; null otherwise. */
   uplink: Tile | null
-  /** On a hold, once it is held, the extraction zone; null otherwise. */
+  /** On a crossing or an ambush, the extraction zone at the objective; null otherwise. */
   extract: Tile | null
   /** Soldiers lifted off from the extraction zone, by soldier id, and the health each left with. */
   escaped: number[]
   lifted: Record<number, number>
-  /** On a raid, the supply caches still on the map, and how many the hero has grabbed. */
-  caches: Tile[]
-  grabbed: number
   /** Soldiers not yet landed. */
   reserve: Reserve[]
   /** Soldiers down on the field, where they fell. */

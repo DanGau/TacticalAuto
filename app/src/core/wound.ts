@@ -5,7 +5,7 @@ import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent, ShotEvent } from './combat-event'
 import { emptyTally, OVERKILL, type FeatId, type Tally } from './feats'
-import { engage, has, hostage, fireproof, immune, onTile } from './fighters'
+import { engage, has, fireproof, immune, onTile } from './fighters'
 import { armorCap, died, kindle } from './stacks'
 import { TUNING } from './tuning'
 
@@ -24,11 +24,11 @@ export function land(battle: Battle, shot: ShotEvent, target: Unit, events: Game
 
 /**
  * Deals `damage` to a unit: its temp HP takes it first, then its armor, then its health. At zero health the unit is removed and its
- * death reported; a hostage takes none. A burster that dies explodes, and a psion that dies hurts the aliens near it. An alien hurt
+ * death reported. A burster that dies explodes, and a psion that dies hurts the aliens near it. An alien hurt
  * engages.
  */
 export function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[], pierce = false, crit = false): void {
-  if (target.hp <= 0 || hostage(battle, target) || target.invulnerable) return
+  if (target.hp <= 0 || target.invulnerable) return
   if (!target.engaged) engage(battle, target)
   const hit = target.kind === 'wraith' && !crit ? Math.min(dealt, 1) : dealt
   const soaked = Math.min(target.temp ?? 0, hit)

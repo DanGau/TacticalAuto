@@ -3,7 +3,8 @@ import { type Group, type Mesh, type MeshBasicMaterial, type Object3D, Sprite as
 import { ENTRY_RADIUS, GRID, type Battle, type Tile } from '../core/battle'
 import { UPLINK_REACH } from '../core/fighters'
 import { EXTRACT_REACH } from '../core/goals'
-import { nearestAlien } from '../core/grid'
+import { opens, routePath } from '../core/route'
+import { effectsOf, UTILITIES } from '../core/utilities'
 import { fuelTanks } from '../core/objects'
 import { visibleTiles } from '../core/sight'
 import { DECAL_LIFT, spot } from './camera'
@@ -15,6 +16,16 @@ import type { Label, Stage } from './stage'
 
 /** Words over a tile, `rise` of their height above it. */
 const label = (text: string, tile: Tile, color: number, size = 44): Label => ({ text, color, size, at: () => spot(tile.x, tile.y), rise: size === 44 ? 0.8 : 0, outline: 6, alpha: 1 })
+
+/** A route along `path`, a band from tile to tile over the ground. */
+function route(shapes: Shapes, path: Tile[], color: number, alpha: number): void {
+  for (let i = 1; i < path.length; i++) {
+    const a = spot(path[i - 1].x, path[i - 1].y)
+    const b = spot(path[i].x, path[i].y)
+    const lift = Math.max(a.y, b.y) + DECAL_LIFT * 3
+    shapes.band({ ...a, y: lift }, { ...b, y: lift }, 5 / ACROSS, color, alpha)
+  }
+}
 
 /** Replaces the marks on the ground in `layer` with `shapes`. */
 function lay(layer: Group, shapes: Shapes): void {
@@ -49,11 +60,8 @@ export function drawMarks(s: Stage, battle: Battle): void {
   const marks: Label[] = (s.marks = [])
   if (battle.uplink) marks.push(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
   if (battle.extract) marks.push(label('🚁 EXTRACT', battle.extract, COLOR.uplink, 28))
-  for (const cache of battle.caches) marks.push(label('📦', cache, COLOR.uplink, 24))
   if (battle.rigged) marks.push(label('💣 RIGGED', battle.rigged, COLOR.crit, 22))
   if (battle.phase === 'deploy' && s.rigging && !s.briefing) fuelTanks(battle).forEach((tank, i) => marks.push(label(`🛢️ ${i + 1}`, tank, COLOR.crit, 24)))
-  const vip = battle.vip === 'held' && battle.units.find((u) => u.civilian === 'vip')
-  if (vip) marks.push(label('⭐ VIP', vip, COLOR.vip, 28))
   for (const body of battle.downed) marks.push(label('✚ DOWN', body, COLOR.contact, 22))
   // Aliens caught off guard say so over their heads until they recover, while the hero sees them.
   for (const u of battle.units) {
@@ -68,15 +76,17 @@ export function drawMarks(s: Stage, battle: Battle): void {
             if (y >= 0 && x >= 0 && y < GRID && x < GRID && battle.ground[y * GRID + x] !== 'void') diamond(tint, x, y, COLOR.zoneHover, 0.8)
           }
         }
-        // Its way in: a line to the uplink, or to the nearest contact.
-        const toward = battle.uplink ?? nearestAlien(battle, zone)
-        if (toward) {
-          const a = spot(zone.x, zone.y)
-          const b = spot(toward.x, toward.y)
-          const lift = Math.max(a.y, b.y) + DECAL_LIFT * 3
-          tint.band({ ...a, y: lift }, { ...b, y: lift }, 4 / ACROSS, battle.uplink ? COLOR.uplink : COLOR.contact, 0.9)
+        // The route to the objective, and in gold each a boon held opens shorter, named where it leaves the plain one.
+        route(tint, routePath(battle), 0xffffff, 0.75)
+        for (const id of s.boonsHeld.filter((id) => opens(battle, id))) {
+          const path = routePath(battle, effectsOf(id))
+          route(tint, path, COLOR.uplink, 0.95)
+          const plain = new Set(routePath(battle).map((t) => t.y * GRID + t.x))
+          const off = path.filter((t) => !plain.has(t.y * GRID + t.x))
+          marks.push(label(`${UTILITIES[id].icon} ${UTILITIES[id].name.toUpperCase()}`, off[off.length >> 1] ?? path[path.length >> 1], COLOR.uplink, 22))
         }
         marks.push(label('⬇ WAY IN', zone, 0xffffff, 26))
+        if (battle.goal === 'rescue') marks.push(label('🆘 CIVILIANS', battle.objective, COLOR.uplink, 28))
       }
     }
     // Those the mission turns on are named; every other alien speaks for itself.

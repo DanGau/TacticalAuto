@@ -244,8 +244,8 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       float(s, callout(s, e.type === 'saved' ? 'SAVED' : 'LIFTED OFF', COLOR.heal, sprite))
       await s.tween(PACE.death, (t) => fade(sprite, 1 - t))
       remove(s, e.id)
-    } else if (e.type === 'extract') {
-      drawMarks(s, battle)
+    } else if (e.type === 'freeze') {
+      drawTerrain(s, battle)
     } else if (e.type === 'feed') {
       const on = sprites.get(e.id)
       if (on) float(s, callout(s, `FED +${e.damage}`, COLOR.crit, on))
