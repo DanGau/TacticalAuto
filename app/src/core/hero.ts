@@ -15,6 +15,7 @@ import { committed, powerOf, SKILLS, type SkillId, TREES } from './skills'
 import { MELEE_RANGE, WEAPONS } from './weapons'
 import { CONTINENT_IDS, type City, CONTINENTS } from './world'
 import type { Flow, Quantity } from './quantities'
+import { boonStat, UTILITIES } from './utilities'
 import { emptyTally, type FeatId, type Tally, FEATS } from './feats'
 
 /** Experience each level takes beyond the last: level n takes LEVEL_XP × n more. */
@@ -98,7 +99,7 @@ export function soldierStats(run: Run, soldier: Soldier): Stats {
     const fromClass = soldier.cls ? (CLASSES[soldier.cls].stats[key] ?? 0) : 0
     const fromGear = (soldier.gear?.stats[key] ?? 0) + (weapon?.stats[key] ?? 0)
     const fromSkills = [...soldier.skills.map((id) => SKILLS[id]), ...soldier.perks.map((id) => PERKS[id])].reduce((sum, p) => sum + (p.stats?.[key] ?? 0), 0)
-    stats[key] += fromClass + fromGear + fromSkills + level(soldier) * (LEVEL_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key])
+    stats[key] += fromClass + fromGear + fromSkills + level(soldier) * (LEVEL_STATS[key] ?? 0) + total(run, (u) => u.stats?.[key]) + boonStat(run.utilities, key)
   }
   if (weapon?.melee) stats.range = MELEE_RANGE
   // Class, weapon and mod can sum below walking, and a hero that cannot walk stalls a battle.
@@ -173,8 +174,8 @@ export function heroFlows(soldier: Soldier): Flow[] {
   ]
 }
 
-/** Everything the run has that makes or reads: the hero's and its relics. */
-const flows = (run: Run): Flow[] => [...heroFlows(run.hero), ...run.relics.map((id) => RELICS[id])]
+/** Everything the run has that makes or reads: the hero's, its relics and its boons. */
+const flows = (run: Run): Flow[] => [...heroFlows(run.hero), ...run.relics.map((id) => RELICS[id]), ...run.utilities.map((h) => UTILITIES[h.id])]
 
 /** The quantities the run makes. */
 export const makes = (run: Run): Quantity[] => [...new Set(flows(run).flatMap((f) => f.makes ?? []))]

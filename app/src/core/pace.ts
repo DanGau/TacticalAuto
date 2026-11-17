@@ -63,7 +63,7 @@ export const overlaps = (events: GameEvent[]) => events.some((e) => e.type === '
 export const staggerOf = (events: GameEvent[]) => (events.some((e) => e.type === 'shot' && e.opens) ? PACE.combo : PACE.stagger) + events.reduce((sum, e) => sum + beyond(e), 0)
 
 /** Events the view shows at once, as a word over a unit or a change of marks, without waiting on them. */
-const INSTANT = new Set<GameEvent['type']>(['stacks', 'order', 'feed', 'effect', 'freeze', 'frozen', 'hurt', 'heal', 'cloak'])
+const INSTANT = new Set<GameEvent['type']>(['stacks', 'order', 'feed', 'effect', 'frozen', 'hurt', 'heal', 'cloak'])
 export const instant = (e: GameEvent) => INSTANT.has(e.type)
 
 /** A unit's ms per tile. */
@@ -103,7 +103,6 @@ export function beatMs(events: GameEvent[], pace: Map<number, number>, shown: Se
     else if (e.type === 'reveal' || e.type === 'wave') ms += e.units.some((u) => shown.has(u.id)) ? PACE.reveal : 0
     else if (e.type === 'spawn') ms += shown.has(e.unit.id) ? PACE.reveal : 0
     else if (e.type === 'death' || e.type === 'saved' || e.type === 'escaped') ms += PACE.death
-    else if (e.type === 'used') ms += PACE.reveal
     else if (e.type === 'effect') ms += PACE.cancel
   }
   return ms + walk

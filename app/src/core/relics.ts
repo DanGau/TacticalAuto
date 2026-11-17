@@ -33,14 +33,11 @@ export interface Relic extends Flow {
   recon?: boolean
   /** Added to the supplies each civilian saved pays. */
   civilianSupplies?: number
-  /** Whether a fight won with no boon charges the reservoir, which spends BOON_CHARGES to take a second boon in. */
-  boons?: true
   /** Supplies each STREAK_FIGHTS fights in a row won pay. */
   streak?: number
 }
 
-/** Charges a second boon costs, and the fights in a row a clean streak pays after. */
-export const BOON_CHARGES = 3
+/** The fights in a row a clean streak pays after. */
 export const STREAK_FIGHTS = 2
 /** The battles Zenith Chronometer's come every. */
 export const ZENITH_EVERY = 3
@@ -75,7 +72,7 @@ const relics = {
   impetus: { name: 'Kinetic Engine', text: 'Whenever you knock an alien into something or off a ledge, deal your damage to it again.', reads: ['impact'], effect: 'impetus' },
   catalyst: { name: 'Catalyst Prism', text: `Every ${CATALYST_EVERY}rd hit you land doubles the Burn, Chill and Mark on its target.`, reads: ['burn', 'chill', 'mark', 'shots'], rarity: 'epic', effect: 'catalyst' },
   chrono: { name: 'Chrono Coil', text: 'Every 3rd turn, double your attacks.', effect: 'chrono' },
-  reservoir: { name: 'Boon Reservoir', text: `Each battle won with no boon adds 1 charge. At ${BOON_CHARGES} charges, take a second boon into a battle.`, boons: true },
+  rack: { name: 'Boon Rack', text: 'Hold 1 more boon.' },
   zenith: { name: 'Zenith Chronometer', text: `Every ${ZENITH_EVERY}rd battle, your tier 4 skill has 2 uses.`, rarity: 'epic', effect: 'zenith' },
   streak: { name: 'Unbroken Line', text: `Every ${STREAK_FIGHTS}nd battle won in a row pays 3 more supplies.`, rarity: 'common', streak: 3 },
   fracture: { name: 'Frost Fracture', text: `Whenever a Frozen alien dies, deal ${FRACTURE_DAMAGE} damage per Chill on it to each alien beside it.`, reads: ['chill', 'kill'], rarity: 'epic', effect: 'fracture' },

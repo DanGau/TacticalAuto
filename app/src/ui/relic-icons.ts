@@ -32,7 +32,7 @@ export const RELIC_ICONS: Record<RelicId, string> = {
   impetus: '<path d="M2 12h12M10 7l5 5-5 5M19 2v20M22 5l-3 3M22 12l-3 1M22 19l-3-3"/>',
   catalyst: '<path d="M12 3l8 15H4zM1 10l7 4M16 13l7-3M16 15l7 2"/>',
   chrono: '<circle cx="12" cy="13" r="8.5"/><path d="M12 8v5l3 2M9 2h6"/>',
-  reservoir: '<path d="M9 2h6M10 2v6L4.5 18.5A2 2 0 0 0 6.3 21h11.4a2 2 0 0 0 1.8-2.5L14 8V2M7 14h10"/>',
+  rack: '<path d="M9 2h6M10 2v6L4.5 18.5A2 2 0 0 0 6.3 21h11.4a2 2 0 0 0 1.8-2.5L14 8V2M7 14h10"/>',
   zenith: '<path d="M5 2h14M5 22h14M7 2c0 5 5 7 5 10s-5 5-5 10M17 2c0 5-5 7-5 10s5 5 5 10"/>',
   streak: '<path d="M5 21l7-5 7 5M5 14.5l7-5 7 5M5 8l7-5 7 5"/>',
   fracture: '<path d="M12 2l8 10-8 10-8-10zM12 2l-1.5 6 3 3-3 4 1.5 7M7.5 7.5l3 1M16.5 16.5l-3-1.5"/>',

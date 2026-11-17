@@ -51,7 +51,7 @@ import { REST_COLUMNS } from './progress'
 import { powerOf, SKILLS } from './skills'
 import { atKey, road, enterAt, begun } from './roads'
 import { RELICS } from './relics'
-import { SHOP_UTILITIES, UTILITY_SLOTS } from './utilities'
+import { SHOP_UTILITIES, UTILITY_IDS, UTILITY_SLOTS } from './utilities'
 
 /** A run whose hero has learned its first skill, so the overworld waits. */
 function started(): Run {
@@ -452,7 +452,7 @@ test('a satellite won offers three relics; a relic held changes the run', () => 
   expect(paid(['contact']).finds.every((find) => find.rarity !== 'common')).toBe(true)
 })
 
-test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the hero lacks, utilities, and a medkit, each sold once and kept in its place; and is left for the road", () => {
+test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the hero lacks, boons, and a medkit, each sold once and kept in its place; and is left for the road", () => {
   const run = travelling(['shop', 'battle'])
   expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: false, reason: 'not in a shop' })
   apply(run, { type: 'advance' })
@@ -478,18 +478,19 @@ test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the
   expect(shop.relics[last]).toEqual({ id: relic, sold: true })
   expect(apply(run, { type: 'buy', index: last }).ok).toBe(false)
   expect(new Set(shop.utilities.map((c) => c.id)).size).toBe(SHOP_UTILITIES)
-  run.utilities = Array(UTILITY_SLOTS - 1).fill('hover')
+  const others = UTILITY_IDS.filter((id) => id !== shop.utilities[0].id).map((id) => ({ id, level: 1 }))
+  run.utilities = others.slice(0, UTILITY_SLOTS - 1)
   expect(apply(run, { type: 'utility', index: 0 })).toEqual({ ok: true })
-  expect(run.utilities.at(-1)).toBe(shop.utilities[0].id)
+  expect(run.utilities.at(-1)).toEqual({ id: shop.utilities[0].id, level: 1 })
   expect(run.spare).toBeNull()
-  run.utilities = Array(UTILITY_SLOTS).fill('mending')
+  run.utilities = others.slice(0, UTILITY_SLOTS)
   shop.utilities[0].sold = false
   expect(apply(run, { type: 'utility', index: 0 })).toEqual({ ok: true })
   expect(run.spare).toBe(shop.utilities[0].id)
   run.hero.wounds = 6
   const held = [...run.utilities]
   expect(apply(run, { type: 'keep', drop: 0 })).toEqual({ ok: true })
-  expect(run.utilities).toEqual([shop.utilities[0].id, ...held.slice(1)])
+  expect(run.utilities).toEqual([{ id: shop.utilities[0].id, level: 1 }, ...held.slice(1)])
   expect(apply(run, { type: 'medkit' })).toEqual({ ok: true })
   expect(run.hero.wounds).toBe(6 - MEDKIT.heal)
   expect(apply(run, { type: 'medkit' }).ok).toBe(false)

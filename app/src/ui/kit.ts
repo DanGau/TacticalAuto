@@ -1,6 +1,5 @@
 // A hero's kit grouped by where each part comes from, each tagged as battle callouts tag it; shown on hovering or tapping a hero.
 import { PERKS } from '../core/perks'
-import type { Battle } from '../core/battle'
 import { CLASSES } from '../core/classes'
 import { DOCTRINES } from '../core/doctrines'
 import { EFFECTS } from '../core/gear'
@@ -14,7 +13,8 @@ import { SECONDARIES } from '../core/secondaries'
 import { BASICS, type SrcKind } from '../core/sources'
 import { abilityOf, secondaryOf } from '../core/hero'
 import { SKILLS } from '../core/skills'
-import { UTILITIES } from '../core/utilities'
+import { boonName, boonText } from '../core/utilities'
+import { boonIcon } from './boon-icons'
 import { WEAPONS } from '../core/weapons'
 import { css } from '../view/shapes'
 import { SOURCE } from '../view/palette'
@@ -27,7 +27,7 @@ export const tag = (kind: SrcKind, name: string, title = '') => `<span class="sr
 export const basicsOf = (hero: Soldier) => [BASICS.attack, BASICS.jump, ...(hero.perks.includes('heave') ? [BASICS.throw] : [])]
 
 /** What a hero has in a battle, by source: each part's name and what it does. */
-export function kitOf(run: Run, hero: Soldier, battle: Battle | null): [SrcKind, { name: string; text: string }[]][] {
+export function kitOf(run: Run, hero: Soldier): [SrcKind, { name: string; text: string }[]][] {
   const weapon = hero.gear ? WEAPONS[hero.gear.weapon] : null
   const ability = abilityOf(hero)
   const groups: [SrcKind, { name: string; text: string }[]][] = [
@@ -39,14 +39,14 @@ export function kitOf(run: Run, hero: Soldier, battle: Battle | null): [SrcKind,
     ['gear', hero.gear?.effect ? [{ name: EFFECTS[hero.gear.effect].prefix, text: EFFECTS[hero.gear.effect].text }] : []],
     ['relic', run.relics.map((id) => ({ name: `${relicIcon(id)} ${RELICS[id].name}`, text: RELICS[id].text }))],
     ['doctrine', run.doctrines.map((id) => DOCTRINES[id])],
-    ['boon', (battle?.boons ?? []).filter((b) => b.until > battle!.round).map((b) => UTILITIES[b.id])],
+    ['boon', run.utilities.map((h) => ({ name: `${boonIcon(h.id)} ${boonName(h.id, h.level)}`, text: boonText(h.id, h.level) }))],
   ]
   return groups.filter(([, parts]) => parts.length > 0)
 }
 
 /** A hero's kit as a card. */
-export const kitCard = (run: Run, hero: Soldier, battle: Battle | null) =>
-  `<b>${hero.name}</b>${kitOf(run, hero, battle)
+export const kitCard = (run: Run, hero: Soldier) =>
+  `<b>${hero.name}</b>${kitOf(run, hero)
     .map(([kind, parts]) => `<div class="kit-row"><small>${kind}</small>${parts.map((p) => tag(kind, p.name, p.text)).join(' ')}</div>`)
     .join('')}`
 
@@ -62,7 +62,7 @@ export function installKit(view: View, run: Run): void {
     const hero = unit && unit.soldier === run.hero.id ? run.hero : undefined
     card.hidden = !hero
     if (!hero) return
-    card.innerHTML = kitCard(run, hero, battle)
+    card.innerHTML = kitCard(run, hero)
     card.style.left = `${Math.min(e.clientX + 14, innerWidth - card.offsetWidth - 8)}px`
     card.style.top = `${Math.max(8, e.clientY - card.offsetHeight - 14)}px`
   }

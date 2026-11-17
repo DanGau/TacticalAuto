@@ -7,15 +7,14 @@ import type { ClassId } from '../core/classes'
 import { generateGear } from '../core/gear'
 import { powerOf } from '../core/skills'
 import { GOALS, type Goal } from '../core/goals'
-import { fuelTanks } from '../core/objects'
 import { offerable } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { road } from '../core/roads'
-import { createRun, legOf } from '../core/run'
+import { createRun, legOf, refit } from '../core/run'
 import { type Run } from '../core/run-state'
 import { minorOffers, skillOffers, soldierStats, xpFor } from '../core/hero'
 import { timedFlow } from '../core/step'
-import { carries, UTILITY_IDS, type UtilityId } from '../core/utilities'
+import { UTILITY_IDS, type UtilityId } from '../core/utilities'
 
 const { values } = parseArgs({ options: { runs: { type: 'string', default: '30' }, challenge: { type: 'string', default: '' }, leg: { type: 'string', default: '0,1,2' }, rung: { type: 'string', default: '0,1,2' }, goal: { type: 'string', default: 'cross' }, cls: { type: 'string', default: '' }, none: { type: 'boolean', default: false } } })
 
@@ -26,7 +25,7 @@ const levelAt = (leg: number, rung: number) => leg * 3 + 2 + rung
 function battle(seed: number, leg: number, rung: number, challenge: ChallengeId, utility: UtilityId | null, goal: Goal): { won: boolean; hurt: number; seconds: number } {
   const run = createRun(seed)
   apply(run, { type: 'hero', index: seed % run.candidates.length })
-  apply(run, { type: 'boons', picks: [0, 1] })
+  apply(run, { type: 'boons', picks: [0, 1, 2] })
   const hero = run.hero
   if (values.cls) {
     hero.cls = values.cls as ClassId
@@ -44,10 +43,9 @@ function battle(seed: number, leg: number, rung: number, challenge: ChallengeId,
   legOf(run).path = Array<number>(run.stop).fill(-1)
   road(run, [stop])
   apply(run, { type: 'advance' })
-  const held = utility ? [utility] : []
-  run.utilities = held
-  const usable = utility !== 'tank' || fuelTanks(run.battle!).length > 0
-  apply(run, held.length > 0 && usable ? { type: 'enter', utility: 0, tank: Math.max(0, fuelTanks(run.battle!).length - 1) } : { type: 'enter' })
+  run.utilities = utility ? [{ id: utility, level: 1 }] : []
+  refit(run)
+  apply(run, { type: 'enter' })
   let clock = { next: 0, done: 0 }
   while ((run.phase as Run['phase']) === 'battle') clock = timedFlow(run, clock).clock
   return { won: run.report!.won, hurt: 1 - run.report!.hero!.hp / soldierStats(run, hero).hp, seconds: clock.done / 1000 }
@@ -61,7 +59,7 @@ for (const challenge of challenges) {
   for (const leg of values.leg.split(',').map(Number)) {
     for (const rung of values.rung.split(',').map(Number)) {
       const answers = CHALLENGES[challenge].answers
-      const others = UTILITY_IDS.filter((id) => !carries(id, answers))
+      const others = UTILITY_IDS.filter((id) => !answers.includes(id))
       for (const utility of (values.none ? [null] : [null, ...answers, 'other']) as (UtilityId | 'other' | null)[]) {
         const results = Array.from({ length: runs }, (_, i) => battle(1000 + i, leg, rung, challenge, utility === 'other' ? others[i % others.length] : utility, values.goal as Goal))
         const mean = (value: (r: (typeof results)[number]) => number) => results.reduce((sum, r) => sum + value(r), 0) / runs

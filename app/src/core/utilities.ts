@@ -1,135 +1,112 @@
-// Boons: what each does, how long it lasts, how rare it is, how many the hero holds, and where it finds them.
-import type { Rarity } from './base'
-import { HIGH_CRIT, REPULSE_TILES } from './battle'
+// Boons: the hero's field kit, held for the run in a few slots, each working in every battle; what each does at each level.
+import type { Effect, Stats } from './battle'
+import { EFFECTS } from './gear'
+import { PERKS } from './perks'
+import type { Flow } from './quantities'
 
-/** What a boon can do: a common boon does one; a combo one at full strength and one or two MinorIds at less. */
-export type EffectId =
-  | 'thrusters' | 'hover' | 'overcharge' | 'crack' | 'tank' | 'smoke' | 'flashbang' | 'rangedShield' | 'meleeShield'
-  | 'mending' | 'ironSkin' | 'farsight' | 'keen' | 'coldSnap' | 'blaze' | 'hunted' | 'gravity' | 'dampener' | 'push'
-export type ComboId = 'stormfront' | 'bulwark' | 'warpath' | 'deadeye' | 'smokescreen' | 'skyborne' | 'executioner' | 'inferno' | 'siegebreaker' | 'phalanx' | 'eclipse' | 'tempest'
-/** Kept for the run and never used up: at each deploy screen the player picks one held for that fight. */
-export type UtilityId = EffectId | ComboId
+/** How a boon helps: the plain thing it raises. */
+export type Category = 'damage' | 'soak' | 'mitigation' | 'speed' | 'jump height' | 'jump length' | 'knockback' | 'range'
 
-/** Move Thrusters add, and damage Overcharge adds. */
-export const THRUST = 3
-export const OVERCHARGE = 2
-/** How far an alien in smoke can shoot. */
-export const SMOKE_REACH = 2
-/** Alien turns a flashbang stuns the nearest cluster, its boss one fewer. */
-export const STUN_TURNS = 2
-/** A rigged tank: blows once `crowd` aliens stand within `near` tiles of it; `damage` to every alien within `radius` and every hero within `close`, and fire within `fireReach` for `fireTurns`. */
-export const RIG = { crowd: 3, near: 4, radius: 6, close: 2, damage: 10, fireReach: 4, fireTurns: 4 }
-/** Health Mending gives back a turn; armor Stoneskin adds; range Farsight adds; crit Keen adds; move Gravity Well and damage Dampener take. */
-export const MEND = 2
-export const IRON_SKIN = 3
-export const FARSIGHT = 2
-export const KEEN = 0.25
-export const GRAVITY = 2
-export const DAMPEN = 2
-/** Tiles of the way in Wildfire sets aliens burning within. */
-export const BLAZE_REACH = 6
+export type UtilityId =
+  | 'incendiary' | 'cryo' | 'overcharge' | 'plasma' | 'hollowPoint' | 'tracer'
+  | 'nanoweave' | 'leech' | 'regen'
+  | 'plating' | 'bracing' | 'ablative' | 'deflector' | 'riot'
+  | 'afterburner' | 'hoverPack' | 'gravBoots' | 'jumpJets'
+  | 'gauntlet' | 'concussion' | 'thermite' | 'cryoRams'
+  | 'longshot' | 'suppression'
 
-/** What each effect a combo can carry as minor gives at full strength, and as minor. */
-export const STRENGTH = { thrusters: THRUST, overcharge: OVERCHARGE, ironSkin: IRON_SKIN, farsight: FARSIGHT, keen: KEEN, gravity: GRAVITY, dampener: DAMPEN, mending: MEND }
-export type MinorId = keyof typeof STRENGTH
-export const MINOR: Record<MinorId, number> = { thrusters: 2, overcharge: 1, ironSkin: 2, farsight: 1, keen: 0.15, gravity: 1, dampener: 1, mending: 1 }
-
-const SCALED: Record<MinorId, (n: number) => string> = {
-  thrusters: (n) => `Have ${n} more move.`,
-  overcharge: (n) => `Deal ${n} more damage.`,
-  ironSkin: (n) => `Have ${n} more Armor.`,
-  farsight: (n) => `Have ${n} more range.`,
-  keen: (n) => `Have ${Math.round(n * 100)}% more Crit chance.`,
-  gravity: (n) => `Aliens have ${n} less move.`,
-  dampener: (n) => `Aliens deal ${n} less damage, down to 1.`,
-  mending: (n) => `At the start of your turn, heal ${n}.`,
+/** A boon held, at its level. */
+export interface Held {
+  id: UtilityId
+  level: number
 }
-const full = (id: MinorId) => SCALED[id](STRENGTH[id])
 
-interface Kind {
+/** The highest level a boon reaches; one gained again while held rises a level. */
+export const MAX_LEVEL = 3
+
+/** What a boon adds that is no stat: damage each hit on the hero loses, health it heals a turn, tiles Force Gauntlet drives. */
+export type Rider = 'guard' | 'regen' | 'push'
+
+interface Kind extends Flow {
   name: string
-  icon: string
-  text: string
-  rounds: number
-  rarity: Rarity
+  category: Category
+  /** The effects it lends the hero, each working as on gear, a skill or a perk. */
+  lends: Effect[]
+  /** What it adds at levels 1, 2 and 3, to a stat or a rider. */
+  adds: { to: keyof Stats | Rider; by: [number, number, number] }
+  /** What its lent effects do, apart from what it adds. */
+  text?: string
 }
 
-const SINGLES: Record<EffectId, Kind> = {
-  thrusters: { name: 'Swiftness', icon: '💨', text: full('thrusters'), rounds: 3, rarity: 'common' },
-  hover: { name: 'Levitation', icon: '🪽', text: 'Cross mire, cliffs and steep ground at no extra cost. Float over chasms and water.', rounds: 6, rarity: 'common' },
-  overcharge: { name: 'Overcharge', icon: '⚡', text: full('overcharge'), rounds: 3, rarity: 'common' },
-  crack: { name: 'Sunder', icon: '🔨', text: 'Ignore Armor.', rounds: 2, rarity: 'rare' },
-  tank: { name: 'Rigged Tank', icon: '🛢️', text: `Choose a fuel tank. Once ${RIG.crowd} aliens are within ${RIG.near} tiles of it, it explodes: ${RIG.damage} damage to each alien within ${RIG.radius} tiles and to you within ${RIG.close}, and fire.`, rounds: 4, rarity: 'rare' },
-  smoke: { name: 'Obscuring Mist', icon: '🌫️', text: `Aliens cannot shoot farther than ${SMOKE_REACH} tiles.`, rounds: 3, rarity: 'common' },
-  flashbang: { name: 'Blinding Flash', icon: '✴️', text: `When you land, Stun the nearest cluster for ${STUN_TURNS} rounds, a boss for ${STUN_TURNS - 1}.`, rounds: STUN_TURNS, rarity: 'rare' },
-  rangedShield: { name: 'Ranged Shield', icon: '🛡️', text: "Hits on you from beyond arm's reach deal half damage, rounded up.", rounds: 3, rarity: 'common' },
-  meleeShield: { name: 'Melee Shield', icon: '🔰', text: "Hits and blasts on you from arm's reach deal half damage, rounded up.", rounds: 3, rarity: 'common' },
-  mending: { name: 'Mending', icon: '💚', text: full('mending'), rounds: 4, rarity: 'common' },
-  ironSkin: { name: 'Stoneskin', icon: '🪨', text: full('ironSkin'), rounds: 3, rarity: 'common' },
-  farsight: { name: 'Farsight', icon: '🔭', text: full('farsight'), rounds: 3, rarity: 'common' },
-  keen: { name: 'Keen Eye', icon: '👁️', text: `${full('keen')} Have ${100 * HIGH_CRIT}% more Crit chance per level above your target.`, rounds: 3, rarity: 'common' },
-  coldSnap: { name: 'Cold Snap', icon: '❄️', text: 'Turn the water in the arena to ice. At the start of your turn, apply 1 Chill to each alien in the fight.', rounds: 3, rarity: 'rare' },
-  blaze: { name: 'Wildfire', icon: '🔥', text: `At the start of your turn, apply 1 Burn to each alien within ${BLAZE_REACH} tiles of your landing.`, rounds: 2, rarity: 'common' },
-  hunted: { name: 'Prey', icon: '🎯', text: 'The alien with the most max HP takes 50% more damage.', rounds: 3, rarity: 'common' },
-  gravity: { name: 'Gravity Well', icon: '🌀', text: full('gravity'), rounds: 3, rarity: 'common' },
-  dampener: { name: 'Dampener', icon: '🔇', text: full('dampener'), rounds: 2, rarity: 'rare' },
-  push: { name: 'Force Push', icon: '👐', text: `Whenever you hit an alien, Displace it ${REPULSE_TILES} tiles back. Off a ledge or the edge, it falls.`, rounds: 3, rarity: 'common' },
+const gear = (id: keyof typeof EFFECTS) => ({ lends: [id], text: EFFECTS[id].text, makes: EFFECTS[id].makes, reads: EFFECTS[id].reads })
+
+export const UTILITIES: Record<UtilityId, Kind> = {
+  incendiary: { name: 'Incendiary Rounds', category: 'damage', ...gear('incendiary'), adds: { to: 'damage', by: [0, 1, 2] } },
+  cryo: { name: 'Cryo Payload', category: 'damage', ...gear('frostbite'), adds: { to: 'damage', by: [0, 1, 2] } },
+  overcharge: { name: 'Overcharged Cell', category: 'damage', ...gear('arc'), adds: { to: 'crit', by: [0.1, 0.2, 0.3] }, makes: ['crit'] },
+  plasma: { name: 'Plasma Lance', category: 'damage', ...gear('piercing'), adds: { to: 'damage', by: [1, 2, 3] } },
+  hollowPoint: { name: 'Hollow Points', category: 'damage', ...gear('executioner'), adds: { to: 'damage', by: [0, 1, 2] } },
+  tracer: { name: 'Tracer Feed', category: 'damage', ...gear('tracer'), adds: { to: 'damage', by: [0, 1, 2] } },
+  nanoweave: { name: 'Nanoweave', category: 'soak', lends: [], adds: { to: 'hp', by: [4, 7, 10] } },
+  leech: { name: 'Leech Rounds', category: 'soak', ...gear('vampiric'), adds: { to: 'hp', by: [0, 3, 6] } },
+  regen: { name: 'Regen Gel', category: 'soak', lends: [], adds: { to: 'regen', by: [1, 2, 3] } },
+  plating: { name: 'Kinetic Plating', category: 'mitigation', lends: [], adds: { to: 'armor', by: [3, 5, 7] }, makes: ['armor'] },
+  bracing: { name: 'Reactive Bracing', category: 'mitigation', ...gear('braced'), adds: { to: 'armor', by: [0, 2, 4] } },
+  ablative: { name: 'Ablative Field', category: 'mitigation', lends: [], adds: { to: 'guard', by: [1, 2, 3] } },
+  deflector: { name: 'Deflector Screen', category: 'mitigation', lends: ['rangedShield'], text: "Hits on you from beyond arm's reach deal half damage, rounded up.", adds: { to: 'armor', by: [0, 2, 4] } },
+  riot: { name: 'Riot Shield', category: 'mitigation', lends: ['meleeShield'], text: "Hits and blasts on you from arm's reach deal half damage, rounded up.", adds: { to: 'armor', by: [0, 2, 4] } },
+  afterburner: { name: 'Afterburners', category: 'speed', lends: [], adds: { to: 'move', by: [2, 3, 4] } },
+  hoverPack: { name: 'Hover Pack', category: 'speed', lends: ['hover'], text: 'Cross mire, cliffs and steep ground at no extra cost. Float over chasms and water.', adds: { to: 'move', by: [0, 1, 2] } },
+  gravBoots: { name: 'Grav Boots', category: 'jump height', ...gear('lofty'), adds: { to: 'jump', by: [1, 2, 3] } },
+  jumpJets: { name: 'Jump Jets', category: 'jump length', lends: ['crashLanding'], text: PERKS.crashLanding.text, adds: { to: 'span', by: [1, 2, 3] } },
+  gauntlet: { name: 'Force Gauntlet', category: 'knockback', lends: ['repulse'], adds: { to: 'push', by: [2, 3, 4] }, makes: ['moved', 'impact'] },
+  concussion: { name: 'Concussion Shells', category: 'knockback', ...gear('thunder'), adds: { to: 'damage', by: [0, 1, 2] } },
+  thermite: { name: 'Thermite Rams', category: 'knockback', lends: ['shove', 'kiln'], text: `${EFFECTS.shove.text} ${EFFECTS.kiln.text}`, makes: ['moved', 'impact', 'burn'], reads: ['impact'], adds: { to: 'damage', by: [0, 1, 2] } },
+  cryoRams: { name: 'Cryo Rams', category: 'knockback', lends: ['shove', 'quench'], text: `${EFFECTS.shove.text} ${EFFECTS.quench.text}`, makes: ['moved', 'impact', 'chill'], reads: ['impact'], adds: { to: 'damage', by: [0, 1, 2] } },
+  longshot: { name: 'Longshot Optics', category: 'range', lends: [], adds: { to: 'range', by: [2, 3, 4] } },
+  suppression: { name: 'Suppression Scope', category: 'range', ...gear('sapping'), adds: { to: 'range', by: [1, 2, 3] } },
 }
-
-/** Combos: the major effect, then the minor ones. One minor makes a combo rare, two epic. */
-const COMBOS: Record<ComboId, { name: string; icon: string; rounds: number; major: EffectId; minor: MinorId[] }> = {
-  stormfront: { name: 'Stormfront', icon: '🌨️', rounds: 3, major: 'coldSnap', minor: ['gravity'] },
-  bulwark: { name: 'Bulwark', icon: '🏰', rounds: 3, major: 'ironSkin', minor: ['mending'] },
-  warpath: { name: 'Warpath', icon: '🐗', rounds: 3, major: 'overcharge', minor: ['thrusters'] },
-  deadeye: { name: 'Deadeye', icon: '🦅', rounds: 3, major: 'farsight', minor: ['keen'] },
-  smokescreen: { name: 'Smokescreen', icon: '☁️', rounds: 3, major: 'smoke', minor: ['dampener'] },
-  skyborne: { name: 'Skyborne', icon: '🪂', rounds: 6, major: 'hover', minor: ['farsight'] },
-  executioner: { name: 'Executioner', icon: '🪓', rounds: 3, major: 'hunted', minor: ['overcharge'] },
-  inferno: { name: 'Inferno', icon: '🌋', rounds: 2, major: 'blaze', minor: ['overcharge', 'keen'] },
-  siegebreaker: { name: 'Siegebreaker', icon: '⚒️', rounds: 2, major: 'crack', minor: ['overcharge', 'keen'] },
-  phalanx: { name: 'Phalanx', icon: '🪖', rounds: 3, major: 'meleeShield', minor: ['ironSkin', 'mending'] },
-  eclipse: { name: 'Eclipse', icon: '🌑', rounds: 2, major: 'flashbang', minor: ['dampener', 'gravity'] },
-  tempest: { name: 'Tempest', icon: '🌪️', rounds: 3, major: 'rangedShield', minor: ['thrusters', 'farsight'] },
-}
-
-/** One effect of a boon; a minor one gives MINOR in place of STRENGTH. */
-export interface Part {
-  id: EffectId
-  minor?: true
-}
-
-type Utility = Kind & { parts: Part[] }
-
-/** `rounds`: the rounds its bonus lasts from the landing. `parts`: what it does, its major effect first. */
-export const UTILITIES = {
-  ...Object.fromEntries(Object.entries(SINGLES).map(([id, kind]) => [id, { ...kind, parts: [{ id }] }])),
-  ...Object.fromEntries(
-    Object.entries(COMBOS).map(([id, { major, minor, ...kind }]) => [
-      id,
-      { ...kind, rarity: minor.length > 1 ? 'epic' : 'rare', parts: [{ id: major }, ...minor.map((m) => ({ id: m, minor: true }))], text: [SINGLES[major].text, ...minor.map((m) => SCALED[m](MINOR[m]))].join(' ') },
-    ]),
-  ),
-} as Record<UtilityId, Utility>
-
-/** The effects a boon carries, major first. */
-export const effectsOf = (id: UtilityId): EffectId[] => UTILITIES[id].parts.map((p) => p.id)
-
-/** Whether boon `id` carries one of the effects `of`. */
-export const carries = (id: UtilityId, of: readonly EffectId[]) => effectsOf(id).some((e) => of.includes(e))
-
-/** What a boon does, and for how long. */
-export const boonText = (id: UtilityId) => `${UTILITIES[id].text} Lasts ${UTILITIES[id].rounds} rounds.`
 
 export const UTILITY_IDS = Object.keys(UTILITIES) as UtilityId[]
 
-/** Utilities the hero holds at most, those a shop stocks, and what one costs. */
+/** What boon `id` adds at `level`. */
+export const amountOf = (id: UtilityId, level: number) => UTILITIES[id].adds.by[Math.min(level, MAX_LEVEL) - 1]
+
+/** What each stat or rider's amount reads as. */
+const ADDS: Record<keyof Stats | Rider, (n: number) => string> = {
+  hp: (n) => `Have ${n} more max HP.`,
+  armor: (n) => `Gain ${n} Armor.`,
+  damage: (n) => `Deal ${n} more damage.`,
+  range: (n) => `Have ${n} more range.`,
+  move: (n) => `Have ${n} more move.`,
+  crit: (n) => `Have ${Math.round(n * 100)}% more Crit chance.`,
+  strength: (n) => `Have ${n} more strength.`,
+  jump: (n) => `Leap ${n} more levels up or down a ledge.`,
+  span: (n) => `Leap gaps of void or water ${n} more tiles wide.`,
+  guard: (n) => `Take ${n} less damage from each hit, down to 1.`,
+  regen: (n) => `At the start of your turn, heal ${n}.`,
+  push: (n) => `Whenever you hit an alien, Displace it ${n} tiles back. Off a ledge or the edge, it falls.`,
+}
+
+/** What boon `id` does at `level`. */
+export function boonText(id: UtilityId, level = 1): string {
+  const { text, adds } = UTILITIES[id]
+  const n = amountOf(id, level)
+  return [text, n > 0 ? ADDS[adds.to](n) : ''].filter(Boolean).join(' ')
+}
+
+/** A boon's name with its level past the first, as II or III. */
+export const boonName = (id: UtilityId, level = 1) => `${UTILITIES[id].name}${level > 1 ? ` ${'I'.repeat(level)}` : ''}`
+
+
+
+/** What the boons `held` add to the hero's stat `key`. */
+export const boonStat = (held: Held[], key: keyof Stats | Rider) => held.reduce((sum, h) => sum + (UTILITIES[h.id].adds.to === key ? amountOf(h.id, h.level) : 0), 0)
+
+/** Boons the hero holds at most and starts the run with; those a shop stocks, and what one costs. */
 export const UTILITY_SLOTS = 3
 export const SHOP_UTILITIES = 1
 export const UTILITY_PRICE = 6
 
-/** How often each rarity of boon is drawn against the others. */
-export const BOON_WEIGHT: Record<Rarity, number> = { common: 6, rare: 3, epic: 1 }
-
-/** Commons offered at the run's start, and how many the hero takes. */
-export const START_OFFERS = 3
-export const START_PICKS = 2
+/** Boons offered at the run's start, of which the hero takes UTILITY_SLOTS. */
+export const START_OFFERS = 5

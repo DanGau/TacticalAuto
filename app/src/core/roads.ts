@@ -32,7 +32,7 @@ export function begun(seed: number): Run {
   run.candidates[0].skills = [powerOf('sniper')]
   run.candidates[0].gear = { id: 0, rarity: 'common', name: 'Rifle', weapon: 'rifle', stats: {}, effect: null }
   apply(run, { type: 'hero', index: 0 })
-  apply(run, { type: 'boons', picks: [0, 1] })
+  apply(run, { type: 'boons', picks: [0, 1, 2] })
   run.utilities = []
   return run
 }

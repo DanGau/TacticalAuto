@@ -1,8 +1,6 @@
 // The player's actions, checked and applied to the run: the only way a player changes state.
 import { land } from './landing'
-import { fuelTanks } from './objects'
-import { BOON_CHARGES } from './relics'
-import { START_PICKS, UTILITY_PRICE } from './utilities'
+import { UTILITY_PRICE, UTILITY_SLOTS } from './utilities'
 import { arrive, MEDKIT, depart, EVENTS, RELIC_PRICE } from './events'
 import { advance, choose, current, go, nextStop, ways } from './run'
 import { type Run } from './run-state'
@@ -19,7 +17,7 @@ import { minorOffers, skillOffers } from './hero'
 export type Action =
   /** At the run's start: take the candidate at `index` of run.candidates as the run's hero. */
   | { type: 'hero'; index: number }
-  /** Run start: take the offers at `picks` of run.boonOffers, START_PICKS of them. */
+  /** Run start: take the offers at `picks` of run.boonOffers, UTILITY_SLOTS of them. */
   | { type: 'boons'; picks: number[] }
   /** Shop: buy the gear at `index` of shop.wares for the hero to wield, discarding what it replaces. */
   | { type: 'gear'; index: number }
@@ -27,7 +25,7 @@ export type Action =
   | { type: 'buy'; index: number }
   /** Shop: buy the utility at `index` of shop.utilities. */
   | { type: 'utility'; index: number }
-  /** Shop or reward phase, with a utility to spare: drop the one held at `drop`, or with -1, the new one. */
+  /** With a new boon gained: slot it in for the one held at `drop`, or with -1 leave it. */
   | { type: 'keep'; drop: number }
   /** Shop: heal the hero some, once. */
   | { type: 'medkit' }
@@ -39,8 +37,8 @@ export type Action =
   | { type: 'go'; index: number }
   /** Overworld: travel to the next stop. */
   | { type: 'advance' }
-  /** Deploy phase: land with the utility held at `utility`, and with the reservoir's charges another at `second`, rigging the tank at `tank` of fuelTanks if one is a tank, and begin. */
-  | { type: 'enter'; utility?: number; tank?: number; second?: number }
+  /** Deploy phase: land, and begin. */
+  | { type: 'enter' }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
   /** Reward phase: put the find at `find` of run.finds on the hero, discarding what it replaces. */
@@ -75,27 +73,21 @@ export function apply(run: Run, action: Action): Result {
   if (action.type === 'boons') {
     const { picks } = action
     if (run.boonOffers.length === 0) return no('no boons on offer')
-    if (picks.length !== Math.min(START_PICKS, run.boonOffers.length) || new Set(picks).size !== picks.length || picks.some((i) => !run.boonOffers[i])) return no(`pick ${START_PICKS} offers`)
+    if (picks.length !== Math.min(UTILITY_SLOTS, run.boonOffers.length) || new Set(picks).size !== picks.length || picks.some((i) => !run.boonOffers[i])) return no(`pick ${UTILITY_SLOTS} offers`)
     takeStart(run, picks)
     return ok
   }
   if (run.boonOffers.length > 0) return no('pick the starting boons first')
-  if (run.spare !== null && action.type !== 'keep') return no('choose what to drop first')
+  if (run.spare !== null && action.type !== 'keep') return no('slot in or leave the new boon first')
   if (action.type === 'enter') {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not entering')
-    const utility = action.utility === undefined ? null : run.utilities[action.utility]
-    if (utility === undefined) return no('no such utility')
-    const second = action.second === undefined ? null : run.utilities[action.second]
-    if (second === undefined || (second && (second === utility || run.boons < BOON_CHARGES))) return no('no second boon to take')
-    if ((utility === 'tank' || second === 'tank') && !fuelTanks(battle)[action.tank ?? 0]) return no('no such tank')
-    if (second) run.boons -= BOON_CHARGES
-    land(battle, utility, action.tank, second)
+    land(battle)
     return ok
   }
   if (action.type === 'keep') {
-    if (run.spare === null) return no('no utility to spare')
-    if (action.drop !== -1 && !run.utilities[action.drop]) return no('no such utility')
+    if (run.spare === null) return no('no new boon')
+    if (action.drop !== -1 && !run.utilities[action.drop]) return no('no such boon')
     keepUtility(run, action.drop)
     return ok
   }

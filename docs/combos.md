@@ -33,12 +33,45 @@ Example chains: Lodestone pulls an alien onto the tank → it hits the tank → 
 
 Each ground multiplies some quantities, so a build reads the Flight map for ground that suits it (`core/arena-kinds.ts`):
 
-| Ground | Multiplies | Boons that pay |
+| Ground | Multiplies | Boons that answer |
 |---|---|---|
-| Rooftops, Rift, Quarry | Displace: a drop or a terrace kills or hurts | Force Push, Levitation |
-| Overpass, Mesa | Crit and damage from above | Keen Eye, Farsight, Force Push |
-| Flooded, Ice Sheet | Chill: 1 more beside water or on ice; Displace slides on ice | Cold Snap, Force Push |
-| Marsh | Burn: an alien in mire sets the mire about it alight | Wildfire, Levitation |
+| Rooftops, Rift, Quarry | Displace: a drop or a terrace kills or hurts | Force Gauntlet, Concussion Shells, Grav Boots; Jump Jets and Hover Pack over the rift; Thermite Rams on the terraces |
+| Overpass, Mesa | Crit and damage from above | Grav Boots, Longshot Optics, Overcharged Cell |
+| Flooded, Ice Sheet | Chill: 1 more beside water or on ice; Displace slides on ice | Jump Jets, Hover Pack, Cryo Payload, Cryo Rams, Force Gauntlet |
+| Marsh | Burn: an alien in mire sets the mire about it alight | Incendiary Rounds, Thermite Rams, Hover Pack, Afterburners |
+
+## Boons
+
+The hero holds 3, each in every battle (`core/utilities.ts`). Each raises one plain thing, its category, its own way; most lend an effect that makes or reads a quantity, so a boon feeds the build or starts a cancellation. A level raises the number; a NEW boon is slotted in for one held, or left.
+
+| Boon | Category | Effect, level 1 | Makes / reads |
+|---|---|---|---|
+| Incendiary Rounds | damage | Scorching: every hit Burns | Burn / shots |
+| Cryo Payload | damage | Rimed: every hit Chills | Chill / shots |
+| Overcharged Cell | damage | Arcing, 10% more Crit | Crit / Crit |
+| Plasma Lance | damage | Ignore Armor, 1 more damage | |
+| Hollow Points | damage | Merciless: more damage at half HP | Overkill |
+| Tracer Feed | damage | Seeking: every hit Marks | Mark / shots |
+| Nanoweave | soak | 4 more max HP | |
+| Leech Rounds | soak | Leeching: every hit heals | / shots |
+| Regen Gel | soak | heal 1 a turn | |
+| Kinetic Plating | mitigation | 3 Armor | Armor |
+| Reactive Bracing | mitigation | Bracing: every hit gains Armor | Armor / shots |
+| Ablative Field | mitigation | 1 less damage a hit | |
+| Deflector Screen | mitigation | ranged hits halved | |
+| Riot Shield | mitigation | hits at arm's reach halved | |
+| Afterburners | speed | 2 more move | |
+| Hover Pack | speed | float over mire, water, chasms | |
+| Grav Boots | jump height | 1 more jump; Lofty Crit from above | Crit |
+| Jump Jets | jump length | gaps 1 tile wider, water too; Crash Landing | |
+| Force Gauntlet | knockback | every hit Displaces 2 tiles | Displace, Impact |
+| Concussion Shells | knockback | Thundering | Displace, Impact |
+| Thermite Rams | knockback | Shoving and Kilned | Displace, Impact, Burn / Impact |
+| Cryo Rams | knockback | Shoving and Hailing | Displace, Impact, Chill / Impact |
+| Longshot Optics | range | 2 more range | |
+| Suppression Scope | range | Sapping: every hit Weakens; 1 more range | / shots |
+
+Incendiary Rounds beside Cryo Payload, or Thermite Rams beside Cryo Rams, Quench without Thermal Shock Core; Force Gauntlet beside Tracer Feed loses Marks without Lock-On Rig.
 
 ## Cancellations
 

@@ -56,7 +56,7 @@ test('on the flight map, at every stop of every leg, trails never cross nor run 
   for (let seed = 0; seed < SEEDS; seed++) {
     const run = createRun(seed)
     apply(run, { type: 'hero', index: seed % run.candidates.length })
-    apply(run, { type: 'boons', picks: [0, 1] })
+    apply(run, { type: 'boons', picks: [0, 1, 2] })
     for (let key = 0; key < KEYS; key++) {
       for (let stop = 0; stop < legOf(run).columns.length; stop++) {
         check(run, `seed ${seed} leg ${key} stop ${stop} choosing`)
@@ -78,7 +78,7 @@ test('every stop the player can take next is on screen and clear to tap, at ever
   for (let seed = 0; seed < 60; seed++) {
     const run = createRun(seed)
     apply(run, { type: 'hero', index: seed % run.candidates.length })
-    apply(run, { type: 'boons', picks: [0, 1] })
+    apply(run, { type: 'boons', picks: [0, 1, 2] })
     for (let key = 0; key <= KEYS; key++) {
       run.keys = key
       run.stop = 0
@@ -103,7 +103,7 @@ test('the tunnel, taken at every stop of every leg, leaves the hero at its last 
       for (let at = 0; at + 2 < LEG_STOPS; at++) {
         const run = createRun(seed)
         apply(run, { type: 'hero', index: seed % run.candidates.length })
-        apply(run, { type: 'boons', picks: [0, 1] })
+        apply(run, { type: 'boons', picks: [0, 1, 2] })
         run.keys = key
         for (let c = 0; c <= at; c++) {
           legOf(run).path.push(ways(run)[0])

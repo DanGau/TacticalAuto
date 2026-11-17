@@ -77,6 +77,7 @@ export const STAT_NAMES: Record<keyof Stats, string> = {
   crit: "Crit",
   strength: "Strength",
   jump: "Jump",
+  span: "Span",
 };
 
 const percent = (n: number) => `${signed(Math.round(100 * n))}%`;
@@ -91,6 +92,7 @@ const STAT_TEXT: Record<keyof Stats, (n: number) => string> = {
   crit: (n) => `${percent(n)} Crit`,
   strength: (n) => `${signed(n)} strength`,
   jump: (n) => `${signed(n)} jump`,
+  span: (n) => `${signed(n)} span`,
 };
 
 const statText = (stats: Partial<Stats>) =>

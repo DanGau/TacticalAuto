@@ -57,7 +57,7 @@ function outcome(e: GameEvent, names: Names): string {
 export function logLine(run: Run, battle: Battle, names: Names, e: GameEvent): string | null {
   if (!('src' in e) || ((e.type === 'move' || e.type === 'order') && e.src.kind === 'basic')) return null
   // An effect's id is the unit it acts on; its doer is unknown.
-  const actor = e.type === 'effect' || e.type === 'used' ? undefined : e.id
+  const actor = e.type === 'effect' ? undefined : e.id
   const kit = { skills: run.hero.skills, weapons: run.hero.gear ? [run.hero.gear.weapon] : [] }
   const ctx = context(run, e.src, actor ?? (e.type === 'effect' ? e.id : undefined), battle)
   const who = actor !== undefined && actor >= 0 ? names.get(actor) : ''

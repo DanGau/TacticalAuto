@@ -104,9 +104,6 @@ export class Stage {
   readonly sprites = new Map<number, Sprite>()
   /** The hero of the run shown, whose skills and weapon name the effects at work. */
   hero: Run['hero'] | null = null
-  /** Whether the hero holds a rigged tank, so the deploy screen numbers the tanks. */
-  rigging = false
-  /** The boons the hero holds, whose routes the deploy screen draws. */
   /** A red glow under each alien the hero hasn't found, by unit id. */
   readonly glows = new Map<number, { node: Object3D; tile: Tile }>()
   /** Each prop, wall and window on the board, with the tiles that light it: it is lit when a soldier sees any of them. */

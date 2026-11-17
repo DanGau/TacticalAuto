@@ -1,4 +1,5 @@
 // A run's journey: creating it, the route and each leg's map of stops, and moving along it.
+import { UTILITIES } from './utilities'
 import { type Reserve } from './battle'
 import { secondaryOf } from './hero'
 import { createBattle } from './setup'
@@ -338,7 +339,6 @@ export function createRun(seed: number): Run {
     gains: [],
     log: [],
     utilities: [],
-    boons: 0,
     streak: 0,
     spare: null,
     boonOffers: [],
@@ -396,9 +396,16 @@ export function advance(run: Run): void {
   const rules = run.doctrines.map((id) => (DOCTRINES[id] as Doctrine).rule).filter((rule): rule is Rule => !!rule)
   run.mission = mission
   run.phase = 'battle'
+  const challenge = stop === 'battle' || stop === 'key' || stop === 'final' ? here.challenge : null
+  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), [reserveOf(run, rules)], mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city, ground: here.ground } : undefined, challenge)
+  run.battle.boons = run.utilities.map((h) => ({ ...h }))
+}
+
+/** The hero as it goes into a battle under `rules`: its stats, health, kit and every effect it carries, its boons' among them. */
+export function reserveOf(run: Run, rules: Rule[]): Reserve {
   const doctrines = run.doctrines.map((id): Doctrine => DOCTRINES[id])
   const s = run.hero
-  const reserve: Reserve = {
+  return {
     soldier: s.id,
     stats: soldierStats(run, s),
     hp: health(run, s),
@@ -407,12 +414,18 @@ export function advance(run: Run): void {
     secondary: secondaryOf(s),
     weapon: doctrines.find((d) => d.fights)?.fights ?? s.gear?.weapon,
     stance: doctrines.find((d) => d.stance)?.stance ?? weaponOf(s)?.stance ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
-    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...s.perks.flatMap((id) => PERKS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])].filter(
+    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...s.perks.flatMap((id) => PERKS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? []), ...run.utilities.flatMap((h) => UTILITIES[h.id].lends)].filter(
       // Zenith Chronometer works every ZENITH_EVERY battles; under Executioner's Oath a kill pays a hero nothing.
       (effect) => (effect !== 'zenith' || (run.log.length + 1) % ZENITH_EVERY === 0) && !(rules.includes('reckoning') && KILL_REWARDS.includes(effect)),
     ),
   }
-  const challenge = stop === 'battle' || stop === 'key' || stop === 'final' ? here.challenge : null
-  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), [reserve], mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city, ground: here.ground } : undefined, challenge)
 }
+
+/** Gives the battle at its deploy screen the hero's boons as they stand now. */
+export function refit(run: Run): void {
+  const battle = run.battle!
+  battle.reserve = [reserveOf(run, battle.rules)]
+  battle.boons = run.utilities.map((h) => ({ ...h }))
+}
+
 

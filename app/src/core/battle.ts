@@ -11,8 +11,7 @@ import type { DoctrineEffect, Rule } from './doctrines'
 import type { Resist } from './quantities'
 import { type Flow, Goal } from './goals'
 import type { Twist } from './twists'
-import type { UtilityId } from './utilities'
-import type { Boon } from './boons'
+import type { Held } from './utilities'
 import type { ChallengeId } from './challenges'
 import { type Bulk, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
 
@@ -166,9 +165,11 @@ export interface Stats {
   strength: number
   /** Levels it leaps up or down a ledge, landing unhurt; it leaps a gap of one tile fewer. */
   jump: number
+  /** Tiles wider than its jump allows that it leaps a gap of void or water. */
+  span: number
 }
 
-export const BASE_STATS: Stats = { hp: 10, armor: 0, damage: 3, range: 5, move: 4, crit: 0.2, strength: 2, jump: 2 }
+export const BASE_STATS: Stats = { hp: 10, armor: 0, damage: 3, range: 5, move: 4, crit: 0.2, strength: 2, jump: 2, span: 0 }
 
 /** A mech's stats, a frail decoy the aliens must shoot, and a light drone's, before its engineer's skills. */
 export const MECH_STATS: Stats = { ...BASE_STATS, hp: 3, crit: 0.1, range: 4, strength: 4, jump: 1 }
@@ -395,13 +396,8 @@ export interface Battle {
   challenge: ChallengeId | null
   /** The round reinforcements start coming, one clump a round, if the aliens posted are not all down; null when they come on a flood's beat. */
   deadline: number | null
-  /** The utility the player picked for this fight, and a second the reservoir paid for. */
-  utility: UtilityId | null
-  second: UtilityId | null
-  /** A fuel tank rigged to blow; null once it has. */
-  rigged: Tile | null
-  /** The boons under way. */
-  boons: Boon[]
+  /** The boons the hero holds, working all battle. */
+  boons: Held[]
   /** Set by the landing until what it sets off lands, as the battle's first beat. */
   opening: boolean
   /** Tiles of acid, each with the alien turns it has left. */

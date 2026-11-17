@@ -169,7 +169,6 @@ export async function createView(): Promise<View> {
     async show(run, events, animate) {
       const { fx, sprites } = s
       s.hero = run.hero
-      s.rigging = run.utilities.includes('tank')
       fx.clear()
       const battle = run.battle
       if (!battle) return
@@ -197,7 +196,7 @@ export async function createView(): Promise<View> {
         await play(s, battle, events)
       }
       sync(s, run, battle)
-      if (events.some((e) => e.type === 'rocket' || e.type === 'freeze' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(s, battle)
+      if (events.some((e) => e.type === 'rocket' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(s, battle)
       drawFog(s, battle, true)
       if (!animate) {
         if (battle.phase !== 'deploy') s.look(clamped(inPlay(), team(battle)))

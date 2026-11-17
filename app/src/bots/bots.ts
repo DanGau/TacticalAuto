@@ -1,11 +1,9 @@
 // Bots: each chooses the next action whenever the run waits for the player.
-import { scouted } from '../core/arena-kinds'
-import type { UtilityId } from '../core/utilities'
 import type { Action } from '../core/apply'
 import { strategic } from './strategic'
 import { plannedPerk } from '../core/plans'
-import { fuelTanks } from '../core/objects'
-import { UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
+import { UTILITIES, UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
+import { slotsOf } from '../core/rewards'
 import type { Flow } from '../core/quantities'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
@@ -75,16 +73,14 @@ const affordable = (run: Run): Action[] => [
     return !sold && GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE] <= run.supplies && fits(run, gear, false) ? [{ type: 'gear', index }] : []
   }),
   ...run.shop!.relics.flatMap((relic, index): Action[] => (!relic.sold && RELIC_PRICE <= run.supplies ? [{ type: 'buy', index }] : [])),
-  ...run.shop!.utilities.flatMap((item, index): Action[] => (!item.sold && !run.utilities.includes(item.id) && run.utilities.length < UTILITY_SLOTS && UTILITY_PRICE <= run.supplies ? [{ type: 'utility', index }] : [])),
+  ...run.shop!.utilities.flatMap((item, index): Action[] => (!item.sold && (run.utilities.length < slotsOf(run) || run.utilities.some((h) => h.id === item.id)) && UTILITY_PRICE <= run.supplies ? [{ type: 'utility', index }] : [])),
   ...(!run.shop!.medkit && wounded(run) && MEDKIT.price <= run.supplies ? [{ type: 'medkit' } as const] : []),
 ]
 
-/** Goes in with the first utility held the deploy screen tags for this ground or challenge, else the first that can be used here; a rigged tank on the first tank. */
-function goIn(run: Run): Action {
-  const can = (id: UtilityId) => id !== 'tank' || fuelTanks(run.battle!).length > 0
-  const tagged = run.utilities.findIndex((id) => can(id) && Object.values(scouted(run.battle!, id)).some(Boolean))
-  const usable = tagged >= 0 ? tagged : run.utilities.findIndex(can)
-  return usable < 0 ? { type: 'enter' } : { type: 'enter', utility: usable, tank: 0 }
+/** Slots a new boon in for a held one of the same category, else leaves it. */
+function slot(run: Run): Action {
+  const same = run.utilities.findIndex((h) => UTILITIES[h.id].category === UTILITIES[run.spare!].category)
+  return { type: 'keep', drop: same }
 }
 
 /** The hero's health as a share of its most. */
@@ -119,11 +115,11 @@ function shop(run: Run): Action {
 const play =
   ({ risk, pick, build, events }: Strategy): Bot =>
   (run, rng) => {
-    if (run.boonOffers.length > 0) return { type: 'boons', picks: [0, 1] }
-    if (run.spare) return { type: 'keep', drop: -1 }
+    if (run.boonOffers.length > 0) return { type: 'boons', picks: [0, 1, 2] }
+    if (run.spare) return slot(run)
     if (run.phase === 'reward') return reward(run, rng, PICKS[pick])
     if (run.phase === 'select') return { type: 'hero', index: 0 }
-    if (run.phase === 'battle') return goIn(run)
+    if (run.phase === 'battle') return { type: 'enter' }
     if (run.phase === 'shop') return build ? shop(run) : { type: 'leave' }
     if (run.phase === 'event') return { type: 'choose', index: events === 'bold' ? takeable(run)[0] : takeable(run).at(-1)! }
     const wanted = heroHealth(run) < HURT ? 'safe' : typeof risk === 'function' ? risk(run) : risk
@@ -140,16 +136,13 @@ const play =
 /** Chooses every option at random; in a shop, builds or leaves at a coin flip. Decides finds as decideFind says. */
 const randomBot: Bot = (run, rng) => {
   if (run.boonOffers.length > 0) {
-    const first = randomInt(rng, run.boonOffers.length)
-    return { type: 'boons', picks: [first, (first + 1 + randomInt(rng, run.boonOffers.length - 1)) % run.boonOffers.length] }
+    const pool = run.boonOffers.map((_, i) => i)
+    return { type: 'boons', picks: Array.from({ length: UTILITY_SLOTS }, () => pool.splice(randomInt(rng, pool.length), 1)[0]) }
   }
   if (run.spare) return { type: 'keep', drop: randomInt(rng, run.utilities.length + 1) - 1 }
   if (run.phase === 'reward') return reward(run, rng, PICKS.random)
   if (run.phase === 'select') return { type: 'hero', index: randomInt(rng, run.candidates.length) }
-  if (run.phase === 'battle') {
-    const usable = run.utilities.flatMap((id, i) => (id !== 'tank' || fuelTanks(run.battle!).length > 0 ? [i] : []))
-    return usable.length > 0 ? { type: 'enter', utility: usable[randomInt(rng, usable.length)], tank: 0 } : { type: 'enter' }
-  }
+  if (run.phase === 'battle') return { type: 'enter' }
   if (run.phase === 'event') return { type: 'choose', index: takeable(run)[randomInt(rng, takeable(run).length)] }
   if (run.phase === 'shop') {
     const options = affordable(run)

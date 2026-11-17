@@ -27,8 +27,8 @@ export function nearest<T extends Tile>(units: T[], from: Tile): T | undefined {
 
 export const has = (unit: Unit, effect: Effect) => unit.effects.includes(effect)
 
-/** The jump a unit's ways are found with: HOVER while it levitates. */
-export const leap = (unit: Unit) => (has(unit, 'hover') ? HOVER : unit.stats.jump)
+/** The jump and span a unit's ways are found with: HOVER while it levitates. */
+export const leap = (unit: Unit): [number, number] => (has(unit, 'hover') ? [HOVER, 0] : [unit.stats.jump, unit.stats.span])
 
 /** Whether a unit's foes include one with `effect`: a relic, or a soldier's gear, working on the aliens. */
 export const foeHas = (battle: Battle, unit: Unit, effect: Effect) => battle.units.some((u) => u.side !== unit.side && u.hp > 0 && has(u, effect))

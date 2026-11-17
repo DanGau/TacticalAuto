@@ -4,7 +4,6 @@ import { ENTRY_RADIUS, GRID, type Battle, type Tile } from '../core/battle'
 import { UPLINK_REACH } from '../core/fighters'
 import { EXTRACT_REACH } from '../core/goals'
 import { ARENA_KINDS, featureOf } from '../core/arena-kinds'
-import { fuelTanks } from '../core/objects'
 import { visibleTiles } from '../core/sight'
 import { DECAL_LIFT, spot } from './camera'
 import { fence } from './fences'
@@ -49,8 +48,6 @@ export function drawMarks(s: Stage, battle: Battle): void {
   const marks: Label[] = (s.marks = [])
   if (battle.uplink) marks.push(label('📡 UPLINK', battle.uplink, COLOR.uplink, 28))
   if (battle.extract) marks.push(label('🚁 EXTRACT', battle.extract, COLOR.uplink, 28))
-  if (battle.rigged) marks.push(label('💣 RIGGED', battle.rigged, COLOR.crit, 22))
-  if (battle.phase === 'deploy' && s.rigging && !s.briefing) fuelTanks(battle).forEach((tank, i) => marks.push(label(`🛢️ ${i + 1}`, tank, COLOR.crit, 24)))
   for (const body of battle.downed) marks.push(label('✚ DOWN', body, COLOR.contact, 22))
   // Aliens caught off guard say so over their heads until they recover, while the hero sees them.
   for (const u of battle.units) {

@@ -10,7 +10,6 @@ import { drive, fall, FALL_DAMAGE, isDrop, pushesOff } from './knockback'
 import { canShoot, lineOfSight } from './sight'
 import type { Prop } from './terrain'
 import { FUEL_DAMAGE } from './twists'
-import { RIG } from './utilities'
 import { SLAM_DAMAGE, wound } from './wound'
 
 /** What a hero can pick up and throw, by the strength it takes. */
@@ -50,35 +49,6 @@ export const canHurlFrom = (battle: Battle, unit: Unit, at: Tile) => isSoldier(u
 
 const away = (from: Tile, to: Tile): Tile => ({ x: Math.sign(to.x - from.x), y: Math.sign(to.y - from.y) })
 
-
-/** The fuel tanks standing in the arena, nearest the way in first: what a rigged tank is picked from. */
-export function fuelTanks(battle: Battle): Tile[] {
-  const tanks: Tile[] = []
-  for (let t = 0; t < GRID * GRID; t++) {
-    const tile = { x: t % GRID, y: Math.floor(t / GRID) }
-    if (battle.props[t] === 'fuel' && distance(tile, battle.arena) <= battle.arena.reach) tanks.push(tile)
-  }
-  return tanks.sort((a, b) => distance(a, battle.approach) - distance(b, battle.approach))
-}
-
-/** The rigged tank blows once aliens crowd it, catching them and any hero close by. */
-export function blowRigged(battle: Battle): GameEvent[] {
-  const tank = battle.rigged
-  if (!tank) return []
-  if (battle.props[tank.y * GRID + tank.x] !== 'fuel') {
-    battle.rigged = null
-    return []
-  }
-  const aliens = battle.units.filter((u) => u.side === 'alien' && u.revealed)
-  if (aliens.filter((a) => distance(a, tank) <= RIG.near).length < RIG.crowd) return []
-  battle.rigged = null
-  const caught = battle.units.filter((u) => distance(u, tank) <= (u.side === 'alien' ? RIG.radius : RIG.close))
-  const events: GameEvent[] = [{ type: 'rocket', src: { kind: 'object', id: 'rig' }, id: aliens[0].id, x: tank.x, y: tank.y, hits: caught.map((u) => ({ target: u.id, damage: RIG.damage })) }]
-  wreck(battle, tank, 1)
-  for (let y = tank.y - RIG.fireReach; y <= tank.y + RIG.fireReach; y++) for (let x = tank.x - RIG.fireReach; x <= tank.x + RIG.fireReach; x++) if (onGrid(x, y) && !['void', 'water'].includes(battle.ground[y * GRID + x])) battle.fire.push({ x, y, turns: RIG.fireTurns })
-  for (const unit of caught) wound(battle, unit, RIG.damage, events)
-  return events
-}
 
 /** A throw a hero could make: what it is worth, and making it. */
 interface Throw {
@@ -181,7 +151,6 @@ export function leverage(battle: Battle, unit: Unit): GameEvent[] {
   for (let t = 0; t < GRID * GRID; t++) {
     if (battle.props[t] !== 'fuel') continue
     const tank = { x: t % GRID, y: Math.floor(t / GRID) }
-    if (battle.rigged?.x === tank.x && battle.rigged.y === tank.y) continue
     if (distance(tank, unit) > unit.stats.range || !canShoot(battle, unit, tank, unit.stats.range) || beside(tank, 1).length === 0) continue
     if (battle.units.some((u) => u.side === 'human' && distance(u, tank) <= 1)) continue
     unit.spent.push('throw')

@@ -4,14 +4,15 @@ import { DOCTRINES } from '../core/doctrines'
 import { MEDKIT, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
 import { relicIcon } from './relic-icons'
-import { boonText, carries, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS } from '../core/utilities'
+import { boonName, UTILITIES, UTILITY_PRICE } from '../core/utilities'
+import { boonIcon } from './boon-icons'
 import { current, legOf, KEYS, ways, nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Stop } from '../core/run-state'
 import { missionAt } from '../core/missions'
 import { huntForce } from '../core/missions'
 import { RISKS } from '../core/missions'
-import { GEAR_PRICE } from '../core/rewards'
+import { GEAR_PRICE, slotsOf } from '../core/rewards'
 import { makes } from '../core/hero'
 import { soldierStats } from '../core/hero'
 import { health, wounded } from '../core/hero'
@@ -26,7 +27,7 @@ import { objective, THREATS } from '../core/objectives'
 import { CHALLENGES } from '../core/challenges'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
-import { pickCard, shopSwap, pickDetail, utilityPick, type Pick } from './cards'
+import { boonDoes, pickCard, shopSwap, pickDetail, utilityPick, type Pick } from './cards'
 import { heroSheet } from './sheet'
 import { alienName, badge, button, describe, describeGear, gearCard, gearName, healthBar, quantityChips, examChip, STOP_NAMES, threatBar } from './html'
 
@@ -63,7 +64,7 @@ function stopIcon(run: Run, stop: Stop, state = ''): string {
   const goal = GOALS[stop.goal]
   const aliens = census(run, stop.aliens) + (stop.goal === 'assassinate' ? ', a Commander' : '')
   const challenge = stop.challenge && CHALLENGES[stop.challenge]
-  const answered = challenge && run.utilities.some((id) => carries(id, challenge.answers)) ? ' answered' : ''
+  const answered = challenge && run.utilities.some((h) => challenge.answers.includes(h.id)) ? ' answered' : ''
   const ground = stop.ground && ARENA_KINDS[stop.ground]
   return `<span class="node ${stop.risk} ${state}${answered}" title="${ground ? `${ground.name} · ` : ''}${challenge?.name} · ${goal.name} · ${risk.name} · ${aliens.replace(/<[^>]*>/g, '')}">${challenge?.icon ?? STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}${ground && stop.ground !== 'open' ? `<sub>${ground.icon}</sub>` : ''}</span>`
 }
@@ -151,12 +152,12 @@ function travelLabel(run: Run, stop: Stop, next: 'battle' | 'key' | 'final'): st
   return `${stop.aliens.length} aliens${hunt > 0 ? ` + ${hunt} hunting` : ''}${stop.challenge === 'bigOne' ? ' + boss' : ''}`
 }
 
-/** What a stop tests, and which utility held answers it. */
+/** What a stop tests, and which boons held answer it. */
 function readChallenge(run: Run, stop: Stop): string {
   if (!stop.challenge) return ''
   const challenge = CHALLENGES[stop.challenge]
-  const held = run.utilities.filter((id) => carries(id, challenge.answers))
-  return `<span title="${challenge.name}: ${challenge.test}">${challenge.icon} ${THREATS[stop.challenge]}</span>${held.length > 0 ? ` <small class="down">Held: ${held.map((id) => UTILITIES[id].name).join(', ')}</small>` : ''}`
+  const held = run.utilities.filter((h) => challenge.answers.includes(h.id))
+  return `<span title="${challenge.name}: ${challenge.test}">${challenge.icon} ${THREATS[stop.challenge]}</span>${held.length > 0 ? ` <small class="down">Held: ${held.map((h) => UTILITIES[h.id].name).join(', ')}</small>` : ''}`
 }
 
 /** What the hero faces at a stop, as the map's heading. */
@@ -185,9 +186,9 @@ function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
   })
   const relics = shop.relics.map(({ id, sold }, index): Pick => ({ key: `r${index}`, action: { type: 'buy', index }, look: 'relic', body: card('relic', `${relicIcon(id)} ${RELICS[id].name}`, `${RELIC_PRICE} supplies`, sold), detail: `<p><b>${RELICS[id].name}.</b> ${describe(RELICS[id].text, RELICS[id], held)}</p>`, go: `Tap again to buy for ${RELIC_PRICE} supplies`, block: poor(RELIC_PRICE), spent: sold }))
   const utilities = shop.utilities.map(({ id, sold }, index): Pick =>
-    utilityPick(`u${index}`, { type: 'utility', index }, id, 'boon', `Tap again to buy for ${UTILITY_PRICE} supplies${run.utilities.length >= UTILITY_SLOTS ? ', dropping one' : ''}`, {
-      body: card('boon', `${UTILITIES[id].icon} ${UTILITIES[id].name}`, `${UTILITY_PRICE} supplies`, sold),
-      block: run.utilities.includes(id) ? 'Held' : poor(UTILITY_PRICE),
+    utilityPick(run, `u${index}`, { type: 'utility', index }, id, 'boon', `Tap again to buy for ${UTILITY_PRICE} supplies${run.utilities.some((h) => h.id === id) ? ', raising its level' : run.utilities.length >= slotsOf(run) ? ', swapping 1 out' : ''}`, {
+      body: card(UTILITIES[id].category, `${boonIcon(id)} ${UTILITIES[id].name}`, `${UTILITY_PRICE} supplies`, sold),
+      block: poor(UTILITY_PRICE),
       spent: sold,
     }),
   )
@@ -199,10 +200,10 @@ function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
 function shopView(run: Run, armed: string | null, ware: number | null): string {
   const shelves = shopShelves(run)
   const picks = shelves.flatMap((shelf) => shelf.picks)
-  const held = run.utilities.map((k) => `${UTILITIES[k].icon} ${UTILITIES[k].name}`).join(', ') || 'none'
+  const held = run.utilities.map((h) => `${boonIcon(h.id)} ${boonName(h.id, h.level)}`).join(', ') || 'none'
   const screen = `<h2>A shop. Each piece is one of a kind.</h2>
     ${shelves.filter((shelf) => shelf.picks.length > 0).map((shelf) => `<div class="shelf"><small>${shelf.name}</small><div class="picks">${shelf.picks.map((p) => pickCard(p, ware === null ? armed : null)).join('')}</div></div>`).join('')}
-    <div class="shopfoot"><button class="travel" data-action='${JSON.stringify({ type: 'leave' })}'>Leave the shop</button><p class="kit">Boons ${run.utilities.length}/${UTILITY_SLOTS}: ${held}</p></div>
+    <div class="shopfoot"><button class="travel" data-action='${JSON.stringify({ type: 'leave' })}'>Leave the shop</button><p class="kit">Boons ${run.utilities.length}/${slotsOf(run)}: ${held}</p></div>
     ${pickDetail(picks, ware === null ? armed : null, 'Tap a card for its details; tap it again to buy.')}`
   if (ware === null || run.shop!.wares[ware].sold) return screen
   const { gear } = run.shop!.wares[ware]
@@ -238,10 +239,10 @@ function mapView(run: Run, picked: number | null, armed: string | null, ware: nu
 function baseView(run: Run): string {
   const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${relicIcon(id)} ${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id])}</div>`)
   const doctrines = run.doctrines.map((id) => `<div class="gear doctrine"><small>oath</small><br><b>${DOCTRINES[id].name}</b><br>${DOCTRINES[id].text}</div>`)
-  const utilities = run.utilities.map((id) => `<div class="gear"><small>boon</small><br><b>${UTILITIES[id].icon} ${UTILITIES[id].name}</b><br>${boonText(id)}</div>`)
+  const utilities = run.utilities.map((h) => `<div class="gear"><small>${UTILITIES[h.id].category}</small><br><b>${boonIcon(h.id)} ${boonName(h.id, h.level)}</b><br>${boonDoes(run, h.id, h.level)}</div>`)
   const held = makes(run)
   return `${relics.length + doctrines.length + held.length + utilities.length === 0 ? '<h2>Relics, oaths and boons the hero gains show here.</h2>' : ''}
-    ${utilities.length > 0 ? `<h2>Boons ${utilities.length}/${UTILITY_SLOTS}</h2><div class="stash">${utilities.join('')}</div>` : ''}
+    ${utilities.length > 0 ? `<h2>Boons ${utilities.length}/${slotsOf(run)}</h2><div class="stash">${utilities.join('')}</div>` : ''}
     ${held.length > 0 ? `<h2>Your build makes</h2>${quantityChips(held, held)}` : ''}
     ${doctrines.length > 0 ? `<h2>Oaths</h2><div class="stash">${doctrines.join('')}</div>` : ''}
     ${relics.length > 0 ? `<h2>Relics</h2><div class="stash">${relics.join('')}</div>` : ''}`

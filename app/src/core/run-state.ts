@@ -11,7 +11,7 @@ import type { FeatId, Tally } from './feats'
 import type { Gear } from './gear'
 import type { SkillId } from './skills'
 import type { PerkId } from './perks'
-import type { UtilityId } from './utilities'
+import type { Held, UtilityId } from './utilities'
 import type { ChallengeId } from './challenges'
 import type { RelicId } from './relics'
 import type { Battle } from './battle'
@@ -136,7 +136,7 @@ export interface Report {
 }
 
 /** What the hero gained or lost without choosing it from a card the player could read; the player is told, one screen each. */
-export type Gain = { kind: 'relic'; id: RelicId } | { kind: 'relicLost'; id: RelicId } | { kind: 'boon'; id: UtilityId }
+export type Gain = { kind: 'relic'; id: RelicId } | { kind: 'relicLost'; id: RelicId } | { kind: 'boon'; id: UtilityId; level: number }
 
 /** A battle as the run remembers it, for the post-game summary. */
 export interface Fought {
@@ -201,14 +201,13 @@ export interface Run {
   log: Fought[]
   /** What the player has yet to be told of. */
   gains: Gain[]
-  /** Utilities the hero holds, at most UTILITY_SLOTS. One is picked for each fight, and it is never used up. */
-  utilities: UtilityId[]
-  /** Boon Reservoir's charges, and fights won in a row, for Unbroken Line. */
-  boons: number
+  /** Boons the hero holds, at most slotsOf; each works in every battle. */
+  utilities: Held[]
+  /** Fights won in a row, for Unbroken Line. */
   streak: number
-  /** At the run's start, the commons to pick its first utilities from. */
+  /** At the run's start, the boons to take its first from. */
   boonOffers: UtilityId[]
-  /** A utility gained with no room for it: the player drops it or one held. */
+  /** A new boon gained: the player slots it in for one held, or leaves it. */
   spare: UtilityId | null
   /** Relics to choose from in the reward phase. */
   relicOffers: RelicId[]

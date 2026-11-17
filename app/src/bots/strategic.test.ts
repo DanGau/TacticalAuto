@@ -22,11 +22,13 @@ function deploying(challenge: ChallengeId, held: Run['utilities']): Run {
   return run
 }
 
-test.each(Object.keys(CHALLENGES) as ChallengeId[])('the strategic bot takes the answer it holds into a %s', (challenge) => {
+test.each(Object.keys(CHALLENGES) as ChallengeId[])('offered a %s answer it lacks, the strategic bot slots it in for a boon that answers nothing ahead', (challenge) => {
   const [answer] = CHALLENGES[challenge].answers
-  const decoy = (['hover', 'smoke', 'crack'] as const).filter((id) => !CHALLENGES[challenge].answers.includes(id))
-  const run = deploying(challenge, [...decoy.slice(0, 2), answer])
-  expect(strategic(run, { rng: 1 })).toMatchObject({ type: 'enter', utility: 2 })
+  const decoys = (['nanoweave', 'longshot', 'plasma', 'ablative'] as const).filter((id) => !CHALLENGES[challenge].answers.includes(id)).slice(0, 3)
+  const run = deploying(challenge, decoys.map((id) => ({ id, level: 1 })))
+  run.spare = answer
+  expect(strategic(run, { rng: 1 })).toMatchObject({ type: 'keep', drop: expect.any(Number) })
+  expect((strategic(run, { rng: 1 }) as { drop: number }).drop).toBeGreaterThanOrEqual(0)
 })
 
 test('the plan: every class names a real path; a hero takes the path its weapon suits, then an ultimate for its capstone', () => {
@@ -44,9 +46,9 @@ test('the plan: every class names a real path; a hero takes the path its weapon 
   expect(pathOf('heavy', hero('heavy', 'rifle').skills[1])!.name).toBe('Cataclysm')
 })
 
-test('with a utility to spare, it keeps what answers the most, and plays a run to its end', () => {
-  const run = deploying('swarm', ['overcharge', 'crack', 'hover'])
-  run.spare = 'meleeShield'
+test('with a new boon, it keeps what answers the most, and plays a run to its end', () => {
+  const run = deploying('swarm', [{ id: 'plasma', level: 1 }, { id: 'longshot', level: 1 }, { id: 'gravBoots', level: 1 }])
+  run.spare = 'riot'
   run.legs[0].columns[0][0].stop = { ...run.legs[0].columns[0][0].stop!, challenge: 'swarm' }
   expect(strategic(run, { rng: 1 })).toMatchObject({ type: 'keep' })
   expect(['won', 'lost']).toContain(runWith(5, strategic).won ? 'won' : 'lost')
@@ -55,11 +57,10 @@ test('with a utility to spare, it keeps what answers the most, and plays a run t
 const toll = (challenge: ChallengeId, answer: Toll['answer'], won: boolean, lost: number): Toll => ({ nth: 1, leg: 0, kind: 'battle', elite: false, won, goal: 'cross', challenge, answer, ground: 'open', exploited: 'none', most: 100, before: 100, after: 100 - lost, downed: 0, maxHit: 0, bossRounds: null, healed: 0 })
 const of = (tolls: Toll[]) => rows([{ tolls } as RunResult])
 
-test('the diagnosis tells the game from the bot', () => {
+test('the diagnosis tells what is off in the game', () => {
   const twelve = (t: Toll) => Array<Toll>(12).fill(t)
-  expect(verdicts(of(twelve(toll('slog', 'picked', false, 80))))).toContainEqual(expect.stringMatching(/^GAME: Slog .* too hard/))
-  expect(verdicts(of([toll('slog', 'held', false, 80)]))).toContainEqual(expect.stringMatching(/^BOT: held an answer to Slog/))
+  expect(verdicts(of(twelve(toll('slog', 'held', false, 80))))).toContainEqual(expect.stringMatching(/^GAME: Slog .* too hard/))
   expect(verdicts(of(twelve(toll('slog', 'none', true, 5))))).toContainEqual(expect.stringMatching(/^GAME: a mismatch on Slog/))
-  expect(verdicts(of([...twelve(toll('slog', 'picked', true, 40)), ...twelve(toll('slog', 'none', true, 30))]))).toContainEqual(expect.stringMatching(/^GAME: the answer to Slog/))
-  expect(verdicts(of([...twelve(toll('slog', 'picked', true, 10)), ...twelve(toll('slog', 'none', false, 60))]))).toEqual([])
+  expect(verdicts(of([...twelve(toll('slog', 'held', true, 40)), ...twelve(toll('slog', 'none', true, 30))]))).toContainEqual(expect.stringMatching(/^GAME: the answer to Slog/))
+  expect(verdicts(of([...twelve(toll('slog', 'held', true, 10)), ...twelve(toll('slog', 'none', false, 60))]))).toEqual([])
 })

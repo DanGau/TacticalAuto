@@ -1,4 +1,4 @@
-// The hero's arrival: the one point the encounter chooses, the plain landing there, and what relics and the picked utility set off.
+// The hero's arrival: the one point the encounter chooses, the plain landing there, and what relics set off.
 import { chillUnit } from './stacks'
 import { BARRIER_ARMOR, GRID, isSoldier, type Battle, type Effect, type Tile, type Unit } from './battle'
 import { CHALLENGES } from './challenges'
@@ -8,8 +8,6 @@ import { blocked, distance, edgeDepths, freeTilesNear, NEIGHBORS, onGrid, openNe
 import { dropUnit, soldierUnit, TURRET } from './spawn'
 import { PROP_BULK } from './terrain'
 import { TUNING } from './tuning'
-import { carries, type UtilityId } from './utilities'
-import { takeBoon } from './boons'
 import { wound } from './wound'
 
 /** How near the landing Breaching Charges reach aliens, the damage they add, and how near the aliens stand that Surprise Drop catches. */
@@ -33,8 +31,8 @@ export function planEntry(battle: Battle): void {
   battle.entry = best ?? openNear(battle, battle.approach)
 }
 
-/** The hero lands, with the utility the player picked and any second from the reservoir, and the battle begins. What it sets off lands as the first beat; see opening. */
-export function land(battle: Battle, utility: UtilityId | null = null, tank = 0, second: UtilityId | null = null): void {
+/** The hero lands, and the battle begins. What it sets off lands as the first beat; see opening. */
+export function land(battle: Battle): void {
   const at = battle.entry!
   deploy(battle, at)
   if (battle.challenge && CHALLENGES[battle.challenge].volley) for (const u of battle.units) if (u.side === 'alien') u.engaged = true
@@ -48,10 +46,6 @@ export function land(battle: Battle, utility: UtilityId | null = null, tank = 0,
   }
   if (held('entryTurret')) dropUnit(battle, team[0], TURRET, at)
   if (held('entryWall')) for (const soldier of team) barricade(battle, soldier)
-  battle.utility = utility
-  battle.second = second
-  takeBoon(battle, utility, tank)
-  takeBoon(battle, second, tank)
 }
 
 /** Puts the heroes down on the free tiles nearest `at` and begins the battle, the cluster nearest engaging. */
@@ -86,13 +80,11 @@ function barricade(battle: Battle, soldier: Unit): void {
   walks.delete(battle)
 }
 
-/** The battle's first beat: the utility taking hold, and what the hero's charges do. */
+/** The battle's first beat: what the hero's charges do. */
 export function opening(battle: Battle): GameEvent[] {
   battle.opening = false
   const events: GameEvent[] = []
   const soldiers = battle.units.filter(isSoldier)
-  for (const utility of [battle.utility, battle.second]) if (utility) events.push({ type: 'used', src: { kind: 'boon', id: utility }, utility, on: utility === 'flashbang' ? battle.units.filter((u) => u.surprised > 0).map((u) => u.id) : soldiers.map((u) => u.id) })
-  if ([battle.utility, battle.second].some((u) => u && carries(u, ['coldSnap']))) events.push({ type: 'freeze' })
   const held = (effect: Effect) => soldiers.some((s) => has(s, effect))
   const at = battle.entry
   if (at && (held('entryBlast') || held('entryShred') || held('entryFrost'))) {

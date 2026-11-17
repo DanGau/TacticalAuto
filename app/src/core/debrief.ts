@@ -42,8 +42,7 @@ export function endBattle(run: Run): void {
   else run.threat = Math.min(run.threat + STOP_THREAT + (won ? 0 : LOSS_THREAT) + (rescued === null ? 0 : Math.floor((CIVILIANS - (won ? rescued : 0)) / CIVILIANS_PER_THREAT)), THREAT_MAX)
   const held = run.relics.map((id): Relic => RELICS[id])
   const earned = won ? risk.supplies + (rescued ?? 0) * (CIVILIAN_SUPPLIES + held.reduce((sum, relic) => sum + (relic.civilianSupplies ?? 0), 0)) + held.reduce((sum, relic) => sum + (relic.supplies ?? 0), 0) : 0
-  // The reservoir charges on a fight won with no boon; a clean streak pays every STREAK_FIGHTS fights.
-  if (won && battle.utility === null && held.some((relic) => relic.boons)) run.boons++
+  // A clean streak pays every STREAK_FIGHTS fights.
   run.streak = won ? run.streak + 1 : 0
   const supplies = earned + (run.streak > 0 && run.streak % STREAK_FIGHTS === 0 ? held.reduce((sum, relic) => sum + (relic.streak ?? 0), 0) : 0)
   run.supplies += supplies
@@ -51,8 +50,8 @@ export function endBattle(run: Run): void {
   const byGoal = { cross: risk.gear, assassinate: 1, hold: 0, rescue: 0, ambush: 0 }[mission.goal]
   const chance = mission.kind === 'key' ? 1 : mission.kind === 'battle' ? byGoal : 0
   if (won && chance > 0 && random(run) < chance) dropGear(run, risk.rareGear || mission.kind === 'key' || held.some((relic) => relic.rareGear))
-  // A win with none held always turns up a utility; a key mission, an ambush or a battle by chance.
-  const find = run.utilities.length === 0 ? 1 : mission.kind === 'key' ? KEY_BOON : mission.kind === 'ambush' ? AMBUSH_BOON : mission.kind === 'battle' ? risk.utility : 0
+  // A key mission, an ambush or a battle by chance turns up a boon.
+  const find = mission.kind === 'key' ? KEY_BOON : mission.kind === 'ambush' ? AMBUSH_BOON : mission.kind === 'battle' ? risk.utility : 0
   if (won && mission.kind !== 'final' && random(run) < find) findUtility(run)
   const key = won && mission.kind === 'key'
   run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, hero, rescued }

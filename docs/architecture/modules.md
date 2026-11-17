@@ -10,13 +10,13 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `grid.ts` | The board: distance, objects, walls, walking costs and routes, free tiles |
 | `setup.ts` | `createBattle`: battle state, placing aliens, civilians, goals by the encounter |
 | `encounter.ts` | `designEncounter`: the set-piece: its ends, arena, overlook, hazard, ridge, objects, posts, gates |
-| `arena-kinds.ts` | The ground a battle is fought over, drawn by region: its shape, its feature, and the boons and quantities it pays |
+| `arena-kinds.ts` | The ground a battle is fought over, drawn by region: its shape, its feature, the boons that answer it and the quantities it multiplies |
 | `levels.ts` | Smoothing heights so ledges stand only where meant |
 | `knockback.ts` | Knockback and falls: off a ledge, through glass, over the edge |
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
 | `objects.ts` | What heroes do with objects: the strong throwing them or small aliens, setting off tanks, a rigged tank |
 | `landing.ts` | The one entry point, the plain landing there, what relics set off |
-| `boons.ts` | The picked utilities in a battle: taking hold, Cold Snap's ice, each turn, ending |
+| `boons.ts` | What held boons add in a battle beyond stats and lent effects: Ablative Field, Regen Gel, Force Gauntlet |
 | `spawn.ts` | Making units: aliens, soldiers, civilians, mechs, drops |
 | `step.ts` | Advances the run's battle a beat; settles it when it ends |
 | `combat.ts` | `stepBattle`: whose turn, the next unit's action |

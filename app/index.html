@@ -360,6 +360,25 @@
     .gearswap.relics .side.keep { border-color: #6fe08c; }
     @media (max-width: 600px) { .gearswap.relics .swap { grid-template-columns: 1fr; } .gearswap.relics .side { display: grid; grid-template-columns: 56px 1fr; column-gap: 12px; align-items: center; text-align: left; } .gearswap.relics .side .art { grid-row: span 3; width: 56px; height: 56px; margin: 0; } .gearswap.relics .side .art :is(.ricon, .icon) { width: 44px; height: 44px; } }
     @media (max-height: 520px) { .gearswap.relics .side .art { width: 48px; height: 48px; margin: 0; } .gearswap.relics .side .art :is(.ricon, .icon) { width: 38px; height: 38px; } .gearswap.relics .side { font-size: 12px; } }
+    .gearswap.boons .swap { width: min(1000px, 100%); grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+    .gearswap.boons .side { align-items: center; text-align: center; }
+    .gearswap.boons .side .art .ricon { width: 44px; height: 44px; }
+    .gearswap.boons .side .tier { text-transform: capitalize; color: #9aa6bd; }
+    @media (max-width: 700px) { .gearswap.boons .swap { grid-template-columns: 1fr; } .gearswap.boons .side { min-height: 0; display: grid; grid-template-columns: 40px 1fr; column-gap: 10px; text-align: left; } .gearswap.boons .side .art { grid-row: span 4; } .gearswap.boons .side .art .ricon { width: 32px; height: 32px; } }
+    @media (max-height: 520px) { .gearswap.boons .side { min-height: 0; font-size: 12px; } .gearswap.boons .side .art .ricon { width: 28px; height: 28px; } }
+    .boonswap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .boonswap h2 { margin: 0; font-size: 15px; }
+    .newboon { position: relative; display: grid; justify-items: center; gap: 4px; width: min(360px, 100%); padding: 18px 16px 14px; border: 2px solid #4dd8ff; border-radius: 10px; background: radial-gradient(circle at 50% 0, #4dd8ff26, #131822 70%); box-shadow: 0 0 0 3px #4dd8ff33, 0 0 28px #4dd8ff66; animation: newglow 1.6s ease-in-out infinite alternate; }
+    .newboon .newbadge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); padding: 2px 12px; border-radius: 999px; font-weight: 800; font-size: 13px; letter-spacing: 0.12em; color: #10141c; background: #4dd8ff; box-shadow: 0 0 12px #4dd8ffaa; }
+    .newboon .art .ricon { width: 52px; height: 52px; color: #4dd8ff; filter: drop-shadow(0 0 6px #4dd8ff88); }
+    .newboon .tier { text-transform: capitalize; color: #9aa6bd; }
+    .newboon b { font-size: 18px; }
+    @keyframes newglow { from { box-shadow: 0 0 0 3px #4dd8ff33, 0 0 16px #4dd8ff44; } to { box-shadow: 0 0 0 3px #4dd8ff66, 0 0 34px #4dd8ffaa; } }
+    @media (max-height: 520px) { .newboon { padding: 12px 12px 8px; } .newboon .art .ricon { width: 32px; height: 32px; } .boonswap { gap: 6px; } }
+    .boons-held { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+    .held-boon { padding: 3px 8px; border: 1px solid #3a4458; border-radius: 6px; font-size: 13px; }
+    .held-boon.answers { border-color: #6fe08c; box-shadow: 0 0 8px #6fe08c44; }
+    .held-boon small { color: #6fe08c; }
     .boons .swap { width: min(900px, 100%); grid-template-columns: repeat(3, minmax(0, 1fr)); }
       @media (max-width: 600px) { .boons .swap { grid-template-columns: 1fr; } }
       button.pick.blocked .price { color: #ff6b6b; }

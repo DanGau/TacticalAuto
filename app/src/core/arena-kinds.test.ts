@@ -45,12 +45,12 @@ test('every ground is fought on, and every ground but open shows its feature', (
   }
 })
 
-test('every feature has an answer: a boon that exploits it, and a build quantity it multiplies that something makes', () => {
+test('every feature has an answer: a boon that answers it, and a build quantity it multiplies that something makes', () => {
   const makers = [...Object.values(EFFECTS), ...Object.values(RELICS), ...Object.values(SKILLS)].flatMap((f) => f.makes ?? [])
   for (const kind of GROUNDS.filter((k) => k !== 'open')) {
-    const { pays, reads } = ARENA_KINDS[kind]
-    expect(pays.length, kind).toBeGreaterThan(0)
-    for (const effect of pays) expect(UTILITIES[effect], `${kind} ${effect}`).toBeDefined()
+    const { answers, reads } = ARENA_KINDS[kind]
+    expect(answers.length, kind).toBeGreaterThan(0)
+    for (const id of answers) expect(UTILITIES[id], `${kind} ${id}`).toBeDefined()
     expect(reads.length, kind).toBeGreaterThan(0)
     for (const q of reads) expect(makers, `${kind} ${q}`).toContain(q)
   }

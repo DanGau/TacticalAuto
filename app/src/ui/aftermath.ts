@@ -6,7 +6,8 @@ import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { relicIcon } from './relic-icons'
 import { perkIcon, skillIcon } from './skill-icons'
-import { boonText, UTILITIES } from '../core/utilities'
+import { boonName, UTILITIES } from '../core/utilities'
+import { boonIcon } from './boon-icons'
 import { type Gain, type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { type Soldier } from '../core/run-state'
@@ -18,9 +19,9 @@ import { level } from '../core/hero'
 import { xpFor } from '../core/hero'
 import { SKILLS, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
-import { findSwap, pickCard, pickDetail, startChoice, utilityPick, type Pick } from './cards'
+import { boonDoes, findSwap, pickCard, pickDetail, startChoice, utilityPick, type Pick } from './cards'
 import { treeMap } from './tree'
-import { badge, button, describe, gearText, gearName, healthBar, sentence, signed, STOP_NAMES, threatBar } from './html'
+import { badge, button, describe, gearText, gearName, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
 /**
  * The hero's card: class badge, name, weapon, and an experience bar filling with what the battle earned, flaring on a
@@ -53,7 +54,7 @@ function heroCard(run: Run, fought: NonNullable<Report['hero']>): string {
 export function acquired(run: Run, gain: Gain): string {
   const shown = (top: string, look: string, name: string, text: string) => `<small class="up-top">${top}</small><div class="prize gear ${look}"><b>${name}</b><br>${text}</div>`
   const relicBody = (top: string, look: string, id: RelicId, held: Quantity[] = []) => shown(top, look, `${relicIcon(id)} ${RELICS[id].name}`, describe(RELICS[id].text, RELICS[id], held))
-  const body = gain.kind === 'relic' ? relicBody('Relic gained', 'relic', gain.id, makes(run)) : gain.kind === 'relicLost' ? relicBody('Relic lost', 'relic lost', gain.id) : shown(`${UTILITIES[gain.id].rarity} boon gained`, UTILITIES[gain.id].rarity, `${UTILITIES[gain.id].icon} ${UTILITIES[gain.id].name}`, boonText(gain.id))
+  const body = gain.kind === 'relic' ? relicBody('Relic gained', 'relic', gain.id, makes(run)) : gain.kind === 'relicLost' ? relicBody('Relic lost', 'relic lost', gain.id) : shown(gain.level > 1 ? `Boon to level ${gain.level}` : 'Boon gained', 'utility', `${boonIcon(gain.id)} ${boonName(gain.id, gain.level)}`, boonDoes(run, gain.id, gain.level))
   return modal(`<div class="acquired">${body}<button class="decide" data-action='${JSON.stringify({ type: 'ack' })}'>Got it</button></div>`)
 }
 
@@ -99,11 +100,18 @@ export function perkChoice(soldier: Soldier): string {
 /** The hero's next pick: its power first, then its perk. */
 export const pickChoice = (run: Run, soldier: Soldier, armed: string | null) => (skillOffers(soldier).length > 0 ? skillChoice(run, soldier, armed) : perkChoice(soldier))
 
-/** With a utility found and no room: fixed cards, each held one to drop for it, or the new one left behind. */
+/** A new boon with no free slot: it shown alone, marked NEW, beside the boons held; each held one tapped to arm and tapped again to swap it out, or the new one left. */
 export function spareChoice(run: Run, armed: string | null): string {
-  const spare = UTILITIES[run.spare!]
-  const picks = [...run.utilities.map((id, i) => utilityPick(`d${i}`, { type: 'keep', drop: i }, id, 'drop', `Tap again to drop ${UTILITIES[id].name} for ${spare.name}`)), utilityPick('d', { type: 'keep', drop: -1 }, run.spare!, run.shop ? 'put back' : 'leave', run.shop ? `Tap again to put ${spare.name} back, your supplies repaid` : `Tap again to leave ${spare.name} behind`)]
-  return modal(`<h2>${spare.icon} ${spare.name}: ${sentence(spare.text)} You hold 3. Drop 1.</h2><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, 'Tap a card for its details; tap it again to choose it.')}`)
+  const id = run.spare!
+  const { name, category } = UTILITIES[id]
+  const slots = run.utilities.map((h, i) => utilityPick(run, `d${i}`, { type: 'keep', drop: i }, h.id, 'swap out', `Tap again to swap ${boonName(h.id, h.level)} out for ${name}`, {}, h.level))
+  const leave = run.shop ? 'Put it back, supplies repaid' : 'Leave it'
+  return modal(`<div class="boonswap">
+    <div class="newboon"><span class="newbadge">NEW</span><span class="art">${boonIcon(id)}</span><small class="tier">${category}</small><b>${name}</b><span>${boonDoes(run, id)}</span></div>
+    <h2>Slot it in for 1 of your ${run.utilities.length} boons, or leave it.</h2>
+    <div class="picks slots">${slots.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(slots, armed, 'Tap a held boon, then tap it again to swap it out.')}
+    <button class="decide leave" data-action='${JSON.stringify({ type: 'keep', drop: -1 })}'>${leave}</button>
+  </div>`)
 }
 
 /** The relics offered, as cards with their icons: one tapped is armed, then Take carries it. */

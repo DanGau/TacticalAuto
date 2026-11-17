@@ -15,14 +15,12 @@ import { type Battle } from '../core/battle'
 import { HOLD_ROUNDS } from '../core/goals'
 import { missionOrder, THREATS } from '../core/objectives'
 import { button, STOP_NAMES } from './html'
-import { fuelTanks } from '../core/objects'
-import { UTILITIES, type UtilityId } from '../core/utilities'
+import { boonName, boonText, UTILITIES, type UtilityId } from '../core/utilities'
+import { boonIcon } from './boon-icons'
 import { ARENA_KINDS, scouted } from '../core/arena-kinds'
 import { QUANTITIES } from '../core/quantities'
-import { BOON_CHARGES } from '../core/relics'
-import { relicIcon } from './relic-icons'
 import { RECKONING_KILLS } from '../core/doctrines'
-import { pickCard, pickDetail, utilityPick, type Pick } from './cards'
+import { pickCard, type Pick } from './cards'
 import { alienBlock } from './sheet'
 import { overworld, type Tab } from './overworld'
 import { drift, glide, viewNow } from './globe'
@@ -43,8 +41,7 @@ function status(run: Run): string {
   if (battle.phase === 'deploy') return title
   const rounds = battle.goal === 'hold' ? ` · held ${Math.min(battle.held, HOLD_ROUNDS)} of ${HOLD_ROUNDS} rounds` : ''
   const clock = battle.deadline !== null && battle.round < battle.deadline ? ` · reinforcements in ${battle.deadline - battle.round} rounds` : ''
-  const boons = battle.boons.filter((b) => b.until > battle.round).map((b) => ` · ${UTILITIES[b.id].icon} ${UTILITIES[b.id].name} ⏳${b.until - battle.round}`).join('')
-  return `${title}${rounds}${clock}${boons}${counts(run, battle)}`
+  return `${title}${rounds}${clock}${counts(run, battle)}`
 }
 
 /** The hero's counts toward its every-Nth triggers. */
@@ -55,38 +52,14 @@ function counts(run: Run, battle: Battle): string {
   return `${chrono}${oath}`
 }
 
-/**
- * Before the landing: what the battle tests, the twist, and how the hero goes in: with no utility held, a tap; else a
- * card per utility, tapped to arm and again to go in with it. A rigged tank then asks which tank, `rigging` holding its index.
- * With the reservoir charged, a boon picked, `doubling` its index, asks for a second or none.
- */
-function drop(run: Run, battle: Battle, armed: string | null, rigging: number | null, doubling: number | null): string {
+/** Before the landing: the ground, what the battle tests, the twist, the aliens, the boons held and which of them answer here, and the way in. */
+function drop(run: Run, battle: Battle, armed: string | null): string {
   const twist = battle.twist ? `<p title="${TWISTS[battle.twist].text}">${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}</b></p>` : ''
-  const tanks = fuelTanks(battle)
-  const go = (detail: string, picks: Pick[], idle: string) => `<p>${detail}</p><div class="picks">${picks.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(picks, armed, idle)}`
-  const charged = run.relics.includes('reservoir') && run.boons >= BOON_CHARGES && run.utilities.filter((id) => id !== 'tank').length >= 2
-  const reservoir = run.relics.includes('reservoir') ? `<p class="reservoir">${relicIcon('reservoir')} Boon Reservoir: ${run.boons} charge${run.boons === 1 ? '' : 's'}${charged ? `; ${BOON_CHARGES} take a second boon in` : `; go in with no boon to charge it`}.</p>` : ''
-  const second = (i: number): Pick[] => [
-    { key: 'one', action: { type: 'enter', utility: i }, look: 'utility', body: `<small>keep charges</small><b>${UTILITIES[run.utilities[i]].icon} Just one</b>`, detail: '', go: `Tap again to go in with ${UTILITIES[run.utilities[i]].name} alone` },
-    ...run.utilities.flatMap((id, j): Pick[] => (j === i || id === 'tank' ? [] : [utilityPick(`s${j}`, { type: 'enter', utility: i, second: j }, id, `+${BOON_CHARGES} charges`, `Tap again to go in with ${UTILITIES[run.utilities[i]].name} and ${UTILITIES[id].name}`)])),
-  ]
-  const chosen =
-    doubling !== null
-      ? go(`Spend ${BOON_CHARGES} charges on a second boon?`, second(doubling), 'Tap a second boon, or Just one, then tap it again to go in.')
-      : rigging !== null
-      ? go('Rig which tank?', tanks.map((_, tank): Pick => utilityPick(`t${tank}`, { type: 'enter', utility: rigging, tank }, 'tank', 'rig', `Tap again to rig tank ${tank + 1} and go in`, { body: `<small>rig</small><b>🛢️ Tank ${tank + 1}</b>` })), 'Tap a tank, then tap it again to go in.')
-      : run.utilities.length === 0
-        ? button({ type: 'enter' }, 'Go in')
-        : go(
-            'Pick a boon for this battle.',
-            run.utilities.map((id, i): Pick =>
-              utilityPick(`u${i}`, id === 'tank' || charged ? undefined : { type: 'enter', utility: i }, id, tagOf(battle, id), id === 'tank' ? 'Tap again to choose a tank' : charged ? 'Tap again, then choose a second' : `Tap again to go in with ${UTILITIES[id].name}`, id === 'tank' ? { attrs: `data-rig="${i}"`, block: tanks.length === 0 ? 'No fuel tanks on this ground' : null } : charged ? { attrs: `data-double="${i}"` } : {}),
-            ),
-            'Tap a boon or an alien to read it; tap a boon again to go in with it.',
-          )
   const test = battle.challenge ? `<h2 class="challenge" title="${CHALLENGES[battle.challenge].test}">${CHALLENGES[battle.challenge].icon} ${THREATS[battle.challenge]}</h2>` : ''
   const clock = battle.deadline !== null ? `<p>⏱️ Reinforcements arrive in round ${battle.deadline}.</p>` : ''
-  return `${groundOf(run, battle)}${test}${clock}${twist}${foes(battle, armed)}${reservoir}${chosen}`
+  const held = run.utilities.map((h) => `<span class="held-boon${tagOf(battle, h.id) ? ' answers' : ''}" title="${UTILITIES[h.id].name}: ${boonText(h.id, h.level)}">${boonIcon(h.id)} ${boonName(h.id, h.level)}${tagOf(battle, h.id) ? ` <small>${tagOf(battle, h.id)}</small>` : ''}</span>`)
+  const boons = held.length > 0 ? `<p class="boons-held">${held.join(' ')}</p>` : ''
+  return `${groundOf(run, battle)}${test}${clock}${twist}${foes(battle, armed)}${boons}${button({ type: 'enter' }, 'Go in')}`
 }
 
 /** The ground scouted: its name and what it does, and which of what the hero's build makes it multiplies. */
@@ -96,10 +69,10 @@ function groundOf(run: Run, battle: Battle): string {
   return `<h2 class="challenge ground" title="${ground.text}">${ground.icon} ${ground.name}</h2><p class="ground-text">${ground.text}${yours.length > 0 ? ` <b>Your ${yours.join(' and ')} pays here.</b>` : ''}</p>`
 }
 
-/** What a boon does for this battle: exploits the ground, answers its challenge, both, or neither. */
+/** What a boon held does for this battle: answers the ground, its challenge, both, or neither. */
 function tagOf(battle: Battle, id: UtilityId): string {
   const { ground, challenge } = scouted(battle, id)
-  return ground && challenge ? 'answers both' : ground ? 'pays here' : challenge ? 'answers this' : 'boon'
+  return ground && challenge ? 'answers both' : ground ? 'answers the ground' : challenge ? 'answers the test' : ''
 }
 
 /** The encounter: each alien kind on the deploy screen and how many; tapped, its stat block. Burrowers stay hidden. */
@@ -121,10 +94,6 @@ export function createUi(act: (action: Action) => void): Ui {
   installTips(overlay)
   const dropPanel = document.getElementById('drop')!
   let choosing: Battle | null = null
-  /** On the deploy screen, the rigged tank held at this index awaiting its tank. */
-  let rigging: number | null = null
-  /** On the deploy screen, the boon picked whose second the reservoir may pay for. */
-  let doubling: number | null = null
   /** The report the player has continued past. */
   let seen: Report | null = null
   let tab: Tab = 'Map'
@@ -225,11 +194,9 @@ export function createUi(act: (action: Action) => void): Ui {
     if (!battle) return
     if (battle !== choosing) {
       choosing = battle
-      rigging = null
-      doubling = null
       armed = null
     }
-    dropPanel.innerHTML = drop(run, battle, armed, rigging, doubling)
+    dropPanel.innerHTML = drop(run, battle, armed)
   }
 
   dropPanel.addEventListener('click', (e) => {
@@ -239,15 +206,7 @@ export function createUi(act: (action: Action) => void): Ui {
       armed = target.dataset.arm
       return showDrop(shown!)
     }
-    if (target.dataset.rig) {
-      rigging = Number(target.dataset.rig)
-      armed = null
-      showDrop(shown!)
-    } else if (target.dataset.double) {
-      doubling = Number(target.dataset.double)
-      armed = null
-      showDrop(shown!)
-    } else if (target.dataset.action) {
+    if (target.dataset.action) {
       armed = null
       act(JSON.parse(target.dataset.action) as Action)
     }

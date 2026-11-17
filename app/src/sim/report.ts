@@ -183,13 +183,13 @@ const nameOf = (test: Row['test']) => (test in CHALLENGES ? CHALLENGES[test as C
 /** Battles of each challenge and each ground (with no challenge), by leg and answer. */
 export function rows(results: RunResult[]): Row[] {
   const tolls = results.flatMap((r) => r.tolls)
-  const grounds = (Object.keys(ARENA_KINDS) as ArenaKind[]).filter((k) => ARENA_KINDS[k].pays.length > 0)
+  const grounds = (Object.keys(ARENA_KINDS) as ArenaKind[]).filter((k) => ARENA_KINDS[k].answers.length > 0)
   const tests: [Row['test'], (t: Toll) => boolean, (t: Toll) => Answer][] = [
     ...(Object.keys(CHALLENGES) as ChallengeId[]).map((c): [Row['test'], (t: Toll) => boolean, (t: Toll) => Answer] => [c, (t) => t.challenge === c, (t) => t.answer]),
     ...grounds.map((g): [Row['test'], (t: Toll) => boolean, (t: Toll) => Answer] => [g, (t) => t.ground === g && !t.challenge, (t) => t.exploited]),
   ]
   return tests.flatMap(([test, met, how]) =>
-    [0, 1, 2, 3].flatMap((leg) => (['picked', 'held', 'none'] as const).flatMap((answer): Row[] => {
+    [0, 1, 2, 3].flatMap((leg) => (['held', 'none'] as const).flatMap((answer): Row[] => {
       const of = tolls.filter((t) => met(t) && t.leg === leg && how(t) === answer)
       if (of.length === 0) return []
       return [{ test, leg, answer, battles: of.length, won: Math.round((100 * of.filter((t) => t.won).length) / of.length), lost: Math.round((100 * of.reduce((sum, t) => sum + (t.before - t.after) / t.most, 0)) / of.length) }]
@@ -204,20 +204,19 @@ const HARD = 70
 const CHEAP = { won: 95, lost: 20 }
 
 /**
- * What each row says. Won with the answer: the encounter is fine. Lost with it: the encounter is too hard, the game's
- * fault. Held the answer and went in without it: the bot's fault. No answer held: what a mismatch costs, the game's
- * if it costs too little; how often it happened is the bot's route and keeping, or the shops' luck.
+ * What each row says. Won holding the answer: the encounter is fine. Lost with it: the encounter is too hard, the
+ * game's fault. No answer held: what a mismatch costs, the game's if it costs too little; how often it happened is the
+ * bot's route and keeping, or the shops' luck.
  */
 export function verdicts(of: Row[]): string[] {
   const found: string[] = []
   for (const row of of) {
     const name = `${nameOf(row.test)} (leg ${row.leg + 1})`
-    if (row.answer === 'held') found.push(`BOT: held an answer to ${name} and went in without it, ${row.battles} times`)
     if (row.battles < READ_FROM) continue
-    if (row.answer === 'picked' && row.won < HARD) found.push(`GAME: ${name} too hard even with its answer: won ${row.won}% of ${row.battles}`)
+    if (row.answer === 'held' && row.won < HARD) found.push(`GAME: ${name} too hard even with its answer: won ${row.won}% of ${row.battles}`)
     if (row.answer === 'none' && row.won >= CHEAP.won && row.lost < CHEAP.lost) found.push(`GAME: a mismatch on ${name} costs too little: won ${row.won}%, lost ${row.lost}% health`)
     const none = of.find((r) => r.test === row.test && r.leg === row.leg && r.answer === 'none')
-    if (row.answer === 'picked' && none && none.battles >= READ_FROM && row.lost >= none.lost && row.won <= none.won) found.push(`GAME: the answer to ${name} does not answer it: lost ${row.lost}% health with, ${none.lost}% without`)
+    if (row.answer === 'held' && none && none.battles >= READ_FROM && row.lost >= none.lost && row.won <= none.won) found.push(`GAME: the answer to ${name} does not answer it: lost ${row.lost}% health with, ${none.lost}% without`)
   }
   return found
 }

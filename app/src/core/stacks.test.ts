@@ -7,8 +7,8 @@ import { endBattle } from './debrief'
 import { knockback, knocksInto } from './knockback'
 import { mend, SLAM_DAMAGE } from './wound'
 import { TUNING } from './tuning'
-import { BOON_CHARGES, STREAK_FIGHTS } from './relics'
-import { gainRelic } from './rewards'
+import { STREAK_FIGHTS } from './relics'
+import { gainRelic, gainUtility, slotsOf } from './rewards'
 import { begun } from './roads'
 import { createRun } from './run'
 import { step } from './step'
@@ -187,20 +187,13 @@ test('Chrono Coil: every 3rd human turn the hero doubles its attacks', () => {
   expect(hero.twice).toBe(true)
 })
 
-test('Boon Reservoir: a fight won with no boon adds a charge; BOON_CHARGES take a second boon in', () => {
+test('Boon Rack: hold 1 more boon', () => {
   const run = begun(1)
-  gainRelic(run, 'reservoir', true)
-  apply(run, { type: 'go', index: 1 })
-  apply(run, { type: 'advance' })
-  run.utilities = ['overcharge', 'thrusters']
-  expect(apply(run, { type: 'enter', utility: 0, second: 1 }).ok).toBe(false)
-  run.boons = BOON_CHARGES
-  expect(apply(run, { type: 'enter', utility: 0, second: 1 }).ok).toBe(true)
-  expect(run.boons).toBe(0)
-  expect(run.battle).toMatchObject({ utility: 'overcharge', second: 'thrusters' })
-  Object.assign(run.battle!, { phase: 'over', winner: 'human', utility: null, second: null })
-  endBattle(run)
-  expect(run.boons).toBe(1)
+  run.utilities = [{ id: 'plasma', level: 1 }, { id: 'riot', level: 1 }, { id: 'longshot', level: 1 }]
+  gainRelic(run, 'rack', true)
+  gainUtility(run, 'nanoweave')
+  expect(run.spare).toBeNull()
+  expect(run.utilities).toHaveLength(slotsOf(run))
 })
 
 test('Unbroken Line: every STREAK_FIGHTS fights in a row won pay more', () => {

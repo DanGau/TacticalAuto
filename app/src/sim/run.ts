@@ -13,12 +13,12 @@ import type { GearEffect } from '../core/battle'
 import { CHALLENGES, type ChallengeId } from '../core/challenges'
 import type { Goal } from '../core/goals'
 import { ARENA_KINDS, type ArenaKind } from '../core/arena-kinds'
-import { carries, type EffectId, type UtilityId } from '../core/utilities'
+import type { UtilityId } from '../core/utilities'
 import { forksOf, type Fork } from './forks'
 import { restForks, type RestFork } from './rest'
 
 /** Whether the hero met a challenge with an answer it picked, with one it held and left behind, or with none. */
-export type Answer = 'picked' | 'held' | 'none'
+export type Answer = 'held' | 'none'
 
 /** A battle's toll: which of the run it was, the leg it was on, the hero's most health, its health at the start and end, whether it fell, whether it was won, and what it tested. */
 export interface Toll {
@@ -85,11 +85,8 @@ export interface RunResult {
   rests: { safehouses: number; medkits: number }
 }
 
-/** How the hero met `answers`, given the utilities it held going in. */
-function answerOf(battle: NonNullable<Run['battle']>, held: UtilityId[], answers: EffectId[]): Answer {
-  if (battle.utility && carries(battle.utility, answers)) return 'picked'
-  return held.some((id) => carries(id, answers)) ? 'held' : 'none'
-}
+/** Whether the boons the hero `held` going in meet `answers`. */
+const answerOf = (held: UtilityId[], answers: UtilityId[]): Answer => (held.some((id) => answers.includes(id)) ? 'held' : 'none')
 
 /** More player actions than any run takes: a run past it is stuck, and fails instead of hanging. */
 const MAX_ACTIONS = 10000
@@ -110,16 +107,16 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
   let leaps = 0
   /** This battle's hardest hero hit, its boss, and the round the boss was first wounded. */
   let hits = { max: 0, boss: -1, from: -1, rounds: null as number | null }
-  /** The battle under way, its leg, the hero's health as it began, and the utilities it held. */
+  /** The battle under way, its leg, the hero's health as it began, and the boons it held. */
   let begun: [Run['battle'], number, number, UtilityId[], boolean] = [null, 0, 0, [], false]
   let had: { leg: number; held: (UtilityId | null)[] } = { leg: 0, held: [] }
   while (run.phase !== 'won' && run.phase !== 'lost') {
-    const held = [...run.utilities, run.spare]
+    const held = [...run.utilities.map((h) => h.id), run.spare]
     result.found[had.leg] += held.filter((id) => id && !had.held.includes(id)).length
     had = { leg: run.keys, held }
     const battle = run.battle
     if (run.phase === 'battle' && begun[0] !== battle) {
-      begun = [battle, run.keys, health(run, run.hero), [...run.utilities], battle!.units.some((u) => u.boss || u.target)]
+      begun = [battle, run.keys, health(run, run.hero), run.utilities.map((h) => h.id), battle!.units.some((u) => u.boss || u.target)]
       hits = { max: 0, boss: battle!.units.find((u) => u.boss)?.id ?? -1, from: -1, rounds: null }
     }
     if (run.phase === 'battle' && battle!.phase === 'battle') {
@@ -145,7 +142,7 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
         const fought = run.report!.hero!
-        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[4], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3], battle!.challenge ? CHALLENGES[battle!.challenge].answers : []), ground: battle!.arenaKind, exploited: answerOf(battle!, begun[3], ARENA_KINDS[battle!.arenaKind].pays), most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
+        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[4], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(begun[3], battle!.challenge ? CHALLENGES[battle!.challenge].answers : []), ground: battle!.arenaKind, exploited: answerOf(begun[3], ARENA_KINDS[battle!.arenaKind].answers), most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
         clock = { next: 0, done: 0 }
       }
       continue
@@ -158,7 +155,7 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
     if (action.type === 'advance' && nextStop(run) === 'safehouse') result.rests.safehouses++
     if (action.type === 'medkit') result.rests.medkits++
     const applied = apply(run, action)
-    if (action.type === 'boons') had.held = [...run.utilities]
+    if (action.type === 'boons') had.held = run.utilities.map((h) => h.id)
     if (!applied.ok) throw new Error(`action rejected: ${applied.reason}`)
     arm()
     result.actions.push(action)

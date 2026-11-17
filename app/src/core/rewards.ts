@@ -1,6 +1,6 @@
 // Gear and relic rewards, the shop, and settling the reward phase.
 import { RARITY_CHANCE, type Rarity } from './base'
-import { BOON_WEIGHT, SHOP_UTILITIES, START_OFFERS, START_PICKS, UTILITIES, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
+import { MAX_LEVEL, SHOP_UTILITIES, START_OFFERS, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
 import { generateGear, type Gear } from './gear'
 import { random, randomInt } from './rng'
 import { drawRelic, offerable, type RelicId } from './relics'
@@ -67,7 +67,7 @@ export function stockShop(run: Run): Shop {
   const relics = offerable(run.relics)
   const stocked: RelicId[] = []
   while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(drawRelic(run, relics, makes(run), reads(run)))
-  const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
+  const kinds = drawable(run)
   const utilities = Array.from({ length: Math.min(SHOP_UTILITIES, kinds.length) }, () => ({ id: drawUtility(run, kinds), sold: false }))
   return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, medkit: false }
 }
@@ -84,10 +84,22 @@ export function buyWare(run: Run, index: number): void {
   wear(run.hero, gear)
 }
 
-/** The hero gains a utility; with no room, the player must choose what to drop. */
+/** Boons the hero holds at most: UTILITY_SLOTS, and 1 more with Boon Rack. */
+export const slotsOf = (run: Run) => UTILITY_SLOTS + (run.relics.includes('rack') ? 1 : 0)
+
+/** Boons the hero could gain: any not held at MAX_LEVEL. */
+const drawable = (run: Run) => UTILITY_IDS.filter((id) => (run.utilities.find((h) => h.id === id)?.level ?? 0) < MAX_LEVEL)
+
+/** The hero gains boon `id`: one held rises a level, and the player is told; else it fills a free slot, or with none the player slots it in for one held or leaves it. */
 export function gainUtility(run: Run, id: UtilityId): void {
-  if (run.utilities.length < UTILITY_SLOTS) run.utilities.push(id)
-  else run.spare = id
+  const held = run.utilities.find((h) => h.id === id)
+  if (held) {
+    held.level = Math.min(MAX_LEVEL, held.level + 1)
+    run.gains.push({ kind: 'boon', id, level: held.level })
+  } else if (run.utilities.length < slotsOf(run)) {
+    run.utilities.push({ id, level: 1 })
+    run.gains.push({ kind: 'boon', id, level: 1 })
+  } else run.spare = id
 }
 
 /** The hero gains a relic: `seen` if the player chose it from a card, else the player is told. */
@@ -104,39 +116,35 @@ export function loseRelic(run: Run, index: number): RelicId {
   return id
 }
 
-/** Takes a utility out of `pool`, the commoner the likelier. */
+/** Takes a boon out of `pool`, each as likely. */
 export function drawUtility(rng: { rng: number }, pool: UtilityId[]): UtilityId {
-  const weight = (id: UtilityId) => BOON_WEIGHT[UTILITIES[id].rarity]
-  let roll = random(rng) * pool.reduce((sum, id) => sum + weight(id), 0)
-  const i = Math.max(0, pool.findIndex((id) => (roll -= weight(id)) < 0))
-  return pool.splice(i, 1)[0]
+  return pool.splice(randomInt(rng, pool.length), 1)[0]
 }
 
-/** At the run's start, the commons the hero picks its first utilities from: drawn from the seed apart from the run's own stream, so they shift no later draw. */
+/** At the run's start, the boons the hero picks its first from: drawn from the seed apart from the run's own stream, so they shift no later draw. */
 export function offerStart(run: Run): void {
-  const commons = UTILITY_IDS.filter((id) => UTILITIES[id].rarity === 'common')
+  const pool = [...UTILITY_IDS]
   const rng = { rng: ~run.seed }
-  run.boonOffers = Array.from({ length: START_OFFERS }, () => commons.splice(randomInt(rng, commons.length), 1)[0])
+  run.boonOffers = Array.from({ length: START_OFFERS }, () => drawUtility(rng, pool))
 }
 
-/** Takes the START_PICKS offers at `picks`. The caller checks they are distinct offers. */
+/** Takes the UTILITY_SLOTS offers at `picks`. The caller checks they are distinct offers. */
 export function takeStart(run: Run, picks: number[]): void {
-  run.utilities = picks.slice(0, START_PICKS).map((i) => run.boonOffers[i])
+  run.utilities = picks.slice(0, UTILITY_SLOTS).map((i) => ({ id: run.boonOffers[i], level: 1 }))
   run.boonOffers = []
   settle(run)
 }
 
-/** A utility the hero lacks, found at a stop; none if it holds them all. With no room the choice of what to drop tells of it; else the player is told. */
+/** A new boon found at a stop, or a level of one held; none once every boon is held at MAX_LEVEL. */
 export function findUtility(run: Run): UtilityId | null {
-  const kinds = UTILITY_IDS.filter((id) => !run.utilities.includes(id))
+  const kinds = drawable(run)
   if (kinds.length === 0) return null
   const id = drawUtility(run, kinds)
   gainUtility(run, id)
-  if (run.spare !== id) run.gains.push({ kind: 'boon', id })
   return id
 }
 
-/** Buys the shop's utility at `index`. The caller checks it is affordable and not held. */
+/** Buys the shop's boon at `index`. The caller checks it is affordable. */
 export function buyUtility(run: Run, index: number): void {
   const item = run.shop!.utilities[index]
   item.sold = true
@@ -144,9 +152,9 @@ export function buyUtility(run: Run, index: number): void {
   gainUtility(run, item.id)
 }
 
-/** Settles a utility with no room: drops the one held at `drop`, or with -1, the new one; one just bought goes back on the shelf, its price repaid. */
+/** Settles a new boon: slots it in for the one held at `drop`, or with -1 leaves it; one just bought goes back on the shelf, its price repaid. */
 export function keepUtility(run: Run, drop: number): void {
-  if (drop >= 0) run.utilities[drop] = run.spare!
+  if (drop >= 0) run.utilities[drop] = { id: run.spare!, level: 1 }
   const bought = run.shop?.utilities.find((item) => item.id === run.spare)
   if (drop < 0 && bought) {
     bought.sold = false
@@ -162,7 +170,7 @@ export function sellFind(run: Run, index: number): void {
   settle(run)
 }
 
-/** Ends the reward phase once no choice is left: no starting utilities, relic, find, spare utility, skill or perk. */
+/** Ends the reward phase once no choice is left: no starting boons, relic, find, new boon, skill or perk. */
 export function settle(run: Run): void {
   const owed = run.boonOffers.length > 0 || run.relicOffers.length > 0 || run.finds.length > 0 || run.spare !== null || owesPick(run.hero)
   run.phase = owed ? 'reward' : 'overworld'

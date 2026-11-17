@@ -1,7 +1,6 @@
 // The events a beat emits for the view to play.
 import type { Prop } from './terrain'
 import type { Tile, Effect, Ability, Order, Side } from './battle'
-import type { UtilityId } from './utilities'
 import type { SecondaryId } from './secondaries'
 import type { Src } from './sources'
 
@@ -44,15 +43,11 @@ export type GameEvent =
   | { type: 'frozen'; id: number }
   /** A unit is hurt by acid underfoot, or by the death of a psion near it. */
   | { type: 'hurt'; id: number; amount: number; cause: 'acid' | 'backlash' | 'impact' }
-  /** The arena's water froze to ice. */
-  | { type: 'freeze' }
   /** A wave arrives on a hold, unseen unless the hero already sees where it lands. */
   | { type: 'wave'; units: { id: number; x: number; y: number }[] }
   /** A boss spawns a swarmling, or an engineer deploys a mech. */
   | { type: 'spawn'; src: Src; id: number; unit: { id: number; x: number; y: number } }
   | { type: 'death'; id: number }
-  /** A utility takes hold on the units `on`, or with `ended`, its rounds run out. */
-  | { type: 'used'; src: Src; utility: UtilityId; on: number[]; ended?: true }
   | { type: 'end'; winner: Side | null }
 
 export type ShotEvent = Extract<GameEvent, { type: 'shot' }> 

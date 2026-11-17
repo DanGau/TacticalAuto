@@ -2,7 +2,6 @@
 import type { Object3D } from 'three'
 import { type Battle, type Order, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
-import { UTILITIES } from '../core/utilities'
 import { instant, PACE, strolls, tilePace, walkMs } from '../core/pace'
 import { attackOf, finisher, opener, secondaryAttack } from './attacks'
 import { drawTerrain } from './board'
@@ -244,20 +243,9 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       float(s, callout(s, e.type === 'saved' ? 'SAVED' : 'LIFTED OFF', COLOR.heal, sprite))
       await s.tween(PACE.death, (t) => fade(sprite, 1 - t))
       remove(s, e.id)
-    } else if (e.type === 'freeze') {
-      drawTerrain(s, battle)
     } else if (e.type === 'feed') {
       const on = sprites.get(e.id)
       if (on) float(s, callout(s, `FED +${e.damage}`, COLOR.crit, on))
-    } else if (e.type === 'used') {
-      const word = `${UTILITIES[e.utility].name.toUpperCase()}${e.ended ? ' ENDS' : ''}`
-      for (const id of e.on) {
-        const on = sprites.get(id)
-        if (!on) continue
-        on.drawHp(...shown(id))
-        float(s, callout(s, word, e.ended ? COLOR.crit : COLOR.heal, on))
-      }
-      await s.tween(PACE.reveal, () => {})
     } else if (e.type === 'heal') {
       const to = sprites.get(e.target)
       if (!to) continue

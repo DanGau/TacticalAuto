@@ -1,76 +1,20 @@
-// The strategic bot: reads each stop's challenge, and chooses utilities, route, hero and weapons to answer them.
+// The strategic bot: reads each stop's challenge, and chooses boons, route, hero and weapons to answer them.
 import type { Action } from '../core/apply'
 import { CHALLENGES, rungOf, TIERS, type ChallengeId } from '../core/challenges'
 import type { ClassId } from '../core/classes'
 import { MEDKIT, EVENTS, RELIC_PRICE } from '../core/events'
 import { EFFECTS, type Gear } from '../core/gear'
-import { distance } from '../core/grid'
-import { fuelTanks } from '../core/objects'
 import { ARENA_KINDS, type ArenaKind } from '../core/arena-kinds'
-import { GEAR_PRICE } from '../core/rewards'
+import { GEAR_PRICE, slotsOf } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type MapNode, type Run, type Soldier, type Stop } from '../core/run-state'
 import { plannedPerk, plannedSkill } from '../core/plans'
 import { health, makes, minorOffers, reads, skillOffers, soldierStats } from '../core/hero'
-import { BOON_CHARGES, RELICS, type RelicId } from '../core/relics'
+import { RELICS, type RelicId } from '../core/relics'
 import { CANCELS, cancelling, type Cancel, type Flow } from '../core/quantities'
-import { carries, RIG, UTILITIES, UTILITY_PRICE, UTILITY_SLOTS, type EffectId, type UtilityId } from '../core/utilities'
+import { UTILITIES, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from '../core/utilities'
 import type { Bot } from './bots'
 import { EXAMS } from '../core/exams'
-
-/** What to take into a fight no utility held answers, best first. */
-const FALLBACK: EffectId[] = ['overcharge', 'ironSkin', 'mending', 'keen', 'crack', 'rangedShield', 'dampener', 'thrusters', 'meleeShield', 'smoke', 'coldSnap', 'gravity', 'farsight', 'hunted', 'blaze', 'flashbang', 'hover']
-
-/**
- * What a utility is worth against `challenge`: each answer it carries by its place, as CHALLENGES runs them best
- * first, then each effect by its place in FALLBACK, far less. A minor part counts half.
- */
-function fit(id: UtilityId, challenge: ChallengeId | null): number {
-  const answers = challenge ? CHALLENGES[challenge].answers : []
-  return UTILITIES[id].parts.reduce((sum, { id: e, minor }) => {
-    const answer = answers.includes(e) ? 10 - answers.indexOf(e) : 0
-    const fallback = FALLBACK.includes(e) ? 1 - FALLBACK.indexOf(e) / FALLBACK.length : 0
-    return sum + (answer + fallback) * (minor ? 0.5 : 1)
-  }, 0)
-}
-
-/** What exploiting the ground scouted is worth, beside a challenge's best answer. */
-const GROUND_WORTH = 8
-
-/** The utility held best for `challenge` and the ground scouted, if any is worth taking. */
-export function answerFor(run: Run, challenge: ChallengeId | null): number {
-  const battle = run.battle
-  const usable = (id: UtilityId) => id !== 'tank' || (!!battle && fuelTanks(battle).length > 0)
-  const ground = (id: UtilityId) => (battle?.phase === 'deploy' && carries(id, ARENA_KINDS[battle.arenaKind].pays) ? GROUND_WORTH : 0)
-  const scores = run.utilities.map((id) => (usable(id) ? fit(id, challenge) + ground(id) : 0))
-  const best = scores.indexOf(Math.max(0, ...scores))
-  return scores[best] > 0 ? best : -1
-}
-
-/** Against a swarm, which comes to the hero, the tank nearest the way in clear of its blast; else the farthest. */
-export function tankFor(run: Run): number {
-  const battle = run.battle!
-  const tanks = fuelTanks(battle)
-  const at = battle.entry!
-  const rank = (t: { x: number; y: number }) => (distance(t, at) <= RIG.close + 2 ? -Infinity : battle.challenge === 'swarm' ? -distance(t, at) : distance(t, at))
-  return tanks.reduce((best, t, i) => (rank(t) > rank(tanks[best]) ? i : best), 0)
-}
-
-/**
- * Goes in with the best answer held. With Boon Reservoir, an easy fight goes in bare to charge it, and a charged
- * reservoir takes the next best answer in too where the fight is a test.
- */
-function deploy(run: Run): Action {
-  const battle = run.battle!
-  const reservoir = run.relics.includes('reservoir')
-  const easy = !battle.challenge && run.mission?.kind === 'battle' && run.mission.risk === 'safe'
-  if (reservoir && easy) return { type: 'enter' }
-  const index = answerFor(run, battle.challenge)
-  if (index < 0) return { type: 'enter' }
-  if (run.utilities[index] === 'tank') return { type: 'enter', utility: index, tank: tankFor(run) }
-  const second = reservoir && run.boons >= BOON_CHARGES ? answerFor({ ...run, utilities: run.utilities.map((id, i) => (i === index ? 'tank' : id)) }, battle.challenge) : -1
-  return second >= 0 && !['tank', run.utilities[index]].includes(run.utilities[second]) ? { type: 'enter', utility: index, second } : { type: 'enter', utility: index }
-}
 
 /** The stops reachable in the next few columns, nearest first. */
 function ahead(run: Run, depth = 3): Stop[] {
@@ -86,30 +30,37 @@ function ahead(run: Run, depth = 3): Stop[] {
   return stops
 }
 
-/** What a stop's ground the held utilities exploit is worth, beside its challenge answered. */
+/** What a stop's ground the held boons answer is worth, beside its challenge answered. */
 const PAID_WORTH = 1
 
-/** Whether some of `held` exploits `ground`. */
-const pays = (held: UtilityId[], ground: ArenaKind | undefined) => !!ground && held.some((u) => carries(u, ARENA_KINDS[ground].pays))
+/** Whether some of `held` answers `ground`. */
+const pays = (held: UtilityId[], ground: ArenaKind | undefined) => !!ground && held.some((u) => ARENA_KINDS[ground].answers.includes(u))
 
-/** How much the utilities `held` answer: stops in sight count most, then what the leg's tier has in store; and the grounds in sight they exploit. */
+/** The boons held, by id. */
+const ids = (run: Run) => run.utilities.map((h) => h.id)
+
+/**
+ * How much the boons `held` are worth: the challenges they answer, stops in sight most, then what the leg's tier has
+ * in store; the grounds in sight they answer; and what each adds to the hero's combos.
+ */
 function coverage(run: Run, held: UtilityId[]): number {
   const seen = ahead(run).flatMap((stop) => (stop.challenge ? [stop.challenge] : []))
   const tier = Math.min(run.keys, TIERS.length - 1)
   const rung = rungOf(run.stop)
   const coming = [...TIERS[tier][rung], ...TIERS[Math.min(tier + 1, TIERS.length - 1)][Math.min(rung + 1, 2)], 'bigOne' as const]
-  const answered = (id: ChallengeId) => held.some((u) => carries(u, CHALLENGES[id].answers))
-  // A challenge's first answer is its best; a combo does more beside it.
-  const best = (id: ChallengeId) => (held.some((u) => UTILITIES[u].parts[0].id === CHALLENGES[id].answers[0]) ? 0.25 : 0)
-  const breadth = held.reduce((sum, u) => sum + 0.2 * (UTILITIES[u].parts.length - 1), 0)
+  const answered = (id: ChallengeId) => held.some((u) => CHALLENGES[id].answers.includes(u))
+  // A challenge's first answer is its best.
+  const best = (id: ChallengeId) => (held.includes(CHALLENGES[id].answers[0]) ? 0.25 : 0)
   const grounds = ahead(run).filter((stop) => pays(held, stop.ground)).length * PAID_WORTH
-  return breadth + grounds + seen.reduce((sum, id) => sum + (answered(id) ? 2 + best(id) : 0), 0) + coming.reduce((sum, id) => sum + (answered(id) ? 1 + best(id) : 0), 0)
+  const bare = { ...run, utilities: [] }
+  const combos = held.reduce((sum, u) => sum + 0.5 * comboWorth(bare, UTILITIES[u]), 0)
+  return combos + grounds + seen.reduce((sum, id) => sum + (answered(id) ? 2 + best(id) : 0), 0) + coming.reduce((sum, id) => sum + (answered(id) ? 1 + best(id) : 0), 0)
 }
 
-/** With a utility to spare, keeps the three that answer the most. */
+/** With a new boon, keeps the set that is worth the most. */
 function keep(run: Run): { type: 'keep'; drop: number } {
   const options = [-1, ...run.utilities.map((_, i) => i)]
-  const after = (drop: number) => (drop < 0 ? run.utilities : run.utilities.map((id, i) => (i === drop ? run.spare! : id)))
+  const after = (drop: number) => (drop < 0 ? ids(run) : ids(run).map((id, i) => (i === drop ? run.spare! : id)))
   return { type: 'keep', drop: options.reduce((best, d) => (coverage(run, after(d)) > coverage(run, after(best)) ? d : best), -1) }
 }
 
@@ -126,9 +77,9 @@ function worth(run: Run, stop: Stop, rest?: number): number {
   if (stop.kind === 'cache') return 2
   if (stop.kind === 'unknown') return 1
   // Ground the build or a boon held exploits is worth seeking out.
-  const ground = stop.ground ? (pays(run.utilities, stop.ground) ? 1 : 0) + ARENA_KINDS[stop.ground].reads.filter((q) => makes(run).includes(q)).length : 0
+  const ground = stop.ground ? (pays(ids(run), stop.ground) ? 1 : 0) + ARENA_KINDS[stop.ground].reads.filter((q) => makes(run).includes(q)).length : 0
   if (!stop.challenge) return ground
-  const answered = run.utilities.some((id) => carries(id, CHALLENGES[stop.challenge!].answers))
+  const answered = ids(run).some((id) => CHALLENGES[stop.challenge!].answers.includes(id))
   const risk = { safe: 0, standard: 1, dangerous: 2 }[stop.risk]
   return ground + (answered ? 3 : -3 - 2 * (hale < 0.6 ? 1 : 0)) + (hale >= 0.7 && answered ? risk : -risk)
 }
@@ -143,10 +94,10 @@ function route(run: Run, rest?: number): Action {
   return { type: 'go', index: ways(run).filter((i) => i !== safehouse).reduce((a, b) => (score(b) > score(a) ? b : a)) }
 }
 
-/** The challenges in sight or in the leg's tier that no utility held answers. */
+/** The challenges in sight or in the leg's tier that no boon held answers. */
 const unanswered = (run: Run): ChallengeId[] => {
   const seen = ahead(run).flatMap((stop) => (stop.challenge ? [stop.challenge] : []))
-  return [...new Set([...seen, ...TIERS[Math.min(run.keys, TIERS.length - 1)][rungOf(run.stop)]])].filter((id) => !run.utilities.some((u) => carries(u, CHALLENGES[id].answers)))
+  return [...new Set([...seen, ...TIERS[Math.min(run.keys, TIERS.length - 1)][rungOf(run.stop)]])].filter((id) => !ids(run).some((u) => CHALLENGES[id].answers.includes(u)))
 }
 
 const RARITY = { common: 0, rare: 2, epic: 4 }
@@ -169,8 +120,9 @@ function shop(run: Run): Action {
   const relic = relics.findIndex((r) => !r.sold && RELIC_PRICE <= run.supplies && relicWorth(run, r.id) >= 0)
   if (relic >= 0) return { type: 'buy', index: relic }
   const gaps = unanswered(run)
-  const crosses = (id: UtilityId) => ahead(run).some((stop) => !pays(run.utilities, stop.ground) && pays([id], stop.ground))
-  const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && (gaps.some((c) => carries(id, CHALLENGES[c].answers)) || crosses(id)) && (run.utilities.length < UTILITY_SLOTS || keep({ ...run, spare: id }).drop !== -1))
+  const crosses = (id: UtilityId) => ahead(run).some((stop) => !pays(ids(run), stop.ground) && pays([id], stop.ground))
+  const held = (id: UtilityId) => ids(run).includes(id)
+  const answer = utilities.findIndex(({ id, sold }) => !sold && UTILITY_PRICE <= run.supplies && (held(id) || ((gaps.some((c) => CHALLENGES[c].answers.includes(id)) || crosses(id)) && (run.utilities.length < slotsOf(run) || keep({ ...run, spare: id }).drop !== -1))))
   if (answer >= 0) return { type: 'utility', index: answer }
   if (heal(0.75)) return { type: 'medkit' }
   for (const [index, { gear, sold }] of wares.entries()) {
@@ -225,11 +177,11 @@ function choose(run: Run): Action {
   return { type: 'hero', index: run.candidates.reduce((best, s, i) => (rank(s) < rank(run.candidates[best]) ? i : best), 0) }
 }
 
-/** Of the starting offers, the pair that answers the most. */
+/** Of the starting offers, the UTILITY_SLOTS worth the most together. */
 function starting(run: Run): Action {
-  const pairs = run.boonOffers.flatMap((_, i) => run.boonOffers.flatMap((_, j) => (i < j ? [[i, j]] : [])))
-  const score = (pair: number[]) => coverage(run, pair.map((i) => run.boonOffers[i]))
-  return { type: 'boons', picks: pairs.reduce((best, pair) => (score(pair) > score(best) ? pair : best)) }
+  const sets = (from: number, size: number): number[][] => (size === 0 ? [[]] : run.boonOffers.flatMap((_, i) => (i < from ? [] : sets(i + 1, size - 1).map((rest) => [i, ...rest]))))
+  const score = (set: number[]) => coverage(run, set.map((i) => run.boonOffers[i]))
+  return { type: 'boons', picks: sets(0, UTILITY_SLOTS).reduce((best, set) => (score(set) > score(best) ? set : best)) }
 }
 
 /** The strategic bot; given `rest`, it rests at a safehouse on the way exactly when the hero's health is under it. */
@@ -238,7 +190,7 @@ export const resting = (rest?: number): Bot => (run) => {
   if (run.spare) return keep(run)
   if (run.phase === 'reward') return reward(run)
   if (run.phase === 'select') return choose(run)
-  if (run.phase === 'battle') return deploy(run)
+  if (run.phase === 'battle') return { type: 'enter' }
   if (run.phase === 'shop') return shop(run)
   if (run.phase === 'event') {
     const options = EVENTS[run.event!].options.flatMap((option, i) => (!option.can || option.can(run) ? [i] : []))

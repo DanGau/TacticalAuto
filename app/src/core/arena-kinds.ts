@@ -2,7 +2,7 @@
 import { GRID, type Battle, type Tile } from './battle'
 import { CHALLENGES, type ChallengeId } from './challenges'
 import type { Quantity } from './quantities'
-import { carries, type EffectId, type UtilityId } from './utilities'
+import type { UtilityId } from './utilities'
 import { soften } from './levels'
 import { randomInt } from './rng'
 import { PROP_BULK, type Ground, type TerrainKind } from './terrain'
@@ -18,19 +18,19 @@ import { REGIONS, type RegionId } from './regions'
 export type ArenaKind = 'open' | 'skyscraper' | 'overpass' | 'quarry' | 'rift' | 'flooded' | 'marsh' | 'mesa' | 'ice'
 
 /**
- * What the player is told of each. `pays`: the boons that exploit it; `reads`: the quantities a build makes that it
- * multiplies. Open ground favours nothing.
+ * What the player is told of each. `answers`: the boons that meet it, best first; `reads`: the quantities a build makes
+ * that it multiplies. Open ground favours nothing.
  */
-export const ARENA_KINDS: Record<ArenaKind, { name: string; icon: string; text: string; pays: EffectId[]; reads: Quantity[] }> = {
-  open: { name: 'Open Ground', icon: '🌾', text: 'Gentle rises.', pays: [], reads: [] },
-  skyscraper: { name: 'Rooftops', icon: '🏙️', text: 'A long drop on every side, some behind glass. A Displaced alien falls off.', pays: ['push'], reads: ['moved', 'impact'] },
-  overpass: { name: 'Overpass', icon: '🛣️', text: 'A raised road down one flank. Shots from above deal 1 more damage per level.', pays: ['farsight', 'keen', 'push'], reads: ['crit', 'moved'] },
-  quarry: { name: 'Quarry', icon: '⛏️', text: 'Terraces climb to the far end. Displace an alien off a terrace to hurt it.', pays: ['push', 'farsight'], reads: ['moved', 'impact'] },
-  rift: { name: 'Rift', icon: '🕳️', text: 'A rift splits the middle. A Displaced alien at its lip falls in.', pays: ['push', 'hover'], reads: ['moved'] },
-  flooded: { name: 'Flooded', icon: '🌊', text: 'Canals cross the streets. An alien beside water or on ice takes 1 more Chill.', pays: ['coldSnap', 'hover'], reads: ['chill'] },
-  marsh: { name: 'Marsh', icon: '🫧', text: 'Mire costs 3 times the move. Burn on an alien in mire sets the mire about it alight.', pays: ['blaze', 'hover'], reads: ['burn'] },
-  mesa: { name: 'Mesa', icon: '🏜️', text: 'The far end stands on a mesa, ramps up its sides. Shots from above deal 1 more damage per level.', pays: ['farsight', 'keen', 'hover', 'push'], reads: ['crit', 'moved'] },
-  ice: { name: 'Ice Sheet', icon: '🧊', text: 'An alien Displaced on ice slides 3 more tiles. An alien beside water or on ice takes 1 more Chill.', pays: ['coldSnap', 'push'], reads: ['chill', 'moved'] },
+export const ARENA_KINDS: Record<ArenaKind, { name: string; icon: string; text: string; answers: UtilityId[]; reads: Quantity[] }> = {
+  open: { name: 'Open Ground', icon: '🌾', text: 'Gentle rises.', answers: [], reads: [] },
+  skyscraper: { name: 'Rooftops', icon: '🏙️', text: 'A long drop on every side, some behind glass. A Displaced alien falls off.', answers: ['gauntlet', 'concussion', 'gravBoots'], reads: ['moved', 'impact'] },
+  overpass: { name: 'Overpass', icon: '🛣️', text: 'A raised road down one flank. Shots from above deal 1 more damage per level.', answers: ['gravBoots', 'longshot'], reads: ['crit', 'moved'] },
+  quarry: { name: 'Quarry', icon: '⛏️', text: 'Terraces climb to the far end. Displace an alien off a terrace to hurt it.', answers: ['gravBoots', 'gauntlet', 'thermite'], reads: ['moved', 'impact'] },
+  rift: { name: 'Rift', icon: '🕳️', text: 'A rift splits the middle. A Displaced alien at its lip falls in.', answers: ['jumpJets', 'gauntlet', 'hoverPack'], reads: ['moved'] },
+  flooded: { name: 'Flooded', icon: '🌊', text: 'Canals cross the streets. An alien beside water or on ice takes 1 more Chill.', answers: ['jumpJets', 'cryo', 'cryoRams', 'hoverPack'], reads: ['chill'] },
+  marsh: { name: 'Marsh', icon: '🫧', text: 'Mire costs 3 times the move. Burn on an alien in mire sets the mire about it alight.', answers: ['incendiary', 'thermite', 'hoverPack', 'afterburner'], reads: ['burn'] },
+  mesa: { name: 'Mesa', icon: '🏜️', text: 'The far end stands on a mesa, ramps up its sides. Shots from above deal 1 more damage per level.', answers: ['gravBoots', 'longshot', 'overcharge'], reads: ['crit', 'moved'] },
+  ice: { name: 'Ice Sheet', icon: '🧊', text: 'An alien Displaced on ice slides 3 more tiles. An alien beside water or on ice takes 1 more Chill.', answers: ['cryoRams', 'gauntlet', 'cryo'], reads: ['chill', 'moved'] },
 }
 
 /** Where a region draws its ground: its signature as often as all the rest. A satellite's compound and the hive keep their own. */
@@ -293,7 +293,7 @@ export function featureOf(battle: Battle): Tile | null {
   return best
 }
 
-/** What the deploy screen says boon `id` does here: exploits the ground, answers the challenge, both, or neither. */
+/** What the deploy screen says boon `id` does here: answers the ground, the challenge, both, or neither. */
 export function scouted(battle: Pick<Battle, 'arenaKind' | 'challenge'>, id: UtilityId): { ground: boolean; challenge: boolean } {
-  return { ground: carries(id, ARENA_KINDS[battle.arenaKind].pays), challenge: !!battle.challenge && carries(id, CHALLENGES[battle.challenge].answers) }
+  return { ground: ARENA_KINDS[battle.arenaKind].answers.includes(id), challenge: !!battle.challenge && CHALLENGES[battle.challenge].answers.includes(id) }
 }
