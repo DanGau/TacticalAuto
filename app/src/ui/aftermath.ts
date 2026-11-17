@@ -100,17 +100,18 @@ export function perkChoice(soldier: Soldier): string {
 /** The hero's next pick: its power first, then its perk. */
 export const pickChoice = (run: Run, soldier: Soldier, armed: string | null) => (skillOffers(soldier).length > 0 ? skillChoice(run, soldier, armed) : perkChoice(soldier))
 
-/** A new boon with no free slot: it shown alone, marked NEW, beside the boons held; each held one tapped to arm and tapped again to swap it out, or the new one left. */
+/** A new boon with no free slot: it shown alone, marked NEW, beside the boons held; one held tapped to pick it, then Swap, or the new one left. */
 export function spareChoice(run: Run, armed: string | null): string {
   const id = run.spare!
   const { name, category } = UTILITIES[id]
-  const slots = run.utilities.map((h, i) => utilityPick(run, `d${i}`, { type: 'keep', drop: i }, h.id, 'swap out', `Tap again to swap ${boonName(h.id, h.level)} out for ${name}`, {}, h.level))
+  const slots = run.utilities.map((h, i) => utilityPick(run, `d${i}`, undefined, h.id, 'swap out', `Swap ${boonName(h.id, h.level)} out for ${name}`, {}, h.level))
+  const drop = armed?.match(/^d(\d+)$/) ? Number(armed.slice(1)) : null
   const leave = run.shop ? 'Put it back, supplies repaid' : 'Leave it'
   return modal(`<div class="boonswap">
     <div class="newboon"><span class="newbadge">NEW</span><span class="art">${boonIcon(id)}</span><small class="tier">${category}</small><b>${name}</b><span>${boonDoes(run, id)}</span></div>
     <h2>Slot it in for 1 of your ${run.utilities.length} boons, or leave it.</h2>
-    <div class="picks slots">${slots.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(slots, armed, 'Tap a held boon, then tap it again to swap it out.')}
-    <button class="decide leave" data-action='${JSON.stringify({ type: 'keep', drop: -1 })}'>${leave}</button>
+    <div class="picks slots">${slots.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(slots, armed, 'Tap a held boon to swap it out.')}
+    <div class="actions"><button class="decide confirm"${drop === null ? ' disabled' : ` data-action='${JSON.stringify({ type: 'keep', drop })}'`}>${drop === null ? 'Pick one to swap' : 'Swap'}</button><button class="decide leave" data-action='${JSON.stringify({ type: 'keep', drop: -1 })}'>${leave}</button></div>
   </div>`)
 }
 

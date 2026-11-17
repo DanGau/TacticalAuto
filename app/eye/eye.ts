@@ -156,6 +156,27 @@ const commands: Record<string, Command> = {
     }, selector)
     if (fault) throw new Error(`${page.viewportSize()?.width}x${page.viewportSize()?.height}: ${fault}`)
   },
+  /** clickable <selector>: fails unless a mouse click at the centre of each element matching lands on it and changes the page. */
+  async clickable(page, selector) {
+    const size = `${page.viewportSize()?.width}x${page.viewportSize()?.height}`
+    const count = await page.locator(selector).count()
+    if (count === 0) throw new Error(`${size}: nothing matches ${selector}`)
+    for (let i = 0; i < count; i++) {
+      const hit = await page.evaluate(
+        ([selector, i]) => {
+          const target = document.querySelectorAll(selector)[Number(i)]
+          const r = target.getBoundingClientRect()
+          const [x, y] = [r.left + r.width / 2, r.top + r.height / 2]
+          const top = document.elementFromPoint(x, y)
+          return { x, y, on: !!top && target.contains(top), top: top?.outerHTML.slice(0, 80), html: document.getElementById('panel')!.innerHTML }
+        },
+        [selector, String(i)],
+      )
+      if (!hit.on) throw new Error(`${size}: ${selector} #${i} is covered at its centre by ${hit.top}`)
+      await page.mouse.click(hit.x, hit.y)
+      if ((await page.evaluate(() => document.getElementById('panel')!.innerHTML)) === hit.html) throw new Error(`${size}: clicking ${selector} #${i} changed nothing`)
+    }
+  },
   /** viewport <w> <h>: resizes the page for the rest of a playbook, to see phone widths. */
   viewport: (page, w, h) => page.setViewportSize({ width: Number(w), height: Number(h) }),
   /** drag <x1> <y1> <x2> <y2> [touch]: drags from one screen point to another, by mouse or one finger. */

@@ -375,7 +375,14 @@
     .newboon b { font-size: 18px; }
     @keyframes newglow { from { box-shadow: 0 0 0 3px #4dd8ff33, 0 0 16px #4dd8ff44; } to { box-shadow: 0 0 0 3px #4dd8ff66, 0 0 34px #4dd8ffaa; } }
     .boonswap .detail { min-height: 0; margin: 0; }
-    @media (max-height: 520px) { .newboon { padding: 10px 10px 6px; font-size: 12px; } .newboon b { font-size: 15px; } .newboon .art .ricon { width: 26px; height: 26px; } .boonswap { gap: 6px; } .boonswap h2 { font-size: 13px; } .boonswap .slots button.pick { height: 60px; padding: 4px 8px; } .newboon { width: min(560px, 100%); } }
+    @media (max-height: 520px) { .newboon { padding: 10px 10px 6px; font-size: 12px; } .newboon b { font-size: 15px; } .newboon .art .ricon { width: 26px; height: 26px; } .boonswap { gap: 6px; } .boonswap h2 { font-size: 13px; } .boonswap .detail .defs { display: none; } .boonswap .slots button.pick { height: 60px; padding: 4px 8px; } .newboon { width: min(560px, 100%); } }
+    .gearswap.boons .sell { border-style: solid; background: #161c28; }
+    .gearswap.boons .sell > :not(.verb) { opacity: 1; }
+    .gearswap.boons .sell .verb::before { content: ''; width: 14px; height: 14px; border: 2px solid #9aa6bd; border-radius: 50%; }
+    .gearswap.boons .side { cursor: pointer; }
+    .boonswap .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+    .boonswap .confirm:not(:disabled) { font-weight: bold; color: #10141c; background: #6fe08c; border-color: #6fe08c; }
+    .boonswap .slots button.pick.armed { border-color: #6fe08c; outline-color: #6fe08c; background: #1f3326; }
     .boons-held { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
     .held-boon { padding: 3px 8px; border: 1px solid #3a4458; border-radius: 6px; font-size: 13px; }
     .held-boon.answers { border-color: #6fe08c; box-shadow: 0 0 8px #6fe08c44; }

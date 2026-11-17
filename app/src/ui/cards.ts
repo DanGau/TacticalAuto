@@ -95,19 +95,19 @@ export function utilityPick(run: Run, key: string, action: Action | undefined, i
   return { key, action, look: 'utility', body: `<small>${top}</small><b>${boonIcon(id)} ${boonName(id, level)}</b><small class="rounds">${category}</small>`, detail: `<p><b>${name}</b> · ${category}. ${boonDoes(run, id, level)}</p>`, go, ...extra }
 }
 
-/** The arm key of the starting offers picked, by index. */
-const startKey = (picks: number[]) => `b${[...picks].sort().join('-')}`
+/** The arm key of the starting offers picked, by index, oldest first. */
+const startKey = (picks: number[]) => `b${picks.join('-')}`
 
 /** The offers picked in `armed`, by index. */
 const startPicks = (armed: string | null) => (armed?.match(/^b[\d-]*$/) ? armed.slice(1).split('-').filter(Boolean).map(Number) : [])
 
-/** The run's first boons: UTILITY_SLOTS of the offers, each card tapped to take or put back, then Confirm. */
+/** The run's first boons: UTILITY_SLOTS of the offers, each card tapped to take or put back, then Confirm. A tap with all taken puts back the oldest. */
 export function startChoice(run: Run, armed: string | null): string {
   const picks = startPicks(armed)
   const card = (id: UtilityId, i: number) => {
     const on = picks.includes(i)
     const next = on ? picks.filter((p) => p !== i) : picks.length < UTILITY_SLOTS ? [...picks, i] : [...picks.slice(1), i]
-    return `<button class="side ${on ? 'keep' : 'sell'}" role="checkbox" aria-checked="${on}" data-arm="${startKey(next)}"><small class="verb">${on ? 'take' : 'leave'}</small><span class="art">${boonIcon(id)}</span><small class="tier">${UTILITIES[id].category}</small><b>${UTILITIES[id].name}</b><span>${boonDoes(run, id)}</span></button>`
+    return `<button class="side ${on ? 'keep' : 'sell'}" role="checkbox" aria-checked="${on}" data-arm="${startKey(next)}"><small class="verb">${on ? 'take' : 'tap to take'}</small><span class="art">${boonIcon(id)}</span><small class="tier">${UTILITIES[id].category}</small><b>${UTILITIES[id].name}</b><span>${boonDoes(run, id)}</span></button>`
   }
   const ready = picks.length === UTILITY_SLOTS
   return `<div class="gearswap boons"><h1>Starting boons</h1><h2>Take ${UTILITY_SLOTS}. Each works in every battle, all run.</h2>
