@@ -4,7 +4,7 @@ import { blocked, depths, distance, edgeDepths, NEIGHBORS, onGrid, openNear, wal
 import { gather } from './formations'
 import { randomInt } from './rng'
 import { PROP_BULK, type Prop, type TerrainKind } from './terrain'
-import { pickArenaKind, shapeArena } from './arena-kinds'
+import { shapeArena } from './arena-kinds'
 import { CHALLENGES, type ChallengeId } from './challenges'
 
 /** How far from its centre the arena reaches, and how far out the camera shows it clear of props. */
@@ -33,8 +33,8 @@ const GATES: Mark[] = [[13, 0], [8, -12], [8, 12], [-2, -13], [-2, 13]]
 const RIDGE_ALONG = 9
 const RIDGE_REACH = 12
 
-/** How far within the map's edge the arena's centre wants to lie, so a barrier's bridge has room. */
-const SPOT_MARGIN = 22
+/** How far within the map's edge the arena's centre wants to lie, so its shaped ground has room. */
+const SPOT_MARGIN = 18
 
 /** A random open tile as far within the map's edge as there is. */
 function arenaSpot(battle: Battle): Tile {
@@ -88,7 +88,7 @@ function stand(battle: Battle, at: Tile, prop: Prop): boolean {
 /**
  * Sets the arena and lays out the encounter for `challenge`: the crossing runs along its axis from the way in to the
  * objective, over the ground its arena kind shapes. Returns the arena's centre, a post and cluster for each alien;
- * a commander, a boss and the aliens guarding what the mission is about stand at the objective, and a few guard a barrier's bridge.
+ * a commander, a boss and the aliens guarding what the mission is about stand at the objective.
  */
 export function designEncounter(battle: Battle, aliens: Alien[], challenge: ChallengeId | null = null): { spot: Tile; posts: Tile[]; clusters: number[] } {
   const spot = arenaSpot(battle)
@@ -106,7 +106,7 @@ export function designEncounter(battle: Battle, aliens: Alien[], challenge: Chal
     const clamp = (v: number) => Math.max(0, Math.min(GRID - 1, Math.round(v)))
     return { x: clamp(spot.x + fx * along - fy * across), y: clamp(spot.y + fy * along + fx * across) }
   }
-  const bridge = shapeArena(battle, pickArenaKind(battle, battle.place, challenge, battle.twist), spot, [fx, fy])
+  shapeArena(battle, battle.arenaKind, spot, [fx, fy])
   if (battle.arenaKind === 'open') rise(battle, raw(OVERLOOK), 3, 1)
   if (challenge === 'firingLine') for (let across = -RIDGE_REACH; across <= RIDGE_REACH; across += 2) rise(battle, raw([RIDGE_ALONG, across]), 2, 1)
   if (battle.arenaKind === 'open') rise(battle, raw(LEDGE), 2, 0)
@@ -127,6 +127,6 @@ export function designEncounter(battle: Battle, aliens: Alien[], challenge: Chal
     }
   }
   const b = battle.objective
-  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: b, boss: b, objective: b, bridge: bridge && openNear(battle, raw(bridge)), challenge })
+  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: b, boss: b, objective: b, challenge })
   return { spot, posts, clusters }
 }

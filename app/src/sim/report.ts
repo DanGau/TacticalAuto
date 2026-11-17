@@ -1,6 +1,6 @@
 // Turns run results into a report, and says of what is off whether the game or the bot is at fault.
 import { CHALLENGES, type ChallengeId } from '../core/challenges'
-import { ARENA_KINDS, isBarrier, type ArenaKind } from '../core/arena-kinds'
+import { ARENA_KINDS, type ArenaKind } from '../core/arena-kinds'
 import { KEYS } from '../core/run'
 import type { Answer, RunResult, Toll } from './run'
 
@@ -166,7 +166,7 @@ export function formatReport(r: Report): string {
 /** Each bot's win rate on the same seeds, best first. */
 export const ranked = (rates: Record<string, number>) => Object.entries(rates).sort((a, b) => b[1] - a[1]).map(([name, rate]) => `${name.padEnd(12)}${`${Math.round(100 * rate)}%`.padStart(5)}`).join('\n')
 
-/** One row of the diagnosis: how battles of a challenge or barrier went, by whether the hero met it with an answer. */
+/** One row of the diagnosis: how battles of a challenge or ground went, by whether the hero met it with an answer. */
 export interface Row {
   test: ChallengeId | ArenaKind
   leg: number
@@ -177,16 +177,16 @@ export interface Row {
   lost: number
 }
 
-/** The name of a challenge or barrier. */
+/** The name of a challenge or ground. */
 const nameOf = (test: Row['test']) => (test in CHALLENGES ? CHALLENGES[test as ChallengeId].name : ARENA_KINDS[test as ArenaKind].name)
 
-/** Battles of each challenge and each barrier, by leg and answer. */
+/** Battles of each challenge and each ground (with no challenge), by leg and answer. */
 export function rows(results: RunResult[]): Row[] {
   const tolls = results.flatMap((r) => r.tolls)
-  const barriers = (Object.keys(ARENA_KINDS) as ArenaKind[]).filter(isBarrier)
+  const grounds = (Object.keys(ARENA_KINDS) as ArenaKind[]).filter((k) => ARENA_KINDS[k].pays.length > 0)
   const tests: [Row['test'], (t: Toll) => boolean, (t: Toll) => Answer][] = [
     ...(Object.keys(CHALLENGES) as ChallengeId[]).map((c): [Row['test'], (t: Toll) => boolean, (t: Toll) => Answer] => [c, (t) => t.challenge === c, (t) => t.answer]),
-    ...barriers.map((b): [Row['test'], (t: Toll) => boolean, (t: Toll) => Answer] => [b, (t) => t.barrier === b, (t) => t.crossed]),
+    ...grounds.map((g): [Row['test'], (t: Toll) => boolean, (t: Toll) => Answer] => [g, (t) => t.ground === g && !t.challenge, (t) => t.exploited]),
   ]
   return tests.flatMap(([test, met, how]) =>
     [0, 1, 2, 3].flatMap((leg) => (['picked', 'held', 'none'] as const).flatMap((answer): Row[] => {
@@ -248,7 +248,7 @@ export function byGoal(results: RunResult[]): string {
 }
 
 export function formatDiagnosis(bot: string, of: Row[]): string {
-  const head = `${bot}: challenge or barrier, leg, answer, battles, won, health lost`
+  const head = `${bot}: challenge or ground, leg, answer, battles, won, health lost`
   const lines = of.map((r) => `${nameOf(r.test).padEnd(16)}${r.leg + 1}  ${r.answer.padEnd(9)}${String(r.battles).padStart(7)}${`${r.won}%`.padStart(6)}${`${r.lost}%`.padStart(13)}`)
   const found = verdicts(of)
   return [head, ...lines, ...(found.length > 0 ? found : ['nothing off'])].join('\n')

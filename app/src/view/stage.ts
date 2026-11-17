@@ -1,5 +1,4 @@
 // The stage every part of the view draws on: the scene and its layers, the camera and its glides, the frame loop, and what is on screen.
-import type { UtilityId } from '../core/utilities'
 import { ColorManagement, Fog, Group, LinearSRGBColorSpace, type Mesh, PerspectiveCamera, Scene, type Sprite as Billboard, type Object3D, Vector3, WebGLRenderer } from 'three'
 import { ENTRY_RADIUS, GRID, type Battle, type Tile } from '../core/battle'
 import type { Run } from '../core/run-state'
@@ -108,7 +107,6 @@ export class Stage {
   /** Whether the hero holds a rigged tank, so the deploy screen numbers the tanks. */
   rigging = false
   /** The boons the hero holds, whose routes the deploy screen draws. */
-  boonsHeld: UtilityId[] = []
   /** A red glow under each alien the hero hasn't found, by unit id. */
   readonly glows = new Map<number, { node: Object3D; tile: Tile }>()
   /** Each prop, wall and window on the board, with the tiles that light it: it is lit when a soldier sees any of them. */

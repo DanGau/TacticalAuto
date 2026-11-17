@@ -3,8 +3,8 @@ import { fx } from './sources'
 import { BURN_MAX, BURN_STACKS, CHILL_TURNS, CADENCE, CATALYST_EVERY, CHILL_FREEZE, CHILL_MAX, MARK_MAX, COMBO_MAX, EXPOSED, FAULT, FRACTURE_DAMAGE, HIGH_CRIT, HIGH_LEVELS, MIGHT_MAX, GRID, isSoldier, LINGER_STACKS, NUMB_TURNS, THERMAL_FACTOR, BRIDGE_FACTOR, type Battle, type Effect, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import type { Kit } from './weapons'
-import { fireproof, foeHas, has, nearest } from './fighters'
-import { distance, walks } from './grid'
+import { FIRE_TURNS, fireproof, foeHas, has, nearest, onTile } from './fighters'
+import { distance, NEIGHBORS, onGrid, walks } from './grid'
 import { RECKONING_KILLS } from './doctrines'
 import { TUNING } from './tuning'
 import { talentDamage, talentHit, talentKill } from './talents'
@@ -19,12 +19,31 @@ export function kindle(battle: Battle, target: Unit, stacks: number, events: Gam
   if (target.hp <= 0 || fireproof(battle, target) || target.numb > 0) return
   if (stacks > 0) events.push({ type: 'stacks', id: target.id, quantity: 'burn', added: stacks, burn: Math.min(BURN_MAX, target.burn + stacks), chill: target.chill })
   const left = meet(battle, target, stacks, 'chill', events)
-  if (left > 0) target.burn = Math.min(BURN_MAX, target.burn + left)
+  if (left <= 0) return
+  target.burn = Math.min(BURN_MAX, target.burn + left)
+  if (battle.ground[target.y * GRID + target.x] === 'mire') ignite(battle, target, events)
 }
+
+/** Swamp gas: the mire on and beside `at` catches fire. */
+function ignite(battle: Battle, at: Unit, events: GameEvent[]): void {
+  let lit = 0
+  for (const [dx, dy] of [[0, 0], ...NEIGHBORS]) {
+    const tile = { x: at.x + dx, y: at.y + dy }
+    if (!onGrid(tile.x, tile.y) || battle.ground[tile.y * GRID + tile.x] !== 'mire' || onTile(battle.fire, tile)) continue
+    battle.fire.push({ ...tile, turns: FIRE_TURNS })
+    lit++
+  }
+  if (lit > 0) events.push(fx(at.id, 'napalm', 0))
+}
+
+/** Whether `at` stands on ice or beside water, where Chill bites deeper. */
+export const wet = (battle: Battle, at: { x: number; y: number }) =>
+  battle.ground[at.y * GRID + at.x] === 'ice' || NEIGHBORS.some(([dx, dy]) => onGrid(at.x + dx, at.y + dy) && battle.ground[(at.y + dy) * GRID + at.x + dx] === 'water')
 
 /** Adds chill stacks to `target`, to at most CHILL_MAX, unless it cannot be chilled; burn on it cancels them first. At CHILL_FREEZE it freezes and loses its next action; a boss never freezes. */
 export function chillUnit(battle: Battle, target: Unit, stacks: number, events: GameEvent[]): void {
   if (target.hp <= 0 || target.resists.includes('chill') || target.numb > 0) return
+  if (stacks > 0 && wet(battle, target)) stacks++
   if (stacks > 0) events.push({ type: 'stacks', id: target.id, quantity: 'chill', added: stacks, burn: target.burn, chill: Math.min(CHILL_MAX, target.chill + stacks) })
   const left = meet(battle, target, stacks, 'burn', events)
   if (left <= 0) return

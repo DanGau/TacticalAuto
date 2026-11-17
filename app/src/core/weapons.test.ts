@@ -23,6 +23,7 @@ function field(weapon: WeaponId, at: [number, number][], range = WEAPONS[weapon]
   const template = b.units.find((u) => u.side === 'alien')!
   const aliens = at.map(([x, y], i) => ({ ...structuredClone(template), id: 900 + i, x, y, hp: 500, armor: 0, kind: 'trooper' as const, boss: false, target: false, surprised: 0, panicked: false, revealed: true, engaged: true, stats: { ...template.stats, hp: 500, move: 0, range: 0 } }))
   b.units = [hero, ...aliens]
+  b.ground.fill('pavement')
   b.props.fill('none')
   b.bulk.fill(0 as never)
   b.height.fill(0)
@@ -89,7 +90,8 @@ test.each(['hammer', 'shield'] as const)('a %s hits hard up close, and thrown on
   const near = field(id, [[11, 10]])
   const up = heroTurn(near.b, near.hero)
   expect(up[0].form).toBeUndefined()
-  expect(up[0].damage).toBe(Math.round(wielded(10, WEAPONS[id].attack.power)))
+  // A fraction of a point is a chance of one more.
+  expect([Math.floor, Math.ceil].map((f) => f(wielded(10, WEAPONS[id].attack.power)))).toContain(up[0].damage)
   expect(up.at(-1)!.secondary).toBe('frag')
   const far = field(id, [[13, 10]])
   const thrown = heroTurn(far.b, far.hero)

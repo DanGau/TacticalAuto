@@ -298,15 +298,14 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
       }
       // No unit ends its move in acid if it can help it.
       // On a hold, a soldier stands its ground at the uplink before anything else.
-      // Getting out, a soldier makes for the way out as fast as it can.
-      const first = [battle.extract && unit.side === 'human' ? spot.toGoal : 0, leash(end), acid(end), provokes(end), saves(end)]
+      const first = [leash(end), acid(end), provokes(end), saves(end)]
       return spot.mine > 0 ? [...first, 0, wary ? spot.crowded : 0, ...WITH_SHOT[unit.stance](spot), steps] : [...first, 1, ahead(end), ...NO_SHOT[unit.stance](spot)]
     })
   }
   // A unit whose perks pay for standing still holds a tile it can shoot from, unless the tile is acid or off the uplink.
   const still = has(unit, 'steady') || has(unit, 'doubleTap')
   const shotHere = enemies.some((enemy) => enemy.revealed && shootable(battle, unit, unit, enemy, seen))
-  if (still && shotHere && !battle.extract && !leash(unit) && !acid(unit)) return []
+  if (still && shotHere && !leash(unit) && !acid(unit)) return []
   // A booming charge pins a unit that can fight from where it stands; a rooted one cannot move at all.
   if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || unit.frozen || (unit.kind === 'sprinter' && unit.chill > 0)) return []
   const pounced = pounce(battle, unit)
@@ -316,10 +315,10 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
   const end = path.at(-1) ?? unit
   const shot = hasAttack(battle, unit, end, enemies, seen)
-  if (unit.side === 'human' && shot && !battle.extract) battle.strides[unit.id] = move - costOf(battle, unit, path)
+  if (unit.side === 'human' && shot) battle.strides[unit.id] = move - costOf(battle, unit, path)
   if (unit.side !== 'human' || shot) return path
   // A soldier dashes on to a shot, if one is within a dash.
-  if (isSoldier(unit) && move > 0 && !battle.extract) {
+  if (isSoldier(unit) && move > 0) {
     const dash = choose(move + DASH_MOVE)
     if (hasAttack(battle, unit, dash.at(-1) ?? unit, enemies, seen)) return dash
   }
@@ -335,12 +334,11 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
 /**
  * The standard action a soldier with no shot takes in place of attacking, or none. One with an ability that needs no
  * shot, or a leap that would reach the aliens, keeps it. One an enemy could come within range of next turn prepares; any
- * other sprints toward the fight, or for the way out.
+ * other sprints toward its goal.
  */
 export function orderFor(battle: Battle, unit: Unit, threatened: boolean): Order | null {
   if (unit.charges > 0 && (unit.ability === 'medic' || unit.ability === 'mech')) return null
   if (leapTo(battle, unit)) return null
-  if (battle.extract) return 'sprint'
   return threatened ? 'prepare' : 'sprint'
 }
 

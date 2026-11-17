@@ -1,10 +1,11 @@
 // Boons: what each does, how long it lasts, how rare it is, how many the hero holds, and where it finds them.
 import type { Rarity } from './base'
+import { HIGH_CRIT, REPULSE_TILES } from './battle'
 
 /** What a boon can do: a common boon does one; a combo one at full strength and one or two MinorIds at less. */
 export type EffectId =
   | 'thrusters' | 'hover' | 'overcharge' | 'crack' | 'tank' | 'smoke' | 'flashbang' | 'rangedShield' | 'meleeShield'
-  | 'mending' | 'ironSkin' | 'farsight' | 'keen' | 'coldSnap' | 'blaze' | 'hunted' | 'gravity' | 'dampener'
+  | 'mending' | 'ironSkin' | 'farsight' | 'keen' | 'coldSnap' | 'blaze' | 'hunted' | 'gravity' | 'dampener' | 'push'
 export type ComboId = 'stormfront' | 'bulwark' | 'warpath' | 'deadeye' | 'smokescreen' | 'skyborne' | 'executioner' | 'inferno' | 'siegebreaker' | 'phalanx' | 'eclipse' | 'tempest'
 /** Kept for the run and never used up: at each deploy screen the player picks one held for that fight. */
 export type UtilityId = EffectId | ComboId
@@ -66,12 +67,13 @@ const SINGLES: Record<EffectId, Kind> = {
   mending: { name: 'Mending', icon: '💚', text: full('mending'), rounds: 4, rarity: 'common' },
   ironSkin: { name: 'Stoneskin', icon: '🪨', text: full('ironSkin'), rounds: 3, rarity: 'common' },
   farsight: { name: 'Farsight', icon: '🔭', text: full('farsight'), rounds: 3, rarity: 'common' },
-  keen: { name: 'Keen Eye', icon: '👁️', text: full('keen'), rounds: 3, rarity: 'common' },
-  coldSnap: { name: 'Cold Snap', icon: '❄️', text: 'Turn the water on your route to ice. At the start of your turn, apply 1 Chill to each alien in the fight.', rounds: 3, rarity: 'rare' },
+  keen: { name: 'Keen Eye', icon: '👁️', text: `${full('keen')} Have ${100 * HIGH_CRIT}% more Crit chance per level above your target.`, rounds: 3, rarity: 'common' },
+  coldSnap: { name: 'Cold Snap', icon: '❄️', text: 'Turn the water in the arena to ice. At the start of your turn, apply 1 Chill to each alien in the fight.', rounds: 3, rarity: 'rare' },
   blaze: { name: 'Wildfire', icon: '🔥', text: `At the start of your turn, apply 1 Burn to each alien within ${BLAZE_REACH} tiles of your landing.`, rounds: 2, rarity: 'common' },
   hunted: { name: 'Prey', icon: '🎯', text: 'The alien with the most max HP takes 50% more damage.', rounds: 3, rarity: 'common' },
   gravity: { name: 'Gravity Well', icon: '🌀', text: full('gravity'), rounds: 3, rarity: 'common' },
   dampener: { name: 'Dampener', icon: '🔇', text: full('dampener'), rounds: 2, rarity: 'rare' },
+  push: { name: 'Force Push', icon: '👐', text: `Whenever you hit an alien, Displace it ${REPULSE_TILES} tiles back. Off a ledge or the edge, it falls.`, rounds: 3, rarity: 'common' },
 }
 
 /** Combos: the major effect, then the minor ones. One minor makes a combo rare, two epic. */

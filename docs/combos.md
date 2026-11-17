@@ -29,6 +29,17 @@ Borrowed from Slay the Spire: combos the player finds, not ones an item names. E
 
 Example chains: Lodestone pulls an alien onto the tank → it hits the tank → Reactive Shell adds armor → Ram Plating adds that armor to every hit. Rimed gear → chilled aliens slide on Shoving hits → Kinetic Engine on each slam, Stagger Sights on each moved alien. Glass Cannon → Overkill Coils clears the next alien.
 
+## Ground
+
+Each ground multiplies some quantities, so a build reads the Flight map for ground that suits it (`core/arena-kinds.ts`):
+
+| Ground | Multiplies | Boons that pay |
+|---|---|---|
+| Rooftops, Rift, Quarry | Displace: a drop or a terrace kills or hurts | Force Push, Levitation |
+| Overpass, Mesa | Crit and damage from above | Keen Eye, Farsight, Force Push |
+| Flooded, Ice Sheet | Chill: 1 more beside water or on ice; Displace slides on ice | Cold Snap, Force Push |
+| Marsh | Burn: an alien in mire sets the mire about it alight | Wildfire, Levitation |
+
 ## Cancellations
 
 | Cancel | Halves | Default | Bridge |

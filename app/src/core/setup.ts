@@ -11,7 +11,7 @@ import type { Twist } from './twists'
 import { deploy, planEntry } from './landing'
 import { ARENA_REACH, designEncounter } from './encounter'
 import { deadlineFor, sentries, type ChallengeId } from './challenges'
-import { clockFor, routeWalk } from './route'
+import { pickArenaKind } from './arena-kinds'
 
 /** Fills every open tile outside the walkable area holding `keep`, or else the largest, with stacks, so any open tile can reach any other. */
 export function sealPockets(battle: Battle, keep?: Tile): void {
@@ -75,12 +75,6 @@ function clumps(battle: Battle, aliens: Alien[]): Alien[][] {
   return waves
 }
 
-/** The share of a clocked crossing's aliens held back as reinforcements, which pour in once its clock runs out. */
-const HELD_BACK = 1 / 2
-
-/** Whether a battle runs on a clock: a crossing or a takedown, but where a boss waits at the objective, which is the fight. */
-const clocked = (goal: Goal, challenge: ChallengeId | null, aliens: Alien[]) => (goal === 'cross' || goal === 'assassinate') && challenge !== 'bigOne' && !aliens.some((a) => a.boss)
-
 /** The share of a flood's aliens posted at the start; the rest come as waves. */
 const FLOOD_POSTED = 1 / 3
 
@@ -116,12 +110,12 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     units: [],
     nextId: 1,
     place: kind,
-    arenaKind: 'open',
+    arenaKind: place?.ground ?? pickArenaKind(holder, terrain.region, kind, challenge, twist),
     ...terrain,
     bulk: terrain.props.map((prop) => PROP_BULK[prop]),
     used: [],
     challenge,
-    deadline: challenge === 'scattered' || clocked(goal, challenge, aliens) ? 0 : null,
+    deadline: challenge === 'scattered' ? 0 : null,
     utility: null,
     second: null,
     kills: 0,
@@ -153,7 +147,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
   }
   sealPockets(battle)
   const flood = battle.flow === 'flood'
-  const posted = flood ? aliens.slice(0, Math.ceil(aliens.length * FLOOD_POSTED)) : challenge === 'scattered' ? aliens.slice(0, sentries(aliens.length)) : battle.deadline !== null ? aliens.slice(0, aliens.length - Math.floor(aliens.length * HELD_BACK)) : aliens
+  const posted = flood ? aliens.slice(0, Math.ceil(aliens.length * FLOOD_POSTED)) : challenge === 'scattered' ? aliens.slice(0, sentries(aliens.length)) : aliens
   const { spot, posts, clusters } = designEncounter(battle, posted, challenge)
   if (flood || battle.deadline !== null) battle.waves = clumps(battle, goal === 'hold' && posted.length === aliens.length ? aliens : aliens.slice(posted.length))
   sealPockets(battle, openNear(battle, spot))
@@ -175,6 +169,6 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
   planEntry(battle)
   if (goal === 'ambush') deploy(battle, battle.entry!)
   const move = Math.max(...reserve.map((s) => s.stats.move))
-  if (battle.deadline !== null) battle.deadline = challenge === 'scattered' ? deadlineFor(routeWalk(battle), move, posted.length) : clockFor(battle, move)
+  if (battle.deadline !== null) battle.deadline = deadlineFor(walkingDistances(battle, battle.objective)[battle.entry!.y * GRID + battle.entry!.x], move, posted.length)
   return battle
 }

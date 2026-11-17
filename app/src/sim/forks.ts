@@ -7,13 +7,13 @@ import { type Run } from '../core/run-state'
 import { health } from '../core/hero'
 import { step } from '../core/step'
 import { carries, UTILITY_IDS, type EffectId, type UtilityId } from '../core/utilities'
-import { ARENA_KINDS, isBarrier, type ArenaKind } from '../core/arena-kinds'
+import { ARENA_KINDS, type ArenaKind } from '../core/arena-kinds'
 
 /** One battle played on from a deploy screen: the utility taken, whether it won, and the share of the hero's most health lost. */
 export interface Fork {
   challenge: ChallengeId | null
-  /** The barrier across the route, if any. */
-  barrier: ArenaKind | null
+  /** The ground it is fought over. */
+  ground: ArenaKind
   leg: number
   utility: UtilityId | null
   won: boolean
@@ -28,15 +28,14 @@ function playOn(run: Run, utility: UtilityId | null): Fork | null {
   const before = health(fork, fork.hero)
   while (fork.phase === 'battle') step(fork)
   const fought = fork.report!.hero!
-  const kind = run.battle!.arenaKind
-  return { challenge: run.battle!.challenge, barrier: isBarrier(kind) ? kind : null, leg: run.keys, utility, won: fork.report!.won, lost: (before - fought.hp) / fought.maxHp }
+  return { challenge: run.battle!.challenge, ground: run.battle!.arenaKind, leg: run.keys, utility, won: fork.report!.won, lost: (before - fought.hp) / fought.maxHp }
 }
 
 /** The battle at this deploy screen, if it tests anything, played with no utility and with each; the run itself is left as it was. */
-export const forksOf = (run: Run): Fork[] => (run.battle!.challenge || isBarrier(run.battle!.arenaKind) ? [null, ...UTILITY_IDS].flatMap((utility) => playOn(run, utility) ?? []) : [])
+export const forksOf = (run: Run): Fork[] => (run.battle!.challenge || ARENA_KINDS[run.battle!.arenaKind].pays.length > 0 ? [null, ...UTILITY_IDS].flatMap((utility) => playOn(run, utility) ?? []) : [])
 
-/** What answers a fork's battle: its challenge's answers and what opens its barrier. */
-const answersOf = (f: Fork): EffectId[] => [...(f.challenge ? CHALLENGES[f.challenge].answers : []), ...(f.barrier ? ARENA_KINDS[f.barrier].opens! : [])]
+/** What answers a fork's battle: its challenge's answers and what exploits its ground. */
+const answersOf = (f: Fork): EffectId[] => [...(f.challenge ? CHALLENGES[f.challenge].answers : []), ...ARENA_KINDS[f.ground].pays]
 
 /** The legs a run crosses, the hub's last. */
 const LEGS = [0, 1, 2, 3]
@@ -45,28 +44,30 @@ const cell = (of: Fork[]) => (of.length === 0 ? '-' : `${Math.round((100 * of.fi
 
 /**
  * Wins/health lost in percent: from the second leg, with a boon that answers what was scouted, with one that answers
- * none, and with none; then by barrier and by challenge and leg, with each answer and with any other.
+ * none, and with none; on ground with no challenge, with a boon that exploits it and with any other; then by ground and
+ * by challenge and leg, with each answer and with any other.
  */
 export function formatForks(forks: Fork[]): string {
   // The first leg's fights pace the run, not test it.
   const tested = forks.filter((f) => f.leg > 0)
   const right = tested.filter((f) => f.utility && carries(f.utility, answersOf(f)))
   const wrong = tested.filter((f) => f.utility && !carries(f.utility, answersOf(f)))
-  const barred = tested.filter((f) => f.barrier)
-  const opener = (f: Fork) => !!f.utility && carries(f.utility, ARENA_KINDS[f.barrier!].opens!)
+  // Ground alone: battles with no challenge, where only the ground favours a pick.
+  const bare = forks.filter((f) => !f.challenge && ARENA_KINDS[f.ground].pays.length > 0)
+  const exploits = (f: Fork) => !!f.utility && carries(f.utility, ARENA_KINDS[f.ground].pays)
   const lines = [
     `scouted pick, legs 2+  right ${cell(right)} wrong ${cell(wrong)} none ${cell(tested.filter((f) => f.utility === null))}`,
-    `barrier, legs 2+       opener ${cell(barred.filter(opener))} other ${cell(barred.filter((f) => f.utility && !opener(f)))} none ${cell(barred.filter((f) => f.utility === null))}`,
+    `ground alone           right ${cell(bare.filter(exploits))} wrong ${cell(bare.filter((f) => f.utility && !exploits(f)))} none ${cell(bare.filter((f) => f.utility === null))}`,
     '',
   ]
-  lines.push('barrier       leg    battles  none    openers (wins/health lost)                    others')
-  for (const barrier of Object.keys(ARENA_KINDS).filter((k) => isBarrier(k as ArenaKind)) as ArenaKind[]) {
+  lines.push('ground        leg    battles  none    pays (wins/health lost)                       others')
+  for (const ground of (Object.keys(ARENA_KINDS) as ArenaKind[]).filter((k) => ARENA_KINDS[k].pays.length > 0)) {
     for (const leg of LEGS) {
-      const of = forks.filter((f) => f.barrier === barrier && f.leg === leg)
+      const of = forks.filter((f) => f.ground === ground && f.leg === leg)
       if (of.length === 0) continue
-      const opens = ARENA_KINDS[barrier].opens!
-      const shown = opens.map((id) => `${id} ${cell(of.filter((f) => f.utility === id))}`).join(' ').padEnd(46)
-      lines.push(`${barrier.padEnd(14)}${leg}  ${String(of.filter((f) => f.utility === null).length).padStart(8)}  ${cell(of.filter((f) => f.utility === null))}${shown}${cell(of.filter((f) => f.utility && !carries(f.utility, opens)))}`)
+      const { pays } = ARENA_KINDS[ground]
+      const shown = pays.map((id) => `${id} ${cell(of.filter((f) => f.utility === id))}`).join(' ').padEnd(46)
+      lines.push(`${ground.padEnd(14)}${leg}  ${String(of.filter((f) => f.utility === null).length).padStart(8)}  ${cell(of.filter((f) => f.utility === null))}${shown}${cell(of.filter((f) => f.utility && !carries(f.utility, pays)))}`)
     }
   }
   lines.push('', 'challenge     leg    battles  none    answers (wins/health lost)                    mismatch')

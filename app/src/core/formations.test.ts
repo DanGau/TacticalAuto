@@ -44,16 +44,16 @@ test("a push's clusters stand apart, so nearing one need not draw the next", () 
   expect(gaps.filter((g) => g >= 3).length / gaps.length).toBeGreaterThan(0.8)
 })
 
-test('a flood posts few and sends the most as clumps from the gates; a crossing holds half back for its clock', () => {
+test('a flood posts few and sends the most as clumps from the gates; a crossing posts its whole force, on no clock', () => {
   const flood = createBattle(3, 'city', force(15), [], 'hold')
   expect(flood.flow).toBe('flood')
   expect(flood.units.filter((u) => u.side === 'alien').length).toBe(5)
   expect(flood.waves.flat().length).toBe(10)
   const push = createBattle(3, 'city', force(15), [], 'cross')
   expect(push.flow).toBe('push')
-  expect(push.deadline).toBeGreaterThan(0)
-  expect(push.waves.flat().length).toBe(7)
-  expect(push.units.filter((u) => u.side === 'alien').length).toBe(8)
+  expect(push.deadline).toBeNull()
+  expect(push.waves.flat().length).toBe(0)
+  expect(push.units.filter((u) => u.side === 'alien').length).toBe(15)
 })
 
 test('flow follows mission and challenge', () => {

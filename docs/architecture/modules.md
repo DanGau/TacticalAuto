@@ -9,15 +9,14 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `battle.ts` | Battle state types (`Battle`, `Unit`) and the numbers rules share |
 | `grid.ts` | The board: distance, objects, walls, walking costs and routes, free tiles |
 | `setup.ts` | `createBattle`: battle state, placing aliens, civilians, goals by the encounter |
-| `route.ts` | The crossing's route from the landing to the objective, plain and with what a boon opens; Cold Snap's ice |
-| `encounter.ts` | `designEncounter`: the set-piece: the crossing's ends, arena, overlook, hazard, ridge, objects, posts, gates |
-| `arena-kinds.ts` | The ground a crossing runs over: skyscraper roof, overpass, quarry; barriers across the route, chasm, river, swamp, cliff, and what opens each |
+| `encounter.ts` | `designEncounter`: the set-piece: its ends, arena, overlook, hazard, ridge, objects, posts, gates |
+| `arena-kinds.ts` | The ground a battle is fought over, drawn by region: its shape, its feature, and the boons and quantities it pays |
 | `levels.ts` | Smoothing heights so ledges stand only where meant |
 | `knockback.ts` | Knockback and falls: off a ledge, through glass, over the edge |
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
 | `objects.ts` | What heroes do with objects: the strong throwing them or small aliens, setting off tanks, a rigged tank |
 | `landing.ts` | The one entry point, the plain landing there, what relics set off |
-| `boons.ts` | The picked utilities in a battle: taking hold, each turn, ending |
+| `boons.ts` | The picked utilities in a battle: taking hold, Cold Snap's ice, each turn, ending |
 | `spawn.ts` | Making units: aliens, soldiers, civilians, mechs, drops |
 | `step.ts` | Advances the run's battle a beat; settles it when it ends |
 | `combat.ts` | `stepBattle`: whose turn, the next unit's action |

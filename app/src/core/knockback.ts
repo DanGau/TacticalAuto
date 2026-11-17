@@ -125,15 +125,15 @@ export function knockback(battle: Battle, unit: Unit, target: Unit, events: Game
   drive(battle, target, step, tiles, events, way > 0 ? slam : 0, effect, way > 0)
 }
 
-/** Tiles more `target` slides when knocked back: CHILL_SLIDE while chilled. */
-const slideOf = (target: Unit) => (target.chill > 0 ? CHILL_SLIDE : 0)
+/** Tiles more `target` slides when knocked back: CHILL_SLIDE while chilled or on ice. */
+const slideOf = (battle: Battle, target: Unit) => (target.chill > 0 || battle.ground[target.y * GRID + target.x] === 'ice' ? CHILL_SLIDE : 0)
 
 /** Whether a knockback from `unit` drives `target` into something or off a ledge within `tiles`. */
 export function knocksInto(battle: Battle, unit: Tile, target: Unit, tiles = 1): boolean {
   const step = knockWay(battle, unit, target)
   if (!step) return false
   let from: Tile = target
-  for (let i = 0; i < tiles + slideOf(target); i++) {
+  for (let i = 0; i < tiles + slideOf(battle, target); i++) {
     const to = { x: from.x + step.x, y: from.y + step.y }
     if (fallBeyond(battle, from, to) !== 0 || blocked(battle, to.x, to.y) || !unwalled(battle, from, to) || heightAt(battle, to) - heightAt(battle, from) >= CLIFF) return true
     from = to
@@ -149,7 +149,7 @@ export function knocksInto(battle: Battle, unit: Tile, target: Unit, tiles = 1):
 export function drive(battle: Battle, target: Unit, step: Tile, tiles: number, events: GameEvent[], slam: number, effect: Effect, slide = false): boolean {
   displaced(battle, target, events)
   if (target.hp <= 0) return false
-  const most = tiles + (slide ? slideOf(target) : 0)
+  const most = tiles + (slide ? slideOf(battle, target) : 0)
   const path: Tile[] = []
   let over: Tile | null = null
   let stopped = false

@@ -413,6 +413,6 @@ export function advance(run: Run): void {
     ),
   }
   const challenge = stop === 'battle' || stop === 'key' || stop === 'final' ? here.challenge : null
-  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), [reserve], mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city } : undefined, challenge)
+  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), [reserve], mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city, ground: here.ground } : undefined, challenge)
 }
 

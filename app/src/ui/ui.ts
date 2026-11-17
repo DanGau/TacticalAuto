@@ -4,7 +4,7 @@ import type { Action } from '../core/apply'
 import { nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
-import { owesPick } from '../core/hero'
+import { makes, owesPick } from '../core/hero'
 import { battlePage, runSummary } from './summary'
 import { installTips } from './tip'
 import { acquired, choice, loot, modal, pickChoice, spareChoice, stopReport } from './aftermath'
@@ -16,9 +16,9 @@ import { HOLD_ROUNDS } from '../core/goals'
 import { missionOrder, THREATS } from '../core/objectives'
 import { button, STOP_NAMES } from './html'
 import { fuelTanks } from '../core/objects'
-import { carries, UTILITIES, type UtilityId } from '../core/utilities'
-import { ARENA_KINDS } from '../core/arena-kinds'
-import { opens } from '../core/route'
+import { UTILITIES, type UtilityId } from '../core/utilities'
+import { ARENA_KINDS, scouted } from '../core/arena-kinds'
+import { QUANTITIES } from '../core/quantities'
 import { BOON_CHARGES } from '../core/relics'
 import { relicIcon } from './relic-icons'
 import { RECKONING_KILLS } from '../core/doctrines'
@@ -85,17 +85,21 @@ function drop(run: Run, battle: Battle, armed: string | null, rigging: number | 
             'Tap a boon or an alien to read it; tap a boon again to go in with it.',
           )
   const test = battle.challenge ? `<h2 class="challenge" title="${CHALLENGES[battle.challenge].test}">${CHALLENGES[battle.challenge].icon} ${THREATS[battle.challenge]}</h2>` : ''
-  const ground = ARENA_KINDS[battle.arenaKind]
-  const barrier = ground.opens ? `<h2 class="challenge" title="${ground.text}">🛣️ ${ground.name}: ${ground.opens.map((e) => UTILITIES[e].name).join(' or ')} crosses.</h2>` : ''
   const clock = battle.deadline !== null ? `<p>⏱️ Reinforcements arrive in round ${battle.deadline}.</p>` : ''
-  return `${barrier}${test}${clock}${twist}${foes(battle, armed)}${reservoir}${chosen}`
+  return `${groundOf(run, battle)}${test}${clock}${twist}${foes(battle, armed)}${reservoir}${chosen}`
 }
 
-/** What a boon does for this battle: opens the route, answers its challenge, both, or neither. */
+/** The ground scouted: its name and what it does, and which of what the hero's build makes it multiplies. */
+function groundOf(run: Run, battle: Battle): string {
+  const ground = ARENA_KINDS[battle.arenaKind]
+  const yours = ground.reads.filter((q) => makes(run).includes(q)).map((q) => `${QUANTITIES[q].icon} ${QUANTITIES[q].name}`)
+  return `<h2 class="challenge ground" title="${ground.text}">${ground.icon} ${ground.name}</h2><p class="ground-text">${ground.text}${yours.length > 0 ? ` <b>Your ${yours.join(' and ')} pays here.</b>` : ''}</p>`
+}
+
+/** What a boon does for this battle: exploits the ground, answers its challenge, both, or neither. */
 function tagOf(battle: Battle, id: UtilityId): string {
-  const route = opens(battle, id)
-  const answers = !!battle.challenge && carries(id, CHALLENGES[battle.challenge].answers)
-  return route && answers ? 'answers both' : route ? 'opens the route' : answers ? 'answers this' : 'boon'
+  const { ground, challenge } = scouted(battle, id)
+  return ground && challenge ? 'answers both' : ground ? 'pays here' : challenge ? 'answers this' : 'boon'
 }
 
 /** The encounter: each alien kind on the deploy screen and how many; tapped, its stat block. Burrowers stay hidden. */

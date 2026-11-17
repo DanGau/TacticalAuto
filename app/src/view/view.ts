@@ -170,7 +170,6 @@ export async function createView(): Promise<View> {
       const { fx, sprites } = s
       s.hero = run.hero
       s.rigging = run.utilities.includes('tank')
-      s.boonsHeld = run.utilities
       fx.clear()
       const battle = run.battle
       if (!battle) return

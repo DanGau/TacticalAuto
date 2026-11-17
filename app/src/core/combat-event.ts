@@ -44,7 +44,7 @@ export type GameEvent =
   | { type: 'frozen'; id: number }
   /** A unit is hurt by acid underfoot, or by the death of a psion near it. */
   | { type: 'hurt'; id: number; amount: number; cause: 'acid' | 'backlash' | 'impact' }
-  /** Water on the route froze to ice. */
+  /** The arena's water froze to ice. */
   | { type: 'freeze' }
   /** A wave arrives on a hold, unseen unless the hero already sees where it lands. */
   | { type: 'wave'; units: { id: number; x: number; y: number }[] }

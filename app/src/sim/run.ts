@@ -12,7 +12,7 @@ import type { RelicId } from '../core/relics'
 import type { GearEffect } from '../core/battle'
 import { CHALLENGES, type ChallengeId } from '../core/challenges'
 import type { Goal } from '../core/goals'
-import { ARENA_KINDS, isBarrier, type ArenaKind } from '../core/arena-kinds'
+import { ARENA_KINDS, type ArenaKind } from '../core/arena-kinds'
 import { carries, type EffectId, type UtilityId } from '../core/utilities'
 import { forksOf, type Fork } from './forks'
 import { restForks, type RestFork } from './rest'
@@ -33,9 +33,9 @@ export interface Toll {
   goal: Goal
   challenge: ChallengeId | null
   answer: Answer
-  /** The barrier across the route, if any, and how the hero met it. */
-  barrier: ArenaKind | null
-  crossed: Answer
+  /** The ground it was fought over, and how the hero met it: with a boon that exploits it, holding one, or none. */
+  ground: ArenaKind
+  exploited: Answer
   most: number
   before: number
   after: number
@@ -145,7 +145,7 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
         const fought = run.report!.hero!
-        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[4], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3], battle!.challenge ? CHALLENGES[battle!.challenge].answers : []), barrier: isBarrier(battle!.arenaKind) ? battle!.arenaKind : null, crossed: answerOf(battle!, begun[3], ARENA_KINDS[battle!.arenaKind].opens ?? []), most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
+        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[4], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(battle!, begun[3], battle!.challenge ? CHALLENGES[battle!.challenge].answers : []), ground: battle!.arenaKind, exploited: answerOf(battle!, begun[3], ARENA_KINDS[battle!.arenaKind].pays), most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
         clock = { next: 0, done: 0 }
       }
       continue

@@ -1,5 +1,6 @@
 // What a battlefield is made of: ground, props, walls, how solid each is, and the kinds of place.
 import type { RegionId } from './regions'
+import type { ArenaKind } from './arena-kinds'
 
 /** What the ground of a tile is. It changes only how the tile looks, but mire, dear to cross; ice, frozen water; and void: no ground at all, off the battlefield. */
 export type Ground = 'pavement' | 'road' | 'grass' | 'floor' | 'scorched' | 'hive' | 'water' | 'mire' | 'ice' | 'void'
@@ -47,5 +48,7 @@ export const TERRAIN_KINDS: TerrainKind[] = [...ZONE_TERRAINS, 'compound', 'hive
 export interface Locale {
   region: RegionId
   city: string
+  /** The ground drawn for it ahead; drawn by the battle when absent. */
+  ground?: ArenaKind
 }
 

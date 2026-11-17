@@ -1,53 +1,53 @@
-// The shape of the ground an encounter is fought on: its levels, ledges, ramps and drops.
+// The ground a battle is fought over: its levels, ledges, drops, water, mire and ice, and what each pays.
 import { GRID, type Battle, type Tile } from './battle'
-import type { ChallengeId } from './challenges'
-import type { EffectId } from './utilities'
+import { CHALLENGES, type ChallengeId } from './challenges'
+import type { Quantity } from './quantities'
+import { carries, type EffectId, type UtilityId } from './utilities'
 import { soften } from './levels'
 import { randomInt } from './rng'
-import { PROP_BULK, type TerrainKind } from './terrain'
+import { PROP_BULK, type Ground, type TerrainKind } from './terrain'
 import { NEIGHBORS, onGrid } from './grid'
 import type { Twist } from './twists'
+import { REGIONS, type RegionId } from './regions'
 
 /**
- * The kinds of ground a crossing runs over. Open ground has gentle rises; a skyscraper's roof has a drop on every side,
- * some of it behind glass; an overpass runs a raised road down one flank; a quarry climbs in terraces toward the far
- * end. A barrier lies across the route, from one edge of the map to the other, but for a bridge far out on one flank:
- * a chasm, broken bridge and all; a river; a swamp's wide band of mire; a cliff the far end stands on.
+ * The kinds of ground a battle is fought over. Open ground has gentle rises; rooftops have a drop on every side, some
+ * behind glass; an overpass runs a raised road down one flank; a quarry climbs in terraces; a rift splits the middle;
+ * flooded streets run with canals; a marsh is mire and gas; a mesa holds the far end high; an ice sheet is slick.
  */
-export type ArenaKind = 'open' | 'skyscraper' | 'overpass' | 'quarry' | 'chasm' | 'river' | 'swamp' | 'cliff'
+export type ArenaKind = 'open' | 'skyscraper' | 'overpass' | 'quarry' | 'rift' | 'flooded' | 'marsh' | 'mesa' | 'ice'
 
-/** What the player is told of each, and what opens a barrier's straight way across. */
-export const ARENA_KINDS: Record<ArenaKind, { name: string; text: string; opens?: EffectId[] }> = {
-  open: { name: 'Open Ground', text: 'Gentle rises.' },
-  skyscraper: { name: 'Skyscraper Roof', text: 'A long drop on every side.' },
-  overpass: { name: 'Overpass', text: 'A raised road down one flank.' },
-  quarry: { name: 'Quarry', text: 'Terraces climb to the far end.' },
-  chasm: { name: 'Chasm', text: 'A chasm splits the route. The bridge is far round; a broken one is nearer.', opens: ['hover'] },
-  river: { name: 'River', text: 'A river splits the route. The bridge is far round.', opens: ['coldSnap', 'hover'] },
-  swamp: { name: 'Swamp', text: 'Mire across the route costs 3 times the move. Firm ground is far round.', opens: ['hover'] },
-  cliff: { name: 'Cliff', text: 'The far end stands on a cliff. The ramp is far round.', opens: ['hover'] },
+/**
+ * What the player is told of each. `pays`: the boons that exploit it; `reads`: the quantities a build makes that it
+ * multiplies. Open ground favours nothing.
+ */
+export const ARENA_KINDS: Record<ArenaKind, { name: string; icon: string; text: string; pays: EffectId[]; reads: Quantity[] }> = {
+  open: { name: 'Open Ground', icon: '🌾', text: 'Gentle rises.', pays: [], reads: [] },
+  skyscraper: { name: 'Rooftops', icon: '🏙️', text: 'A long drop on every side, some behind glass. A Displaced alien falls off.', pays: ['push'], reads: ['moved', 'impact'] },
+  overpass: { name: 'Overpass', icon: '🛣️', text: 'A raised road down one flank. Shots from above deal 1 more damage per level.', pays: ['farsight', 'keen', 'push'], reads: ['crit', 'moved'] },
+  quarry: { name: 'Quarry', icon: '⛏️', text: 'Terraces climb to the far end. Displace an alien off a terrace to hurt it.', pays: ['push', 'farsight'], reads: ['moved', 'impact'] },
+  rift: { name: 'Rift', icon: '🕳️', text: 'A rift splits the middle. A Displaced alien at its lip falls in.', pays: ['push', 'hover'], reads: ['moved'] },
+  flooded: { name: 'Flooded', icon: '🌊', text: 'Canals cross the streets. An alien beside water or on ice takes 1 more Chill.', pays: ['coldSnap', 'hover'], reads: ['chill'] },
+  marsh: { name: 'Marsh', icon: '🫧', text: 'Mire costs 3 times the move. Burn on an alien in mire sets the mire about it alight.', pays: ['blaze', 'hover'], reads: ['burn'] },
+  mesa: { name: 'Mesa', icon: '🏜️', text: 'The far end stands on a mesa, ramps up its sides. Shots from above deal 1 more damage per level.', pays: ['farsight', 'keen', 'hover', 'push'], reads: ['crit', 'moved'] },
+  ice: { name: 'Ice Sheet', icon: '🧊', text: 'An alien Displaced on ice slides 3 more tiles. An alien beside water or on ice takes 1 more Chill.', pays: ['coldSnap', 'push'], reads: ['chill', 'moved'] },
 }
 
-/** The arena kinds each kind of place may have, each as likely as the others. */
-const FITS: Record<TerrainKind, ArenaKind[]> = {
-  city: ['skyscraper', 'overpass', 'river', 'cliff', 'chasm'],
-  industrial: ['quarry', 'overpass', 'chasm', 'river', 'cliff'],
-  ruins: ['chasm', 'quarry', 'skyscraper', 'river', 'swamp'],
-  countryside: ['cliff', 'quarry', 'chasm', 'river', 'swamp'],
-  town: ['open', 'overpass', 'river', 'cliff', 'swamp'],
-  hive: ['cliff', 'chasm', 'open', 'swamp'],
-  compound: ['open'],
-}
+/** Where a region draws its ground: its signature as often as all the rest. A satellite's compound and the hive keep their own. */
+const OWN: Partial<Record<TerrainKind, ArenaKind[]>> = { compound: ['open'], hive: ['rift', 'marsh', 'open'] }
 
 /** Kinds whose drop is void, which narrow ground's own void would cut too small. */
-const VOIDED: ArenaKind[] = ['skyscraper', 'chasm']
+const VOIDED: ArenaKind[] = ['skyscraper', 'rift']
 
-/** An arena kind fitting the place, challenge and twist: a ridge needs open ground; a Slog is a swamp. */
-export function pickArenaKind(battle: { rng: number }, place: TerrainKind, challenge: ChallengeId | null, twist: Twist | null): ArenaKind {
-  if (challenge === 'slog') return 'swamp'
+/** The ground of a battle in `region` on `place`, fitting its challenge and twist: a Slog is a marsh; a Firing line's ridge needs open ground. */
+export function pickArenaKind(rng: { rng: number }, region: RegionId | undefined, place: TerrainKind, challenge: ChallengeId | null, twist: Twist | null): ArenaKind {
+  if (challenge === 'slog') return 'marsh'
   if (challenge === 'firingLine') return 'open'
-  const fits = FITS[place].filter((k) => twist !== 'narrow' || !VOIDED.includes(k))
-  return fits[randomInt(battle, fits.length)]
+  const own = OWN[place] ?? (region ? REGIONS[region].ground : ['open'])
+  const fits = own.filter((k) => twist !== 'narrow' || !VOIDED.includes(k))
+  if (fits.length === 0) return 'open'
+  // The signature first, as likely as all the rest together.
+  return randomInt(rng, 2) === 0 || fits.length === 1 ? fits[0] : fits[1 + randomInt(rng, fits.length - 1)]
 }
 
 /** Tiles within `reach` of a drop: the void, or the low side of a ledge. */
@@ -70,47 +70,48 @@ export function dropsNear(battle: Battle, reach: number): Set<number> {
 /** Half the side of the square about the arena's centre an arena kind shapes; beyond it the ground slopes back to its own. */
 const FOOT = 16
 
-/** A barrier's footprint, cleared flat, as far across as its bridge and a little past. */
-const BARRIER_FOOT = { along: 17, across: 24 }
+/** What a kind makes of a tile at `a` tiles along the axis and `c` across: its level, a drop, water, mire, ice, or as it was. */
+type Shape = (a: number, c: number) => number | 'drop' | 'water' | 'mire' | 'ice' | null
 
-/** Where a barrier crosses the route, in tiles along the axis, too wide for any jump; a swamp's band is wider. */
-const BAND: [number, number] = [-3.5, 2.5]
-const MIRE_BAND: [number, number] = [-6.5, 5.5]
+/** A rift's half length across the axis, and its band along it; the broken span over it, its gap the middle tiles. */
+const RIFT_HALF = 9
+const RIFT: [number, number] = [-3.5, 0.5]
+const SPAN_HALF = 1.5
 
-/** How far out across the route a barrier's bridge lies at most, and its half width; a chasm's broken bridge, its gap the middle two tiles. */
-export const BRIDGE = 20
-const BRIDGE_HALF = 1.5
-const BROKEN = 10
+/** A flooded arena's two canals, along the axis, and the half width of the ford through each. */
+const CANALS: [number, number][] = [[-6.5, -4.5], [3.5, 5.5]]
+const FORD_HALF = 1.5
 
-/** What a kind makes of a tile at `a` tiles along the axis and `c` across, its bridge at `b` across: its level, a drop, water, mire, or as it was. */
-type Shape = (a: number, c: number, b: number) => number | 'drop' | 'water' | 'mire' | null
-
-/** Levels a cliff stands, too high for any jump. */
-const CLIFF_HIGH = 6
+/** Levels a mesa stands, too high for any jump, its half width, where its face stands along the axis, and its two ramps. */
+const MESA_HIGH = 3
+const MESA_HALF = 11
+const MESA_FACE = 3
+const RAMP_AT = 7
 
 /** Levels of a ramp `d` tiles out from the edge of ground `top` high. */
 const ramp = (top: number, d: number) => Math.max(0, top - Math.ceil(d))
 
 const within = (v: number, lo: number, hi: number) => v >= lo && v <= hi
 
-/** Whether `c` lies on the bridge at `b`. */
-const onBridge = (c: number, b: number) => Math.abs(c - b) <= BRIDGE_HALF
+/** Blobs in the shaped square: how many, their least and greatest radii. */
+type Blob = { a: number; c: number; r: number }
+const blobs = (battle: Battle, n: number, [r0, r1]: [number, number], margin = 3): Blob[] =>
+  Array.from({ length: n }, () => ({ a: randomInt(battle, 2 * (FOOT - margin)) - FOOT + margin, c: randomInt(battle, 2 * (FOOT - margin)) - FOOT + margin, r: r0 + (randomInt(battle, 4) / 3) * (r1 - r0) }))
+const inBlob = (of: Blob[], a: number, c: number) => of.some((o) => Math.hypot(a - o.a, c - o.c) <= o.r)
 
-/** A barrier's shape: `band` across the whole map, made by `cross`, but the bridge; flat ground about it. */
-const barrier = (band: [number, number], cross: Shape): Shape => (a, c, b) => {
-  if (within(a, ...band) && !onBridge(c, b)) return cross(a, c, b)
-  return Math.abs(a) > BARRIER_FOOT.along || Math.abs(c) > BARRIER_FOOT.across ? null : 0
-}
+/** Whether a tile lies within reach of the landing or the objective, kept firm so either end stands on solid ground. */
+const ends = (a: number, c: number) => Math.abs(c) <= 3 && Math.abs(a) >= 11
 
-const SHAPES: Record<Exclude<ArenaKind, 'open'>, Shape> = {
+/** Each kind's shape; the random ones draw their blobs or fords from the battle. */
+const SHAPES: Record<Exclude<ArenaKind, 'open'>, (battle: Battle) => Shape> = {
   // The roof, a machine deck over the far end and a stair up to it; all else is the drop.
-  skyscraper: (a, c) => {
+  skyscraper: () => (a, c) => {
     if (Math.abs(a) > 14.5 || Math.abs(c) > 7.5) return 'drop'
     if (within(a, 5, 10) && Math.abs(c) <= 5) return 2
     return within(a, 3.5, 5) && Math.abs(c) <= 1.5 ? 1 : 0
   },
   // A road three levels up down one flank, a ramp off each side.
-  overpass: (a, c) => {
+  overpass: () => (a, c) => {
     if (Math.abs(a) > FOOT || Math.abs(c) > FOOT) return null
     if (within(c, 3.5, 7.5)) return 3
     if (within(a, -9, -6) && within(c, 0.5, 3.5)) return ramp(3, 3.5 - c)
@@ -118,7 +119,7 @@ const SHAPES: Record<Exclude<ArenaKind, 'open'>, Shape> = {
     return 0
   },
   // Terraces two levels apart, each joined to the next by two ramps.
-  quarry: (a, c) => {
+  quarry: () => (a, c) => {
     if (Math.abs(a) > FOOT || Math.abs(c) > FOOT) return null
     if (a < -6) return 0
     if (a < -5) return within(c, -10, -7) || within(c, 6, 9) ? 1 : 0
@@ -126,44 +127,65 @@ const SHAPES: Record<Exclude<ArenaKind, 'open'>, Shape> = {
     if (a < 2) return within(c, -3, 0) || within(c, 9, 12) ? 3 : 2
     return 4
   },
-  // The broken bridge, on the other flank from the whole one: its middle two tiles fallen.
-  chasm: barrier(BAND, (a, c, b) => (Math.abs(c + Math.sign(b) * BROKEN) <= BRIDGE_HALF && !within(a, -1.5, 0.5) ? 0 : 'drop')),
-  river: barrier(BAND, () => 'water'),
-  swamp: barrier(MIRE_BAND, () => 'mire'),
-  // The far end CLIFF_HIGH levels up, its face along the band and a drop beyond; the ramp up it on the bridge.
-  cliff: (a, c, b) => {
-    if (Math.abs(a) > BARRIER_FOOT.along || Math.abs(c) > BARRIER_FOOT.across) return within(a, ...BAND) ? 'drop' : null
-    if (a >= BAND[1] - 2) return CLIFF_HIGH
-    return onBridge(c, b) && a > BAND[1] - 2 - CLIFF_HIGH ? ramp(CLIFF_HIGH, BAND[1] - 2 - a) : 0
+  // A rift across the middle, open round both ends; a span over it, its middle fallen.
+  rift: () => (a, c) => {
+    if (Math.abs(a) > FOOT || Math.abs(c) > FOOT) return null
+    if (!within(a, ...RIFT) || Math.abs(c) > RIFT_HALF) return 0
+    return Math.abs(c) <= SPAN_HALF && !within(a, -2, -0.5) ? 0 : 'drop'
+  },
+  // Two canals across the streets, each forded at a different side, and pools between.
+  flooded: (battle) => {
+    const ford = (randomInt(battle, 2) * 2 - 1) * (4 + randomInt(battle, 5))
+    const pools = blobs(battle, 4, [1, 2])
+    return (a, c) => {
+      if (Math.abs(a) > FOOT || Math.abs(c) > FOOT) return null
+      const canal = CANALS.findIndex(([lo, hi]) => within(a, lo, hi))
+      if (canal >= 0) return Math.abs(c - (canal === 0 ? ford : -ford)) <= FORD_HALF ? 0 : 'water'
+      return !ends(a, c) && inBlob(pools, a, c) ? 'water' : 0
+    }
+  },
+  // Wide beds of mire, firm ground winding between.
+  marsh: (battle) => {
+    const beds = blobs(battle, 7, [3, 5], 1)
+    return (a, c) => (Math.abs(a) > FOOT || Math.abs(c) > FOOT ? null : !ends(a, c) && inBlob(beds, a, c) ? 'mire' : 0)
+  },
+  // The far end MESA_HIGH levels up, a ramp up each side.
+  mesa: () => (a, c) => {
+    if (Math.abs(a) > FOOT || Math.abs(c) > FOOT) return null
+    if (a >= MESA_FACE && Math.abs(c) <= MESA_HALF) return MESA_HIGH
+    const up = MESA_FACE - a
+    return Math.abs(Math.abs(c) - RAMP_AT) <= SPAN_HALF && up > 0 && up <= MESA_HIGH ? ramp(MESA_HIGH, up) : 0
+  },
+  // Sheets of ice, with a few holes of open water.
+  ice: (battle) => {
+    const sheets = blobs(battle, 6, [3, 5], 1)
+    const holes = blobs(battle, 3, [1, 1.5])
+    return (a, c) => {
+      if (Math.abs(a) > FOOT || Math.abs(c) > FOOT) return null
+      if (ends(a, c)) return 0
+      return inBlob(holes, a, c) ? 'water' : inBlob(sheets, a, c) ? 'ice' : 0
+    }
   },
 }
 
-/** A swamp's pools and islands in the mire: how many of each and their radii; the share of firm tiles that hold a tree. */
+/** A marsh's pools and islands in the mire: how many of each and their radii; the share of firm tiles that hold a tree. */
 const ISLANDS = 6
-const ISLAND_RADIUS = [1, 2]
 const POOLS = 8
-const POOL_RADIUS = [1, 2]
 const TREES = 0.15
 
-/** Lays pools and wooded islands, a level up, over a swamp's mire. */
-function bog(battle: Battle, mire: number[], axis: (t: number) => [number, number], b: number): void {
-  const [lo, hi] = MIRE_BAND
-  const blobs = (n: number, [r0, r1]: number[]) => Array.from({ length: n }, () => ({ a: lo + 1 + randomInt(battle, hi - lo - 2), c: randomInt(battle, 2 * BARRIER_FOOT.across) - BARRIER_FOOT.across, r: r0 + (randomInt(battle, 4) / 3) * (r1 - r0) }))
-  const islands = blobs(ISLANDS, ISLAND_RADIUS)
-  const pools = blobs(POOLS, POOL_RADIUS)
-  const inside = (t: number, of: typeof islands) => { const [a, c] = axis(t); return of.some((o) => Math.hypot(a - o.a, c - o.c) <= o.r) }
+/** Lays pools and wooded islands, a level up, over a marsh's mire. */
+function bog(battle: Battle, mire: number[], axis: (t: number) => [number, number]): void {
+  const islands = blobs(battle, ISLANDS, [1, 2])
+  const pools = blobs(battle, POOLS, [1, 2])
   const clear = (x: number, y: number) => NEIGHBORS.every(([dx, dy]) => !onGrid(x + dx, y + dy) || battle.bulk[(y + dy) * GRID + x + dx] === 0)
   for (const t of mire) {
-    // Nothing stands within reach of the straight way or the bridge, so the mire is all that slows either.
-    const [, c] = axis(t)
-    const clearWay = Math.abs(c) <= 2 || Math.abs(c - b) <= BRIDGE_HALF + 1
-    if (clearWay) continue
-    const island = inside(t, islands)
+    const [a, c] = axis(t)
+    const island = inBlob(islands, a, c)
     if (island) {
       battle.ground[t] = battle.place === 'hive' ? 'hive' : 'grass'
       battle.height[t] = 1
     }
-    const prop = !island && inside(t, pools) ? 'water' : island && randomInt(battle, 100) < 100 * TREES && clear(t % GRID, Math.floor(t / GRID)) ? 'tree' : null
+    const prop = !island && inBlob(pools, a, c) ? 'water' : island && randomInt(battle, 100) < 100 * TREES && clear(t % GRID, Math.floor(t / GRID)) ? 'tree' : null
     if (!prop) continue
     if (prop === 'water') battle.ground[t] = 'water'
     battle.props[t] = prop
@@ -174,38 +196,25 @@ function bog(battle: Battle, mire: number[], axis: (t: number) => [number, numbe
 /** The parapet: glass along the roof's edge in runs of this many tiles, with as long gaps between. */
 const PANE_RUN = 4
 
-/** How far out across the route, on the side `side` of it, the map runs from `spot`: room for a bridge. */
-function room(spot: Tile, [fx, fy]: [number, number], side: number): number {
-  let c = 0
-  while (c < BRIDGE + 2 && onGrid(Math.round(spot.x - fy * side * (c + 1)), Math.round(spot.y + fx * side * (c + 1)))) c++
-  return c
-}
-
-/** Whether `kind` lays a barrier across the route. */
-export const isBarrier = (kind: ArenaKind) => !!ARENA_KINDS[kind].opens
-
 /**
  * Shapes the ground about `spot` for `kind`, its axis heading `f` from the way in toward the objective. Within the
- * shaped ground nothing stands but what the encounter places next; beyond it, the ground slopes back to its own. A
- * barrier's bridge lies on the side of the route with more room, as far out as BRIDGE. Returns where a barrier's bridge
- * lands on the far side, in tiles along the axis and across, or null.
+ * shaped ground nothing stands but what the encounter places next; beyond it, the ground slopes back to its own.
  */
-export function shapeArena(battle: Battle, kind: ArenaKind, spot: Tile, [fx, fy]: [number, number]): [number, number] | null {
+export function shapeArena(battle: Battle, kind: ArenaKind, spot: Tile, [fx, fy]: [number, number]): void {
   battle.arenaKind = kind
-  if (kind === 'open') return null
-  const shape = SHAPES[kind]
+  if (kind === 'open') return
+  const shape = SHAPES[kind](battle)
   const axis = (t: number): [number, number] => {
     const dx = (t % GRID) - spot.x
     const dy = Math.floor(t / GRID) - spot.y
     return [dx * fx + dy * fy, -dx * fy + dy * fx]
   }
-  const side = room(spot, [fx, fy], 1) >= room(spot, [fx, fy], -1) ? 1 : -1
-  const b = side * Math.min(BRIDGE, room(spot, [fx, fy], side) - 3)
   const shaped = new Set<number>()
   const mire: number[] = []
+  const hive = battle.place === 'hive'
   for (let t = 0; t < GRID * GRID; t++) {
     const [a, c] = axis(t)
-    const level = shape(a, c, b)
+    const level = shape(a, c)
     if (level === null || battle.ground[t] === 'void') continue
     shaped.add(t)
     battle.north[t] = battle.west[t] = 'none'
@@ -220,13 +229,12 @@ export function shapeArena(battle: Battle, kind: ArenaKind, spot: Tile, [fx, fy]
     }
     battle.props[t] = 'none'
     battle.bulk[t] = 0
-    battle.height[t] = level === 'mire' ? 0 : level
+    battle.height[t] = typeof level === 'number' ? level : 0
     // The hive keeps its own ground: nothing human stands there.
-    const hive = battle.place === 'hive'
-    battle.ground[t] = level === 'mire' ? 'mire' : hive ? 'hive' : ['water', 'floor', 'mire'].includes(battle.ground[t]) ? 'pavement' : battle.ground[t]
+    const own: Ground = hive ? 'hive' : ['water', 'floor', 'mire', 'ice'].includes(battle.ground[t]) ? 'pavement' : battle.ground[t]
+    battle.ground[t] = level === 'mire' || level === 'ice' ? level : own
     if (level === 'mire') mire.push(t)
     if (!hive && kind === 'overpass' && level === 3) battle.ground[t] = 'road'
-    if (!hive && (kind === 'chasm' || kind === 'river') && within(a, ...BAND)) battle.ground[t] = 'road'
   }
   if (kind === 'skyscraper') {
     // Glass on the roof's edge over the drop, in runs.
@@ -241,7 +249,35 @@ export function shapeArena(battle: Battle, kind: ArenaKind, spot: Tile, [fx, fy]
       if (t + GRID < GRID * GRID && battle.ground[t + GRID] === 'void') battle.north[t + GRID] = 'window'
     }
   }
-  if (kind === 'swamp') bog(battle, mire, axis, b)
+  if (kind === 'marsh') bog(battle, mire, axis)
   soften(battle, GRID, (t) => shaped.has(t))
-  return isBarrier(kind) ? [(kind === 'swamp' ? MIRE_BAND : BAND)[1] + 2, b] : null
+}
+
+/** What marks each kind's feature on the ground: the tiles to name it by. */
+const FEATURE: Record<ArenaKind, (battle: Battle, t: number) => boolean> = {
+  open: () => false,
+  skyscraper: (b, t) => b.ground[t] === 'void',
+  overpass: (b, t) => b.height[t] >= 3,
+  quarry: (b, t) => b.height[t] >= 4,
+  rift: (b, t) => b.ground[t] === 'void',
+  flooded: (b, t) => b.ground[t] === 'water',
+  marsh: (b, t) => b.ground[t] === 'mire',
+  mesa: (b, t) => b.height[t] >= MESA_HIGH,
+  ice: (b, t) => b.ground[t] === 'ice',
+}
+
+/** The tile of the ground's feature nearest the arena's centre, or null on open ground. */
+export function featureOf(battle: Battle): Tile | null {
+  let best: Tile | null = null
+  for (let t = 0; t < GRID * GRID; t++) {
+    if (!FEATURE[battle.arenaKind](battle, t)) continue
+    const tile = { x: t % GRID, y: Math.floor(t / GRID) }
+    if (!best || Math.hypot(tile.x - battle.arena.x, tile.y - battle.arena.y) < Math.hypot(best.x - battle.arena.x, best.y - battle.arena.y)) best = tile
+  }
+  return best
+}
+
+/** What the deploy screen says boon `id` does here: exploits the ground, answers the challenge, both, or neither. */
+export function scouted(battle: Pick<Battle, 'arenaKind' | 'challenge'>, id: UtilityId): { ground: boolean; challenge: boolean } {
+  return { ground: carries(id, ARENA_KINDS[battle.arenaKind].pays), challenge: !!battle.challenge && carries(id, CHALLENGES[battle.challenge].answers) }
 }

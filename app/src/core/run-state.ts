@@ -3,6 +3,7 @@ import type { AlienKind } from './aliens'
 import type { Twist } from './twists'
 import type { TerrainKind } from './terrain'
 import type { RegionId } from './regions'
+import type { ArenaKind } from './arena-kinds'
 import type { Goal } from './goals'
 import type { ContinentId, LonLat, City } from './world'
 import type { ClassId } from './classes'
@@ -45,6 +46,8 @@ export interface Stop {
   /** How the town it is fought in is built, and the place it is named for; drawn by the battle when absent. */
   region?: RegionId
   city?: string
+  /** The ground it is fought over, drawn ahead so the map can show it. */
+  ground?: ArenaKind
 }
 
 /**

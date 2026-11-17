@@ -11,6 +11,7 @@ import { soldierStats } from './hero'
 import { TUNING } from './tuning'
 import { random, randomInt } from './rng'
 import { type RegionId, REGION_IDS, REGIONS } from './regions'
+import { pickArenaKind } from './arena-kinds'
 import { ZONE_TERRAINS, type TerrainKind } from './terrain'
 import { CONTINENTS } from './world'
 import { drawTwist } from './twists'
@@ -125,7 +126,9 @@ export function drawBattle(run: Run, risk: Risk, when: Run = run, taken: Challen
   // Each battle's force varies a little either way, so two battles of one risk are not the same fight.
   const aliens = challenge ? forceOf(challenge, when.keys, rung, RISKS[risk].aliens + GOALS[goal].force + randomInt(run, 3) - 1) : []
   const terrain = ZONE_TERRAINS[randomInt(run, ZONE_TERRAINS.length)]
-  return { kind: 'battle', risk, goal, terrain, challenge, twist: drawTwist(run, when.keys), aliens, ...placed(run, terrain) }
+  const twist = drawTwist(run, when.keys)
+  const where = placed(run, terrain)
+  return { kind: 'battle', risk, goal, terrain, challenge, twist, aliens, ...where, ground: pickArenaKind(run, where.region, terrain, challenge, twist) }
 }
 
 /** How hard a stop is: a battle counts one, a quiet one none and an overrun one two. */

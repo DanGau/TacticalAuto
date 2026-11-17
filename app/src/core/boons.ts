@@ -3,8 +3,7 @@ import { fx } from './sources'
 import { GRID, isSoldier, type Battle, type Effect, type Stats, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { nearest } from './fighters'
-import { distance, floats } from './grid'
-import { freeze, waterOnRoute } from './route'
+import { distance, floats, walks } from './grid'
 import { fuelTanks } from './objects'
 import { chillUnit, kindle } from './stacks'
 import { BLAZE_REACH, carries, effectsOf, MINOR, SMOKE_REACH, STRENGTH, STUN_TURNS, UTILITIES, type EffectId, type MinorId, type Part, type UtilityId } from './utilities'
@@ -17,7 +16,7 @@ export interface Boon {
 }
 
 /** The effect each part lends each hero while it lasts. */
-const LENT: Partial<Record<EffectId, Effect>> = { crack: 'piercing', hover: 'hover', rangedShield: 'rangedShield', meleeShield: 'meleeShield' }
+const LENT: Partial<Record<EffectId, Effect>> = { crack: 'piercing', hover: 'hover', rangedShield: 'rangedShield', meleeShield: 'meleeShield', keen: 'lofty', push: 'repulse' }
 
 /** How much a part gives: as minor, MINOR; else STRENGTH. */
 const amount = (part: Part) => (part.minor ? MINOR : STRENGTH)[part.id as MinorId]
@@ -42,6 +41,17 @@ const shift = (unit: Unit, delta: Partial<Stats>, sign: number) => {
   unit.stats = stats
 }
 
+/** Cold Snap: every tile of water in the arena turns to ice, firm to walk on. */
+function freeze(battle: Battle): void {
+  battle.ground.forEach((g, t) => {
+    if (g !== 'water' || distance({ x: t % GRID, y: Math.floor(t / GRID) }, battle.arena) > battle.arena.reach) return
+    battle.ground[t] = 'ice'
+    battle.props[t] = 'none'
+    battle.bulk[t] = 0
+  })
+  walks.delete(battle)
+}
+
 /** The utility the player picked takes hold as the hero comes in, each of its parts on the units it acts on. */
 export function takeBoon(battle: Battle, id: UtilityId | null, tank: number): void {
   if (!id) return
@@ -50,7 +60,7 @@ export function takeBoon(battle: Battle, id: UtilityId | null, tank: number): vo
   for (const part of UTILITIES[id].parts) {
     const add = HERO[part.id] ?? ALIEN[part.id]
     for (const u of battle.units.filter((u) => u.hp > 0 && (ALIEN[part.id] ? u.side === 'alien' : isSoldier(u)))) {
-      if (LENT[part.id]) u.effects = [...u.effects, LENT[part.id]!]
+      if (LENT[part.id] && !part.minor) u.effects = [...u.effects, LENT[part.id]!]
       if (!add) continue
       const delta = add(u.stats, amount(part))
       shift(u, delta, 1)
@@ -59,7 +69,7 @@ export function takeBoon(battle: Battle, id: UtilityId | null, tank: number): vo
       for (const [key, value] of Object.entries(delta) as [keyof Stats, number][]) sum[key] = (sum[key] ?? 0) + value
     }
     if (part.id === 'tank') battle.rigged = fuelTanks(battle)[tank] ?? null
-    if (part.id === 'coldSnap') freeze(battle, waterOnRoute(battle))
+    if (part.id === 'coldSnap') freeze(battle)
     if (part.id === 'flashbang') {
       const first = nearest(battle.units.filter((u) => u.side === 'alien' && u.engaged), battle.entry!)
       for (const u of battle.units.filter((a) => a.side === 'alien' && first && a.cluster === first.cluster)) u.surprised = u.boss ? STUN_TURNS - 1 : STUN_TURNS
@@ -97,7 +107,7 @@ export function tickBoons(battle: Battle, events: GameEvent[]): void {
 
 /** A boon's bonus is taken back from every unit it held. */
 function end(battle: Battle, boon: Boon, events: GameEvent[]): void {
-  const lent = effectsOf(boon.id).flatMap((id) => LENT[id] ?? [])
+  const lent = UTILITIES[boon.id].parts.flatMap((p) => (p.minor ? [] : (LENT[p.id] ?? [])))
   const on: number[] = []
   for (const u of battle.units.filter((u) => u.hp > 0)) {
     const delta = boon.deltas[u.id]
