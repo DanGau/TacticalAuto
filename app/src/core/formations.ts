@@ -1,5 +1,5 @@
 // Gathers a battle's aliens into clusters: how they are grouped, the shapes they stand in, and how the ground shapes those.
-import { dropsNear } from './arena-kinds'
+import { lures } from './arena-kinds'
 import { ENGAGE_REACH, GRID, type Alien, type Battle, type Tile } from './battle'
 import { distance, onGrid } from './grid'
 import { random, randomInt } from './rng'
@@ -133,8 +133,8 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
   const outdoors = plot.ground.filter((t) => battle.ground[t.y * GRID + t.x] !== 'floor')
   const open = outdoors.length > 0 ? outdoors : plot.ground
   const groups = groupsOf(battle, aliens, plot)
-  // On shaped ground, clusters gather by the drops, where a knockback sends them over.
-  const lips = battle.arenaKind === 'open' ? new Set<number>() : dropsNear(battle, EDGE_REACH)
+  // On shaped ground, clusters gather where the ground pays: by the drops, where a knockback sends them over; by water or on ice; in the mire.
+  const lips = lures(battle, EDGE_REACH)
   const staged = plot.challenge ? STAGING[plot.challenge] : undefined
   const free = groups.filter((g) => !g.at)
   const centres: Tile[] = groups.flatMap((g) => g.at ?? [])

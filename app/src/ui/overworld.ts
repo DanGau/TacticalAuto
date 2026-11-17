@@ -20,6 +20,8 @@ import { xpFor } from '../core/hero'
 import { LEG_STOPS } from '../core/progress'
 import { FEATS } from '../core/feats'
 import { TWISTS } from '../core/twists'
+import { ARENA_KINDS } from '../core/arena-kinds'
+import { REGIONS } from '../core/regions'
 import { objective, THREATS } from '../core/objectives'
 import { CHALLENGES } from '../core/challenges'
 import type { LonLat } from '../core/world'
@@ -62,7 +64,8 @@ function stopIcon(run: Run, stop: Stop, state = ''): string {
   const aliens = census(run, stop.aliens) + (stop.goal === 'assassinate' ? ', a Commander' : '')
   const challenge = stop.challenge && CHALLENGES[stop.challenge]
   const answered = challenge && run.utilities.some((id) => carries(id, challenge.answers)) ? ' answered' : ''
-  return `<span class="node ${stop.risk} ${state}${answered}" title="${challenge?.name} · ${goal.name} · ${risk.name} · ${aliens.replace(/<[^>]*>/g, '')}">${challenge?.icon ?? STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}</span>`
+  const ground = stop.ground && ARENA_KINDS[stop.ground]
+  return `<span class="node ${stop.risk} ${state}${answered}" title="${ground ? `${ground.name} · ` : ''}${challenge?.name} · ${goal.name} · ${risk.name} · ${aliens.replace(/<[^>]*>/g, '')}">${challenge?.icon ?? STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}${ground && stop.ground !== 'open' ? `<sub>${ground.icon}</sub>` : ''}</span>`
 }
 
 /** A stop not yet seen. */
@@ -163,7 +166,9 @@ function where(run: Run, stop: Stop): string {
   if (stop.kind !== 'battle' && stop.kind !== 'key' && stop.kind !== 'final') return ''
   const order = `<b title="${GOALS[stop.goal].text}">${objective(stop.kind, stop.goal, stop.challenge)}</b>`
   const extras = stop.kind === 'battle' ? ` · ${RISKS[stop.risk].name}${stop.twist ? ` · <span title="${TWISTS[stop.twist].text}">${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}</span>` : ''}` : ''
-  return `${order}${extras}<br>${readChallenge(run, stop)}`
+  const ground = stop.ground && ARENA_KINDS[stop.ground]
+  const land = ground ? `<br><span class="ground" title="${ground.text}">${ground.icon} ${ground.name}${stop.region ? ` · ${REGIONS[stop.region].name}` : ''}</span>: ${ground.text}` : ''
+  return `${order}${extras}${land}<br>${readChallenge(run, stop)}`
 }
 
 const PURCHASED = '<small class="purchased">Purchased</small>'

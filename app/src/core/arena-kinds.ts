@@ -67,6 +67,22 @@ export function dropsNear(battle: Battle, reach: number): Set<number> {
   return near
 }
 
+/** Tiles within `reach` of where the ground pays: a drop, water or ice, or mire. */
+export function lures(battle: Battle, reach: number): Set<number> {
+  const kind = battle.arenaKind
+  if (kind === 'open') return new Set()
+  const wanted: Ground[] = kind === 'flooded' || kind === 'ice' ? ['water', 'ice'] : kind === 'marsh' ? ['mire'] : []
+  if (wanted.length === 0) return dropsNear(battle, reach)
+  const near = new Set<number>()
+  for (let t = 0; t < GRID * GRID; t++) {
+    if (!wanted.includes(battle.ground[t])) continue
+    const x = t % GRID
+    const y = Math.floor(t / GRID)
+    for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) if (onGrid(x + dx, y + dy)) near.add((y + dy) * GRID + x + dx)
+  }
+  return near
+}
+
 /** Half the side of the square about the arena's centre an arena kind shapes; beyond it the ground slopes back to its own. */
 const FOOT = 16
 

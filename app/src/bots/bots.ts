@@ -1,4 +1,6 @@
 // Bots: each chooses the next action whenever the run waits for the player.
+import { scouted } from '../core/arena-kinds'
+import type { UtilityId } from '../core/utilities'
 import type { Action } from '../core/apply'
 import { strategic } from './strategic'
 import { plannedPerk } from '../core/plans'
@@ -77,9 +79,11 @@ const affordable = (run: Run): Action[] => [
   ...(!run.shop!.medkit && wounded(run) && MEDKIT.price <= run.supplies ? [{ type: 'medkit' } as const] : []),
 ]
 
-/** Goes in with the first utility held that can be used here; a rigged tank on the first tank. */
+/** Goes in with the first utility held the deploy screen tags for this ground or challenge, else the first that can be used here; a rigged tank on the first tank. */
 function goIn(run: Run): Action {
-  const usable = run.utilities.findIndex((id) => id !== 'tank' || fuelTanks(run.battle!).length > 0)
+  const can = (id: UtilityId) => id !== 'tank' || fuelTanks(run.battle!).length > 0
+  const tagged = run.utilities.findIndex((id) => can(id) && Object.values(scouted(run.battle!, id)).some(Boolean))
+  const usable = tagged >= 0 ? tagged : run.utilities.findIndex(can)
   return usable < 0 ? { type: 'enter' } : { type: 'enter', utility: usable, tank: 0 }
 }
 

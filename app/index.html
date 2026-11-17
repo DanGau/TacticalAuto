@@ -219,6 +219,8 @@
       .globe .cell { position: absolute; transform: translate(-50%, -50%); z-index: 1; }
       .map .node { display: inline-block; font-size: 16px; width: 30px; height: 30px; line-height: 30px; border-width: 2px; flex: none; }
       .map .node sup { font-size: 9px; }
+      .node { position: relative; }
+      .node sub { position: absolute; right: -6px; bottom: -6px; font-size: 11px; line-height: 1; }
       .node.done { opacity: 0.55; }
       .node.here { box-shadow: 0 0 0 3px #ffd166, 0 0 14px #ffd166; }
       .globe .cell.choice { z-index: 2; }

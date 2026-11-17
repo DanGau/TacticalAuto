@@ -69,6 +69,7 @@ export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], cha
     const stats = { ...best, hp: Math.round(best.hp * HUNTER.hp), damage: Math.ceil(best.damage * HUNTER.damage), armor: Math.max(best.armor, trooper.stats.armor) + 1, move: best.move + 1 }
     aliens.unshift({ ...trooper, stats, boss: true, target: true, stance: 'rush' })
   }
+  if (mission.kind === 'battle' && run.keys >= TUNING.roadDamage.from) for (const a of aliens.filter((a, i) => !a.boss && i % TUNING.roadDamage.every === 0)) a.stats = { ...a.stats, damage: a.stats.damage + TUNING.roadDamage.damage }
   const stiff = challenge && STIFFEN[challenge]
   if (stiff) {
     for (const a of aliens) a.stats = { ...a.stats, range: a.stats.range > 1 ? a.stats.range + (stiff.range ?? 0) : a.stats.range, armor: a.stats.armor + (stiff.armor?.[Math.min(run.keys, stiff.armor.length - 1)] ?? 0) }
