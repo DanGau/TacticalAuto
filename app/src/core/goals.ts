@@ -31,11 +31,11 @@ export const RESCUE_QUORUM = CIVILIANS / 2
 /** `from` is the leg a goal is first drawn on: a fresh hero meets no hold or assassination. */
 export const GOALS: Record<Goal, { name: string; text: string; reward: string; force: number; weight: number; from: number }> = {
   cross: { name: 'Break Through', text: 'Reach the extraction zone.', reward: 'supplies and gear', force: 2, weight: 3, from: 0 },
-  assassinate: { name: 'Takedown', text: 'Kill the commander at the far end. It has Armor and guards, and blinks away when hurt. When it dies, the rest flee.', reward: 'supplies and rare gear', force: -3, weight: 1, from: 1 },
-  hold: { name: 'Hold the Uplink', text: `Reach the uplink. Stand in its zone for ${HOLD_ROUNDS} rounds as aliens pour in.`, reward: 'a relic, no gear', force: -6, weight: 1, from: 1 },
+  assassinate: { name: 'Takedown', text: 'Kill the commander at the far end. It has Armor and guards, and blinks away when hurt. Its death routs the rest.', reward: 'supplies and rare gear', force: -3, weight: 1, from: 1 },
+  hold: { name: 'Hold the Uplink', text: `Reach the uplink. Hold its zone for ${HOLD_ROUNDS} rounds.`, reward: 'a relic, no gear', force: -6, weight: 1, from: 1 },
   rescue: {
     name: 'Rescue',
-    text: `Reach the civilians at the far end. Save more than half of the ${CIVILIANS}, or the mission is lost. Reach a civilian to save it. Aliens shoot civilians when they have no shot at you. Hiders stay put, runners flee, and Harvesters raise the dead as Husks. Each civilian saved pays ${CIVILIAN_SUPPLIES} supplies and 1 XP. Every ${CIVILIANS_PER_THREAT} left behind add 1 threat.`,
+    text: `Reach civilians to save them. Save over half of ${CIVILIANS}, or fail. Each pays ${CIVILIAN_SUPPLIES} supplies and 1 XP. Every ${CIVILIANS_PER_THREAT} lost: 1 threat.`,
     reward: 'supplies and experience, no gear',
     force: 1,
     weight: 1,

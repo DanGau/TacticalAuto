@@ -5,6 +5,7 @@ import { feeds, type Flow, type Quantity } from './quantities'
 import { random, randomInt } from './rng'
 import { BURN_STACKS, CADENCE, EXECUTE_BONUS, EXPOSED, GUARD_MAX, HIGH_CRIT, VOLATILE_DAMAGE } from './battle'
 import { TUNING } from './tuning'
+import { SLAM_DAMAGE } from './wound'
 import { WEAPONS, type WeaponId } from './weapons'
 
 /**
@@ -32,30 +33,30 @@ const MODS: { prefix: string; stats: Partial<Stats> }[] = [
 
 /** Each effect: the word it adds to a name, what it does, and the rarity that has it, rare unless set. Combat applies them. */
 export const EFFECTS: Record<GearEffect, Flow & { prefix: string; text: string; rarity?: Rarity }> = {
-  bellows: { prefix: 'Billowing', text: 'Whenever you hit a Burning alien, apply half its Burn to each alien beside it.', reads: ['burn'], makes: ['burn'] },
-  incendiary: { prefix: 'Scorching', text: `Whenever you hit, apply 1 Burn. Your first hit each attack applies ${BURN_STACKS}.`, reads: ['shots'], makes: ['burn'], rarity: 'common' },
-  frostbite: { prefix: 'Rimed', text: 'Whenever you hit, apply 1 Chill.', reads: ['shots'], makes: ['chill'], rarity: 'common' },
+  bellows: { prefix: 'Billowing', text: 'On hit on a Burning alien, apply half its Burn to adjacent aliens.', reads: ['burn'], makes: ['burn'] },
+  incendiary: { prefix: 'Scorching', text: `On hit, apply 1 Burn. First hit: ${BURN_STACKS}.`, reads: ['shots'], makes: ['burn'], rarity: 'common' },
+  frostbite: { prefix: 'Rimed', text: 'On hit, apply 1 Chill.', reads: ['shots'], makes: ['chill'], rarity: 'common' },
   cadence: { prefix: 'Cadenced', text: `Every ${CADENCE}th shot deals double damage.`, reads: ['shots'], makes: ['overkill'], rarity: 'common' },
-  lofty: { prefix: 'Lofty', text: `Have ${100 * HIGH_CRIT}% more Crit chance per level above your target.`, makes: ['crit'], rarity: 'common' },
-  topple: { prefix: 'Toppling', text: `Whenever you knock an alien off a ledge, deal 1 damage per level. It takes 50% more damage for ${EXPOSED.turns} turns.`, reads: ['impact'] },
-  kiln: { prefix: 'Kilned', text: 'Whenever you knock an alien into something, apply 1 Burn.', reads: ['impact'], makes: ['burn'] },
-  quench: { prefix: 'Hailing', text: 'Whenever you knock an alien into something, apply 1 Chill.', reads: ['impact'], makes: ['chill'] },
-  tracer: { prefix: 'Seeking', text: 'Whenever you hit, apply 1 Mark.', reads: ['shots'], makes: ['mark'] },
+  lofty: { prefix: 'Lofty', text: `${100 * HIGH_CRIT}% more Crit chance per level above the target.`, makes: ['crit'], rarity: 'common' },
+  topple: { prefix: 'Toppling', text: `Knockback off a ledge: deal 1 damage per level. It takes 50% more damage for ${EXPOSED.turns} turns.`, reads: ['impact'] },
+  kiln: { prefix: 'Kilned', text: 'Impact: apply 1 Burn.', reads: ['impact'], makes: ['burn'] },
+  quench: { prefix: 'Hailing', text: 'Impact: apply 1 Chill.', reads: ['impact'], makes: ['chill'] },
+  tracer: { prefix: 'Seeking', text: 'On hit, apply 1 Mark.', reads: ['shots'], makes: ['mark'] },
   piercing: { prefix: 'Piercing', text: 'Ignore Armor.' },
-  vampiric: { prefix: 'Leeching', text: `Whenever you hit, heal 1, up to ${TUNING.healCap} each battle.`, reads: ['shots'] },
+  vampiric: { prefix: 'Leeching', text: `On hit, heal 1, up to ${TUNING.healCap} each battle.`, reads: ['shots'] },
   executioner: { prefix: 'Merciless', text: `Deal ${EXECUTE_BONUS} more damage to aliens at half HP or less.`, makes: ['overkill'] },
-  chain: { prefix: 'Frenzied', text: 'Whenever you kill an alien, attack again.', reads: ['kill'], rarity: 'epic' },
-  ricochet: { prefix: 'Ricocheting', text: 'Whenever you hit, deal half the damage to the nearest alien within 3 tiles of the target.', rarity: 'epic' },
-  arc: { prefix: 'Arcing', text: 'Whenever you Crit, deal half the damage to the nearest alien within 3 tiles, then to 1 more.', reads: ['crit'], rarity: 'epic' },
-  volatile: { prefix: 'Volatile', text: `Whenever you kill an alien, deal the damage past its HP, at least ${VOLATILE_DAMAGE}, to each alien beside it.`, reads: ['overkill'], rarity: 'epic' },
-  thunder: { prefix: 'Thundering', text: 'Knock the target back 1 tile. If it hits something, deal 1 damage to both.', makes: ['moved', 'impact'], rarity: 'epic' },
-  snare: { prefix: 'Snaring', text: 'Apply Root.' },
-  booming: { prefix: 'Booming', text: 'Whenever you hit, the target takes 3 damage the next time it moves.', reads: ['moved'], rarity: 'epic' },
-  shove: { prefix: 'Shoving', text: 'Knock the target back 1 tile, into whatever stops it.', makes: ['moved', 'impact'] },
-  tether: { prefix: 'Tethered', text: 'Pull the target 1 tile closer.', makes: ['moved'] },
-  twinned: { prefix: 'Twinned', text: 'If this weapon fires 2 or more shots, fire 1 more.', makes: ['shots'] },
-  braced: { prefix: 'Bracing', text: `Whenever you hit, gain 1 Armor, up to ${GUARD_MAX} above your own.`, reads: ['shots'], makes: ['armor'] },
-  sapping: { prefix: 'Sapping', text: 'Whenever you hit, apply Weak.', reads: ['shots'], rarity: 'common' },
+  chain: { prefix: 'Frenzied', text: 'On kill, attack again.', reads: ['kill'], rarity: 'epic' },
+  ricochet: { prefix: 'Ricocheting', text: 'On hit, half the damage hits the nearest alien within 3 tiles of the target.', rarity: 'epic' },
+  arc: { prefix: 'Arcing', text: 'On Crit, half the damage arcs to the nearest alien within 3 tiles, then 1 more.', reads: ['crit'], rarity: 'epic' },
+  volatile: { prefix: 'Volatile', text: `On kill, deal the damage past its HP, at least ${VOLATILE_DAMAGE}, to adjacent aliens.`, reads: ['overkill'], rarity: 'epic' },
+  thunder: { prefix: 'Thundering', text: `On hit, Knockback 1. Impact: deal ${SLAM_DAMAGE} damage to both.`, makes: ['moved', 'impact'], rarity: 'epic' },
+  snare: { prefix: 'Snaring', text: 'On hit, Root.' },
+  booming: { prefix: 'Booming', text: 'On hit, the target takes 3 damage when it next moves.', reads: ['moved'], rarity: 'epic' },
+  shove: { prefix: 'Shoving', text: 'On hit, Knockback 1.', makes: ['moved', 'impact'] },
+  tether: { prefix: 'Tethered', text: 'On hit, Pull 1.', makes: ['moved'] },
+  twinned: { prefix: 'Twinned', text: 'With 2+ shots, fire 1 more.', makes: ['shots'] },
+  braced: { prefix: 'Bracing', text: `On hit, gain 1 Armor, up to ${GUARD_MAX} above base.`, reads: ['shots'], makes: ['armor'] },
+  sapping: { prefix: 'Sapping', text: 'On hit, apply Weak.', reads: ['shots'], rarity: 'common' },
 }
 
 /** The weapon a hero starts with: any, with nothing added. */

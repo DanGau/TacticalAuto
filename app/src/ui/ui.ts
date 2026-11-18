@@ -14,7 +14,7 @@ import { CHALLENGES } from '../core/challenges'
 import { type Battle } from '../core/battle'
 import { HOLD_ROUNDS } from '../core/goals'
 import { missionOrder, THREATS } from '../core/objectives'
-import { button, STOP_NAMES } from './html'
+import { button, describe, STOP_NAMES } from './html'
 import { boonName, boonText, UTILITIES, type UtilityId } from '../core/utilities'
 import { boonIcon } from './boon-icons'
 import { ARENA_KINDS, scouted } from '../core/arena-kinds'
@@ -66,7 +66,7 @@ function drop(run: Run, battle: Battle, armed: string | null): string {
 function groundOf(run: Run, battle: Battle): string {
   const ground = ARENA_KINDS[battle.arenaKind]
   const yours = ground.reads.filter((q) => makes(run).includes(q)).map((q) => `${QUANTITIES[q].icon} ${QUANTITIES[q].name}`)
-  return `<h2 class="challenge ground" title="${ground.text}">${ground.icon} ${ground.name}</h2><p class="ground-text">${ground.text}${yours.length > 0 ? ` <b>Your ${yours.join(' and ')} pays here.</b>` : ''}</p>`
+  return `<h2 class="challenge ground" title="${ground.text}">${ground.icon} ${ground.name}</h2><p class="ground-text">${describe(ground.text, { reads: ground.reads })}${yours.length > 0 ? ` <b>${yours.join(' and ')} pays here.</b>` : ''}</p>`
 }
 
 /** What a boon held does for this battle: answers the ground, its challenge, both, or neither. */

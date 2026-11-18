@@ -41,7 +41,7 @@ test('each mark and column tells its exact numbers', () => {
   const { tally } = run.log[0]
   const [damage, tanked] = heroMarks({ name: run.hero.name, cls: run.hero.cls, tally })
   expect(damage.marks[0].value).toBe(tally.dealt)
-  expect(tanked.marks[0].tip.join(' ')).toContain(`${tally.taken} to health, ${tally.blocked} to armor`)
+  expect(tanked.marks[0].tip.join(' ')).toContain(`${tally.taken} to health, ${tally.blocked} to Armor`)
   const cols = battleColumns(run)
   run.log.forEach((f, i) => {
     expect(cols[i].up.map((m) => m.value)).toEqual([f.tally.dealt])

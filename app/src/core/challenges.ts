@@ -3,6 +3,7 @@ import type { AlienKind } from './aliens'
 import type { Stats } from './battle'
 import type { Goal } from './goals'
 import { randomInt } from './rng'
+import { MIRE_COST } from './grid'
 import { amountOf, type UtilityId } from './utilities'
 
 /** What a battle tests. It shapes the ground and the aliens, and shows on the Flight map and the deploy screen. */
@@ -13,13 +14,13 @@ export type ChallengeId = 'slog' | 'firingLine' | 'ironWall' | 'swarm' | 'scatte
  * `grim`: the alien force, by leg and then by rung, each rung harder; the hub reads the last leg's.
  */
 export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test: string; answers: UtilityId[]; volley?: true; grim: number[][] }> = {
-  slog: { name: 'Slog', icon: '🌿', test: 'Small groups of shooters across a swamp fire from the start. Mire costs 3 times the move to cross.', answers: ['hoverPack', 'longshot', 'deflector', 'afterburner', 'regen'], volley: true, grim: [[2, 3, 4], [3, 4, 6], [5, 7, 8]] },
-  firingLine: { name: 'Firing Line', icon: '🎯', test: 'Long-range shooters along a ridge fire from the moment you land.', answers: ['deflector', 'longshot', 'suppression', 'plating'], volley: true, grim: [[2, 3, 4], [3, 5, 6], [6, 7, 9]] },
-  ironWall: { name: 'Iron Wall', icon: '🧱', test: 'Aliens with heavy Armor shrug off small hits.', answers: ['plasma', 'hollowPoint', 'overcharge', 'concussion'], grim: [[2, 3, 4], [4, 6, 8], [7, 9, 11]] },
-  swarm: { name: 'Swarm', icon: '🐜', test: 'Aliens flood in from every side and keep coming.', answers: ['ablative', 'riot', 'gauntlet', 'incendiary', 'leech'], grim: [[8, 12, 16], [14, 18, 22], [20, 24, 30]] },
-  scattered: { name: 'Scattered', icon: '🗺️', test: 'Sentries stand far apart. When the clock runs out, reinforcements pour in.', answers: ['afterburner', 'hoverPack', 'jumpJets'], grim: [[8, 12, 16], [12, 16, 20], [16, 20, 24]] },
-  bigOne: { name: 'Big One', icon: '👹', test: 'A huge alien with heavy Armor, and its escort.', answers: ['plasma', 'tracer', 'overcharge', 'nanoweave'], grim: [[1, 1, 2], [2, 3, 3], [3, 4, 5]] },
-  killBox: { name: 'Kill Box', icon: '💥', test: 'You land beside a packed cluster of aliens that strikes first.', answers: ['riot', 'ablative', 'nanoweave', 'plating', 'bracing'], grim: [[3, 5, 6], [6, 8, 10], [9, 12, 15]] },
+  slog: { name: 'Slog', icon: '🌿', test: `Small groups of shooters across a swamp fire from the start. Mire costs ${MIRE_COST + 1}× move.`, answers: ['hoverPack', 'longshot', 'deflector', 'afterburner', 'regen'], volley: true, grim: [[2, 3, 4], [3, 4, 6], [5, 7, 8]] },
+  firingLine: { name: 'Firing Line', icon: '🎯', test: 'Long-range shooters on a ridge fire from the start.', answers: ['deflector', 'longshot', 'suppression', 'plating'], volley: true, grim: [[2, 3, 4], [3, 5, 6], [6, 7, 9]] },
+  ironWall: { name: 'Iron Wall', icon: '🧱', test: 'Heavy Armor shrugs off small hits.', answers: ['plasma', 'hollowPoint', 'overcharge', 'concussion'], grim: [[2, 3, 4], [4, 6, 8], [7, 9, 11]] },
+  swarm: { name: 'Swarm', icon: '🐜', test: 'Aliens flood in from every side.', answers: ['ablative', 'riot', 'gauntlet', 'incendiary', 'leech'], grim: [[8, 12, 16], [14, 18, 22], [20, 24, 30]] },
+  scattered: { name: 'Scattered', icon: '🗺️', test: 'Sentries stand far apart. When the clock runs out, reinforcements arrive.', answers: ['afterburner', 'hoverPack', 'jumpJets'], grim: [[8, 12, 16], [12, 16, 20], [16, 20, 24]] },
+  bigOne: { name: 'Big One', icon: '👹', test: 'A huge alien with heavy Armor, and escorts.', answers: ['plasma', 'tracer', 'overcharge', 'nanoweave'], grim: [[1, 1, 2], [2, 3, 3], [3, 4, 5]] },
+  killBox: { name: 'Kill Box', icon: '💥', test: 'Land adjacent to a packed cluster that strikes first.', answers: ['riot', 'ablative', 'nanoweave', 'plating', 'bracing'], grim: [[3, 5, 6], [6, 8, 10], [9, 12, 15]] },
 }
 
 /** The challenges the hero meets, by leg and rung: harder ones arrive up each tier. */

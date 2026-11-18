@@ -21,7 +21,7 @@ type Row = { name: string; cls: Run['hero']['cls']; tally: Pick<Tally, 'dealt' |
 /** Each stat charted: its name, its value, and how it reads in a tip. */
 const METRICS: [string, (t: Row['tally']) => number, (t: Row['tally']) => string][] = [
   ['Damage', (t) => t.dealt, (t) => `${t.dealt} damage dealt`],
-  ['Tanked', (t) => t.taken + t.blocked, (t) => `${t.taken + t.blocked} tanked: ${t.taken} to health, ${t.blocked} to armor`],
+  ['Tanked', (t) => t.taken + t.blocked, (t) => `${t.taken + t.blocked} tanked: ${t.taken} to health, ${t.blocked} to Armor`],
   ['Kills', (t) => t.kills, (t) => `${t.kills} kills`],
   ['Healed', (t) => t.healed, (t) => `${t.healed} healed`],
 ]

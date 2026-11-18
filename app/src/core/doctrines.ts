@@ -39,12 +39,12 @@ export const KILL_REWARDS: Effect[] = ['feast', 'momentum', 'bloodRite', 'bloodb
 export const FORTIFIED_SOAK = 1
 
 const doctrines = {
-  exosuits: { name: 'Power Armor', text: 'Have 3 more Armor and 1 less move.', stats: { armor: 3, move: -1 } },
-  fortified: { name: 'Iron Skin', text: "Every hit, yours and the aliens', deals 1 less damage, down to 1.", rule: 'fortified' },
-  scatterguns: { name: 'Brawlers', text: 'Deal 2 more damage. Have 2 less range.', stats: { damage: 2, range: -2 }, weapon: true },
+  exosuits: { name: 'Power Armor', text: '3 more Armor. 1 less move.', stats: { armor: 3, move: -1 } },
+  fortified: { name: 'Iron Skin', text: 'All hits deal 1 less damage, down to 1.', rule: 'fortified' },
+  scatterguns: { name: 'Brawlers', text: 'Deal 2 more damage. 2 less range.', stats: { damage: 2, range: -2 }, weapon: true },
   blades: {
     name: 'Blademasters',
-    text: `Fight with a sword: range 1, 2 more move and a dash to strike. Hits on you from beyond arm's reach deal ${PARRY_SOAK} less damage.`,
+    text: `Fight with a sword: range 1, 2 more move, a dash to strike. Take ${PARRY_SOAK} less damage from ranged hits.`,
     stats: { move: 2 },
     set: { range: 1 },
     fights: 'sword',
@@ -54,7 +54,7 @@ const doctrines = {
   },
   psionics: {
     name: 'Psi Awakened',
-    text: 'Attack with your mind at range 6, through walls, any alien whose cluster is revealed. Ignore Armor. Deal 1 less damage.',
+    text: 'Attack revealed aliens at range 6, through walls. Ignore Armor. Deal 1 less damage.',
     stats: { damage: -1 },
     set: { range: 6 },
     effect: 'psionic',
@@ -62,17 +62,17 @@ const doctrines = {
   },
   demolitions: {
     name: 'Wreckers',
-    text: 'Deal 1 more damage. Have 1 less range. Your hits destroy the objects around the target.',
+    text: 'Deal 1 more damage. 1 less range. Hits destroy objects around the target.',
     stats: { damage: 1, range: -1 },
     effect: 'demolish',
     weapon: true,
   },
   reckoning: {
     name: "Executioner's Oath",
-    text: `Kills give you no heal, Armor, Might, extra attack or experience. Every ${RECKONING_KILLS}rd kill each battle, gain 1 Might.`,
+    text: `Kills give no heal, Armor, Might, extra attack or XP. Every ${RECKONING_KILLS}rd kill each battle, gain 1 Might.`,
     rule: 'reckoning',
   },
-  gunslingers: { name: 'Gunslingers', text: 'Deal 1 less damage. Have 2 less range. Attack 1 more time each turn.', stats: { damage: -1, range: -2 }, effect: 'twin', weapon: true },
+  gunslingers: { name: 'Gunslingers', text: 'Deal 1 less damage. 2 less range. Attack 1 more time each turn.', stats: { damage: -1, range: -2 }, effect: 'twin', weapon: true },
 } satisfies Record<string, Doctrine>
 
 export type DoctrineId = keyof typeof doctrines

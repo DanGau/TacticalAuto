@@ -53,8 +53,8 @@ export const UTILITIES: Record<UtilityId, Kind> = {
   plating: { name: 'Kinetic Plating', category: 'mitigation', lends: [], adds: { to: 'armor', by: [3, 5, 7] }, makes: ['armor'] },
   bracing: { name: 'Reactive Bracing', category: 'mitigation', ...gear('braced'), adds: { to: 'armor', by: [0, 2, 4] } },
   ablative: { name: 'Ablative Field', category: 'mitigation', lends: [], adds: { to: 'guard', by: [1, 2, 3] } },
-  deflector: { name: 'Deflector Screen', category: 'mitigation', lends: ['rangedShield'], text: "Hits on you from beyond arm's reach deal half damage, rounded up.", adds: { to: 'armor', by: [0, 2, 4] } },
-  riot: { name: 'Riot Shield', category: 'mitigation', lends: ['meleeShield'], text: "Hits and blasts on you from arm's reach deal half damage, rounded up.", adds: { to: 'armor', by: [0, 2, 4] } },
+  deflector: { name: 'Deflector Screen', category: 'mitigation', lends: ['rangedShield'], text: "Take half damage from ranged hits, rounded up.", adds: { to: 'armor', by: [0, 2, 4] } },
+  riot: { name: 'Riot Shield', category: 'mitigation', lends: ['meleeShield'], text: "Take half damage from melee hits and blasts, rounded up.", adds: { to: 'armor', by: [0, 2, 4] } },
   afterburner: { name: 'Afterburners', category: 'speed', lends: [], adds: { to: 'move', by: [2, 3, 4] } },
   hoverPack: { name: 'Hover Pack', category: 'speed', lends: ['hover'], text: 'Cross mire, cliffs and steep ground at no extra cost. Float over chasms and water.', adds: { to: 'move', by: [0, 1, 2] } },
   gravBoots: { name: 'Grav Boots', category: 'jump height', ...gear('lofty'), adds: { to: 'jump', by: [1, 2, 3] } },
@@ -74,18 +74,18 @@ export const amountOf = (id: UtilityId, level: number) => UTILITIES[id].adds.by[
 
 /** What each stat or rider's amount reads as. */
 const ADDS: Record<keyof Stats | Rider, (n: number) => string> = {
-  hp: (n) => `Have ${n} more max HP.`,
+  hp: (n) => `${n} more max HP.`,
   armor: (n) => `Gain ${n} Armor.`,
   damage: (n) => `Deal ${n} more damage.`,
-  range: (n) => `Have ${n} more range.`,
-  move: (n) => `Have ${n} more move.`,
-  crit: (n) => `Have ${Math.round(n * 100)}% more Crit chance.`,
-  strength: (n) => `Have ${n} more strength.`,
-  jump: (n) => `Leap ${n} more levels up or down a ledge.`,
-  span: (n) => `Leap gaps of void or water ${n} more tiles wide.`,
-  guard: (n) => `Take ${n} less damage from each hit, down to 1.`,
-  regen: (n) => `At the start of your turn, heal ${n}.`,
-  push: (n) => `Whenever you hit an alien, Displace it ${n} tiles back. Off a ledge or the edge, it falls.`,
+  range: (n) => `${n} more range.`,
+  move: (n) => `${n} more move.`,
+  crit: (n) => `${Math.round(n * 100)}% more Crit chance.`,
+  strength: (n) => `${n} more strength.`,
+  jump: (n) => `Leap ${n} more levels up or down.`,
+  span: (n) => `Leap gaps ${n} more tiles wide.`,
+  guard: (n) => `Take ${n} less damage per hit, down to 1.`,
+  regen: (n) => `Start of turn: heal ${n}.`,
+  push: (n) => `On hit, Knockback ${n}.`,
 }
 
 /** What boon `id` does at `level`. */

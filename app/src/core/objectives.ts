@@ -12,15 +12,15 @@ const GOAL_ORDERS: Record<Goal, string> = {
   ambush: 'Survive the hunt',
 }
 
-/** What a challenge throws at the hero, and how to meet it. */
+/** What a challenge throws at the hero. Its answers are the boons CHALLENGES names. */
 export const THREATS: Record<ChallengeId, string> = {
-  slog: 'Swamp, foes scattered. Levitate, shield or reach.',
-  firingLine: 'Snipers. Mist, shield or dampener.',
-  ironWall: 'Heavy armor. Sunder, overcharge or fire.',
-  swarm: 'Swarm. Shield, tank, cold or gravity.',
-  scattered: 'Scattered sentries, on a clock. Swiftness or reach.',
-  bigOne: 'Armored giant. Overcharge, sunder or mark.',
-  killBox: 'Hot landing. Flash, mist, shield or dampener.',
+  slog: 'Swamp, shooters scattered.',
+  firingLine: 'Snipers on a ridge.',
+  ironWall: 'Heavy Armor.',
+  swarm: 'Swarm.',
+  scattered: 'Scattered sentries, on a clock.',
+  bigOne: 'Armored giant.',
+  killBox: 'Hot landing.',
 }
 
 /** The hero's order at a battle: a key storms the satellite, the final takes the hub; a crossing a Big One guards fells it. */

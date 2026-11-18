@@ -50,7 +50,7 @@ function census(run: Run, kinds: AlienKind[]): string {
 }
 
 /** What a safehouse does, told on its icon and card. */
-const SAFEHOUSE = 'your hero heals fully, in place of a fight'
+const SAFEHOUSE = 'heal to full instead of fighting'
 
 const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '📦', cache: '🎁', shop: '🛒', safehouse: '🏠', unknown: '❓', key: '⭐', final: '👁️' }
 
@@ -168,7 +168,7 @@ function where(run: Run, stop: Stop): string {
   const order = `<b title="${GOALS[stop.goal].text}">${objective(stop.kind, stop.goal, stop.challenge)}</b>`
   const extras = stop.kind === 'battle' ? ` · ${RISKS[stop.risk].name}${stop.twist ? ` · <span title="${TWISTS[stop.twist].text}">${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}</span>` : ''}` : ''
   const ground = stop.ground && ARENA_KINDS[stop.ground]
-  const land = ground ? `<br><span class="ground" title="${ground.text}">${ground.icon} ${ground.name}${stop.region ? ` · ${REGIONS[stop.region].name}` : ''}</span>: ${ground.text}` : ''
+  const land = ground ? `<br><span class="ground" title="${ground.text}">${ground.icon} ${ground.name}${stop.region ? ` · ${REGIONS[stop.region].name}` : ''}</span>: ${describe(ground.text, { reads: ground.reads })}` : ''
   return `${order}${extras}${land}<br>${readChallenge(run, stop)}`
 }
 
@@ -192,7 +192,7 @@ function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
       spent: sold,
     }),
   )
-  const medkit: Pick = { key: 'm', action: { type: 'medkit' }, look: 'medkit', body: card('medkit', '✚ Medkit', `${MEDKIT.price} supplies`, shop.medkit), detail: `<p><b>Medkit.</b> Heal ${MEDKIT.heal}, once. A safehouse heals you fully.</p>`, go: `Tap again to pay ${MEDKIT.price} supplies`, block: wounded(run) ? poor(MEDKIT.price) : 'Full health', spent: shop.medkit }
+  const medkit: Pick = { key: 'm', action: { type: 'medkit' }, look: 'medkit', body: card('medkit', '✚ Medkit', `${MEDKIT.price} supplies`, shop.medkit), detail: `<p><b>Medkit.</b> Heal ${MEDKIT.heal}. Single use. A safehouse heals to full.</p>`, go: `Tap again to pay ${MEDKIT.price} supplies`, block: wounded(run) ? poor(MEDKIT.price) : 'Full health', spent: shop.medkit }
   return [{ name: 'Weapons', picks: gear }, { name: 'Relics', picks: relics }, { name: 'Boons and the medkit', picks: [...utilities, medkit] }]
 }
 

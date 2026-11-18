@@ -12,8 +12,8 @@ export const REGROWTH = { turn: 0.1, most: 0.6 }
 
 /** `answers`: the quantities whose makers pass it, each a different line. */
 export const EXAMS: Record<Exam, { name: string; icon: string; text: string; answer: string; answers: Quantity[] }> = {
-  plates: { name: 'Plated', icon: '🪨', text: `Hits under ${PLATES_UNDER} damage deal half. Slams and falls deal full damage.`, answer: 'Overkill, Mark, or Impact', answers: ['overkill', 'mark', 'impact'] },
-  regrowth: { name: 'Regrowth', icon: '🧬', text: `At the start of its turn, unless it has Burn or Chill, it heals ${100 * REGROWTH.turn}% of its max HP, up to ${100 * REGROWTH.most}% each battle.`, answer: 'Burn, Chill, or many shots', answers: ['burn', 'chill', 'shots'] },
-  rampage: { name: 'Rampager', icon: '😡', text: 'At the start of its turn, unless Displaced since its last, it gains 1 Might.', answer: 'Displace, Chill, or Armor', answers: ['moved', 'chill', 'armor'] },
-  thorns: { name: 'Thorned', icon: '🌵', text: 'Whenever a hit lands on it, deal 1 damage to the attacker. Slams and falls do not count.', answer: 'Armor, Impact, or few big hits', answers: ['armor', 'impact', 'overkill'] },
+  plates: { name: 'Plated', icon: '🪨', text: `Hits under ${PLATES_UNDER} damage deal half. Impacts and falls deal full.`, answer: 'Overkill, Mark, or Impact', answers: ['overkill', 'mark', 'impact'] },
+  regrowth: { name: 'Regrowth', icon: '🧬', text: `Start of turn: unless Burning or Chilled, heal ${100 * REGROWTH.turn}% max HP, up to ${100 * REGROWTH.most}% a battle.`, answer: 'Burn, Chill, or many shots', answers: ['burn', 'chill', 'shots'] },
+  rampage: { name: 'Rampager', icon: '😡', text: 'Start of turn: unless Displaced since its last, gain 1 Might.', answer: 'Displace, Chill, or Armor', answers: ['moved', 'chill', 'armor'] },
+  thorns: { name: 'Thorned', icon: '🌵', text: 'Thorns 1. Impacts and falls do not trigger it.', answer: 'Armor, Impact, or few big hits', answers: ['armor', 'impact', 'overkill'] },
 }

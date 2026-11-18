@@ -19,13 +19,13 @@ export interface Secondary {
 
 const secondaries = {
   sidearm: { name: 'Sidearm', range: 5, damage: 0 },
-  frag: { name: 'Force Burst', range: 6, damage: -1, effect: 'splash', text: `Deal ${FRAG_SPLASH} damage to each alien beside the target and Displace it 1 tile away.` },
-  slug: { name: 'Kinetic Blast', range: 5, damage: 0, effect: 'knock', text: `Displace the target ${KNOCK_TILES} tiles back.` },
+  frag: { name: 'Force Burst', range: 6, damage: -1, effect: 'splash', text: `Deal ${FRAG_SPLASH} damage to aliens adjacent to the target. Displace them 1 tile away.` },
+  slug: { name: 'Kinetic Blast', range: 5, damage: 0, effect: 'knock', text: `Knockback ${KNOCK_TILES}.` },
   pistol: { name: 'Trick Shot', range: 10, damage: 0 },
   flare: { name: 'Guiding Bolt', range: 5, damage: -1, effect: 'mark', text: 'Apply 1 Mark.' },
   shockCoil: { name: 'Shock Coil', range: 5, damage: 0, effect: 'suppress', text: 'Apply Weak.' },
   flameBurst: { name: 'Fire Bolt', range: 4, damage: -1, effect: 'burn', text: `Apply ${BURN_STACKS} Burn.` },
-  iceShard: { name: 'Ray of Frost', range: 7, damage: -1, effect: 'root', text: 'Apply Root.' },
+  iceShard: { name: 'Ray of Frost', range: 7, damage: -1, effect: 'root', text: 'Root.' },
   knives: { name: 'Spectral Blades', range: 4, damage: 1, effect: 'pierce', text: 'Ignore Armor.' },
 } satisfies Record<string, Secondary>
 

@@ -44,7 +44,7 @@ export const STOP_NAMES: Record<StopKind | Mission["kind"], string> = {
 
 /** A soldier's health as a red bar and a count, and the armor it starts each fight with as a yellow bar after it. */
 export const healthBar = (hp: number, max: number, armor = 0) =>
-  `<div class="health" title="${hp} of ${max} HP${armor > 0 ? `. ${armor} Armor: takes damage before HP, restored at the start of each battle` : ""}">♥ ${hp}/${max}${armor > 0 ? ` <span class="armor">⛨ ${armor}</span>` : ""}<div class="bar"><div style="width: ${(100 * hp) / (max + armor)}%"></div><div class="armor" style="left: ${(100 * max) / (max + armor)}%; width: ${(100 * armor) / (max + armor)}%"></div></div></div>`;
+  `<div class="health" title="${hp} of ${max} HP${armor > 0 ? `. ${armor} Armor: ${QUANTITIES.armor.text}` : ""}">♥ ${hp}/${max}${armor > 0 ? ` <span class="armor">⛨ ${armor}</span>` : ""}<div class="bar"><div style="width: ${(100 * hp) / (max + armor)}%"></div><div class="armor" style="left: ${(100 * max) / (max + armor)}%; width: ${(100 * armor) / (max + armor)}%"></div></div></div>`;
 
 const BADGES: Record<ClassId, string> = {
   assault: "⚔️",
@@ -63,7 +63,7 @@ export const badge = (cls?: ClassId | null) => (cls ? BADGES[cls] : "🦸");
 /** The threat bar. `landed` is how much of the newest threat animates in. */
 export function threatBar(threat: number, landed = 0): string {
   const pct = (n: number) => `${(100 * n) / THREAT_MAX}%`;
-  const meter = `<span class="threat" title="The hunt. As it fills, each battle has up to ${Math.round(100 * TUNING.hunt)}% more aliens. When full, the aliens ambush you."><i style="width:${pct(threat - landed)}"></i><i class="landed" style="width:${pct(landed)}"></i></span>`;
+  const meter = `<span class="threat" title="The hunt. As it fills, up to ${Math.round(100 * TUNING.hunt)}% more aliens per battle. Full: an ambush."><i style="width:${pct(threat - landed)}"></i><i class="landed" style="width:${pct(landed)}"></i></span>`;
   return `${meter}${threat === THREAT_MAX ? '<b class="up">Ambush next</b>' : ""}`;
 }
 
@@ -110,7 +110,7 @@ export function gearText(gear: Gear): string {
 }
 
 const kitText = (kit: Kit) =>
-  `${kit.shots} × ${Math.round(100 * kit.power)}% damage${kit.power > 1 ? ` of the first ${BASE_STATS.damage}, 1 more per point past` : ""}${kit.wide ? `, ${Math.round(100 * kit.wide)}% splash beside` : ""}${kit.range ? `, range ${kit.range}` : ""}`;
+  `${kit.shots} × ${Math.round(100 * kit.power)}% damage${kit.power > 1 ? ` of the first ${BASE_STATS.damage}, 1 more per point past` : ""}${kit.wide ? `, ${Math.round(100 * kit.wide)}% splash to adjacent` : ""}${kit.range ? `, range ${kit.range}` : ""}`;
 
 /** A piece of gear's numbers: its weapon's attacks and stat changes, then its mod's. */
 export function gearStats(gear: Gear): string[] {
@@ -172,13 +172,14 @@ const INFLECTIONS: Record<string, string[]> = {
   Displace: ["Displaced", "Displacing", "Displaces"],
   Crit: ["Crits"],
   Kill: ["Kills"],
-  Root: ["Rooted"],
+  Root: ["Rooted", "Roots"],
   Stun: ["Stunned"],
   Panic: ["Panicked"],
   Surprise: ["Surprised"],
   Cloak: ["Cloaked"],
   Thaw: ["Thaws", "Thawed"],
   Quench: ["Quenched"],
+  Impact: ["Impacts"],
 };
 /** Every keyword word to the glossary name it stands for. */
 const KEYWORD_OF = new Map<string, string>(

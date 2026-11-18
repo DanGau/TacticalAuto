@@ -147,7 +147,7 @@ const encounters = {
     options: [
       {
         quip: 'Fill in the form. Leave "previous experience" blank.',
-        text: 'Change to a random other class. Lose your powers. Gain 1 level.',
+        text: 'Become a random other class. Lose your powers. Gain 1 level.',
         take: (run) => {
           const cls = pick(run, (Object.keys(CLASSES) as ClassId[]).filter((id) => id !== run.hero.cls))
           run.hero.cls = cls
@@ -165,7 +165,7 @@ const encounters = {
     options: [
       {
         quip: '"Surprise us." He claps, delighted, which is worrying.',
-        text: 'Trade a random relic you hold for a random new relic.',
+        text: 'Swap a random relic for a new random relic.',
         can: (run) => run.relics.length > 0 && unheld(run).length > 0,
         take: (run) => {
           // What is given up is gone before the new one is drawn, so the new one needs no relic given up.
@@ -191,13 +191,13 @@ const encounters = {
     options: [
       {
         quip: '"I am very tough." Squeak, goes your boot.',
-        text: 'Each stop ahead of you becomes an Overrun battle.',
+        text: 'Every stop ahead becomes Overrun.',
         can: (run) => ahead(run),
         take: (run) => {
           for (const i of current(run)!.next) legOf(run).columns[run.stop + 1][i].stop = drawBattle(run, 'dangerous', { ...run, stop: run.stop + 1 })
         },
       },
-      { quip: 'Hand it over. The sofa was a nice touch.', text: 'Lose all your supplies.', take: (run) => (run.supplies = 0) },
+      { quip: 'Hand it over. The sofa was a nice touch.', text: 'Lose all supplies.', take: (run) => (run.supplies = 0) },
     ],
   },
   fightPit: {

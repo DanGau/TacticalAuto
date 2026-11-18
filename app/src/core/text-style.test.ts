@@ -17,6 +17,10 @@ import { SKILLS } from './skills'
 import { TWISTS } from './twists'
 import { boonText, UTILITY_IDS, UTILITIES } from './utilities'
 import { WEAPONS } from './weapons'
+import { ALIENS } from './aliens'
+import { ARENA_KINDS } from './arena-kinds'
+import { QUANTITIES, RESISTS, type Resist } from './quantities'
+import { describe } from '../ui/html'
 
 /** What each effect text says, by where it comes from. */
 const effects: [string, string][] = [
@@ -36,6 +40,10 @@ const effects: [string, string][] = [
   ...Object.values(EXAMS).map((e): [string, string] => [e.name, e.text]),
   ...Object.values(FEATS).map((f): [string, string] => [f.name, f.text]),
   ...Object.entries(KEYWORDS).map(([name, k]): [string, string] => [name, k.text]),
+  ...Object.values(WEAPONS).flatMap((w): [string, string][] => (w.special ? [[w.name, w.special]] : [])),
+  ...Object.values(ALIENS).map((a): [string, string] => [a.name, a.text]),
+  ...Object.values(ARENA_KINDS).map((k): [string, string] => [k.name, k.text]),
+  ...Object.entries(RESISTS).map(([q, text]): [string, string] => [QUANTITIES[q as Resist].name, text]),
 ]
 
 const names = [
@@ -44,13 +52,13 @@ const names = [
   ...Object.values(EVENTS).map((e) => e.name),
 ]
 
-/** Keywords text names only capitalized; kill, shots and hurt read as plain words. */
+/** Keywords by the lowercase forms text must not use: those words read as the keyword, so always capitalized. */
 const KEYWORD_FORMS: Record<string, string> = {
   Burn: 'burn|burns|burning|burned',
   Chill: 'chill|chills|chilled|chilling',
   Freeze: 'freeze|freezes|frozen',
   Mark: 'mark|marks|marked',
-  Displace: 'displace|displaces|displaced',
+  Displace: 'displace|displaces|displaced|displacing',
   Crit: 'crit|crits',
   Overkill: 'overkill',
   Armor: 'armor',
@@ -62,18 +70,31 @@ const KEYWORD_FORMS: Record<string, string> = {
   Panic: 'panic|panics|panicked',
   Surprise: 'surprised',
   Cloak: 'cloak|cloaks|cloaked',
+  Knockback: 'knockback|knock back|knocks back|knocked back',
+  Parry: 'parry|parries',
+  Retreat: 'retreat|retreats',
+  Consume: 'consume|consumes|consumed|consuming',
+  Thorns: 'thorns',
+  Impact: 'impact',
 }
 
-/** Hedges, lore and ways of speaking the style drops. */
-const BANNED = /\b(may|maybe|perhaps|some|somewhat|a little|a lot|harder|stronger|faster|tries to|heroes|an ally sees|one|two|three|four|five|six|seven|eight|nine|ten|twice|thrice|(once|twice) per battle)\b/i
+/** Hedges, lore, spelled numbers, and the wordy forms the terse style replaced. */
+const BANNED = /\b(may|maybe|perhaps|some|somewhat|a little|a lot|harder|stronger|faster|tries to|heroes|one|two|three|four|five|six|seven|eight|nine|ten|twice|thrice|beside|whenever you hit|whenever you kill|whenever you crit|whenever you are hit|whenever an alien hits you|at the start of your turn|at the start of each battle|times your|times the)\b/i
 
-test('every effect is whole sentences, each capitalized and ending in a full stop', () => {
+/** The longest an effect may run. */
+const MAX_LENGTH = 130
+
+test('every effect is whole sentences or fragments, each capitalized and ending in a full stop', () => {
   const bad = effects.filter(([, text]) => !/^[A-Z0-9"']/.test(text) || !/[.!]$/.test(text))
   expect(bad).toEqual([])
 })
 
-test('no effect hedges, tells lore, or spells a number', () => {
+test('no effect hedges, tells lore, spells a number, or uses a replaced form', () => {
   expect(effects.filter(([, text]) => BANNED.test(text))).toEqual([])
+})
+
+test(`no effect runs past ${MAX_LENGTH} characters`, () => {
+  expect(effects.filter(([, text]) => text.length > MAX_LENGTH)).toEqual([])
 })
 
 test('amounts are stated, never "+N"', () => {
@@ -86,6 +107,24 @@ test('keywords are capitalized and defined in the glossary', () => {
   for (const keyword of Object.keys(KEYWORD_FORMS)) expect(KEYWORDS[keyword], keyword).toBeDefined()
   const lower = new RegExp(`\\b(${Object.values(KEYWORD_FORMS).join('|')})\\b`)
   expect(effects.filter(([, text]) => lower.test(text))).toEqual([])
+})
+
+test('what text applies, gains or triggers on is a glossary keyword', () => {
+  const named = /\b(?:[Aa]pply|[Gg]ain|On) (?:\d+ )?([A-Z][a-z]+(?: HP)?)\b/g
+  // Triggers and stats that read as plain words.
+  const plain = new Set(['HP', 'Kill', 'Hit'])
+  const bad = effects.flatMap(([name, text]) => [...text.matchAll(named)].map((m) => m[1]).filter((w) => !plain.has(w) && !KEYWORDS[w]).map((w) => `${name}: ${w}`))
+  expect(bad).toEqual([])
+})
+
+test('each keyword in an effect renders bold, with its definition on hover', () => {
+  const bad = effects.filter(([, text]) => {
+    const [rich, defs = ''] = describe(text).split('<span class="defs">')
+    const bolded = [...rich.matchAll(/<b class="kwi[^>]*>[^<]*?([A-Za-z][A-Za-z ]*)<\/b>/g)].map((m) => m[1])
+    const loose = rich.replace(/<b class="kwi[^>]*>[^<]*<\/b>/g, '')
+    return Object.keys(KEYWORDS).some((k) => new RegExp(`\\b${k}\\b`).test(loose)) || (bolded.length > 0 && !defs.includes('class="def'))
+  })
+  expect(bad).toEqual([])
 })
 
 test('names are 1 to 3 words in Title Case', () => {

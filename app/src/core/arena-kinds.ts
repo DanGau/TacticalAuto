@@ -1,12 +1,12 @@
 // The ground a battle is fought over: its levels, ledges, drops, water, mire and ice, and what each pays.
-import { GRID, type Battle, type Tile } from './battle'
+import { CHILL_SLIDE, GRID, type Battle, type Tile } from './battle'
 import { CHALLENGES, type ChallengeId } from './challenges'
 import type { Quantity } from './quantities'
 import type { UtilityId } from './utilities'
 import { soften } from './levels'
 import { randomInt } from './rng'
 import { PROP_BULK, type Ground, type TerrainKind } from './terrain'
-import { NEIGHBORS, onGrid } from './grid'
+import { MIRE_COST, NEIGHBORS, onGrid } from './grid'
 import type { Twist } from './twists'
 import { REGIONS, type RegionId } from './regions'
 
@@ -23,14 +23,14 @@ export type ArenaKind = 'open' | 'skyscraper' | 'overpass' | 'quarry' | 'rift' |
  */
 export const ARENA_KINDS: Record<ArenaKind, { name: string; icon: string; text: string; answers: UtilityId[]; reads: Quantity[] }> = {
   open: { name: 'Open Ground', icon: '🌾', text: 'Gentle rises.', answers: [], reads: [] },
-  skyscraper: { name: 'Rooftops', icon: '🏙️', text: 'A long drop on every side, some behind glass. A Displaced alien falls off.', answers: ['gauntlet', 'concussion', 'gravBoots'], reads: ['moved', 'impact'] },
-  overpass: { name: 'Overpass', icon: '🛣️', text: 'A raised road down one flank. Shots from above deal 1 more damage per level.', answers: ['gravBoots', 'longshot'], reads: ['crit', 'moved'] },
-  quarry: { name: 'Quarry', icon: '⛏️', text: 'Terraces climb to the far end. Displace an alien off a terrace to hurt it.', answers: ['gravBoots', 'gauntlet', 'thermite'], reads: ['moved', 'impact'] },
-  rift: { name: 'Rift', icon: '🕳️', text: 'A rift splits the middle. A Displaced alien at its lip falls in.', answers: ['jumpJets', 'gauntlet', 'hoverPack'], reads: ['moved'] },
-  flooded: { name: 'Flooded', icon: '🌊', text: 'Canals cross the streets. An alien beside water or on ice takes 1 more Chill.', answers: ['jumpJets', 'cryo', 'cryoRams', 'hoverPack'], reads: ['chill'] },
-  marsh: { name: 'Marsh', icon: '🫧', text: 'Mire costs 3 times the move. Burn on an alien in mire sets the mire about it alight.', answers: ['incendiary', 'thermite', 'hoverPack', 'afterburner'], reads: ['burn'] },
-  mesa: { name: 'Mesa', icon: '🏜️', text: 'The far end stands on a mesa, ramps up its sides. Shots from above deal 1 more damage per level.', answers: ['gravBoots', 'longshot', 'overcharge'], reads: ['crit', 'moved'] },
-  ice: { name: 'Ice Sheet', icon: '🧊', text: 'An alien Displaced on ice slides 3 more tiles. An alien beside water or on ice takes 1 more Chill.', answers: ['cryoRams', 'gauntlet', 'cryo'], reads: ['chill', 'moved'] },
+  skyscraper: { name: 'Rooftops', icon: '🏙️', text: 'A long drop on every side, partly behind glass. Displaced aliens fall off.', answers: ['gauntlet', 'concussion', 'gravBoots'], reads: ['moved', 'impact'] },
+  overpass: { name: 'Overpass', icon: '🛣️', text: 'A raised road down a flank. Shots from above deal 1 more damage per level.', answers: ['gravBoots', 'longshot'], reads: ['crit', 'moved'] },
+  quarry: { name: 'Quarry', icon: '⛏️', text: 'Terraces climb to the far end. Displacing aliens off a terrace hurts them.', answers: ['gravBoots', 'gauntlet', 'thermite'], reads: ['moved', 'impact'] },
+  rift: { name: 'Rift', icon: '🕳️', text: 'A rift splits the middle. Displaced aliens at its lip fall in.', answers: ['jumpJets', 'gauntlet', 'hoverPack'], reads: ['moved'] },
+  flooded: { name: 'Flooded', icon: '🌊', text: 'Canals cross the streets. Aliens adjacent to water or on ice take 1 more Chill.', answers: ['jumpJets', 'cryo', 'cryoRams', 'hoverPack'], reads: ['chill'] },
+  marsh: { name: 'Marsh', icon: '🫧', text: `Mire costs ${MIRE_COST + 1}× move. A Burning alien in mire sets it alight.`, answers: ['incendiary', 'thermite', 'hoverPack', 'afterburner'], reads: ['burn'] },
+  mesa: { name: 'Mesa', icon: '🏜️', text: 'The far end stands on a mesa with ramps. Shots from above deal 1 more damage per level.', answers: ['gravBoots', 'longshot', 'overcharge'], reads: ['crit', 'moved'] },
+  ice: { name: 'Ice Sheet', icon: '🧊', text: `Knockback on ice slides ${CHILL_SLIDE} more tiles. Aliens adjacent to water or on ice take 1 more Chill.`, answers: ['cryoRams', 'gauntlet', 'cryo'], reads: ['chill', 'moved'] },
 }
 
 /** Where a region draws its ground: its signature as often as all the rest. A satellite's compound and the hive keep their own. */
