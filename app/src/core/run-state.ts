@@ -201,7 +201,7 @@ export interface Run {
   log: Fought[]
   /** What the player has yet to be told of. */
   gains: Gain[]
-  /** Boons the hero holds, at most slotsOf; each works in every battle. */
+  /** Boons the hero holds, at most slotsOf; the player activates one each battle. */
   utilities: Held[]
   /** Fights won in a row, for Unbroken Line. */
   streak: number

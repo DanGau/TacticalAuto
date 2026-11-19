@@ -32,4 +32,5 @@ Run in `app/`.
 - `npm run -s eye -- <command>` — play and screenshot the game in a headless browser. Commands: `app/eye/eye.ts`. One server and browser serve all worktrees; `eye -- stop` ends them.
 - `npm run -s eye -- play eye/gear-swap.json` — fails unless the gear swap sits centred, its cards equal, at five screen sizes.
 - `npm run -s eye -- play eye/boon-pick.json` — fails unless one click on each starting boon and NEW-swap card lands and registers, on phone, landscape phone, tablet and desktop.
+- `npm run -s eye -- play eye/activate.json` — fails unless a click on each of the 3 activate cards on the deploy screen lands and registers, on phone, landscape phone and desktop.
 - `npm run dev` — serve the game for a human. Each push to `main` also deploys it to https://dangau.github.io/TacticalAuto/.

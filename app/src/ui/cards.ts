@@ -110,7 +110,7 @@ export function startChoice(run: Run, armed: string | null): string {
     return `<button class="side ${on ? 'keep' : 'sell'}" role="checkbox" aria-checked="${on}" data-arm="${startKey(next)}"><small class="verb">${on ? 'take' : 'tap to take'}</small><span class="art">${boonIcon(id)}</span><small class="tier">${UTILITIES[id].category}</small><b>${UTILITIES[id].name}</b><span>${boonDoes(run, id)}</span></button>`
   }
   const ready = picks.length === UTILITY_SLOTS
-  return `<div class="gearswap boons"><h1>Starting boons</h1><h2>Take ${UTILITY_SLOTS}. Each works in every battle, all run.</h2>
+  return `<div class="gearswap boons"><h1>Starting boons</h1><h2>Take ${UTILITY_SLOTS}. Each battle, activate 1.</h2>
     <div class="swap" style="--n:${run.boonOffers.length}">${run.boonOffers.map(card).join('')}</div>
     <button class="decide confirm"${ready ? ` data-action='${JSON.stringify({ type: 'boons', picks })}'` : ' disabled'}>${ready ? 'Confirm' : `Pick ${UTILITY_SLOTS - picks.length} more`}</button></div>`
 }

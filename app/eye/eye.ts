@@ -158,7 +158,7 @@ const commands: Record<string, Command> = {
     }, selector)
     if (fault) throw new Error(`${page.viewportSize()?.width}x${page.viewportSize()?.height}: ${fault}`)
   },
-  /** clickable <selector>: fails unless a mouse click at the centre of each element matching lands on it and changes the page. */
+  /** clickable <selector>: fails unless a mouse click at the centre of each element matching lands on it and changes the panel it sits in. */
   async clickable(page, selector) {
     const size = `${page.viewportSize()?.width}x${page.viewportSize()?.height}`
     const count = await page.locator(selector).count()
@@ -170,13 +170,14 @@ const commands: Record<string, Command> = {
           const r = target.getBoundingClientRect()
           const [x, y] = [r.left + r.width / 2, r.top + r.height / 2]
           const top = document.elementFromPoint(x, y)
-          return { x, y, on: !!top && target.contains(top), top: top?.outerHTML.slice(0, 80), html: document.getElementById('panel')!.innerHTML }
+          const box = target.closest('#drop') ?? document.getElementById('panel')!
+          return { x, y, on: !!top && target.contains(top), top: top?.outerHTML.slice(0, 80), html: box.innerHTML, box: box.id }
         },
         [selector, String(i)],
       )
       if (!hit.on) throw new Error(`${size}: ${selector} #${i} is covered at its centre by ${hit.top}`)
       await page.mouse.click(hit.x, hit.y)
-      if ((await page.evaluate(() => document.getElementById('panel')!.innerHTML)) === hit.html) throw new Error(`${size}: clicking ${selector} #${i} changed nothing`)
+      if ((await page.evaluate((id) => document.getElementById(id)!.innerHTML, hit.box)) === hit.html) throw new Error(`${size}: clicking ${selector} #${i} changed nothing`)
     }
   },
   /** viewport <w> <h>: resizes the page, to see phone widths: for the rest of a playbook, or, run alone, for later commands too. */

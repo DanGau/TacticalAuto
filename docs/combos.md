@@ -42,7 +42,7 @@ Each ground multiplies some quantities, so a build reads the Flight map for grou
 
 ## Boons
 
-The hero holds 3, each in every battle (`core/utilities.ts`). Each raises one plain thing, its category, its own way; most lend an effect that makes or reads a quantity, so a boon feeds the build or starts a cancellation. A level raises the number; a NEW boon is slotted in for one held, or left.
+The hero holds 3 and activates 1 each battle on the deploy screen; the others sit idle (`core/utilities.ts`). Each raises one plain thing, its category, its own way; most lend an effect that makes or reads a quantity, so a boon feeds the build or starts a cancellation. A level raises the number; a NEW boon is slotted in for one held, or left.
 
 | Boon | Category | Effect, level 1 | Makes / reads |
 |---|---|---|---|

@@ -2,7 +2,7 @@
 import { land } from './landing'
 import { UTILITY_PRICE, UTILITY_SLOTS } from './utilities'
 import { arrive, MEDKIT, depart, EVENTS, RELIC_PRICE } from './events'
-import { advance, choose, current, go, nextStop, ways } from './run'
+import { activate, advance, choose, current, go, nextStop, ways } from './run'
 import { type Run } from './run-state'
 import { gainRelic, takeRelic } from './rewards'
 import { sellFind } from './rewards'
@@ -37,8 +37,8 @@ export type Action =
   | { type: 'go'; index: number }
   /** Overworld: travel to the next stop. */
   | { type: 'advance' }
-  /** Deploy phase: land, and begin. */
-  | { type: 'enter' }
+  /** Deploy phase: activate the boon held at `boon`, none with null only if none is held; land, and begin. */
+  | { type: 'enter'; boon: number | null }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
   /** Reward phase: put the find at `find` of run.finds on the hero, discarding what it replaces. */
@@ -82,6 +82,8 @@ export function apply(run: Run, action: Action): Result {
   if (action.type === 'enter') {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not entering')
+    if (action.boon === null ? run.utilities.length > 0 : !run.utilities[action.boon]) return no('activate a boon held')
+    activate(run, action.boon)
     land(battle)
     return ok
   }

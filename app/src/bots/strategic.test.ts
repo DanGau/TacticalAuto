@@ -64,3 +64,10 @@ test('the diagnosis tells what is off in the game', () => {
   expect(verdicts(of([...twelve(toll('slog', 'held', true, 40)), ...twelve(toll('slog', 'none', true, 30))]))).toContainEqual(expect.stringMatching(/^GAME: the answer to Slog/))
   expect(verdicts(of([...twelve(toll('slog', 'held', true, 10)), ...twelve(toll('slog', 'none', false, 60))]))).toEqual([])
 })
+
+test.each(Object.keys(CHALLENGES) as ChallengeId[])('at a %s, the strategic bot activates its best answer held, not a decoy', (challenge) => {
+  const [answer] = CHALLENGES[challenge].answers
+  const decoys = (['nanoweave', 'longshot', 'plasma', 'ablative'] as const).filter((id) => !CHALLENGES[challenge].answers.includes(id)).slice(0, 2)
+  const run = deploying(challenge, [...decoys, answer].map((id) => ({ id, level: 1 })))
+  expect(strategic(run, { rng: 1 })).toEqual({ type: 'enter', boon: 2 })
+})

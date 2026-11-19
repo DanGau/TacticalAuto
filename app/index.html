@@ -393,7 +393,11 @@
     .loadout-slot svg { width: 26px; height: 26px; }
     .loadout-slot.answers { border-color: #6fe08c; box-shadow: 0 0 8px #6fe08c44; }
     .loadout-slot small { color: #6fe08c; font-size: 11px; }
-    .loadout-slot.empty { border-style: dashed; color: #6a7488; justify-content: center; }
+    .loadout-slot { color: inherit; font: inherit; font-size: 13px; cursor: pointer; justify-content: flex-start; }
+    .loadout-slot span { font-size: 11px; color: #9aa6bd; }
+    .loadout-slot.on { border-color: #ffd166; background: #2c2a1c; box-shadow: 0 0 10px #ffd16688; }
+    .loadout-slot.on b::before { content: '✓ '; color: #ffd166; }
+    #drop > button.primary:disabled { opacity: 0.45; cursor: default; }
     #drop .auto { margin: 8px 0 0; text-align: center; color: #9aa6bd; }
     #drop > button.primary { margin-top: 6px; padding: 12px; font-size: 18px; font-weight: bold; letter-spacing: 1px; color: #10141c; background: #ffd166; border-color: #ffd166; }
     #drop > button.primary:hover { background: #ffe08f; }

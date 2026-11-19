@@ -1,11 +1,11 @@
-// Boons in a battle: what the held boons add that is no stat or lent effect, read where combat needs it.
+// Boons in a battle: what the activated boon adds that is no stat or lent effect, read where combat needs it.
 import { fx } from './sources'
 import { isSoldier, type Battle, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
 import { boonStat, type Rider } from './utilities'
 
-/** What the hero's boons add to `rider` for `unit`: none for any but the hero. */
-export const rider = (battle: Battle, unit: Unit, of: Rider) => (isSoldier(unit) ? boonStat(battle.boons, of) : 0)
+/** What the hero's activated boon adds to `rider` for `unit`: none for any but the hero. */
+export const rider = (battle: Battle, unit: Unit, of: Rider) => (isSoldier(unit) && battle.boon ? boonStat([battle.boon], of) : 0)
 
 /** As the hero's turn begins, Regen Gel heals it. */
 export function tickBoons(battle: Battle, events: GameEvent[]): void {

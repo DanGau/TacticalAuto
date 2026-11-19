@@ -22,7 +22,7 @@ export function atKey(run: Run): void {
 
 /** For tests: makes the landing. */
 export function enterAt(run: Run): Result {
-  return apply(run, { type: 'enter' })
+  return apply(run, { type: 'enter', boon: run.utilities.length > 0 ? 0 : null })
 }
 
 /** For tests: a run of `seed` under way, its hero the first candidate, a Deadeye with a plain rifle, holding no boons. */

@@ -293,6 +293,13 @@ export function featureOf(battle: Battle): Tile | null {
   return best
 }
 
+/** The boon held, by index, the deploy screen suggests activating: one answering both the ground and the challenge, else the challenge, else the ground, else the first. */
+export function suggested(battle: Pick<Battle, 'arenaKind' | 'challenge'>, held: UtilityId[]): number | null {
+  if (held.length === 0) return null
+  const score = (id: UtilityId) => (scouted(battle, id).challenge ? 2 : 0) + (scouted(battle, id).ground ? 1 : 0)
+  return held.reduce((best, id, i) => (score(id) > score(held[best]) ? i : best), 0)
+}
+
 /** What the deploy screen says boon `id` does here: answers the ground, the challenge, both, or neither. */
 export function scouted(battle: Pick<Battle, 'arenaKind' | 'challenge'>, id: UtilityId): { ground: boolean; challenge: boolean } {
   return { ground: ARENA_KINDS[battle.arenaKind].answers.includes(id), challenge: !!battle.challenge && CHALLENGES[battle.challenge].answers.includes(id) }

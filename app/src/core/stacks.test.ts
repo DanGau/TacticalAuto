@@ -204,7 +204,7 @@ test('Unbroken Line: every STREAK_FIGHTS fights in a row won pay more', () => {
     run.phase = 'overworld'
     apply(run, { type: 'go', index: 1 })
     apply(run, { type: 'advance' })
-    apply(run, { type: 'enter' })
+    apply(run, { type: 'enter', boon: run.utilities.length > 0 ? 0 : null })
     Object.assign(run.battle!, { phase: 'over', winner: 'human' })
     endBattle(run)
     pays.push(run.report!.supplies)

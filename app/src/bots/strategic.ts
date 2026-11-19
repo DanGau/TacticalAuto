@@ -184,13 +184,25 @@ function starting(run: Run): Action {
   return { type: 'boons', picks: sets(0, UTILITY_SLOTS).reduce((best, set) => (score(set) > score(best) ? set : best)) }
 }
 
+/** The boon held that best answers the battle at the deploy screen: its challenge, by how early the boon stands in its answers, then its ground, then what it adds to the combos. */
+function activating(run: Run): number | null {
+  const battle = run.battle!
+  const score = (id: UtilityId) => {
+    const answers = battle.challenge ? CHALLENGES[battle.challenge].answers : []
+    const rank = answers.indexOf(id)
+    return (rank >= 0 ? 4 - 0.5 * rank : 0) + (ARENA_KINDS[battle.arenaKind].answers.includes(id) ? 1.5 : 0) + 0.1 * comboWorth({ ...run, utilities: [] }, UTILITIES[id])
+  }
+  const held = ids(run)
+  return held.length === 0 ? null : held.reduce((best, id, i) => (score(id) > score(held[best]) ? i : best), 0)
+}
+
 /** The strategic bot; given `rest`, it rests at a safehouse on the way exactly when the hero's health is under it. */
 export const resting = (rest?: number): Bot => (run) => {
   if (run.boonOffers.length > 0) return starting(run)
   if (run.spare) return keep(run)
   if (run.phase === 'reward') return reward(run)
   if (run.phase === 'select') return choose(run)
-  if (run.phase === 'battle') return { type: 'enter' }
+  if (run.phase === 'battle') return { type: 'enter', boon: activating(run) }
   if (run.phase === 'shop') return shop(run)
   if (run.phase === 'event') {
     const options = EVENTS[run.event!].options.flatMap((option, i) => (!option.can || option.can(run) ? [i] : []))

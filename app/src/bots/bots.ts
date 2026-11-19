@@ -11,6 +11,7 @@ import { SKILLS } from '../core/skills'
 import { EFFECTS, type Gear } from '../core/gear'
 import { MEDKIT, EVENTS, RELIC_PRICE } from '../core/events'
 import { current, legOf, ways } from '../core/run'
+import { suggested } from '../core/arena-kinds'
 import { type Run } from '../core/run-state'
 import { type Risk } from '../core/run-state'
 import { danger } from '../core/missions'
@@ -119,7 +120,7 @@ const play =
     if (run.spare) return slot(run)
     if (run.phase === 'reward') return reward(run, rng, PICKS[pick])
     if (run.phase === 'select') return { type: 'hero', index: 0 }
-    if (run.phase === 'battle') return { type: 'enter' }
+    if (run.phase === 'battle') return { type: 'enter', boon: suggested(run.battle!, run.utilities.map((h) => h.id)) }
     if (run.phase === 'shop') return build ? shop(run) : { type: 'leave' }
     if (run.phase === 'event') return { type: 'choose', index: events === 'bold' ? takeable(run)[0] : takeable(run).at(-1)! }
     const wanted = heroHealth(run) < HURT ? 'safe' : typeof risk === 'function' ? risk(run) : risk
@@ -142,7 +143,7 @@ const randomBot: Bot = (run, rng) => {
   if (run.spare) return { type: 'keep', drop: randomInt(rng, run.utilities.length + 1) - 1 }
   if (run.phase === 'reward') return reward(run, rng, PICKS.random)
   if (run.phase === 'select') return { type: 'hero', index: randomInt(rng, run.candidates.length) }
-  if (run.phase === 'battle') return { type: 'enter' }
+  if (run.phase === 'battle') return { type: 'enter', boon: run.utilities.length > 0 ? randomInt(rng, run.utilities.length) : null }
   if (run.phase === 'event') return { type: 'choose', index: takeable(run)[randomInt(rng, takeable(run).length)] }
   if (run.phase === 'shop') {
     const options = affordable(run)

@@ -39,7 +39,7 @@ export function kitOf(run: Run, hero: Soldier): [SrcKind, { name: string; text: 
     ['gear', hero.gear?.effect ? [{ name: EFFECTS[hero.gear.effect].prefix, text: EFFECTS[hero.gear.effect].text }] : []],
     ['relic', run.relics.map((id) => ({ name: `${relicIcon(id)} ${RELICS[id].name}`, text: RELICS[id].text }))],
     ['doctrine', run.doctrines.map((id) => DOCTRINES[id])],
-    ['boon', run.utilities.map((h) => ({ name: `${boonIcon(h.id)} ${boonName(h.id, h.level)}`, text: boonText(h.id, h.level) }))],
+    ['boon', (run.battle?.boon ? [run.battle.boon] : run.utilities).map((h) => ({ name: `${boonIcon(h.id)} ${boonName(h.id, h.level)}`, text: boonText(h.id, h.level) }))],
   ]
   return groups.filter(([, parts]) => parts.length > 0)
 }

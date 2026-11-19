@@ -1,8 +1,7 @@
-// The clean comparison: at each deploy screen of a run, the same battle played from there holding each boon alone and none.
+// The clean comparison: at each deploy screen of a run, the same battle played from there with each boon activated, and none.
 import { apply } from '../core/apply'
 import { CHALLENGES, type ChallengeId } from '../core/challenges'
 import { type Run } from '../core/run-state'
-import { refit } from '../core/run'
 import { health } from '../core/hero'
 import { step } from '../core/step'
 import { UTILITY_IDS, type UtilityId } from '../core/utilities'
@@ -22,8 +21,7 @@ export interface Fork {
 function playOn(run: Run, utility: UtilityId | null): Fork {
   const fork = structuredClone(run)
   fork.utilities = utility ? [{ id: utility, level: 1 }] : []
-  refit(fork)
-  apply(fork, { type: 'enter' })
+  apply(fork, { type: 'enter', boon: utility ? 0 : null })
   const before = health(fork, fork.hero)
   while (fork.phase === 'battle') step(fork)
   const fought = fork.report!.hero!

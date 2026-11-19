@@ -98,7 +98,7 @@ test('every flow ends with nothing to choose: bots play each goal to a winner, u
   for (const goal of ['cross', 'hold', 'rescue', 'assassinate'] as Goal[]) {
     for (let seed = 1; seed <= 3; seed++) {
       const run = entering(seed, goal)
-      apply(run, { type: 'enter' })
+      apply(run, { type: 'enter', boon: run.utilities.length > 0 ? 0 : null })
       // Heroes that never move, already across: rally and waves must still settle it.
       for (const u of run.battle.units.filter(isSoldier)) Object.assign(u, freeTilesNear(run.battle, run.battle.objective, 12)[11], { stats: { ...u.stats, move: 0, range: 0 } })
       while (run.battle.phase === 'battle') stepBattle(run.battle)

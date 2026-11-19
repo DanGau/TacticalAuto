@@ -3,13 +3,12 @@ import { apply } from './apply'
 import { GRID, isSoldier, type Battle } from './battle'
 import { findUtility, gainUtility, settle, stockShop } from './rewards'
 import { begun, road } from './roads'
-import { createRun } from './run'
+import { createRun, reserveOf } from './run'
 import { type Run } from './run-state'
 import { drawBattle } from './missions'
 import { rider, tickBoons } from './boons'
 import type { GameEvent } from './combat-event'
 import { strides } from './grid'
-import { soldierStats } from './hero'
 import { amountOf, boonText, MAX_LEVEL, START_OFFERS, UTILITIES, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type Held, type UtilityId } from './utilities'
 
 const held = (...ids: UtilityId[]): Held[] => ids.map((id) => ({ id, level: 1 }))
@@ -40,17 +39,21 @@ test('a run offers START_OFFERS boons and takes exactly UTILITY_SLOTS before any
   expect(run.phase).toBe('overworld')
 })
 
-test('every boon held works in every battle: its stat on the hero, its effects lent', () => {
+test('the boon activated works in the battle, its stat on the hero, its effects lent; the others held sit idle', () => {
   const bare = landing([])
-  const base = bare.battle!.reserve[0].stats
-  for (const id of UTILITY_IDS) {
-    const run = landing(held(id))
+  apply(bare, { type: 'enter', boon: null })
+  const base = hero(bare).stats
+  for (const [i, id] of UTILITY_IDS.entries()) {
+    const idle = UTILITY_IDS[(i + 1) % UTILITY_IDS.length]
+    const run = landing(held(idle, id))
+    expect(apply(run, { type: 'enter', boon: null }).ok).toBe(false)
+    apply(run, { type: 'enter', boon: 1 })
     const { adds, lends } = UTILITIES[id]
-    const stats = run.battle!.reserve[0].stats
+    const { stats, effects } = hero(run)
     if (adds.to in base) expect(stats[adds.to as keyof typeof base], id).toBeCloseTo(base[adds.to as keyof typeof base] + amountOf(id, 1))
-    for (const effect of lends) expect(run.battle!.reserve[0].effects, id).toContain(effect)
-    apply(run, { type: 'enter' })
-    expect(run.battle!.boons).toEqual(held(id))
+    for (const effect of lends) expect(effects, id).toContain(effect)
+    for (const effect of UTILITIES[idle].lends.filter((e) => !lends.includes(e))) expect(effects, idle).not.toContain(effect)
+    expect(run.battle!.boon).toEqual({ id, level: 1 })
   }
 })
 
@@ -64,19 +67,23 @@ test('a boon raises more at each level, its text saying how much', () => {
   const run = begun(1)
   run.utilities = [{ id: 'nanoweave', level: 2 }]
   run.utilities[0].level = 1
-  const one = soldierStats(run, run.hero).hp
+  const one = reserveOf(run, [], run.utilities[0]).stats.hp
   run.utilities[0].level = 2
-  expect(soldierStats(run, run.hero).hp).toBe(one + amountOf('nanoweave', 2) - amountOf('nanoweave', 1))
+  expect(reserveOf(run, [], run.utilities[0]).stats.hp).toBe(one + amountOf('nanoweave', 2) - amountOf('nanoweave', 1))
 })
 
 test('Ablative Field takes its amount off each hit on the hero; Regen Gel heals at the start of its turn; Force Gauntlet drives by level', () => {
-  const run = landing([{ id: 'ablative', level: 2 }, { id: 'regen', level: 1 }, { id: 'gauntlet', level: 3 }])
-  apply(run, { type: 'enter' })
-  const battle = run.battle!
-  const me = hero(run)
-  expect(rider(battle, me, 'guard')).toBe(amountOf('ablative', 2))
-  expect(rider(battle, me, 'push')).toBe(amountOf('gauntlet', 3))
-  expect(rider(battle, battle.units.find((u) => u.side === 'alien')!, 'guard')).toBe(0)
+  const at = (boon: Held) => {
+    const run = landing([boon])
+    apply(run, { type: 'enter', boon: 0 })
+    return { battle: run.battle!, me: hero(run) }
+  }
+  const ablative = at({ id: 'ablative', level: 2 })
+  expect(rider(ablative.battle, ablative.me, 'guard')).toBe(amountOf('ablative', 2))
+  expect(rider(ablative.battle, ablative.battle.units.find((u) => u.side === 'alien')!, 'guard')).toBe(0)
+  const gauntlet = at({ id: 'gauntlet', level: 3 })
+  expect(rider(gauntlet.battle, gauntlet.me, 'push')).toBe(amountOf('gauntlet', 3))
+  const { battle, me } = at({ id: 'regen', level: 1 })
   me.hp = 1
   const events: GameEvent[] = []
   tickBoons(battle, events)

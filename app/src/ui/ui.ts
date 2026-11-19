@@ -15,13 +15,13 @@ import { type Battle } from '../core/battle'
 import { HOLD_ROUNDS } from '../core/goals'
 import { missionOrder, THREATS } from '../core/objectives'
 import { button, describe, STOP_NAMES } from './html'
-import { boonName, boonText, UTILITIES, type UtilityId } from '../core/utilities'
+import { boonName, boonText, UTILITIES, type Held, type UtilityId } from '../core/utilities'
+import { groundPoi } from '../core/pois'
 import { boonIcon } from './boon-icons'
-import { ARENA_KINDS, scouted } from '../core/arena-kinds'
+import { ARENA_KINDS, scouted, suggested } from '../core/arena-kinds'
 import { QUANTITIES } from '../core/quantities'
 import { RECKONING_KILLS } from '../core/doctrines'
 import { pickCard, type Pick } from './cards'
-import { slotsOf } from '../core/rewards'
 import { alienBlock } from './sheet'
 import { overworld, type Tab } from './overworld'
 import { drift, glide, viewNow } from './globe'
@@ -53,19 +53,18 @@ function counts(run: Run, battle: Battle): string {
   return `${chrono}${oath}`
 }
 
-/** Before the landing: the ground, what the battle tests, the twist, the aliens, the hero's kit of boons and which of them answer here, and the way in. */
-function drop(run: Run, battle: Battle, armed: string | null): string {
+/** Before the landing: the ground, what the battle tests, the twist, the aliens, and the choice of the one boon held to activate, each tagged with what it answers here. */
+function drop(run: Run, battle: Battle, armed: string | null, active: number | null): string {
   const twist = battle.twist ? `<p title="${TWISTS[battle.twist].text}">${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}</b></p>` : ''
   const test = battle.challenge ? `<h2 class="challenge" title="${CHALLENGES[battle.challenge].test}">${CHALLENGES[battle.challenge].icon} ${THREATS[battle.challenge]}</h2>` : ''
   const clock = battle.deadline !== null ? `<p>⏱️ Reinforcements arrive in round ${battle.deadline}.</p>` : ''
-  const slot = (i: number) => {
-    const h = run.utilities[i]
-    if (!h) return '<div class="loadout-slot empty">Empty</div>'
+  const card = (h: Held, i: number) => {
     const tag = tagOf(battle, h.id)
-    return `<div class="loadout-slot${tag ? ' answers' : ''}" title="${UTILITIES[h.id].name}: ${boonText(h.id, h.level)}">${boonIcon(h.id)}<b>${boonName(h.id, h.level)}</b>${tag ? `<small>${tag}</small>` : ''}</div>`
+    return `<button class="loadout-slot${tag ? ' answers' : ''}${i === active ? ' on' : ''}" data-activate="${i}" aria-pressed="${i === active}" title="${UTILITIES[h.id].name}: ${boonText(h.id, h.level)}">${boonIcon(h.id)}<b>${boonName(h.id, h.level)}</b><span>${boonText(h.id, h.level)}</span>${tag ? `<small>${tag}</small>` : ''}</button>`
   }
-  const loadout = `<h2 class="loadout-head">Your kit</h2><div class="loadout">${Array.from({ length: slotsOf(run) }, (_, i) => slot(i)).join('')}</div>`
-  return `${groundOf(run, battle)}${test}${clock}${twist}${foes(battle, armed)}${loadout}<p class="auto">The battle plays itself.</p>${button({ type: 'enter' }, 'Deploy', 'primary')}`
+  const choice = run.utilities.length > 0 ? `<h2 class="loadout-head">What do you activate?</h2><div class="loadout">${run.utilities.map(card).join('')}</div>` : ''
+  const ready = active !== null || run.utilities.length === 0
+  return `${groundOf(run, battle)}${test}${clock}${twist}${foes(battle, armed)}${choice}<p class="auto">${ready ? 'Only the boon activated works. The battle plays itself.' : 'Tap a boon to activate.'}</p>${button({ type: 'enter', boon: active }, 'Deploy', 'primary', ready)}`
 }
 
 /** The ground scouted: its name and what it does, and which of what the hero's build makes it multiplies. */
@@ -75,10 +74,11 @@ function groundOf(run: Run, battle: Battle): string {
   return `<h2 class="challenge ground" title="${ground.text}">${ground.icon} ${ground.name}</h2><p class="ground-text">${describe(ground.text, { reads: ground.reads })}${yours.length > 0 ? ` <b>${yours.join(' and ')} pays here.</b>` : ''}</p>`
 }
 
-/** What a boon held does for this battle: answers the ground, its challenge, both, or neither. */
+/** What a boon held answers here, among what the intro showed: the challenge's aliens, the ground's landmark, or both. */
 function tagOf(battle: Battle, id: UtilityId): string {
   const { ground, challenge } = scouted(battle, id)
-  return ground && challenge ? 'answers both' : ground ? 'answers the ground' : challenge ? 'answers the test' : ''
+  const names = [challenge ? CHALLENGES[battle.challenge!].name : '', ground ? (groundPoi(battle)?.label ?? ARENA_KINDS[battle.arenaKind].name) : ''].filter(Boolean)
+  return names.length > 0 ? `Answers ${names.join(' and ')}` : ''
 }
 
 /** The encounter: each alien kind on the deploy screen and how many; tapped, its stat block. Burrowers stay hidden. */
@@ -100,6 +100,8 @@ export function createUi(act: (action: Action) => void): Ui {
   installTips(overlay)
   const dropPanel = document.getElementById('drop')!
   let choosing: Battle | null = null
+  /** The boon held the player has activated on the deploy screen, by index. */
+  let active: number | null = null
   /** The report the player has continued past. */
   let seen: Report | null = null
   let tab: Tab = 'Map'
@@ -201,13 +203,20 @@ export function createUi(act: (action: Action) => void): Ui {
     if (battle !== choosing) {
       choosing = battle
       armed = null
+      active = suggested(battle, run.utilities.map((h) => h.id))
     }
-    dropPanel.innerHTML = drop(run, battle, armed)
+    dropPanel.innerHTML = drop(run, battle, armed, active)
   }
 
   dropPanel.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (!target) return
+    if (target.dataset.activate) {
+      // A tap activates a boon; a second on it takes it back.
+      const i = Number(target.dataset.activate)
+      active = active === i ? null : i
+      return showDrop(shown!)
+    }
     if (target.dataset.arm && armed !== target.dataset.arm) {
       armed = target.dataset.arm
       return showDrop(shown!)

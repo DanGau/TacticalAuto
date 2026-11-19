@@ -10,7 +10,7 @@ import { GOALS, type Goal } from '../core/goals'
 import { offerable } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { road } from '../core/roads'
-import { createRun, legOf, refit } from '../core/run'
+import { createRun, legOf } from '../core/run'
 import { type Run } from '../core/run-state'
 import { minorOffers, skillOffers, soldierStats, xpFor } from '../core/hero'
 import { timedFlow } from '../core/step'
@@ -44,8 +44,7 @@ function battle(seed: number, leg: number, rung: number, challenge: ChallengeId,
   road(run, [stop])
   apply(run, { type: 'advance' })
   run.utilities = utility ? [{ id: utility, level: 1 }] : []
-  refit(run)
-  apply(run, { type: 'enter' })
+  apply(run, { type: 'enter', boon: run.utilities.length > 0 ? 0 : null })
   let clock = { next: 0, done: 0 }
   while ((run.phase as Run['phase']) === 'battle') clock = timedFlow(run, clock).clock
   return { won: run.report!.won, hurt: 1 - run.report!.hero!.hp / soldierStats(run, hero).hp, seconds: clock.done / 1000 }

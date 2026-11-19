@@ -1,4 +1,4 @@
-// Boons: the hero's field kit, held for the run in a few slots, each working in every battle; what each does at each level.
+// Boons: the hero's field kit, held for the run in a few slots, one activated each battle; what each does at each level.
 import type { Effect, Stats } from './battle'
 import { EFFECTS } from './gear'
 import { PERKS } from './perks'

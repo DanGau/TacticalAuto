@@ -17,7 +17,7 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
 | `objects.ts` | What heroes do with objects: the strong throwing them or small aliens, setting off tanks, a rigged tank |
 | `landing.ts` | The one entry point, the plain landing there, what relics set off |
-| `boons.ts` | What held boons add in a battle beyond stats and lent effects: Ablative Field, Regen Gel, Force Gauntlet |
+| `boons.ts` | What the activated boon adds in a battle beyond stats and lent effects: Ablative Field, Regen Gel, Force Gauntlet |
 | `spawn.ts` | Making units: aliens, soldiers, civilians, mechs, drops |
 | `step.ts` | Advances the run's battle a beat; settles it when it ends |
 | `combat.ts` | `stepBattle`: whose turn, the next unit's action |

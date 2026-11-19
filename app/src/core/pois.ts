@@ -40,6 +40,9 @@ export function objectiveName(goal: Goal, aliens: Alien[]): string {
 /** The ground a hazard is on its own, where the ground has one: the drop, water, mire or ice. */
 export const NATURAL_HAZARD: Partial<Record<ArenaKind, Ground>> = { skyscraper: 'void', rift: 'void', flooded: 'water', marsh: 'mire', ice: 'ice' }
 
+/** The landmark the ground's feature shows at: its hazard where the ground has its own, else its vantage. */
+export const groundPoi = (battle: Battle): Poi | undefined => battle.pois.find((p) => p.kind === (NATURAL_HAZARD[battle.arenaKind] ? 'hazard' : 'vantage'))
+
 /** The least a frame reaches past its centre, and the margin it keeps past what it shows. */
 const FRAME_LEAST = 3
 const FRAME_MARGIN = 2

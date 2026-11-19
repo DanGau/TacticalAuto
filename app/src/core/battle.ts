@@ -396,8 +396,8 @@ export interface Battle {
   challenge: ChallengeId | null
   /** The round reinforcements start coming, one clump a round, if the aliens posted are not all down; null when they come on a flood's beat. */
   deadline: number | null
-  /** The boons the hero holds, working all battle. */
-  boons: Held[]
+  /** The one boon the hero activated for this battle; the others held sit idle. */
+  boon: Held | null
   /** Set by the landing until what it sets off lands, as the battle's first beat. */
   opening: boolean
   /** Tiles of acid, each with the alien turns it has left. */

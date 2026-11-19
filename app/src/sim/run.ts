@@ -107,8 +107,8 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
   let leaps = 0
   /** This battle's hardest hero hit, its boss, and the round the boss was first wounded. */
   let hits = { max: 0, boss: -1, from: -1, rounds: null as number | null }
-  /** The battle under way, its leg, the hero's health as it began, and the boons it held. */
-  let begun: [Run['battle'], number, number, UtilityId[], boolean] = [null, 0, 0, [], false]
+  /** The battle under way, its leg, the hero's health as it began, and whether a boss or commander leads it. */
+  let begun: [Run['battle'], number, number, boolean] = [null, 0, 0, false]
   let had: { leg: number; held: (UtilityId | null)[] } = { leg: 0, held: [] }
   while (run.phase !== 'won' && run.phase !== 'lost') {
     const held = [...run.utilities.map((h) => h.id), run.spare]
@@ -116,7 +116,7 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
     had = { leg: run.keys, held }
     const battle = run.battle
     if (run.phase === 'battle' && begun[0] !== battle) {
-      begun = [battle, run.keys, health(run, run.hero), run.utilities.map((h) => h.id), battle!.units.some((u) => u.boss || u.target)]
+      begun = [battle, run.keys, health(run, run.hero), battle!.units.some((u) => u.boss || u.target)]
       hits = { max: 0, boss: battle!.units.find((u) => u.boss)?.id ?? -1, from: -1, rounds: null }
     }
     if (run.phase === 'battle' && battle!.phase === 'battle') {
@@ -142,7 +142,8 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
         const fought = run.report!.hero!
-        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[4], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(begun[3], battle!.challenge ? CHALLENGES[battle!.challenge].answers : []), ground: battle!.arenaKind, exploited: answerOf(begun[3], ARENA_KINDS[battle!.arenaKind].answers), most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
+        const activated = battle!.boon ? [battle!.boon.id] : []
+        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[3], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(activated, battle!.challenge ? CHALLENGES[battle!.challenge].answers : []), ground: battle!.arenaKind, exploited: answerOf(activated, ARENA_KINDS[battle!.arenaKind].answers), most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
         clock = { next: 0, done: 0 }
       }
       continue
