@@ -19,7 +19,7 @@ test('a mission intro: wide, the threat, the ground, the goal, then the hero alo
     expect(intro.shots[0].from.zoom).toBe(ZOOM.wide)
     expect(intro.shots[0].glide).toBe(0)
     expect(intro.shots.at(-2)!.caption).toBe('Clear the streets.')
-    expect(intro.shots.at(-1)).toMatchObject({ hero: true, caption: 'Vex fights alone. Pick the kit.' })
+    expect(intro.shots.at(-1)).toMatchObject({ hero: true, caption: 'Vex fights alone. You build.' })
     expect(ms(intro)).toBeGreaterThan(6000)
     expect(ms(intro)).toBeLessThan(9000)
   }
@@ -34,7 +34,7 @@ test('a boss intro opens close on the boss, pulls out under its title card, and 
     expect(Math.hypot(close.from.x - boss.x, close.from.y - boss.y)).toBeLessThan(4)
     expect(pull.to.zoom).toBeLessThan(pull.from.zoom)
     expect(pull.title).toBe('Plated Guardian')
-    expect(intro.shots.at(-1)).toMatchObject({ hero: true, caption: 'Your hero fights alone. Pick the kit.' })
+    expect(intro.shots.at(-1)).toMatchObject({ hero: true, caption: 'Your hero fights alone. You build.' })
     expect(ms(intro)).toBeLessThan(13000)
   }
 })

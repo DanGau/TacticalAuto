@@ -124,7 +124,7 @@ export function introShots(battle: Battle, order: string, hero: string, yaw: num
   const feature = at('hazard') ?? at('vantage')
   const boss = aliens.find((u) => u.boss)
   const turned = axisYaw(yaw, landing, boss ?? threat)
-  const alone = `${hero || 'Your hero'} fights alone. Pick the kit.`
+  const alone = `${hero || 'Your hero'} fights alone. You build.`
   const mid = centre([landing, objective])
   const heroBeat: Beat = { from: frame(landing, ZOOM.hero, 0, -1), to: frame(landing, ZOOM.hero * 1.05, (boss ? -4 : 2) * DEG, -1), ms: boss ? 1800 : 1500, caption: alone, hero: true }
   if (seen >= 2) {
