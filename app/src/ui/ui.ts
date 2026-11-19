@@ -21,6 +21,7 @@ import { ARENA_KINDS, scouted } from '../core/arena-kinds'
 import { QUANTITIES } from '../core/quantities'
 import { RECKONING_KILLS } from '../core/doctrines'
 import { pickCard, type Pick } from './cards'
+import { slotsOf } from '../core/rewards'
 import { alienBlock } from './sheet'
 import { overworld, type Tab } from './overworld'
 import { drift, glide, viewNow } from './globe'
@@ -52,14 +53,19 @@ function counts(run: Run, battle: Battle): string {
   return `${chrono}${oath}`
 }
 
-/** Before the landing: the ground, what the battle tests, the twist, the aliens, the boons held and which of them answer here, and the way in. */
+/** Before the landing: the ground, what the battle tests, the twist, the aliens, the hero's kit of boons and which of them answer here, and the way in. */
 function drop(run: Run, battle: Battle, armed: string | null): string {
   const twist = battle.twist ? `<p title="${TWISTS[battle.twist].text}">${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}</b></p>` : ''
   const test = battle.challenge ? `<h2 class="challenge" title="${CHALLENGES[battle.challenge].test}">${CHALLENGES[battle.challenge].icon} ${THREATS[battle.challenge]}</h2>` : ''
   const clock = battle.deadline !== null ? `<p>⏱️ Reinforcements arrive in round ${battle.deadline}.</p>` : ''
-  const held = run.utilities.map((h) => `<span class="held-boon${tagOf(battle, h.id) ? ' answers' : ''}" title="${UTILITIES[h.id].name}: ${boonText(h.id, h.level)}">${boonIcon(h.id)} ${boonName(h.id, h.level)}${tagOf(battle, h.id) ? ` <small>${tagOf(battle, h.id)}</small>` : ''}</span>`)
-  const boons = held.length > 0 ? `<p class="boons-held">${held.join(' ')}</p>` : ''
-  return `${groundOf(run, battle)}${test}${clock}${twist}${foes(battle, armed)}${boons}${button({ type: 'enter' }, 'Go in')}`
+  const slot = (i: number) => {
+    const h = run.utilities[i]
+    if (!h) return '<div class="loadout-slot empty">Empty</div>'
+    const tag = tagOf(battle, h.id)
+    return `<div class="loadout-slot${tag ? ' answers' : ''}" title="${UTILITIES[h.id].name}: ${boonText(h.id, h.level)}">${boonIcon(h.id)}<b>${boonName(h.id, h.level)}</b>${tag ? `<small>${tag}</small>` : ''}</div>`
+  }
+  const loadout = `<h2 class="loadout-head">Your kit</h2><div class="loadout">${Array.from({ length: slotsOf(run) }, (_, i) => slot(i)).join('')}</div>`
+  return `${groundOf(run, battle)}${test}${clock}${twist}${foes(battle, armed)}${loadout}<p class="auto">The battle plays itself.</p>${button({ type: 'enter' }, 'Deploy', 'primary')}`
 }
 
 /** The ground scouted: its name and what it does, and which of what the hero's build makes it multiplies. */

@@ -53,6 +53,8 @@ export interface Debug {
   watch(n: number): Promise<void>
   /** Runs `code` with `state` bound to the live run, shows the result, and returns the state. */
   edit(code: string): Run
+  /** Plays the deploy screen's intro in full. */
+  brief(): void
 }
 
 declare global {
@@ -77,7 +79,7 @@ async function show(events: GameEvent[], animate: boolean): Promise<void> {
   ui.update(state)
   if (state.battle?.phase === 'deploy' && state.battle !== briefed && !params.has('manual')) {
     briefed = state.battle
-    void brief(view, state.battle, missionOrder(state))
+    void brief(view, state.battle, missionOrder(state), state.hero.name)
   }
 }
 
@@ -121,6 +123,9 @@ window.debug = {
     new Function('state', code)(state)
     void show([], false)
     return structuredClone(state)
+  },
+  brief() {
+    if (state.battle?.phase === 'deploy') void brief(view, state.battle, missionOrder(state), state.hero.name, true)
   },
 }
 

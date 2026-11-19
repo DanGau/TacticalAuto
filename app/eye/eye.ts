@@ -24,6 +24,8 @@ const CDP_PORT = 9333
 // Without these a window behind others stops drawing frames, and the battle the model is watching stalls.
 const KEEP_ANIMATING = ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling']
 const URL = `http://localhost:${VITE_PORT}/`
+/** The page size later commands keep, which `viewport` run alone sets. */
+const SIZE = resolve(DIR, 'viewport.json')
 
 const portOpen = (port: number) =>
   new Promise<boolean>((done) => {
@@ -177,7 +179,7 @@ const commands: Record<string, Command> = {
       if ((await page.evaluate(() => document.getElementById('panel')!.innerHTML)) === hit.html) throw new Error(`${size}: clicking ${selector} #${i} changed nothing`)
     }
   },
-  /** viewport <w> <h>: resizes the page for the rest of a playbook, to see phone widths. */
+  /** viewport <w> <h>: resizes the page, to see phone widths: for the rest of a playbook, or, run alone, for later commands too. */
   viewport: (page, w, h) => page.setViewportSize({ width: Number(w), height: Number(h) }),
   /** drag <x1> <y1> <x2> <y2> [touch]: drags from one screen point to another, by mouse or one finger. */
   async drag(page, x1, y1, x2, y2, touch) {
@@ -239,8 +241,9 @@ async function main(name: string, args: string[]): Promise<unknown> {
   const browser = await chromium.connectOverCDP(`http://localhost:${CDP_PORT}`)
   try {
     const page = browser.contexts()[0].pages()[0]
+    if (name === 'viewport') writeFileSync(SIZE, JSON.stringify({ width: Number(args[0]), height: Number(args[1]) }))
     // A human's window keeps its own size.
-    if (!('window' in readPids())) await page.setViewportSize({ width: WIDTH, height: HEIGHT })
+    if (!('window' in readPids())) await page.setViewportSize(existsSync(SIZE) ? JSON.parse(readFileSync(SIZE, 'utf8')) : { width: WIDTH, height: HEIGHT })
     return await run(page, name, args)
   } finally {
     await browser.close()

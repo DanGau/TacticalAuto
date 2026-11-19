@@ -66,7 +66,8 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 | File | Owns |
 |---|---|
-| `view.ts` | `createView`, the `View` the UI drives: show, framing, panning |
+| `view.ts` | `createView`, the `View` the UI drives: show, framing, the intro's shots |
+| `controls.ts` | The player's camera: pan, zoom, quarter turns, recentre; following the action again once let go |
 | `stage.ts` | `Stage`: scene layers, camera and glides, frame loop, what is on screen |
 | `camera.ts` | World and picture points, cameras that frame tiles |
 | `play.ts` | Plays a beat's events in order |
@@ -84,6 +85,6 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 ## Elsewhere
 
-- `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `summary.ts` a battle's statistics page and the post-game summary, drawn by `charts.ts`, whose marks `tip.ts` explains on hover, focus or tap; `cards.ts` fixed-size cards tapped to arm and again to confirm, and gear comparisons; `sheet.ts` character sheets and alien stat blocks; `kit.ts` source tags and a hero's kit by source, shown on hover or tap in battle; `log.ts` the battle log; `tree.ts` a class's skill tree as a map; `briefing.ts` the tour before the landing; `menu.ts` the title and recruit choice, `select.ts` its card-to-dossier and deploy motion.
+- `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `summary.ts` a battle's statistics page and the post-game summary, drawn by `charts.ts`, whose marks `tip.ts` explains on hover, focus or tap; `cards.ts` fixed-size cards tapped to arm and again to confirm, and gear comparisons; `sheet.ts` character sheets and alien stat blocks; `kit.ts` source tags and a hero's kit by source, shown on hover or tap in battle; `log.ts` the battle log; `tree.ts` a class's skill tree as a map; `briefing.ts` the mission intro: its shot list from the battle's landmarks, and playing it; `menu.ts` the title and recruit choice, `select.ts` its card-to-dossier and deploy motion.
 - `bots/bots.ts`: bot strategies. `sim/`: the sim CLI, `sim/encounter.ts`, the challenge lab, and `sim/forks.ts`, the clean comparison of answers.
 - `main.ts`: browser entry and `window.debug`.

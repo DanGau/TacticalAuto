@@ -34,9 +34,8 @@
       body.cinema::before, body.cinema::after { height: 11vh; }
       canvas { transition: filter 1.2s ease-in-out; }
       body.cinema canvas:first-of-type { filter: saturate(0.8) contrast(1.12) brightness(0.95); }
-      body.cinema .brief { bottom: 1.5vh; background: none; }
       .vignette { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: radial-gradient(ellipse at 58% 42%, transparent 45%, rgba(0, 0, 0, 0.55) 100%); opacity: 0; transition: opacity 1.2s ease-in-out; }
-      body.cinema .vignette { opacity: 1; }
+      body.cinema .vignette { opacity: 0.45; }
       #hud { transition: opacity 0.6s; }
       .src { white-space: nowrap; font-weight: bold; }
       #log { position: fixed; left: 60px; bottom: 12px; z-index: 2; max-width: min(460px, calc(100vw - 24px)); background: rgba(10, 13, 19, 0.85); border-radius: 6px; font-size: 12px; }
@@ -49,10 +48,21 @@
       #kit .kit-row small { width: 100%; color: #889; text-transform: uppercase; font-size: 9px; letter-spacing: 1px; }
       body.cinema #log { opacity: 0; }
       body.cinema #hud { opacity: 0; }
-      .brief { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5; width: min(560px, calc(100vw - 32px)); box-sizing: border-box; padding: 10px 16px; border-radius: 8px; background: rgba(10, 13, 19, 0.85); color: #e8e2c8; font-size: 16px; line-height: 1.5; pointer-events: none; animation: fade 0.4s; }
-      .brief p { margin: 0; animation: fade 0.6s; }
-      .brief p:not(:last-child) { color: #9aa6bd; font-size: 14px; }
-      #drop.briefing { visibility: hidden; }
+      /* The intro's caption on the lower third, a boss's title card, and the skip hint. */
+      .brief, .title-card, .skip-hint { position: fixed; left: 50%; transform: translateX(-50%); z-index: 5; pointer-events: none; opacity: 0; transition: opacity 0.2s; text-align: center; text-shadow: 0 2px 6px #000; }
+      .brief { bottom: calc(11vh + 18px); width: min(560px, calc(100vw - 32px)); color: #e8e2c8; font-size: 20px; font-weight: bold; letter-spacing: 0.5px; }
+      .title-card { top: calc(11vh + 24px); color: #ff6b5e; font-size: 34px; font-weight: bold; letter-spacing: 4px; text-transform: uppercase; }
+      .skip-hint { bottom: calc(11vh - 26px); color: #9aa6bd; font-size: 12px; letter-spacing: 1px; }
+      .brief.on, .title-card.on { opacity: 1; }
+      .skip-hint.on { opacity: 0.8; }
+      #drop { transition: transform 0.25s ease-out, opacity 0.25s; }
+      #drop.briefing { transform: translate(-50%, 120%); opacity: 0; pointer-events: none; }
+      /* The camera's buttons: they move the camera, never the hero. */
+      #cam { position: fixed; right: 8px; top: 50%; transform: translateY(-50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px; border-radius: 8px; background: rgba(10, 13, 19, 0.7); }
+      #cam[hidden], body.cinema #cam { display: none; }
+      @media (max-height: 520px) { #cam { top: 8px; right: 96px; transform: none; flex-direction: row; } }
+      #cam button { width: 34px; height: 34px; padding: 0; font-size: 18px; line-height: 1; }
+      #cam .cam-label { padding: 2px 0; font-size: 14px; opacity: 0.7; }
       .intro { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; background: radial-gradient(#232c3d, #0a0d13 70%); text-align: center; animation: fade 0.6s; }
       .intro svg { width: min(52vh, 80vw); height: auto; }
       .intro h1 { font-size: 32px; letter-spacing: 2px; text-transform: uppercase; }
@@ -99,7 +109,6 @@
       .threat { display: inline-flex; width: 120px; height: 8px; margin: 0 8px; vertical-align: middle; background: #10141c; border: 1px solid #ff6b5e; border-radius: 4px; overflow: hidden; }
       .threat i { background: #ff6b5e; }
       .threat i.landed { background: #ffd84d; transition: width 0.6s 0.6s; }
-      .skip { position: absolute; right: 24px; bottom: 24px; z-index: 6; }
       #fullscreen { position: absolute; bottom: 12px; left: 12px; z-index: 10; padding: 6px 10px; font-size: 18px; }
       :fullscreen #fullscreen { display: none; }
       /* Installed, the game opens full screen already. */
@@ -383,10 +392,16 @@
     .boonswap .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
     .boonswap .confirm:not(:disabled) { font-weight: bold; color: #10141c; background: #6fe08c; border-color: #6fe08c; }
     .boonswap .slots button.pick.armed { border-color: #6fe08c; outline-color: #6fe08c; background: #1f3326; }
-    .boons-held { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-    .held-boon { padding: 3px 8px; border: 1px solid #3a4458; border-radius: 6px; font-size: 13px; }
-    .held-boon.answers { border-color: #6fe08c; box-shadow: 0 0 8px #6fe08c44; }
-    .held-boon small { color: #6fe08c; }
+    .loadout-head { margin: 8px 0 4px; }
+    .loadout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .loadout-slot { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; border: 2px solid #4a5a78; border-radius: 8px; background: #1d2433; text-align: center; font-size: 13px; line-height: 1.25; }
+    .loadout-slot svg { width: 26px; height: 26px; }
+    .loadout-slot.answers { border-color: #6fe08c; box-shadow: 0 0 8px #6fe08c44; }
+    .loadout-slot small { color: #6fe08c; font-size: 11px; }
+    .loadout-slot.empty { border-style: dashed; color: #6a7488; justify-content: center; }
+    #drop .auto { margin: 8px 0 0; text-align: center; color: #9aa6bd; }
+    #drop > button.primary { margin-top: 6px; padding: 12px; font-size: 18px; font-weight: bold; letter-spacing: 1px; color: #10141c; background: #ffd166; border-color: #ffd166; }
+    #drop > button.primary:hover { background: #ffe08f; }
     .boons .swap { width: min(900px, 100%); grid-template-columns: repeat(3, minmax(0, 1fr)); }
       @media (max-width: 600px) { .boons .swap { grid-template-columns: 1fr; } }
       button.pick.blocked .price { color: #ff6b6b; }

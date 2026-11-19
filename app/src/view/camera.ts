@@ -125,15 +125,6 @@ export const STILL_FOV = 0.25
 /** How far the haze reaches past what the camera looks at, in world units, at its thinnest and thickest. */
 export const HAZE_REACH = [400, 26]
 
-/** A shot's camera, against the still camera: how much more it turns and tilts, its lens, its haze, and the third of the screen its subject sits on, -1 left to 1 right. */
-export interface Shot {
-  turn?: number
-  pitch?: number
-  fov?: number
-  haze?: number
-  third?: number
-}
-
 /** The camera that shows the picture point `at` at the screen's centre, aimed at the ground `height` units up. */
 export function aim(at: Tile, zoom: number, yaw = YAW, height = 0): Camera {
   const { back, right, up } = axes(yaw)
@@ -162,7 +153,7 @@ const screen = () => {
 }
 
 /** The closest a shot comes: a phone, its picture scaled down to fit, comes closer so units still read. */
-const closest = () => Math.max(1, 0.7 / Math.min(innerWidth / WIDTH, innerHeight / HEIGHT))
+export const closest = () => Math.max(1, 0.7 / Math.min(innerWidth / WIDTH, innerHeight / HEIGHT))
 
 /** The zoom that fits a `width` by `height` of picture on the screen. */
 const seen = (width: number, height: number) => [screen().w / width, screen().h / height]

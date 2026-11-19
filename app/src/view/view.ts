@@ -1,35 +1,33 @@
-// The battle view the UI drives: showing a run's battle, framing it, and panning.
-import { AdditiveBlending, BoxGeometry, CircleGeometry, Mesh, MeshBasicMaterial } from 'three'
-import { BLAST_RADIUS, type Battle, type Tile } from '../core/battle'
+// The battle view the UI drives: showing a run's battle, framing it, the intro's shots, and the player's camera.
+import { BLAST_RADIUS, type Battle } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { srcOf } from '../core/sources'
+import { soldierUnit } from '../core/spawn'
 import { overlaps, staggerOf } from '../core/pace'
 import type { Run } from '../core/run-state'
+import { level } from '../core/hero'
+import { CLASSES } from '../core/classes'
+import type { Frame } from '../ui/briefing'
 import { drawTerrain } from './board'
-import { axes, bestTurn, clamped, DECAL_LIFT, framing, panned, setHeights, setRinged, spot, still, STILL_FOV, WIDTH, type Camera, type Shot } from './camera'
+import { aim, axes, bestTurn, clamped, framing, picture, setHeights, settled, setRinged, spot, WIDTH, type Camera } from './camera'
+import { installControls } from './controls'
 import { callout, chest, effectCallout, shotCallout, sourceCallout, tagText } from './effects'
 import { drawFog, drawMarks } from './marks'
 import { COLOR, SOURCE } from './palette'
 import { play, team } from './play'
-import { ACROSS, PITCH, TILE_H, TILE_W, YAW } from './space'
-import { remove, sync } from './sprites'
+import { ACROSS, TILE_H, TILE_W, YAW } from './space'
+import { create, remove, squash, sync } from './sprites'
 import { Stage } from './stage'
 import { empty } from './shapes'
 
-/** Screen pixels a press moves before it pans the camera. */
-const DRAG_PX = 6
-/** How long after a drag the camera is left where the player put it. */
-const HOLD_MS = 2000
-/** How long the camera takes to glide to an landing, and to fly in over a new battle. */
-const FOCUS_MS = 700
-const FLY_MS = 1600
 /** Screen pixels the landing panel takes from the bottom of the canvas. */
 const PANEL = 230
 /** Screen pixels kept clear around what is in play, which sits in the middle of the screen above the panel. */
 const WHOLE_MARGIN = PANEL - 20
-
-/** The opening shot of a new battle, which the briefing flies on from. */
-const OPENING: Shot = { turn: -1.1, pitch: -0.32, fov: 42, haze: 1 }
+/** The id of the hero's stand-in, shown readying at the landing in the intro. */
+const STAND_IN = -1
+/** How long the stand-in crouches, then springs up. */
+const READY_MS = 700
 
 export interface View {
   canvas: HTMLCanvasElement
@@ -42,12 +40,18 @@ export interface View {
   show(run: Run, events: GameEvent[], animate: boolean): Promise<void>
   /** Resolves once every attack begun has finished. */
   settle(): Promise<void>
-  /** Hides the landing while the briefing flies over the mission, and shows it once it is done. */
+  /** Hides the landing while the intro plays, and shows it once it is done. */
   hideLanding(hidden: boolean): void
-  /** Glides the camera to frame the given tiles as `shot` says, above the landing panel; null pulls back to the whole map. */
-  frame(tiles: Tile[] | null, ms?: number, shot?: Shot): Promise<void>
-  /** Lights a beam over the tile the briefing is on, so it stands out from the night; null puts it out. */
-  spotlight(tile: Tile | null): void
+  /** The turn the deploy screen is seen at; given one, sets it. */
+  turn(yaw?: number): number
+  /** Jumps the camera to an intro frame. */
+  cut(frame: Frame): void
+  /** Glides the camera to an intro frame over `ms` along `ease`. */
+  shoot(frame: Frame, ms: number, ease: (t: number) => number): Promise<void>
+  /** Shows the hero at the landing, readying itself. */
+  ready(): void
+  /** Glides the camera to the deploy framing over `ms`, and takes away the hero's stand-in. */
+  frame(ms: number): Promise<void>
   /** The unit drawn under a point of the window, if any. */
   unitAt(x: number, y: number): number | null
 }
@@ -57,11 +61,14 @@ export async function createView(): Promise<View> {
   const { canvas } = s
   /** The attacks of the stage under way, which the next beat that is not an attack waits for. */
   let attacks = Promise.resolve()
+  /** The turn the deploy screen is seen at, once the intro has set it. */
+  let deployTurn: number | null = null
 
   /** Clears the board for a new battle. */
   function setBattle(battle: Battle): void {
     s.shown = battle
     s.held = 0
+    deployTurn = null
     setHeights(battle.height)
     setRinged(battle.arenaKind === 'skyscraper')
     for (const id of [...s.sprites.keys()]) remove(s, id)
@@ -70,41 +77,6 @@ export async function createView(): Promise<View> {
     drawTerrain(s, battle)
   }
 
-  // One finger or the mouse drags the still camera, the ground staying under it; a second finger ends the drag.
-  // Glides leave the camera alone until HOLD_MS after. A drag is not a click.
-  canvas.style.touchAction = 'none'
-  let drag: { id: number; x: number; y: number; moved: boolean } | null = null
-  const pointers = new Set<number>()
-  canvas.addEventListener('pointerdown', (e) => {
-    pointers.add(e.pointerId)
-    drag = pointers.size === 1 ? { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false } : null
-    if (drag) canvas.setPointerCapture(e.pointerId)
-  })
-  const release = (e: PointerEvent) => {
-    pointers.delete(e.pointerId)
-    if (drag?.id !== e.pointerId) return
-    if (drag.moved) s.held = performance.now() + HOLD_MS
-    const ended = drag
-    setTimeout(() => drag === ended && (drag = null))
-  }
-  canvas.addEventListener('pointerup', release)
-  canvas.addEventListener('pointercancel', release)
-  canvas.addEventListener(
-    'click',
-    (e) => {
-      if (drag?.moved) e.stopImmediatePropagation()
-    },
-    { capture: true },
-  )
-  canvas.addEventListener('pointermove', (e) => {
-    if (drag?.id !== e.pointerId || !pointers.has(e.pointerId) || !still(s.camera)) return
-    if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) <= DRAG_PX) return
-    drag.moved = true
-    s.held = Infinity
-    s.glides++
-    s.look(clamped(panned(s.camera, e.clientX - drag.x, e.clientY - drag.y, s.scale())))
-    Object.assign(drag, { x: e.clientX, y: e.clientY })
-  })
   /**
    * The camera framing what is in play: before the landing it, the aliens and goals; after it, the hero and the
    * aliens it has found.
@@ -116,50 +88,71 @@ export async function createView(): Promise<View> {
     return framing([...(battle.phase === 'deploy' && battle.entry ? [battle.entry] : []), ...goals, ...units], yaw, WHOLE_MARGIN)
   }
 
-  /**
-   * The camera framing `tiles` as `shot` says, raised so the landing panel below covers none of it; null frames what
-   * is in play. A subject on a third is set off the centre, the screen's other two thirds left open before it.
-   */
-  function above(tiles: Tile[] | null, shot: Shot = {}): Camera {
-    const deploying = tiles === null && s.shown?.phase === 'deploy'
-    // A tall screen shows the fight down its length, so it turns the map to lie that way.
-    const yaw = deploying && innerHeight > innerWidth ? bestTurn([...(s.shown!.entry ? [s.shown!.entry] : []), ...s.shown!.units.filter((u) => u.side === 'alien')], YAW) : YAW + (shot.turn ?? 0)
-    const framed = tiles === null ? inPlay(yaw) : framing(tiles, yaw)
-    const { up, right } = axes(yaw)
-    const lift = -(tiles === null ? PANEL / 2 : PANEL) / framed.zoom / ACROSS
-    const aside = -((shot.third ?? 0) * WIDTH) / 6 / framed.zoom / ACROSS
-    return clamped({
-      ...framed,
-      x: framed.x + up.x * lift + right.x * aside,
-      y: framed.y + up.y * lift,
-      z: framed.z + up.z * lift + right.z * aside,
-      pitch: PITCH + (shot.pitch ?? 0),
-      fov: shot.fov ?? STILL_FOV,
-      haze: shot.haze ?? 0,
-    }, tiles === null && s.shown?.phase === 'deploy' ? [...(s.shown.entry ? [s.shown.entry] : []), ...s.shown.units.filter((u) => u.side === 'alien')] : [])
+  /** The turn the deploy screen is seen at: set by the intro, else a tall screen turns the map to lie down its length. */
+  function turnOf(): number {
+    const battle = s.shown
+    if (deployTurn !== null || !battle) return deployTurn ?? YAW
+    return innerHeight > innerWidth ? bestTurn([...(battle.entry ? [battle.entry] : []), ...battle.units.filter((u) => u.side === 'alien')], YAW) : YAW
   }
+
+  /** The deploy framing, raised so the landing panel below covers none of it; in battle, what is in play. */
+  function home(yaw = turnOf()): Camera {
+    const battle = s.shown!
+    if (battle.phase !== 'deploy') return clamped(inPlay(yaw), team(battle))
+    const framed = inPlay(yaw)
+    const { up } = axes(yaw)
+    const lift = -PANEL / 2 / framed.zoom / ACROSS
+    return clamped({ ...framed, x: framed.x + up.x * lift, y: framed.y + up.y * lift, z: framed.z + up.z * lift }, [...(battle.entry ? [battle.entry] : []), ...battle.units.filter((u) => u.side === 'alien')])
+  }
+
+  /** The camera on an intro frame: zoomed against the deploy framing, its subject on a third. */
+  function shotOf(f: Frame): Camera {
+    const yaw = turnOf() + f.orbit
+    const zoom = home().zoom * f.zoom
+    const ground = spot(f.x, f.y)
+    const c = aim(picture(ground, yaw), zoom, yaw, ground.y)
+    const { right } = axes(yaw)
+    const aside = -(f.third * WIDTH) / 6 / zoom / ACROSS
+    return clamped({ ...c, x: c.x + right.x * aside, z: c.z + right.z * aside })
+  }
+
+  const cam = installControls(s, home, (yaw) => s.shown?.phase === 'deploy' && (deployTurn = yaw))
 
   s.resize()
   return {
     canvas,
     unitAt: (x, y) => s.unitAt(x, y),
-    frame(tiles, ms = FOCUS_MS, shot = {}) {
-      return s.follow(above(tiles, shot), ms)
+    turn(yaw) {
+      if (yaw !== undefined) deployTurn = yaw
+      return turnOf()
     },
-    spotlight(tile) {
-      s.lit = tile
-      s.beam.clear()
-      if (!tile) return
-      const at = spot(tile.x, tile.y)
-      // A warm shaft against the cool night, brightest at its foot.
-      for (const [wide, high, alpha] of [[1.6, 14, 0.1], [0.7, 18, 0.16], [0.25, 22, 0.3]]) {
-        const shaft = new Mesh(new BoxGeometry(wide, high, wide), new MeshBasicMaterial({ color: COLOR.hit, transparent: true, opacity: alpha, blending: AdditiveBlending, depthWrite: false, fog: false }))
-        shaft.position.set(at.x, at.y + high / 2, at.z)
-        s.beam.add(shaft)
-      }
-      const pool = new Mesh(new CircleGeometry(2.2, 32).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: COLOR.hit, transparent: true, opacity: 0.22, blending: AdditiveBlending, depthWrite: false, fog: false }))
-      pool.position.set(at.x, at.y + DECAL_LIFT * 5, at.z)
-      s.beam.add(pool)
+    cut(f) {
+      s.glides++
+      s.held = 0
+      s.look(shotOf(f))
+    },
+    shoot(f, ms, ease) {
+      s.held = 0
+      return s.follow(shotOf(f), ms, ease)
+    },
+    ready() {
+      const battle = s.shown
+      const soldier = battle?.reserve[0]
+      if (!battle?.entry || !soldier || !s.hero) return
+      remove(s, STAND_IN)
+      const unit = { ...soldierUnit({ nextId: STAND_IN } as Battle, soldier, battle.entry), id: STAND_IN }
+      const sprite = create(s, unit, level(s.hero), s.hero.cls ? CLASSES[s.hero.cls].name[0] : '')
+      void s.tween(READY_MS, (t) => {
+        const crouch = t < 0.4 ? t / 0.4 : 1 - (t - 0.4) / 0.6
+        squash(sprite, 1 + 0.18 * crouch, 1 - 0.22 * crouch)
+        if (t === 1) callout(s, '👁 READY', COLOR.hit, sprite)
+      })
+    },
+    async frame(ms) {
+      s.held = 0
+      await s.follow(home(), ms)
+      remove(s, STAND_IN)
+      s.labels.clear()
     },
     hideLanding(hidden) {
       s.briefing = hidden
@@ -169,6 +162,7 @@ export async function createView(): Promise<View> {
     async show(run, events, animate) {
       const { fx, sprites } = s
       s.hero = run.hero
+      cam.hidden = run.phase !== 'battle' || !run.battle
       fx.clear()
       const battle = run.battle
       if (!battle) return
@@ -176,14 +170,9 @@ export async function createView(): Promise<View> {
       const fresh = battle !== s.shown
       if (fresh) setBattle(battle)
       drawMarks(s, battle)
-      // A new battle opens flying in from high above, turning, down to what is in play.
-      if (fresh && battle.phase === 'deploy') {
-        // An establishing shot: low over the far side of the town, looking in across its rooftops through the haze.
-        s.look(above(null, OPENING))
-        void s.follow(above(null), FLY_MS)
-      }
+      if (fresh && battle.phase === 'deploy') s.look(home())
       // An ambush opens already in the fight, on the team.
-      if (fresh && battle.phase !== 'deploy') s.look(clamped(inPlay(), team(battle)))
+      if (fresh && battle.phase !== 'deploy') s.look(home(settled(s.camera.yaw)))
       if (animate && overlaps(events) && !events.some((e) => e.type === 'end')) {
         // An attack lets the next start a stagger later, so a side's attacks land one after another; the beat after them settles the picture.
         const playing = play(s, battle, events)
@@ -199,7 +188,7 @@ export async function createView(): Promise<View> {
       if (events.some((e) => e.type === 'rocket' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(s, battle)
       drawFog(s, battle, true)
       if (!animate) {
-        if (battle.phase !== 'deploy') s.look(clamped(inPlay(), team(battle)))
+        if (battle.phase !== 'deploy') s.look(home(settled(s.camera.yaw)))
         s.labels.clear()
         for (const e of events) {
           if (e.type === 'effect' && sprites.has(e.id)) effectCallout(s, e, sprites.get(e.id)!)

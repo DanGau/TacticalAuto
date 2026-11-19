@@ -88,8 +88,6 @@ export class Stage {
   readonly fog = new Group()
   readonly lurk = new Group()
   readonly units = new Group()
-  /** The briefing's beam of light over what it shows. */
-  readonly beam = new Group()
   /** The holographic fences round the zones in play, by what and where each is, so one already standing stays up. */
   readonly fences = new Group()
   standing = new Map<string, ReturnType<typeof fence>>()
@@ -112,8 +110,6 @@ export class Stage {
   walls: { at: Tile; fade: { value: number } }[] = []
   /** Each roof on the battlefield, the tiles under it and the rectangle they span, and its fade: see cutAway. */
   roofs: { tiles: Set<number>; box: { x1: number; y1: number; x2: number; y2: number }; fade: { value: number }; mesh: Mesh }[] = []
-  /** The tile the briefing is lighting, which no roof hides. */
-  lit: Tile | null = null
   /** The tiles the hero sees, by index; null before the landing. */
   seen: boolean[] | null = null
   /** The battle on screen. */
@@ -125,7 +121,7 @@ export class Stage {
   briefing = false
   /** The camera's glide under way; a new one takes over from wherever the camera is, so two never fight over it. */
   glides = 0
-  /** Until when, by `performance.now`, glides leave the camera alone: the player is panning it. */
+  /** Until when, by `performance.now`, glides that follow the action leave the camera alone: the player is moving it. */
   held = 0
 
   /** Each rendered frame's work for a tween under way, given the milliseconds since the last frame. */
@@ -138,7 +134,7 @@ export class Stage {
     for (const c of [this.canvas, this.overlay]) Object.assign(c.style, { position: 'fixed', left: '0', top: '0' })
     this.overlay.style.pointerEvents = 'none'
     document.body.prepend(this.overlay)
-    this.scene.add(this.chasm, this.terrain, this.zones, this.fences, this.acid, this.fog, this.lurk, this.units, this.beam)
+    this.scene.add(this.chasm, this.terrain, this.zones, this.fences, this.acid, this.fog, this.lurk, this.units)
     this.scene.fog = this.haze
     this.zones.renderOrder = 1
     // The cliffs fade into the depths, so draw before the units, or they paint over one levitating over the drop.
@@ -233,26 +229,28 @@ export class Stage {
   }
 
   /**
-   * Glides the camera to frame the given tiles, or to the given camera, over `ms`, easing in and out. Zoom changes by
-   * the same factor each frame, so pulling out reads as steady as pushing in.
+   * Glides the camera to frame the given tiles, or to the given camera, over `ms`, along `ease`. Framing tiles follows the
+   * action, so it leaves the camera alone while the player holds it. Zoom changes by the same factor each frame, so
+   * pulling out reads as steady as pushing in.
    */
-  follow(points: Tile[] | Camera, ms = CAMERA_MS): Promise<void> {
+  follow(points: Tile[] | Camera, ms = CAMERA_MS, ease = (t: number) => t * t * (3 - 2 * t)): Promise<void> {
     const from = this.camera
-    const to = Array.isArray(points) ? clamped(framing(points, settled(this.camera.yaw)), points) : clamped(points)
+    const following = Array.isArray(points)
+    if (following && performance.now() < this.held) return this.tween(ms, () => {})
+    const to = following ? clamped(framing(points, settled(this.camera.yaw)), points) : clamped(points)
     const mine = ++this.glides
     return this.tween(ms, (t) => {
-      if (mine !== this.glides) return
-      const ease = t * t * (3 - 2 * t)
-      const at = (a: number, b: number) => a + (b - a) * ease
-      // Zoom and lens change by the same factor each frame, so pulling out reads as steady as pushing in.
-      const by = (a: number, b: number) => a * (b / a) ** ease
+      if (mine !== this.glides || (following && performance.now() < this.held)) return
+      const e = ease(t)
+      const at = (a: number, b: number) => a + (b - a) * e
+      const by = (a: number, b: number) => a * (b / a) ** e
       this.look({ x: at(from.x, to.x), y: at(from.y, to.y), z: at(from.z, to.z), zoom: by(from.zoom, to.zoom), yaw: at(from.yaw, to.yaw), pitch: at(from.pitch, to.pitch), fov: by(from.fov, to.fov), haze: at(from.haze, to.haze) })
     })
   }
 
   /**
    * Fades away each roof within the circle of the arena, where the fight is staged, and each over a tile that
-   * matters: a unit's, the briefing's lit one, or the landing's before the hero goes in. Thins each wall standing just
+   * matters: a unit's, or the landing's before the hero goes in. Thins each wall standing just
    * before a unit toward the camera, as XCOM cuts its buildings away. The rest fade back.
    */
   private cutAway(ms: number): void {
@@ -260,7 +258,6 @@ export class Stage {
     const step = ms / FADE_MS
     const toward = (fade: { value: number }, target: number) => (fade.value = fade.value < target ? Math.min(target, fade.value + step) : Math.max(target, fade.value - step))
     const keys = [...this.sprites.values()].map((s) => ({ x: Math.round(s.tile.x), y: Math.round(s.tile.y) }))
-    if (this.lit) keys.push({ x: Math.round(this.lit.x), y: Math.round(this.lit.y) })
     // Before the hero goes in, the landing shows whole.
     if (shown?.phase === 'deploy' && !this.briefing && shown.entry)
       for (const at of [shown.entry]) for (let dy = -ENTRY_RADIUS; dy <= ENTRY_RADIUS; dy++) for (let dx = -ENTRY_RADIUS; dx <= ENTRY_RADIUS; dx++) keys.push({ x: at.x + dx, y: at.y + dy })
