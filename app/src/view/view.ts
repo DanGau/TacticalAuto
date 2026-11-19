@@ -2,11 +2,8 @@
 import { BLAST_RADIUS, type Battle } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { srcOf } from '../core/sources'
-import { soldierUnit } from '../core/spawn'
 import { overlaps, staggerOf } from '../core/pace'
 import type { Run } from '../core/run-state'
-import { level } from '../core/hero'
-import { CLASSES } from '../core/classes'
 import type { Frame } from '../ui/briefing'
 import { drawTerrain } from './board'
 import { aim, axes, bestTurn, clamped, framing, picture, setHeights, settled, setRinged, spot, WIDTH, type Camera } from './camera'
@@ -16,7 +13,7 @@ import { drawFog, drawMarks } from './marks'
 import { COLOR, SOURCE } from './palette'
 import { play, team } from './play'
 import { ACROSS, TILE_H, TILE_W, YAW } from './space'
-import { create, remove, squash, sync } from './sprites'
+import { remove, sync } from './sprites'
 import { Stage } from './stage'
 import { empty } from './shapes'
 
@@ -24,10 +21,6 @@ import { empty } from './shapes'
 const PANEL = 230
 /** Screen pixels kept clear around what is in play, which sits in the middle of the screen above the panel. */
 const WHOLE_MARGIN = PANEL - 20
-/** The id of the hero's stand-in, shown readying at the landing in the intro. */
-const STAND_IN = -1
-/** How long the stand-in crouches, then springs up. */
-const READY_MS = 700
 
 export interface View {
   canvas: HTMLCanvasElement
@@ -48,9 +41,7 @@ export interface View {
   cut(frame: Frame): void
   /** Glides the camera to an intro frame over `ms` along `ease`. */
   shoot(frame: Frame, ms: number, ease: (t: number) => number): Promise<void>
-  /** Shows the hero at the landing, readying itself. */
-  ready(): void
-  /** Glides the camera to the deploy framing over `ms`, and takes away the hero's stand-in. */
+  /** Glides the camera to the deploy framing over `ms`. */
   frame(ms: number): Promise<void>
   /** The unit drawn under a point of the window, if any. */
   unitAt(x: number, y: number): number | null
@@ -135,23 +126,9 @@ export async function createView(): Promise<View> {
       s.held = 0
       return s.follow(shotOf(f), ms, ease)
     },
-    ready() {
-      const battle = s.shown
-      const soldier = battle?.reserve[0]
-      if (!battle?.entry || !soldier || !s.hero) return
-      remove(s, STAND_IN)
-      const unit = { ...soldierUnit({ nextId: STAND_IN } as Battle, soldier, battle.entry), id: STAND_IN }
-      const sprite = create(s, unit, level(s.hero), s.hero.cls ? CLASSES[s.hero.cls].name[0] : '')
-      void s.tween(READY_MS, (t) => {
-        const crouch = t < 0.4 ? t / 0.4 : 1 - (t - 0.4) / 0.6
-        squash(sprite, 1 + 0.18 * crouch, 1 - 0.22 * crouch)
-        if (t === 1) callout(s, '👁 READY', COLOR.hit, sprite)
-      })
-    },
     async frame(ms) {
       s.held = 0
       await s.follow(home(), ms)
-      remove(s, STAND_IN)
       s.labels.clear()
     },
     hideLanding(hidden) {

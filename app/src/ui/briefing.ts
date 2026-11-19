@@ -1,18 +1,22 @@
-// The mission intro: a shot list built from the battle's landmarks, and playing it over the deploy screen.
+// The mission intro: a tour of the 3 to 5 points that matter this battle, built from its landmarks, and playing it over the deploy screen.
 import { GRID, type Battle, type Tile } from '../core/battle'
+import { ARENA_KINDS } from '../core/arena-kinds'
+import { CHALLENGES } from '../core/challenges'
 import { EXAMS, type Exam } from '../core/exams'
-import type { Poi } from '../core/pois'
+import { CIVILIANS, RESCUE_QUORUM } from '../core/goals'
+import { groundPoi, type Poi } from '../core/pois'
 import type { View } from '../view/view'
 
-/** Zoom against the deploy framing: wide, medium and close. */
-export const ZOOM = { wide: 1, medium: 1.6, hero: 2, close: 2.4 }
-/** The most a shot orbits off the axis, either way, so the hero's side stays screen-left. */
-export const ORBIT = (8 * Math.PI) / 180
-const DEG = Math.PI / 180
-/** A glide's shortest and longest; a shot's least hold. */
+/** Zoom against the deploy framing: a point's opening, and how much closer its hold eases in. */
+export const ZOOM = { point: 1.5, close: 2.2, quick: 1.3, push: 1.25 }
+/** How far a point's hold orbits, either way off the axis, so the hero's side stays screen-left. */
+export const ORBIT = (10 * Math.PI) / 180
+/** A glide's shortest and longest; a point's shortest and longest hold. */
 export const GLIDE_MS = [800, 1400]
-export const HOLD_MS = 600
-/** How long the intro lasts once its kind has been seen twice: one glide to the hero, and a hold. */
+export const HOLD_MS = [1500, 2500]
+/** Points a tour shows, fewest and most. */
+export const POINTS = [3, 5]
+/** How long the intro lasts once its kind has been seen twice: one glide to the objective, and a hold. */
 const QUICK_MS = 1500
 /** Screen widths a glide may cross before it becomes a cut; screen widths a second at peak; zoom factor a second. */
 const CUT_SCREENS = 1.5
@@ -22,6 +26,8 @@ const ZOOM_RATE = 1.5
 const SPAN = GRID / 2
 /** Most words a caption takes. */
 export const CAPTION_WORDS = 6
+/** Nests a tour shows at most. */
+const NESTS = 2
 
 /** Where a shot looks: a square of tiles, `extent` from its centre each way, zoomed against the deploy framing, orbited off the axis, its subject on a third (-1 left, 1 right). */
 export interface Frame {
@@ -41,8 +47,6 @@ export interface Shot {
   hold: number
   caption?: string
   title?: string
-  /** The hero readies here. */
-  hero?: boolean
 }
 
 /** What the intro plays: the shots, and the turn that keeps the hero screen-left. */
@@ -70,9 +74,6 @@ function frame(at: { x: number; y: number; extent?: number }, zoom: number, orbi
   return { x: inside(at.x, extent), y: inside(at.y, extent), extent, zoom, orbit, third }
 }
 
-const of = (p: Poi) => ({ ...p.frame })
-const centre = (tiles: Tile[]): Tile => ({ x: tiles.reduce((s, t) => s + t.x, 0) / tiles.length, y: tiles.reduce((s, t) => s + t.y, 0) / tiles.length })
-
 /** How long a glide from `a` to `b` takes: steady enough to read, within GLIDE_MS. */
 function glideMs(a: Frame, b: Frame): number {
   const screens = Math.hypot(b.x - a.x, b.y - a.y) / (SPAN / Math.max(a.zoom, b.zoom))
@@ -85,75 +86,75 @@ export function cuts(a: Frame, b: Frame): boolean {
   return Math.hypot(b.x - a.x, b.y - a.y) / (SPAN / Math.max(a.zoom, b.zoom)) > CUT_SCREENS
 }
 
-interface Beat {
-  from: Frame
-  to?: Frame
+/** A point the tour stops at: what it frames, how close it opens, how long it holds, and what it says. */
+interface Point {
+  at: { x: number; y: number; extent?: number }
+  zoom: number
   ms: number
   caption?: string
   title?: string
-  hero?: boolean
-  cut?: boolean
 }
 
-/** Joins beats into shots: each glides from the last or, too far or marked, cuts; its hold fills the rest of its time. */
-function join(beats: Beat[], glideFirst: Frame | null): Shot[] {
-  let last = glideFirst
-  return beats.map((b) => {
-    const to = b.to ?? b.from
-    const cut = !last || b.cut || cuts(last, b.from)
-    const glide = cut ? 0 : glideMs(last!, b.from)
+/** Aliens in a landmark's frame. */
+const within = (battle: Battle, p: Poi) => battle.units.filter((u) => u.side === 'alien' && Math.max(Math.abs(u.x - p.frame.x), Math.abs(u.y - p.frame.y)) <= p.frame.extent)
+
+/** The points that matter this battle, in the order the tour shows them: a boss first, then the alien clusters, the ground's landmark where a boon answers it, and the objective last. Landmarks fill a quiet battle up to 3; a busy one stops at 5. */
+export function pointsOf(battle: Battle, order: string): Point[] {
+  const landing = battle.pois.find((p) => p.kind === 'landing')!
+  const objective = battle.pois.find((p) => p.kind === 'objective')!
+  const boss = battle.units.find((u) => u.side === 'alien' && u.boss)
+  const nests = battle.pois.filter((p) => p.kind === 'nest' && within(battle, p).length > 0).sort((p, q) => within(battle, q).length - within(battle, p).length).slice(0, boss ? 1 : NESTS)
+  const ground = groundPoi(battle)
+  const feature = (p: Poi): Point => ({ at: p.frame, zoom: ZOOM.point, ms: 1800, caption: p.kind === 'hazard' ? `Hazard: ${p.label}.` : `High ground: ${p.label}.` })
+  const nest = (p: Poi, i: number): Point => ({ at: p.frame, zoom: ZOOM.point, ms: 2200, caption: `${i === 0 && battle.challenge ? CHALLENGES[battle.challenge].name : p.label}: ${within(battle, p).length} aliens.` })
+  const exam = boss?.effects.find((e): e is Exam => e in EXAMS)
+  const goal: Point = boss
+    ? { at: { x: boss.x, y: boss.y, extent: 3 }, zoom: ZOOM.close, ms: 2500, title: exam ? `${EXAMS[exam].name} Guardian` : 'Guardian', caption: `${order}.` }
+    : { at: objective.frame, zoom: ZOOM.point, ms: 2000, caption: battle.goal === 'rescue' ? `${CIVILIANS} civilians. Save ${RESCUE_QUORUM + 1}.` : `${order}.` }
+  const far = (p: Point) => Math.hypot(p.at.x - landing.x, p.at.y - landing.y)
+  const middle = [...nests.map(nest), ...(ground && ARENA_KINDS[battle.arenaKind].answers.length > 0 ? [feature(ground)] : [])]
+  // A quiet battle shows its other landmarks, nearest the landing first.
+  const spare = battle.pois.filter((p) => (p.kind === 'hazard' || p.kind === 'vantage' || p.kind === 'strongpoint') && p !== ground).sort((p, q) => Math.hypot(p.x - landing.x, p.y - landing.y) - Math.hypot(q.x - landing.x, q.y - landing.y))
+  for (const p of spare) if (middle.length + 1 < POINTS[0]) middle.push(p.kind === 'strongpoint' ? { at: p.frame, zoom: ZOOM.point, ms: 1600, caption: `Cover: ${p.label}.` } : feature(p))
+  const tour = middle.sort((a, b) => far(a) - far(b)).slice(0, POINTS[1] - 1)
+  // A boss opens the tour, close, and the objective it guards needs no second stop.
+  return boss ? [goal, ...tour] : [...tour, goal]
+}
+
+/** A point held: opened from one side of the axis, it orbits slowly to the other and eases in. */
+function shotAt(p: Point, i: number): { from: Frame; to: Frame } {
+  const side = i % 2 === 0 ? 1 : -1
+  return { from: frame(p.at, p.zoom, -side * ORBIT, 0), to: frame(p.at, p.zoom * ZOOM.push, side * ORBIT, 0) }
+}
+
+/** Joins points into shots: each glides from the last or, too far, cuts; its hold fills the rest of its time. */
+function join(points: Point[], hold?: number): Shot[] {
+  let last: Frame | null = null
+  return points.map((p, i) => {
+    const { from, to } = shotAt(p, i)
+    const glide = !last || cuts(last, from) ? 0 : glideMs(last, from)
     last = to
-    return { from: b.from, to, glide, hold: Math.max(HOLD_MS, b.ms - glide), caption: b.caption, title: b.title, hero: b.hero }
+    return { from, to, glide, hold: Math.min(HOLD_MS[1], Math.max(HOLD_MS[0], hold ?? p.ms)), caption: p.caption, title: p.title }
   })
 }
 
-/** Aliens in a nest's frame. */
-const within = (battle: Battle, p: Poi) => battle.units.filter((u) => u.side === 'alien' && Math.max(Math.abs(u.x - p.frame.x), Math.abs(u.y - p.frame.y)) <= p.frame.extent)
-
 /**
- * The intro for a battle at deploy, seen at the turn `yaw`: where we are, what is in the way, the ground, the goal, and
- * the hero alone at the landing. A boss opens close on it and pulls out. `seen` intros of its kind before shorten it.
+ * The intro for a battle at deploy, seen at the turn `yaw`: a tour of the points that matter, each held while the
+ * camera orbits slowly and eases in. `seen` intros of its kind before shorten it: to its first and last points, then to
+ * one glide onto the last.
  */
-export function introShots(battle: Battle, order: string, hero: string, yaw: number, seen = 0): Intro {
-  const at = (kind: Poi['kind']) => battle.pois.find((p) => p.kind === kind)
-  const landing = at('landing')!
-  const objective = at('objective')!
-  const aliens = battle.units.filter((u) => u.side === 'alien')
-  const nest = battle.pois.filter((p) => p.kind === 'nest').sort((p, q) => within(battle, q).length - within(battle, p).length)[0]
-  const threat = nest ? { ...of(nest), x: nest.frame.x, y: nest.frame.y } : { ...centre(aliens), extent: 4 }
-  const feature = at('hazard') ?? at('vantage')
-  const boss = aliens.find((u) => u.boss)
-  const turned = axisYaw(yaw, landing, boss ?? threat)
-  const alone = `${hero || 'Your hero'} fights alone. You build.`
-  const mid = centre([landing, objective])
-  const heroBeat: Beat = { from: frame(landing, ZOOM.hero, 0, -1), to: frame(landing, ZOOM.hero * 1.05, (boss ? -4 : 2) * DEG, -1), ms: boss ? 1800 : 1500, caption: alone, hero: true }
+export function introShots(battle: Battle, order: string, yaw: number, seen = 0): Intro {
+  const points = pointsOf(battle, order)
+  const landing = battle.pois.find((p) => p.kind === 'landing')!
+  const boss = battle.units.find((u) => u.side === 'alien' && u.boss)
+  const turned = axisYaw(yaw, landing, boss ?? points.at(-1)!.at)
   if (seen >= 2) {
-    const [glide] = join([heroBeat], frame({ ...mid, extent: SPAN / 2 }, ZOOM.wide))
-    return { yaw: turned, shots: [{ ...glide, glide: QUICK_MS - HOLD_MS, hold: HOLD_MS }] }
+    const end = points.at(-1)!
+    const from = frame({ x: (landing.x + end.at.x) / 2, y: (landing.y + end.at.y) / 2, extent: SPAN / 2 }, 1)
+    const to = frame(end.at, ZOOM.quick)
+    return { yaw: turned, shots: [{ from, to, glide: 0, hold: QUICK_MS, caption: end.caption, title: end.title }] }
   }
-  if (boss) {
-    const exam = boss.effects.find((e): e is Exam => e in EXAMS)
-    const name = exam ? `${EXAMS[exam].name} Guardian` : 'Guardian'
-    const beats: Beat[] = [
-      { from: frame(boss, ZOOM.close), ms: 1200 },
-      { from: frame(boss, ZOOM.close), to: frame(boss, 1.3, 2 * DEG, 1), ms: 1800, title: name },
-      { from: frame({ ...mid, extent: SPAN / 2 }, ZOOM.wide, -2 * DEG), to: frame({ ...mid, extent: SPAN / 2 }, ZOOM.wide * 1.08, 2 * DEG), ms: 1600, caption: `${order}.`, cut: true },
-      ...(at('hazard') ? [{ from: frame(of(at('hazard')!), ZOOM.medium, 0, 1), to: frame(of(at('hazard')!), ZOOM.medium * 1.05, 2 * DEG, 1), ms: 1600 }] : []),
-      ...(at('vantage') ? [{ from: frame(of(at('vantage')!), ZOOM.medium, 0, -1), to: frame(of(at('vantage')!), ZOOM.medium * 1.05, -2 * DEG, -1), ms: 1400 }] : []),
-      heroBeat,
-    ]
-    return { yaw: turned, shots: join(seen === 1 ? [beats[1], beats[2], heroBeat] : beats, null) }
-  }
-  const featureCaption = feature?.kind === 'hazard' ? `Hazard: ${feature.label}.` : `High ground: ${feature?.label}.`
-  const count = nest ? within(battle, nest).length : aliens.length
-  const beats: Beat[] = [
-    { from: frame({ ...mid, extent: SPAN / 2 }, ZOOM.wide), to: frame({ ...mid, extent: SPAN / 2 }, 1.1, 4 * DEG), ms: 1600, caption: `${landing.label}, ${battle.city}.` },
-    { from: frame(threat, ZOOM.medium, 0, 1), to: frame(threat, ZOOM.medium * 1.05, 2 * DEG, 1), ms: 1800, caption: `${nest?.label ?? 'Aliens'}: ${count} aliens.` },
-    ...(feature ? [{ from: frame(of(feature), ZOOM.medium), to: frame(of(feature), ZOOM.medium * 1.05, -2 * DEG), ms: 1200, caption: featureCaption }] : []),
-    { from: frame(of(objective), ZOOM.medium, 0, 1), to: frame(of(objective), ZOOM.medium * 1.05, 2 * DEG, 1), ms: 1400, caption: `${order}.` },
-    heroBeat,
-  ]
-  return { yaw: turned, shots: join(seen === 1 ? [beats[0], beats.at(-2)!, heroBeat] : beats, null) }
+  return { yaw: turned, shots: seen === 1 ? join([points[0], points.at(-1)!], HOLD_MS[0]) : join(points) }
 }
 
 /** The pause before the deploy screen, the ease to it, and the ease on a skip. */
@@ -169,10 +170,10 @@ const CAPTION_OUT = 150
 const played = new Map<string, number>()
 
 /** Plays the intro over the deploy screen; a tap or any key skips to it. `fresh` plays it in full, as if never seen. */
-export async function brief(view: View, battle: Battle, order: string, hero: string, fresh = false): Promise<void> {
+export async function brief(view: View, battle: Battle, order: string, fresh = false): Promise<void> {
   const boss = battle.units.some((u) => u.side === 'alien' && u.boss)
   const kind = boss ? 'boss' : battle.goal
-  const intro = introShots(battle, order, hero, view.turn(), fresh ? 0 : (played.get(kind) ?? 0))
+  const intro = introShots(battle, order, view.turn(), fresh ? 0 : (played.get(kind) ?? 0))
   played.set(kind, (played.get(kind) ?? 0) + 1)
   view.turn(intro.yaw)
   const drop = document.getElementById('drop')!
@@ -204,8 +205,7 @@ export async function brief(view: View, battle: Battle, order: string, hero: str
     if (shot.glide > 0) await Promise.race([view.shoot(shot.from, shot.glide, easeInOutCubic), wait(shot.glide)])
     else view.cut(shot.from)
     if (skipped) break
-    if (shot.hero) view.ready()
-    // The first move after a cut lands hard; a hold after a glide drifts.
+    // The first move after a cut lands hard; a hold after a glide orbits on smoothly.
     void view.shoot(shot.to, shot.hold, shot.glide > 0 ? easeInOutSine : easeOutQuart)
     say(title, shot.title)
     if (await held(CAPTION_IN)) break

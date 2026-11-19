@@ -79,7 +79,7 @@ async function show(events: GameEvent[], animate: boolean): Promise<void> {
   ui.update(state)
   if (state.battle?.phase === 'deploy' && state.battle !== briefed && !params.has('manual')) {
     briefed = state.battle
-    void brief(view, state.battle, missionOrder(state), state.hero.name)
+    void brief(view, state.battle, missionOrder(state))
   }
 }
 
@@ -125,7 +125,7 @@ window.debug = {
     return structuredClone(state)
   },
   brief() {
-    if (state.battle?.phase === 'deploy') void brief(view, state.battle, missionOrder(state), state.hero.name, true)
+    if (state.battle?.phase === 'deploy') void brief(view, state.battle, missionOrder(state), true)
   },
 }
 
