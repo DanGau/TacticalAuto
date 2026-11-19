@@ -41,8 +41,12 @@ const FLANKS: Mark[] = [[-2, -3], [-2, 3]]
 const TANKS = 3
 const TANK_REACH = 5
 /** Nests framed: the biggest clusters standing farther than this from the objective. */
-const NESTS = 2
+const NESTS = 3
 const GUARD_REACH = 5
+/** How far apart landmarks stand to each hold a cluster. */
+const ANCHOR_APART = 8
+/** How near a landmark a nest stands to be named for it. */
+const HOLD_REACH = 6
 
 /** A Firing line's ridge: how far along it runs and how far to each side. */
 const RIDGE_ALONG = 9
@@ -167,23 +171,27 @@ export function designEncounter(battle: Battle, aliens: Alien[], challenge: Chal
     }
   }
   const b = battle.objective
-  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: b, boss: b, objective: battle.goal === 'rescue' ? null : b, challenge })
-  // Nests: the biggest clusters away from the objective, each marked with creep.
+  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: b, boss: b, objective: battle.goal === 'rescue' ? null : b, challenge, anchors: apart([strongpoint, hazard, vantage], ANCHOR_APART) })
+  // Nests: the biggest clusters away from the objective, each marked with creep and named for the landmark it holds.
   const groups = [...new Set(clusters)].map((c) => posts.filter((_, i) => clusters[i] === c))
   const centre = (tiles: Tile[]): Tile => ({ x: Math.round(tiles.reduce((s, t) => s + t.x, 0) / tiles.length), y: Math.round(tiles.reduce((s, t) => s + t.y, 0) / tiles.length) })
   const guards = groups.filter((g) => distance(centre(g), b) <= GUARD_REACH).flat()
   const nests = groups.filter((g) => distance(centre(g), b) > GUARD_REACH).sort((p, q) => q.length - p.length).slice(0, NESTS)
   for (const g of nests) creep(battle, centre(g))
   const hive = battle.place === 'hive'
+  const held = (at: Tile) => ([[strongpoint, names.strongpoint], [hazard, names.hazard], [vantage, names.vantage]] as const).find(([t]) => distance(t, at) <= HOLD_REACH)?.[1]
   battle.pois = [
     poi('objective', objectiveName(battle.goal, aliens), b, [...guards, ...flanks]),
-    ...nests.map((g) => poi('nest', hive ? 'Hive Brood' : g.length >= 3 ? 'Alien Nest' : 'Alien Post', centre(g), g)),
+    ...nests.map((g) => poi('nest', held(centre(g)) ?? (hive ? 'Hive Brood' : g.length >= 3 ? 'Alien Nest' : 'Alien Post'), centre(g), g)),
     poi('hazard', names.hazard, hazard, tanks),
     poi('vantage', names.vantage, vantage),
     poi('strongpoint', names.strongpoint, strongpoint, cover),
   ] satisfies Poi[]
   return { spot, posts, clusters }
 }
+
+/** Of `tiles`, each at least `by` from those kept before it. */
+const apart = (tiles: Tile[], by: number) => tiles.filter((t, i) => tiles.slice(0, i).every((u) => distance(t, u) >= by))
 
 /** The firm tile nearest `at`: not water, mire, ice or the void. */
 function firm(battle: Battle, at: Tile): Tile {

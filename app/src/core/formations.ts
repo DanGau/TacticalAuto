@@ -15,6 +15,8 @@ export interface Plot {
   /** What the mission is about. */
   objective: Tile | null
   challenge: ChallengeId | null
+  /** Landmarks the free aliens gather at, a cluster each, nearest the way in first. */
+  anchors: Tile[]
 }
 
 /** How a challenge stands its clusters: their sizes, how far along the axis and off it, how far apart, and in what shape. */
@@ -94,8 +96,19 @@ function shapesFor(feature: Feature, n: number): Shape[] {
 /** How strong an alien looks, to lead a retinue. */
 const bulk = (alien: Alien) => alien.stats.hp + alien.stats.damage
 
-/** Which aliens stand together: those a set piece holds first, then the rest in clusters of drawn sizes. */
-function groupsOf(battle: Battle, aliens: Alien[], plot: Plot): { members: number[]; at: Tile | null; shape: Shape | null }[] {
+/** Aliens standing together: where, if a set piece holds them; in what shape, if set; the landmark they gather at, if any. */
+interface Group {
+  members: number[]
+  at: Tile | null
+  shape: Shape | null
+  anchor?: Tile
+}
+
+/** Aliens a landmark's cluster takes, about. */
+const ANCHOR_SHARE = 4
+
+/** Which aliens stand together: those a set piece holds first, then the rest in a cluster at each landmark, or, under a challenge that stages them, in clusters of its sizes. */
+function groupsOf(battle: Battle, aliens: Alien[], plot: Plot): Group[] {
   // Leaders last, so no retinue swallows another's leader.
   const leads = (i: number) => (aliens[i].boss || aliens[i].target ? 1 : 0)
   const left = aliens.map((_, i) => i).sort((a, b) => leads(a) - leads(b))
@@ -103,7 +116,7 @@ function groupsOf(battle: Battle, aliens: Alien[], plot: Plot): { members: numbe
     left.splice(left.indexOf(first), 1)
     return [first, ...left.splice(0, more)]
   }
-  const groups: { members: number[]; at: Tile | null; shape: Shape | null }[] = []
+  const groups: Group[] = []
   const lead = aliens.findIndex((a) => a.target)
   if (lead >= 0) groups.push({ members: take(lead, 2), at: plot.commander, shape: 'retinue' })
   const boss = aliens.findIndex((a, i) => a.boss && left.includes(i))
@@ -113,7 +126,19 @@ function groupsOf(battle: Battle, aliens: Alien[], plot: Plot): { members: numbe
     const j = randomInt(battle, i + 1)
     ;[left[i], left[j]] = [left[j], left[i]]
   }
-  const sizes = (plot.challenge && STAGING[plot.challenge]?.sizes) || SIZES
+  const staged = plot.challenge && STAGING[plot.challenge]?.sizes
+  if (!staged && plot.anchors.length > 0 && left.length > 0) {
+    // A cluster at each of the first landmarks, of shares drawn at random, two at least.
+    const k = Math.min(plot.anchors.length, Math.max(1, Math.round(left.length / ANCHOR_SHARE)))
+    const weights = Array.from({ length: k }, () => 0.5 + random(battle))
+    const sum = weights.reduce((s, w) => s + w, 0)
+    const sizes = weights.map((w) => Math.max(Math.min(2, left.length), Math.floor((left.length * w) / sum)))
+    for (let i = 0; sizes.reduce((s, n) => s + n, 0) < left.length; i++) sizes[i % k]++
+    while (sizes.reduce((s, n) => s + n, 0) > left.length) sizes[sizes.indexOf(Math.max(...sizes))]--
+    sizes.forEach((n, i) => groups.push({ members: left.splice(0, n), at: null, shape: null, anchor: plot.anchors[i] }))
+    return groups
+  }
+  const sizes = staged || SIZES
   while (left.length > 0) groups.push({ members: left.splice(0, sizes[randomInt(battle, sizes.length)]), at: null, shape: null })
   return groups
 }
@@ -152,7 +177,9 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
     if (!at) {
       const i = order++
       const span = PUSH_BAND[1] - PUSH_BAND[0]
-      const wanted = staged
+      const wanted = group.anchor
+        ? { along: along(group.anchor), across: (group.anchor.x - spot.x) * -fy + (group.anchor.y - spot.y) * fx }
+        : staged
         ? { along: staged.band[0] + ((staged.band[1] - staged.band[0]) * (i + 0.5)) / free.length, across: (r() * 2 - 1) * staged.wander }
         : battle.flow === 'push'
         ? { along: PUSH_BAND[0] + (span * (i + 0.5)) / free.length + (r() - 0.5) * 3, across: (r() * 2 - 1) * WANDER }
@@ -161,7 +188,7 @@ export function gather(battle: Battle, aliens: Alien[], plot: Plot): { posts: Ti
       const want = FEATURES[randomInt(battle, FEATURES.length)]
       for (let sep = staged?.apart ?? SEPARATION[battle.flow]; !at && sep >= (keepApart ? WAKE_CLEAR : 2); sep--) {
         const room = open.filter((t) => centres.every((c) => distance(c, t) >= sep) && clearOfOthers(t, Math.ceil(Math.sqrt(n))))
-        const score = (t: Tile) => -Math.hypot(t.x - aim.x, t.y - aim.y) + (!staged && featureAt(battle, t) === want ? SETTLE : 0) + (lips.has(t.y * GRID + t.x) ? EDGE_PULL : 0) + r()
+        const score = (t: Tile) => -Math.hypot(t.x - aim.x, t.y - aim.y) + (!staged && !group.anchor && featureAt(battle, t) === want ? SETTLE : 0) + (!group.anchor && lips.has(t.y * GRID + t.x) ? EDGE_PULL : 0) + r()
         at = room.reduce<Tile | null>((a, b) => (!a || score(b) > score(a) ? b : a), null)
       }
       // No room stands clear: it joins the nearest cluster, which engages as one.

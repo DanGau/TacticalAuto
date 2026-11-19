@@ -76,3 +76,18 @@ test('an assassination that is also a big one stands every alien, its boss clear
   expect(battle.units.filter((u) => u.side === 'alien')).toHaveLength(aliens.length)
   expect(battle.units.every((u) => Number.isInteger(u.x) && Number.isInteger(u.y))).toBe(true)
 })
+
+test('free aliens gather in a cluster at each landmark, each a nest named for it', () => {
+  for (const place of PLACES) {
+    for (let seed = 1; seed <= 6; seed++) {
+      const battle = createBattle(seed, place, force(12), [], 'cross')
+      const marks = battle.pois.filter((p) => p.kind === 'strongpoint' || p.kind === 'hazard' || p.kind === 'vantage')
+      const free = battle.units.filter((u) => u.side === 'alien' && distance(u, battle.objective) > 5)
+      const near = free.filter((u) => marks.some((m) => distance(u, m) <= 8))
+      expect(near.length / free.length).toBeGreaterThan(0.8)
+      const nests = battle.pois.filter((p) => p.kind === 'nest')
+      expect(nests.length).toBeGreaterThan(0)
+      expect(nests.some((n) => marks.some((m) => m.label === n.label))).toBe(true)
+    }
+  }
+})
