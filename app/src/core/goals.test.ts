@@ -116,7 +116,7 @@ test('on a rescue aliens with no soldier to fight kill civilians', () => {
   for (const u of battle.units.filter((u) => u.side === 'alien')) u.engaged = true
   const civilians = new Set(battle.units.filter((u) => u.civilian).map((u) => u.id))
   let killed = 0
-  while (battle.phase === 'battle' && battle.round < 10) for (const e of stepBattle(battle)) if (e.type === 'death' && civilians.has(e.id)) killed++
+  while (battle.phase === 'battle' && battle.round < 30) for (const e of stepBattle(battle)) if (e.type === 'death' && civilians.has(e.id)) killed++
   expect(killed).toBeGreaterThan(0)
 })
 

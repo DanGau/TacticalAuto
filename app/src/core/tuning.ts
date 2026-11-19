@@ -5,7 +5,7 @@ export const TUNING = {
   /** Damage every alien's attack adds. */
   alienDamage: -3,
   /** Damage more every `every`th alien of a road battle hits for, from the leg after `from` keys: the road wears the hero down. */
-  roadDamage: { damage: 1, from: 2, every: 2 },
+  roadDamage: { damage: 1, from: 3, every: 3 },
   /** The alien force a battle has in each leg, before its risk and kind are counted. */
   legForce: [3, 10, 16, 17],
   /** Damage each hit on a marked unit adds. */

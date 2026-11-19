@@ -20,7 +20,7 @@ export const EXTRACT_REACH = 3
 export const WAVE_EVERY = 2
 /** Civilians on a rescue, the health of each, how far each flees in a turn, and the supplies and experience each saved pays. */
 export const CIVILIANS = 3
-export const CIVILIAN_HP = 8
+export const CIVILIAN_HP = 16
 export const CIVILIAN_MOVE = 4
 export const CIVILIAN_SUPPLIES = 6
 export const CIVILIAN_XP = 3
@@ -38,10 +38,10 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
     name: 'Rescue',
     text: `Reach the ${CIVILIANS} civilians to save them. Save ${RESCUE_QUORUM + 1}, or fail. Each pays ${CIVILIAN_SUPPLIES} supplies and ${CIVILIAN_XP} XP. Every ${CIVILIANS_PER_THREAT} lost: 1 threat.`,
     reward: 'supplies and experience, no gear',
-    force: 1,
+    force: -3,
     weight: 1,
     from: 0,
   },
   // Never drawn: a full threat turns the next stop into an ambush.
-  ambush: { name: 'Hunted', text: 'Reach the extraction zone, or kill the Hunter.', reward: 'the threat emptied', force: -7, weight: 0, from: 0 },
+  ambush: { name: 'Hunted', text: 'Reach the extraction zone, or kill the Hunter.', reward: 'the threat emptied', force: -10, weight: 0, from: 0 },
 }

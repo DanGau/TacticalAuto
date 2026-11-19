@@ -15,7 +15,7 @@ export type ChallengeId = 'slog' | 'firingLine' | 'ironWall' | 'swarm' | 'scatte
  */
 export const CHALLENGES: Record<ChallengeId, { name: string; icon: string; test: string; answers: UtilityId[]; volley?: true; grim: number[][] }> = {
   slog: { name: 'Slog', icon: '🌿', test: `Small groups of shooters across a swamp fire from the start. Mire costs ${MIRE_COST + 1}× move.`, answers: ['hoverPack', 'longshot', 'deflector', 'afterburner', 'regen'], volley: true, grim: [[2, 3, 4], [3, 4, 6], [5, 7, 8]] },
-  firingLine: { name: 'Firing Line', icon: '🎯', test: 'Long-range shooters on a ridge fire from the start.', answers: ['deflector', 'longshot', 'suppression', 'plating'], volley: true, grim: [[2, 3, 4], [3, 5, 6], [6, 7, 9]] },
+  firingLine: { name: 'Firing Line', icon: '🎯', test: 'Long-range shooters on a ridge fire from the start.', answers: ['deflector', 'longshot', 'suppression', 'plating'], volley: true, grim: [[2, 3, 4], [3, 4, 5], [4, 6, 7]] },
   ironWall: { name: 'Iron Wall', icon: '🧱', test: 'Heavy Armor shrugs off small hits.', answers: ['plasma', 'hollowPoint', 'overcharge', 'concussion'], grim: [[2, 3, 4], [4, 6, 8], [7, 9, 11]] },
   swarm: { name: 'Swarm', icon: '🐜', test: 'Aliens flood in from every side.', answers: ['ablative', 'riot', 'gauntlet', 'incendiary', 'leech'], grim: [[8, 12, 16], [14, 18, 22], [20, 24, 30]] },
   scattered: { name: 'Scattered', icon: '🗺️', test: 'Sentries stand far apart. When the clock runs out, reinforcements arrive.', answers: ['afterburner', 'hoverPack', 'jumpJets'], grim: [[8, 12, 16], [12, 16, 20], [16, 20, 24]] },
