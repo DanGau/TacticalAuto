@@ -12,6 +12,7 @@ import { deploy, planEntry } from './landing'
 import { ARENA_REACH, designEncounter } from './encounter'
 import { deadlineFor, sentries, type ChallengeId } from './challenges'
 import { pickArenaKind } from './arena-kinds'
+import { landingPoi } from './pois'
 
 /** Fills every open tile outside the walkable area holding `keep`, or else the largest, with stacks, so any open tile can reach any other. */
 export function sealPockets(battle: Battle, keep?: Tile): void {
@@ -131,6 +132,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     objective: { x: 0, y: 0 },
     quarry: aliens.some((a) => a.target),
     arena: { x: 0, y: 0, reach: ARENA_REACH },
+    pois: [],
     approach: { x: 0, y: 0 },
     gates: [],
     rallied: 0,
@@ -164,6 +166,7 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     }
   }
   planEntry(battle)
+  battle.pois.push(landingPoi(battle))
   if (goal === 'ambush') deploy(battle, battle.entry!)
   const move = Math.max(...reserve.map((s) => s.stats.move))
   if (battle.deadline !== null) battle.deadline = deadlineFor(walkingDistances(battle, battle.objective)[battle.entry!.y * GRID + battle.entry!.x], move, posted.length)

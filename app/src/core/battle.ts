@@ -1,6 +1,7 @@
 // A battle's state: units, the board, and the numbers its rules share.
 import type { Exam } from './exams'
 import type { ArenaKind } from './arena-kinds'
+import type { Poi } from './pois'
 import type { SecondaryId } from './secondaries'
 import type { SKILL_EFFECTS } from './skill-effects'
 import type { PerkEffect } from './perks'
@@ -419,6 +420,8 @@ export interface Battle {
   /** Whether the battle is won once its targets fall: a commander, a Guardian, a big one or the Hunter. */
   quarry: boolean
   arena: Arena
+  /** The landmarks the encounter is staged about, most important first. */
+  pois: Poi[]
   /** Where the landing means to lie: head on down the fight's axis, the far end from the objective. */
   approach: Tile
   /** Where reinforcements arrive. */

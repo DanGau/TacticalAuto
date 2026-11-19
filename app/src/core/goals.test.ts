@@ -110,7 +110,7 @@ test('a rescue scatters its civilians about the objective, every alien in sight'
 })
 
 test('on a rescue aliens with no soldier to fight kill civilians', () => {
-  const battle = terror(1).battle!
+  const battle = terror(2).battle!
   for (const s of battle.units.filter(isSoldier)) Object.assign(s, { cloaked: 99, stats: { ...s.stats, range: 0 } })
   for (const u of battle.units.filter((u) => u.side === 'alien')) u.engaged = true
   const civilians = new Set(battle.units.filter((u) => u.civilian).map((u) => u.id))
