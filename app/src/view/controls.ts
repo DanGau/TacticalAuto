@@ -13,8 +13,8 @@ const NOTCH = 1.15
 /** How much closer than the closest framing the player may zoom. */
 const NEAREST = 3
 
-/** Wires the camera to the canvas, the keys and the buttons in `#cam`. `home` is the framing of what is in play at turn `yaw`; `turned` hears a quarter turn. */
-export function installControls(s: Stage, home: (yaw: number) => Camera, turned: (yaw: number) => void): HTMLElement {
+/** Wires the camera to the canvas and the keys. `home` is the framing of what is in play at turn `yaw`; `turned` hears a quarter turn. Returns a switch for the keys, on in battle. */
+export function installControls(s: Stage, home: (yaw: number) => Camera, turned: (yaw: number) => void): (live: boolean) => void {
   const { canvas } = s
   canvas.style.touchAction = 'none'
   const pointers = new Map<number, { x: number; y: number }>()
@@ -104,27 +104,11 @@ export function installControls(s: Stage, home: (yaw: number) => Camera, turned:
     letGo()
   }
 
-  const bar = document.createElement('div')
-  bar.id = 'cam'
-  bar.hidden = true
-  const buttons: [string, string, () => void][] = [
-    ['⟲', 'Turn camera left (Q)', () => turn(-1)],
-    ['−', 'Zoom out (-)', () => zoomKey(1 / NOTCH)],
-    ['⌖', 'Recentre camera (C)', recentre],
-    ['+', 'Zoom in (+)', () => zoomKey(NOTCH)],
-    ['⟳', 'Turn camera right (E)', () => turn(1)],
-  ]
-  bar.innerHTML = `<span class="cam-label">🎥</span>${buttons.map(([glyph, title], i) => `<button data-cam="${i}" title="${title}" aria-label="${title}">${glyph}</button>`).join('')}`
-  bar.addEventListener('pointerdown', (e) => e.stopPropagation())
-  bar.addEventListener('click', (e) => {
-    const i = (e.target as HTMLElement).closest('button')?.dataset.cam
-    if (i !== undefined) buttons[Number(i)][2]()
-  })
-  document.body.append(bar)
+  let on = false
   const keys: Record<string, () => void> = { q: () => turn(-1), e: () => turn(1), c: recentre, Home: recentre, '+': () => zoomKey(NOTCH), '=': () => zoomKey(NOTCH), '-': () => zoomKey(1 / NOTCH) }
   addEventListener('keydown', (e) => {
-    if (bar.hidden || e.ctrlKey || e.metaKey || e.altKey) return
+    if (!on || e.ctrlKey || e.metaKey || e.altKey) return
     keys[e.key.length === 1 ? e.key.toLowerCase() : e.key]?.()
   })
-  return bar
+  return (live) => (on = live)
 }

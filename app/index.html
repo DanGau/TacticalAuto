@@ -58,11 +58,6 @@
       #drop { transition: transform 0.25s ease-out, opacity 0.25s; }
       #drop.briefing { transform: translate(-50%, 120%); opacity: 0; pointer-events: none; }
       /* The camera's buttons: they move the camera, never the hero. */
-      #cam { position: fixed; right: 8px; top: 50%; transform: translateY(-50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px; border-radius: 8px; background: rgba(10, 13, 19, 0.7); }
-      #cam[hidden], body.cinema #cam { display: none; }
-      @media (max-height: 520px) { #cam { top: 8px; right: 96px; transform: none; flex-direction: row; } }
-      #cam button { width: 34px; height: 34px; padding: 0; font-size: 18px; line-height: 1; }
-      #cam .cam-label { padding: 2px 0; font-size: 14px; opacity: 0.7; }
       .intro { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; background: radial-gradient(#232c3d, #0a0d13 70%); text-align: center; animation: fade 0.6s; }
       .intro svg { width: min(52vh, 80vw); height: auto; }
       .intro h1 { font-size: 32px; letter-spacing: 2px; text-transform: uppercase; }

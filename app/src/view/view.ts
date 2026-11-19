@@ -116,7 +116,7 @@ export async function createView(): Promise<View> {
     return clamped({ ...c, x: c.x + right.x * aside, z: c.z + right.z * aside })
   }
 
-  const cam = installControls(s, home, (yaw) => s.shown?.phase === 'deploy' && (deployTurn = yaw))
+  const keys = installControls(s, home, (yaw) => s.shown?.phase === 'deploy' && (deployTurn = yaw))
 
   s.resize()
   return {
@@ -162,7 +162,7 @@ export async function createView(): Promise<View> {
     async show(run, events, animate) {
       const { fx, sprites } = s
       s.hero = run.hero
-      cam.hidden = run.phase !== 'battle' || !run.battle
+      keys(run.phase === 'battle' && !!run.battle)
       fx.clear()
       const battle = run.battle
       if (!battle) return
