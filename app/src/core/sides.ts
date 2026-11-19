@@ -10,7 +10,7 @@ import { freeTilesNear } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
 import { engage, immune, onTile, fireproof, foeHas, has, extractReach, BEACON_REACH, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
-import { fleePath, fightPath, walk, paths, costOf, bestPath, COHESION } from './pathing'
+import { fightPath, walk, paths, costOf, bestPath, COHESION } from './pathing'
 import { detects, sees } from './sight'
 import { upkeep } from './upkeep'
 import { moved, wound } from './wound'
@@ -25,7 +25,7 @@ export function moveSide(battle: Battle): GameEvent[] {
   battle.strides = {}
   for (const unit of battle.units) {
     if (unit.side !== battle.turn || unit.hp <= 0) continue
-    const path = unit.civilian ? fleePath(battle, unit) : unit.engaged ? fightPath(battle, unit) : []
+    const path = unit.civilian ? [] : unit.engaged ? fightPath(battle, unit) : []
     if (path.length === 0 && unit.order) events.push({ type: 'order', src: { kind: 'basic', id: 'order' }, id: unit.id, order: unit.order })
     if (path.length === 0) continue
     // A sentry fires as the alien turns to go.

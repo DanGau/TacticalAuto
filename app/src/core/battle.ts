@@ -289,10 +289,9 @@ export interface Unit {
   /** Keywords it shrugs off; empty for humans. */
   resists: Resist[]
   /**
-   * A civilian to rescue, null for any other unit: on the human side, never fights, and is not a soldier. A hider takes
-   * beside the biggest object it can reach and stays; a runner flees the aliens.
+   * Whether a civilian to rescue: on the human side, never fights, and is not a soldier. It stays put.
    */
-  civilian: 'hider' | 'runner' | null
+  civilian: boolean
   /** For a mech, the soldier id of the engineer who deployed it, credited with what it does; null for any other unit. */
   summoner: number | null
   /** A hero's attack after its weapon's. */

@@ -101,11 +101,12 @@ function terror(seed: number): Run {
   return run
 }
 
-test('a rescue scatters its civilians about the objective, every alien in sight', () => {
+test('a rescue huddles its civilians at the objective, every alien in sight', () => {
   const run = before('rescue')
   const battle = run.battle!
   const civilians = battle.units.filter((u) => u.civilian)
-  expect(Math.min(...civilians.map((c) => distance(c, battle.objective)))).toBeLessThanOrEqual(10)
+  expect(civilians).toHaveLength(CIVILIANS)
+  expect(Math.max(...civilians.map((c) => distance(c, battle.objective)))).toBeLessThanOrEqual(3)
   expect(battle.units.filter((u) => u.side === 'alien').every((u) => u.revealed)).toBe(true)
 })
 
@@ -119,23 +120,10 @@ test('on a rescue aliens with no soldier to fight kill civilians', () => {
   expect(killed).toBeGreaterThan(0)
 })
 
-test('a rescue mixes civilians who hide, huddling and staying put, with civilians who run from the aliens', () => {
-  const run = terror(3)
-  const battle = run.battle!
+test("a rescue's civilians stay put", () => {
+  const battle = terror(3).battle!
   const civilians = battle.units.filter((u) => u.civilian)
-  expect(new Set(civilians.map((u) => u.civilian))).toEqual(new Set(['hider', 'runner']))
-  stepBattle(battle)
-  while (battle.turn !== 'human') stepBattle(battle)
-  const hidden = civilians.filter((u) => u.civilian === 'hider' && battle.units.includes(u)).map((u) => ({ u, x: u.x, y: u.y }))
-  let ran = false
-  for (let i = 0; i < 40 && battle.phase === 'battle'; i++)
-    for (const e of stepBattle(battle)) {
-      const mover = e.type === 'move' ? civilians.find((c) => c.id === e.id) : undefined
-      if (mover?.civilian === 'runner') ran = true
-      expect(hidden.some((h) => h.u === mover)).toBe(false)
-    }
-  expect(hidden.length).toBeGreaterThan(0)
-  expect(ran).toBe(true)
+  for (let i = 0; i < 40 && battle.phase === 'battle'; i++) for (const e of stepBattle(battle)) expect(e.type === 'move' && civilians.some((c) => c.id === e.id)).toBe(false)
 })
 
 test('on a rescue a soldier makes for the alien nearest a civilian, and with none near one, for the nearest civilian', () => {
@@ -163,9 +151,12 @@ test('a civilian a harvester kills rises on the next alien turn as a husk', () =
   const harvester = battle.units.find((u) => u.kind === 'harvester')!
   expect(harvester).toBeDefined()
   battle.units = battle.units.filter((u) => u.side !== 'alien' || u === harvester)
-  // Beside the hider farthest from the team, which stays put.
+  // Beside the civilian farthest from the team; the others last.
   const soldier = battle.units.find(isSoldier)!
-  const prey = battle.units.filter((u) => u.civilian === 'hider').sort((a, b) => distance(b, soldier) - distance(a, soldier))[0]
+  const prey = battle.units.filter((u) => u.civilian).sort((a, b) => distance(b, soldier) - distance(a, soldier))[0]
+  for (const c of battle.units.filter((u) => u.civilian && u !== prey)) c.hp = c.stats.hp = 999
+  // Too far to get anyone out.
+  Object.assign(soldier, freeTilesNear(battle, prey, 2000).find((t) => distance(t, prey) >= 15))
   // Neither falls before the harvest.
   harvester.hp = harvester.stats.hp = 999
   harvester.stats.damage = 99

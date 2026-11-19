@@ -156,7 +156,7 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
   shadow.position.y = DECAL_LIFT * 2
   const node = new Group()
   node.add(shadow, body)
-  const color = unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR[unit.civilian] : unit.summoner !== null ? COLOR.mech : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human
+  const color = unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR.civilian : unit.summoner !== null ? COLOR.mech : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human
   const barred = unit.stats.hp + unit.stats.armor > PIP_MAX
   const rows = barred ? 2 : Math.ceil((unit.stats.hp + unit.stats.armor) / 10)
   const maxHp = unit.stats.hp
@@ -183,9 +183,8 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
       g.clearRect(-BODY.left, -BODY.up, 2 * BODY.left, BODY.up + BODY.down)
       g.fillStyle = css(color)
       g.beginPath()
-      // A hider crouches low and wide; a runner stands tall and thin.
-      if (unit.civilian === 'hider') g.roundRect(-14, -22, 28, 22, 10)
-      else if (unit.civilian === 'runner') g.roundRect(-6, -34, 12, 34, 6)
+      // A civilian crouches low and wide.
+      if (unit.civilian) g.roundRect(-14, -22, 28, 22, 10)
       else g.roundRect(-9, -30, 18, 30, 6)
       g.fill()
       g.fillStyle = css(COLOR.human)

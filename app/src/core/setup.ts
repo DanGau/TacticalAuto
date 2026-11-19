@@ -79,14 +79,12 @@ function clumps(battle: Battle, aliens: Alien[]): Alien[][] {
 /** The share of a flood's aliens posted at the start; the rest come as waves. */
 const FLOOD_POSTED = 1 / 3
 
-/** Tiles apart a rescue's civilians start, from each other and the aliens, and the farthest from the terror's heart. */
+/** Tiles a rescue's civilians start from any alien. */
 export const CIVILIAN_CLEARANCE = 4
-
-export const TERROR_REACH = 10
 
 /**
  * A battle awaiting the hero's landing, its encounter designed as one piece: see designEncounter. A flood keeps most
- * of its aliens back as waves; a rescue's civilians are scattered about the objective. A crossing's and an ambush's
+ * of its aliens back as waves; a rescue's civilians huddle at the objective. A crossing's and an ambush's
  * objective is the extraction zone. An ambush has no deploy screen: the hero is down at once.
  */
 export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[], goal: Goal = 'cross', rules: Rule[] = [], twist: Twist | null = null, place?: Locale, challenge: ChallengeId | null = null): Battle {
@@ -157,13 +155,10 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
   posted.forEach((alien, i) => {
     placeAlien(battle, alien, posts[i]).cluster = clusters[i]
   })
-  // A rescue's civilians are scattered about the objective, half hiding where they are, half running from the aliens.
+  // A rescue's civilians huddle at the objective, apart from any alien, and stay put.
   if (goal === 'rescue') {
-    for (let i = 0; i < CIVILIANS; i++) {
-      let tile = spacedTile(battle, battle.units, CIVILIAN_CLEARANCE)
-      for (let tries = 0; distance(tile, b) > TERROR_REACH && tries < 500; tries++) tile = spacedTile(battle, battle.units, CIVILIAN_CLEARANCE - Math.floor(tries / 100))
-      battle.units.push(civilianUnit(battle, tile, CIVILIAN_HP, i % 2 === 0 ? 'hider' : 'runner'))
-    }
+    const huddle = freeTilesNear(battle, b, 40).filter((t) => battle.units.every((u) => distance(u, t) >= CIVILIAN_CLEARANCE))
+    for (let i = 0; i < CIVILIANS; i++) battle.units.push(civilianUnit(battle, huddle[i] ?? spacedTile(battle, battle.units, 2), CIVILIAN_HP))
   }
   planEntry(battle)
   battle.pois.push(landingPoi(battle))

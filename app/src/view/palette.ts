@@ -22,8 +22,7 @@ export const SOURCE: Record<SrcKind, { color: number; glyph: string }> = {
 export const NIGHT = 0x10141c
 
 export const COLOR = {
-  hider: 0xe0a24a,
-  runner: 0xe8e2c8,
+  civilian: 0xe0a24a,
   vip: 0x6ec8ff,
   mech: 0x9aa9bf,
   human: 0x4da3ff,

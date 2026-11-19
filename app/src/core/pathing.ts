@@ -1,6 +1,6 @@
 // Where a unit moves: candidate paths, scored by stance, goal and threat.
 import { type Battle, type Unit, type Tile, GRID, type Stance, isSoldier, STANDOFF, HASTE_MOVE, CHILL_MOVE, type Order, ENGAGE_REACH } from './battle'
-import { barred, blocked, breach, walkingDistances, bulkAt, stepCost, onGrid, NEIGHBORS, distance, strides, jumps } from './grid'
+import { barred, blocked, breach, walkingDistances, stepCost, onGrid, NEIGHBORS, distance, strides, jumps } from './grid'
 import type { GameEvent } from './combat-event'
 import { hasAttack, nearest, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes, leap } from './fighters'
 import { canHurlFrom } from './objects'
@@ -357,22 +357,6 @@ export function leapTo(battle: Battle, unit: Unit): { to: Tile; caught: Unit[] }
     }
   }
   return best
-}
-
-/** Tiles from every alien a fleeing civilian counts safe. */
-export const SAFE = 6
-
-/** The biggest object beside `tile`: what a hider huddles by. */
-export const hideout = (battle: Battle, tile: Tile) =>
-  Math.max(...[[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => (onGrid(tile.x + dx, tile.y + dy) ? bulkAt(battle, tile.x + dx, tile.y + dy) : 0)))
-
-/** A civilian's path. A hider makes for the biggest object in reach and stays there; a runner goes away from the nearest alien until SAFE from all, then toward the nearest soldier. */
-export function fleePath(battle: Battle, unit: Unit): Tile[] {
-  if (unit.civilian === 'hider') return hideout(battle, unit) > 0 ? [] : bestPath(paths(battle, unit, unit.stats.move), unit, (end, steps) => [-hideout(battle, end), steps])
-  const aliens = battle.units.filter((u) => u.side === 'alien')
-  const soldier = nearest(battle.units.filter(isSoldier), unit)
-  const toSquad = soldier ? walkingDistances(battle, soldier, ...leap(unit)) : null
-  return bestPath(paths(battle, unit, unit.stats.move), unit, (end) => [SAFE - Math.min(SAFE, ...aliens.map((a) => distance(a, end))), toSquad ? toSquad[end.y * GRID + end.x] : 0])
 }
 
 /** The move a path costs, climbing costing more. */

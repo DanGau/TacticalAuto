@@ -167,7 +167,7 @@ export function designEncounter(battle: Battle, aliens: Alien[], challenge: Chal
     }
   }
   const b = battle.objective
-  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: b, boss: b, objective: b, challenge })
+  const { posts, clusters } = gather(battle, aliens, { ground, spot, heading: [fx, fy], commander: b, boss: b, objective: battle.goal === 'rescue' ? null : b, challenge })
   // Nests: the biggest clusters away from the objective, each marked with creep.
   const groups = [...new Set(clusters)].map((c) => posts.filter((_, i) => clusters[i] === c))
   const centre = (tiles: Tile[]): Tile => ({ x: Math.round(tiles.reduce((s, t) => s + t.x, 0) / tiles.length), y: Math.round(tiles.reduce((s, t) => s + t.y, 0) / tiles.length) })

@@ -1,4 +1,5 @@
 // The hero: experience and levels, skills, stats and health, and the candidates a run starts from.
+import { CIVILIAN_XP } from './goals'
 import type { SecondaryId } from './secondaries'
 import type { Lasting } from './base'
 import { type Battle, type Stats, BASE_STATS } from './battle'
@@ -35,7 +36,7 @@ export function level(soldier: { xp: number }): number {
  * Experience a soldier still standing earns from a battle: some shared, for surviving and winning, and the rest its
  * own: for each kill, each `damage` points done, each civilian a won rescue keeps alive, and each feat the first time.
  */
-export const XP = { fought: 1, won: 2, kill: 1, damage: 5, civilian: 1, feat: 2 }
+export const XP = { fought: 1, won: 2, kill: 1, damage: 5, civilian: CIVILIAN_XP, feat: 2 }
 
 /** The sum of one lasting effect over every relic and doctrine held. */
 export function total(run: Run, effect: (source: Lasting) => number | undefined): number {

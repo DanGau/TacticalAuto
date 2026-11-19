@@ -18,15 +18,16 @@ export const HOLD_ROUNDS = 6
 export const EXTRACT_REACH = 3
 /** Alien turns between waves on a flood. */
 export const WAVE_EVERY = 2
-/** Civilians on a rescue, the health of each, how far each flees in a turn, and the supplies each saved pays. */
-export const CIVILIANS = 10
+/** Civilians on a rescue, the health of each, how far each flees in a turn, and the supplies and experience each saved pays. */
+export const CIVILIANS = 3
 export const CIVILIAN_HP = 8
 export const CIVILIAN_MOVE = 4
-export const CIVILIAN_SUPPLIES = 2
+export const CIVILIAN_SUPPLIES = 6
+export const CIVILIAN_XP = 3
 /** Civilians left unsaved on a rescue for each point of threat they add. */
-export const CIVILIANS_PER_THREAT = 4
+export const CIVILIANS_PER_THREAT = 2
 /** A rescue is won, and pays, only when more than this many civilians are saved. */
-export const RESCUE_QUORUM = CIVILIANS / 2
+export const RESCUE_QUORUM = 1
 
 /** `from` is the leg a goal is first drawn on: a fresh hero meets no hold or assassination. */
 export const GOALS: Record<Goal, { name: string; text: string; reward: string; force: number; weight: number; from: number }> = {
@@ -35,7 +36,7 @@ export const GOALS: Record<Goal, { name: string; text: string; reward: string; f
   hold: { name: 'Hold the Uplink', text: `Reach the uplink. Hold its zone for ${HOLD_ROUNDS} rounds.`, reward: 'a relic, no gear', force: -6, weight: 1, from: 1 },
   rescue: {
     name: 'Rescue',
-    text: `Reach civilians to save them. Save over half of ${CIVILIANS}, or fail. Each pays ${CIVILIAN_SUPPLIES} supplies and 1 XP. Every ${CIVILIANS_PER_THREAT} lost: 1 threat.`,
+    text: `Reach the ${CIVILIANS} civilians to save them. Save ${RESCUE_QUORUM + 1}, or fail. Each pays ${CIVILIAN_SUPPLIES} supplies and ${CIVILIAN_XP} XP. Every ${CIVILIANS_PER_THREAT} lost: 1 threat.`,
     reward: 'supplies and experience, no gear',
     force: 1,
     weight: 1,
