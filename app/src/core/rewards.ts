@@ -1,6 +1,6 @@
 // Gear and relic rewards, the shop, and settling the reward phase.
 import { RARITY_CHANCE, type Rarity } from './base'
-import { CARDS } from './cards'
+import { CARDS, type CardRarity } from './cards'
 import { drawCards, OFFERS, UPGRADED } from './deck'
 import { generateGear, type Gear } from './gear'
 import { random, randomInt } from './rng'
@@ -85,7 +85,7 @@ export function buyWare(run: Run, index: number): void {
 }
 
 /** What a card costs in a shop, by rarity; and removing one from the deck, once a shop. */
-export const CARD_PRICE: Record<Rarity, number> = { common: 3, rare: 5, epic: 8 }
+export const CARD_PRICE: Record<CardRarity, number> = { basic: 1, common: 3, rare: 5, epic: 8 }
 export const REMOVE_PRICE = 4
 
 /** Buys the shop's card at `index` into the deck. The caller checks it is affordable. */

@@ -6,7 +6,7 @@ import { random, randomInt } from './rng'
 import type { Run } from './run-state'
 
 /** The deck every run starts with. */
-export const STARTER: CardId[] = ['plasma', 'plating', 'nanoweave', 'afterburner', 'longshot', 'regen']
+export const STARTER: CardId[] = ['hotLoads', 'fieldPlating', 'medPatch', 'sprint', 'scope', 'steady']
 
 /** Cards drawn each battle; Tactical Satchel draws 1 more. */
 export const HAND = 3

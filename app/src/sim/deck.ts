@@ -13,7 +13,7 @@ const skipping: Bot = (run, rng) => {
 /** The strategic bot taking the rarest card of every offer. */
 const hoarding: Bot = (run, rng) => {
   if (run.phase === 'reward' && run.cardOffers.length > 0 && run.relicOffers.length === 0 && run.finds.length === 0) {
-    const rank = { common: 0, rare: 1, epic: 2 }
+    const rank = { basic: -1, common: 0, rare: 1, epic: 2 }
     return { type: 'card', index: run.cardOffers.reduce((b, id, i) => (rank[CARDS[id].rarity] > rank[CARDS[run.cardOffers[b]].rarity] ? i : b), 0) }
   }
   return strategic(run, rng)

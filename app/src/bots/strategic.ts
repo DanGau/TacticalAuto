@@ -130,7 +130,7 @@ function choose(run: Run): Action {
   return { type: 'hero', index: run.candidates.reduce((best, s, i) => (rank(s) < rank(run.candidates[best]) ? i : best), 0) }
 }
 
-const RARITY_WORTH = { common: 1, rare: 2, epic: 3 }
+const RARITY_WORTH = { basic: 0.5, common: 1, rare: 2, epic: 3 }
 
 /** What card `id` is worth in the deck, wherever it is drawn: its rarity and what it adds to the combos. */
 export const cardWorth = (run: Run, id: CardId) => RARITY_WORTH[CARDS[id].rarity] + 0.5 * comboWorth(run, CARDS[id])
@@ -149,15 +149,15 @@ function weakestCard(run: Run): number | null {
   return cardWorth(run, run.deck[worst].id) < deckWorth(run) - LEAN ? worst : null
 }
 
-/** How much the board pulls on what a card plays to, for a hero of `stats` and a card adding `n`. */
-function pull(card: Card, board: Board, battle: Battle, stats: Stats): number {
+/** How much the board pulls on what a card plays to, for a hero of `stats`: what its line in the hand says it does here. */
+export function pull(card: Card, board: Board, battle: Battle, stats: Stats): number {
   const b = board
   const n = CARDS[card.id].adds.by[card.level - 1]
   const turns = (move: number) => Math.ceil(b.far / Math.max(1, move))
   switch (signOf(card.id)) {
     case 'damage': return 1 + b.hp / 60 + (b.boss ? 1 : 0)
     case 'pierce': return b.armor / 6
-    case 'hp': return 0.6 + b.aliens / 10
+    case 'hp': case 'temp': return 0.6 + b.aliens / 10
     case 'armor': return 0.5 + b.melee / 5
     case 'guard': return 0.5 + b.aliens / 6
     case 'regen': return 0.6 + (b.boss ? 0.8 : 0)

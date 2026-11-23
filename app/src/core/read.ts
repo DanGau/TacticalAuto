@@ -82,6 +82,7 @@ export function lineOf(battle: Battle, board: Board, card: Card, stats: Stats): 
     case 'damage': return `Hits ${change(stats.damage, n)}. ${aliens(b.aliens)}, ${b.hp} HP.`
     case 'pierce': return b.armor > 0 ? `Ignores ${b.armor} alien Armor.` : 'No alien Armor here.'
     case 'hp': return `HP ${change(stats.hp, n)}. ${aliens(b.aliens)}.`
+    case 'temp': return `${n} Temp HP. ${aliens(b.aliens)}, ${b.hp} HP.`
     case 'armor': return `${b.melee} melee and ${b.ranged} ranged aliens.`
     case 'guard': return `${aliens(b.aliens)} to hit you.`
     case 'regen': return b.boss ? `Long fight: ${tough}` : `${aliens(b.aliens)}, ${b.hp} HP.`

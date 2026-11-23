@@ -1,5 +1,6 @@
 // The player's actions, checked and applied to the run: the only way a player changes state.
 import { land } from './landing'
+import { armCard } from './played'
 import { CARDS } from './cards'
 import { arrive, MEDKIT, depart, EVENTS, RELIC_PRICE } from './events'
 import { advance, choose, current, go, nextStop, playCard, ways } from './run'
@@ -80,6 +81,7 @@ export function apply(run: Run, action: Action): Result {
     if (action.fuse && (action.card === null || run.hand.length < 2)) return no('fuse needs another card in hand')
     playCard(run, action.card, action.fuse)
     land(battle)
+    armCard(battle)
     return ok
   }
   if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill' || action.type === 'perk' || action.type === 'card' || action.type === 'upgrade') {

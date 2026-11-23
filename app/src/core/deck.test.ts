@@ -76,7 +76,7 @@ test('a card raises more at each level, its text and name saying so', () => {
     expect(cardText(id, 3), id).not.toBe(cardText(id, 1))
   }
   const run = begun(1)
-  expect(reserveOf(run, [], { id: 'nanoweave', level: 2 }).stats.hp - reserveOf(run, [], { id: 'nanoweave', level: 1 }).stats.hp).toBe(amountOf('nanoweave', 2) - amountOf('nanoweave', 1))
+  expect(reserveOf(run, [], { id: 'plating', level: 2 }).stats.armor - reserveOf(run, [], { id: 'plating', level: 1 }).stats.armor).toBe(amountOf('plating', 2) - amountOf('plating', 1))
 })
 
 test('Fuse plays the card a level higher and puts the hand\'s others out until the next leg', () => {
@@ -149,7 +149,7 @@ test('a safehouse heals and offers an upgrade: a card picked rises to UPGRADED, 
   expect(apply(run, { type: 'upgrade', index: null })).toEqual({ ok: true })
 })
 
-test('Ablative Field takes its amount off each hit on the hero; Regen Gel heals at the start of its turn; Force Gauntlet drives by level', () => {
+test('Ablative Field takes its amount off each hit on the hero; Regen Gel heals at the start of its turn; Force Gauntlet drives by level; Nanoweave lands with Temp HP', () => {
   const at = (card: Card) => {
     const run = landing([card])
     apply(run, { type: 'enter', card: 0, fuse: false })
@@ -160,6 +160,7 @@ test('Ablative Field takes its amount off each hit on the hero; Regen Gel heals 
   expect(rider(ablative.battle, ablative.battle.units.find((u) => u.side === 'alien')!, 'guard')).toBe(0)
   const gauntlet = at({ id: 'gauntlet', level: 3 })
   expect(rider(gauntlet.battle, gauntlet.me, 'push')).toBe(amountOf('gauntlet', 3))
+  expect(at({ id: 'nanoweave', level: 2 }).me.temp).toBe(amountOf('nanoweave', 2))
   const { battle, me } = at({ id: 'regen', level: 1 })
   me.hp = 1
   const events: GameEvent[] = []

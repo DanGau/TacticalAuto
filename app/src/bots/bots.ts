@@ -1,11 +1,11 @@
 // Bots: each chooses the next action whenever the run waits for the player.
 import type { Action } from '../core/apply'
-import { strategic } from './strategic'
-import { plannedPerk } from '../core/plans'
+import { pull, strategic } from './strategic'
+import { plannedPerk, plannedSkill } from '../core/plans'
 import { CARDS, type CardId } from '../core/cards'
 import { UPGRADED } from '../core/deck'
 import { CARD_PRICE } from '../core/rewards'
-import { boardOf, inert } from '../core/read'
+import { boardOf } from '../core/read'
 import type { Flow } from '../core/quantities'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
@@ -57,7 +57,7 @@ const PICKS = {
   },
 } satisfies Record<string, Pick>
 
-const RANK = { common: 0, rare: 1, epic: 2 }
+const RANK = { basic: -1, common: 0, rare: 1, epic: 2 }
 
 /** Of `ids`, by index, the rarest, the first among equals. */
 const rarest = (ids: CardId[]) => ids.reduce((best, id, i) => (RANK[CARDS[id].rarity] > RANK[CARDS[ids[best]].rarity] ? i : best), 0)
@@ -67,7 +67,8 @@ const FULL = 12
 
 /**
  * The reward phase's next choice: a relic, then finds, then cards, an upgrade, then skills. A random bot equips a find
- * or sells it, takes a card or skips, at random; any other takes the rarest card, skipping commons once the deck is FULL.
+ * or sells it, takes a card or skips, at random; any other takes the rarest card, skipping commons once the deck is FULL,
+ * and learns skills along its class's plan unless it picks by synergy.
  */
 function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
   if (run.relicOffers.length > 0) return { type: 'relic', index: pick(run, rng, run.relicOffers.map((id) => RELICS[id])) }
@@ -85,7 +86,7 @@ function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
   if (run.upgrading) return { type: 'upgrade', index: open[rarest(open.map((i) => run.deck[i].id))] }
   const offers = skillOffers(run.hero)
   if (offers.length === 0) return { type: 'perk', index: pick === PICKS.random ? randomInt(rng, minorOffers(run.hero).length) : plannedPerk(run.hero) }
-  return { type: 'skill', index: pick(run, rng, offers.map((id) => SKILLS[id])) }
+  return { type: 'skill', index: pick === PICKS.first ? plannedSkill(run.hero) : pick(run, rng, offers.map((id) => SKILLS[id])) }
 }
 
 /** Purchases the run can pay for now: gear that fits the hero, relics, cards, then a medkit while the hero is hurt. */
@@ -102,11 +103,12 @@ const affordable = (run: Run): Action[] => [
 const heroHealth = (run: Run) => health(run, run.hero) / soldierStats(run, run.hero).hp
 const HURT = 0.6
 
-/** The card of the hand that looks strongest: one with something to play to here, the rarest, then the most upgraded, the first among equals; none with an empty hand. */
+/** The card of the hand that looks strongest: what its line says it does here, by its level; none with an empty hand. */
 function strongest(run: Run): number | null {
   if (run.hand.length === 0) return null
-  const board = boardOf(run.battle!)
-  const look = (i: number) => (inert(run.battle!, board, run.deck[run.hand[i]]) ? -100 : 0) + 10 * RANK[CARDS[run.deck[run.hand[i]].id].rarity] + run.deck[run.hand[i]].level
+  const battle = run.battle!
+  const board = boardOf(battle)
+  const look = (i: number) => pull(run.deck[run.hand[i]], board, battle, battle.reserve[0].stats) * run.deck[run.hand[i]].level
   return run.hand.reduce((best, _, i) => (look(i) > look(best) ? i : best), 0)
 }
 

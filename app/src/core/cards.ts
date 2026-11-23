@@ -18,16 +18,19 @@ export interface Card {
 /** The highest level a card plays at: upgraded, then fused. */
 export const MAX_LEVEL = 3
 
-/** What a card adds that is no stat: damage each hit on the hero loses, health it heals a turn, tiles Force Gauntlet drives. */
-export const RIDERS = ['guard', 'regen', 'push'] as const
+/** What a card adds that is no stat: damage each hit on the hero loses, health it heals a turn, tiles Force Gauntlet drives, Temp HP it lands with. */
+export const RIDERS = ['guard', 'regen', 'push', 'temp'] as const
 export type Rider = (typeof RIDERS)[number]
 
 /** What on the board a card plays to, which its line on the deploy screen counts. */
 export type Sign = keyof Stats | Rider | Quantity | 'pierce' | 'ranged' | 'melee' | 'hover' | 'landing' | 'rescue' | 'hold' | 'extract' | 'boss'
 
+/** A starting card is basic and never offered; the rest are drawn by rarity. */
+export type CardRarity = Rarity | 'basic'
+
 interface Kind extends Flow {
   name: string
-  rarity: Rarity
+  rarity: CardRarity
   /** The effects it lends the hero, each working as on gear, a skill or a relic. */
   lends: Effect[]
   /** What it adds at levels 1, 2 and 3, to a stat or a rider. */
@@ -43,14 +46,20 @@ type FromRelic = Omit<Kind, 'lends' | 'text' | 'makes' | 'reads'> & { relic: Rel
 
 const gear = (id: keyof typeof EFFECTS) => ({ lends: [id], text: EFFECTS[id].text, makes: EFFECTS[id].makes, reads: EFFECTS[id].reads })
 const relic = (id: RelicId) => ({ relic: id })
-const damage = { to: 'damage', by: [0, 1, 2] } as const
-const armor = { to: 'armor', by: [0, 2, 4] } as const
-const move = { to: 'move', by: [0, 1, 2] } as const
+const damage = { to: 'damage', by: [1, 2, 3] } as const
+const armor = { to: 'armor', by: [2, 3, 5] } as const
+const move = { to: 'move', by: [1, 2, 3] } as const
 
 const cards = {
+  hotLoads: { name: 'Hot Loads', rarity: 'basic', lends: [], adds: { to: 'damage', by: [1, 2, 3] } },
+  fieldPlating: { name: 'Field Plating', rarity: 'basic', lends: [], adds: { to: 'armor', by: [2, 3, 4] }, makes: ['armor'] },
+  medPatch: { name: 'Med Patch', rarity: 'basic', lends: [], adds: { to: 'temp', by: [3, 5, 7] } },
+  sprint: { name: 'Sprint Servos', rarity: 'basic', lends: [], adds: { to: 'move', by: [1, 2, 3] } },
+  scope: { name: 'Spotting Scope', rarity: 'basic', lends: [], adds: { to: 'range', by: [1, 2, 3] } },
+  steady: { name: 'Steady Aim', rarity: 'basic', lends: [], adds: { to: 'crit', by: [0.1, 0.15, 0.2] }, makes: ['crit'] },
   plasma: { name: 'Plasma Lance', rarity: 'common', ...gear('piercing'), adds: { to: 'damage', by: [1, 2, 3] }, shows: 'pierce' },
   plating: { name: 'Kinetic Plating', rarity: 'common', lends: [], adds: { to: 'armor', by: [3, 5, 7] }, makes: ['armor'] },
-  nanoweave: { name: 'Nanoweave', rarity: 'common', lends: [], adds: { to: 'hp', by: [4, 7, 10] } },
+  nanoweave: { name: 'Nanoweave', rarity: 'common', lends: [], adds: { to: 'temp', by: [4, 7, 10] } },
   afterburner: { name: 'Afterburners', rarity: 'common', lends: [], adds: { to: 'move', by: [SPRINT, SPRINT + 1, SPRINT + 2] } },
   longshot: { name: 'Longshot Optics', rarity: 'common', lends: [], adds: { to: 'range', by: [2, 3, 4] } },
   regen: { name: 'Regen Gel', rarity: 'common', lends: [], adds: { to: 'regen', by: [1, 2, 3] } },
@@ -59,8 +68,8 @@ const cards = {
   hollowPoint: { name: 'Hollow Points', rarity: 'common', ...gear('executioner'), adds: damage },
   tracer: { name: 'Tracer Feed', rarity: 'common', ...gear('tracer'), adds: damage },
   ablative: { name: 'Ablative Field', rarity: 'common', lends: [], adds: { to: 'guard', by: [1, 2, 3] } },
-  deflector: { name: 'Deflector Screen', rarity: 'common', lends: ['rangedShield'], text: 'Take half damage from ranged hits, rounded up.', adds: armor, shows: 'ranged' },
-  riot: { name: 'Riot Shield', rarity: 'common', lends: ['meleeShield'], text: 'Take half damage from melee hits and blasts, rounded up.', adds: armor, shows: 'melee' },
+  deflector: { name: 'Deflector Screen', rarity: 'common', lends: ['rangedShield'], text: 'Take half damage from ranged hits, rounded up.', adds: { to: 'armor', by: [0, 2, 4] }, shows: 'ranged' },
+  riot: { name: 'Riot Shield', rarity: 'common', lends: ['meleeShield'], text: 'Take half damage from melee hits and blasts, rounded up.', adds: { to: 'armor', by: [0, 2, 4] }, shows: 'melee' },
   cadence: { name: 'Cadence Driver', rarity: 'common', ...gear('cadence'), adds: damage, shows: 'shots' },
   snare: { name: 'Snare Rounds', rarity: 'common', ...gear('snare'), adds: damage, shows: 'melee' },
   grapple: { name: 'Grapple Line', rarity: 'common', ...gear('tether'), adds: damage },
@@ -74,10 +83,10 @@ const cards = {
   uplinkSpike: { name: 'Uplink Spike', rarity: 'common', ...relic('relay'), adds: armor, shows: 'hold' },
   sentinel: { name: 'Sentinel Mode', rarity: 'common', ...relic('sentinel'), adds: armor, shows: 'melee' },
   opener: { name: 'Opening Shot', rarity: 'common', ...relic('capacitor'), adds: damage },
-  overcharge: { name: 'Overcharged Cell', rarity: 'rare', ...gear('arc'), adds: { to: 'crit', by: [0.1, 0.2, 0.3] }, makes: ['crit'] },
-  leech: { name: 'Leech Rounds', rarity: 'rare', ...gear('vampiric'), adds: { to: 'hp', by: [0, 3, 6] } },
+  overcharge: { name: 'Overcharged Cell', rarity: 'rare', ...gear('arc'), adds: { to: 'crit', by: [0.15, 0.25, 0.35] }, makes: ['crit'] },
+  leech: { name: 'Leech Rounds', rarity: 'rare', ...gear('vampiric'), adds: { to: 'temp', by: [2, 4, 6] } },
   bracing: { name: 'Reactive Bracing', rarity: 'rare', ...gear('braced'), adds: armor },
-  hoverPack: { name: 'Hover Pack', rarity: 'rare', lends: ['hover'], text: 'Cross mire, cliffs and steep ground at no extra cost. Float over chasms and water.', adds: move, shows: 'hover' },
+  hoverPack: { name: 'Hover Pack', rarity: 'rare', lends: ['hover'], text: 'Cross mire, cliffs and steep ground at no extra cost. Float over chasms and water.', adds: { to: 'move', by: [0, 1, 2] }, shows: 'hover' },
   gravBoots: { name: 'Grav Boots', rarity: 'rare', ...gear('lofty'), adds: { to: 'jump', by: [1, 2, 3] }, shows: 'jump' },
   jumpJets: { name: 'Jump Jets', rarity: 'rare', lends: ['crashLanding'], text: PERKS.crashLanding.text, adds: { to: 'span', by: [1, 2, 3] } },
   gauntlet: { name: 'Force Gauntlet', rarity: 'rare', lends: ['repulse'], adds: { to: 'push', by: [2, 3, 4] }, makes: ['moved', 'impact'] },
@@ -113,7 +122,7 @@ const cards = {
   lockOn: { name: 'Lock-On Beacon', rarity: 'epic', ...relic('lockOn'), adds: damage },
   accelerant: { name: 'Accelerant Canister', rarity: 'epic', ...relic('accelerant'), adds: damage },
   split: { name: 'Split Barrel', rarity: 'epic', ...relic('split'), adds: damage },
-  phoenix: { name: 'Revival Stim', rarity: 'epic', ...relic('phoenix'), adds: { to: 'hp', by: [0, 3, 6] }, shows: 'hp' },
+  phoenix: { name: 'Revival Stim', rarity: 'epic', ...relic('phoenix'), adds: { to: 'temp', by: [2, 4, 6] }, shows: 'temp' },
 } satisfies Record<string, Kind | FromRelic>
 
 // Relics import combat, which imports this module, so a relic is read only once everything has loaded.
@@ -153,6 +162,7 @@ const ADDS: Record<keyof Stats | Rider, (n: number) => string> = {
   guard: (n) => `Take ${n} less damage per hit, down to 1.`,
   regen: (n) => `Start of turn: heal ${n}.`,
   push: (n) => `On hit, Knockback ${n}.`,
+  temp: (n) => `Start of battle: gain ${n} Temp HP.`,
 }
 
 /** What card `id` does at `level`. */

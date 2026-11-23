@@ -1,7 +1,7 @@
 // Balance numbers.
 export const TUNING = {
   /** Every alien's health, as a multiple of its kind's. */
-  alienHp: 0.46,
+  alienHp: 0.47,
   /** Damage every alien's attack adds. */
   alienDamage: -3,
   /** Damage more every `every`th alien of a road battle hits for, from the leg after `from` keys: the road wears the hero down. */
