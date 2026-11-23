@@ -1,32 +1,31 @@
 // The player's actions, checked and applied to the run: the only way a player changes state.
 import { land } from './landing'
-import { UTILITY_PRICE, UTILITY_SLOTS } from './utilities'
+import { CARDS } from './cards'
 import { arrive, MEDKIT, depart, EVENTS, RELIC_PRICE } from './events'
-import { activate, advance, choose, current, go, nextStop, ways } from './run'
+import { advance, choose, current, go, nextStop, playCard, ways } from './run'
 import { type Run } from './run-state'
 import { gainRelic, takeRelic } from './rewards'
 import { sellFind } from './rewards'
 import { buyWare } from './rewards'
-import { buyUtility, keepUtility, takeStart } from './rewards'
+import { buyCard, CARD_PRICE, REMOVE_PRICE, removeCard, takeCard, upgradeCard } from './rewards'
 import { GEAR_PRICE } from './rewards'
 import { equipFind } from './rewards'
 import { takePerk, takeSkill } from './rewards'
+import { UPGRADED } from './deck'
 import { mend, wounded } from './hero'
 import { minorOffers, skillOffers } from './hero'
 
 export type Action =
   /** At the run's start: take the candidate at `index` of run.candidates as the run's hero. */
   | { type: 'hero'; index: number }
-  /** Run start: take the offers at `picks` of run.boonOffers, UTILITY_SLOTS of them. */
-  | { type: 'boons'; picks: number[] }
   /** Shop: buy the gear at `index` of shop.wares for the hero to wield, discarding what it replaces. */
   | { type: 'gear'; index: number }
   /** Shop: buy the relic at `index` of shop.relics. */
   | { type: 'buy'; index: number }
-  /** Shop: buy the utility at `index` of shop.utilities. */
-  | { type: 'utility'; index: number }
-  /** With a new boon gained: slot it in for the one held at `drop`, or with -1 leave it. */
-  | { type: 'keep'; drop: number }
+  /** Shop: buy the card at `index` of shop.cards into the deck. */
+  | { type: 'buyCard'; index: number }
+  /** Shop: remove the card at `index` of the deck, once a shop. */
+  | { type: 'remove'; index: number }
   /** Shop: heal the hero some, once. */
   | { type: 'medkit' }
   /** Shop: leave for the road. */
@@ -37,10 +36,14 @@ export type Action =
   | { type: 'go'; index: number }
   /** Overworld: travel to the next stop. */
   | { type: 'advance' }
-  /** Deploy phase: activate the boon held at `boon`, none with null only if none is held; land, and begin. */
-  | { type: 'enter'; boon: number | null }
+  /** Deploy phase: play the card at `card` of the hand, none with null only if the hand is empty; `fuse` plays it a level higher and puts the hand's others out until the next leg. Land, and begin. */
+  | { type: 'enter'; card: number | null; fuse: boolean }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
+  /** Reward phase: add the offered card at `index` to the deck, or with null skip. */
+  | { type: 'card'; index: number | null }
+  /** Reward phase, at a safehouse: upgrade the card at `index` of the deck, or with null skip. */
+  | { type: 'upgrade'; index: number | null }
   /** Reward phase: put the find at `find` of run.finds on the hero, discarding what it replaces. */
   | { type: 'equip'; find: number }
   /** Reward phase: sell the find at `find` of run.finds. */
@@ -70,32 +73,26 @@ export function apply(run: Run, action: Action): Result {
     return ok
   }
   if (run.phase === 'select') return no('choose a hero first')
-  if (action.type === 'boons') {
-    const { picks } = action
-    if (run.boonOffers.length === 0) return no('no boons on offer')
-    if (picks.length !== Math.min(UTILITY_SLOTS, run.boonOffers.length) || new Set(picks).size !== picks.length || picks.some((i) => !run.boonOffers[i])) return no(`pick ${UTILITY_SLOTS} offers`)
-    takeStart(run, picks)
-    return ok
-  }
-  if (run.boonOffers.length > 0) return no('pick the starting boons first')
-  if (run.spare !== null && action.type !== 'keep') return no('slot in or leave the new boon first')
   if (action.type === 'enter') {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not entering')
-    if (action.boon === null ? run.utilities.length > 0 : !run.utilities[action.boon]) return no('activate a boon held')
-    activate(run, action.boon)
+    if (action.card === null ? run.hand.length > 0 : run.hand[action.card] === undefined) return no('play a card from the hand')
+    if (action.fuse && (action.card === null || run.hand.length < 2)) return no('fuse needs another card in hand')
+    playCard(run, action.card, action.fuse)
     land(battle)
     return ok
   }
-  if (action.type === 'keep') {
-    if (run.spare === null) return no('no new boon')
-    if (action.drop !== -1 && !run.utilities[action.drop]) return no('no such boon')
-    keepUtility(run, action.drop)
-    return ok
-  }
-  if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill' || action.type === 'perk') {
+  if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill' || action.type === 'perk' || action.type === 'card' || action.type === 'upgrade') {
     if (run.phase !== 'reward') return no('nothing to choose')
-    if (action.type === 'relic') {
+    if (action.type === 'card') {
+      if (run.cardOffers.length === 0) return no('no cards on offer')
+      if (action.index !== null && !run.cardOffers[action.index]) return no('no such card')
+      takeCard(run, action.index)
+    } else if (action.type === 'upgrade') {
+      if (!run.upgrading) return no('no upgrade owed')
+      if (action.index !== null && !(run.deck[action.index]?.level < UPGRADED)) return no('no such card to upgrade')
+      upgradeCard(run, action.index)
+    } else if (action.type === 'relic') {
       const id = run.relicOffers[action.index]
       if (!id) return no('no such relic')
       takeRelic(run, id)
@@ -112,7 +109,7 @@ export function apply(run: Run, action: Action): Result {
     }
     return ok
   }
-  if (action.type === 'gear' || action.type === 'buy' || action.type === 'utility' || action.type === 'medkit' || action.type === 'leave') {
+  if (action.type === 'gear' || action.type === 'buy' || action.type === 'buyCard' || action.type === 'remove' || action.type === 'medkit' || action.type === 'leave') {
     const shop = run.shop
     if (run.phase !== 'shop' || !shop) return no('not in a shop')
     if (action.type === 'gear') {
@@ -127,11 +124,16 @@ export function apply(run: Run, action: Action): Result {
       run.supplies -= RELIC_PRICE
       gainRelic(run, relic.id, true)
       relic.sold = true
-    } else if (action.type === 'utility') {
-      const item = shop.utilities[action.index]
-      if (!item || item.sold) return no('no such utility for sale')
-      if (UTILITY_PRICE > run.supplies) return no('not enough supplies')
-      buyUtility(run, action.index)
+    } else if (action.type === 'buyCard') {
+      const item = shop.cards[action.index]
+      if (!item || item.sold) return no('no such card for sale')
+      if (CARD_PRICE[CARDS[item.id].rarity] > run.supplies) return no('not enough supplies')
+      buyCard(run, action.index)
+    } else if (action.type === 'remove') {
+      if (shop.removed) return no('a card already removed here')
+      if (!run.deck[action.index]) return no('no such card')
+      if (REMOVE_PRICE > run.supplies) return no('not enough supplies')
+      removeCard(run, action.index)
     } else if (action.type === 'medkit') {
       if (shop.medkit) return no('medkit already bought')
       if (!wounded(run)) return no('the hero is not hurt')

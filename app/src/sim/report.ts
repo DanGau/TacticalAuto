@@ -2,7 +2,8 @@
 import { CHALLENGES, type ChallengeId } from '../core/challenges'
 import { ARENA_KINDS, type ArenaKind } from '../core/arena-kinds'
 import { KEYS } from '../core/run'
-import type { Answer, RunResult, Toll } from './run'
+import type { RunResult, Toll } from './run'
+import type { Row } from './forks'
 
 export interface Report {
   runs: number
@@ -28,8 +29,9 @@ export interface Report {
   spikes: { rate: number; what: string }
   /** Heroes' hits on aliens: the hardest, and the hardest but one in a hundred battles; and rounds a boss from leg LATE_LEG on takes to fell, by median and least. */
   hits: { max: number; p99: number; bossRounds: number; leastBossRounds: number }
-  /** Boons found or bought a run, by leg. */
-  found: number[]
+  /** Cards added to the deck a run, by leg; and the deck's size at the end by mean. */
+  taken: number[]
+  deck: number
   /** Safehouses rested at and medkits bought a run. */
   rests: { safehouses: number; medkits: number }
   /** Battles past MAX_BATTLE_SECONDS, which the report warns of without failing. */
@@ -100,7 +102,8 @@ export function report(results: RunResult[]): Report {
     losses: losses(fatal),
     spikes: spikes(tolls),
     hits: { max: hardest.at(-1) ?? 0, p99: hardest[Math.floor(0.99 * hardest.length)] ?? 0, bossRounds: felled[Math.floor(felled.length / 2)] ?? 0, leastBossRounds: felled[0] ?? 0 },
-    found: Array.from({ length: KEYS + 1 }, (_, leg) => mean((r) => r.found[leg])),
+    taken: Array.from({ length: KEYS + 1 }, (_, leg) => mean((r) => r.taken[leg])),
+    deck: mean((r) => r.deck),
     rests: { safehouses: mean((r) => r.rests.safehouses), medkits: mean((r) => r.rests.medkits) },
     warnings,
     failures,
@@ -157,7 +160,7 @@ export function formatReport(r: Report): string {
     `spikes              ${r.spikes.rate}% of battles begun at ${100 * SUDDEN}%+ end under ${100 * SPIKE}% or lost: ${r.spikes.what}`,
     `hero hits           hardest ${r.hits.max}, p99 battle ${r.hits.p99}; a late boss falls in ${r.hits.bossRounds} rounds by median, ${r.hits.leastBossRounds} at least`,
     `rests a run         ${r.rests.safehouses} safehouses, ${r.rests.medkits} medkits`,
-    `boons found a run   ${Math.round(10 * r.found.reduce((a, b) => a + b, 0)) / 10}, by leg ${r.found.join(', ')}`,
+    `cards taken a run   ${Math.round(10 * r.taken.reduce((a, b) => a + b, 0)) / 10}, by leg ${r.taken.join(', ')}; deck at the end ${r.deck}`,
     ...r.warnings.map((w) => `WARN                ${w}`),
     ...r.failures.map((f) => `FAIL                ${f}`),
   ].join('\n')
@@ -166,57 +169,28 @@ export function formatReport(r: Report): string {
 /** Each bot's win rate on the same seeds, best first. */
 export const ranked = (rates: Record<string, number>) => Object.entries(rates).sort((a, b) => b[1] - a[1]).map(([name, rate]) => `${name.padEnd(12)}${`${Math.round(100 * rate)}%`.padStart(5)}`).join('\n')
 
-/** One row of the diagnosis: how battles of a challenge or ground went, by whether the hero met it with an answer. */
-export interface Row {
-  test: ChallengeId | ArenaKind
-  leg: number
-  answer: Answer
-  battles: number
-  won: number
-  /** Health lost, as a share of the hero's most, in percent. */
-  lost: number
-}
-
 /** The name of a challenge or ground. */
 const nameOf = (test: Row['test']) => (test in CHALLENGES ? CHALLENGES[test as ChallengeId].name : ARENA_KINDS[test as ArenaKind].name)
 
-/** Battles of each challenge and each ground (with no challenge), by leg and answer. */
-export function rows(results: RunResult[]): Row[] {
-  const tolls = results.flatMap((r) => r.tolls)
-  const grounds = (Object.keys(ARENA_KINDS) as ArenaKind[]).filter((k) => ARENA_KINDS[k].answers.length > 0)
-  const tests: [Row['test'], (t: Toll) => boolean, (t: Toll) => Answer][] = [
-    ...(Object.keys(CHALLENGES) as ChallengeId[]).map((c): [Row['test'], (t: Toll) => boolean, (t: Toll) => Answer] => [c, (t) => t.challenge === c, (t) => t.answer]),
-    ...grounds.map((g): [Row['test'], (t: Toll) => boolean, (t: Toll) => Answer] => [g, (t) => t.ground === g && !t.challenge, (t) => t.exploited]),
-  ]
-  return tests.flatMap(([test, met, how]) =>
-    [0, 1, 2, 3].flatMap((leg) => (['held', 'none'] as const).flatMap((answer): Row[] => {
-      const of = tolls.filter((t) => met(t) && t.leg === leg && how(t) === answer)
-      if (of.length === 0) return []
-      return [{ test, leg, answer, battles: of.length, won: Math.round((100 * of.filter((t) => t.won).length) / of.length), lost: Math.round((100 * of.reduce((sum, t) => sum + (t.before - t.after) / t.most, 0)) / of.length) }]
-    })),
-  )
-}
-
-/** Battles needed before a row is read at all. */
+/** Screens needed before a row is read at all. */
 const READ_FROM = 10
-/** Wins with the answer picked below which a challenge is too hard; wins and health lost without one above and below which a mismatch is too cheap. */
+/** Wins with the best card in hand below which an encounter is too hard; the spread of wins and health lost between the best and worst card below which the card hardly matters; how far the bot's play may trail the best. */
 const HARD = 70
-const CHEAP = { won: 95, lost: 20 }
+const FLAT = 5
+const TRAILS = 10
 
 /**
- * What each row says. Won holding the answer: the encounter is fine. Lost with it: the encounter is too hard, the
- * game's fault. No answer held: what a mismatch costs, the game's if it costs too little; how often it happened is the
- * bot's route and keeping, or the shops' luck.
+ * What each row says. The best card in hand still losing: the encounter is too hard, the game's fault. The best and
+ * worst card alike: the card played hardly matters there, the game's fault. The bot's play trailing the best: the bot's.
  */
 export function verdicts(of: Row[]): string[] {
   const found: string[] = []
   for (const row of of) {
     const name = `${nameOf(row.test)} (leg ${row.leg + 1})`
-    if (row.battles < READ_FROM) continue
-    if (row.answer === 'held' && row.won < HARD) found.push(`GAME: ${name} too hard even with its answer: won ${row.won}% of ${row.battles}`)
-    if (row.answer === 'none' && row.won >= CHEAP.won && row.lost < CHEAP.lost) found.push(`GAME: a mismatch on ${name} costs too little: won ${row.won}%, lost ${row.lost}% health`)
-    const none = of.find((r) => r.test === row.test && r.leg === row.leg && r.answer === 'none')
-    if (row.answer === 'held' && none && none.battles >= READ_FROM && row.lost >= none.lost && row.won <= none.won) found.push(`GAME: the answer to ${name} does not answer it: lost ${row.lost}% health with, ${none.lost}% without`)
+    if (row.screens < READ_FROM) continue
+    if (row.best.won < HARD) found.push(`GAME: ${name} too hard even with the best card in hand: won ${row.best.won}% of ${row.screens}`)
+    if (row.best.won - row.worst.won < FLAT && row.worst.lost - row.best.lost < FLAT) found.push(`GAME: the card played hardly matters on ${name}: best ${row.best.won}%/${row.best.lost}% lost, worst ${row.worst.won}%/${row.worst.lost}%`)
+    if (row.bot.won <= row.best.won - TRAILS || row.bot.lost >= row.best.lost + TRAILS) found.push(`BOT: its play on ${name} trails the best card in hand: ${row.bot.won}%/${row.bot.lost}% lost against ${row.best.won}%/${row.best.lost}%`)
   }
   return found
 }
@@ -247,8 +221,9 @@ export function byGoal(results: RunResult[]): string {
 }
 
 export function formatDiagnosis(bot: string, of: Row[]): string {
-  const head = `${bot}: challenge or ground, leg, answer, battles, won, health lost`
-  const lines = of.map((r) => `${nameOf(r.test).padEnd(16)}${r.leg + 1}  ${r.answer.padEnd(9)}${String(r.battles).padStart(7)}${`${r.won}%`.padStart(6)}${`${r.lost}%`.padStart(13)}`)
+  const head = `${bot}: challenge or ground, leg, screens, won/health lost with the best card in hand, the worst, the bot's play`
+  const pair = (p: { won: number; lost: number }) => `${p.won}/${p.lost}`.padStart(9)
+  const lines = of.map((r) => `${nameOf(r.test).padEnd(16)}${r.leg + 1}${String(r.screens).padStart(8)}${pair(r.best)}${pair(r.worst)}${pair(r.bot)}`)
   const found = verdicts(of)
   return [head, ...lines, ...(found.length > 0 ? found : ['nothing off'])].join('\n')
 }

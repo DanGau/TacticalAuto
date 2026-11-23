@@ -11,13 +11,13 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `setup.ts` | `createBattle`: battle state, placing aliens, civilians, goals by the encounter |
 | `encounter.ts` | `designEncounter`: the set-piece: its ends, arena, landmarks and their clusters, lanes, ridge, posts, gates |
 | `pois.ts` | Landmarks (POIs): kinds, each ground's names for them, their framing, lanes and nest creep |
-| `arena-kinds.ts` | The ground a battle is fought over, drawn by region: its shape, its feature, the boons that answer it and the quantities it multiplies |
+| `arena-kinds.ts` | The ground a battle is fought over, drawn by region: its shape, its feature and the quantities it multiplies |
 | `levels.ts` | Smoothing heights so ledges stand only where meant |
 | `knockback.ts` | Knockback and falls: off a ledge, through glass, over the edge |
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
 | `objects.ts` | What heroes do with objects: the strong throwing them or small aliens, setting off tanks, a rigged tank |
 | `landing.ts` | The one entry point, the plain landing there, what relics set off |
-| `boons.ts` | What the activated boon adds in a battle beyond stats and lent effects: Ablative Field, Regen Gel, Force Gauntlet |
+| `played.ts` | What the card played adds in a battle beyond stats and lent effects: Ablative Field, Regen Gel, Force Gauntlet |
 | `spawn.ts` | Making units: aliens, soldiers, civilians, mechs, drops |
 | `step.ts` | Advances the run's battle a beat; settles it when it ends |
 | `combat.ts` | `stepBattle`: whose turn, the next unit's action |
@@ -55,12 +55,14 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `rewards.ts` | Gear and relic rewards, the shop, settling the reward phase |
 | `missions.ts` | Missions: their force, aliens, goal and place |
 | `debrief.ts` | `endBattle`: settling a battle into the run |
+| `deck.ts` | The deck: the starting cards, the hand drawn each battle and the card played, cards offered by rarity |
+| `read.ts` | The board at a deploy screen, counted for what each card plays to, and each card's line in the hand |
 | `events.ts` | Unknown stops' events |
 | `apply.ts` | `apply`: the player's actions, checked and applied |
 
 ## core/: content and helpers
 
-`aliens`, `challenges`, `classes`, `doctrines`, `exams`, `feats`, `gear`, `goals`, `powers`, `quantities`, `relics`, `secondaries`, `skill-effects`, `skills`, `twists`, `utilities`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`, `arena`: test helpers.
+`aliens`, `challenges`, `classes`, `doctrines`, `exams`, `feats`, `gear`, `goals`, `powers`, `quantities`, `relics`, `secondaries`, `skill-effects`, `skills`, `twists`, `cards`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`, `arena`: test helpers.
 
 ## view/: battle rendering
 
@@ -86,5 +88,5 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 ## Elsewhere
 
 - `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `summary.ts` a battle's statistics page and the post-game summary, drawn by `charts.ts`, whose marks `tip.ts` explains on hover, focus or tap; `cards.ts` fixed-size cards tapped to arm and again to confirm, and gear comparisons; `sheet.ts` character sheets and alien stat blocks; `kit.ts` source tags and a hero's kit by source, shown on hover or tap in battle; `log.ts` the battle log; `tree.ts` a class's skill tree as a map; `briefing.ts` the mission intro: a tour of the 3 to 5 points that matter, from the battle's landmarks, and playing it; `menu.ts` the title and recruit choice, `select.ts` its card-to-dossier and deploy motion.
-- `bots/bots.ts`: bot strategies. `sim/`: the sim CLI, `sim/encounter.ts`, the challenge lab, and `sim/forks.ts`, the clean comparison of answers.
+- `bots/bots.ts`: bot strategies. `sim/`: the sim CLI, `sim/encounter.ts`, the challenge lab, and `sim/forks.ts`, the clean comparison of each hand's cards, and `sim/deck.ts`, the deck comparison.
 - `main.ts`: browser entry and `window.debug`.

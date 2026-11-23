@@ -13,7 +13,7 @@ import { RELICS } from './relics'
 import { SECONDARIES, secondaryPower } from './secondaries'
 import { SKILLS } from './skills'
 import { TWISTS } from './twists'
-import { UTILITIES } from './utilities'
+import { CARDS } from './cards'
 import { WEAPONS } from './weapons'
 
 /** About two lines of a card, so every power can be read at a glance. */
@@ -30,6 +30,6 @@ it('states every power in a usage line and at most two lines of effect', () => {
 })
 
 it('speaks of the hero, never soldiers, squads, recruits or duos', () => {
-  const told = JSON.stringify([ALIENS, CHALLENGES, CLASSES, DOCTRINES, EVENTS, FEATS, GOALS, EFFECTS, QUANTITIES, CANCELS, RELICS, SECONDARIES, SKILLS, TWISTS, UTILITIES, WEAPONS])
+  const told = JSON.stringify([ALIENS, CHALLENGES, CLASSES, DOCTRINES, EVENTS, FEATS, GOALS, EFFECTS, QUANTITIES, CANCELS, RELICS, SECONDARIES, SKILLS, TWISTS, CARDS, WEAPONS])
   expect(told).not.toMatch(/\b(soldiers?|squads?|squadmates?|recruits?|duos?|party|grenades?|AIM\?)\b/i)
 })

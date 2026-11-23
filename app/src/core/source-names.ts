@@ -5,7 +5,7 @@ import { effectName } from './effects'
 import { SECONDARIES } from './secondaries'
 import type { SkillId } from './skills'
 import { BASICS, has, type Src } from './sources'
-import { UTILITIES, type UtilityId } from './utilities'
+import { CARDS, type CardId } from './cards'
 import { WEAPONS, type WeaponId } from './weapons'
 
 /** What thrown or blown objects show as. */
@@ -15,7 +15,7 @@ const OBJECTS: Record<string, string> = { fuel: 'Fuel Tank', rig: 'Rigged Tank',
 export function sourceName(src: Src, kit?: { skills: SkillId[]; weapons: WeaponId[] }): string {
   const { kind, id } = src
   if (kind === 'object') return OBJECTS[id] ?? 'Object'
-  if (kind === 'boon') return UTILITIES[id as UtilityId].name
+  if (kind === 'card') return CARDS[id as CardId].name
   if (kind === 'alien') return has(ALIENS, id) ? ALIENS[id as AlienKind].name : effectName(id as Ability)
   if (has(WEAPONS, id)) return WEAPONS[id].name
   if (kind === 'weapon') return [...(kit?.weapons ?? []).map((w) => WEAPONS[w]), ...Object.values(WEAPONS)].find((w) => w.effect === id)!.name

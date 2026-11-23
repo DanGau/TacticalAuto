@@ -1,11 +1,14 @@
 import { expect, test } from 'vitest'
-import { CHALLENGES, type ChallengeId } from '../core/challenges'
+import type { Goal } from '../core/goals'
+import type { CardId } from '../core/cards'
+import { starterDeck } from '../core/deck'
 import { drawBattle } from '../core/missions'
 import { begun, road } from '../core/roads'
 import { apply } from '../core/apply'
 import { type Run } from '../core/run-state'
-import { rows, verdicts } from '../sim/report'
-import { runWith, type RunResult, type Toll } from '../sim/run'
+import { verdicts } from '../sim/report'
+import type { Row } from '../sim/forks'
+import { runWith } from '../sim/run'
 import { strategic } from './strategic'
 import { PLANS, plannedSkill } from '../core/plans'
 import { CLASSES, type ClassId } from '../core/classes'
@@ -14,21 +17,33 @@ import { ULTIMATE_EFFECTS } from '../core/skill-effects'
 import { skillOffers, xpFor } from '../core/hero'
 import type { WeaponId } from '../core/weapons'
 
-function deploying(challenge: ChallengeId, held: Run['utilities']): Run {
+/** A run at the deploy screen of a battle of `goal`, its deck `deck`, all of it in hand. */
+function deploying(goal: Goal, deck: CardId[]): Run {
   const run = begun(3)
-  run.utilities = held
-  road(run, [{ ...drawBattle(run, 'standard'), goal: 'cross', terrain: 'town', challenge, aliens: ['trooper', 'trooper'] }])
+  run.deck = deck.map((id) => ({ id, level: 1 }))
+  road(run, [{ ...drawBattle(run, 'standard'), goal, terrain: 'town', challenge: null, aliens: ['trooper', 'trooper'] }])
   apply(run, { type: 'advance' })
   return run
 }
 
-test.each(Object.keys(CHALLENGES) as ChallengeId[])('offered a %s answer it lacks, the strategic bot slots it in for a boon that answers nothing ahead', (challenge) => {
-  const [answer] = CHALLENGES[challenge].answers
-  const decoys = (['nanoweave', 'longshot', 'plasma', 'ablative'] as const).filter((id) => !CHALLENGES[challenge].answers.includes(id)).slice(0, 3)
-  const run = deploying(challenge, decoys.map((id) => ({ id, level: 1 })))
-  run.spare = answer
-  expect(strategic(run, { rng: 1 })).toMatchObject({ type: 'keep', drop: expect.any(Number) })
-  expect((strategic(run, { rng: 1 }) as { drop: number }).drop).toBeGreaterThanOrEqual(0)
+test('the strategic bot plays the card the board pulls on: Evac Line on a rescue, never where no civilians are', () => {
+  const on = (goal: Goal) => {
+    const run = deploying(goal, ['evac', 'nanoweave', 'plating'])
+    const action = strategic(run, { rng: 1 }) as { card: number }
+    return run.deck[run.hand[action.card]].id
+  }
+  expect(on('rescue')).toBe('evac')
+  expect(on('cross')).not.toBe('evac')
+})
+
+test('it adds a card that lifts its deck and skips one that does not', () => {
+  const run = begun(3)
+  run.deck = starterDeck()
+  run.phase = 'reward'
+  run.cardOffers = ['evac', 'uplinkSpike', 'liftFlare']
+  expect(strategic(run, { rng: 1 })).toEqual({ type: 'card', index: null })
+  run.cardOffers = ['evac', 'chain', 'liftFlare']
+  expect(strategic(run, { rng: 1 })).toEqual({ type: 'card', index: 1 })
 })
 
 test('the plan: every class names a real path; a hero takes the path its weapon suits, then an ultimate for its capstone', () => {
@@ -46,28 +61,15 @@ test('the plan: every class names a real path; a hero takes the path its weapon 
   expect(pathOf('heavy', hero('heavy', 'rifle').skills[1])!.name).toBe('Cataclysm')
 })
 
-test('with a new boon, it keeps what answers the most, and plays a run to its end', () => {
-  const run = deploying('swarm', [{ id: 'plasma', level: 1 }, { id: 'longshot', level: 1 }, { id: 'gravBoots', level: 1 }])
-  run.spare = 'riot'
-  run.legs[0].columns[0][0].stop = { ...run.legs[0].columns[0][0].stop!, challenge: 'swarm' }
-  expect(strategic(run, { rng: 1 })).toMatchObject({ type: 'keep' })
+test('it plays a run to its end', () => {
   expect(['won', 'lost']).toContain(runWith(5, strategic).won ? 'won' : 'lost')
 })
 
-const toll = (challenge: ChallengeId, answer: Toll['answer'], won: boolean, lost: number): Toll => ({ nth: 1, leg: 0, kind: 'battle', elite: false, won, goal: 'cross', challenge, answer, ground: 'open', exploited: 'none', most: 100, before: 100, after: 100 - lost, downed: 0, maxHit: 0, bossRounds: null, healed: 0 })
-const of = (tolls: Toll[]) => rows([{ tolls } as RunResult])
+const row = (best: [number, number], worst: [number, number], bot: [number, number]): Row => ({ test: 'slog', leg: 1, screens: 12, best: { won: best[0], lost: best[1] }, worst: { won: worst[0], lost: worst[1] }, bot: { won: bot[0], lost: bot[1] } })
 
-test('the diagnosis tells what is off in the game', () => {
-  const twelve = (t: Toll) => Array<Toll>(12).fill(t)
-  expect(verdicts(of(twelve(toll('slog', 'held', false, 80))))).toContainEqual(expect.stringMatching(/^GAME: Slog .* too hard/))
-  expect(verdicts(of(twelve(toll('slog', 'none', true, 5))))).toContainEqual(expect.stringMatching(/^GAME: a mismatch on Slog/))
-  expect(verdicts(of([...twelve(toll('slog', 'held', true, 40)), ...twelve(toll('slog', 'none', true, 30))]))).toContainEqual(expect.stringMatching(/^GAME: the answer to Slog/))
-  expect(verdicts(of([...twelve(toll('slog', 'held', true, 10)), ...twelve(toll('slog', 'none', false, 60))]))).toEqual([])
-})
-
-test.each(Object.keys(CHALLENGES) as ChallengeId[])('at a %s, the strategic bot activates its best answer held, not a decoy', (challenge) => {
-  const [answer] = CHALLENGES[challenge].answers
-  const decoys = (['nanoweave', 'longshot', 'plasma', 'ablative'] as const).filter((id) => !CHALLENGES[challenge].answers.includes(id)).slice(0, 2)
-  const run = deploying(challenge, [...decoys, answer].map((id) => ({ id, level: 1 })))
-  expect(strategic(run, { rng: 1 })).toEqual({ type: 'enter', boon: 2 })
+test('the diagnosis tells what is off in the game, and what in the bot', () => {
+  expect(verdicts([row([60, 50], [40, 60], [60, 50])])).toContainEqual(expect.stringMatching(/^GAME: Slog .* too hard/))
+  expect(verdicts([row([90, 20], [88, 22], [90, 20])])).toContainEqual(expect.stringMatching(/^GAME: the card played hardly matters on Slog/))
+  expect(verdicts([row([95, 10], [70, 40], [80, 30])])).toContainEqual(expect.stringMatching(/^BOT: its play on Slog/))
+  expect(verdicts([row([95, 10], [70, 40], [93, 12])])).toEqual([])
 })

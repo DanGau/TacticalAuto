@@ -51,7 +51,9 @@ import { REST_COLUMNS } from './progress'
 import { powerOf, SKILLS } from './skills'
 import { atKey, road, enterAt, begun } from './roads'
 import { RELICS } from './relics'
-import { SHOP_UTILITIES, UTILITY_IDS, UTILITY_SLOTS } from './utilities'
+import { CARDS } from './cards'
+import { OFFERS } from './deck'
+import { CARD_PRICE, REMOVE_PRICE } from './rewards'
 
 /** A run whose hero has learned its first skill, so the overworld waits. */
 function started(): Run {
@@ -102,6 +104,8 @@ function fight(run: Run, winner: Side): void {
   battle.phase = 'over'
   battle.winner = winner
   endBattle(run)
+  // The cards offered are skipped.
+  if (run.cardOffers.length > 0) apply(run, { type: 'card', index: null })
 }
 
 test('a run begins with its hero at level 1 on a path of its class, choosing where to start among the battles of its first leg', () => {
@@ -452,7 +456,7 @@ test('a satellite won offers three relics; a relic held changes the run', () => 
   expect(paid(['contact']).finds.every((find) => find.rarity !== 'common')).toBe(true)
 })
 
-test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the hero lacks, boons, and a medkit, each sold once and kept in its place; and is left for the road", () => {
+test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the hero lacks, cards, removing a card, and a medkit, each sold once and kept in its place; and is left for the road", () => {
   const run = travelling(['shop', 'battle'])
   expect(apply(run, { type: 'gear', index: 0 })).toEqual({ ok: false, reason: 'not in a shop' })
   apply(run, { type: 'advance' })
@@ -477,20 +481,19 @@ test("a shop stocks one-of-a-kind gear, each piece one hero's weapon, relics the
   expect(run.relics).toContain(relic)
   expect(shop.relics[last]).toEqual({ id: relic, sold: true })
   expect(apply(run, { type: 'buy', index: last }).ok).toBe(false)
-  expect(new Set(shop.utilities.map((c) => c.id)).size).toBe(SHOP_UTILITIES)
-  const others = UTILITY_IDS.filter((id) => id !== shop.utilities[0].id).map((id) => ({ id, level: 1 }))
-  run.utilities = others.slice(0, UTILITY_SLOTS - 1)
-  expect(apply(run, { type: 'utility', index: 0 })).toEqual({ ok: true })
-  expect(run.utilities.at(-1)).toEqual({ id: shop.utilities[0].id, level: 1 })
-  expect(run.spare).toBeNull()
-  run.utilities = others.slice(0, UTILITY_SLOTS)
-  shop.utilities[0].sold = false
-  expect(apply(run, { type: 'utility', index: 0 })).toEqual({ ok: true })
-  expect(run.spare).toBe(shop.utilities[0].id)
+  expect(new Set(shop.cards.map((c) => c.id)).size).toBe(OFFERS)
+  const before = { supplies: run.supplies, deck: run.deck.length }
+  expect(apply(run, { type: 'buyCard', index: 0 })).toEqual({ ok: true })
+  expect(run.deck.at(-1)).toEqual({ id: shop.cards[0].id, level: 1 })
+  expect(run.supplies).toBe(before.supplies - CARD_PRICE[CARDS[shop.cards[0].id].rarity])
+  expect(apply(run, { type: 'buyCard', index: 0 }).ok).toBe(false)
+  const removed = run.deck[0]
+  expect(apply(run, { type: 'remove', index: 0 })).toEqual({ ok: true })
+  expect(run.deck).toHaveLength(before.deck)
+  expect(run.deck).not.toContain(removed)
+  expect(run.supplies).toBe(before.supplies - CARD_PRICE[CARDS[shop.cards[0].id].rarity] - REMOVE_PRICE)
+  expect(apply(run, { type: 'remove', index: 0 }).ok).toBe(false)
   run.hero.wounds = 6
-  const held = [...run.utilities]
-  expect(apply(run, { type: 'keep', drop: 0 })).toEqual({ ok: true })
-  expect(run.utilities).toEqual([{ id: shop.utilities[0].id, level: 1 }, ...held.slice(1)])
   expect(apply(run, { type: 'medkit' })).toEqual({ ok: true })
   expect(run.hero.wounds).toBe(6 - MEDKIT.heal)
   expect(apply(run, { type: 'medkit' }).ok).toBe(false)

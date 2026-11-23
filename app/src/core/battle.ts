@@ -12,7 +12,7 @@ import type { DoctrineEffect, Rule } from './doctrines'
 import type { Resist } from './quantities'
 import { type Flow, Goal } from './goals'
 import type { Twist } from './twists'
-import type { Held } from './utilities'
+import type { Card, Rider } from './cards'
 import type { ChallengeId } from './challenges'
 import { type Bulk, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
 
@@ -396,8 +396,9 @@ export interface Battle {
   challenge: ChallengeId | null
   /** The round reinforcements start coming, one clump a round, if the aliens posted are not all down; null when they come on a flood's beat. */
   deadline: number | null
-  /** The one boon the hero activated for this battle; the others held sit idle. */
-  boon: Held | null
+  /** The card the hero played for this battle, at the level it plays at, and what it adds that is no stat. Combat reads `riders`, as cards import relics, which import combat. */
+  card: Card | null
+  riders: Partial<Record<Rider, number>>
   /** Set by the landing until what it sets off lands, as the battle's first beat. */
   opening: boolean
   /** Tiles of acid, each with the alien turns it has left. */

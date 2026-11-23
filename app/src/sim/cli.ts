@@ -2,11 +2,12 @@
 import { parseArgs } from 'node:util'
 import { bots } from '../bots/bots'
 import { DOCTRINES, type DoctrineId } from '../core/doctrines'
-import { formatForks, formatMatrix } from './forks'
+import { formatForks, rows } from './forks'
+import { DECKS, formatDecks } from './deck'
 import { playAll } from './pool'
 import { formatRest, POLICIES } from './rest'
 import { formatPower, loadoutOf, SINGLES } from './power'
-import { byBattle, byGoal, formatDiagnosis, formatReport, ranked, report, rows, OPENING_FLOOR, STRATEGIC_FLOOR, BOSS_ROUNDS_FLOOR, HIT_CEILING } from './report'
+import { byBattle, byGoal, formatDiagnosis, formatReport, ranked, report, OPENING_FLOOR, STRATEGIC_FLOOR, BOSS_ROUNDS_FLOOR, HIT_CEILING } from './report'
 import { OPENING } from '../core/progress'
 
 const { values } = parseArgs({
@@ -16,10 +17,12 @@ const { values } = parseArgs({
     bot: { type: 'string', default: 'standard' },
     /** Doctrines, comma-separated, the hero holds from the start of every run. */
     doctrine: { type: 'string', default: '' },
-    /** Print battles by challenge and answer, and whose fault what is off is. */
+    /** Print battles by challenge and ground with the best, worst and played card of each hand, and whose fault what is off is. */
     diagnose: { type: 'boolean', default: false },
-    /** Print the clean comparison: each deploy screen played on with every utility and with none. */
+    /** Print the clean comparison: each deploy screen played on with each card of the hand, plain and fused. */
     clean: { type: 'boolean', default: false },
+    /** Print the deck comparison: the strategic bot keeping a lean deck, skipping every card, and taking every offer, on the same seeds. */
+    deck: { type: 'boolean', default: false },
     /** Print the rest comparison: each safehouse and medkit on offer played on both ways, and fixed rest policies on the same seeds. */
     rest: { type: 'boolean', default: false },
     /** Print the power comparison: the strategic bot holding each relic and gear effect from the start, and none, on the same seeds. */
@@ -45,6 +48,8 @@ if (values.power || values.loadouts) {
   const names = asked.length ? [...new Set(['none', ...asked.flatMap((n) => n.split('+').flatMap((id, i, ids) => [id, ids.slice(0, i + 1).join('+')])), ...asked])] : SINGLES
   const played = await playAll(['strategic'], runs, start, { doctrines, threads, loadouts: Object.fromEntries(names.map((n) => [n, loadoutOf(n)])) })
   console.log(formatPower(played))
+} else if (values.deck) {
+  console.log(formatDecks(await playAll(Object.keys(DECKS), runs, start, { doctrines, threads })))
 } else if (values.rest) {
   const forks = (await playAll(['strategic'], runs, start, { doctrines, rests: true, threads })).strategic
   console.log(formatRest(forks.flatMap((r) => r.restForks)))
@@ -59,10 +64,10 @@ if (values.power || values.loadouts) {
   const names = Object.keys(bots)
   const played = await playAll(names, runs, start, { doctrines, threads })
   console.log(ranked(Object.fromEntries(names.map((bot) => [bot, played[bot].filter((r) => r.won).length / runs]))))
-  if (values.diagnose) for (const bot of ['standard', 'strategic']) console.log(`\n${formatDiagnosis(bot, rows(played[bot]))}`)
+  if (values.diagnose) for (const bot of ['standard', 'strategic']) console.log(`\n${formatDiagnosis(bot, rows((await playAll([bot], runs, start, { doctrines, forks: true, threads }))[bot].flatMap((r) => r.forks)))}`)
 } else {
   if (!bots[values.bot]) throw new Error(`unknown bot "${values.bot}"; choose from all, ${Object.keys(bots).join(', ')}`)
-  const results = (await playAll([values.bot], runs, start, { doctrines, forks: values.clean, threads }))[values.bot]
+  const results = (await playAll([values.bot], runs, start, { doctrines, forks: values.clean || values.diagnose, threads }))[values.bot]
   const summary = report(results)
   if (values.floor && summary.wins / summary.runs < STRATEGIC_FLOOR) summary.failures.push(`the strategic bot won ${summary.wins} of ${summary.runs}, under its floor of ${Math.round(100 * STRATEGIC_FLOOR)}%: the game has become unwinnable, or the bot has broken`)
   const opening = results.flatMap((r) => r.tolls.filter((t) => t.nth <= OPENING))
@@ -71,7 +76,7 @@ if (values.power || values.loadouts) {
   if (values.floor && summary.hits.bossRounds < BOSS_ROUNDS_FLOOR) summary.failures.push(`a late boss falls in ${summary.hits.bossRounds} rounds by median, under the floor of ${BOSS_ROUNDS_FLOOR}: heroes hit too hard for bosses`)
   if (values.floor && summary.hits.max > HIT_CEILING) summary.failures.push(`a hero hit for ${summary.hits.max}, over the ceiling of ${HIT_CEILING}: bonuses stack too high`)
   console.log(values.json ? JSON.stringify(summary) : formatReport(summary))
-  if (values.diagnose) console.log(`\nby battle:\n${byBattle(results)}\nby goal: ${byGoal(results)}\n${formatDiagnosis(values.bot, rows(results))}`)
-  if (values.clean) console.log(`\n${formatForks(results.flatMap((r) => r.forks))}\n\n${formatMatrix(results.flatMap((r) => r.forks))}`)
+  if (values.diagnose) console.log(`\nby battle:\n${byBattle(results)}\nby goal: ${byGoal(results)}\n${formatDiagnosis(values.bot, rows(results.flatMap((r) => r.forks)))}`)
+  if (values.clean) console.log(`\n${formatForks(results.flatMap((r) => r.forks))}`)
   if (summary.failures.length > 0) process.exitCode = 1
 }

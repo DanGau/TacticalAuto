@@ -98,7 +98,7 @@ interface Point {
 /** Aliens in a landmark's frame. */
 const within = (battle: Battle, p: Poi) => battle.units.filter((u) => u.side === 'alien' && Math.max(Math.abs(u.x - p.frame.x), Math.abs(u.y - p.frame.y)) <= p.frame.extent)
 
-/** The points that matter this battle, in the order the tour shows them: a boss first, then the alien clusters, the ground's landmark where a boon answers it, and the objective last. Landmarks fill a quiet battle up to 3; a busy one stops at 5. */
+/** The points that matter this battle, in the order the tour shows them: a boss first, then the alien clusters, the ground's landmark where it has a feature, and the objective last. Landmarks fill a quiet battle up to 3; a busy one stops at 5. */
 export function pointsOf(battle: Battle, order: string): Point[] {
   const landing = battle.pois.find((p) => p.kind === 'landing')!
   const objective = battle.pois.find((p) => p.kind === 'objective')!
@@ -112,7 +112,7 @@ export function pointsOf(battle: Battle, order: string): Point[] {
     ? { at: { x: boss.x, y: boss.y, extent: 3 }, zoom: ZOOM.close, ms: 2500, title: exam ? `${EXAMS[exam].name} Guardian` : 'Guardian', caption: `${order}.` }
     : { at: objective.frame, zoom: ZOOM.point, ms: 2000, caption: battle.goal === 'rescue' ? `${CIVILIANS} civilians. Save ${RESCUE_QUORUM + 1}.` : `${order}.` }
   const far = (p: Point) => Math.hypot(p.at.x - landing.x, p.at.y - landing.y)
-  const middle = [...nests.map(nest), ...(ground && ARENA_KINDS[battle.arenaKind].answers.length > 0 ? [feature(ground)] : [])]
+  const middle = [...nests.map(nest), ...(ground && ARENA_KINDS[battle.arenaKind].reads.length > 0 ? [feature(ground)] : [])]
   // A quiet battle shows its other landmarks, nearest the landing first.
   const spare = battle.pois.filter((p) => (p.kind === 'hazard' || p.kind === 'vantage' || p.kind === 'strongpoint') && p !== ground).sort((p, q) => Math.hypot(p.x - landing.x, p.y - landing.y) - Math.hypot(q.x - landing.x, q.y - landing.y))
   for (const p of spare) if (middle.length + 1 < POINTS[0]) middle.push(p.kind === 'strongpoint' ? { at: p.frame, zoom: ZOOM.point, ms: 1600, caption: `Cover: ${p.label}.` } : feature(p))

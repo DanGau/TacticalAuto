@@ -22,17 +22,16 @@ export function atKey(run: Run): void {
 
 /** For tests: makes the landing. */
 export function enterAt(run: Run): Result {
-  return apply(run, { type: 'enter', boon: run.utilities.length > 0 ? 0 : null })
+  return apply(run, { type: 'enter', card: run.hand.length > 0 ? 0 : null, fuse: false })
 }
 
-/** For tests: a run of `seed` under way, its hero the first candidate, a Deadeye with a plain rifle, holding no boons. */
+/** For tests: a run of `seed` under way, its hero the first candidate, a Deadeye with a plain rifle, its deck empty. */
 export function begun(seed: number): Run {
   const run = createRun(seed)
   run.candidates[0].cls = 'sniper'
   run.candidates[0].skills = [powerOf('sniper')]
   run.candidates[0].gear = { id: 0, rarity: 'common', name: 'Rifle', weapon: 'rifle', stats: {}, effect: null }
   apply(run, { type: 'hero', index: 0 })
-  apply(run, { type: 'boons', picks: [0, 1, 2] })
-  run.utilities = []
+  run.deck = []
   return run
 }

@@ -72,7 +72,7 @@ const relics = {
   impetus: { name: 'Kinetic Engine', text: 'Impact: deal your damage again.', reads: ['impact'], effect: 'impetus' },
   catalyst: { name: 'Catalyst Prism', text: `Every ${CATALYST_EVERY}rd hit doubles the target's Burn, Chill and Mark.`, reads: ['burn', 'chill', 'mark', 'shots'], rarity: 'epic', effect: 'catalyst' },
   chrono: { name: 'Chrono Coil', text: 'Every 3rd turn, double your attacks.', effect: 'chrono' },
-  rack: { name: 'Boon Rack', text: 'Hold 1 more boon.' },
+  satchel: { name: 'Tactical Satchel', text: 'Draw 1 more card each battle.' },
   zenith: { name: 'Zenith Chronometer', text: `Every ${ZENITH_EVERY}rd battle, your tier 4 skill has 2 uses.`, rarity: 'epic', effect: 'zenith' },
   streak: { name: 'Unbroken Line', text: `Every ${STREAK_FIGHTS}nd battle won in a row pays 3 more supplies.`, rarity: 'common', streak: 3 },
   fracture: { name: 'Frost Fracture', text: `When a Frozen alien dies, deal ${FRACTURE_DAMAGE} damage per Chill on it to adjacent aliens.`, reads: ['chill', 'kill'], rarity: 'epic', effect: 'fracture' },

@@ -17,11 +17,11 @@ import { CONTINENTS } from './world'
 import { drawTwist } from './twists'
 import { bigOneStats, drawChallenge, forceOf, rungOf, sentries, STIFFEN, type ChallengeId } from './challenges'
 
-/** What each risk means for a battle: how many aliens it has, what it pays, and the chance it drops gear on the goals that do, and of a utility. */
-export const RISKS: Record<Risk, { name: string; aliens: number; supplies: number; gear: number; rareGear: boolean; utility: number; text: string }> = {
-  safe: { name: 'Quiet', aliens: -1, supplies: 1, gear: 0, rareGear: false, utility: 0, text: 'Fewer aliens. No gear.' },
-  standard: { name: 'Contested', aliens: 0, supplies: 2, gear: 0.5, rareGear: false, utility: 0.025, text: '50% chance of gear.' },
-  dangerous: { name: 'Overrun', aliens: 1, supplies: TUNING.dangerSupplies, gear: 1, rareGear: true, utility: 0.06, text: 'More aliens. Rare or better gear.' },
+/** What each risk means for a battle: how many aliens it has, what it pays, and the chance it drops gear on the goals that do. */
+export const RISKS: Record<Risk, { name: string; aliens: number; supplies: number; gear: number; rareGear: boolean; text: string }> = {
+  safe: { name: 'Quiet', aliens: -1, supplies: 1, gear: 0, rareGear: false, text: 'Fewer aliens. No gear.' },
+  standard: { name: 'Contested', aliens: 0, supplies: 2, gear: 0.5, rareGear: false, text: '50% chance of gear.' },
+  dangerous: { name: 'Overrun', aliens: 1, supplies: TUNING.dangerSupplies, gear: 1, rareGear: true, text: 'More aliens. Rare or better gear.' },
 }
 
 /** What an assassination's commander has over a trooper, its guards (a trooper, then aegises), and the depth from which it has one more. */

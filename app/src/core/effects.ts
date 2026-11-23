@@ -4,7 +4,6 @@ import type { Ability, Effect } from './battle'
 import { CLASSES } from './classes'
 import { DOCTRINES } from './doctrines'
 import { EFFECTS } from './gear'
-import { UTILITIES } from './utilities'
 import { RELICS } from './relics'
 import { cancelOf } from './quantities'
 import { PERKS } from './perks'
@@ -29,7 +28,6 @@ export function effectName(effect: Effect | Ability, team: { skills: SkillId[]; 
   if (ability) return ability.abilityName
   const own = [...team.skills.map((id) => SKILLS[id]), ...team.weapons.map((id) => WEAPONS[id]), ...Object.values(RELICS), ...Object.values(DOCTRINES)].find((source) => source.effect === effect)
   if (own) return own.name
-  if (effect in UTILITIES) return UTILITIES[effect as keyof typeof UTILITIES].name
   const perk = Object.values(PERKS).find((p) => p.effect === effect)
   if (perk) return perk.name
   if (effect in EFFECTS) return EFFECTS[effect as keyof typeof EFFECTS].prefix

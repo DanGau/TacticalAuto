@@ -10,15 +10,12 @@ import { timedFlow } from '../core/step'
 import type { DoctrineId } from '../core/doctrines'
 import type { RelicId } from '../core/relics'
 import type { GearEffect } from '../core/battle'
-import { CHALLENGES, type ChallengeId } from '../core/challenges'
+import type { ChallengeId } from '../core/challenges'
 import type { Goal } from '../core/goals'
-import { ARENA_KINDS, type ArenaKind } from '../core/arena-kinds'
-import type { UtilityId } from '../core/utilities'
+import type { ArenaKind } from '../core/arena-kinds'
+import type { CardId } from '../core/cards'
 import { forksOf, type Fork } from './forks'
 import { restForks, type RestFork } from './rest'
-
-/** Whether the hero met a challenge with an answer it picked, with one it held and left behind, or with none. */
-export type Answer = 'held' | 'none'
 
 /** A battle's toll: which of the run it was, the leg it was on, the hero's most health, its health at the start and end, whether it fell, whether it was won, and what it tested. */
 export interface Toll {
@@ -32,10 +29,12 @@ export interface Toll {
   won: boolean
   goal: Goal
   challenge: ChallengeId | null
-  answer: Answer
-  /** The ground it was fought over, and how the hero met it: with a boon that exploits it, holding one, or none. */
   ground: ArenaKind
-  exploited: Answer
+  /** The card played, at the level it played at, and whether it was fused; the deck's size going in. */
+  card: CardId | null
+  level: number
+  fused: boolean
+  deck: number
   most: number
   before: number
   after: number
@@ -73,20 +72,18 @@ export interface RunResult {
   jumps: Partial<Record<ArenaKind, { battles: number; jumps: number }>>
   /** Each battle's toll on the hero's health. */
   tolls: Toll[]
-  /** With `forks` asked for: each deploy screen played on with every utility. */
+  /** With `forks` asked for: each deploy screen played on with each card of the hand, plain and fused. */
   forks: Fork[]
   /** With `rests` asked for: each safehouse on offer and fresh shop's medkit, the run played on both ways. */
   restForks: RestFork[]
   /** With the seed, enough to replay the run. */
   actions: Action[]
-  /** Boons found or bought, by leg; the starting pick not counted. */
-  found: number[]
+  /** Cards added to the deck, by leg; and the deck's size at the run's end. */
+  taken: number[]
+  deck: number
   /** Safehouses rested at and medkits bought. */
   rests: { safehouses: number; medkits: number }
 }
-
-/** Whether the boons the hero `held` going in meet `answers`. */
-const answerOf = (held: UtilityId[], answers: UtilityId[]): Answer => (held.some((id) => answers.includes(id)) ? 'held' : 'none')
 
 /** More player actions than any run takes: a run past it is stuck, and fails instead of hanging. */
 const MAX_ACTIONS = 10000
@@ -102,18 +99,16 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
     if (loadout.effect && run.hero?.gear && !run.hero.gear.effect) run.hero.gear.effect = loadout.effect
   }
   arm()
-  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], restForks: [], actions: [], found: Array<number>(KEYS + 1).fill(0), rests: { safehouses: 0, medkits: 0 } }
+  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], restForks: [], actions: [], taken: Array<number>(KEYS + 1).fill(0), deck: 0, rests: { safehouses: 0, medkits: 0 } }
   let clock = { next: 0, done: 0 }
   let leaps = 0
   /** This battle's hardest hero hit, its boss, and the round the boss was first wounded. */
   let hits = { max: 0, boss: -1, from: -1, rounds: null as number | null }
   /** The battle under way, its leg, the hero's health as it began, and whether a boss or commander leads it. */
   let begun: [Run['battle'], number, number, boolean] = [null, 0, 0, false]
-  let had: { leg: number; held: (UtilityId | null)[] } = { leg: 0, held: [] }
+  /** The hand of the battle under way as it was dealt: its deck's size, and whether its card was fused. */
+  let dealt = { deck: 0, fused: false }
   while (run.phase !== 'won' && run.phase !== 'lost') {
-    const held = [...run.utilities.map((h) => h.id), run.spare]
-    result.found[had.leg] += held.filter((id) => id && !had.held.includes(id)).length
-    had = { leg: run.keys, held }
     const battle = run.battle
     if (run.phase === 'battle' && begun[0] !== battle) {
       begun = [battle, run.keys, health(run, run.hero), battle!.units.some((u) => u.boss || u.target)]
@@ -142,26 +137,27 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
         const fought = run.report!.hero!
-        const activated = battle!.boon ? [battle!.boon.id] : []
-        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[3], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, answer: answerOf(activated, battle!.challenge ? CHALLENGES[battle!.challenge].answers : []), ground: battle!.arenaKind, exploited: answerOf(activated, ARENA_KINDS[battle!.arenaKind].answers), most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
+        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[3], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, ground: battle!.arenaKind, card: battle!.card?.id ?? null, level: battle!.card?.level ?? 0, fused: dealt.fused, deck: dealt.deck, most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
         clock = { next: 0, done: 0 }
       }
       continue
     }
     if (result.actions.length >= MAX_ACTIONS) throw new Error(`seed ${seed}: no end after ${MAX_ACTIONS} actions, in phase ${run.phase}`)
-    if (forks && run.phase === 'battle' && run.battle!.phase === 'deploy') result.forks.push(...forksOf(run))
     const action = next(run)
+    if (forks && action.type === 'enter') result.forks.push(...forksOf(run, action, `${seed}:${result.battles}`))
+    if (action.type === 'enter') dealt = { deck: run.deck.length, fused: action.fuse }
+    if (action.type === 'card' && action.index !== null) result.taken[run.keys]++
+    if (action.type === 'buyCard') result.taken[run.keys]++
     const rest = rests ? restForks(run, action) : null
     if (rest) result.restForks.push(rest)
     if (action.type === 'advance' && nextStop(run) === 'safehouse') result.rests.safehouses++
     if (action.type === 'medkit') result.rests.medkits++
     const applied = apply(run, action)
-    if (action.type === 'boons') had.held = run.utilities.map((h) => h.id)
     if (!applied.ok) throw new Error(`action rejected: ${applied.reason}`)
     arm()
     result.actions.push(action)
   }
-  return { run, result: { ...result, won: run.phase === 'won', keys: run.keys, endedOn: run.mission!.kind } }
+  return { run, result: { ...result, won: run.phase === 'won', keys: run.keys, endedOn: run.mission!.kind, deck: run.deck.length } }
 }
 
 /** The final state of the run these inputs produce. */

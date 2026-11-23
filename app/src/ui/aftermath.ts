@@ -6,8 +6,9 @@ import { CIVILIANS } from '../core/goals'
 import { RELICS, type RelicId } from '../core/relics'
 import { relicIcon } from './relic-icons'
 import { perkIcon, skillIcon } from './skill-icons'
-import { boonName, UTILITIES } from '../core/utilities'
-import { boonIcon } from './boon-icons'
+import { CARDS } from '../core/cards'
+import { UPGRADED } from '../core/deck'
+import { cardFace, deckGrid } from './card-face'
 import { type Gain, type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { type Soldier } from '../core/run-state'
@@ -19,7 +20,7 @@ import { level } from '../core/hero'
 import { xpFor } from '../core/hero'
 import { SKILLS, type SkillId } from '../core/skills'
 import { usage } from '../core/powers'
-import { boonDoes, findSwap, pickCard, pickDetail, startChoice, utilityPick, type Pick } from './cards'
+import { findSwap, pickCard, pickDetail, type Pick } from './cards'
 import { treeMap } from './tree'
 import { badge, button, describe, gearText, gearName, healthBar, signed, STOP_NAMES, threatBar } from './html'
 
@@ -54,7 +55,7 @@ function heroCard(run: Run, fought: NonNullable<Report['hero']>): string {
 export function acquired(run: Run, gain: Gain): string {
   const shown = (top: string, look: string, name: string, text: string) => `<small class="up-top">${top}</small><div class="prize gear ${look}"><b>${name}</b><br>${text}</div>`
   const relicBody = (top: string, look: string, id: RelicId, held: Quantity[] = []) => shown(top, look, `${relicIcon(id)} ${RELICS[id].name}`, describe(RELICS[id].text, RELICS[id], held))
-  const body = gain.kind === 'relic' ? relicBody('Relic gained', 'relic', gain.id, makes(run)) : gain.kind === 'relicLost' ? relicBody('Relic lost', 'relic lost', gain.id) : shown(gain.level > 1 ? `Boon to level ${gain.level}` : 'Boon gained', 'utility', `${boonIcon(gain.id)} ${boonName(gain.id, gain.level)}`, boonDoes(run, gain.id, gain.level))
+  const body = gain.kind === 'relic' ? relicBody('Relic gained', 'relic', gain.id, makes(run)) : relicBody('Relic lost', 'relic lost', gain.id)
   return modal(`<div class="acquired">${body}<button class="decide" data-action='${JSON.stringify({ type: 'ack' })}'>Got it</button></div>`)
 }
 
@@ -100,19 +101,22 @@ export function perkChoice(soldier: Soldier): string {
 /** The hero's next pick: its power first, then its perk. */
 export const pickChoice = (run: Run, soldier: Soldier, armed: string | null) => (skillOffers(soldier).length > 0 ? skillChoice(run, soldier, armed) : perkChoice(soldier))
 
-/** A new boon with no free slot: it shown alone, marked NEW, beside the boons held; one held tapped to pick it, then Swap, or the new one left. */
-export function spareChoice(run: Run, armed: string | null): string {
-  const id = run.spare!
-  const { name, category } = UTILITIES[id]
-  const slots = run.utilities.map((h, i) => utilityPick(run, `d${i}`, undefined, h.id, 'swap out', `Swap ${boonName(h.id, h.level)} out for ${name}`, {}, h.level))
-  const drop = armed?.match(/^d(\d+)$/) ? Number(armed.slice(1)) : null
-  const leave = run.shop ? 'Put it back, supplies repaid' : 'Leave it'
-  return modal(`<div class="boonswap">
-    <div class="newboon"><span class="newbadge">NEW</span><span class="art">${boonIcon(id)}</span><small class="tier">${category}</small><b>${name}</b><span>${boonDoes(run, id)}</span></div>
-    <h2>Slot it in for 1 of your ${run.utilities.length} boons, or leave it.</h2>
-    <div class="picks slots">${slots.map((p) => pickCard(p, armed)).join('')}</div>${pickDetail(slots, armed, 'Tap a held boon to swap it out.')}
-    <div class="actions"><button class="decide confirm"${drop === null ? ' disabled' : ` data-action='${JSON.stringify({ type: 'keep', drop })}'`}>${drop === null ? 'Pick one to swap' : 'Swap'}</button><button class="decide leave" data-action='${JSON.stringify({ type: 'keep', drop: -1 })}'>${leave}</button></div>
-  </div>`)
+/** The cards offered after a battle: one tapped is picked, then added to the deck; or Skip keeps the deck as it is. */
+function cardChoice(run: Run, armed: string | null): string {
+  const pick = armed?.match(/^k(\d)$/) ? Number(armed.slice(1)) : null
+  const cards = run.cardOffers.map((id, i) => cardFace(run, { id, level: 1 }, { attrs: `data-arm="k${i}" role="radio" aria-checked="${pick === i}"`, state: pick === i ? 'on' : '' }))
+  return `<div class="gearswap cardpick"><h1>Add a card</h1><h2>Add 1 to your deck of ${run.deck.length}, or skip to keep it lean.</h2>
+    <div class="hand" role="radiogroup">${cards.join('')}</div>
+    <div class="actions"><button class="decide confirm"${pick === null ? ' disabled' : ` data-action='${JSON.stringify({ type: 'card', index: pick })}'`}>${pick === null ? 'Pick one' : `Add ${CARDS[run.cardOffers[pick]].name}`}</button><button class="decide skip" data-action='${JSON.stringify({ type: 'card', index: null })}'>Skip</button></div></div>`
+}
+
+/** At a safehouse: a card of the deck tapped is picked, then upgraded; or Skip. */
+function upgradeChoice(run: Run, armed: string | null): string {
+  const pick = armed?.match(/^u(\d+)$/) ? Number(armed.slice(1)) : null
+  const grid = deckGrid(run, (card, i) => (card.level < UPGRADED ? `data-arm="u${i}"${pick === i ? ' data-on' : ''}` : undefined))
+  const preview = pick === null ? '' : `<div class="hand">${cardFace(run, run.deck[pick])}<span class="arrow">→</span>${cardFace(run, { ...run.deck[pick], level: UPGRADED })}</div>`
+  return `<div class="gearswap cardpick"><h1>Upgrade a card</h1><h2>Rested to full. Upgrade 1 card for the run, or skip.</h2>${preview}${grid}
+    <div class="actions"><button class="decide confirm"${pick === null ? ' disabled' : ` data-action='${JSON.stringify({ type: 'upgrade', index: pick })}'`}>${pick === null ? 'Pick one' : 'Upgrade'}</button><button class="decide skip" data-action='${JSON.stringify({ type: 'upgrade', index: null })}'>Skip</button></div></div>`
 }
 
 /** The relics offered, as cards with their icons: one tapped is armed, then Take carries it. */
@@ -127,14 +131,15 @@ function relicChoice(run: Run, armed: string | null): string {
     <button class="decide confirm"${pick ? ` data-action='${JSON.stringify(pick)}'` : ' disabled'}>${pick ? 'Take it' : 'Pick one'}</button></div>`
 }
 
-/** The next choice of the reward phase, alone on its screen: the starting boons, a relic, then each find, taken or sold, then each skill and perk owed. */
+/** The next choice of the reward phase, alone on its screen: a relic, then each find, taken or sold, then cards, an upgrade, then each skill and perk owed. */
 export function choice(run: Run, armed: string | null = null): string {
-  if (run.boonOffers.length > 0) return startChoice(run, armed)
   if (run.relicOffers.length > 0) return relicChoice(run, armed)
   if (run.finds.length > 0) {
     const more = run.finds.length > 1 ? ` · ${run.finds.length - 1} more found` : ''
     return findSwap(run, 0, armed, more)
   }
+  if (run.cardOffers.length > 0) return cardChoice(run, armed)
+  if (run.upgrading) return upgradeChoice(run, armed)
   return owesPick(run.hero) ? pickChoice(run, run.hero, armed) : ''
 }
 
@@ -147,7 +152,7 @@ export function stopReport(run: Run, report: Report, still = false): string {
   const threat = after === before ? '' : `<span class="note">${signed(after - before)}</span>`
   const crates = run.finds.map((_, i) => `<button class="crate" data-crate="${i}" title="Open">🎁</button>`)
   const fought = report.hero ? `<div class="stage second"><div class="fought">${heroCard(run, report.hero)}</div>${crates.length > 0 ? `<div class="crates">${crates.join('')}</div>` : ''}</div>` : ''
-  const owed = fought !== '' && (run.finds.length > 0 || run.spare !== null || owesPick(run.hero))
+  const owed = fought !== '' && (run.finds.length > 0 || owesPick(run.hero))
   return `<div class="debrief${still ? ' still' : ''}">
     ${title(report)}
     <div class="stage">

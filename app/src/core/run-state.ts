@@ -11,7 +11,7 @@ import type { FeatId, Tally } from './feats'
 import type { Gear } from './gear'
 import type { SkillId } from './skills'
 import type { PerkId } from './perks'
-import type { Held, UtilityId } from './utilities'
+import type { Card, CardId } from './cards'
 import type { ChallengeId } from './challenges'
 import type { RelicId } from './relics'
 import type { Battle } from './battle'
@@ -136,7 +136,7 @@ export interface Report {
 }
 
 /** What the hero gained or lost without choosing it from a card the player could read; the player is told, one screen each. */
-export type Gain = { kind: 'relic'; id: RelicId } | { kind: 'relicLost'; id: RelicId } | { kind: 'boon'; id: UtilityId; level: number }
+export type Gain = { kind: 'relic'; id: RelicId } | { kind: 'relicLost'; id: RelicId }
 
 /** A battle as the run remembers it, for the post-game summary. */
 export interface Fought {
@@ -153,12 +153,13 @@ export interface Earned {
   xp: number
 }
 
-/** A shop's stock, each item staying in its place once sold, and whether its medkit is bought. */
+/** A shop's stock, each item staying in its place once sold, and whether its medkit is bought and a card removed. */
 export interface Shop {
   wares: { gear: Gear; sold: boolean }[]
   relics: { id: RelicId; sold: boolean }[]
-  utilities: { id: UtilityId; sold: boolean }[]
+  cards: { id: CardId; sold: boolean }[]
   medkit: boolean
+  removed: boolean
 }
 
 export interface Run {
@@ -201,14 +202,16 @@ export interface Run {
   log: Fought[]
   /** What the player has yet to be told of. */
   gains: Gain[]
-  /** Boons the hero holds, at most slotsOf; the player activates one each battle. */
-  utilities: Held[]
+  /** The hero's cards; each battle draws a hand from those not out, and the player plays one. */
+  deck: Card[]
+  /** The hand drawn for the battle at its deploy screen, as indexes into the deck. */
+  hand: number[]
   /** Fights won in a row, for Unbroken Line. */
   streak: number
-  /** At the run's start, the boons to take its first from. */
-  boonOffers: UtilityId[]
-  /** A new boon gained: the player slots it in for one held, or leaves it. */
-  spare: UtilityId | null
+  /** Cards offered after a battle: the player adds one to the deck, or skips. */
+  cardOffers: CardId[]
+  /** At a safehouse: the player upgrades a card, or skips. */
+  upgrading: boolean
   /** Relics to choose from in the reward phase. */
   relicOffers: RelicId[]
   /** Relics offered and turned down, not offered again until every other is spent. */

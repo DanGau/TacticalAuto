@@ -12,7 +12,7 @@ const GOAL_ORDERS: Record<Goal, string> = {
   ambush: 'Survive the hunt',
 }
 
-/** What a challenge throws at the hero. Its answers are the boons CHALLENGES names. */
+/** What a challenge throws at the hero. */
 export const THREATS: Record<ChallengeId, string> = {
   slog: 'Swamp, shooters scattered.',
   firingLine: 'Snipers on a ridge.',

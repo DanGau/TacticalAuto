@@ -22,15 +22,16 @@ Run in `app/`.
 - `npm run -s sim -- --runs=500 --bot=random` — bots play runs in Node and print a report.
 - `npm run -s sim -- --runs=100 --bot=all --doctrine=blades` — the same, the hero holding a doctrine from the start.
 - `npm run -s sim -- --runs=100 --bot=all` — every bot strategy on the same seeds, ranked.
-- `npm run -s sim -- --runs=100 --bot=strategic --diagnose` — battles by challenge and answer, saying of what is off whether the game or the bot is at fault.
-- `npm run -s tsx -- src/sim/encounter.ts --runs=30` — the challenge lab: each challenge by leg, rung and utility.
-- `npm run -s sim -- --runs=150 --bot=strategic --clean` — each deploy screen played on with every utility and with none: what an answer pays, unconfounded.
+- `npm run -s sim -- --runs=100 --bot=strategic --diagnose` — battles by challenge and ground with the best, worst and played card of each hand, saying of what is off whether the game or the bot is at fault.
+- `npm run -s tsx -- src/sim/encounter.ts --runs=30 [--cards=a,b]` — the challenge lab: each challenge by leg, rung and card played.
+- `npm run -s sim -- --runs=150 --bot=strategic --clean` — each deploy screen played on with each card of the hand, plain and fused: what the card played pays, unconfounded.
+- `npm run -s sim -- --runs=100 --deck` — the strategic bot keeping a lean deck, skipping every card, and taking every offer, on the same seeds: does skipping pay.
 - `npm run -s exam -- --seeds=150 --loadouts=a+b,a+b+c [--escorts=hp]` — the exam lab: a fixed hero per loadout against each Guardian exam and a late elite; rounds to fell it, health lost, and each combo's synergy ± se.
 - `npm run -s sim -- --runs=100 --rest` — each safehouse and medkit on offer played on both ways, by health and leg, and fixed rest policies on the same seeds.
 - `npm run -s sim -- --runs=60 --loadouts=nanites,overkill+volatile` — the strategic bot holds each relic or gear effect (`+` pairs them) from the start, against none on the same seeds: win difference, synergy of pairs, healing a battle. `--power` plays every single.
 - `npm run test -- <files>`, `npm run tsx -- <script>` — run tests or a script under a deadline that kills it if it hangs. A hook blocks running `vitest` or `tsx` directly.
 - `npm run -s eye -- <command>` — play and screenshot the game in a headless browser. Commands: `app/eye/eye.ts`. One server and browser serve all worktrees; `eye -- stop` ends them.
 - `npm run -s eye -- play eye/gear-swap.json` — fails unless the gear swap sits centred, its cards equal, at five screen sizes.
-- `npm run -s eye -- play eye/boon-pick.json` — fails unless one click on each starting boon and NEW-swap card lands and registers, on phone, landscape phone, tablet and desktop.
-- `npm run -s eye -- play eye/activate.json` — fails unless a click on each of the 3 activate cards on the deploy screen lands and registers, on phone, landscape phone and desktop.
+- `npm run -s eye -- play eye/hand.json` — fails unless a click on each card of the battle's hand, and Fuse, lands and registers, on phone, landscape phone and desktop.
+- `npm run -s eye -- play eye/card-reward.json` — fails unless a click on each card offered after a battle, and Skip, lands and registers, at the same sizes.
 - `npm run dev` — serve the game for a human. Each push to `main` also deploys it to https://dangau.github.io/TacticalAuto/.

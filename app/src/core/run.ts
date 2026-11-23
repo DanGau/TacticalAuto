@@ -1,5 +1,6 @@
 // A run's journey: creating it, the route and each leg's map of stops, and moving along it.
-import { boonStat, UTILITIES, type Held } from './utilities'
+import { cardStat, CARDS, RIDERS, type Card } from './cards'
+import { drawHand, play, starterDeck, UPGRADED } from './deck'
 import { type Reserve, type Stats } from './battle'
 import { secondaryOf } from './hero'
 import { createBattle } from './setup'
@@ -16,7 +17,7 @@ import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
 import { LEG_STOPS, OPENING, REST_COLUMNS, STOP_THREAT, THREAT_MAX } from './progress'
 import { abilityOf, charges, health, mend, offerCandidates, soldierStats, weaponOf } from './hero'
-import { dropGear, offerStart, settle } from './rewards'
+import { dropGear, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
 import { forceOf, type ChallengeId } from './challenges'
 import { type Leg, type MapNode, type Risk, type Run, type Stage, type Stop, type StopKind } from './run-state'
@@ -37,7 +38,6 @@ export function choose(run: Run, index: number): void {
   run.route = plotRoute(run, run.hero.home)
   run.route.forEach((stage, l) => placeLeg(run, run.legs[l], stage))
   drawStops(run)
-  offerStart(run)
   settle(run)
 }
 
@@ -338,10 +338,11 @@ export function createRun(seed: number): Run {
     relics: [],
     gains: [],
     log: [],
-    utilities: [],
+    deck: starterDeck(),
+    hand: [],
     streak: 0,
-    spare: null,
-    boonOffers: [],
+    cardOffers: [],
+    upgrading: false,
     relicOffers: [],
     passed: [],
     candidates: [],
@@ -384,7 +385,10 @@ export function advance(run: Run): void {
     run.threat = Math.min(run.threat + STOP_THREAT, THREAT_MAX)
     const supplies = stop === 'supply' ? DROP_SUPPLIES : 0
     run.supplies += supplies
-    if (stop === 'safehouse') mend(run, Infinity)
+    if (stop === 'safehouse') {
+      mend(run, Infinity)
+      run.upgrading = run.deck.some((card) => card.level < UPGRADED)
+    }
     if (stop === 'cache') dropGear(run, run.relics.some((id) => (RELICS[id] as Relic).rareGear))
     run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, key: false, hero: null, rescued: null }
     passStop(run)
@@ -398,33 +402,37 @@ export function advance(run: Run): void {
   run.phase = 'battle'
   const challenge = stop === 'battle' || stop === 'key' || stop === 'final' ? here.challenge : null
   run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), [reserveOf(run, rules, null)], mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city, ground: here.ground } : undefined, challenge)
+  // An ambush has no deploy screen, so no hand: the hero is caught with no card.
+  run.hand = []
+  if (run.battle.phase === 'deploy') drawHand(run)
 }
 
-/** The hero as it goes into a battle under `rules` with `boon` activated: its stats, health, kit and every effect it carries, the boon's among them. */
-export function reserveOf(run: Run, rules: Rule[], boon: Held | null): Reserve {
+/** The hero as it goes into a battle under `rules` with `card` played: its stats, health, kit and every effect it carries, the card's among them. */
+export function reserveOf(run: Run, rules: Rule[], card: Card | null): Reserve {
   const doctrines = run.doctrines.map((id): Doctrine => DOCTRINES[id])
   const s = run.hero
   return {
     soldier: s.id,
-    stats: Object.fromEntries(Object.entries(soldierStats(run, s)).map(([key, n]) => [key, n + (boon ? boonStat([boon], key as keyof Stats) : 0)])) as unknown as Stats,
-    hp: health(run, s) + (boon ? boonStat([boon], 'hp') : 0),
+    stats: Object.fromEntries(Object.entries(soldierStats(run, s)).map(([key, n]) => [key, n + cardStat(card, key as keyof Stats)])) as unknown as Stats,
+    hp: health(run, s) + cardStat(card, 'hp'),
     ability: abilityOf(s),
     charges: charges(run, s),
     secondary: secondaryOf(s),
     weapon: doctrines.find((d) => d.fights)?.fights ?? s.gear?.weapon,
     stance: doctrines.find((d) => d.stance)?.stance ?? weaponOf(s)?.stance ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
-    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...s.perks.flatMap((id) => PERKS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? []), ...(boon ? UTILITIES[boon.id].lends : [])].filter(
+    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...s.perks.flatMap((id) => PERKS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? []), ...(card ? CARDS[card.id].lends : [])].filter(
       // Zenith Chronometer works every ZENITH_EVERY battles; under Executioner's Oath a kill pays a hero nothing.
       (effect) => (effect !== 'zenith' || (run.log.length + 1) % ZENITH_EVERY === 0) && !(rules.includes('reckoning') && KILL_REWARDS.includes(effect)),
     ),
   }
 }
 
-/** Activates the boon held at `index` for the battle at its deploy screen, or none with null, and fits the hero to it. */
-export function activate(run: Run, index: number | null): void {
+/** Plays the card at `index` of the hand for the battle at its deploy screen, or none with null, fused or not, and fits the hero to it. */
+export function playCard(run: Run, index: number | null, fuse: boolean): void {
   const battle = run.battle!
-  battle.boon = index === null ? null : { ...run.utilities[index] }
-  battle.reserve = [reserveOf(run, battle.rules, battle.boon)]
+  battle.card = play(run, index, fuse)
+  battle.riders = Object.fromEntries(RIDERS.map((of) => [of, cardStat(battle.card, of)]))
+  battle.reserve = [reserveOf(run, battle.rules, battle.card)]
 }
 
 

@@ -8,7 +8,8 @@ import { knockback, knocksInto } from './knockback'
 import { mend, SLAM_DAMAGE } from './wound'
 import { TUNING } from './tuning'
 import { STREAK_FIGHTS } from './relics'
-import { gainRelic, gainUtility, slotsOf } from './rewards'
+import { gainRelic } from './rewards'
+import { handSize, HAND } from './deck'
 import { begun } from './roads'
 import { createRun } from './run'
 import { step } from './step'
@@ -187,13 +188,11 @@ test('Chrono Coil: every 3rd human turn the hero doubles its attacks', () => {
   expect(hero.twice).toBe(true)
 })
 
-test('Boon Rack: hold 1 more boon', () => {
+test('Tactical Satchel: draw 1 more card each battle', () => {
   const run = begun(1)
-  run.utilities = [{ id: 'plasma', level: 1 }, { id: 'riot', level: 1 }, { id: 'longshot', level: 1 }]
-  gainRelic(run, 'rack', true)
-  gainUtility(run, 'nanoweave')
-  expect(run.spare).toBeNull()
-  expect(run.utilities).toHaveLength(slotsOf(run))
+  expect(handSize(run)).toBe(HAND)
+  gainRelic(run, 'satchel', true)
+  expect(handSize(run)).toBe(HAND + 1)
 })
 
 test('Unbroken Line: every STREAK_FIGHTS fights in a row won pay more', () => {
@@ -204,7 +203,7 @@ test('Unbroken Line: every STREAK_FIGHTS fights in a row won pay more', () => {
     run.phase = 'overworld'
     apply(run, { type: 'go', index: 1 })
     apply(run, { type: 'advance' })
-    apply(run, { type: 'enter', boon: run.utilities.length > 0 ? 0 : null })
+    apply(run, { type: 'enter', card: run.hand.length > 0 ? 0 : null, fuse: false })
     Object.assign(run.battle!, { phase: 'over', winner: 'human' })
     endBattle(run)
     pays.push(run.report!.supplies)

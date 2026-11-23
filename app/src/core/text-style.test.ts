@@ -15,7 +15,7 @@ import { RELICS } from './relics'
 import { SECONDARIES, secondaryPower } from './secondaries'
 import { SKILLS } from './skills'
 import { TWISTS } from './twists'
-import { boonText, UTILITY_IDS, UTILITIES } from './utilities'
+import { cardText, CARD_IDS, CARDS } from './cards'
 import { WEAPONS } from './weapons'
 import { ALIENS } from './aliens'
 import { ARENA_KINDS } from './arena-kinds'
@@ -31,7 +31,7 @@ const effects: [string, string][] = [
   ...Object.values(RELICS).map((r): [string, string] => [r.name, r.text]),
   ...Object.values(EFFECTS).map((e): [string, string] => [e.prefix, e.text]),
   ...Object.values(DOCTRINES).map((d): [string, string] => [d.name, d.text]),
-  ...UTILITY_IDS.map((id): [string, string] => [UTILITIES[id].name, boonText(id)]),
+  ...CARD_IDS.map((id): [string, string] => [CARDS[id].name, cardText(id)]),
   ...Object.values(EVENTS).flatMap((e) => e.options.map((o): [string, string] => [e.name, o.text])),
   ...Object.values(GOALS).map((g): [string, string] => [g.name, g.text]),
   ...Object.values(RISKS).map((r): [string, string] => [r.name, r.text]),

@@ -9,8 +9,8 @@ import { skillIcon } from './skill-icons'
 import type { Fought, Run } from '../core/run-state'
 import { SKILLS } from '../core/skills'
 import { level } from '../core/hero'
-import { boonName } from '../core/utilities'
-import { boonIcon } from './boon-icons'
+import { cardName } from '../core/cards'
+import { cardIcon } from './card-icons'
 import { barCard, columns, heroColour, type Column, type Mark } from './charts'
 import { badge, gearName, STOP_NAMES } from './html'
 
@@ -85,7 +85,7 @@ export function runSummary(run: Run): string {
     <section><h3>Hero</h3><div class="endheroes">${card}</div></section>
     ${list('Relics', run.relics.map((id) => `${relicIcon(id)} ${RELICS[id].name}`))}
     ${list('Oaths', run.doctrines.map((id) => DOCTRINES[id].name))}
-    ${list('Boons', run.utilities.map((h) => `${boonIcon(h.id)} ${boonName(h.id, h.level)}`))}
+    ${list('Deck', run.deck.map((c) => `${cardIcon(c.id)} ${cardName(c.id, c.level)}`))}
     <section><h3>Run totals · ${run.log.length} battles, ${run.log.filter((f) => f.won).length} won</h3>${charts(runRow(run))}</section>
     <section><h3>Battles · damage dealt above, tanked below</h3>${legend(hero.name)}${columns(battleColumns(run), TANKED)}</section>
   </div>`

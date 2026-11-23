@@ -41,7 +41,7 @@ const log = (line: string) => console.error(`sim pool: ${line}`)
 interface PoolOptions {
   threads?: number
   doctrines?: DoctrineId[]
-  /** Play each deploy screen on with every utility: see forks.ts. */
+  /** Play each deploy screen on with each card of the hand: see forks.ts. */
   forks?: boolean
   /** Play each safehouse and medkit on offer on both ways: see rest.ts. */
   rests?: boolean

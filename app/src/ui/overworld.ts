@@ -4,15 +4,16 @@ import { DOCTRINES } from '../core/doctrines'
 import { MEDKIT, EVENTS, RELIC_PRICE } from '../core/events'
 import { RELICS, type Relic } from '../core/relics'
 import { relicIcon } from './relic-icons'
-import { boonName, UTILITIES, UTILITY_PRICE } from '../core/utilities'
-import { boonIcon } from './boon-icons'
+import { CARDS, cardText } from '../core/cards'
+import { cardIcon } from './card-icons'
+import { deckGrid, deckView } from './card-face'
 import { current, legOf, KEYS, ways, nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Stop } from '../core/run-state'
 import { missionAt } from '../core/missions'
 import { huntForce } from '../core/missions'
 import { RISKS } from '../core/missions'
-import { GEAR_PRICE, slotsOf } from '../core/rewards'
+import { CARD_PRICE, GEAR_PRICE, REMOVE_PRICE } from '../core/rewards'
 import { makes } from '../core/hero'
 import { soldierStats } from '../core/hero'
 import { health, wounded } from '../core/hero'
@@ -27,12 +28,12 @@ import { objective, THREATS } from '../core/objectives'
 import { CHALLENGES } from '../core/challenges'
 import type { LonLat } from '../core/world'
 import { globe, type Pin } from './globe'
-import { boonDoes, pickCard, shopSwap, pickDetail, utilityPick, type Pick } from './cards'
+import { pickCard, shopSwap, pickDetail, type Pick } from './cards'
 import { heroSheet } from './sheet'
 import { alienName, badge, button, describe, describeGear, gearCard, gearName, healthBar, quantityChips, examChip, STOP_NAMES, threatBar } from './html'
 
 /** The views between battles, in tab order. */
-const TABS = ['Map', 'Kit', 'Hero'] as const
+const TABS = ['Map', 'Deck', 'Kit', 'Hero'] as const
 export type Tab = (typeof TABS)[number]
 
 
@@ -50,7 +51,7 @@ function census(run: Run, kinds: AlienKind[]): string {
 }
 
 /** What a safehouse does, told on its icon and card. */
-const SAFEHOUSE = 'heal to full instead of fighting'
+const SAFEHOUSE = 'heal to full and upgrade a card'
 
 const STOP_ICONS: Record<Stop['kind'], string> = { battle: '⚔️', supply: '📦', cache: '🎁', shop: '🛒', safehouse: '🏠', unknown: '❓', key: '⭐', final: '👁️' }
 
@@ -64,9 +65,8 @@ function stopIcon(run: Run, stop: Stop, state = ''): string {
   const goal = GOALS[stop.goal]
   const aliens = census(run, stop.aliens) + (stop.goal === 'assassinate' ? ', a Commander' : '')
   const challenge = stop.challenge && CHALLENGES[stop.challenge]
-  const answered = challenge && run.utilities.some((h) => challenge.answers.includes(h.id)) ? ' answered' : ''
   const ground = stop.ground && ARENA_KINDS[stop.ground]
-  return `<span class="node ${stop.risk} ${state}${answered}" title="${ground ? `${ground.name} · ` : ''}${challenge?.name} · ${goal.name} · ${risk.name} · ${aliens.replace(/<[^>]*>/g, '')}">${challenge?.icon ?? STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}${ground && stop.ground !== 'open' ? `<sub>${ground.icon}</sub>` : ''}</span>`
+  return `<span class="node ${stop.risk} ${state}" title="${ground ? `${ground.name} · ` : ''}${challenge?.name} · ${goal.name} · ${risk.name} · ${aliens.replace(/<[^>]*>/g, '')}">${challenge?.icon ?? STOP_ICONS.battle}${stop.twist ? `<sup>${TWISTS[stop.twist].icon}</sup>` : ''}${ground && stop.ground !== 'open' ? `<sub>${ground.icon}</sub>` : ''}</span>`
 }
 
 /** A stop not yet seen. */
@@ -152,16 +152,15 @@ function travelLabel(run: Run, stop: Stop, next: 'battle' | 'key' | 'final'): st
   return `${stop.aliens.length} aliens${hunt > 0 ? ` + ${hunt} hunting` : ''}${stop.challenge === 'bigOne' ? ' + boss' : ''}`
 }
 
-/** What a stop tests, and which boons held answer it. */
-function readChallenge(run: Run, stop: Stop): string {
+/** What a stop tests. */
+function readChallenge(stop: Stop): string {
   if (!stop.challenge) return ''
   const challenge = CHALLENGES[stop.challenge]
-  const held = run.utilities.filter((h) => challenge.answers.includes(h.id))
-  return `<span title="${challenge.name}: ${challenge.test}">${challenge.icon} ${THREATS[stop.challenge]}</span>${held.length > 0 ? ` <small class="down">Held: ${held.map((h) => UTILITIES[h.id].name).join(', ')}</small>` : ''}`
+  return `<span title="${challenge.name}: ${challenge.test}">${challenge.icon} ${THREATS[stop.challenge]}</span>`
 }
 
 /** What the hero faces at a stop, as the map's heading. */
-function where(run: Run, stop: Stop): string {
+function where(stop: Stop): string {
   // A stop's icon tells what it is; only a fight or a safehouse says more.
   if (stop.kind === 'safehouse') return `<b>🏠 Safehouse</b>: ${SAFEHOUSE}`
   if (stop.kind !== 'battle' && stop.kind !== 'key' && stop.kind !== 'final') return ''
@@ -169,12 +168,12 @@ function where(run: Run, stop: Stop): string {
   const extras = stop.kind === 'battle' ? ` · ${RISKS[stop.risk].name}${stop.twist ? ` · <span title="${TWISTS[stop.twist].text}">${TWISTS[stop.twist].icon} ${TWISTS[stop.twist].name}</span>` : ''}` : ''
   const ground = stop.ground && ARENA_KINDS[stop.ground]
   const land = ground ? `<br><span class="ground" title="${ground.text}">${ground.icon} ${ground.name}${stop.region ? ` · ${REGIONS[stop.region].name}` : ''}</span>: ${describe(ground.text, { reads: ground.reads })}` : ''
-  return `${order}${extras}${land}<br>${readChallenge(run, stop)}`
+  return `${order}${extras}${land}<br>${readChallenge(stop)}`
 }
 
 const PURCHASED = '<small class="purchased">Purchased</small>'
 
-/** Everything a shop sells, as cards of one size: weapons, relics, then boons and the medkit. */
+/** Everything a shop sells, as cards of one size: weapons, relics, then cards, removing one, and the medkit. */
 function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
   const shop = run.shop!
   const held = makes(run)
@@ -185,29 +184,35 @@ function shopShelves(run: Run): { name: string; picks: Pick[] }[] {
     return { key: `g${index}`, attrs: `data-ware="${index}"`, look: `gear ${gear.rarity}`, body: card(gear.rarity, gearName(gear), `${price} supplies`, sold), detail: `<p><b>${gear.name}</b>. ${describeGear(gear, held)}</p>`, go: `Tap again to buy for ${price} supplies`, block: poor(price), spent: sold }
   })
   const relics = shop.relics.map(({ id, sold }, index): Pick => ({ key: `r${index}`, action: { type: 'buy', index }, look: 'relic', body: card('relic', `${relicIcon(id)} ${RELICS[id].name}`, `${RELIC_PRICE} supplies`, sold), detail: `<p><b>${RELICS[id].name}.</b> ${describe(RELICS[id].text, RELICS[id], held)}</p>`, go: `Tap again to buy for ${RELIC_PRICE} supplies`, block: poor(RELIC_PRICE), spent: sold }))
-  const utilities = shop.utilities.map(({ id, sold }, index): Pick =>
-    utilityPick(run, `u${index}`, { type: 'utility', index }, id, 'boon', `Tap again to buy for ${UTILITY_PRICE} supplies${run.utilities.some((h) => h.id === id) ? ', raising its level' : run.utilities.length >= slotsOf(run) ? ', swapping 1 out' : ''}`, {
-      body: card(UTILITIES[id].category, `${boonIcon(id)} ${UTILITIES[id].name}`, `${UTILITY_PRICE} supplies`, sold),
-      block: poor(UTILITY_PRICE),
-      spent: sold,
-    }),
-  )
+  const cards = shop.cards.map(({ id, sold }, index): Pick => {
+    const { name, rarity } = CARDS[id]
+    const price = CARD_PRICE[rarity]
+    return { key: `c${index}`, action: { type: 'buyCard', index }, look: `cardware ${rarity}`, body: card(`${rarity} card`, `${cardIcon(id)} ${name}`, `${price} supplies`, sold), detail: `<p><b>${name}</b>. ${describe(cardText(id), CARDS[id], held)}</p>`, go: `Tap again to add it to your deck for ${price} supplies`, block: poor(price), spent: sold }
+  })
+  const remove: Pick = { key: 'x', attrs: 'data-remove="open"', look: 'cardware remove', body: card('service', '✂ Remove a card', `${REMOVE_PRICE} supplies`, shop.removed), detail: `<p><b>Remove a card.</b> Take 1 card out of your deck for good. Once a shop.</p>`, go: 'Tap again to pick the card', block: run.deck.length > 0 ? poor(REMOVE_PRICE) : 'No cards', spent: shop.removed }
   const medkit: Pick = { key: 'm', action: { type: 'medkit' }, look: 'medkit', body: card('medkit', '✚ Medkit', `${MEDKIT.price} supplies`, shop.medkit), detail: `<p><b>Medkit.</b> Heal ${MEDKIT.heal}. Single use. A safehouse heals to full.</p>`, go: `Tap again to pay ${MEDKIT.price} supplies`, block: wounded(run) ? poor(MEDKIT.price) : 'Full health', spent: shop.medkit }
-  return [{ name: 'Weapons', picks: gear }, { name: 'Relics', picks: relics }, { name: 'Boons and the medkit', picks: [...utilities, medkit] }]
+  return [{ name: 'Weapons', picks: gear }, { name: 'Relics', picks: relics }, { name: 'Cards and the medkit', picks: [...cards, remove, medkit] }]
 }
 
-/** A shop: its cards, what the armed one does, and the way out. What is bought keeps its place, greyed out. With `ware` chosen, the swap, in a pop-up. */
-function shopView(run: Run, armed: string | null, ware: number | null): string {
+/** A shop: its cards, what the armed one does, and the way out. What is bought keeps its place, greyed out. With `ware` chosen, the swap, in a pop-up; `removing`, the deck to pick a card from. */
+function shopView(run: Run, armed: string | null, ware: number | null, removing: boolean): string {
   const shelves = shopShelves(run)
   const picks = shelves.flatMap((shelf) => shelf.picks)
-  const held = run.utilities.map((h) => `${boonIcon(h.id)} ${boonName(h.id, h.level)}`).join(', ') || 'none'
   const screen = `<h2>A shop. Each piece is one of a kind.</h2>
     ${shelves.filter((shelf) => shelf.picks.length > 0).map((shelf) => `<div class="shelf"><small>${shelf.name}</small><div class="picks">${shelf.picks.map((p) => pickCard(p, ware === null ? armed : null)).join('')}</div></div>`).join('')}
-    <div class="shopfoot"><button class="travel" data-action='${JSON.stringify({ type: 'leave' })}'>Leave the shop</button><p class="kit">Boons ${run.utilities.length}/${slotsOf(run)}: ${held}</p></div>
+    <div class="shopfoot"><button class="travel" data-action='${JSON.stringify({ type: 'leave' })}'>Leave the shop</button><p class="kit">Deck: ${run.deck.length} cards</p></div>
     ${pickDetail(picks, ware === null ? armed : null, 'Tap a card for its details; tap it again to buy.')}`
+  if (removing && !run.shop!.removed) return `${screen}<div class="modal"><div class="sheet">${removal(run, armed)}</div></div>`
   if (ware === null || run.shop!.wares[ware].sold) return screen
   const { gear } = run.shop!.wares[ware]
   return `${screen}<div class="modal"><div class="sheet">${shopSwap(run, ware, GEAR_PRICE[gear.rarity as keyof typeof GEAR_PRICE], armed)}</div></div>`
+}
+
+/** The deck to remove a card from: one tapped is picked, then Remove takes it out for good; or Cancel. */
+function removal(run: Run, armed: string | null): string {
+  const pick = armed?.match(/^d(\d+)$/) ? Number(armed.slice(1)) : null
+  return `<div class="gearswap cardpick"><h1>Remove a card</h1><h2>${pick === null ? 'Tap the card to take out of your deck for good.' : `Remove ${CARDS[run.deck[pick].id].name} for ${REMOVE_PRICE} supplies?`}</h2>${deckGrid(run, (_, i) => `data-arm="d${i}"${pick === i ? ' data-on' : ''}`)}
+    <div class="actions"><button class="decide confirm"${pick === null ? ' disabled' : ` data-action='${JSON.stringify({ type: 'remove', index: pick })}'`}>${pick === null ? 'Pick one' : 'Remove'}</button><button class="decide skip" data-remove="">Cancel</button></div></div>`
 }
 
 /** An event: its scene, and the ways to meet it. */
@@ -221,28 +226,26 @@ function eventView(run: Run): string {
  * The map: a shop or event being met; else the run's map, with the ways on to choose from or a button to travel on,
  * and the stop the player has picked to look at but not yet set out for, if any.
  */
-function mapView(run: Run, picked: number | null, armed: string | null, ware: number | null): string {
-  if (run.phase === 'shop') return shopView(run, armed, ware)
+function mapView(run: Run, picked: number | null, armed: string | null, ware: number | null, removing: boolean): string {
+  if (run.phase === 'shop') return shopView(run, armed, ware, removing)
   if (run.phase === 'event') return eventView(run)
   const node = current(run)
   const ahead = picked !== null && ways(run).includes(picked) ? legOf(run).columns[run.stop][picked].stop : null
   // Flight: the map fills the screen; what a stop holds shows over it once picked or reached.
   if (!node && !ahead) return runMap(run, null)
   const brief = (text: string) => (text ? `<div class="stopcard">${text}</div>` : '')
-  if (!node) return `${brief(where(run, ahead!))}${runMap(run, picked)}`
+  if (!node) return `${brief(where(ahead!))}${runMap(run, picked)}`
   const next = nextStop(run)!
   const here = node.stop!
-  return `${brief(next === 'ambush' ? `<b class="up">${objective(next, 'ambush')}</b>` : next === 'battle' || next === 'key' || next === 'final' ? `${where(run, here)} · ${travelLabel(run, here, next)}` : '')}
+  return `${brief(next === 'ambush' ? `<b class="up">${objective(next, 'ambush')}</b>` : next === 'battle' || next === 'key' || next === 'final' ? `${where(here)} · ${travelLabel(run, here, next)}` : '')}
     ${runMap(run, null)}`
 }
 
 function baseView(run: Run): string {
   const relics = run.relics.map((id) => `<div class="gear relic"><small>relic</small><br><b>${relicIcon(id)} ${RELICS[id].name}</b><br>${describe(RELICS[id].text, RELICS[id])}</div>`)
   const doctrines = run.doctrines.map((id) => `<div class="gear doctrine"><small>oath</small><br><b>${DOCTRINES[id].name}</b><br>${DOCTRINES[id].text}</div>`)
-  const utilities = run.utilities.map((h) => `<div class="gear"><small>${UTILITIES[h.id].category}</small><br><b>${boonIcon(h.id)} ${boonName(h.id, h.level)}</b><br>${boonDoes(run, h.id, h.level)}</div>`)
   const held = makes(run)
-  return `${relics.length + doctrines.length + held.length + utilities.length === 0 ? '<h2>Relics, oaths and boons the hero gains show here.</h2>' : ''}
-    ${utilities.length > 0 ? `<h2>Boons ${utilities.length}/${slotsOf(run)}</h2><div class="stash">${utilities.join('')}</div>` : ''}
+  return `${relics.length + doctrines.length + held.length === 0 ? '<h2>Relics and oaths the hero gains show here.</h2>' : ''}
     ${held.length > 0 ? `<h2>Your build makes</h2>${quantityChips(held, held)}` : ''}
     ${doctrines.length > 0 ? `<h2>Oaths</h2><div class="stash">${doctrines.join('')}</div>` : ''}
     ${relics.length > 0 ? `<h2>Relics</h2><div class="stash">${relics.join('')}</div>` : ''}`
@@ -263,8 +266,8 @@ function heroView(run: Run): string {
  * The screen between stops: a header with the keys, threat, supplies and tabs, over the chosen tab's view.
  * `armed` is the card tapped once, `ware` the shop gear being bought.
  */
-export function overworld(run: Run, tab: Tab, picked: number | null, armed: string | null = null, ware: number | null = null): string {
-  const views = { Map: (r: Run) => mapView(r, picked, armed, ware), Kit: baseView, Hero: heroView }
+export function overworld(run: Run, tab: Tab, picked: number | null, armed: string | null = null, ware: number | null = null, removing = false): string {
+  const views = { Map: (r: Run) => mapView(r, picked, armed, ware, removing), Deck: deckView, Kit: baseView, Hero: heroView }
   const tabs = TABS.map((name) => `<button class="tab ${name === tab ? 'active' : ''}" data-tab="${name}">${name}</button>`)
   return `
     <div class="header">

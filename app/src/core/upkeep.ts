@@ -17,7 +17,7 @@ import type { GameEvent } from './combat-event'
 import { engageNearest, walkersFighting, has, nearest, fireproof, foeHas, onTile, FIRE_TURNS, uplinkReach, silenced, centreOf } from './fighters'
 import { WAVE_EVERY } from './goals'
 import { randomInt } from './rng'
-import { tickBoons } from './boons'
+import { tickCard } from './played'
 import { mend, wound } from './wound'
 import { talentTurn } from './talents'
 
@@ -31,7 +31,7 @@ export function upkeep(battle: Battle): GameEvent[] {
   for (const unit of battle.units.filter((u) => u.side !== battle.turn && u.chill > 0 && !u.frozen)) unit.chill--
   if (battle.turn === 'human') {
     chrono(battle, events)
-    tickBoons(battle, events)
+    tickCard(battle, events)
     lodestone(battle, events)
   }
   for (const unit of battle.units.filter((u) => u.side === battle.turn)) {

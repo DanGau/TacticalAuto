@@ -4,15 +4,12 @@ import { RISKS } from './missions'
 import { STOP_THREAT, LOSS_THREAT, THREAT_MAX } from './progress'
 import { type Relic, RELICS, offerable, RELIC_OFFERS, drawRelic, STREAK_FIGHTS, bridged } from './relics'
 import { feeds } from './quantities'
-import { dropGear, findUtility, settle } from './rewards'
+import { dropGear, offerCards, settle } from './rewards'
+import { returnOut } from './deck'
 import { random, randomInt } from './rng'
 import { drawStops, passStop } from './run'
 import { type Run } from './run-state'
 import { earn, makes, reads, soldierStats } from './hero'
-
-/** Chance an ambush or a key mission won turns up a utility. */
-const AMBUSH_BOON = 0.06
-const KEY_BOON = 0.25
 
 /**
  * Settles a finished battle: experience, threat, rewards, and where the hero stands on the road. The hero earns
@@ -50,9 +47,8 @@ export function endBattle(run: Run): void {
   const byGoal = { cross: risk.gear, assassinate: 1, hold: 0, rescue: 0, ambush: 0 }[mission.goal]
   const chance = mission.kind === 'key' ? 1 : mission.kind === 'battle' ? byGoal : 0
   if (won && chance > 0 && random(run) < chance) dropGear(run, risk.rareGear || mission.kind === 'key' || held.some((relic) => relic.rareGear))
-  // A key mission, an ambush or a battle by chance turns up a boon.
-  const find = mission.kind === 'key' ? KEY_BOON : mission.kind === 'ambush' ? AMBUSH_BOON : mission.kind === 'battle' ? risk.utility : 0
-  if (won && mission.kind !== 'final' && random(run) < find) findUtility(run)
+  // Every battle won offers cards; an elite's, one with a boss or commander, are rare or better.
+  if (won && mission.kind !== 'final') offerCards(run, mission.kind !== 'battle' || mission.goal === 'assassinate' || battle.challenge === 'bigOne')
   const key = won && mission.kind === 'key'
   run.report = { stop: mission.kind, won, threat: { before, after: run.threat }, supplies, key, hero, rescued }
 
@@ -64,6 +60,7 @@ export function endBattle(run: Run): void {
   // An ambush stands in front of the stop it interrupted.
   if (key) {
     run.keys++
+    returnOut(run)
     run.stop = 0
     drawStops(run)
   }

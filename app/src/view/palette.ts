@@ -10,7 +10,7 @@ export const SOURCE: Record<SrcKind, { color: number; glyph: string }> = {
   weapon: { color: 0xffffff, glyph: '⚔' },
   gear: { color: 0x6fdc6f, glyph: '⚙' },
   relic: { color: 0xb98cff, glyph: '❖' },
-  boon: { color: 0x4fe3e3, glyph: '✚' },
+  card: { color: 0x4fe3e3, glyph: '✚' },
   doctrine: { color: 0xff9a3d, glyph: '⚑' },
   object: { color: 0xa0a7b4, glyph: '▣' },
   basic: { color: 0xc9ced8, glyph: '•' },

@@ -1,6 +1,7 @@
 // Gear and relic rewards, the shop, and settling the reward phase.
 import { RARITY_CHANCE, type Rarity } from './base'
-import { MAX_LEVEL, SHOP_UTILITIES, START_OFFERS, UTILITY_IDS, UTILITY_PRICE, UTILITY_SLOTS, type UtilityId } from './utilities'
+import { CARDS } from './cards'
+import { drawCards, OFFERS, UPGRADED } from './deck'
 import { generateGear, type Gear } from './gear'
 import { random, randomInt } from './rng'
 import { drawRelic, offerable, type RelicId } from './relics'
@@ -67,9 +68,8 @@ export function stockShop(run: Run): Shop {
   const relics = offerable(run.relics)
   const stocked: RelicId[] = []
   while (stocked.length < SHOP_RELICS && relics.length > 0) stocked.push(drawRelic(run, relics, makes(run), reads(run)))
-  const kinds = drawable(run)
-  const utilities = Array.from({ length: Math.min(SHOP_UTILITIES, kinds.length) }, () => ({ id: drawUtility(run, kinds), sold: false }))
-  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), utilities, medkit: false }
+  const cards = drawCards(run, OFFERS, false).map((id) => ({ id, sold: false }))
+  return { wares: wares.map((gear) => ({ gear, sold: false })), relics: stocked.map((id) => ({ id, sold: false })), cards, medkit: false, removed: false }
 }
 
 /** A new piece of gear for the hero: `weapon`, or its own. */
@@ -84,22 +84,42 @@ export function buyWare(run: Run, index: number): void {
   wear(run.hero, gear)
 }
 
-/** Boons the hero holds at most: UTILITY_SLOTS, and 1 more with Boon Rack. */
-export const slotsOf = (run: Run) => UTILITY_SLOTS + (run.relics.includes('rack') ? 1 : 0)
+/** What a card costs in a shop, by rarity; and removing one from the deck, once a shop. */
+export const CARD_PRICE: Record<Rarity, number> = { common: 3, rare: 5, epic: 8 }
+export const REMOVE_PRICE = 4
 
-/** Boons the hero could gain: any not held at MAX_LEVEL. */
-const drawable = (run: Run) => UTILITY_IDS.filter((id) => (run.utilities.find((h) => h.id === id)?.level ?? 0) < MAX_LEVEL)
+/** Buys the shop's card at `index` into the deck. The caller checks it is affordable. */
+export function buyCard(run: Run, index: number): void {
+  const item = run.shop!.cards[index]
+  item.sold = true
+  run.supplies -= CARD_PRICE[CARDS[item.id].rarity]
+  run.deck.push({ id: item.id, level: 1 })
+}
 
-/** The hero gains boon `id`: one held rises a level, and the player is told; else it fills a free slot, or with none the player slots it in for one held or leaves it. */
-export function gainUtility(run: Run, id: UtilityId): void {
-  const held = run.utilities.find((h) => h.id === id)
-  if (held) {
-    held.level = Math.min(MAX_LEVEL, held.level + 1)
-    run.gains.push({ kind: 'boon', id, level: held.level })
-  } else if (run.utilities.length < slotsOf(run)) {
-    run.utilities.push({ id, level: 1 })
-    run.gains.push({ kind: 'boon', id, level: 1 })
-  } else run.spare = id
+/** Removes the card at `index` of the deck, for REMOVE_PRICE. The caller checks it is affordable. */
+export function removeCard(run: Run, index: number): void {
+  run.deck.splice(index, 1)
+  run.supplies -= REMOVE_PRICE
+  run.shop!.removed = true
+}
+
+/** Offers OFFERS cards after a battle won; an elite's are rare or better. */
+export function offerCards(run: Run, elite: boolean): void {
+  run.cardOffers = drawCards(run, OFFERS, elite)
+}
+
+/** Adds the offered card at `index` to the deck, or with null skips them all. */
+export function takeCard(run: Run, index: number | null): void {
+  if (index !== null) run.deck.push({ id: run.cardOffers[index], level: 1 })
+  run.cardOffers = []
+  settle(run)
+}
+
+/** Upgrades the card at `index` of the deck, or with null skips. */
+export function upgradeCard(run: Run, index: number | null): void {
+  if (index !== null) run.deck[index].level = UPGRADED
+  run.upgrading = false
+  settle(run)
 }
 
 /** The hero gains a relic: `seen` if the player chose it from a card, else the player is told. */
@@ -116,63 +136,15 @@ export function loseRelic(run: Run, index: number): RelicId {
   return id
 }
 
-/** Takes a boon out of `pool`, each as likely. */
-export function drawUtility(rng: { rng: number }, pool: UtilityId[]): UtilityId {
-  return pool.splice(randomInt(rng, pool.length), 1)[0]
-}
-
-/** At the run's start, the boons the hero picks its first from: drawn from the seed apart from the run's own stream, so they shift no later draw. */
-export function offerStart(run: Run): void {
-  const pool = [...UTILITY_IDS]
-  const rng = { rng: ~run.seed }
-  run.boonOffers = Array.from({ length: START_OFFERS }, () => drawUtility(rng, pool))
-}
-
-/** Takes the UTILITY_SLOTS offers at `picks`. The caller checks they are distinct offers. */
-export function takeStart(run: Run, picks: number[]): void {
-  run.utilities = picks.slice(0, UTILITY_SLOTS).map((i) => ({ id: run.boonOffers[i], level: 1 }))
-  run.boonOffers = []
-  settle(run)
-}
-
-/** A new boon found at a stop, or a level of one held; none once every boon is held at MAX_LEVEL. */
-export function findUtility(run: Run): UtilityId | null {
-  const kinds = drawable(run)
-  if (kinds.length === 0) return null
-  const id = drawUtility(run, kinds)
-  gainUtility(run, id)
-  return id
-}
-
-/** Buys the shop's boon at `index`. The caller checks it is affordable. */
-export function buyUtility(run: Run, index: number): void {
-  const item = run.shop!.utilities[index]
-  item.sold = true
-  run.supplies -= UTILITY_PRICE
-  gainUtility(run, item.id)
-}
-
-/** Settles a new boon: slots it in for the one held at `drop`, or with -1 leaves it; one just bought goes back on the shelf, its price repaid. */
-export function keepUtility(run: Run, drop: number): void {
-  if (drop >= 0) run.utilities[drop] = { id: run.spare!, level: 1 }
-  const bought = run.shop?.utilities.find((item) => item.id === run.spare)
-  if (drop < 0 && bought) {
-    bought.sold = false
-    run.supplies += UTILITY_PRICE
-  }
-  run.spare = null
-  if (run.phase === 'reward') settle(run)
-}
-
 /** Sells the find at `index`. */
 export function sellFind(run: Run, index: number): void {
   run.supplies += SELL[run.finds.splice(index, 1)[0].rarity]
   settle(run)
 }
 
-/** Ends the reward phase once no choice is left: no starting boons, relic, find, new boon, skill or perk. */
+/** Ends the reward phase once no choice is left: no relic, find, card, upgrade, skill or perk. */
 export function settle(run: Run): void {
-  const owed = run.boonOffers.length > 0 || run.relicOffers.length > 0 || run.finds.length > 0 || run.spare !== null || owesPick(run.hero)
+  const owed = run.relicOffers.length > 0 || run.finds.length > 0 || run.cardOffers.length > 0 || run.upgrading || owesPick(run.hero)
   run.phase = owed ? 'reward' : 'overworld'
 }
 

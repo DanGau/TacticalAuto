@@ -1,13 +1,13 @@
 // The UI shell: renders the panel for the run's phase and turns clicks into actions.
 import { candidates, story, title } from './menu'
 import type { Action } from '../core/apply'
-import { nextStop } from '../core/run'
+import { current, nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
 import { makes, owesPick } from '../core/hero'
 import { battlePage, runSummary } from './summary'
 import { installTips } from './tip'
-import { acquired, choice, loot, modal, pickChoice, spareChoice, stopReport } from './aftermath'
+import { acquired, choice, loot, modal, pickChoice, stopReport } from './aftermath'
 import { ALIENS } from '../core/aliens'
 import { TWISTS } from '../core/twists'
 import { CHALLENGES } from '../core/challenges'
@@ -15,10 +15,11 @@ import { type Battle } from '../core/battle'
 import { HOLD_ROUNDS } from '../core/goals'
 import { missionOrder, THREATS } from '../core/objectives'
 import { button, describe, STOP_NAMES } from './html'
-import { boonName, boonText, UTILITIES, type Held, type UtilityId } from '../core/utilities'
-import { groundPoi } from '../core/pois'
-import { boonIcon } from './boon-icons'
-import { ARENA_KINDS, scouted, suggested } from '../core/arena-kinds'
+import { CARDS } from '../core/cards'
+import { playing } from '../core/deck'
+import { boardOf, inert, lineOf } from '../core/read'
+import { cardFace, startDeck } from './card-face'
+import { ARENA_KINDS } from '../core/arena-kinds'
 import { QUANTITIES } from '../core/quantities'
 import { RECKONING_KILLS } from '../core/doctrines'
 import { pickCard, type Pick } from './cards'
@@ -53,18 +54,26 @@ function counts(run: Run, battle: Battle): string {
   return `${chrono}${oath}`
 }
 
-/** Before the landing: the ground, what the battle tests, the twist, the aliens, and the choice of the one boon held to activate, each tagged with what it answers here. */
-function drop(run: Run, battle: Battle, armed: string | null, active: number | null): string {
+/** Before the landing: the ground, what the battle tests, the twist, the aliens, and the hand: each card with what it plays to on this board, one to play, and whether to fuse. */
+function drop(run: Run, battle: Battle, armed: string | null, active: number | null, fuse: boolean): string {
   const twist = battle.twist ? `<p title="${TWISTS[battle.twist].text}">${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}</b></p>` : ''
   const test = battle.challenge ? `<h2 class="challenge" title="${CHALLENGES[battle.challenge].test}">${CHALLENGES[battle.challenge].icon} ${THREATS[battle.challenge]}</h2>` : ''
   const clock = battle.deadline !== null ? `<p>⏱️ Reinforcements arrive in round ${battle.deadline}.</p>` : ''
-  const card = (h: Held, i: number) => {
-    const tag = tagOf(battle, h.id)
-    return `<button class="loadout-slot${tag ? ' answers' : ''}${i === active ? ' on' : ''}" data-activate="${i}" aria-pressed="${i === active}" title="${UTILITIES[h.id].name}: ${boonText(h.id, h.level)}">${boonIcon(h.id)}<b>${boonName(h.id, h.level)}</b><span>${boonText(h.id, h.level)}</span>${tag ? `<small>${tag}</small>` : ''}</button>`
+  const board = boardOf(battle)
+  const stats = battle.reserve[0].stats
+  const fused = fuse && active !== null
+  const card = (_: number, i: number) => {
+    const played = playing(run, i, fused && i === active)
+    const out = fused && i !== active
+    const state = [i === active ? 'on' : '', inert(battle, board, played) ? 'inert' : ''].filter(Boolean).join(' ')
+    return cardFace(run, { ...played, out }, { attrs: `data-play="${i}" aria-pressed="${i === active}"`, line: lineOf(battle, board, played, stats), state })
   }
-  const choice = run.utilities.length > 0 ? `<h2 class="loadout-head">What do you activate?</h2><div class="loadout">${run.utilities.map(card).join('')}</div>` : ''
-  const ready = active !== null || run.utilities.length === 0
-  return `${groundOf(run, battle)}${test}${clock}${twist}${foes(battle, armed)}${choice}<p class="auto">${ready ? 'Only the boon activated works. The battle plays itself.' : 'Tap a boon to activate.'}</p>${button({ type: 'enter', boon: active }, 'Deploy', 'primary', ready)}`
+  const hand = run.hand.length > 0 ? `<h2 class="hand-head">Play 1 card</h2><div class="hand">${run.hand.map(card).join('')}</div>` : ''
+  const canFuse = active !== null && run.hand.length > 1
+  const fuseButton = canFuse ? `<button class="fuse${fused ? ' on' : ''}" data-fuse aria-pressed="${fused}"><b>Fuse</b> Play it 1 level higher. The other ${run.hand.length - 1} are out until the next leg.</button>` : ''
+  const ready = active !== null || run.hand.length === 0
+  const hint = ready ? (active !== null ? `${CARDS[run.deck[run.hand[active]].id].name} works this battle. The battle plays itself.` : 'The battle plays itself.') : 'Tap a card to play.'
+  return `${groundOf(run, battle)}${test}${clock}${twist}${foes(battle, armed)}${hand}${fuseButton}<p class="auto">${hint}</p>${button({ type: 'enter', card: active, fuse: fused }, 'Deploy', 'primary', ready)}`
 }
 
 /** The ground scouted: its name and what it does, and which of what the hero's build makes it multiplies. */
@@ -72,13 +81,6 @@ function groundOf(run: Run, battle: Battle): string {
   const ground = ARENA_KINDS[battle.arenaKind]
   const yours = ground.reads.filter((q) => makes(run).includes(q)).map((q) => `${QUANTITIES[q].icon} ${QUANTITIES[q].name}`)
   return `<h2 class="challenge ground" title="${ground.text}">${ground.icon} ${ground.name}</h2><p class="ground-text">${describe(ground.text, { reads: ground.reads })}${yours.length > 0 ? ` <b>${yours.join(' and ')} pays here.</b>` : ''}</p>`
-}
-
-/** What a boon held answers here, among what the intro showed: the challenge's aliens, the ground's landmark, or both. */
-function tagOf(battle: Battle, id: UtilityId): string {
-  const { ground, challenge } = scouted(battle, id)
-  const names = [challenge ? CHALLENGES[battle.challenge!].name : '', ground ? (groundPoi(battle)?.label ?? ARENA_KINDS[battle.arenaKind].name) : ''].filter(Boolean)
-  return names.length > 0 ? `Answers ${names.join(' and ')}` : ''
 }
 
 /** The encounter: each alien kind on the deploy screen and how many; tapped, its stat block. Burrowers stay hidden. */
@@ -100,8 +102,12 @@ export function createUi(act: (action: Action) => void): Ui {
   installTips(overlay)
   const dropPanel = document.getElementById('drop')!
   let choosing: Battle | null = null
-  /** The boon held the player has activated on the deploy screen, by index. */
+  /** The card of the hand the player has picked to play on the deploy screen, by index, and whether to fuse it. */
   let active: number | null = null
+  let fuse = false
+  /** Whether the player has seen the starting deck and set out; and whether the shop's deck is open to remove a card. */
+  let dealt = false
+  let removing = false
   /** The report the player has continued past. */
   let seen: Report | null = null
   let tab: Tab = 'Map'
@@ -137,7 +143,7 @@ export function createUi(act: (action: Action) => void): Ui {
     // Told after the debrief, once the player has seen how the fight went.
     const debriefing = run.report && seen !== run.report && run.report.hero
     if (run.gains.length > 0 && !debriefing && run.phase !== 'battle' && run.phase !== 'won' && run.phase !== 'lost') return screen + acquired(run, run.gains[0])
-    return run.spare ? screen + spareChoice(run, armed) : screen
+    return screen
   }
 
   function phaseScreen(run: Run): string {
@@ -164,9 +170,10 @@ export function createUi(act: (action: Action) => void): Ui {
       // Arriving shows the shop or event; the other tabs stay open to the player while they decide.
       if (phase !== run.phase) tab = 'Map'
       phase = run.phase
-      return overworld(run, tab, picked, armed, ware)
+      return overworld(run, tab, picked, armed, ware, removing)
     }
     phase = run.phase
+    if (!dealt && run.log.length === 0 && run.keys === 0 && run.stop === 0 && !current(run)) return startDeck(run)
     return report && seen !== report ? stopReport(run, report) : overworld(run, tab, picked)
   }
 
@@ -203,18 +210,23 @@ export function createUi(act: (action: Action) => void): Ui {
     if (battle !== choosing) {
       choosing = battle
       armed = null
-      active = suggested(battle, run.utilities.map((h) => h.id))
+      active = null
+      fuse = false
     }
-    dropPanel.innerHTML = drop(run, battle, armed, active)
+    dropPanel.innerHTML = drop(run, battle, armed, active, fuse)
   }
 
   dropPanel.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (!target) return
-    if (target.dataset.activate) {
-      // A tap activates a boon; a second on it takes it back.
-      const i = Number(target.dataset.activate)
+    if (target.dataset.play) {
+      // A tap picks a card to play; a second on it takes it back.
+      const i = Number(target.dataset.play)
       active = active === i ? null : i
+      return showDrop(shown!)
+    }
+    if (target.dataset.fuse !== undefined) {
+      fuse = !fuse
       return showDrop(shown!)
     }
     if (target.dataset.arm && armed !== target.dataset.arm) {
@@ -340,6 +352,11 @@ export function createUi(act: (action: Action) => void): Ui {
       ware = target.dataset.ware ? Number(target.dataset.ware) : null
       armed = null
     }
+    else if (target.dataset.dealt !== undefined) dealt = true
+    else if (target.dataset.remove !== undefined) {
+      removing = target.dataset.remove === 'open'
+      armed = null
+    }
     else if (target.dataset.tab) {
       tab = target.dataset.tab as Tab
       armed = null
@@ -362,6 +379,7 @@ export function createUi(act: (action: Action) => void): Ui {
       crate = null
       armed = null
       ware = null
+      removing = false
       act(JSON.parse(target.dataset.action) as Action)
       return
     }

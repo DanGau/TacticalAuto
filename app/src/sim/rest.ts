@@ -41,7 +41,7 @@ export function restForks(run: Run, took: Action): RestFork | null {
     return { kind: 'safehouse', ...at, took: took.type === 'go' && took.index === safehouse, rested: playOut(structuredClone(run), { type: 'go', index: safehouse }), pressed: playOut(pressed, resting(0)(pressed, { rng: 0 })) }
   }
   const shop = run.shop
-  if (run.phase !== 'shop' || !shop || shop.medkit || MEDKIT.price > run.supplies || !wounded(run) || shop.wares.some((w) => w.sold) || shop.relics.some((r) => r.sold) || shop.utilities.some((u) => u.sold)) return null
+  if (run.phase !== 'shop' || !shop || shop.medkit || MEDKIT.price > run.supplies || !wounded(run) || shop.wares.some((w) => w.sold) || shop.relics.some((r) => r.sold) || shop.cards.some((c) => c.sold) || shop.removed) return null
   const pressed = structuredClone(run)
   pressed.shop!.medkit = true
   return { kind: 'medkit', ...at, took: took.type === 'medkit', rested: playOut(structuredClone(run), { type: 'medkit' }), pressed: playOut(pressed, strategic(pressed, { rng: 0 })) }

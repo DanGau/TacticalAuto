@@ -10,9 +10,9 @@ import { SKILL_EFFECTS } from './skill-effects'
 import { PERK_EFFECTS } from './perks'
 import { WEAPONS } from './weapons'
 
-export type SrcKind = 'class' | 'skill' | 'weapon' | 'gear' | 'relic' | 'boon' | 'doctrine' | 'object' | 'basic' | 'perk' | 'alien'
+export type SrcKind = 'class' | 'skill' | 'weapon' | 'gear' | 'relic' | 'card' | 'doctrine' | 'object' | 'basic' | 'perk' | 'alien'
 
-/** `id` is an effect or ability for class, skill, gear, relic and doctrine; a weapon's id or effect; a boon's id; an object's prop; an alien's kind or ability; a basic action. */
+/** `id` is an effect or ability for class, skill, gear, relic and doctrine; a weapon's id or effect; a card's id; an object's prop; an alien's kind or ability; a basic action. */
 export interface Src {
   kind: SrcKind
   id: string

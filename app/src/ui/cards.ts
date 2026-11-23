@@ -4,10 +4,7 @@ import { EFFECTS, type Gear } from '../core/gear'
 import { WEAPONS } from '../core/weapons'
 import { SELL } from '../core/rewards'
 import type { Run } from '../core/run-state'
-import { boonName, boonText, UTILITIES, UTILITY_SLOTS, type UtilityId } from '../core/utilities'
-import { makes } from '../core/hero'
-import { badge, describe, describeGear, gearName, weaponDoes } from './html'
-import { boonIcon } from './boon-icons'
+import { badge, describeGear, gearName, weaponDoes } from './html'
 
 export interface Pick {
   /** Which card this is among those on screen. */
@@ -84,33 +81,4 @@ export function findSwap(run: Run, index: number, armed: string | null, note = '
 export function shopSwap(run: Run, index: number, price: number, armed: string | null): string {
   const { gear } = run.shop!.wares[index]
   return gearChoice(run, gear, armed, `For sale · <span class="value">${price} supplies</span>`, act({ type: 'gear', index }), { label: 'Leave it', attrs: 'data-ware=""' })
-}
-
-/** What boon `id` does at `level`, its quantities marked, those the hero's build makes lit. */
-export const boonDoes = (run: Run, id: UtilityId, level = 1) => describe(boonText(id, level), UTILITIES[id], makes(run))
-
-/** A boon as a card: `top` says what tapping it means, `go` what the second tap does. */
-export function utilityPick(run: Run, key: string, action: Action | undefined, id: UtilityId, top: string, go: string, extra: Partial<Pick> = {}, level = 1): Pick {
-  const { name, category } = UTILITIES[id]
-  return { key, action, look: 'utility', body: `<small>${top}</small><b>${boonIcon(id)} ${boonName(id, level)}</b><small class="rounds">${category}</small>`, detail: `<p><b>${name}</b> · ${category}. ${boonDoes(run, id, level)}</p>`, go, ...extra }
-}
-
-/** The arm key of the starting offers picked, by index, oldest first. */
-const startKey = (picks: number[]) => `b${picks.join('-')}`
-
-/** The offers picked in `armed`, by index. */
-const startPicks = (armed: string | null) => (armed?.match(/^b[\d-]*$/) ? armed.slice(1).split('-').filter(Boolean).map(Number) : [])
-
-/** The run's first boons: UTILITY_SLOTS of the offers, each card tapped to take or put back, then Confirm. A tap with all taken puts back the oldest. */
-export function startChoice(run: Run, armed: string | null): string {
-  const picks = startPicks(armed)
-  const card = (id: UtilityId, i: number) => {
-    const on = picks.includes(i)
-    const next = on ? picks.filter((p) => p !== i) : picks.length < UTILITY_SLOTS ? [...picks, i] : [...picks.slice(1), i]
-    return `<button class="side ${on ? 'keep' : 'sell'}" role="checkbox" aria-checked="${on}" data-arm="${startKey(next)}"><small class="verb">${on ? 'take' : 'tap to take'}</small><span class="art">${boonIcon(id)}</span><small class="tier">${UTILITIES[id].category}</small><b>${UTILITIES[id].name}</b><span>${boonDoes(run, id)}</span></button>`
-  }
-  const ready = picks.length === UTILITY_SLOTS
-  return `<div class="gearswap boons"><h1>Starting boons</h1><h2>Take ${UTILITY_SLOTS}. Each battle, activate 1.</h2>
-    <div class="swap" style="--n:${run.boonOffers.length}">${run.boonOffers.map(card).join('')}</div>
-    <button class="decide confirm"${ready ? ` data-action='${JSON.stringify({ type: 'boons', picks })}'` : ' disabled'}>${ready ? 'Confirm' : `Pick ${UTILITY_SLOTS - picks.length} more`}</button></div>`
 }
