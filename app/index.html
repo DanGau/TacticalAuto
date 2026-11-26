@@ -597,6 +597,8 @@
       /* A pop-up over the debrief: the ability choice, or a crate opening. */
       .modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: #0a0d13f2; animation: fade 0.25s; }
       .modal .sheet { max-width: min(900px, 92vw); text-align: center; }
+      .modal .sheet:has(.deck) { max-height: 96vh; overflow-y: auto; }
+      .modal .cardpick .actions { position: sticky; bottom: 0; background: #0a0d13f2; padding: 6px 0; }
       .loot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; --glow: #9aa6bd; }
       .loot.rare { --glow: #4da3ff; }
       .loot.epic { --glow: #c77dff; }

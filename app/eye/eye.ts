@@ -118,6 +118,12 @@ const commands: Record<string, Command> = {
   apply: (page, action) => page.evaluate((a) => debug.apply(a), JSON.parse(action)),
   /** edit <js over `state`>: changes the live run, to set up a scene. */
   edit: (page, code) => page.evaluate((c) => debug.edit(c), code),
+  /** expect <expression over `state`>: fails unless it holds. */
+  async expect(page, expression) {
+    const held = await page.evaluate((e) => new Function('state', `return ${e}`)(debug.snapshot()), expression)
+    if (!held) throw new Error(`expected ${expression}`)
+    return held
+  },
   /** step [n] */
   step: (page, n = '1') => page.evaluate((n) => debug.step(n), Number(n)),
   /** step-until <expression over `state`> [max beats] */
@@ -158,7 +164,7 @@ const commands: Record<string, Command> = {
     }, selector)
     if (fault) throw new Error(`${page.viewportSize()?.width}x${page.viewportSize()?.height}: ${fault}`)
   },
-  /** clickable <selector>: fails unless a mouse click at the centre of each element matching lands on it and changes the panel it sits in. */
+  /** clickable <selector>: fails unless a mouse click at the centre of each element matching, scrolled into view, lands on it and changes the panel it sits in. */
   async clickable(page, selector) {
     const size = `${page.viewportSize()?.width}x${page.viewportSize()?.height}`
     const count = await page.locator(selector).count()
@@ -167,6 +173,7 @@ const commands: Record<string, Command> = {
       const hit = await page.evaluate(
         ([selector, i]) => {
           const target = document.querySelectorAll(selector)[Number(i)]
+          target.scrollIntoView({ block: 'nearest' })
           const r = target.getBoundingClientRect()
           const [x, y] = [r.left + r.width / 2, r.top + r.height / 2]
           const top = document.elementFromPoint(x, y)

@@ -32,5 +32,7 @@ Run in `app/`.
 - `npm run -s eye -- <command>` — play and screenshot the game in a headless browser. Commands: `app/eye/eye.ts`. One server and browser serve all worktrees; `eye -- stop` ends them.
 - `npm run -s eye -- play eye/hand.json` — fails unless the hand's cards, a target and End Turn take a click, an attack with no target is greyed and Dash brings it in reach, on phone, landscape phone and desktop.
 - `npm run -s eye -- play eye/card-reward.json` — fails unless each reward card and Skip take a click, at the same sizes.
+- `npm run -s eye -- play eye/safehouse.json` — fails unless a safehouse upgrades the card picked, or rests for 30% of max HP, at three sizes.
+- `npm run -s eye -- play eye/shop.json` — fails unless a shop's Remove a card takes the card picked out of the deck, at three sizes.
 - `npm run -s eye -- play eye/gear-swap.json` — fails unless the gear swap sits centred, its cards equal, at five screen sizes.
 - `npm run dev` — serve the game for a human. Each push to `main` also deploys it to https://dangau.github.io/TacticalAuto/.
