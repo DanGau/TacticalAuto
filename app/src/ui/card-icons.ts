@@ -54,7 +54,7 @@ const ROLES = {
 function roleOf(id: CardId): string {
   const k = CARDS[id]
   if (k.type === 'power') return ROLES.power
-  if (k.damage) return k.area ? ROLES.area : (k.range ?? 1) <= 1 ? ROLES.melee : ROLES.ranged
+  if (k.damage) return k.area ? ROLES.area : (k.range ?? Infinity) <= 1 ? ROLES.melee : ROLES.ranged
   if (k.heal) return ROLES.heal
   if (k.block || k.armor) return ROLES.block
   if (k.move || k.retreat || k.pull) return ROLES.move

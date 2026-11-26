@@ -36,5 +36,5 @@ export function handPanel(run: Run, battle: Battle, picked: number | null): stri
       : ''
   const block = hero?.block ? ` · 🛡 ${hero.block}` : ''
   const say = mine ? (picked !== null ? 'Choose a target.' : 'Your turn: play cards.') : battle.stage === 'enemy' ? 'The aliens act.' : 'Moving.'
-  return `<div class="bar"><span class="orb" title="Energy">⚡${battle.energy}/${ENERGY}</span><span class="piles">Draw ${battle.pile.draw.length} · Discard ${battle.pile.discard.length}${battle.pile.exhaust.length ? ` · Exhaust ${battle.pile.exhaust.length}` : ''}${block}</span><span class="say">${say}</span><button class="end" data-end${mine ? '' : ' disabled'}>End Turn</button></div>${targets ? `<div class="targets">${targets}</div>` : ''}<div class="cards">${cards}</div>`
+  return `<div class="hbar"><span class="orb" title="Energy">⚡${battle.energy}/${ENERGY}</span><span class="piles">Draw ${battle.pile.draw.length} · Discard ${battle.pile.discard.length}${battle.pile.exhaust.length ? ` · Exhaust ${battle.pile.exhaust.length}` : ''}${block}</span><span class="say">${say}</span><button class="end" data-end${mine ? '' : ' disabled'}>End Turn</button></div>${targets ? `<div class="targets">${targets}</div>` : ''}<div class="cards">${cards}</div>`
 }

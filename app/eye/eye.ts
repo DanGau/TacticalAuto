@@ -170,7 +170,7 @@ const commands: Record<string, Command> = {
           const r = target.getBoundingClientRect()
           const [x, y] = [r.left + r.width / 2, r.top + r.height / 2]
           const top = document.elementFromPoint(x, y)
-          const box = target.closest('#drop') ?? document.getElementById('panel')!
+          const box = target.closest('#drop, #hand') ?? document.getElementById('panel')!
           return { x, y, on: !!top && target.contains(top), top: top?.outerHTML.slice(0, 80), html: box.innerHTML, box: box.id }
         },
         [selector, String(i)],
