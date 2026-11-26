@@ -312,7 +312,7 @@ test('alien force follows the leg; an alien\'s health never grows, but deeper al
   expect(m2.force).toBe(TUNING.legForce[2] + GOALS[m2.goal].force)
   apply(late, { type: 'advance' })
   const troopers = (units: typeof early) => units.filter((u) => u.kind === 'trooper' && !u.boss && !u.target)
-  for (const trooper of troopers(late.battle!.units)) expect(trooper.stats.armor).toBe(4)
+  for (const trooper of troopers(late.battle!.units)) expect(trooper.stats.armor).toBe(2)
   for (const trooper of troopers(late.battle!.units)) expect(trooper.stats.hp).toBe(Math.round(BASE_STATS.hp * TUNING.alienHp))
   for (const trooper of troopers(early)) expect(trooper.stats.hp).toBe(Math.round(BASE_STATS.hp * TUNING.alienHp))
 })

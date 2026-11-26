@@ -72,8 +72,8 @@ export function forceOf(id: ChallengeId, leg: number, rung: number, more: number
 /** What a challenge's ground does to its aliens' stats, armor by leg. */
 export const STIFFEN: Partial<Record<ChallengeId, { range?: number; armor?: number[] }>> = {
   slog: { range: 3 },
-  firingLine: { range: 4 },
-  ironWall: { armor: [5, 12, 16] },
+  firingLine: { range: 2 },
+  ironWall: { armor: [4, 7, 9] },
 }
 
 /** A big one's boss: its health over a hero's base, its armor and its damage, by leg and rung. */

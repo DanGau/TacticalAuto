@@ -38,13 +38,13 @@ export function missionAt(run: Run, kind: Mission['kind'], risk: Risk, goal: Goa
 
 /**
  * The aliens of a mission: mustered at random for its force. A kind's health never changes;
- * deeper along the road aliens are better equipped: a point of armor each step, a point of damage every second. A key or final mission adds a boss, a trooper built up by the keys
+ * deeper along the road aliens are better equipped: a point of armor and of damage every second step. A key or final mission adds a boss, a trooper built up by the keys
  * already won: each adds health, armor and an escort, a zealot and a vise in turn; from the second satellite on it hits harder and
  * spawns swarmlings, and from the third it shoots farther.
  */
 export function aliensOf(run: Run, mission: Mission, mustered?: AlienKind[], challenge: ChallengeId | null = null): Alien[] {
   const tier = depth(run)
-  const armor = tier
+  const armor = Math.floor(tier / 2)
   const weapon = Math.floor(tier / 2)
   const alien = (kind: Alien['kind']): Alien => ({ kind, stats: alienStats(kind, armor, weapon), stance: ALIENS[kind].stance, boss: false, spawns: ALIENS[kind].spawns ?? false, target: false, resists: ALIENS[kind].resists })
   const extraction = mission.kind === 'key' || mission.kind === 'final'

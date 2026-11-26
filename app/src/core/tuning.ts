@@ -7,7 +7,7 @@ export const TUNING = {
   /** Damage more every `every`th alien of a road battle hits for, from the leg after `from` keys: the road wears the hero down. */
   roadDamage: { damage: 1, from: 3, every: 3 },
   /** The alien force a battle has in each leg, before its risk and kind are counted. */
-  legForce: [3, 10, 16, 17],
+  legForce: [3, 7, 9, 11],
   /** Damage each hit on a marked unit adds. */
   markDamage: 1,
   /** The share of the hero's damage each stack a payoff spends adds; and the burn, chill and marks Accelerant Gel, Shatterglass Edge and Spotter Network wait for. */
