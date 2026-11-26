@@ -9,6 +9,10 @@ import { current } from './run'
 import { type Run } from './run-state'
 import { DRAW, ENERGY, heroOf, targetsOf, whyNot } from './turn'
 import { wound } from './wound'
+import { REST_HEAL } from './rewards'
+import { soldierStats } from './hero'
+import { drawCards } from './deck'
+import { DOCTRINES } from './doctrines'
 
 /** A run on its first battle, stepped to the hero's first turn. */
 function turn(seed: number): { run: Run; battle: Battle } {
@@ -119,4 +123,20 @@ test('a reward: take 1 of 3 or Skip; a safehouse rests or upgrades', () => {
   run.upgrading = true
   apply(run, { type: 'upgrade', index: 0 })
   expect(run.deck[0].level).toBe(2)
+  run.phase = 'reward'
+  run.upgrading = true
+  run.hero.wounds = 30
+  apply(run, { type: 'upgrade', index: null })
+  expect(run.hero.wounds).toBe(30 - Math.ceil(REST_HEAL * soldierStats(run, run.hero).hp))
+  expect(run.upgrading).toBe(false)
+})
+
+test('a held doctrine leans card offers to the cards it favours', () => {
+  const share = (doctrines: Run['doctrines']) => {
+    const run = begun(7)
+    run.doctrines = doctrines
+    const drawn = Array.from({ length: 200 }, () => drawCards(run, 3, false)).flat()
+    return drawn.filter((id) => DOCTRINES.blades.favours(id)).length / drawn.length
+  }
+  expect(share(['blades'])).toBeGreaterThan(1.5 * share([]))
 })
