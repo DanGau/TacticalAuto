@@ -7,7 +7,6 @@ import { crumble } from './grid'
 import { bulkAt } from './grid'
 import { beat } from './roads'
 import type { GameEvent } from './combat-event'
-import { powerOf } from './skills'
 import { detects, sees } from './sight'
 import { generateTerrain } from './terrain-gen'
 import { drawTwist, FUEL_DAMAGE, TWISTS, type Twist } from './twists'
@@ -15,7 +14,6 @@ import { drawTwist, FUEL_DAMAGE, TWISTS, type Twist } from './twists'
 /** A soldier at (10, 10) and a trooper at (10, 12) on open, flat ground, with `twist`. */
 function duel(twist: Twist | null): Battle {
   const run = begun(1)
-  run.hero.skills = [powerOf(run.hero.cls!)]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   enterAt(run)
@@ -84,7 +82,6 @@ test('a hit on a unit beside a fuel tank sets it off', () => {
   const battle = duel('fuel')
   const [soldier, alien] = battle.units
   soldier.stats = { ...soldier.stats, damage: 3 }
-  soldier.spent = ['throw', 'throw', 'throw']
   battle.props[12 * GRID + 11] = 'fuel'
   battle.bulk[12 * GRID + 11] = 1
   const events = untilShot(battle)

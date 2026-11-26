@@ -1,6 +1,5 @@
 // How long the view takes to play each event, which also times battles in the sim.
 import type { GameEvent } from './combat-event'
-import { distance } from './grid'
 import { cancelOf } from './quantities'
 
 /** How long the view takes to play each kind of event, in ms. The view animates by these; the sim times battles by them. */
@@ -20,29 +19,17 @@ export const PACE = {
   attack: 450,
   /** Between the starts of one attack and the next in a side's attack stage, so each attack reads on its own. */
   stagger: 380,
-  /** A hero's dash to strike. */
-  lunge: 200,
-  /** Between a hero's weapon attack and its secondary: one combo, tighter than a stagger. */
-  combo: 260,
   /** The pause as the turn passes to the other side. */
   turn: 700,
   psi: 320,
   rocket: 320,
   blast: 380,
-  /** A tier 4's moment. */
-  ultimate: 900,
   /** A unit falling off a ledge or over the edge. */
   fall: 560,
   /** A jump: the crouch before it, the time in the air, and the landing it settles from. */
   crouch: 170,
   air: 380,
   landing: 170,
-  /** A throw: the lift overhead, the beat held before letting go, the flight, more for each tile, and the impact. */
-  lift: 300,
-  hold: 120,
-  flight: 240,
-  flightTile: 70,
-  impact: 220,
   /** A cancellation: the stacks it meets show, then go out. */
   cancel: 420,
 }
@@ -50,17 +37,11 @@ export const PACE = {
 /** How long one jump takes, besides the walk it is part of. */
 export const leapMs = PACE.crouch + PACE.air + PACE.landing
 
-/** How long a throw `tiles` far takes, lift to impact. */
-export const throwMs = (tiles: number) => PACE.lift + PACE.hold + PACE.flight + PACE.flightTile * tiles + PACE.impact
-
-/** What an event adds to a beat's lead on the next: a dash, and how much a weapon's shots run past one attack. */
-const beyond = (e: GameEvent) => (e.type === 'move' && e.with === 'dash' ? PACE.lunge : e.type === 'shot' && e.lasts ? e.lasts - (e.nth ? 0 : PACE.attack) : 0)
-
 /** Whether a beat is one attack of a side's attack stage, which the next beat may start over. */
 export const overlaps = (events: GameEvent[]) => events.some((e) => e.type === 'shot' || e.type === 'rocket' || e.type === 'spit' || e.type === 'panic')
 
-/** How long after a beat's attack starts the next may: a combo's first blow leads straight into the second. */
-export const staggerOf = (events: GameEvent[]) => (events.some((e) => e.type === 'shot' && e.opens) ? PACE.combo : PACE.stagger) + events.reduce((sum, e) => sum + beyond(e), 0)
+/** How long after a beat's attack starts the next may. */
+export const STAGGER = PACE.stagger
 
 /** Events the view shows at once, as a word over a unit or a change of marks, without waiting on them. */
 const INSTANT = new Set<GameEvent['type']>(['stacks', 'feed', 'effect', 'frozen', 'hurt', 'heal', 'cloak'])
@@ -88,17 +69,15 @@ export function beatMs(events: GameEvent[], pace: Map<number, number>, shown: Se
   let walk = 0
   for (const e of events) {
     if (e.type === 'move') {
-      if (pace.has(e.id)) walk = e.with === 'dash' ? PACE.lunge : Math.max(walk, walkMs([{ path: e.path, pace: pace.get(e.id)!, leaps: e.leaps }]))
+      if (pace.has(e.id)) walk = Math.max(walk, walkMs([{ path: e.path, pace: pace.get(e.id)!, leaps: e.leaps }]))
       continue
     }
     if (instant(e) && !(e.type === 'effect' && cancelOf(e.effect))) continue
     ms += walk
     walk = 0
-    if (e.type === 'shot') ms += e.lasts ?? PACE.attack
+    if (e.type === 'shot') ms += PACE.attack
     else if (e.type === 'rocket') ms += PACE.rocket + PACE.blast
-    else if (e.type === 'ultimate') ms += PACE.ultimate
     else if (e.type === 'fall') ms += PACE.fall
-    else if (e.type === 'throw') ms += throwMs(distance(e.from, e.to))
     else if (e.type === 'spit' || e.type === 'panic') ms += PACE.psi
     else if (e.type === 'reveal' || e.type === 'wave') ms += e.units.some((u) => shown.has(u.id)) ? PACE.reveal : 0
     else if (e.type === 'spawn') ms += shown.has(e.unit.id) ? PACE.reveal : 0

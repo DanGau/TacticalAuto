@@ -1,11 +1,11 @@
 // Damage landing on a unit, what it sets off, and the tally it adds to.
-import { alienSrc, fx, srcOf } from './sources'
-import { GUARD_MAX, SHELL_MAX, REVIVE_HEALTH, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BURN_STACKS, BLAST_RADIUS, type Battle, type Effect, type Unit, type Tile } from './battle'
+import { alienSrc, fx } from './sources'
+import { GUARD_MAX, SHELL_MAX, PSI_BACKLASH, PSI_BACKLASH_REACH, PHOENIX_HEALTH, isSoldier, BURST_DAMAGE, BLAST_RADIUS, type Battle, type Effect, type Unit } from './battle'
 import { wreck } from './grid'
 import { distance } from './grid'
 import type { GameEvent, ShotEvent } from './combat-event'
-import { emptyTally, OVERKILL, type FeatId, type Tally } from './feats'
-import { engage, has, fireproof, immune, onTile } from './fighters'
+import { emptyTally, type Tally } from './battle'
+import { engage, has, fireproof } from './fighters'
 import { armorCap, died, kindle } from './stacks'
 import { TUNING } from './tuning'
 
@@ -13,8 +13,6 @@ import { TUNING } from './tuning'
 export function tallyOf(battle: Battle, soldier: number): Tally {
   return (battle.tally[soldier] ??= emptyTally())
 }
-
-export const feat = (tally: Tally, id: FeatId) => tally.feats.includes(id) || tally.feats.push(id)
 
 /** `shot` lands on `target` for its damage, and keeps what `target` has left, so the view shows each hit as it lands. */
 export function land(battle: Battle, shot: ShotEvent, target: Unit, events: GameEvent[], pierce = false, crit = false): void {
@@ -28,7 +26,7 @@ export function land(battle: Battle, shot: ShotEvent, target: Unit, events: Game
  * engages.
  */
 export function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[], pierce = false, crit = false): void {
-  if (target.hp <= 0 || target.invulnerable) return
+  if (target.hp <= 0) return
   if (!target.engaged) engage(battle, target)
   const struck = target.kind === 'wraith' && !crit ? Math.min(dealt, 1) : dealt
   const blocked = Math.min(target.block ?? 0, struck)
@@ -37,8 +35,7 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
   const soaked = Math.min(target.temp ?? 0, hit)
   if (soaked > 0) target.temp! -= soaked
   const damage = hit - soaked
-  const full = target.hp === target.stats.hp
-  // A juggernaut's plate stops a hit whole, and is lost to it.
+    // A juggernaut's plate stops a hit whole, and is lost to it.
   const plated = target.kind === 'juggernaut' && !pierce && target.armor > 0 && damage > 0
   const absorbed = plated ? damage : pierce ? 0 : Math.min(target.armor, damage)
   // Health lost: damage past what the target had left is counted for nobody.
@@ -54,68 +51,39 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
     tallyOf(battle, target.soldier).taken += lost
     tallyOf(battle, target.soldier).blocked += (plated ? 0 : absorbed) + soaked
   }
-  // A mech's work is its engineer's.
   const by = battle.units.find((u) => u.id === battle.actor)
-  const credited = by && by.side !== target.side ? (by.soldier ?? by.summoner) : null
+  const credited = by && by.side !== target.side ? by.soldier : null
   const tally = credited !== null && credited !== undefined ? tallyOf(battle, credited) : null
-  if (tally) {
-    tally.dealt += lost
-    if (damage >= OVERKILL) feat(tally, 'overkill')
-  }
+  if (tally) tally.dealt += lost
   if (target.hp > 0) return
-  // An alien that dies burning spreads the fire, if the hero carries wildfire or its killer backdraft.
-  const wildfire = battle.units.some((u) => u.side !== target.side && has(u, 'wildfire'))
+  // An alien that dies burning spreads the fire, if the hero carries wildfire.
   const killer = by && by.side !== target.side ? by : null
   const beside = battle.units.filter((u) => u.side === target.side && u !== target && distance(u, target) <= 1)
-  if (target.burn > 0 && (wildfire || (killer && has(killer, 'backdraft')))) {
+  if (target.burn > 0 && battle.units.some((u) => u.side !== target.side && has(u, 'wildfire'))) {
     for (const other of beside.filter((u) => !fireproof(battle, u))) {
-      kindle(battle, other, wildfire ? target.burn : BURN_STACKS, events)
-      events.push(fx(other.id, wildfire ? 'wildfire' : 'backdraft', 0))
+      kindle(battle, other, target.burn, events)
+      events.push(fx(other.id, 'wildfire', 0))
     }
   }
-  // A hero who would fall may get back up: once by its own revive, or once by the phoenix protocol.
-  const revives = has(target, 'revive') && !target.spent.includes('revive')
-  const rises = revives ? 'revive' : has(target, 'phoenix') && !battle.used.includes('phoenix') ? 'phoenix' : null
-  if (rises) {
-    if (revives) target.spent.push('revive')
-    else battle.used.push('phoenix')
-    target.hp = rises === 'revive' ? REVIVE_HEALTH : PHOENIX_HEALTH
-    events.push(fx(target.id, rises, target.hp))
-    return
-  }
-  if (has(target, 'phoenixRising') && !target.spent.includes('phoenixRising')) {
-    target.spent.push('phoenixRising')
-    target.hp = target.stats.hp
-    events.push({ type: 'ultimate', src: srcOf('phoenixRising'), id: target.id, effect: 'phoenixRising', x: target.x, y: target.y, radius: PHOENIX_RISING.radius })
-    for (const foe of battle.units.filter((u) => u.side !== target.side && !u.civilian && distance(u, target) <= PHOENIX_RISING.radius)) {
-      kindle(battle, foe, BURN_STACKS, events)
-      events.push(fx(foe.id, 'phoenixRising', -PHOENIX_RISING.damage))
-      wound(battle, foe, PHOENIX_RISING.damage, events)
-    }
+  // A hero who would fall gets back up once by the phoenix protocol.
+  if (has(target, 'phoenix') && !battle.used.includes('phoenix')) {
+    battle.used.push('phoenix')
+    target.hp = PHOENIX_HEALTH
+    events.push(fx(target.id, 'phoenix', target.hp))
     return
   }
   battle.units = battle.units.filter((u) => u !== target)
   // A soldier falls where it stands.
   if (isSoldier(target)) battle.downed.push({ soldier: target.soldier!, x: target.x, y: target.y })
   events.push({ type: 'death', id: target.id })
-  died(battle, target, killer, events)
+  died(battle, target, events)
   if (target.civilian && killer?.kind === 'harvester') battle.husks.push({ x: target.x, y: target.y })
-  if (has(target, 'detonate')) {
-    const caught = battle.units.filter((u) => u.side !== target.side && distance(u, target) <= 1)
-    events.push({ type: 'rocket', src: srcOf('detonate'), id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: DETONATE_DAMAGE })) })
-    for (const u of caught) wound(battle, u, DETONATE_DAMAGE, events)
-  }
-  if (tally) {
-    tally.kills++
-    if (full) feat(tally, 'oneShot')
-    if (target.boss || target.target) feat(tally, 'giantSlayer')
-    if (tally.kills === 3) feat(tally, 'hatTrick')
-  }
+  if (tally) tally.kills++
   if (target.kind === 'burster') {
-    const caught = battle.units.filter((u) => distance(target, u) <= BLAST_RADIUS && !immune(battle, u, 'blast'))
-    events.push({ type: 'rocket', src: alienSrc(target), id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: burstOn(u) })) })
+    const caught = battle.units.filter((u) => distance(target, u) <= BLAST_RADIUS)
+    events.push({ type: 'rocket', src: alienSrc(target), id: target.id, x: target.x, y: target.y, hits: caught.map((u) => ({ target: u.id, damage: BURST_DAMAGE })) })
     wreck(battle, target)
-    for (const unit of caught) wound(battle, unit, burstOn(unit), events)
+    for (const unit of caught) wound(battle, unit, BURST_DAMAGE, events)
   }
   if (target.kind === 'psion') {
     for (const unit of battle.units.filter((u) => u.side === 'alien' && distance(u, target) <= PSI_BACKLASH_REACH)) {
@@ -125,22 +93,8 @@ export function wound(battle: Battle, target: Unit, dealt: number, events: GameE
   }
 }
 
-/** What Phoenix Rising does to the aliens around the hero as it rises. */
-export const PHOENIX_RISING = { radius: 3, damage: 8 }
-
-/** Damage a self-destructing mech does to each alien beside it. */
-export const DETONATE_DAMAGE = 4
-
-/** What a burster's explosion does to `unit`. */
-const burstOn = (unit: Unit) => (has(unit, 'meleeShield') ? Math.ceil(BURST_DAMAGE / 2) : BURST_DAMAGE)
-
-/** What befalls a unit that has walked `path`: caltrops it stepped on hurt an alien, and a booming charge goes off. */
-export function moved(battle: Battle, unit: Unit, path: Tile[], events: GameEvent[]): void {
-  const spikes = unit.side === 'alien' ? path.filter((t) => onTile(battle.caltrops, t)).length : 0
-  if (spikes > 0) {
-    events.push(fx(unit.id, 'caltrops', -spikes))
-    wound(battle, unit, spikes, events)
-  }
+/** What befalls a unit that has walked: a booming charge goes off. */
+export function moved(battle: Battle, unit: Unit, events: GameEvent[]): void {
   if (unit.booming > 0 && unit.hp > 0) {
     unit.booming = 0
     events.push(fx(unit.id, 'booming', -BOOM_DAMAGE))

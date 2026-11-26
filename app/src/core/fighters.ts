@@ -1,12 +1,10 @@
 // Questions every combat module asks about units in a fight: whose enemy, nearest, has what, can shoot.
-import { SECONDARIES, type Secondary } from './secondaries'
-import { WEAPONS } from './weapons'
-import { AURA_REACH, type Battle, type Effect, ELUSIVE_REACH, GRID, type Tile, type Unit, isSoldier } from './battle'
-import { HOVER, onGrid } from './grid'
+import { type Battle, type Effect, GRID, type Tile, type Unit, isSoldier } from './battle'
+import { onGrid } from './grid'
 import { NEIGHBORS } from './grid'
 import { distance } from './grid'
 import { EXTRACT_REACH } from './goals'
-import { lineOfSight, canShoot, sees } from './sight'
+import { canShoot, sees } from './sight'
 
 /**
  * The enemies a unit acts against, cloaked ones aside. Aliens know every soldier. Soldiers know the revealed aliens;
@@ -27,16 +25,11 @@ export function nearest<T extends Tile>(units: T[], from: Tile): T | undefined {
 
 export const has = (unit: Unit, effect: Effect) => unit.effects.includes(effect)
 
-/** The jump and span a unit's ways are found with: HOVER while it levitates. */
-export const leap = (unit: Unit): [number, number] => (has(unit, 'hover') ? [HOVER, 0] : [unit.stats.jump, unit.stats.span])
+/** The jump and span a unit's ways are found with. */
+export const leap = (unit: Unit): [number, number] => [unit.stats.jump, unit.stats.span]
 
 /** Whether a unit's foes include one with `effect`: a relic, or a soldier's gear, working on the aliens. */
 export const foeHas = (battle: Battle, unit: Unit, effect: Effect) => battle.units.some((u) => u.side !== unit.side && u.hp > 0 && has(u, effect))
-
-/** Whether an alien stands in a null field, where it cannot spit, panic, spawn or burst. */
-export const silenced = (battle: Battle, unit: Unit) => battle.units.some((u) => u.side !== unit.side && has(u, 'null') && distance(u, unit) <= NULL_REACH)
-
-export const NULL_REACH = 3
 
 export const onTile = (pools: Tile[], unit: Tile) => pools.some((pool) => pool.x === unit.x && pool.y === unit.y)
 
@@ -54,43 +47,12 @@ export function spotted(battle: Battle): Set<number> {
 }
 
 
-/** Whether `unit`, standing on `from`, may shoot `target`. An elusive target is safe from far off, and a cloaked one from all. */
-/** A secondary's reach under Far Sight: any alien in sight and a clear line. */
-const SPOTTED_REACH = Infinity
-
-/** Tiles Longshot adds to a secondary's reach. */
-const LONGSHOT_REACH = 2
-
-/** The unit as it aims a secondary: that reach counts, not its weapon's. */
-export const aiming = (unit: Unit, secondary?: Secondary): Unit =>
-  secondary ? { ...unit, stats: { ...unit.stats, range: unit.ability === 'eagleEye' ? SPOTTED_REACH : secondary.range + (has(unit, 'longshot') ? LONGSHOT_REACH : 0) } } : unit
-
-/** The unit as each of its attacks aims: its weapon, thrown or rocketed, and its secondary. */
-function reaches(unit: Unit): Unit[] {
-  const weapon = unit.weapon && WEAPONS[unit.weapon]
-  const ranged = (range: number | undefined) => (range ? [{ ...unit, stats: { ...unit.stats, range } }] : [])
-  return [unit, ...ranged(weapon?.thrown?.range), ...ranged(weapon?.rocket?.range), ...(unit.secondary ? [aiming(unit, SECONDARIES[unit.secondary])] : [])]
-}
-
-/** Whether any attack of the unit's has something to hit from `end`. */
-export const hasAttack = (battle: Battle, unit: Unit, end: Tile, enemies: Unit[], seen: Set<number>) => reaches(unit).some((aim) => enemies.some((e) => shootable(battle, aim, end, e, seen)))
-
-/** Tiles a hero's powers reach, whatever its weapon. */
-const POWER_REACH = 5
-
-/** The unit as it aims a power, a rocket or a flashbang: the power's reach counts, not its weapon's. */
-export const powering = (unit: Unit): Unit => ({ ...unit, stats: { ...unit.stats, range: POWER_REACH } })
-
-export function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit, seen: Set<number>): boolean {
+/** Whether `unit`, standing on `from`, may shoot `target`: a cloaked one never. */
+export function shootable(battle: Battle, unit: Unit, from: Tile, target: Unit): boolean {
   if (target.cloaked) return false
-  if (has(target, 'elusive') && distance(from, target) > ELUSIVE_REACH) return false
-  // A psionic attack needs no line of sight, only an alien revealed.
-  if (has(unit, 'psionic') && target.revealed && distance(from, target) <= unit.stats.range) return true
-  if (unit.stats.range === SPOTTED_REACH) return seen.has(target.id) && lineOfSight(battle, from, target)
   return canShoot(battle, from, target, unit.stats.range)
 }
 
-/** The aliens a soldier's powers may act on: revealed and in the fight. */
 /** Those of a side's aliens in the fight that can walk: a turret or a nest never holds the next back. */
 export const walkersFighting = (battle: Battle) => battle.units.filter((u) => u.side === 'alien' && u.engaged && u.stats.move > 0).length
 
@@ -110,21 +72,11 @@ export function engageNearest(battle: Battle, from: Tile[]): void {
 
 export const foes = (battle: Battle, unit: Unit) => battle.units.filter((u) => u.side !== unit.side && !u.civilian && u.revealed && u.engaged)
 
-/** Whether a unit cannot burn: by its nature, a fire suit, or in the rain. */
-export const fireproof = (battle: Battle, unit: Unit) => unit.resists.includes('burn') || has(unit, 'fireSuit') || battle.twist === 'rain'
+/** Whether a unit cannot burn: by its nature, or in the rain. */
+export const fireproof = (battle: Battle, unit: Unit) => unit.resists.includes('burn') || battle.twist === 'rain'
 
 /** Whether a fuel tank stands beside a tile. */
 export const besideFuel = (battle: Battle, tile: Tile) => NEIGHBORS.some(([dx, dy]) => onGrid(tile.x + dx, tile.y + dy) && battle.props[(tile.y + dy) * GRID + tile.x + dx] === 'fuel')
-
-/** Whether a unit is proof against panic, acid, or a blast: by its own steadfastness, or for panic and acid, by a ward on it or near it. */
-export function immune(battle: Battle, unit: Unit, to: 'panic' | 'acid' | 'blast'): boolean {
-  return has(unit, 'steadfast') || (to !== 'blast' && (has(unit, 'ward') || inAura(battle, unit, 'ward')))
-}
-
-/** Whether `unit`, or an ally within reach, has the aura `effect`. */
-export function inAura(battle: Battle, unit: Unit, effect: Effect): boolean {
-  return battle.units.some((u) => u.side === unit.side && has(u, effect) && distance(u, unit) <= AURA_REACH)
-}
 
 /** On a hold, how far from the uplink a soldier may stand and still defend it; Relay Booster widens it. */
 export const UPLINK_REACH = 3
@@ -148,8 +100,6 @@ export function centreOf(units: Unit[]): Tile {
 export const FIRE_TURNS = 2
 
 
-/** Mirror images a wearer begins a battle with, and the chance a hit pops one instead. */
-export const MIRROR_IMAGES = 2
 
 /** What Bounty Rounds add to hits on a boss, and how far an Evac Beacon gets a civilian out from. */
 export const BOUNTY_DAMAGE = 3

@@ -72,7 +72,7 @@ test('an assassination that is also a big one stands every alien, its boss clear
   const stats = { hp: 1, armor: 0, damage: 1, range: 5, move: 3, crit: 0, strength: 2, jump: 2, span: 0 }
   const alien = (over: Partial<Alien>): Alien => ({ kind: 'trooper', stats, stance: 'balanced', boss: false, spawns: false, target: false, resists: [], ...over })
   const aliens = [alien({ boss: true }), alien({ target: true }), ...Array.from({ length: 6 }, () => alien({}))]
-  const battle = createBattle(559, 'town', aliens, [], 'assassinate', [], null, undefined, 'bigOne')
+  const battle = createBattle(559, 'town', aliens, [], 'assassinate', null, undefined, 'bigOne')
   expect(battle.units.filter((u) => u.side === 'alien')).toHaveLength(aliens.length)
   expect(battle.units.every((u) => Number.isInteger(u.x) && Number.isInteger(u.y))).toBe(true)
 })

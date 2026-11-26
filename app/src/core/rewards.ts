@@ -8,22 +8,8 @@ import { drawRelic, offerable, type RelicId } from './relics'
 import { type Run } from './run-state'
 import { type Shop } from './run-state'
 import { type Soldier } from './run-state'
-import { makes, mend, minorOffers, owesPick, reads, skillOffers } from './hero'
+import { makes, mend, reads, soldierStats } from './hero'
 import { WEAPONS, type WeaponId } from './weapons'
-
-/** The hero learns the offered skill at `index`. */
-export function takeSkill(run: Run, index: number): void {
-  const offers = skillOffers(run.hero)
-  run.hero.lost.push(...offers.filter((_, i) => i !== index))
-  run.hero.skills.push(offers[index])
-  settle(run)
-}
-
-/** The hero takes the offered perk at `index`; those passed over stay in the pool. */
-export function takePerk(run: Run, index: number): void {
-  run.hero.perks.push(minorOffers(run.hero)[index])
-  settle(run)
-}
 
 /** Hands `gear` to `soldier`, discarding what it held: gear is never taken off, only replaced. */
 export function wear(soldier: Soldier, gear: Gear): void {
@@ -115,10 +101,13 @@ export function takeCard(run: Run, index: number | null): void {
   settle(run)
 }
 
-/** At a safehouse: upgrades the card at `index` of the deck, or with null rests, healing fully. */
+/** The share of max HP a safehouse's rest heals. */
+export const REST_HEAL = 0.3
+
+/** At a safehouse: upgrades the card at `index` of the deck, or with null rests, healing REST_HEAL of max HP. */
 export function upgradeCard(run: Run, index: number | null): void {
   if (index !== null) run.deck[index].level = UPGRADED
-  else mend(run, Infinity)
+  else mend(run, Math.ceil(REST_HEAL * soldierStats(run, run.hero).hp))
   run.upgrading = false
   settle(run)
 }
@@ -143,9 +132,9 @@ export function sellFind(run: Run, index: number): void {
   settle(run)
 }
 
-/** Ends the reward phase once no choice is left: no relic, find, card, upgrade, skill or perk. */
+/** Ends the reward phase once no choice is left: no relic, find, card or upgrade. */
 export function settle(run: Run): void {
-  const owed = run.relicOffers.length > 0 || run.finds.length > 0 || run.cardOffers.length > 0 || run.upgrading || owesPick(run.hero)
+  const owed = run.relicOffers.length > 0 || run.finds.length > 0 || run.cardOffers.length > 0 || run.upgrading
   run.phase = owed ? 'reward' : 'overworld'
 }
 

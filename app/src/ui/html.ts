@@ -3,10 +3,11 @@ import { weaponIcon } from "./weapon-icons";
 import { EXAMS, type Exam } from "../core/exams";
 import type { Action } from "../core/apply";
 import { EFFECTS, type Gear } from "../core/gear";
-import { WEAPONS, type Kit } from "../core/weapons";
+import { WEAPONS } from "../core/weapons";
+import { cardName, STRIKES } from "../core/cards";
 import { tip as markTip } from "./charts";
 import { ALIENS, type AlienKind } from "../core/aliens";
-import { BASE_STATS, type Stats } from "../core/battle";
+import { type Stats } from "../core/battle";
 import { CANCELS, QUANTITIES, RESISTS, type Cancel, type Flow, type Quantity, type Resist } from "../core/quantities";
 import { TUNING } from "../core/tuning";
 import type { ClassId } from "../core/classes";
@@ -24,8 +25,6 @@ export const button = (
   title = "",
 ) =>
   `<button class="${cls}" data-action='${JSON.stringify(action)}' ${title ? `title="${title}"` : ""} ${enabled ? "" : "disabled"}>${label}</button>`;
-
-/** What each skill role is called on a card. */
 
 export const signed = (n: number) => `${n > 0 ? "+" : ""}${n}`;
 
@@ -67,19 +66,6 @@ export function threatBar(threat: number, landed = 0): string {
   return `${meter}${threat === THREAT_MAX ? '<b class="up">Ambush next</b>' : ""}`;
 }
 
-/** What each stat is called. */
-export const STAT_NAMES: Record<keyof Stats, string> = {
-  hp: "HP",
-  armor: "Armor",
-  damage: "Damage",
-  range: "Range",
-  move: "Move",
-  crit: "Crit",
-  strength: "Strength",
-  jump: "Jump",
-  span: "Span",
-};
-
 const percent = (n: number) => `${signed(Math.round(100 * n))}%`;
 
 /** How each stat change reads on a piece of gear. */
@@ -100,44 +86,24 @@ const statText = (stats: Partial<Stats>) =>
     .map((key) => STAT_TEXT[key](stats[key]!))
     .join(", ");
 
-/** A piece of gear's special, as plain text: its weapon's special and its effect. Its numbers are its type's tip. */
-export function gearText(gear: Gear): string {
-  const said = [
-    WEAPONS[gear.weapon].special,
-    gear.effect ? EFFECTS[gear.effect].text : "",
-  ];
-  return [...new Set(said.filter((line): line is string => Boolean(line)))].map(sentence).join(" ");
-}
+/** A piece of gear's special, as plain text: its effect. Its numbers are its type's tip. */
+export const gearText = (gear: Gear): string => (gear.effect ? sentence(EFFECTS[gear.effect].text) : "");
 
-const kitText = (kit: Kit) =>
-  `${kit.shots} × ${Math.round(100 * kit.power)}% damage${kit.power > 1 ? ` of the first ${BASE_STATS.damage}, 1 more per point past` : ""}${kit.wide ? `, ${Math.round(100 * kit.wide)}% splash to adjacent` : ""}${kit.range ? `, range ${kit.range}` : ""}`;
-
-/** A piece of gear's numbers: its weapon's attacks and stat changes, then its mod's. */
+/** A piece of gear's numbers: its weapon's stat changes, then its mod's. */
 export function gearStats(gear: Gear): string[] {
   const w = WEAPONS[gear.weapon];
   return [
-    `Attack: ${kitText(w.attack)}`,
-    w.thrown && `Thrown: ${kitText(w.thrown)}`,
-    w.rocket && `Rocket: ${kitText(w.rocket)}`,
-    w.dash && `Dash up to ${w.dash} tiles to strike`,
     statText(w.stats),
     Object.keys(gear.stats).length > 0 &&
       `${gear.name.split(" ")[0]}: ${statText(gear.stats)}`,
   ].filter((line): line is string => Boolean(line));
 }
 
-/** How a weapon attacks, in plain words. */
+/** How a weapon attacks: its Strike, and its reach. */
 export function weaponDoes(gear: Gear): string {
   const w = WEAPONS[gear.weapon];
-  const { shots, power, wide } = w.attack;
-  const blow = w.melee ? "blow" : "shot";
   const range = w.stats.range ?? 0;
-  return [
-    shots === 1 ? `1 ${power >= 1.5 ? "heavy " : ""}${blow}` : `${shots} ${blow}s`,
-    w.melee ? (w.dash ? "dashes in" : "melee") : range > 0 ? "long range" : range < 0 ? "short range" : "",
-    wide && "splash",
-    (w.thrown || w.rocket) && "throws out of reach",
-  ].filter(Boolean).join(" · ");
+  return [`Strike: ${cardName(STRIKES[gear.weapon])}`, w.melee ? "melee" : range > 0 ? "long range" : range < 0 ? "short range" : ""].filter(Boolean).join(" · ");
 }
 
 /** A piece of gear's name, its numbers shown on hover, focus or tap. */

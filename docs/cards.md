@@ -37,7 +37,9 @@ Over each engaged alien its intent shows, as in Slay the Spire: **Attack** with 
 
 - **Starter deck.** 10 cards: 4 of the weapon's Strike, 4 Defend, 1 Dash and the class's signature card. Every hero has one class and one weapon; the weapon's Strike is its way of fighting: Twin Pistols fire two cheap shots, a Hammer smashes a knot of aliens.
 - **Rewards.** Each battle won offers 3 cards: take 1 or Skip. Cards are of the hero's class or of no class, each of a rarity: common, rare or epic. Rarer cards come more often as the run goes on, and an elite's reward is never common.
-- **Upgrades.** A card upgraded plays as its "+": more damage, more Block, less cost. A safehouse rests or upgrades a card.
+- **Upgrades.** A card upgraded plays as its "+": more damage, more Block, less cost. A safehouse offers one of two: rest, healing 30% of max HP, or upgrade a card.
+- **Doctrines.** Adopted at events and kept for the run, each leans reward offers to its style: within a rarity, a card a held doctrine favours is 3 times as likely. Blademasters favour close-range attacks, Brawlers Knockback and Pull, Power Armor Block and Armor, and so on.
+- **Max HP** comes only from relics and events; the hero has no levels.
 - **Shops** sell cards, and remove one card once a shop.
 - **Relics** stay passives, as Slay the Spire's.
 

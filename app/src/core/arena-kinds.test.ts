@@ -8,7 +8,7 @@ import { TERRAIN_KINDS } from './terrain'
 import { REGION_IDS, REGIONS, type RegionId } from './regions'
 import { EFFECTS } from './gear'
 import { RELICS } from './relics'
-import { SKILLS } from './skills'
+import { CARDS } from './cards'
 
 const KINDS: AlienKind[] = ['trooper', 'spitter', 'brute', 'swarmling', 'juggernaut']
 const force = (n: number): Alien[] =>
@@ -22,9 +22,9 @@ const battles = TERRAIN_KINDS.flatMap((place) => Array.from({ length: 6 }, (_, s
 // Each ground on a region it is native to.
 for (const [i, ground] of GROUNDS.entries()) {
   const region = REGION_IDS.find((id) => REGIONS[id].ground.includes(ground))!
-  for (let seed = 0; seed < 4; seed++) battles.push(createBattle(100 + 10 * i + seed, REGIONS[region].kinds[0], force(10), [], seed % 2 ? 'rescue' : 'cross', [], null, { region, city: REGIONS[region].cities[0], ground }))
+  for (let seed = 0; seed < 4; seed++) battles.push(createBattle(100 + 10 * i + seed, REGIONS[region].kinds[0], force(10), [], seed % 2 ? 'rescue' : 'cross', null, { region, city: REGIONS[region].cities[0], ground }))
 }
-const marshes = Array.from({ length: 4 }, (_, seed) => createBattle(seed + 1, 'countryside', force(14), [], 'cross', [], null, undefined, 'slog'))
+const marshes = Array.from({ length: 4 }, (_, seed) => createBattle(seed + 1, 'countryside', force(14), [], 'cross', null, undefined, 'slog'))
 battles.push(...marshes)
 
 test('a Slog is fought in a marsh: beds of mire with firm islands and pools, its aliens in three groups or more', () => {
@@ -45,7 +45,7 @@ test('every ground is fought on, and every ground but open shows its feature', (
 })
 
 test('every feature multiplies a build quantity that something makes', () => {
-  const makers = [...Object.values(EFFECTS), ...Object.values(RELICS), ...Object.values(SKILLS)].flatMap((f) => f.makes ?? [])
+  const makers = [...Object.values(EFFECTS), ...Object.values(RELICS), ...Object.values(CARDS)].flatMap((f) => f.makes ?? [])
   for (const kind of GROUNDS.filter((k) => k !== 'open')) {
     const { reads } = ARENA_KINDS[kind]
     expect(reads.length, kind).toBeGreaterThan(0)
@@ -80,7 +80,7 @@ test('regions differ: each draws its signature ground most, and regions of diffe
     expect(top, region).toBe(REGIONS[region].ground[0])
   }
   const mean = (region: RegionId) => {
-    const of = Array.from({ length: 6 }, (_, seed) => createBattle(seed + 1, REGIONS[region].kinds[0], force(8), [], 'cross', [], null, { region, city: REGIONS[region].cities[0] })).map(makeup)
+    const of = Array.from({ length: 6 }, (_, seed) => createBattle(seed + 1, REGIONS[region].kinds[0], force(8), [], 'cross', null, { region, city: REGIONS[region].cities[0] })).map(makeup)
     return Object.fromEntries(Object.keys(of[0]).map((k) => [k, of.reduce((s, m) => s + m[k as keyof typeof m], 0) / of.length])) as ReturnType<typeof makeup>
   }
   const canals = mean('canals')

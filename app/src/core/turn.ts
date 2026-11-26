@@ -1,9 +1,9 @@
 // The hero's turn: Energy, drawing, playing a card and what it does, ending the turn; and each alien's intent.
-import { BASE_STATS, isSoldier, PSI_RANGE, SPIT_DAMAGE, BURST_DAMAGE, MIGHT_MAX, type Battle, type Tile, type Unit } from './battle'
+import { BASE_STATS, CHRONO_EVERY, isSoldier, PSI_RANGE, SPIT_DAMAGE, BURST_DAMAGE, MIGHT_MAX, type Battle, type Tile, type Unit } from './battle'
 import { aimed, amount, CARDS, costOf, exhausts, type Card } from './cards'
 import type { GameEvent } from './combat-event'
 import { distance } from './grid'
-import { has, onTile, shootable, spotted } from './fighters'
+import { has, onTile, shootable } from './fighters'
 import { shoot } from './attack'
 import { knockback } from './knockback'
 import { bestPath, paths, walk } from './pathing'
@@ -70,6 +70,8 @@ export function beginTurn(battle: Battle): void {
       hero.frozen = false
     }
   }
+  // Chrono Coil: every CHRONO_EVERY rounds, 1 Energy more.
+  if (hero && has(hero, 'chrono') && battle.round % CHRONO_EVERY === 0) battle.energy++
   draw(battle, DRAW + (hero && has(hero, 'satchel') ? 1 : 0))
   battle.stage = 'play'
   battle.intents = intents(battle)
@@ -99,11 +101,10 @@ export function targetsOf(battle: Battle, card: Card): Unit[] {
   const aliens = battle.units.filter((u) => u.side === 'alien' && u.revealed && u.hp > 0 && !u.cloaked)
   const kind = CARDS[card.id]
   if (kind.type === 'skill' && kind.move && !kind.damage && !kind.pull && !kind.stun) return aliens
-  const seen = spotted(battle)
   const aim = { ...hero, stats: { ...hero.stats, range: reachOf(card, hero) } }
   const steps = stepsOf(card, hero)
   const ends: Tile[] = steps > 0 ? [hero, ...paths(battle, hero, steps).flatMap((p) => p.slice(-1))] : [hero]
-  return aliens.filter((a) => ends.some((end) => shootable(battle, aim, end, a, seen)))
+  return aliens.filter((a) => ends.some((end) => shootable(battle, aim, end, a)))
 }
 
 /** Why the card at `index` of the hand cannot be played at `target`, or null if it can. */
@@ -138,7 +139,8 @@ export function resolve(battle: Battle): GameEvent[] {
   const caught = target ? [target, ...(kind.area ? battle.units.filter((u) => u.side === 'alien' && u !== target && u.revealed && distance(u, target) <= kind.area!) : [])] : []
   battle.actor = hero.id
   if (target && n('damage') > 0) {
-    for (let hit = 0; hit < Math.max(1, n('hits')) && target.hp > 0 && hero.hp > 0; hit++) events.push(...strike(battle, hero, target, n('damage'), reachOf(card, hero), hit))
+    const { hits, damage } = volley(hero, Math.max(1, n('hits')), n('damage'))
+    for (let hit = 0; hit < hits && target.hp > 0 && hero.hp > 0; hit++) events.push(...strike(battle, hero, target, damage, reachOf(card, hero), hit))
     for (const other of caught.slice(1).filter((u) => u.hp > 0)) {
       const dealt = n('damage') + strength(hero) + odds(battle, hero, other)
       events.push({ type: 'hurt', id: other.id, amount: dealt, cause: 'impact' })
@@ -178,22 +180,27 @@ export function resolve(battle: Battle): GameEvent[] {
 /** Damage a hero's hits do more for its stats beyond the base: from its class, gear and level. */
 const strength = (hero: Unit) => hero.stats.damage - BASE_STATS.damage
 
+/** A card's hits as the hero lands them: Twinned gear and Hair Trigger each add a hit to one of 2 or more; Split Rounds doubles the hits at half damage. */
+function volley(hero: Unit, hits: number, damage: number): { hits: number; damage: number } {
+  const more = hits >= 2 ? (['twinned', 'hairTrigger'] as const).filter((e) => has(hero, e)).length : 0
+  return has(hero, 'split') ? { hits: 2 * (hits + more), damage: Math.max(1, Math.floor(damage / 2)) } : { hits: hits + more, damage }
+}
+
 /** One hit of a card on `target`, `nth` of its hits, which every gear, relic and Power effect on the hero shapes. */
 function strike(battle: Battle, hero: Unit, target: Unit, damage: number, range: number, nth: number): GameEvent[] {
   hero.dealing = damage + strength(hero)
-  const events = shoot(battle, hero, spotted(battle), undefined, target, undefined, { kit: { shots: 1, power: 1, range }, nth })
+  const events = shoot(battle, hero, undefined, target, { range, nth })
   delete hero.dealing
   return events
 }
 
 /** The hero steps toward `target` to the nearest tile with a shot at it, or as near as it gets; with no target, to the tile with a shot at the most aliens. */
 function step(battle: Battle, hero: Unit, card: Card, target: Unit | undefined, events: GameEvent[]): void {
-  const seen = spotted(battle)
   const aim = { ...hero, stats: { ...hero.stats, range: CARDS[card.id].damage ? reachOf(card, hero) : hero.stats.range } }
   const aliens = battle.units.filter((u) => u.side === 'alien' && u.revealed)
   const harm = (end: Tile) => (onTile(battle.acid, end) || onTile(battle.fire, end) ? 1 : 0)
   const path = bestPath(paths(battle, hero, stepsOf(card, hero)), hero, (end, steps) =>
-    target ? [harm(end), shootable(battle, aim, end, target, seen) ? 0 : 1, distance(end, target), steps] : [harm(end), -aliens.filter((a) => shootable(battle, aim, end, a, seen)).length, steps],
+    target ? [harm(end), shootable(battle, aim, end, target) ? 0 : 1, distance(end, target), steps] : [harm(end), -aliens.filter((a) => shootable(battle, aim, end, a)).length, steps],
   )
   go(battle, hero, path, events)
 }
@@ -210,7 +217,7 @@ function retreat(battle: Battle, hero: Unit, tiles: number, events: GameEvent[])
 function go(battle: Battle, hero: Unit, path: Tile[], events: GameEvent[]): void {
   if (path.length === 0) return
   walk(battle, hero, path, events)
-  moved(battle, hero, path, events)
+  moved(battle, hero, events)
   events.push(...sight(battle))
 }
 

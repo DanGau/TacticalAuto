@@ -1,19 +1,14 @@
 // Game text follows docs/text-style.md, as far as a test can tell.
 import { expect, test } from 'vitest'
 import { CHALLENGES } from './challenges'
-import { classPower, CLASSES } from './classes'
 import { DOCTRINES } from './doctrines'
 import { EVENTS } from './events'
 import { EXAMS } from './exams'
-import { FEATS } from './feats'
 import { EFFECTS } from './gear'
 import { GOALS } from './goals'
 import { KEYWORDS } from './keywords'
 import { RISKS } from './missions'
-import { PERKS } from './perks'
 import { RELICS } from './relics'
-import { SECONDARIES, secondaryPower } from './secondaries'
-import { SKILLS } from './skills'
 import { TWISTS } from './twists'
 import { cardText, CARD_IDS, CARDS } from './cards'
 import { WEAPONS } from './weapons'
@@ -24,10 +19,6 @@ import { describe } from '../ui/html'
 
 /** What each effect text says, by where it comes from. */
 const effects: [string, string][] = [
-  ...Object.values(SKILLS).map((s): [string, string] => [s.name, s.text]),
-  ...Object.values(CLASSES).flatMap((c): [string, string][] => [[c.abilityName, classPower(c, c.charges).text], [c.name, c.stanceText]]),
-  ...Object.values(SECONDARIES).map((s): [string, string] => [secondaryPower(s).name, secondaryPower(s).text]),
-  ...Object.values(PERKS).map((p): [string, string] => [p.name, p.text]),
   ...Object.values(RELICS).map((r): [string, string] => [r.name, r.text]),
   ...Object.values(EFFECTS).map((e): [string, string] => [e.prefix, e.text]),
   ...Object.values(DOCTRINES).map((d): [string, string] => [d.name, d.text]),
@@ -38,9 +29,7 @@ const effects: [string, string][] = [
   ...Object.values(CHALLENGES).map((c): [string, string] => [c.name, c.test]),
   ...Object.values(TWISTS).map((t): [string, string] => [t.name, t.text]),
   ...Object.values(EXAMS).map((e): [string, string] => [e.name, e.text]),
-  ...Object.values(FEATS).map((f): [string, string] => [f.name, f.text]),
   ...Object.entries(KEYWORDS).map(([name, k]): [string, string] => [name, k.text]),
-  ...Object.values(WEAPONS).flatMap((w): [string, string][] => (w.special ? [[w.name, w.special]] : [])),
   ...Object.values(ALIENS).map((a): [string, string] => [a.name, a.text]),
   ...Object.values(ARENA_KINDS).map((k): [string, string] => [k.name, k.text]),
   ...Object.entries(RESISTS).map(([q, text]): [string, string] => [QUANTITIES[q as Resist].name, text]),

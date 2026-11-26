@@ -4,7 +4,6 @@ import { ALIENS } from '../core/aliens'
 import { type Battle, type Tile, type Unit } from '../core/battle'
 import { CLASSES } from '../core/classes'
 import { type Run } from '../core/run-state'
-import { level } from '../core/hero'
 import { axes, DECAL_LIFT, picture, spot } from './camera'
 import { drawAcid } from './marks'
 import { ALIEN_LOOK, COLOR } from './palette'
@@ -28,18 +27,7 @@ const BODY_RES = 2
 const GHOST = 0.5
 
 /** The letter over a unit that is no soldier: its kind's initial, C for a commander, nothing for a boss or civilian. */
-export const letter = (unit: Unit) => (unit.target ? 'C' : unit.summoner !== null ? 'M' : unit.boss || !unit.kind ? '' : ALIENS[unit.kind].name[0])
-
-/** How much bigger a giant stands. */
-const GIANT = 2.2
-
-/** Makes a sprite a giant's size. */
-export function grow(sprite: Sprite): void {
-  sprite.scale = GIANT
-  sprite.marks.board.position.y = (BADGE_UP * GIANT) / ACROSS
-  sprite.shadow.scale.setScalar(GIANT)
-  squash(sprite, 1, 1)
-}
+export const letter = (unit: Unit) => (unit.target ? 'C' : unit.boss || !unit.kind ? '' : ALIENS[unit.kind].name[0])
 
 /** A health bar above a unit's feet: health left of `maxHp` with temp HP after it, armor left of `maxArmor` a strip above, and the health left written on it. */
 function drawBar(g: CanvasRenderingContext2D, ally: boolean, hp: number, maxHp: number, armor: number, maxArmor: number, temp: number): void {
@@ -109,37 +97,19 @@ export function shimmer(sprite: Sprite, now: number): void {
   fade(sprite, low + (high - low) * (0.5 + 0.5 * Math.sin(now / 140 + sprite.tile.x)) * (0.75 + 0.25 * Math.sin(now / 37)))
 }
 
-/** How high a levitating unit floats over its tile, and how far it bobs either way, in screen pixels. */
-const HOVER_LIFT = 16
-const HOVER_BOB = 3
-
-/** Sets a sprite levitating or not: aloft, its shadow glows. */
-export function hoverLook(sprite: Sprite, on: boolean): void {
-  sprite.hovering = on
-  ;(sprite.shadow.material as MeshBasicMaterial).color.set(on ? COLOR.hover : 0x000000)
-  if (!on) sprite.lift = 0
-}
-
-/** A levitating sprite's lift at `now` ms, rising and sinking slowly. */
-export function bob(sprite: Sprite, now: number): void {
-  sprite.lift = (HOVER_LIFT + HOVER_BOB * Math.sin(now / 400 + sprite.tile.x)) / ACROSS
-}
-
 /** A unit's health, armor, temp HP and badges in the battle; none once it is gone. */
 export const vitals = (battle: Battle, id: number): [number, number, number, Badge[]] => {
   const unit = battle.units.find((u) => u.id === id)
   return [unit?.hp ?? 0, unit?.armor ?? 0, unit?.temp ?? 0, unit ? badges(unit, battle) : []]
 }
 
-
-
 /**
- * `pips` marks a soldier's level above its health; `letter` is the initial of its class. Its health and armor show as
+ * `letter` is the initial of a soldier's class. Its health and armor show as
  * pips, one each, ten to a row, rows stacking upward: health left in green on an ally and red on an enemy, health
  * lost in a dark shade of it, then armor in yellow, then temp HP in pale blue. Past PIP_MAX they show as a bar in
  * those colors, health left written on it, armor a strip above. Above them its badges: the stacks and counts it has built.
  */
-export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite {
+export function create(s: Stage, unit: Unit, letter = ''): Sprite {
   const picture = document.createElement('canvas')
   picture.width = 2 * BODY.left * BODY_RES
   picture.height = (BODY.up + BODY.down) * BODY_RES
@@ -156,9 +126,8 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
   shadow.position.y = DECAL_LIFT * 2
   const node = new Group()
   node.add(shadow, body)
-  const color = unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR.civilian : unit.summoner !== null ? COLOR.mech : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human
+  const color = unit.boss || unit.target ? COLOR.boss : unit.civilian ? COLOR.civilian : unit.kind ? ALIEN_LOOK[unit.kind].color : COLOR.human
   const barred = unit.stats.hp + unit.stats.armor > PIP_MAX
-  const rows = barred ? 2 : Math.ceil((unit.stats.hp + unit.stats.armor) / 10)
   const maxHp = unit.stats.hp
   const ally = unit.side === 'human'
   const marks = badgeBoard()
@@ -170,11 +139,9 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
     shadow,
     tile: unit,
     at: { x: 0, y: 0 },
-    scale: unit.giant ? GIANT : unit.boss ? 1.6 : unit.target ? 1.3 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1,
+    scale: unit.boss ? 1.6 : unit.target ? 1.3 : unit.kind ? ALIEN_LOOK[unit.kind].scale : 1,
     ally,
     cloaked: false,
-    hovering: false,
-    lift: 0,
     marks,
     drawn: [unit.hp, unit.armor, unit.temp ?? 0],
     drawHp(hp, armor, temp = 0, badges = []) {
@@ -187,12 +154,6 @@ export function create(s: Stage, unit: Unit, pips: number, letter = ''): Sprite 
       if (unit.civilian) g.roundRect(-14, -22, 28, 22, 10)
       else g.roundRect(-9, -30, 18, 30, 6)
       g.fill()
-      g.fillStyle = css(COLOR.human)
-      for (let i = 0; i < pips; i++) {
-        g.beginPath()
-        g.arc(-9 + 6 * i, -40 - rows * PIP_STEP, 2, 0, Math.PI * 2)
-        g.fill()
-      }
       if (letter) {
         g.fillStyle = css(0x10141c)
         g.font = 'bold 13px sans-serif'
@@ -239,11 +200,9 @@ export function sync(s: Stage, run: Run, battle: Battle): void {
   for (const id of [...s.sprites.keys()]) if (!live.has(id)) remove(s, id)
   for (const unit of visible) {
     const soldier = unit.soldier === run.hero.id ? run.hero : undefined
-    const sprite = s.sprites.get(unit.id) ?? create(s, unit, soldier ? level(soldier) : 0, soldier?.cls ? CLASSES[soldier.cls].name[0] : letter(unit))
+    const sprite = s.sprites.get(unit.id) ?? create(s, unit, soldier?.cls ? CLASSES[soldier.cls].name[0] : letter(unit))
     place(s, sprite, { x: unit.x, y: unit.y })
-    if (unit.giant) grow(sprite)
     cloakLook(sprite, !!unit.cloaked)
-    hoverLook(sprite, unit.effects.includes('hover'))
     fade(sprite, 1)
     sprite.drawHp(unit.hp, unit.armor, unit.temp, badges(unit, battle))
   }

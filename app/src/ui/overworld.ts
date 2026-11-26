@@ -17,10 +17,7 @@ import { CARD_PRICE, GEAR_PRICE, REMOVE_PRICE } from '../core/rewards'
 import { makes } from '../core/hero'
 import { soldierStats } from '../core/hero'
 import { health, wounded } from '../core/hero'
-import { level } from '../core/hero'
-import { xpFor } from '../core/hero'
 import { LEG_STOPS } from '../core/progress'
-import { FEATS } from '../core/feats'
 import { TWISTS } from '../core/twists'
 import { ARENA_KINDS } from '../core/arena-kinds'
 import { REGIONS } from '../core/regions'
@@ -247,19 +244,17 @@ function baseView(run: Run): string {
   const held = makes(run)
   return `${relics.length + doctrines.length + held.length === 0 ? '<h2>Relics and oaths the hero gains show here.</h2>' : ''}
     ${held.length > 0 ? `<h2>Your build makes</h2>${quantityChips(held, held)}` : ''}
-    ${doctrines.length > 0 ? `<h2>Oaths</h2><div class="stash">${doctrines.join('')}</div>` : ''}
+    ${doctrines.length > 0 ? `<h2>Doctrines</h2><div class="stash">${doctrines.join('')}</div>` : ''}
     ${relics.length > 0 ? `<h2>Relics</h2><div class="stash">${relics.join('')}</div>` : ''}`
 }
 
-/** Everything about the hero: its health, its sheet, its progress and its feats. */
+/** Everything about the hero: its health and its sheet. */
 function heroView(run: Run): string {
   const hero = run.hero
-  const r = level(hero)
-  const feats = hero.feats.map((id) => `<span class="chip feat" title="${FEATS[id].text}">★ ${FEATS[id].name}</span>`)
   const gear = hero.gear?.effect ? `<div class="gear ${hero.gear.rarity}">${gearCard(hero.gear)}</div>` : ''
-  return `<h2>${hero.name} · ${xpFor(r + 1) - hero.xp} XP to level ${r + 1}</h2>
+  return `<h2>${hero.name}</h2>
     ${healthBar(health(run, hero), soldierStats(run, hero).hp, soldierStats(run, hero).armor)}
-    <div class="details">${heroSheet(run, hero)}${gear}${feats.length > 0 ? `<p>${feats.join(' ')}</p>` : ''}</div>`
+    <div class="details">${heroSheet(run, hero)}${gear}</div>`
 }
 
 /**

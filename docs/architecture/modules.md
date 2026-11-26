@@ -15,27 +15,21 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `levels.ts` | Smoothing heights so ledges stand only where meant |
 | `knockback.ts` | Knockback and falls: off a ledge, through glass, over the edge |
 | `formations.ts` | `gather`: which aliens cluster together, the shapes they stand in, how the ground shapes those |
-| `objects.ts` | What heroes do with objects: the strong throwing them or small aliens, setting off tanks, a rigged tank |
 | `landing.ts` | The one entry point, the plain landing there, what relics set off |
-| `played.ts` | What the card played adds in a battle beyond stats and lent effects: Ablative Field, Regen Gel, Force Gauntlet |
-| `spawn.ts` | Making units: aliens, soldiers, civilians, mechs, drops |
+| `spawn.ts` | Making units: aliens, soldiers, civilians |
 | `step.ts` | Advances the run's battle a beat; settles it when it ends |
 | `combat.ts` | `stepBattle`: whose turn, the next unit's action |
+| `turn.ts` | The hero's turn: Energy, drawing, playing a card, ending the turn; each alien's intent |
 | `combat-event.ts` | `GameEvent`, what a beat emits for the view |
 | `sources.ts` | What each event's action comes from (`Src`); `source-names.ts` the name it shows under |
-| `sides.ts` | A side's simultaneous move: sighting, walking, sentries, overwatch |
+| `sides.ts` | A side's simultaneous move: sighting, walking, sentries |
 | `pathing.ts` | Where a unit moves: candidate paths scored by stance, goal and threat |
 | `attack.ts` | A shot and what a hit or kill sets off |
 | `brawlers.ts` | Rules of aliens that fight up close: charge, pounce, hold, ram, shield, pack, fury |
 | `threat.ts` | What a hero gains by shooting an alien: harm stopped over hits to kill |
-| `abilities.ts` | Actions in place of a shot: alien powers, soldier skills and gear |
-| `keystones.ts` | Deep path powers: what a hit sets off, their numbers |
-| `follow-ups.ts` | Command's ally attack, Blade Dance's extra strikes |
-| `ultimates.ts` | Ultimates, once-a-battle capstones: when each fires and what it does |
+| `abilities.ts` | Actions in place of a shot: alien powers; cloaking |
 | `wound.ts` | Damage landing, what it sets off, the battle tally |
-| `stacks.ts` | Stacks a fight builds and what they set off: burn, chill and freezing and how they cancel, moving, Might, combos, exposure, every-Nth hits; payoffs that spend them, shots a volley fires |
-| `talents.ts` | Talents: skills shaping a hit by where it lands, or answering a hit, a kill or a turn's start |
-| `perks.ts` | Minor perks: small upgrades picked between power picks, offers and effects' sizes |
+| `stacks.ts` | Stacks a fight builds and what they set off: burn, chill and freezing and how they cancel, moving, Might, exposure, every-Nth hits; payoffs that spend them |
 | `upkeep.ts` | What happens as a side's turn begins: more aliens engaging, waves |
 | `fighters.ts` | Unit queries every combat module asks |
 | `sight.ts` | Line of sight, what height does to a shot, noticing |
@@ -51,18 +45,17 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `run-state.ts` | Run state types (`Run`, `Soldier`, `Stop`, `Leg`, `Mission`) |
 | `run.ts` | `createRun`, the route and each leg's map of stops, moving along it |
 | `progress.ts` | How far along the run is, and threat |
-| `hero.ts` | The hero: experience, levels, skills, stats, health, the candidates a run starts from |
+| `hero.ts` | The hero: stats, health, the candidates a run starts from |
 | `rewards.ts` | Gear and relic rewards, the shop, settling the reward phase |
 | `missions.ts` | Missions: their force, aliens, goal and place |
 | `debrief.ts` | `endBattle`: settling a battle into the run |
-| `deck.ts` | The deck: the starting cards, the hand drawn each battle and the card played, cards offered by rarity |
-| `read.ts` | The board at a deploy screen, counted for what each card plays to, and each card's line in the hand |
+| `deck.ts` | The deck: the starter deck, cards offered by rarity and leaned by doctrines |
 | `events.ts` | Unknown stops' events |
 | `apply.ts` | `apply`: the player's actions, checked and applied |
 
 ## core/: content and helpers
 
-`aliens`, `challenges`, `classes`, `doctrines`, `exams`, `feats`, `gear`, `goals`, `powers`, `quantities`, `relics`, `secondaries`, `skill-effects`, `skills`, `twists`, `cards`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics and doctrines share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`, `arena`: test helpers.
+`aliens`, `challenges`, `classes`, `doctrines`, `exams`, `gear`, `goals`, `quantities`, `relics`, `twists`, `cards`, `weapons`: one kind of game content each. `regions`, `towns`, `world`: places. `base`: what relics share. `effects`: effect names for the view. `pace`: event timing. `plane`: flat-map geometry. `rng`: seeded randomness. `tuning`: balance numbers. `roads`, `arena`: test helpers.
 
 ## view/: battle rendering
 
@@ -74,7 +67,6 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 | `camera.ts` | World and picture points, cameras that frame tiles |
 | `play.ts` | Plays a beat's events in order |
 | `effects.ts` | Shots, lunges, rockets, sparks, shake, callouts |
-| `ultimates.ts` | An ultimate on screen: its name, colour and shape |
 | `sprites.ts` | Unit pictures and moving them |
 | `badges.ts` | The stacks and counts over a unit's head, the same size on any screen |
 | `marks.ts` | Ground marks: the way in, goals, fences, acid, fog, glows |
@@ -87,6 +79,6 @@ Where each system lives under `app/src/`. Each file's first line says what it ow
 
 ## Elsewhere
 
-- `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `summary.ts` a battle's statistics page and the post-game summary, drawn by `charts.ts`, whose marks `tip.ts` explains on hover, focus or tap; `cards.ts` fixed-size cards tapped to arm and again to confirm, and gear comparisons; `sheet.ts` character sheets and alien stat blocks; `kit.ts` source tags and a hero's kit by source, shown on hover or tap in battle; `log.ts` the battle log; `tree.ts` a class's skill tree as a map; `briefing.ts` the mission intro: a tour of the 3 to 5 points that matter, from the battle's landmarks, and playing it; `menu.ts` the title and recruit choice, `select.ts` its card-to-dossier and deploy motion.
+- `ui/`: HTML panels. `ui.ts` is the shell; `overworld.ts` and `globe.ts` the flight map; `aftermath.ts` rewards and reports; `summary.ts` a battle's statistics page and the post-game summary, drawn by `charts.ts`, whose marks `tip.ts` explains on hover, focus or tap; `cards.ts` fixed-size cards tapped to arm and again to confirm, and gear comparisons; `sheet.ts` character sheets and alien stat blocks; `kit.ts` source tags and a hero's kit by source, shown on hover or tap in battle; `log.ts` the battle log; `briefing.ts` the mission intro: a tour of the 3 to 5 points that matter, from the battle's landmarks, and playing it; `menu.ts` the title and recruit choice, `select.ts` its card-to-dossier and deploy motion.
 - `bots/bots.ts`: bot strategies. `sim/`: the sim CLI, `sim/encounter.ts`, the challenge lab, and `sim/forks.ts`, the clean comparison of each hand's cards, and `sim/deck.ts`, the deck comparison.
 - `main.ts`: browser entry and `window.debug`.

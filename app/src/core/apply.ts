@@ -12,10 +12,8 @@ import { buyWare } from './rewards'
 import { buyCard, CARD_PRICE, REMOVE_PRICE, removeCard, takeCard, upgradeCard } from './rewards'
 import { GEAR_PRICE } from './rewards'
 import { equipFind } from './rewards'
-import { takePerk, takeSkill } from './rewards'
 import { UPGRADED } from './deck'
 import { mend, wounded } from './hero'
-import { minorOffers, skillOffers } from './hero'
 
 export type Action =
   /** At the run's start: take the candidate at `index` of run.candidates as the run's hero. */
@@ -56,9 +54,6 @@ export type Action =
   | { type: 'sell'; find: number }
   /** Any time: the player has read the first of run.gains. */
   | { type: 'ack' }
-  /** Reward phase: the hero learns the skill, or takes the perk, at `index` of its offers. */
-  | { type: 'skill'; index: number }
-  | { type: 'perk'; index: number }
 
 export type Result = { ok: true } | { ok: false; reason: string }
 
@@ -96,7 +91,7 @@ export function apply(run: Run, action: Action): Result {
     }
     return ok
   }
-  if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill' || action.type === 'perk' || action.type === 'card' || action.type === 'upgrade') {
+  if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'card' || action.type === 'upgrade') {
     if (run.phase !== 'reward') return no('nothing to choose')
     if (action.type === 'card') {
       if (run.cardOffers.length === 0) return no('no cards on offer')
@@ -110,12 +105,6 @@ export function apply(run: Run, action: Action): Result {
       const id = run.relicOffers[action.index]
       if (!id) return no('no such relic')
       takeRelic(run, id)
-    } else if (action.type === 'skill') {
-      if (!skillOffers(run.hero)[action.index]) return no('no such skill on offer')
-      takeSkill(run, action.index)
-    } else if (action.type === 'perk') {
-      if (!minorOffers(run.hero)[action.index]) return no('no such perk on offer')
-      takePerk(run, action.index)
     } else {
       if (!run.finds[action.find]) return no('no such find')
       if (action.type === 'sell') sellFind(run, action.find)

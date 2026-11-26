@@ -1,14 +1,11 @@
 // Numbers after a fight and after a run, charted: the battle's statistics page, and the post-game summary.
 import { CLASSES } from '../core/classes'
 import { DOCTRINES } from '../core/doctrines'
-import type { Tally } from '../core/feats'
+import type { Tally } from '../core/battle'
 import { GOALS } from '../core/goals'
 import { RELICS } from '../core/relics'
 import { relicIcon } from './relic-icons'
-import { skillIcon } from './skill-icons'
 import type { Fought, Run } from '../core/run-state'
-import { SKILLS } from '../core/skills'
-import { level } from '../core/hero'
 import { cardName } from '../core/cards'
 import { cardIcon } from './card-icons'
 import { barCard, columns, heroColour, type Column, type Mark } from './charts'
@@ -76,15 +73,14 @@ export function runSummary(run: Run): string {
   const ended = won ? 'The source is destroyed. Earth is saved.' : 'Earth has fallen.'
   const cause = won || !last ? '' : `<p>Ended by: ${foughtName(last)}, round ${last.rounds}.</p>`
   const hero = run.hero
-  const card = `<div class="endhero"><span class="portrait">${badge(hero.cls)}</span><div><b>${hero.name}</b> <small>Level ${level(hero)}${hero.cls ? ` ${CLASSES[hero.cls].name}` : ''}</small><br>
-    <small class="tier ${hero.gear?.rarity ?? ''}">${hero.gear ? `${gearName(hero.gear)}` : 'Empty hands'}</small><br>
-    <small>${hero.skills.map((id) => `${skillIcon(id)} ${SKILLS[id].name}`).join(' · ') || 'No powers'}</small></div></div>`
+  const card = `<div class="endhero"><span class="portrait">${badge(hero.cls)}</span><div><b>${hero.name}</b> <small>${hero.cls ? CLASSES[hero.cls].name : ''}</small><br>
+    <small class="tier ${hero.gear?.rarity ?? ''}">${hero.gear ? `${gearName(hero.gear)}` : 'Empty hands'}</small></div></div>`
   return `<div class="summary">
     <h1 class="${won ? 'down' : 'up'}">${ended}</h1>${cause}
     <button id="again" class="decide">New run</button>
     <section><h3>Hero</h3><div class="endheroes">${card}</div></section>
     ${list('Relics', run.relics.map((id) => `${relicIcon(id)} ${RELICS[id].name}`))}
-    ${list('Oaths', run.doctrines.map((id) => DOCTRINES[id].name))}
+    ${list('Doctrines', run.doctrines.map((id) => DOCTRINES[id].name))}
     ${list('Deck', run.deck.map((c) => `${cardIcon(c.id)} ${cardName(c.id, c.level)}`))}
     <section><h3>Run totals · ${run.log.length} battles, ${run.log.filter((f) => f.won).length} won</h3>${charts(runRow(run))}</section>
     <section><h3>Battles · damage dealt above, tanked below</h3>${legend(hero.name)}${columns(battleColumns(run), TANKED)}</section>

@@ -1,11 +1,11 @@
 // The title screen, story and the choice of hero.
-import { classPower, CLASSES } from "../core/classes";
+import { CLASSES } from "../core/classes";
+import { cardName, SIGNATURES } from "../core/cards";
 import type { Run, Soldier } from "../core/run-state";
-import { charges } from "../core/hero";
 import { places } from "./globe";
 import { badge } from "./html";
 import { heroDossier } from "./sheet";
-import { kitIcon } from "./ability-icons";
+import { classIcon } from "./class-icons";
 import { weaponIcon } from "./weapon-icons";
 
 /** The title screen, before a run begins. */
@@ -33,14 +33,14 @@ export function story(): string {
   </div>`;
 }
 
-/** A candidate as a small card to open: badge, class, name, weapon and ability by name. */
-export const candidateCard = (run: Run, hero: Soldier, index: number) =>
+/** A candidate as a small card to open: badge, class, name, weapon and class card by name. */
+export const candidateCard = (hero: Soldier, index: number) =>
   `<button data-candidate="${index}" class="candidate" aria-haspopup="dialog">
     <span class="emblem" aria-hidden="true">${badge(hero.cls)}</span>
     <small class="cls">${CLASSES[hero.cls!].name}</small>
     <b class="name">${hero.name}</b>
     <span class="line">${hero.gear ? `${weaponIcon(hero.gear.weapon)} ${hero.gear.name}` : "Empty hands"}</span>
-    <span class="line">${kitIcon(hero.cls!)} ${classPower(CLASSES[hero.cls!], charges(run, hero)).name}</span>
+    <span class="line">${classIcon(hero.cls!)} ${cardName(SIGNATURES[hero.cls!])}</span>
   </button>`;
 
 /** Candidate `index` in full, with the way back or to deploy with them. */
@@ -61,7 +61,7 @@ export function candidates(run: Run, open: number | null): string {
   return `<div class="menu picking${open === null ? "" : " opened"}">
     <div class="map flight">${places(size, homes, open === null)}</div>
     <h2>Who saves the world?</h2>
-    <div class="choices"${open === null ? "" : " inert"}>${run.candidates.map((r, i) => candidateCard(run, r, i)).join("")}</div>
+    <div class="choices"${open === null ? "" : " inert"}>${run.candidates.map((r, i) => candidateCard( r, i)).join("")}</div>
     ${open === null ? "" : candidateDossier(run, open)}
   </div>`;
 }

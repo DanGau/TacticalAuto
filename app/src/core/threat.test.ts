@@ -1,5 +1,4 @@
 import { beforeAll, expect, test } from 'vitest'
-import { powerOf } from './skills'
 import { apply } from './apply'
 import { enterAt, begun } from './roads'
 import { isSoldier, type Battle, type Unit } from './battle'
@@ -7,7 +6,6 @@ import { reshaped } from './grid'
 import { ALIENS, alienStats, type AlienKind } from './aliens'
 import { alienUnit } from './spawn'
 import { shoot } from './attack'
-import { spotted } from './fighters'
 import { harm, threat } from './threat'
 import { TUNING } from './tuning'
 
@@ -16,7 +14,6 @@ beforeAll(() => void Object.assign(TUNING, { alienHp: 0.4 }))
 
 function arena(aliens: { kind: AlienKind; x: number; y: number }[]): { battle: Battle; hero: Unit; aliens: Unit[] } {
   const run = begun(1)
-  run.hero.skills = [powerOf(run.hero.cls!)]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   enterAt(run)
@@ -35,7 +32,7 @@ function arena(aliens: { kind: AlienKind; x: number; y: number }[]): { battle: B
   return { battle, hero, aliens: units }
 }
 
-const shotAt = (battle: Battle, hero: Unit) => shoot(battle, hero, spotted(battle)).find((e) => e.type === 'shot')
+const shotAt = (battle: Battle, hero: Unit) => shoot(battle, hero).find((e) => e.type === 'shot')
 
 test('a hero shoots the psion behind a brute', () => {
   const { battle, hero, aliens } = arena([{ kind: 'brute', x: 10, y: 12 }, { kind: 'psion', x: 10, y: 16 }])

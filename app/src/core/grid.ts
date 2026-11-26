@@ -33,42 +33,29 @@ export const HIGH_DAMAGE = 1
 /** Move a step costs beyond its one tile for each level it climbs. */
 export const CLIMB = 2
 
-/** Move a step onto caltrops costs beyond its one tile. */
-export const CALTROP_COST = 2
 
 /** Move a step onto mire costs beyond its one tile. */
 export const MIRE_COST = 2
-
-/** The jump a hovering unit strides with: onto any neighbour, up or down any ledge, out over the void. */
-export const HOVER = 99
-
-/** Whether a hovering unit may float over the tile: the void, or water. */
-export const floats = (battle: Battle, t: number) => battle.ground[t] === 'void' || battle.ground[t] === 'water'
-
-/** Whether a unit may not stand on the tile; one that `hovers` may stand over the void or water. */
-export const barred = (battle: Battle, x: number, y: number, hovers = false) => blocked(battle, x, y) && !(hovers && floats(battle, y * GRID + x) && !unitAt(battle, x, y))
 
 /** Whether a stride from `from` to `to` is a jump: up or down a ledge, or across a gap. */
 export const jumps = (battle: Battle, from: Tile, to: Tile) => distance(from, to) > 1 || ledge(battle, from, to)
 
 /**
  * What a stride costs of a unit's move: a walk is one tile, CLIMB more for each level up; a jump is a tile for each
- * tile across and each level up. Either costs more onto mire or caltrops. A unit that `hovers` pays only the tiles.
+ * tile across and each level up. Either costs more onto mire.
  */
-export const stepCost = (battle: Battle, from: Tile, to: Tile, hovers = false) => {
+export const stepCost = (battle: Battle, from: Tile, to: Tile) => {
   const up = Math.max(0, heightAt(battle, to) - heightAt(battle, from))
-  if (hovers) return distance(from, to)
   const stride = jumps(battle, from, to) ? distance(from, to) + up : 1 + CLIMB * up
-  return stride + (battle.ground[to.y * GRID + to.x] === 'mire' ? MIRE_COST : 0) + (battle.caltrops.some((t) => t.x === to.x && t.y === to.y) ? CALTROP_COST : 0)
+  return stride + (battle.ground[to.y * GRID + to.x] === 'mire' ? MIRE_COST : 0)
 }
 
 /**
  * The tiles a unit with `jump` can stride to from `from`, whatever stands on them: a neighbour it may step to, one up
  * or down a ledge of at most `jump` levels, and straight across a gap of void at most `jump` - 1 + `span` tiles wide to
- * ground at most `jump` levels off; with `span`, a gap of water too. With HOVER, every unwalled neighbour.
+ * ground at most `jump` levels off; with `span`, a gap of water too.
  */
 export function strides(battle: Battle, from: Tile, jump: number, span = 0): Tile[] {
-  if (jump >= HOVER) return NEIGHBORS.map(([dx, dy]) => ({ x: from.x + dx, y: from.y + dy })).filter((to) => onGrid(to.x, to.y) && unwalled(battle, from, to))
   const out: Tile[] = []
   const near = (to: Tile) => Math.abs(heightAt(battle, to) - heightAt(battle, from)) <= jump
   const isVoid = (t: Tile) => battle.ground[t.y * GRID + t.x] === 'void' || (span > 0 && battle.ground[t.y * GRID + t.x] === 'water')
@@ -191,8 +178,8 @@ export function walkGraph(battle: Battle, jump = 0, span = 0) {
   const into: number[][] = Array.from({ length: GRID * GRID }, () => [])
   for (let f = 0; f < GRID * GRID; f++) {
     const from = { x: f % GRID, y: Math.floor(f / GRID) }
-    if ((battle.bulk[f] > 0 && !(jump >= HOVER && floats(battle, f))) || walls.has(f)) continue
-    for (const to of strides(battle, from, jump, span)) into[to.y * GRID + to.x].push(f, stepCost(battle, from, to, jump >= HOVER))
+    if (battle.bulk[f] > 0 || walls.has(f)) continue
+    for (const to of strides(battle, from, jump, span)) into[to.y * GRID + to.x].push(f, stepCost(battle, from, to))
   }
   const graph = { into, fields: new Map<number, number[]>() }
   walk.graphs.set(`${jump}/${span}`, graph)
@@ -339,18 +326,6 @@ export function edgeDepths(battle: Battle): number[] {
   }
   depths.set(battle, depth)
   return depth
-}
-
-/** The open tile of the edge nearest `tile`. */
-export function edgeNear(battle: Battle, tile: Tile): Tile {
-  const depth = edgeDepths(battle)
-  let best: Tile | null = null
-  for (let t = 0; t < GRID * GRID; t++) {
-    const at = { x: t % GRID, y: Math.floor(t / GRID) }
-    if (!inPart(depth[t], 'edge') || blocked(battle, at.x, at.y)) continue
-    if (!best || distance(at, tile) < distance(best, tile)) best = at
-  }
-  return best ?? openNear(battle, tile)
 }
 
 /** The alien nearest a tile, if any. */

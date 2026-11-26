@@ -1,4 +1,4 @@
-// Settling a finished battle into the run: experience, losses, loot and threat.
+// Settling a finished battle into the run: losses, loot and threat.
 import { CIVILIANS, CIVILIANS_PER_THREAT, CIVILIAN_SUPPLIES } from './goals'
 import { RISKS } from './missions'
 import { STOP_THREAT, LOSS_THREAT, THREAT_MAX } from './progress'
@@ -8,11 +8,11 @@ import { dropGear, offerCards, settle } from './rewards'
 import { random, randomInt } from './rng'
 import { drawStops, passStop } from './run'
 import { type Run } from './run-state'
-import { earn, makes, reads, soldierStats } from './hero'
+import { makes, reads, soldierStats } from './hero'
+import { tallyOf } from './wound'
 
 /**
- * Settles a finished battle: experience, threat, rewards, and where the hero stands on the road. The hero earns
- * experience, won or lost. Fallen in any battle, the run is lost.
+ * Settles a finished battle: threat, rewards, and where the hero stands on the road. Fallen in any battle, the run is lost.
  */
 export function endBattle(run: Run): void {
   const battle = run.battle!
@@ -20,15 +20,13 @@ export function endBattle(run: Run): void {
   const won = battle.winner === 'human'
   const rescued = mission.goal === 'rescue' ? battle.saved + battle.units.filter((u) => u.civilian).length : null
   const s = run.hero
-  const xpBefore = s.xp
-  const { earned: xp, feats, tally } = earn(battle, s, won, rescued)
-  s.xp += xp.reduce((sum, e) => sum + e.xp, 0)
+  const tally = tallyOf(battle, s.id)
   // Health carries on: what it ends standing or lifted off with.
   const maxHp = soldierStats(run, s).hp
   const hp = Math.max(0, Math.min(maxHp, battle.units.find((u) => u.soldier === s.id)?.hp ?? battle.lifted[s.id] ?? 0))
   const fell = hp === 0
   s.wounds = maxHp - hp
-  const hero = { xpBefore, xpAfter: s.xp, earned: xp, feats, hp, maxHp, tally }
+  const hero = { hp, maxHp, tally }
 
   run.log.push({ stop: mission.kind, goal: mission.goal, won, rounds: battle.round, tally })
   const before = run.threat

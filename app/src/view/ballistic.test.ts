@@ -3,10 +3,10 @@ import { PACE } from '../core/pace'
 import { ballistic } from './ballistic'
 import { LEVEL } from './space'
 
-test('a throw over the edge moves every frame from release until it is gone, through the lip and on down', () => {
+test('a fall over the edge moves every frame from the lip until it is gone, through the lip and on down', () => {
   const from = { x: 2, y: LEVEL * 1.6, z: 2 }
   const over = { x: 6, y: 0, z: 2 }
-  const ms = PACE.flight + PACE.flightTile * 4
+  const ms = PACE.fall / 2
   const flight = ballistic(from, over, LEVEL * 4, LEVEL * 6, ms)
   const frame = 1000 / 60
   let last = flight.at(0)

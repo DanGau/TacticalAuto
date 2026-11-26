@@ -1,4 +1,3 @@
-import { powerOf } from './skills'
 import { TUNING } from './tuning'
 
 // These duels stage exact hits and survivals, whatever the balance numbers are.
@@ -9,7 +8,7 @@ import { fury, hold, pounce, turned } from './brawlers'
 import { fightPath } from './pathing'
 import { enterAt, begun } from './roads'
 import { apply } from './apply'
-import { isSoldier, ACID_DAMAGE, BACKSTAB_DAMAGE, BURST_DAMAGE, REVIVE_HEALTH,  SPAWN_EVERY, SPIT_DAMAGE, GRID,        type Battle, type Unit } from './battle'
+import { isSoldier, ACID_DAMAGE, BURST_DAMAGE, SPAWN_EVERY, SPIT_DAMAGE, GRID, type Battle, type Unit } from './battle'
 import { alienUnit } from './spawn'
 import { reshaped } from './grid'
 import { distance } from './grid'
@@ -34,7 +33,6 @@ test('a mission musters packs its depth allows, for exactly its force, and a lon
  */
 function arena(aliens: { kind: AlienKind; x: number; y: number; boss?: boolean }[]): { battle: Battle; soldier: Unit; aliens: Unit[]; until: (done: (events: GameEvent[]) => boolean) => GameEvent[] } {
   const run = begun(1)
-  run.hero.skills = [powerOf(run.hero.cls!)]
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
   enterAt(run)
@@ -136,63 +134,7 @@ test('an alien unseen, as a wave coming in, stays unseen until it opens fire', (
   expect(events.findIndex((e) => e.type === 'reveal')).toBeLessThan(events.findIndex((e) => e.type === 'shot'))
 })
 
-test('backstab adds damage against a target with no alien beside it; shredder destroys armor before the damage lands', () => {
-  for (const [effect, expected] of [['backstab', 3 + BACKSTAB_DAMAGE], ['shred', 3 + 2]] as const) {
-    const { soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
-    soldier.effects = [effect]
-    soldier.stats = { ...soldier.stats, move: 0 }
-    aliens[0].stats = { ...aliens[0].stats, move: 0 }
-    aliens[0].armor = 2
-    until((all) => all.some((e) => e.type === 'shot' && e.id === soldier.id))
-    // Armor takes the first two points unless it is shredded.
-    expect(aliens[0].stats.hp - aliens[0].hp + (2 - aliens[0].armor)).toBe(expected)
-  }
-})
-
-test('revive gets the hero back up once as it falls', () => {
-  const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
-  soldier.effects = ['revive']
-  soldier.stats = { ...soldier.stats, move: 0, range: 0 }
-  soldier.hp = 1
-  aliens[0].stats = { ...aliens[0].stats, move: 0, crit: 0 }
-  const events = until((all) => all.some((e) => e.type === 'effect' && e.effect === 'revive'))
-  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: soldier.id, effect: 'revive', amount: REVIVE_HEALTH }))
-  expect(battle.units).toContain(soldier)
-  until((all) => all.some((e) => e.type === 'death' && e.id === soldier.id))
-  expect(battle.units).not.toContain(soldier)
-})
-
-test('a soldier whose skills pay for standing still holds a tile it can shoot from', () => {
-  const { soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 13 }])
-  soldier.effects = ['steady']
-  // A rushing soldier would close in.
-  soldier.stance = 'rush'
-  soldier.stats = { ...soldier.stats }
-  aliens[0].hp = aliens[0].stats.hp = 99
-  aliens[0].stats = { ...aliens[0].stats, move: 0 }
-  const start = { x: soldier.x, y: soldier.y }
-  const events = until((all) => all.filter((e) => e.type === 'shot' && e.id === soldier.id).length >= 3)
-  expect(events.some((e) => e.type === 'move' && e.id === soldier.id)).toBe(false)
-  expect(soldier).toMatchObject(start)
-})
-
-test('an alien that can shoot a taunting soldier must, and cannot shoot an elusive one from far off', () => {
-  for (const [effect, shot] of [['taunt', true], ['elusive', false]] as const) {
-    const { battle, soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 15 }])
-    // A decoy nearer the alien than the soldier with the skill.
-    const decoy: Unit = { ...structuredClone(soldier), id: 900, x: 11, y: 12, hp: 500 }
-    battle.units.push(decoy)
-    soldier.effects = [effect]
-    soldier.hp = 500
-    for (const unit of [soldier, decoy]) unit.stats = { ...unit.stats, move: 0, range: 0 }
-    aliens[0].stats = { ...aliens[0].stats, move: 0 }
-    const events = until((all) => all.filter((e) => e.type === 'shot').length >= 3)
-    expect(events.some((e) => e.type === 'shot' && e.target === soldier.id)).toBe(shot)
-    if (shot) expect(events.every((e) => e.type !== 'shot' || e.target === soldier.id)).toBe(true)
-  }
-})
-
-test("a blademaster charges in and strikes from the next tile; a parry deflects a shot from beyond arm's reach", () => {
+test('a melee hero charges in and strikes from the next tile', () => {
   const { soldier, aliens, until } = arena([{ kind: 'trooper', x: 10, y: 15 }])
   soldier.stance = 'rush'
   soldier.stats = { ...soldier.stats, range: 1, move: 6, damage: 1 }
@@ -201,13 +143,6 @@ test("a blademaster charges in and strikes from the next tile; a parry deflects 
   const events = until((all) => all.some((e) => e.type === 'shot' && e.id === soldier.id))
   expect(events[0]).toMatchObject({ type: 'move', id: soldier.id })
   expect(Math.max(Math.abs(soldier.x - aliens[0].x), Math.abs(soldier.y - aliens[0].y))).toBe(1)
-
-  const duel = arena([{ kind: 'trooper', x: 10, y: 14 }])
-  duel.soldier.effects = ['parry']
-  duel.soldier.stats = { ...duel.soldier.stats, range: 1, move: 0, hp: 999 }
-  duel.soldier.hp = 999
-  duel.aliens[0].stats = { ...duel.aliens[0].stats, move: 0 }
-  expect(duel.until((all) => all.some((e) => e.type === 'effect' && e.effect === 'parry'))).toContainEqual(expect.objectContaining({ type: 'effect', id: duel.soldier.id, effect: 'parry', amount: 0 }))
 })
 
 test("a juggernaut's plate stops a whole hit and loses one plate; a wraith takes 1 from anything but a crit", () => {
@@ -318,7 +253,7 @@ test('a leaper pounces once, over a wall, onto the hero who shoots farthest', ()
   reshaped(battle)
   until((all) => all.some((e) => e.type === 'move' && e.id === aliens[0].id))
   expect(distance(aliens[0], sniper)).toBe(1)
-  expect(aliens[0].spent).toContain('leap')
+  expect(aliens[0].spent).toContain('pounce')
   expect(pounce(battle, aliens[0])).toEqual([])
 })
 

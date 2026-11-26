@@ -5,7 +5,6 @@ import { createRun, KEYS, nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Mission } from '../core/run-state'
 import { health } from '../core/hero'
-import { distance } from '../core/grid'
 import { timedFlow } from '../core/step'
 import type { DoctrineId } from '../core/doctrines'
 import type { RelicId } from '../core/relics'
@@ -66,8 +65,8 @@ export interface RunResult {
   draws: number
   /** How long each battle takes to play in the view, in ms. */
   durations: number[]
-  /** Units fallen off a ledge or over the edge, those the fall killed, and objects or aliens thrown, over all its battles; and the farthest throw in tiles. */
-  moments: { falls: number; fallKills: number; throws: number; farthest: number }
+  /** Units fallen off a ledge or over the edge, and those the fall killed, over all its battles. */
+  moments: { falls: number; fallKills: number }
   /** By arena kind: battles fought there, and the jumps units made in them. */
   jumps: Partial<Record<ArenaKind, { battles: number; jumps: number }>>
   /** Each battle's toll on the hero's health. */
@@ -97,7 +96,7 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, r
     if (loadout.effect && run.hero?.gear && !run.hero.gear.effect) run.hero.gear.effect = loadout.effect
   }
   arm()
-  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], restForks: [], actions: [], taken: Array<number>(KEYS + 1).fill(0), deck: 0, rests: { safehouses: 0, medkits: 0 } }
+  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0 }, jumps: {}, tolls: [], restForks: [], actions: [], taken: Array<number>(KEYS + 1).fill(0), deck: 0, rests: { safehouses: 0, medkits: 0 } }
   let clock = { next: 0, done: 0 }
   let leaps = 0
   /** This battle's hardest hero hit, its boss, and the round the boss was first wounded. */
@@ -119,8 +118,6 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, r
       for (const event of played.events) {
         if (event.type === 'fall') result.moments.falls++
         if (event.type === 'fall' && !!event.fatal) result.moments.fallKills++
-        if (event.type === 'throw') result.moments.throws++
-        if (event.type === 'throw') result.moments.farthest = Math.max(result.moments.farthest, distance(event.from, event.to))
         if (event.type === 'move') leaps += event.leaps ?? 0
         if (event.type === 'shot' && event.damage > 0 && battle!.units.find((u) => u.id === event.id)?.side === 'human') {
           hits.max = Math.max(hits.max, event.damage)

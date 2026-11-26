@@ -18,7 +18,7 @@ const GROUNDS = Object.keys(ARENA_KINDS) as ArenaKind[]
 const battles = GROUNDS.flatMap((ground, i) => {
   const region = REGION_IDS.find((id) => REGIONS[id].ground.includes(ground))!
   return Array.from({ length: 8 }, (_, seed) =>
-    createBattle(300 + 20 * i + seed, REGIONS[region].kinds[seed % REGIONS[region].kinds.length], force(10), [], (['cross', 'hold', 'rescue'] as const)[seed % 3], [], null, { region, city: REGIONS[region].cities[0], ground }),
+    createBattle(300 + 20 * i + seed, REGIONS[region].kinds[seed % REGIONS[region].kinds.length], force(10), [], (['cross', 'hold', 'rescue'] as const)[seed % 3], null, { region, city: REGIONS[region].cities[0], ground }),
   )
 })
 

@@ -5,14 +5,13 @@ import { apply } from '../core/apply'
 import { CHALLENGES, forceOf, type ChallengeId } from '../core/challenges'
 import type { ClassId } from '../core/classes'
 import { generateGear } from '../core/gear'
-import { powerOf } from '../core/skills'
 import { GOALS, type Goal } from '../core/goals'
 import { offerable } from '../core/relics'
 import { randomInt } from '../core/rng'
 import { road } from '../core/roads'
 import { createRun, legOf } from '../core/run'
 import { type Run } from '../core/run-state'
-import { minorOffers, skillOffers, soldierStats, xpFor } from '../core/hero'
+import { soldierStats } from '../core/hero'
 import { timedFlow } from '../core/step'
 import { CARDS, type CardId } from '../core/cards'
 import { starterDeck } from '../core/deck'
@@ -21,23 +20,14 @@ import { bestPlay } from '../bots/play'
 
 const { values } = parseArgs({ options: { runs: { type: 'string', default: '30' }, challenge: { type: 'string', default: '' }, leg: { type: 'string', default: '0,1,2' }, rung: { type: 'string', default: '0,1,2' }, goal: { type: 'string', default: 'cross' }, cls: { type: 'string', default: '' }, cards: { type: 'string', default: '' }, none: { type: 'boolean', default: false } } })
 
-/** The level the hero has reached by the time it meets a rung of a leg, about what a careful run has. */
-const levelAt = (leg: number, rung: number) => leg * 3 + 2 + rung
-
-/** One battle alone: a fresh hero levelled for where it stands, with a relic a leg, at full health. */
+/** One battle alone: a fresh hero with gear for where it stands and a relic a leg, at full health. */
 function battle(seed: number, leg: number, rung: number, challenge: ChallengeId, card: CardId | null, goal: Goal): { won: boolean; hurt: number; seconds: number } {
   const run = createRun(seed)
   apply(run, { type: 'hero', index: seed % run.candidates.length })
   const hero = run.hero
-  if (values.cls) {
-    hero.cls = values.cls as ClassId
-    hero.skills = [powerOf(values.cls as ClassId)]
-  }
+  if (values.cls) hero.cls = values.cls as ClassId
   run.keys = leg
   run.stop = rung * 3
-  hero.xp = xpFor(levelAt(leg, rung))
-  while (skillOffers(hero).length > 0) hero.skills.push(skillOffers(hero)[randomInt(run, skillOffers(hero).length)])
-  while (minorOffers(hero).length > 0) hero.perks.push(minorOffers(hero)[randomInt(run, minorOffers(hero).length)])
   hero.gear = generateGear(run, run.nextGear++, leg === 0 ? 'common' : 'rare')
   run.deck = [...starterDeck(hero.cls, hero.gear.weapon), ...(card ? [{ id: card, level: 1 }] : [])]
   for (let i = 0; i < leg; i++) gainRelic(run, offerable(run.relics)[randomInt(run, offerable(run.relics).length)], true)

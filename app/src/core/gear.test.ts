@@ -1,10 +1,9 @@
 import { OVERKILL_FROM } from './battle'
-import { powerOf } from './skills'
 import { expect, test } from 'vitest'
 import { spendStacks } from './stacks'
 import { enterAt, begun } from './roads'
 import { apply } from './apply'
-import {   SEARING_DAMAGE,  GRID, type Battle, type Effect, type Stats, type Unit } from './battle'
+import { type Battle, type Effect, type Stats, type Unit } from './battle'
 import { alienUnit } from './spawn'
 import { reshaped } from './grid'
 import { beat } from './roads'
@@ -41,13 +40,12 @@ test('any soldier wields any weapon: a melee one reaches the next tile and charg
   expect(hammer).toMatchObject({ range: MELEE_RANGE, damage: rifle.damage })
   apply(run, { type: 'go', index: 1 })
   apply(run, { type: 'advance' })
-  expect(run.battle!.reserve[0]).toMatchObject({ stance: 'rush', weapon: 'hammer', effects: expect.arrayContaining([WEAPONS.hammer.effect]) })
+  expect(run.battle!.reserve[0]).toMatchObject({ stance: 'rush', weapon: 'hammer' })
 })
 
-/** A run whose soldier has learned its first skill and found `gear`. */
+/** A run whose soldier has found `gear`. */
 function withFind(gear: Omit<Gear, 'id'>): Run {
   const run = begun(1)
-  run.hero.skills = [powerOf(run.hero.cls!)]
   run.finds.push({ id: 1, ...gear })
   run.phase = 'reward'
   return run
@@ -172,13 +170,6 @@ test('blinking gear carries a soldier hit to half health to safety, once', () =>
   expect(d.soldier.spent).toContain('blink')
 })
 
-test('a null field stops a spitter spitting', () => {
-  const d = armed(['null'], { damage: 0 })
-  d.alien.kind = 'spitter'
-  d.alien.stats = { ...d.alien.stats, move: 0 }
-  expect(untilAlienShoots(d).some((e) => e.type === 'spit')).toBe(false)
-})
-
 test('a pyre censer sets the ground under a burning alien ablaze', () => {
   const d = armed(['pyre'], { damage: 0 })
   d.alien.burn = 3
@@ -211,19 +202,6 @@ test('a tethered hit pulls its target a tile toward the shooter', () => {
   expect(untilAlienShoots(d)).toContainEqual(expect.objectContaining({ type: 'move', id: d.alien.id, path: [{ x: 10, y: 12 }], with: 'tether' }))
 })
 
-test('caltrops slow an alien that must cross them, and hurt it', () => {
-  const d = armed([], { damage: 0 })
-  Object.assign(d.alien, { x: 10, y: 15 })
-  d.alien.stats = { ...d.alien.stats, range: 1, move: 4 }
-  // The soldier holds its ground, so the alien must come to it.
-  d.soldier.stats = { ...d.soldier.stats, move: 0 }
-  d.battle.caltrops = Array.from({ length: GRID }, (_, x) => ({ x, y: 13 }))
-  const events = untilAlienShoots(d)
-  const steps = events.find((e) => e.type === 'move' && e.id === d.alien.id)
-  expect(steps?.type === 'move' && steps.path.length).toBeLessThan(4)
-  expect(effectsOf(events, 'caltrops')).toContainEqual(expect.objectContaining({ type: 'effect', id: d.alien.id, effect: 'caltrops', amount: -1 }))
-})
-
 test('the sentinel protocol shoots an alien that walks away from beside a soldier', () => {
   const d = armed(['sentinel'], { damage: 0 })
   d.alien.stance = 'standoff'
@@ -242,25 +220,10 @@ test('a snaring soldier shoots the alien closing in over an equal shot at one th
   expect(shot).toMatchObject({ target: rusher.id })
 })
 
-test("a soldier's kills, damage and feats are credited to it", () => {
+test("a soldier's kills and damage are credited to it", () => {
   const d = duel({ weapon: 'rifle', rarity: 'common', name: 'Rifle', stats: {}, effect: null })
   d.soldier.stats = { ...d.soldier.stats, damage: 120, crit: 0 }
   while (d.alien.hp > 0) d.step()
-  expect(d.battle.tally[d.soldier.soldier!]).toMatchObject({ kills: 1, dealt: 99, feats: ['overkill', 'oneShot'] })
-})
-
-test('incendiary rounds set the target burning, and searing hits a burning one harder', () => {
-  const d = armed(['tinder', 'searing'])
-  const shots = () => untilAlienShoots(d).filter((e) => e.type === 'shot' && e.id === d.soldier.id)
-  expect(shots()[0]).toMatchObject({ damage: 1 })
-  expect(d.alien.burn).toBeGreaterThan(0)
-  expect(shots()[0]).toMatchObject({ damage: 1 + SEARING_DAMAGE })
-})
-
-test('a fire suit keeps its wearer from burning in fire', () => {
-  const d = armed(['fireSuit'])
-  d.battle.fire.push({ x: d.soldier.x, y: d.soldier.y, turns: 9 })
-  untilAlienShoots(d)
-  expect(d.soldier.burn).toBe(0)
+  expect(d.battle.tally[d.soldier.soldier!]).toMatchObject({ kills: 1, dealt: 99 })
 })
 

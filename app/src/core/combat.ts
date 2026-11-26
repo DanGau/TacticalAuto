@@ -1,13 +1,11 @@
 // A battle's beat: the round's stage, and the next unit's action.
-import { settle } from './knockback'
 import { HOLD_ROUNDS, RESCUE_QUORUM } from './goals'
 import { isSoldier, MAX_BEATS, type Battle } from './battle'
 
 /** Rounds after which a battle still undecided is lost. */
 export const MAX_ROUNDS = 40
 import type { GameEvent } from './combat-event'
-import { spotted } from './fighters'
-import { weaponAttack } from './attack'
+import { shoot } from './attack'
 import { alienAction } from './abilities'
 import { armed, moveSide } from './sides'
 import { tallyOf } from './wound'
@@ -16,11 +14,6 @@ import { beginTurn, resolve } from './turn'
 
 /** The next alien's action on the enemy's turn, each acting once, lowest id first: what its kind does in place of a shot, else a shot. Empty once every alien has acted. */
 function alienActs(battle: Battle): GameEvent[] {
-  for (const unit of battle.units) {
-    const drift = settle(battle, unit)
-    if (drift.length > 0) return drift
-  }
-  const seen = spotted(battle)
   for (const unit of battle.units) {
     if (unit.side !== 'alien' || unit.id <= battle.shooter || !armed(unit)) continue
     battle.shooter = unit.id
@@ -35,7 +28,7 @@ function alienActs(battle: Battle): GameEvent[] {
       return special
     }
     battle.actor = unit.id
-    const events = weaponAttack(battle, unit, seen)
+    const events = shoot(battle, unit)
     battle.actor = null
     if (events.length === 0) continue
     // An alien unseen gives itself away when it opens fire.
@@ -65,10 +58,7 @@ function act(battle: Battle): GameEvent[] {
     if (battle.stage === 'play') return battle.queued ? resolve(battle) : []
     const action = alienActs(battle)
     if (action.length > 0) return action
-    for (const u of battle.units) {
-      u.surprised = Math.max(0, u.surprised - 1)
-      u.guarded = []
-    }
+    for (const u of battle.units) u.surprised = Math.max(0, u.surprised - 1)
     battle.stage = 'move'
   }
   return []
@@ -77,14 +67,13 @@ function act(battle: Battle): GameEvent[] {
 /** Whether the battle waits for the player: on the hero's turn with no card queued. */
 export const awaiting = (battle: Battle) => battle.phase === 'battle' && battle.stage === 'play' && !battle.queued
 
-/** Credits each heal to the hero who gave it, or whose mech did; health a hero's own effect gives back, to that hero. */
+/** Credits each heal to the hero who gave it; health a hero's own effect gives back, to that hero. */
 function tallyHealing(battle: Battle, events: GameEvent[]): void {
   for (const e of events) {
     const amount = e.type === 'heal' || (e.type === 'effect' && e.amount > 0) ? e.amount : 0
     if (amount === 0 || !('id' in e)) continue
     const giver = battle.units.find((u) => u.id === e.id && u.side === 'human')
-    const hero = giver?.soldier ?? giver?.summoner
-    if (hero !== null && hero !== undefined) tallyOf(battle, hero).healed += amount
+    if (giver?.soldier != null) tallyOf(battle, giver.soldier).healed += amount
   }
 }
 

@@ -3,7 +3,8 @@ import type { Rarity } from './base'
 import { CARD_IDS, CARDS, SIGNATURES, STRIKES, type Card, type CardId } from './cards'
 import type { ClassId } from './classes'
 import { LEG_STOPS } from './progress'
-import { random, randomInt } from './rng'
+import { DOCTRINES, LEAN } from './doctrines'
+import { random } from './rng'
 import type { Run } from './run-state'
 import type { WeaponId } from './weapons'
 
@@ -40,7 +41,7 @@ export function rarityChances(run: Run, elite: boolean): Record<Rarity, number> 
 /** Whether the hero may be offered card `id`: not basic, and of its class or none. */
 export const offerable = (run: Run, id: CardId) => CARDS[id].rarity !== 'basic' && (!CARDS[id].cls || CARDS[id].cls === run.hero.cls)
 
-/** `n` different cards the hero may be offered, each of a rarity drawn by rarityChances. */
+/** `n` different cards the hero may be offered, each of a rarity drawn by rarityChances; within it, one a held doctrine favours is LEAN times as likely. */
 export function drawCards(run: Run, n: number, elite: boolean): CardId[] {
   const chances = rarityChances(run, elite)
   const drawn: CardId[] = []
@@ -49,7 +50,9 @@ export function drawCards(run: Run, n: number, elite: boolean): CardId[] {
     const rarity: Rarity = roll < chances.epic ? 'epic' : roll < chances.epic + chances.rare ? 'rare' : 'common'
     const pool = CARD_IDS.filter((id) => CARDS[id].rarity === rarity && offerable(run, id) && !drawn.includes(id))
     if (pool.length === 0) continue
-    drawn.push(pool[randomInt(run, pool.length)])
+    const weight = (id: CardId) => (run.doctrines.some((d) => DOCTRINES[d].favours(id)) ? LEAN : 1)
+    let pick = random(run) * pool.reduce((sum, id) => sum + weight(id), 0)
+    drawn.push(pool.find((id) => (pick -= weight(id)) < 0) ?? pool[pool.length - 1])
   }
   return drawn
 }

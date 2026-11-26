@@ -25,14 +25,13 @@ function landed(relics: RelicId[]): Run {
   return run
 }
 
-test('landing relics strip, chill and wall in where the hero comes in, and bring a turret', () => {
+test('landing relics strip, chill and wall in where the hero comes in', () => {
   const plain = landed([]).battle!
-  const battle = landed(['shredder', 'cryo', 'bulwark', 'turrets']).battle!
+  const battle = landed(['shredder', 'cryo', 'bulwark']).battle!
   const near = battle.units.filter((u) => u.side === 'alien' && distance(u, battle.entry!) <= CHARGE_REACH)
   expect(near.length).toBeGreaterThan(0)
   for (const alien of near) expect(alien).toMatchObject({ armor: 0, chill: 1 })
   expect(battle.props.filter((p) => p === 'stack').length).toBeGreaterThan(plain.props.filter((p) => p === 'stack').length)
-  expect(battle.units.filter((u) => u.side === 'human' && u.soldier === null && u.stats.move === 0)).toHaveLength(1)
   expect(battle.opening).toBe(true)
 })
 

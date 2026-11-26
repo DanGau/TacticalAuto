@@ -6,8 +6,6 @@ import { apply } from './apply'
 import { isSoldier, BASE_STATS, type Side } from './battle'
 import { CLASSES } from './classes'
 import { EVENTS, MEDKIT } from './events'
-import { odds } from './sight'
-import { FORTIFIED_SOAK } from './doctrines'
 import { HUB } from './world'
 import { OPENING } from './progress'
 import {
@@ -36,31 +34,20 @@ import { GEAR_PRICE } from './rewards'
 import { makes, reads } from './hero'
 import { feeds } from './quantities'
 import { CANDIDATES } from './hero'
-import { LEVEL_STATS } from './hero'
-import { soldierStats } from './hero'
+import { HERO_HP, soldierStats } from './hero'
 import { health } from './hero'
-import { skillOffers } from './hero'
-import { MAX_SKILLS, minorOffers, PICK_LEVELS, picksEarned } from './hero'
-import { XP } from './hero'
-import { level } from './hero'
-import { xpFor } from './hero'
 import { STOP_THREAT } from './progress'
 import { THREAT_MAX } from './progress'
 import { LEG_STOPS } from './progress'
 import { REST_COLUMNS } from './progress'
-import { powerOf, SKILLS } from './skills'
 import { atKey, road, enterAt, begun } from './roads'
 import { RELICS } from './relics'
 import { CARDS } from './cards'
 import { OFFERS } from './deck'
 import { CARD_PRICE, REMOVE_PRICE } from './rewards'
 
-/** A run whose hero has learned its first skill, so the overworld waits. */
-function started(): Run {
-  const run = begun(1)
-  run.hero.skills = [powerOf(run.hero.cls!)]
-  return run
-}
+/** A run under way, the overworld waiting. */
+const started = (): Run => begun(1)
 
 /** A stop of `kind`; a battle sends one patrol. */
 const stopOf = (kind: StopKind, risk: Risk = 'standard'): Stop => ({
@@ -108,11 +95,9 @@ function fight(run: Run, winner: Side): void {
   if (run.cardOffers.length > 0) apply(run, { type: 'card', index: null })
 }
 
-test('a run begins with its hero at level 1 on a path of its class, choosing where to start among the battles of its first leg', () => {
+test('a run begins with its hero choosing where to start among the battles of its first leg', () => {
   const run = begun(1)
-  expect(level(run.hero)).toBe(1)
-  expect(run.hero.skills[0]).toBe(powerOf(run.hero.cls!))
-  expect(run).toMatchObject({ phase: 'overworld', hero: { skills: [expect.anything()] } })
+  expect(run.phase).toBe('overworld')
   const leg = legOf(run)
   expect(leg.columns).toHaveLength(LEG_STOPS + 1)
   expect(leg.columns[0].length).toBeGreaterThan(1)
@@ -144,7 +129,7 @@ test('a leg is a map of trails that part and meet without crossing; every way th
   }
 })
 
-test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone adds threat, pays by the risk, gives experience and gear for the player to hand out, and relics if Overrun', (risk) => {
+test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone adds threat, pays by the risk, gives gear for the player to hand out, and relics if Overrun', (risk) => {
   const run = travelling(['battle', 'battle'], risk)
   fight(run, 'human')
   expect(run).toMatchObject({ threat: STOP_THREAT, stop: 1 })
@@ -153,10 +138,7 @@ test.each(['safe', 'standard', 'dangerous'] as const)('a won battle in a %s zone
   if (RISKS[risk].gear !== 0.5) expect(run.finds).toHaveLength(RISKS[risk].gear)
   if (RISKS[risk].rareGear) expect(run.finds[0].rarity).not.toBe('common')
   expect(run.report).toMatchObject({ stop: 'battle', won: true, threat: { before: 0, after: STOP_THREAT }, key: false })
-  const report = run.report!.hero!
-  expect(report).toMatchObject({ xpBefore: xpFor(1) })
-  expect(report.earned).toEqual(expect.arrayContaining([{ label: 'fought', xp: XP.fought }, { label: 'won', xp: XP.won }]))
-  expect(report.xpAfter - report.xpBefore).toBe(report.earned.reduce((sum, e) => sum + e.xp, 0))
+  expect(run.report!.hero).toMatchObject({ maxHp: soldierStats(run, run.hero).hp })
   while (run.finds.length > 0) apply(run, { type: 'sell', find: 0 })
   // An Overrun battle won offers relics too.
   expect(run.relicOffers).toHaveLength(risk === 'dangerous' ? 3 : 0)
@@ -186,7 +168,7 @@ test('the hero falling in a battle on the road loses the run', () => {
   const run = travelling(['battle', 'battle'])
   fight(run, 'alien')
   expect(run.phase).toBe('lost')
-  expect(run.report!.hero).toMatchObject({ hp: 0, xpBefore: xpFor(1), earned: [{ label: 'fought', xp: XP.fought }] })
+  expect(run.report!.hero).toMatchObject({ hp: 0 })
 })
 
 test('the hero falling at a satellite loses the run', () => {
@@ -250,8 +232,6 @@ test('after the stops of a leg comes its satellite: winning it wins a key and th
   enter(run, 'safe', ['battle', 'battle'])
   for (let i = 0; i < 2; i++) {
     fight(run, 'human')
-    while (skillOffers(run.hero).length > 0) apply(run, { type: 'skill', index: 0 })
-    while (minorOffers(run.hero).length > 0) apply(run, { type: 'perk', index: 0 })
   }
   onward(run)
   expect(current(run)!.stop).toMatchObject({ kind: 'key', terrain: 'compound' })
@@ -272,32 +252,6 @@ test('each leg crosses a continent to a satellite in one of its cities; the last
   expect(run.route[KEYS].to).toBe(HUB)
 })
 
-test('experience follows what the hero did: kills and damage, feats only the first time', () => {
-  const run = travelling(['battle', 'battle', 'battle'])
-  const soldier = run.hero
-  const battle = () => {
-    apply(run, { type: 'advance' })
-    enterAt(run)
-    const b = run.battle!
-    b.tally[soldier.id] = { dealt: 12, kills: 3, taken: 4, blocked: 0, healed: 0, feats: ['hatTrick'] }
-    b.units = b.units.filter((u) => u.side === 'human')
-    Object.assign(b, { phase: 'over', winner: 'human' })
-    endBattle(run)
-    while (run.finds.length > 0) apply(run, { type: 'sell', find: 0 })
-    return run.report!.hero!
-  }
-  const first = battle()
-  expect(first.feats).toEqual(['hatTrick'])
-  expect(first.earned).toEqual([
-    { label: 'fought', xp: XP.fought },
-    { label: 'won', xp: XP.won },
-    { label: '3 kills', xp: 3 * XP.kill },
-    { label: '12 damage', xp: Math.floor(12 / XP.damage) },
-    { label: 'Hat Trick', xp: XP.feat },
-  ])
-  expect(battle().feats).toEqual([])
-  expect(soldier.feats).toEqual(['hatTrick'])
-})
 
 test('an ambush has no landing: the hero is down at once, every posted alien in the fight, more coming, the Hunter stronger than its best soldier by HUNTER', () => {
   const run = travelling(['battle', 'battle'])
@@ -332,8 +286,6 @@ test.each(['human', 'alien'] as const)('with every key won only the final missio
     fight(run, 'human')
     apply(run, { type: 'relic', index: 0 })
     while (run.finds.length > 0) apply(run, { type: 'equip', find: 0 })
-    while (skillOffers(run.hero).length > 0) apply(run, { type: 'skill', index: 0 })
-    while (minorOffers(run.hero).length > 0) apply(run, { type: 'perk', index: 0 })
     expect(run.phase).toBe('overworld')
   }
   expect(run.relics).toHaveLength(KEYS)
@@ -379,54 +331,21 @@ test('a key mission has one boss, with an escort for each key already won', () =
   }
 })
 
-const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', xp: 0, cls: null, skills: [], feats: [], gear: null, home: HUB, wounds: 0, seed: 0, lost: [], perks: [], ...extra })
+const soldier = (extra: Partial<Soldier>): Soldier => ({ id: 0, name: '', cls: null, gear: null, home: HUB, wounds: 0, ...extra })
 
-test('stats add class, level, skills and relics to the base', () => {
+test('max HP comes from the hero, relics and events, never from class; stats add class movement and relics to the base', () => {
   const run = begun(1)
   run.relics = ['plasma']
-  const stats = soldierStats(run, soldier({ xp: xpFor(2) }))
-  expect(stats.hp).toBe(BASE_STATS.hp + 2 * LEVEL_STATS.hp!)
+  const stats = soldierStats(run, soldier({}))
+  expect(stats.hp).toBe(HERO_HP)
   expect(stats.damage).toBe(BASE_STATS.damage + 1)
-  expect(stats.crit).toBeCloseTo(BASE_STATS.crit + 2 * LEVEL_STATS.crit!)
-  expect(soldierStats(run, soldier({ xp: xpFor(2), cls: 'heavy' })).hp).toBe(stats.hp + CLASSES.heavy.stats.hp!)
-  expect(soldierStats(run, soldier({ xp: xpFor(2), skills: ['sprinter'] })).move).toBe(stats.move + SKILLS.sprinter.stats!.move!)
+  expect(soldierStats(run, soldier({ cls: 'heavy' })).hp).toBe(HERO_HP)
+  expect(soldierStats(run, soldier({ cls: 'assault' })).move).toBe(stats.move + CLASSES.assault.stats.move!)
   run.relics = ['plasma', 'glassCannon']
-  expect(soldierStats(run, soldier({ xp: xpFor(2) })).damage).toBe(stats.damage + RELICS.glassCannon.stats!.damage!)
-})
-
-test('levels never stop: each takes more experience than the last', () => {
-  for (let n = 1; n < 30; n++) {
-    expect(level({ xp: xpFor(n) })).toBe(n)
-    expect(level({ xp: xpFor(n + 1) - 1 })).toBe(n)
-    expect(xpFor(n + 1) - xpFor(n)).toBeGreaterThan(xpFor(n) - xpFor(n - 1))
-  }
-})
-
-test('each pick owed offers its row, and the rest of it is lost; past the last, levels add stats only', () => {
-  const run = begun(1)
-  const soldier = run.hero
-  expect(skillOffers(soldier)).toEqual([])
-  soldier.xp = xpFor(PICK_LEVELS.at(-1)! + 3)
-  run.phase = 'reward'
-  while (soldier.skills.length < MAX_SKILLS) {
-    const offers = skillOffers(soldier)
-    expect(offers).toHaveLength(3)
-    apply(run, { type: 'skill', index: 1 })
-    expect(soldier.skills.at(-1)).toBe(offers[1])
-    expect(soldier.lost).toEqual(expect.arrayContaining([offers[0], offers[2]]))
-  }
-  expect(skillOffers(soldier)).toEqual([])
-})
-
-test('a power comes only at its level: none at level 2, one at the first, none past the last', () => {
-  const hero = begun(1).hero
-  hero.skills = []
-  hero.xp = xpFor(PICK_LEVELS[0] - 1)
-  expect(skillOffers(hero)).toEqual([])
-  hero.xp = xpFor(PICK_LEVELS[0])
-  expect(skillOffers(hero).length).toBeGreaterThan(0)
-  hero.xp = xpFor(PICK_LEVELS.at(-1)! + 9)
-  expect(picksEarned(hero)).toBe(PICK_LEVELS.length)
+  expect(soldierStats(run, soldier({})).damage).toBe(stats.damage + RELICS.glassCannon.stats!.damage!)
+  expect(soldierStats(run, soldier({})).hp).toBe(HERO_HP + RELICS.glassCannon.stats!.hp!)
+  run.maxHp = 4
+  expect(soldierStats(run, soldier({})).hp).toBe(HERO_HP + RELICS.glassCannon.stats!.hp! + 4)
 })
 
 test('a satellite won offers three relics; a relic held changes the run', () => {
@@ -499,7 +418,6 @@ test('an unknown stop turns out a battle, a shop, or an event met once a run, wh
   const kinds = new Set<string>()
   for (let seed = 0; seed < 40; seed++) {
     const run = begun(seed)
-    run.hero.skills = [powerOf(run.hero.cls!)]
     enter(run, 'standard', ['unknown', 'battle'])
     apply(run, { type: 'advance' })
     kinds.add(run.phase)
@@ -540,28 +458,15 @@ test('the Smugglers\' Tunnel skips the next two stops and comes out anywhere in 
   for (const i of next) expect(legOf(raided).columns[1][i].stop).toMatchObject({ kind: 'battle', risk: 'dangerous' })
 })
 
-test('under fortification every hit does 1 less damage, on either side', () => {
-  const run = begun(1)
-  apply(run, { type: 'go', index: 1 })
-  apply(run, { type: 'advance' })
-  enterAt(run)
-  const battle = run.battle!
-  const soldier = battle.units.find(isSoldier)!
-  const alien = battle.units.find((u) => u.side === 'alien')!
-  const plain = odds(battle, alien, soldier)
-  battle.rules = ['fortified']
-  expect(odds(battle, alien, soldier)).toBe(plain - FORTIFIED_SOAK)
-})
-
-test("a soldier lands with its class's ability and its uses, the effects of its skills and the hero's relics, and armor from its class's skills", () => {
+test("a soldier lands with its stance and the effects of its gear and the hero's relics", () => {
   const run = travelling(['battle'])
   run.hero.cls = 'heavy'
-  run.hero.skills = ['meteorStrike', 'arsenal', 'shredder', 'reactive']
-  run.relics = ['echo', 'capacitor']
+  run.hero.gear = { id: 0, rarity: 'rare', name: 'Seeking Rifle', weapon: 'rifle', stats: {}, effect: 'tracer' }
+  run.relics = ['capacitor']
   apply(run, { type: 'advance' })
   enterAt(run)
   const [unit] = run.battle!.units.filter(isSoldier)
-  expect(unit).toMatchObject({ ability: 'rocket', charges: 3, stance: 'anchor', armor: 4, effects: ['shred', 'opener'] })
+  expect(unit).toMatchObject({ stance: 'anchor', effects: ['tracer', 'opener'] })
   expect(unit.hp).toBe(soldierStats(run, run.hero).hp)
 })
 
@@ -569,7 +474,7 @@ test('the first relic offered reads a quantity the hero makes, or makes one it r
   for (let seed = 1; seed <= 5; seed++) {
     const run = started()
     run.rng = seed
-    run.hero.skills = ['mark']
+    run.deck.push({ id: 'calledShot', level: 1 })
     atKey(run)
     fight(run, 'human')
     expect(feeds(RELICS[run.relicOffers[0]], makes(run), reads(run))).toBe(true)
@@ -582,7 +487,6 @@ test('a run begins with a choice of heroes of different classes, each with a com
     expect(run.phase).toBe('select')
     expect(new Set(run.candidates.map((r) => r.cls)).size).toBe(CANDIDATES)
     for (const r of run.candidates) {
-      expect(r.skills).toEqual([powerOf(r.cls!)])
       expect(r.gear!.stats).toEqual({})
       expect(r.gear).toMatchObject({ rarity: 'common' })
     }

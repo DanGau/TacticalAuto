@@ -1,48 +1,39 @@
 // What an event's action comes from. Combat imports it, so it reads only tables that import no combat.
 import { EXAMS } from './exams'
-import type { Ability, Effect, Unit } from './battle'
+import type { Effect, Unit } from './battle'
 import type { GameEvent } from './combat-event'
-import { CLASSES } from './classes'
-import { DOCTRINES } from './doctrines'
 import { EFFECTS } from './gear'
-import type { SecondaryId } from './secondaries'
-import { SKILL_EFFECTS } from './skill-effects'
-import { PERK_EFFECTS } from './perks'
-import { WEAPONS } from './weapons'
 
-export type SrcKind = 'class' | 'skill' | 'weapon' | 'gear' | 'relic' | 'card' | 'doctrine' | 'object' | 'basic' | 'perk' | 'alien'
+export type SrcKind = 'weapon' | 'gear' | 'relic' | 'card' | 'object' | 'basic' | 'alien'
 
-/** `id` is an effect or ability for class, skill, gear, relic and doctrine; a weapon's id or effect; a card's id; an object's prop; an alien's kind or ability; a basic action. */
+/** `id` is an effect for gear and relic; a weapon's id; a card's id; an object's prop; an alien's kind or trait; a basic action or state. */
 export interface Src {
   kind: SrcKind
   id: string
 }
 
 /** Actions and states every unit has. */
-export const BASICS = { attack: 'Attack', throw: 'Throw', jump: 'Jump', move: 'Move', dash: 'Dash', stun: 'Stunned', frozen: 'Frozen', surge: 'Temp HP', overwatch: 'Overwatch', rangedShield: 'Shield', meleeShield: 'Shield', hover: 'Hover', taunt: 'Decoy' } as const
+export const BASICS = { attack: 'Attack', jump: 'Jump', move: 'Move', dash: 'Dash', stun: 'Stunned', frozen: 'Frozen', napalm: 'Fire', regen: 'Regen' } as const
+
+/** What an effect event can name: an effect, or a basic action or state. */
+export type Label = Effect | keyof typeof BASICS
 
 export const has = <T extends object>(table: T, id: string): id is Extract<keyof T, string> => Object.hasOwn(table, id)
 
-/** The kind an effect comes from: a class ability, a weapon's own, a doctrine's, a skill's, a perk's, a gear mod's, a basic; any other is a relic's. */
-export function srcOf(effect: Effect | Ability): Src {
+/** The kind an effect comes from: a Guardian's trait, a gear effect's, a basic; any other is a relic's. */
+export function srcOf(effect: Label): Src {
   const kind = ((): SrcKind => {
-    if (Object.values(CLASSES).some((c) => c.ability === effect) ) return 'class'
     if (has(EXAMS, effect) && effect !== 'thorns') return 'alien'
-    if (Object.values(WEAPONS).some((w) => w.effect === effect)) return 'weapon'
-    if (effect === 'reckoning' || Object.values(DOCTRINES).some((d) => d.effect === effect)) return 'doctrine'
-    if ((SKILL_EFFECTS as readonly string[]).includes(effect)) return 'skill'
-    if ((PERK_EFFECTS as readonly string[]).includes(effect)) return 'perk'
     if (has(EFFECTS, effect)) return 'gear'
     return has(BASICS, effect) ? 'basic' : 'relic'
   })()
   return { kind, id: effect }
 }
 
-/** What a unit's plain attack comes from: an alien's kind, a hero's secondary or weapon, else bare hands. */
-export function attackSrc(unit: Unit, secondary?: SecondaryId): Src {
+/** What a unit's plain attack comes from: an alien's kind, else the hero's weapon. */
+export function attackSrc(unit: Unit): Src {
   if (unit.side === 'alien' && unit.kind) return { kind: 'alien', id: unit.kind }
-  if (secondary) return { kind: 'class', id: secondary }
-  return unit.weapon ? { kind: 'weapon', id: unit.weapon } : { kind: 'basic', id: 'attack' }
+  return { kind: 'basic', id: 'attack' }
 }
 
 /** An alien's own doing, by its kind. */
@@ -52,4 +43,4 @@ export const alienSrc = (unit: Unit): Src => ({ kind: 'alien', id: unit.kind ?? 
 export const BASIC_MOVE: Src = { kind: 'basic', id: 'move' }
 
 /** An effect event, its source the effect's unless told. */
-export const fx = (id: number, effect: Effect | Ability, amount: number, src: Src = srcOf(effect)): GameEvent => ({ type: 'effect', id, effect, amount, src })
+export const fx = (id: number, effect: Label, amount: number, src: Src = srcOf(effect)): GameEvent => ({ type: 'effect', id, effect, amount, src })

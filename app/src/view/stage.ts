@@ -1,13 +1,12 @@
 // The stage every part of the view draws on: the scene and its layers, the camera and its glides, the frame loop, and what is on screen.
 import { ColorManagement, Fog, Group, LinearSRGBColorSpace, type Mesh, PerspectiveCamera, Scene, type Sprite as Billboard, type Object3D, Vector3, WebGLRenderer } from 'three'
 import { ENTRY_RADIUS, GRID, type Battle, type Tile } from '../core/battle'
-import type { Run } from '../core/run-state'
 import { aim, axes, clamped, FIT, framing, HAZE_REACH, HEIGHT, picture, settled, spot, WIDTH, type Camera } from './camera'
 import { RISE_MS, type fence } from './fences'
 import { COLOR, NIGHT } from './palette'
 import { css, Sketch, type Point3 } from './shapes'
 import { ACROSS } from './space'
-import { bob, shimmer } from './sprites'
+import { shimmer } from './sprites'
 import type { Badge, BadgeBoard } from './badges'
 
 export interface Sprite {
@@ -33,10 +32,6 @@ export interface Sprite {
   ally: boolean
   /** Whether it is cloaked, so it shimmers, faint, for the player alone. */
   cloaked: boolean
-  /** Whether it levitates, so it bobs above its tile over a glowing shadow. */
-  hovering: boolean
-  /** How far its picture floats above its feet, in world units. */
-  lift: number
 }
 
 /** Words over the map: an landing's name, or a callout over a unit. */
@@ -100,8 +95,6 @@ export class Stage {
   readonly labels = new Set<Label>()
 
   readonly sprites = new Map<number, Sprite>()
-  /** The hero of the run shown, whose skills and weapon name the effects at work. */
-  hero: Run['hero'] | null = null
   /** A red glow under each alien the hero hasn't found, by unit id. */
   readonly glows = new Map<number, { node: Object3D; tile: Tile }>()
   /** Each prop, wall and window on the board, with the tiles that light it: it is lit when a soldier sees any of them. */
@@ -149,7 +142,6 @@ export class Stage {
       for (const tick of [...this.ticks]) tick(ms * PLAYBACK)
       for (const sprite of this.sprites.values()) {
         if (sprite.cloaked) shimmer(sprite, now)
-        if (sprite.hovering) bob(sprite, now)
         sprite.marks.fit(this.eye.fov)
       }
       for (const f of this.standing.values()) {
@@ -159,11 +151,6 @@ export class Stage {
       this.cutAway(ms)
       this.render()
     })
-  }
-
-  /** The skills and weapon the hero has, which name the effects shown at work. */
-  kit() {
-    return { skills: this.hero?.skills ?? [], weapons: this.hero?.gear ? [this.hero.gear.weapon] : [] }
   }
 
   /** Where a tile falls in the camera's picture. */
@@ -283,7 +270,7 @@ export class Stage {
   render(): void {
     const { ctx, overlay, camera, jolt } = this
     const { back } = axes(camera.yaw)
-    for (const sprite of this.sprites.values()) sprite.body.position.copy(back).multiplyScalar(STANDOFF).setY(sprite.body.position.y + sprite.lift)
+    for (const sprite of this.sprites.values()) sprite.body.position.copy(back).multiplyScalar(STANDOFF)
     this.renderer.render(this.scene, this.eye)
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.clearRect(0, 0, overlay.width, overlay.height)

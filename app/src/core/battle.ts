@@ -2,17 +2,12 @@
 import type { Exam } from './exams'
 import type { ArenaKind } from './arena-kinds'
 import type { Poi } from './pois'
-import type { SecondaryId } from './secondaries'
-import type { SKILL_EFFECTS } from './skill-effects'
-import type { PerkEffect } from './perks'
-import type { WeaponId } from './weapons'
 import { type AlienKind } from './aliens'
-import type { Tally } from './feats'
-import type { DoctrineEffect, Rule } from './doctrines'
 import type { Resist } from './quantities'
 import { type Flow, Goal } from './goals'
 import type { Twist } from './twists'
 import type { Card } from './cards'
+import type { WeaponId } from './weapons'
 import type { Intent } from './turn'
 import type { ChallengeId } from './challenges'
 import { type Bulk, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
@@ -26,18 +21,8 @@ export const MAX_BEATS = 3000
 export const CRIT_BONUS = 2
 /** Tiles within which a soldier with line of sight reveals an alien. */
 export const SIGHT = 24
-/** Damage a rocket does to every unit within BLAST_RADIUS tiles of where it lands. */
-export const ROCKET_DAMAGE = 4
+/** Tiles a blast reaches from where it lands. */
 export const BLAST_RADIUS = 1
-/** Damage napalm does to every unit within its blast, which it sets burning on ground set alight. */
-export const NAPALM_DAMAGE = 3
-/** Damage Searing adds and Icebreaker adds against a burning or chilled target. */
-export const SEARING_DAMAGE = 2
-/** Stacks Smolder adds to each burn, and Permafrost to each chill. */
-export const LINGER_STACKS = 1
-/** Health a medic restores, to a soldier within MEDIC_REACH tiles. */
-export const MEDIC_HEAL = 4
-export const MEDIC_REACH = 2
 /** Tiles a unit in the standoff stance keeps from every enemy. */
 export const STANDOFF = 7
 /** Burn stacks a source adds; each own turn a burning unit takes its stacks in damage, then loses one. At most BURN_MAX. */
@@ -50,7 +35,7 @@ export const CHILL_SLIDE = 3
 /** The most mark and chill stacks a unit holds. */
 export const MARK_MAX = 6
 export const CHILL_MAX = 6
-/** The most Might a unit holds, the most a combo adds, and what makes a hit exposed or every-Nth. */
+/** The most Might a unit holds. */
 export const MIGHT_MAX = 8
 /** The round from which Adrenal Pump gives Might, and the most it gives a hero a battle. */
 export const ADRENAL_FROM = 2
@@ -71,12 +56,12 @@ export const OVERKILL_FROM = 6
 export const VOLATILE_DAMAGE = 2
 export const LODESTONE_REACH = 6
 export const SHELL_MAX = 1
+/** The rounds Chrono Coil's Energy comes every. */
+export const CHRONO_EVERY = 3
 /** Catalyst Prism's every-Nth hit. */
 export const CATALYST_EVERY = 3
-export const COMBO_MAX = 4
 export const EXPOSED = { turns: 2, factor: 1.5 }
 export const CADENCE = 10
-export const FAULT = { every: 5, levels: 2, damage: 4 }
 /** Damage Frost Fracture does to each alien beside a frozen alien broken, per chill stack on it. */
 export const FRACTURE_DAMAGE = 3
 /** Crit chance a level above the target adds, for Lofty gear, to at most HIGH_LEVELS levels. */
@@ -101,54 +86,30 @@ export const PSI_BACKLASH = 2
 export const PSI_BACKLASH_REACH = 3
 /** Alien turns between the swarmlings a boss spawns. */
 export const SPAWN_EVERY = 2
-/** What skills and relics are worth. Each name says the effect; skills.ts and relics.ts say what the effect does. */
-export const BACKSTAB_DAMAGE = 2
-export const RAGE_DAMAGE = 2
-export const DODGE_SOAK = 1
+/** What Weak takes off a hit, and what relics are worth; relics.ts says what each does. */
 export const SUPPRESS_DAMAGE = 1
-export const AURA_REACH = 2
-export const BULWARK_SOAK = 1
-export const INSPIRE_DAMAGE = 1
-export const HEADSHOT_DAMAGE = 2
-export const REVIVE_HEALTH = 3
-export const BARRIER_ARMOR = 2
-export const SURGEON_HEAL = 3
 export const FEAST_HEAL = 2
 export const PHOENIX_HEALTH = 5
-export const SECOND_WIND_HEAL = 5
-export const SKIRMISH_MOVE = 2
-export const CLEAVE_DAMAGE = 2
-export const BIG_BLAST_RADIUS = 2
-export const SLAYER_DAMAGE = 2
-export const ELUSIVE_REACH = 4
-export const HASTE_MOVE = 2
-export const BANE_REACH = 3
-export const BANE_DAMAGE = 1
-export const DRONE_DAMAGE = 2
-export const DRONE_REACH = 5
-export const LEAP_DAMAGE = 2
-export const HURL_TILES = 3
-export const HURL_DAMAGE = 2
-/** Tiles a Repulsor hit or a Gale crit drives its target back. */
-export const REPULSE_TILES = 2
-export const SLAM_HIT = 3
-export const SLAM_TILES = 2
-export const STUN_REACH = 3
-export const FORCE_FIELD_ARMOR = 4
-export const TITAN_HEALTH = 3
-export const PLATING_ARMOR = 3
-/** Own turns a cloak lasts unbroken, and the damage an attack out of cloak adds, and Shadow Strike on top. */
+/** Own turns a cloak lasts unbroken, and the damage an attack out of cloak adds. */
 export const CLOAK_TURNS = 2
 export const CLOAK_DAMAGE = 3
-export const SHADOW_DAMAGE = 2
 /** Tiles around an landing that are marked as it, and that its hero comes in on. */
 export const ENTRY_RADIUS = 2
-/** Tiles a wave keeps from the team. */
-export const POD_CLEARANCE = 7
 /** How near a soldier comes to an alien waiting its turn before its cluster engages. */
 export const ENGAGE_REACH = 5
 
 export type Side = 'human' | 'alien'
+
+/** What a soldier did in a battle: damage done to aliens, kills, health lost, damage its armor stopped, health it restored. */
+export interface Tally {
+  dealt: number
+  kills: number
+  taken: number
+  blocked: number
+  healed: number
+}
+
+export const emptyTally = (): Tally => ({ dealt: 0, kills: 0, taken: 0, blocked: 0, healed: 0 })
 
 export type Tile = { x: number; y: number }
 
@@ -173,21 +134,14 @@ export interface Stats {
 
 export const BASE_STATS: Stats = { hp: 10, armor: 0, damage: 3, range: 5, move: 4, crit: 0.2, strength: 2, jump: 2, span: 0 }
 
-/** A mech's stats, a frail decoy the aliens must shoot, and a light drone's, before its engineer's skills. */
-export const MECH_STATS: Stats = { ...BASE_STATS, hp: 3, crit: 0.1, range: 4, strength: 4, jump: 1 }
-export const DRONE_STATS: Stats = { ...BASE_STATS, hp: 2, damage: 2, crit: 0.1, range: 4, move: 6, strength: 1, jump: 4 }
 
-/** Something a unit does unprompted beyond moving and shooting; each is described where combat applies it. */
-export type Ability = 'runAndGun' | 'rocket' | 'eagleEye' | 'medic' | 'mech' | 'napalm' | 'cryo' | 'cloak'
 
 /** Something a piece of gear does; gear.ts says what each does. */
 export type GearEffect = 'bellows' | 'frostbite' | 'tracer' | 'incendiary' | 'piercing' | 'vampiric' | 'executioner' | 'chain' | 'ricochet' | 'arc' | 'volatile' | 'thunder' | 'snare' | 'booming' | 'tether' | 'shove' | 'cadence' | 'lofty' | 'topple' | 'kiln' | 'quench' | 'twinned' | 'braced' | 'sapping'
-/** Something a skill does; skills.ts says what each does. */
-export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'satchel' | 'domino' | 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'zenith' | 'fracture' | 'eternal' | 'frostHeart' | 'ledger' | 'gravity' | 'ironclad' | 'split' | 'ram' | 'overflow' | 'adrenal' | 'hairTrigger' | 'stagger' | 'lodestone' | 'shell' | 'lockOn'
-/** Anything a unit's gear, skills, relics or weapon doctrine do. Combat applies them. */
-export type Effect = GearEffect | SkillEffect | PerkEffect | RelicEffect | DoctrineEffect | Exam | 'block' | 'taunt' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning' | 'quenched' | 'thawed' | 'unlocked' | 'glassEdge'
+export type RelicEffect = 'satchel' | 'domino' | 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'fracture' | 'eternal' | 'frostHeart' | 'ledger' | 'gravity' | 'ironclad' | 'split' | 'ram' | 'overflow' | 'adrenal' | 'hairTrigger' | 'stagger' | 'lodestone' | 'shell' | 'lockOn'
+/** Anything a unit's gear, relics, cards, Guardian trait or alien power do, and the cancellations; combat applies them. */
+export type Effect = GearEffect | RelicEffect | Exam | 'blink' | 'pounce' | 'stun' | 'frozen' | 'quenched' | 'thawed' | 'unlocked' | 'glassEdge'
 
 /** How a unit chooses where to stand; each is described where combat applies it. */
 export type Stance = 'balanced' | 'rush' | 'anchor' | 'standoff'
@@ -209,14 +163,11 @@ export interface Alien {
 
 /** A soldier waiting to land. */
 export interface Reserve {
-  secondary?: SecondaryId
   weapon?: WeaponId
   soldier: number
   stats: Stats
   /** Health it lands with. */
   hp: number
-  ability: Ability | null
-  charges: number
   stance: Stance
   effects: Effect[]
 }
@@ -249,8 +200,7 @@ export interface Unit {
   revealed: boolean
   /** Alien turns left caught off guard, doing nothing. */
   surprised: number
-  ability: Ability | null
-  /** Uses of the ability left this battle. */
+  /** A hive node's spawns left this battle. */
   charges: number
   stance: Stance
   /** What the unit's weapon, skills and the hero's relics do. */
@@ -282,8 +232,6 @@ export interface Unit {
   exposed: number
   /** Its shots that struck this battle, toward its every-Nth triggers. */
   hits: number
-  /** Whether it attacks twice over this turn. */
-  twice?: boolean
   /** The kind of alien; null for humans. */
   kind: AlienKind | null
   boss: boolean
@@ -297,18 +245,12 @@ export interface Unit {
    * Whether a civilian to rescue: on the human side, never fights, and is not a soldier. It stays put.
    */
   civilian: boolean
-  /** For a mech, the soldier id of the engineer who deployed it, credited with what it does; null for any other unit. */
-  summoner: number | null
-  /** A hero's attack after its weapon's. */
-  secondary?: SecondaryId
-  /** What a hero fights with; aliens and machines have their one shot. */
+  /** What a hero fights with, for its look; aliens have their one shot. */
   weapon?: WeaponId
   /** Whether the unit loses its next action. */
   panicked: boolean
   /** Whether the unit has moved this turn. */
   moved: boolean
-  /** The reaches its weapon's guard has saved a hit from this turn: `any`, or for a guard of `each`, `near` and `far`. */
-  guarded?: ('any' | 'near' | 'far')[]
   /** Own turns for which its attacks do SUPPRESS_DAMAGE less. */
   suppressed: number
   /** Mark stacks: while any, every hit on it does TUNING.markDamage more damage. At most MARK_MAX. */
@@ -317,12 +259,6 @@ export interface Unit {
   cooldown: number
   /** Own turns its cloak has left: no enemy sees or targets it. Unset or 0 when not cloaked. */
   cloaked?: number
-  /** Own turns for which nothing can hurt it. */
-  invulnerable?: number
-  /** Own turns its blizzard has left. */
-  storm?: number
-  /** Grown to giant size, by a tier 4. */
-  giant?: boolean
   /** Health healed this battle by each capped source; see mend. */
   healed?: Partial<Record<Effect, number>>
 }
@@ -339,8 +275,6 @@ export interface Arena {
 export interface Battle {
   rng: number
   goal: Goal
-  /** Doctrines' changes to how this battle works. */
-  rules: Rule[]
   /** What about the ground or weather changes this battle, if anything. */
   twist: Twist | null
   /** The kind of place it is fought in. */
@@ -387,8 +321,6 @@ export interface Battle {
   city: string
   /** Once-per-battle effects the heroes have used. */
   used: Effect[]
-  /** Aliens the hero has killed this battle, toward the oath's every-Nth. */
-  kills: number
   /** What this battle tests; an ambush or a recovery has none. */
   challenge: ChallengeId | null
   /** The round reinforcements start coming, one clump a round, if the aliens posted are not all down; null when they come on a flood's beat. */
@@ -407,8 +339,6 @@ export interface Battle {
   acid: { x: number; y: number; turns: number }[]
   /** Tiles of fire, each with the alien turns it has left. */
   fire: { x: number; y: number; turns: number }[]
-  /** Tiles strewn with caltrops: dear to cross, and they hurt an alien that steps on them. */
-  caltrops: Tile[]
   /** Where civilians a harvester killed lie, to rise as husks on the next alien turn. */
   husks: Tile[]
   /** Rounds ended with a soldier inside the uplink's zone, on a hold. */
@@ -444,7 +374,6 @@ export interface Battle {
 }
 
 /** Primary attacks a soldier makes each turn; an alien makes one. */
-export const SOLDIER_ATTACKS = 2
 
 /** A soldier of the team: not a civilian, nor a mech, which fights for the hero but cannot hold the field alone. */
 export const isSoldier = (unit: Unit) => unit.side === 'human' && unit.soldier !== null

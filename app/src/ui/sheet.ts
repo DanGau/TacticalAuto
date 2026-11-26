@@ -1,46 +1,20 @@
-// Character sheets and stat blocks: a hero's or alien's numbers, weapon and powers, told one way everywhere.
+// Character sheets and stat blocks: a hero's or alien's numbers, weapon and class card, told one way everywhere.
 import { ALIENS, type AlienKind } from "../core/aliens";
 import type { Stats } from "../core/battle";
-import { classPower, CLASSES } from "../core/classes";
-import type { Flow, Quantity } from "../core/quantities";
-import { usage, type Power } from "../core/powers";
+import { CLASSES } from "../core/classes";
 import type { Run, Soldier } from "../core/run-state";
-import {
-  secondaryOf,
-  charges,
-  health,
-  level,
-  soldierStats,
-  weaponOf,
-} from "../core/hero";
-import { secondaryPower, SECONDARIES } from "../core/secondaries";
-import { powerOf, SKILLS } from "../core/skills";
-import { PERKS } from "../core/perks";
-import { treeMap } from "./tree";
+import { health, soldierStats } from "../core/hero";
+import { cardName, cardText, SIGNATURES } from "../core/cards";
 import { css } from "../view/shapes";
 import { COLOR } from "../view/palette";
-import {
-  badge,
-  describe,
-  gearStats,
-  gearText,
-  gearName,
-  resistChip,
-  sentence,
-  weaponDoes,
-} from "./html";
+import { badge, gearStats, gearText, gearName, resistChip, sentence, weaponDoes } from "./html";
 import { tip as markTip } from "./charts";
-import { bonusIcon, kitIcon } from "./ability-icons";
-import { perkIcon, skillIcon } from "./skill-icons";
+import { cardIcon } from "./card-icons";
 import { weaponIcon } from "./weapon-icons";
 
 /** A row of named numbers. */
 export const statBlock = (cells: [string, string | number][]) =>
   `<div class="statblock">${cells.map(([name, value]) => `<span><small>${name}</small><b>${value}</b></span>`).join("")}</div>`;
-
-/** A power in full: its icon, name, usage line and effect. */
-export const powerBlock = (icon: string, power: Power, flow?: Flow, held?: Quantity[]) =>
-  `<div class="power described"><b>${icon} ${power.name}</b> <small class="use">${usage(power)}</small><div>${describe(power.text, flow, held)}</div></div>`;
 
 /** A hero's numbers. */
 const heroStats = (run: Run, hero: Soldier) => {
@@ -61,35 +35,18 @@ const heroStats = (run: Run, hero: Soldier) => {
 const kit = ({ gear }: Soldier) =>
   gear ? `${gearName(gear)}: ${gearText(gear)}` : "";
 
-/** A hero's powers: its bonus attack, then those it learned, its class's ability with its uses worked out. */
-const powers = (run: Run, hero: Soldier): [string, Power & Flow][] => [
-  [bonusIcon(secondaryOf(hero)), secondaryPower(SECONDARIES[secondaryOf(hero)])],
-  ...hero.skills.map((id): [string, Power & Flow] => [
-    skillIcon(id),
-    id === powerOf(hero.cls!)
-      ? classPower(CLASSES[hero.cls!], charges(run, hero))
-      : SKILLS[id],
-  ]),
-];
+/** Its class, as a sheet heads it. */
+const heading = (hero: Soldier) => (hero.cls ? CLASSES[hero.cls].name : "");
 
-/** Class and level, as a sheet heads them. */
-const heading = (hero: Soldier) =>
-  `Level ${level(hero)}${hero.cls ? ` ${CLASSES[hero.cls].name}` : ""}`;
-
-/** A hero's picks made: skills learned past its class power, then perks. */
-function picksTaken(hero: Soldier): string {
-  const names = [...hero.skills.filter((id) => id !== powerOf(hero.cls!)).map((id) => `${skillIcon(id)} ${SKILLS[id].name}`), ...hero.perks.map((id) => `${perkIcon(id)} ${PERKS[id].name}`)];
-  return names.length > 0 ? `<div class="key"><small class="label">Picks taken</small><span>${names.join(" · ")}</span></div>` : "";
-}
+/** A hero's class card, the one its starter deck holds. */
+const signature = (hero: Soldier) => (hero.cls ? `<div class="key"><small class="label">Class card</small><b>${cardIcon(SIGNATURES[hero.cls])} ${cardName(SIGNATURES[hero.cls])}</b><span>${cardText(SIGNATURES[hero.cls])}</span></div>` : "");
 
 /**
- * A hero in full, as a dialog: their battle figure on a turning pedestal before their class badge; then name, level,
- * class and home, weapon, ability, picks taken, numbers and bonus attack; and `actions`, its buttons.
+ * A hero in full, as a dialog: their battle figure on a turning pedestal before their class badge; then name, class
+ * and home, weapon, class card and numbers; and `actions`, its buttons.
  */
 export function heroDossier(run: Run, hero: Soldier, actions: string): string {
   const cls = CLASSES[hero.cls!];
-  const ability = classPower(cls, charges(run, hero));
-  const bonus = secondaryPower(SECONDARIES[secondaryOf(hero)]);
   const weapon = hero.gear
     ? `<b class="tip" ${markTip([hero.gear.name, ...gearStats(hero.gear)])}>${weaponIcon(hero.gear.weapon)} ${hero.gear.name}</b><span>${weaponDoes(hero.gear)}</span>${gearText(hero.gear) ? `<span>${gearText(hero.gear)}</span>` : ""}`
     : "<b>Empty hands</b>";
@@ -104,30 +61,18 @@ export function heroDossier(run: Run, hero: Soldier, actions: string): string {
       <h2 id="dossier-name">${hero.name}</h2>
       <small class="home">🌍 ${hero.home.name}, ${hero.home.country}</small></div>
       <div class="key"><small class="label">Weapon</small>${weapon}</div>
-      <div class="key"><small class="label">Ability · ${usage(ability)}</small><b>${kitIcon(hero.cls!)} ${ability.name}</b><span>${sentence(ability.text)}</span></div>
-      ${picksTaken(hero)}
+      ${signature(hero)}
       ${heroStats(run, hero)}
-      <div class="key"><small class="label">Bonus attack · ${usage(bonus)}</small><b>${bonusIcon(secondaryOf(hero))} ${bonus.name}</b><span>${sentence(bonus.text)}</span></div>
       <div class="actions">${actions}</div>
     </div>
   </div>`;
 }
 
-/** A hero's powers in full. */
-export const powerList = (run: Run, hero: Soldier, held?: Quantity[]) =>
-  `<div class="powers">${powers(run, hero)
-    .map(([icon, p]) => powerBlock(icon, p, p, held))
-    .join("")}</div>`;
-
-/** A hero's whole sheet: numbers, weapon and kit, how it fights, and its powers in full. */
+/** A hero's whole sheet: numbers, weapon and its class card. */
 export function heroSheet(run: Run, hero: Soldier): string {
-  const stance =
-    hero.cls && !weaponOf(hero)?.stance
-      ? `<small>${CLASSES[hero.cls].stanceText}.</small>`
-      : "";
   return `<div class="charsheet"><small>${heading(hero)}</small>${heroStats(run, hero)}
-    <div class="weapon"><b>${hero.gear ? `${weaponIcon(hero.gear.weapon)} ${hero.gear.name}` : "Empty hands"}</b><small>${kit(hero)}</small></div>${stance}
-    ${powerList(run, hero)}${hero.cls ? treeMap(hero) : ""}</div>`;
+    <div class="weapon"><b>${hero.gear ? `${weaponIcon(hero.gear.weapon)} ${hero.gear.name}` : "Empty hands"}</b><small>${kit(hero)}</small></div>
+    ${signature(hero)}</div>`;
 }
 
 /** An alien's stat block: name, numbers, what it does, what it resists. */

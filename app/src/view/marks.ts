@@ -9,7 +9,7 @@ import { DECAL_LIFT, spot } from './camera'
 import { fence } from './fences'
 import { COLOR, mixTint } from './palette'
 import { empty, Shapes, tinted } from './shapes'
-import { ACROSS, TILE_W, tall } from './space'
+import { ACROSS, TILE_W } from './space'
 import type { Label, Stage } from './stage'
 
 /** Words over a tile, `rise` of their height above it. */
@@ -138,16 +138,11 @@ export function drawFog(s: Stage, battle: Battle, snap = false): void {
   for (const sprite of s.sprites.values()) (sprite.body.material as SpriteMaterial).color.setHex(tint(Math.round(sprite.tile.y) * GRID + Math.round(sprite.tile.x)))
 }
 
-/** Tints every tile of acid or fire, marks every tile of caltrops, and rings each unit rooted or charged. */
+/** Tints every tile of acid or fire, and rings each unit rooted or charged. */
 export function drawAcid(s: Stage, battle: Battle): void {
   const shapes = new Shapes()
   for (const pool of battle.acid) diamond(shapes, pool.x, pool.y, COLOR.acid, 0.45)
   for (const pool of battle.fire) diamond(shapes, pool.x, pool.y, COLOR.fire, 0.5)
-  // Caltrops: a scatter of spikes across the tile.
-  for (const tile of battle.caltrops) {
-    const at = spot(tile.x, tile.y)
-    for (const [dx, dz] of [[-0.25, 0.1], [0, -0.2], [0.25, 0.1], [-0.12, 0.25], [0.12, 0.25]]) shapes.spike(at.x + dx, at.z + dz, at.y, 0.05, { x: at.x + dx, y: at.y + tall(5), z: at.z + dz }, COLOR.spike)
-  }
   for (const unit of battle.units.filter((u) => u.hp > 0 && u.revealed)) {
     if (unit.rooted > 0) ring(shapes, unit.x, unit.y, COLOR.rooted, 3, 0.9)
     if (unit.booming > 0) ring(shapes, unit.x, unit.y, COLOR.booming, 2, 0.9)

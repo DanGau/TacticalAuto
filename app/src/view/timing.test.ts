@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { PACE, throwMs, walkMs, tilePace } from '../core/pace'
+import { PACE, walkMs, tilePace } from '../core/pace'
 import { timeline, type Moment } from './timing'
 
 /** A walk sampled each frame of 60 fps: how long each phase of each jump lasts, in ms. */
@@ -45,10 +45,3 @@ test('a walk with jumps keeps to its path and ends where it was going', () => {
   expect(when(1)).toMatchObject({ i: 8, f: 1 })
 })
 
-test('a throw lifts and holds before it lets fly, flies longer the farther it goes, and lands with an impact', () => {
-  expect(PACE.lift + PACE.hold).toBeGreaterThanOrEqual(350)
-  expect(PACE.impact).toBeGreaterThanOrEqual(150)
-  for (let tiles = 1; tiles <= 6; tiles++) expect((PACE.flight + PACE.flightTile * tiles) / tiles).toBeGreaterThanOrEqual(PACE.flightTile)
-  expect(throwMs(6)).toBeGreaterThan(throwMs(1))
-  expect(throwMs(6)).toBeLessThanOrEqual(1500)
-})

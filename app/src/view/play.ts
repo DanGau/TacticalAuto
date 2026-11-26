@@ -3,30 +3,27 @@ import type { Object3D } from 'three'
 import { type Battle, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { instant, PACE, strolls, tilePace, walkMs } from '../core/pace'
-import { attackOf, finisher, opener, secondaryAttack } from './attacks'
+import { attackOf } from './attacks'
 import { drawTerrain } from './board'
 import { along, leaping, lerp, spot, strideOf } from './camera'
 import { dust, ground as grounded, land, pose } from './leaps'
 import { momentum, timeline, type Moment } from './timing'
 import { CLIFF } from '../core/grid'
-import { callout, chest, dashTo, daze, drawing, effectCallout, fireRocket, float, playShot, shockwave, sourceCallout } from './effects'
+import { callout, chest, daze, drawing, effectCallout, fireRocket, float, playShot, shockwave, sourceCallout } from './effects'
 import { drawAcid, drawFog, drawMarks } from './marks'
 import { COLOR } from './palette'
 import { badges, BURN, CHILL } from './badges'
 import { cancelOf, QUANTITIES } from '../core/quantities'
 import { cloakLook, create, fade, letter, place, remove, squash, vitals } from './sprites'
 import { CAMERA_MS, type Sprite, type Stage } from './stage'
-import { playUltimate } from './ultimates'
-import { playFall, playThrow } from './falls'
+import { playFall } from './falls'
 
 /** Triggers that ring out when they fire: how far, in what colour. */
 const TRIGGERS = {
   frozen: { tiles: 0, color: 0x7fd6ff },
   fracture: { tiles: 1, color: 0x7fd6ff },
   catalyst: { tiles: 0, color: COLOR.psi },
-  faultLine: { tiles: 1, color: COLOR.crit },
   chrono: { tiles: 0, color: COLOR.hit },
-  reckoning: { tiles: 0, color: COLOR.crit },
   impetus: { tiles: 0, color: COLOR.crit },
   embers: { tiles: 0, color: COLOR.crit },
   projectile: { tiles: 1, color: COLOR.crit },
@@ -109,16 +106,10 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
   }
   for (; i < events.length; i++) {
     const e = events[i]
-    if (e.type === 'move' && e.with === 'dash') {
-      const sprite = sprites.get(e.id)
-      if (!sprite) continue
-      float(s, sourceCallout(s, e.src, sprite, '', 15))
-      await drawing(s, (fx) => dashTo(s, fx, sprite, e.path))
-      drawFog(s, battle)
-    } else if (e.type === 'move') {
+    if (e.type === 'move') {
       // Moves in a row, and the instant events among them, play as one: everyone walks together, then the words show.
       const group: GameEvent[] = []
-      for (; events[i] && ((events[i].type === 'move' && (events[i] as { with?: unknown }).with !== 'dash') || instant(events[i])); i++) group.push(events[i])
+      for (; events[i] && (events[i].type === 'move' || instant(events[i])); i++) group.push(events[i])
       i--
       // Each walks the whole way it went, from where it stood.
       const paths = new Map<number, Tile[]>()
@@ -127,7 +118,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       const pace = (id: number) => tilePace(!!sprites.get(id)?.ally)
       const ms = walkMs([...paths].map(([id, path]) => ({ path, pace: pace(id), leaps: group.reduce((sum, m) => sum + (m.type === 'move' && m.id === id ? (m.leaps ?? 0) : 0), 0) })))
       const walks = [...paths].map(([id, path]) => (sprites.has(id) ? walk(s, sprites.get(id)!, path, ms, leapers.has(id) ? (battle.units.find((u) => u.id === id)?.stats.strength ?? 2) : undefined) : glide(s, glows.get(id)!, path, ms)))
-      for (const m of group) if (m.type === 'move' && m.with && m.with !== 'dash' && sprites.has(m.id)) float(s, sourceCallout(s, m.src, sprites.get(m.id)!))
+      for (const m of group) if (m.type === 'move' && m.with && sprites.has(m.id)) float(s, sourceCallout(s, m.src, sprites.get(m.id)!))
       // The camera takes in where each jump leaves from as well as where it lands, rather than chasing the jumper.
       const takeoffs = [...leapers].flatMap((id) => (sprites.has(id) ? [sprites.get(id)!.tile] : []))
       await Promise.all([s.follow([...team(battle), ...takeoffs], Math.max(ms, CAMERA_MS)), ...walks])
@@ -139,7 +130,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       if (e.type === 'wave' && !e.units.some((at) => battle.units.some((u) => u.id === at.id && u.revealed))) continue
       const appeared = e.units.flatMap((at) => {
         const unit = battle.units.find((u) => u.id === at.id)
-        return unit && !sprites.has(unit.id) ? [create(s, { ...unit, x: at.x, y: at.y }, 0, letter(unit))] : []
+        return unit && !sprites.has(unit.id) ? [create(s, { ...unit, x: at.x, y: at.y }, letter(unit))] : []
       })
       await s.tween(PACE.reveal, (t) => appeared.forEach((sprite) => fade(sprite, t)))
       if (e.type === 'wave' && appeared.length > 0) float(s, callout(s, 'REINFORCEMENTS', COLOR.crit, appeared[0], 18))
@@ -151,11 +142,8 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       if (!from || !to || !shooter) continue
       const now = shown(e.target)
       const after: typeof now = e.after ? [e.after.hp, e.after.armor, e.after.temp, now[3]] : now
-      const weapon = attackOf(shooter, e.form)
-      const gun = e.secondary ? finisher(secondaryAttack(e.secondary)) : e.opens && !e.lasts ? opener(weapon) : weapon
       const ground = { x: to.at.x, y: to.at.y }
-      await drawing(s, (fx) => playShot(s, fx, from, to, e, after, gun))
-      if (e.ring) void drawing(s, (fx) => shockwave(s, fx, ground, e.ring!))
+      await drawing(s, (fx) => playShot(s, fx, from, to, e, after, attackOf(shooter)))
       if (e.with.includes('cadence')) void drawing(s, (fx) => shockwave(s, fx, ground, 0, COLOR.crit))
       // Crumbling ruins have already broken in the battle; show it as the hit lands.
       if (battle.twist === 'crumbling' && e.damage > 0) drawTerrain(s, battle)
@@ -165,14 +153,6 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       await drawing(s, (fx) => fireRocket(s, fx, battle, from, e))
     } else if (e.type === 'fall') {
       await playFall(s, battle, e)
-    } else if (e.type === 'throw') {
-      // An alien thrown over the edge and lost flies on in the one arc.
-      const next = events[i + 1]
-      const off = next?.type === 'fall' && next.id === e.thrown && next.fatal ? next : undefined
-      if (off) i++
-      await playThrow(s, battle, e, off)
-    } else if (e.type === 'ultimate') {
-      await playUltimate(s, battle, e)
     } else if (e.type === 'spit' || e.type === 'panic') {
       const from = sprites.get(e.id)
       const to = sprites.get(e.target)
@@ -206,7 +186,7 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
     } else if (e.type === 'spawn') {
       const unit = battle.units.find((u) => u.id === e.unit.id)
       if (!unit || !unit.revealed) continue
-      const born = create(s, { ...unit, x: e.unit.x, y: e.unit.y }, 0, letter(unit))
+      const born = create(s, { ...unit, x: e.unit.x, y: e.unit.y }, letter(unit))
       await s.tween(PACE.reveal, (t) => fade(born, t))
     } else if (e.type === 'stacks') {
       const on = sprites.get(e.id)
@@ -221,14 +201,8 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
       // A cancellation lets the stacks it meets be seen before they go out.
       if (cancelOf(e.effect)) await s.tween(PACE.cancel, () => {})
       on.drawHp(...shown(e.id))
-      // A demolishing hit has already wrecked what stood in the battle; show it as the hit lands.
-      if (e.effect === 'demolish') drawTerrain(s, battle)
       if (e.effect === 'stun') void drawing(s, (fx) => daze(s, fx, on))
-      // A trigger that fires rings out from the unit it fires on; Fault Line drops the ground first.
-      if (e.effect === 'faultLine') {
-        drawTerrain(s, battle)
-        for (const u of battle.units) if (sprites.has(u.id)) place(s, sprites.get(u.id)!, u)
-      }
+      // A trigger that fires rings out from the unit it fires on.
       const ring = TRIGGERS[e.effect as keyof typeof TRIGGERS]
       if (ring) void drawing(s, (fx) => shockwave(s, fx, { x: on.at.x, y: on.at.y }, ring.tiles, ring.color))
       float(s, effectCallout(s, e, on))

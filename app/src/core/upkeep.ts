@@ -2,23 +2,19 @@
 import { REGROWTH } from './exams'
 import { alienSrc, fx } from './sources'
 import { REGEN_HEAL, alienStats, ALIENS, NODE_EVERY } from './aliens'
-import { replenish } from './abilities'
-import { type Battle, ADRENAL_FROM, ADRENAL_MAX, AURA_REACH, BURN_STACKS, isSoldier, LODESTONE_REACH, SPAWN_EVERY, type Unit } from './battle'
+import { type Battle, ADRENAL_FROM, ADRENAL_MAX, isSoldier, LODESTONE_REACH, SPAWN_EVERY, type Unit } from './battle'
 import { pull } from './knockback'
-import { armorCap, chrono, empower, kindle, lastingArmor } from './stacks'
-import { CONFLAGRATION_DAMAGE, HELLFIRE_REACH } from './keystones'
-import { stormBlows } from './ultimates'
+import { armorCap, empower } from './stacks'
 import { placeAlien } from './setup'
 import { alienUnit } from './spawn'
 import { openNear } from './grid'
 import { freeTilesNear } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { engageNearest, walkersFighting, has, nearest, fireproof, foeHas, onTile, FIRE_TURNS, uplinkReach, silenced, centreOf } from './fighters'
+import { engageNearest, walkersFighting, has, nearest, foeHas, onTile, FIRE_TURNS, uplinkReach, centreOf } from './fighters'
 import { WAVE_EVERY } from './goals'
 import { randomInt } from './rng'
 import { mend, wound } from './wound'
-import { talentTurn } from './talents'
 
 /**
  * What happens as a side's turn begins: burning hurts and mending armor heals. On the aliens' turn more aliens may
@@ -28,10 +24,7 @@ export function upkeep(battle: Battle): GameEvent[] {
   const events: GameEvent[] = []
   // Chill wears off a stack once its side's turn is over.
   for (const unit of battle.units.filter((u) => u.side !== battle.turn && u.chill > 0 && !u.frozen)) unit.chill--
-  if (battle.turn === 'human') {
-    chrono(battle, events)
-    lodestone(battle, events)
-  }
+  if (battle.turn === 'human') lodestone(battle, events)
   for (const unit of battle.units.filter((u) => u.side === battle.turn)) {
     // An explosion earlier in this upkeep may have killed it.
     if (unit.hp <= 0) continue
@@ -41,27 +34,9 @@ export function upkeep(battle: Battle): GameEvent[] {
     unit.moved = false
     if (unit.suppressed > 0) unit.suppressed--
     if (unit.exposed > 0) unit.exposed--
-    lastingArmor(unit)
     if (unit.rooted > 0) unit.rooted--
     if (unit.booming > 0) unit.booming--
     if (unit.cloaked && --unit.cloaked === 0) events.push({ type: 'cloak', id: unit.id, on: false })
-    if (unit.invulnerable) unit.invulnerable--
-    if (unit.storm) {
-      unit.storm--
-      stormBlows(battle, unit, events)
-    }
-    if (has(unit, 'vitality')) {
-      for (const mate of battle.units.filter((u) => u.side === unit.side && u.hp < u.stats.hp && distance(u, unit) <= AURA_REACH)) {
-        mate.hp++
-        events.push(fx(mate.id, 'vitality', 1))
-      }
-    }
-    events.push(...replenish(battle, unit))
-    if (has(unit, 'glacialArmor') && unit.armor < unit.stats.armor) {
-      unit.armor = unit.stats.armor
-      events.push(fx(unit.id, 'glacialArmor', 0))
-    }
-    talentTurn(battle, unit, events)
     if (has(unit, 'adrenal') && battle.round >= ADRENAL_FROM && battle.round < ADRENAL_FROM + ADRENAL_MAX) empower(unit, 1, 'adrenal', events)
     if (has(unit, 'rampage') && !shifted) empower(unit, 1, 'rampage', events)
     if (has(unit, 'regrowth') && unit.burn === 0 && unit.chill === 0) mend(unit, Math.ceil(unit.stats.hp * REGROWTH.turn), 'regrowth', events, Math.round(unit.stats.hp * REGROWTH.most))
@@ -74,24 +49,12 @@ export function upkeep(battle: Battle): GameEvent[] {
       unit.hp += amount
       events.push(fx(unit.id, 'regen', amount))
     }
-    if (battle.units.some((u) => u.side !== unit.side && has(u, 'hellfire') && distance(u, unit) <= HELLFIRE_REACH) && !fireproof(battle, unit)) {
-      kindle(battle, unit, 1, events)
-      events.push(fx(unit.id, 'hellfire', 0))
-    }
     if (unit.burn > 0) {
-      const raging = foeHas(battle, unit, 'conflagration')
-      if (raging) {
-        for (const other of battle.units.filter((u) => u.side === unit.side && u !== unit && distance(u, unit) <= 1 && u.burn === 0)) kindle(battle, other, BURN_STACKS, events)
-      }
       if (foeHas(battle, unit, 'pyre') && !onTile(battle.fire, unit)) battle.fire.push({ x: unit.x, y: unit.y, turns: FIRE_TURNS })
-      const damage = unit.burn + (raging ? CONFLAGRATION_DAMAGE : 0)
+      const damage = unit.burn
       if (!foeHas(battle, unit, 'eternal')) unit.burn--
       events.push(fx(unit.id, 'incendiary', -damage))
       wound(battle, unit, damage, events)
-    }
-    if (unit.hp > 0 && unit.hp < unit.stats.hp && has(unit, 'regen')) {
-      unit.hp++
-      events.push(fx(unit.id, 'regen', 1))
     }
   }
   if (battle.turn !== 'alien') return events
@@ -129,7 +92,7 @@ export function upkeep(battle: Battle): GameEvent[] {
       events.push(...hatch(battle, unit))
       continue
     }
-    if (!unit.spawns || unit.cooldown > 0 || !fighting || silenced(battle, unit)) continue
+    if (!unit.spawns || unit.cooldown > 0 || !fighting) continue
     const [tile] = freeTilesNear(battle, unit, 1)
     if (!tile || (unit.kind === 'hiveNode' && unit.charges <= 0)) continue
     if (unit.kind === 'hiveNode') unit.charges--

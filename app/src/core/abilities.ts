@@ -1,73 +1,11 @@
-// Actions in place of a shot: alien powers, and soldier skills and gear.
-import { alienSrc, fx, srcOf } from './sources'
-import { type Battle, type Effect, type Unit, BLAST_RADIUS, CLOAK_TURNS, FORCE_FIELD_ARMOR, SLAM_HIT, SLAM_TILES, STUN_REACH, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN, SURGEON_HEAL, MEDIC_REACH, MEDIC_HEAL, SECOND_WIND_HEAL, DRONE_REACH, DRONE_DAMAGE, SKIRMISH_MOVE, TITAN_HEALTH, PLATING_ARMOR, MECH_STATS, DRONE_STATS, type Stats, type SkillEffect } from './battle'
-import { mechUnit } from './spawn'
-import { freeTilesNear } from './grid'
-import { onGrid } from './grid'
-import { NEIGHBORS } from './grid'
+// Actions in place of a shot: alien powers; and cloaking.
+import { alienSrc } from './sources'
+import { type Battle, type Unit, CLOAK_TURNS, SPIT_DAMAGE, ACID_TURNS, PSI_RANGE, PSI_COOLDOWN } from './battle'
 import { distance } from './grid'
-import type { GameEvent, ShotEvent } from './combat-event'
-import { has, foes, powering, shootable, nearest, immune, silenced, spend, enemiesOf, onTile } from './fighters'
-import { walk, bestPath, paths } from './pathing'
+import type { GameEvent } from './combat-event'
+import { nearest } from './fighters'
 import { canShoot, lineOfSight } from './sight'
-import { FONT_REACH, SWARM_BUILDS, SWARM_LIMIT, WAR_MACHINE } from './keystones'
-import { land, wound, SLAM_DAMAGE } from './wound'
-import { knockback } from './knockback'
-
-/** Ground Slam: once per battle, with two or more foes beside it, in place of an attack, it hurts each and hurls it back. */
-export function slam(battle: Battle, unit: Unit): GameEvent[] {
-  if (!has(unit, 'slam') || unit.spent.includes('slam')) return []
-  const beside = foes(battle, unit).filter((u) => distance(u, unit) <= 1)
-  if (beside.length < 2) return []
-  unit.spent.push('slam')
-  const events: GameEvent[] = [{ type: 'rocket', src: srcOf('slam'), id: unit.id, x: unit.x, y: unit.y, hits: beside.map((u) => ({ target: u.id, damage: SLAM_HIT })) }]
-  for (const foe of beside) {
-    wound(battle, foe, SLAM_HIT, events)
-    if (foe.hp > 0) knockback(battle, unit, foe, events, 1, SLAM_TILES, SLAM_DAMAGE, 'slam')
-  }
-  return events
-}
-
-/** Stuns each of `caught`, a boss aside: it loses its next action. */
-export function stun(caught: Unit[], effect: Effect): GameEvent[] {
-  return caught
-    .filter((u) => !u.boss)
-    .map((u) => {
-      u.panicked = true
-      return fx(u.id, effect, 0)
-    })
-}
-
-/** EMP Pulse: once per battle, with two or more foes within STUN_REACH of the soldier or its machines, each is stunned. */
-export function pulse(battle: Battle, unit: Unit): GameEvent[] {
-  const effect = 'emp'
-  if (!has(unit, effect) || unit.spent.includes(effect)) return []
-  const centres = [unit, ...battle.units.filter((u) => u.summoner !== null && u.summoner === unit.soldier)]
-  const caught = foes(battle, unit).filter((u) => !u.boss && centres.some((c) => distance(c, u) <= STUN_REACH))
-  if (caught.length < 2) return []
-  unit.spent.push(effect)
-  return stun(caught, effect)
-}
-
-/** Flashbang: once per battle, at the foe it can attack with the most foes beside it, two or more, stunning each. */
-export function flashbang(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
-  if (!has(unit, 'flashbang') || unit.spent.includes('flashbang')) return []
-  const all = foes(battle, unit).filter((u) => !u.boss)
-  const knots = all.filter((u) => shootable(battle, powering(unit), unit, u, seen)).map((centre) => all.filter((u) => distance(u, centre) <= BLAST_RADIUS))
-  const caught = knots.reduce<Unit[]>((best, knot) => (knot.length > best.length ? knot : best), [])
-  if (caught.length < 2) return []
-  unit.spent.push('flashbang')
-  return stun(caught, 'flashbang')
-}
-
-/** Sanctuary: once per battle, at half health or less, the hero gains armor. */
-export function forceField(unit: Unit): GameEvent[] {
-  if (!has(unit, 'forceField') || unit.spent.includes('forceField')) return []
-  if (unit.hp > unit.stats.hp / 2) return []
-  unit.spent.push('forceField')
-  unit.armor += FORCE_FIELD_ARMOR
-  return [fx(unit.id, 'forceField', 0)]
-}
+import { wound } from './wound'
 
 /** Spit: the nearest unit the spitter can shoot is hit, and acid is left on its tile. */
 export function spit(battle: Battle, unit: Unit): GameEvent[] {
@@ -85,7 +23,7 @@ export function spit(battle: Battle, unit: Unit): GameEvent[] {
 /** Panic: when ready, the psion panics the soldier in reach and sight who hits hardest, not already panicked. */
 export function panic(battle: Battle, unit: Unit): GameEvent[] {
   if (unit.cooldown > 0) return []
-  const targets = battle.units.filter((u) => u.side !== unit.side && !u.cloaked && !u.panicked && !immune(battle, u, 'panic') && distance(unit, u) <= PSI_RANGE && lineOfSight(battle, unit, u))
+  const targets = battle.units.filter((u) => u.side !== unit.side && !u.cloaked && !u.panicked && distance(unit, u) <= PSI_RANGE && lineOfSight(battle, unit, u))
   const target = targets.reduce<Unit | undefined>((best, u) => (!best || u.stats.damage > best.stats.damage ? u : best), undefined)
   if (!target) return []
   target.panicked = true
@@ -95,7 +33,6 @@ export function panic(battle: Battle, unit: Unit): GameEvent[] {
 
 /** What an alien does in place of a shot, by its kind; empty if it shoots, or has nothing to do. */
 export function alienAction(battle: Battle, unit: Unit): GameEvent[] | null {
-  if (unit.kind && unit.kind !== 'trooper' && silenced(battle, unit)) return unit.kind === 'burster' ? [] : null
   if (unit.kind === 'incubator') return []
   if (unit.kind === 'spitter') return spit(battle, unit)
   if (unit.kind === 'psion') {
@@ -109,61 +46,9 @@ export function alienAction(battle: Battle, unit: Unit): GameEvent[] | null {
   return events
 }
 
-/** Medic: heals the most wounded soldier at half health or less within reach, itself among them. It does not cost the medic's shot. */
-export function heal(battle: Battle, unit: Unit): GameEvent[] {
-  const boost = has(unit, 'surgeon') ? SURGEON_HEAL : 0
-  if (has(unit, 'fontOfLife')) {
-    const hurt = battle.units.filter((u) => u.side === unit.side && u.hp > 0 && u.hp < u.stats.hp && distance(unit, u) <= FONT_REACH)
-    if (hurt.length === 0) return []
-    return hurt.map((u) => {
-      const amount = Math.min(MEDIC_HEAL + boost, u.stats.hp - u.hp)
-      u.hp += amount
-      return { type: 'heal', src: srcOf('medic'), id: unit.id, target: u.id, amount }
-    })
-  }
-  const wounded =
-    battle.units.filter((u) => u.side === unit.side && u.hp > 0 && u.hp <= u.stats.hp / 2 && distance(unit, u) <= MEDIC_REACH).reduce<Unit | undefined>((worst, u) => (!worst || u.hp < worst.hp ? u : worst), undefined)
-  if (!wounded) return []
-  const amount = Math.min(MEDIC_HEAL + boost, wounded.stats.hp - wounded.hp)
-  wounded.hp += amount
-  return [{ type: 'heal', src: srcOf('medic'), id: unit.id, target: wounded.id, amount }]
-}
-
-/** Second wind: once per battle, a soldier at half health or less heals. */
-export function secondWind(unit: Unit): GameEvent[] {
-  if (unit.hp > unit.stats.hp / 2 || !spend(unit, 'secondWind')) return []
-  const amount = Math.min(SECOND_WIND_HEAL, unit.stats.hp - unit.hp)
-  unit.hp += amount
-  return [fx(unit.id, 'secondWind', amount)]
-}
-
-/** A combat drone hits the nearest revealed alien its soldier has in sight within reach. */
-export function drone(battle: Battle, unit: Unit): GameEvent[] {
-  if (!has(unit, 'drone')) return []
-  const target = nearest(
-    battle.units.filter((u) => u.side !== unit.side && u.revealed && distance(unit, u) <= DRONE_REACH && lineOfSight(battle, unit, u)),
-    unit,
-  )
-  if (!target) return []
-  const shot: ShotEvent = { type: 'shot', src: srcOf('drone'), id: unit.id, target: target.id, crit: false, damage: DRONE_DAMAGE, with: ['drone'] }
-  const events: GameEvent[] = [shot]
-  land(battle, shot, target, events)
-  return events
-}
-
-/** A skirmisher steps to the tile in reach farthest from the enemy. */
-export function skirmish(battle: Battle, unit: Unit): GameEvent[] {
-  // Getting out or holding the uplink, a step back would undo the walk there.
-  if (!has(unit, 'skirmish') || (unit.side === 'human' && battle.uplink)) return []
-  const enemies = enemiesOf(battle, unit)
-  const events: GameEvent[] = []
-  walk(battle, unit, bestPath(paths(battle, unit, SKIRMISH_MOVE), unit, (end) => [-Math.min(...enemies.map((e) => distance(e, end)))]), events)
-  return events.map((e) => (e.type === 'move' ? { ...e, with: 'skirmish' as const } : e))
-}
-
 /** Each feeder in sight grows on a trick the hero's unit used in `events`: its ability or a once-per-battle effect. */
 export function feed(battle: Battle, unit: Unit, events: GameEvent[]): GameEvent[] {
-  const tricked = events.some((e) => (e.type === 'rocket' || e.type === 'ultimate' || e.type === 'heal' || e.type === 'spawn' || (e.type === 'effect' && e.amount >= 0)) && e.id === unit.id)
+  const tricked = events.some((e) => (e.type === 'rocket' || e.type === 'heal' || e.type === 'spawn' || (e.type === 'effect' && e.amount >= 0)) && e.id === unit.id)
   if (!tricked) return []
   return battle.units
     .filter((u) => u.kind === 'feeder' && u.revealed)
@@ -173,81 +58,8 @@ export function feed(battle: Battle, unit: Unit, events: GameEvent[]): GameEvent
     })
 }
 
-/**
- * Deploy Mech: once aliens are in sight, an engineer with a deploy left builds a mech beside it, a frail decoy every
- * alien that can shoot must shoot, or drones for a swarm, shaped by its skills. It costs no shot.
- */
-export function deploy(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
-  if (unit.ability !== 'mech' || unit.charges <= 0 || seen.size === 0) return []
-  const events = build(battle, unit, has(unit, 'swarm') ? (has(unit, 'hive') ? 3 : 2) : 1)
-  if (events.length > 0) unit.charges--
-  return events
-}
-
-/** Endless Swarm: with aliens in sight, a new drone as the engineer's turn begins, while it has room for one. */
-export function replenish(battle: Battle, unit: Unit): GameEvent[] {
-  if (!has(unit, 'endlessSwarm') || !has(unit, 'swarm') || foes(battle, unit).length === 0) return []
-  if (unit.spent.filter((e) => e === 'endlessSwarm').length >= SWARM_BUILDS || battle.units.filter((u) => u.summoner === unit.soldier).length >= SWARM_LIMIT) return []
-  unit.spent.push('endlessSwarm')
-  return build(battle, unit, 1)
-}
-
-/** Builds `count` of an engineer's machines beside it, as its skills shape them. */
-function build(battle: Battle, unit: Unit, count: number): GameEvent[] {
-  const swarm = has(unit, 'swarm')
-  const stats: Stats = swarm ? { ...DRONE_STATS } : { ...MECH_STATS }
-  if (has(unit, 'titan')) Object.assign(stats, { hp: stats.hp + TITAN_HEALTH, damage: stats.damage + 1 })
-  if (has(unit, 'plating')) stats.armor += PLATING_ARMOR
-  if (has(unit, 'servos')) Object.assign(stats, { move: stats.move + 2, damage: stats.damage + 1 })
-  if (!swarm && has(unit, 'warMachine')) Object.assign(stats, { hp: stats.hp + WAR_MACHINE.hp, damage: stats.damage + WAR_MACHINE.damage, range: stats.range + WAR_MACHINE.range })
-  const granted: [SkillEffect, Effect][] = [['spotter', 'mark'], ['linked', 'inspire'], ['detonate', 'detonate']]
-  const effects = [...(swarm ? [] : ['taunt' as const]), ...granted.flatMap(([skill, effect]) => (has(unit, skill) ? [effect] : []))]
-  return freeTilesNear(battle, unit, count).map((tile) => {
-    const mech = mechUnit(battle, unit, { ...stats }, effects, tile)
-    battle.units.push(mech)
-    return { type: 'spawn', src: srcOf('mech'), id: unit.id, unit: { id: mech.id, x: mech.x, y: mech.y } }
-  })
-}
-
-/** Caltrops: once per battle, an alien closing in finds the tiles between it and the soldier strewn with them. */
-export function strew(battle: Battle, unit: Unit): GameEvent[] {
-  if (!has(unit, 'caltrops') || unit.spent.includes('caltrops')) return []
-  const rusher = nearest(
-    battle.units.filter((u) => u.side !== unit.side && u.revealed && u.engaged && distance(u, unit) <= CALTROP_RANGE && distance(u, unit) > CALTROP_LATE),
-    unit,
-  )
-  if (!rusher) return []
-  unit.spent.push('caltrops')
-  const centre = { x: unit.x + 2 * Math.sign(rusher.x - unit.x), y: unit.y + 2 * Math.sign(rusher.y - unit.y) }
-  for (const [dx, dy] of [[0, 0], ...NEIGHBORS]) {
-    const tile = { x: centre.x + dx, y: centre.y + dy }
-    if (!onGrid(tile.x, tile.y)) continue
-    if (!onTile(battle.caltrops, tile)) battle.caltrops.push(tile)
-  }
-  return [fx(unit.id, 'caltrops', 0)]
-}
-
-/** How near an alien closing in must come before caltrops are strewn in its path, and how near is too late. */
-export const CALTROP_RANGE = 6
-
-export const CALTROP_LATE = 2
-
 /** Cloaks a unit for CLOAK_TURNS. */
 export function cloakOn(unit: Unit): GameEvent {
   unit.cloaked = CLOAK_TURNS
   return { type: 'cloak', id: unit.id, on: true }
-}
-
-/**
- * Cloak: in place of its attacks, a phantom with a cloak left and none on cloaks once aliens can shoot it and it is
- * wounded, two can, or it has no shot of its own.
- */
-export function cloak(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
-  if (unit.ability !== 'cloak' || unit.charges <= 0 || unit.cloaked) return []
-  const aliens = foes(battle, unit)
-  const threats = aliens.filter((u) => shootable(battle, u, u, unit, seen)).length
-  const shot = aliens.some((u) => shootable(battle, unit, unit, u, seen))
-  if (threats === 0 || (shot && threats < 2 && unit.hp > unit.stats.hp / 2)) return []
-  unit.charges--
-  return [cloakOn(unit)]
 }

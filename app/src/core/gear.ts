@@ -45,7 +45,7 @@ export const EFFECTS: Record<GearEffect, Flow & { prefix: string; text: string; 
   piercing: { prefix: 'Piercing', text: 'Ignore Armor.' },
   vampiric: { prefix: 'Leeching', text: `On hit, heal 1, up to ${TUNING.healCap} each battle.`, reads: ['shots'] },
   executioner: { prefix: 'Merciless', text: `Deal ${EXECUTE_BONUS} more damage to aliens at half HP or less.`, makes: ['overkill'] },
-  chain: { prefix: 'Frenzied', text: 'On kill, attack again.', reads: ['kill'], rarity: 'epic' },
+  chain: { prefix: 'Frenzied', text: 'On kill, gain 1 Energy.', reads: ['kill'], rarity: 'epic' },
   ricochet: { prefix: 'Ricocheting', text: 'On hit, half the damage hits the nearest alien within 3 tiles of the target.', rarity: 'epic' },
   arc: { prefix: 'Arcing', text: 'On Crit, half the damage arcs to the nearest alien within 3 tiles, then 1 more.', reads: ['crit'], rarity: 'epic' },
   volatile: { prefix: 'Volatile', text: `On kill, deal the damage past its HP, at least ${VOLATILE_DAMAGE}, to adjacent aliens.`, reads: ['overkill'], rarity: 'epic' },
@@ -54,7 +54,7 @@ export const EFFECTS: Record<GearEffect, Flow & { prefix: string; text: string; 
   booming: { prefix: 'Booming', text: 'On hit, the target takes 3 damage when it next moves.', reads: ['moved'], rarity: 'epic' },
   shove: { prefix: 'Shoving', text: 'On hit, Knockback 1.', makes: ['moved', 'impact'] },
   tether: { prefix: 'Tethered', text: 'On hit, Pull 1.', makes: ['moved'] },
-  twinned: { prefix: 'Twinned', text: 'With 2+ shots, fire 1 more.', makes: ['shots'] },
+  twinned: { prefix: 'Twinned', text: 'Attacks that hit 2+ times hit 1 more time.', makes: ['shots'] },
   braced: { prefix: 'Bracing', text: `On hit, gain 1 Armor, up to ${GUARD_MAX} above base.`, reads: ['shots'], makes: ['armor'] },
   sapping: { prefix: 'Sapping', text: 'On hit, apply Weak.', reads: ['shots'], rarity: 'common' },
 }

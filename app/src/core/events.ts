@@ -1,7 +1,6 @@
 // Unknown stops' events: their choices and what each does.
 import { CLASSES, type ClassId } from './classes'
 import { DOCTRINES, type DoctrineId } from './doctrines'
-import { powerOf } from './skills'
 import { offerable } from './relics'
 import { random, randomInt } from './rng'
 import { advance, current, legOf, nextStop, passStop } from './run'
@@ -11,8 +10,6 @@ import { dropGear, gainRelic, loseRelic } from './rewards'
 import { settle } from './rewards'
 import { stockShop } from './rewards'
 import { mend } from './hero'
-import { level } from './hero'
-import { xpFor } from './hero'
 import { STOP_THREAT } from './progress'
 import { THREAT_MAX } from './progress'
 import { LEG_STOPS } from './progress'
@@ -40,19 +37,14 @@ export const MEDKIT = { price: 3, heal: 6 }
 const UNKNOWN_CHANCE = { battle: 0.3, shop: 0.3 }
 
 const raise = (run: Run, threat: number) => (run.threat = Math.max(0, Math.min(run.threat + threat, THREAT_MAX)))
-/** Adopts a doctrine; a weapon doctrine sets aside the one the hero fought with. */
-const adopt = (run: Run, id: DoctrineId) => {
-  if (DOCTRINES[id].weapon) run.doctrines = run.doctrines.filter((held) => !DOCTRINES[held].weapon)
-  run.doctrines.push(id)
-}
 const gain = (supplies: number, quip: string): Option => ({ quip, text: `Gain ${supplies} supplies.`, take: (run) => (run.supplies += supplies) })
 const leave = (quip: string): Option => ({ quip, text: 'Leave.', take: () => {} })
-const doctrine = (id: DoctrineId, quip: string): Option => ({ quip, text: `Adopt ${DOCTRINES[id].name}. ${DOCTRINES[id].text}`, take: (run) => adopt(run, id) })
+const doctrine = (id: DoctrineId, quip: string): Option => ({ quip, text: `Adopt ${DOCTRINES[id].name}. ${DOCTRINES[id].text}`, take: (run) => void run.doctrines.push(id) })
 /** Relics the hero may be offered. */
 const unheld = (run: Run) => offerable(run.relics)
 const pick = <T>(run: Run, options: T[]): T => options[randomInt(run, options.length)]
-/** Moves the hero `levels` up or down, never below level 1. */
-const train = (soldier: Run['hero'], levels: number) => (soldier.xp = xpFor(Math.max(1, level(soldier) + levels)))
+/** Raises the hero's max HP by `amount`, or lowers it. */
+const grow = (run: Run, amount: number) => (run.maxHp += amount)
 /** Whether `n` more stops lie between this one and the satellite. */
 const ahead = (run: Run, n = 1) => run.stop + n < LEG_STOPS
 
@@ -65,10 +57,10 @@ const encounters = {
     text: 'A crashed transport holds a suit of power armor, still in its packing foam. The manual has one page: DO NOT CROUCH. Underneath, in pen: seriously, the knees.',
     options: [doctrine('exosuits', 'Suit up. Walking is for people without a reactor on their back.'), gain(4, 'Sell the suit on the black market as a very large toaster.')],
   },
-  bunker: {
-    name: 'Bunker Plans',
-    text: 'A filing cabinet of bunker blueprints, stamped TOP SECRET and, below that, ALSO FILED ON THE PUBLIC WIKI. Whatever the hero learns from them, the aliens will have read too.',
-    options: [doctrine('fortified', 'Sandbag everything. Sandbag the sandbags.'), leave('Leave the cabinet for the aliens. Let them do the reading.')],
+  fuelDepot: {
+    name: 'Fuel Depot',
+    text: 'Rows of napalm drums stand in a depot nobody guards, each stencilled NO SMOKING. Someone has crossed out NO.',
+    options: [doctrine('incendiaries', 'Fill every pocket. Stand well back from yourself.'), gain(4, 'Sell the drums to a very relaxed man with no eyebrows.')],
   },
   shotguns: {
     name: 'Smuggled Gauntlets',
@@ -95,10 +87,10 @@ const encounters = {
     text: 'A drifter in a long coat leans on a burned-out car, a pistol in each hand, spinning both. "Care," they drawl, "is for people with one gun."',
     options: [doctrine('gunslingers', 'Two guns. Zero plans. Infinite style.'), leave('Point out that they just dropped one. Walk away while they look.')],
   },
-  headsman: {
-    name: 'The Headsman',
-    text: 'A hooded figure sharpens an axe on the steps of the courthouse, counting under its breath. "Not every kill is glory," it says. "Count them. Only the third is."',
-    options: [doctrine('reckoning', 'One, two, three.'), leave('Back away. Do not let it count you.')],
+  coldStorage: {
+    name: 'Cold Storage',
+    text: 'A cryogenics lab still hums on backup power. The freezers are labelled SAMPLES, LUNCH and DO NOT OPEN. The last one is open.',
+    options: [doctrine('cryonics', 'Take the freeze guns. Leave the lunch.'), leave('Close the door. Close it twice.')],
   },
   refugees: {
     name: 'Refugees',
@@ -147,13 +139,11 @@ const encounters = {
     options: [
       {
         quip: 'Fill in the form. Leave "previous experience" blank.',
-        text: 'Become a random other class. Lose your powers. Gain 1 level.',
+        text: 'Become a random other class. Gain 3 max HP.',
         take: (run) => {
           const cls = pick(run, (Object.keys(CLASSES) as ClassId[]).filter((id) => id !== run.hero.cls))
           run.hero.cls = cls
-          run.hero.skills = [powerOf(cls)]
-          run.hero.lost = []
-          train(run.hero, 1)
+          grow(run, 3)
         },
       },
       leave('Take a free pen. Take all the free pens.'),
@@ -219,9 +209,9 @@ const encounters = {
     options: [
       {
         quip: 'Bring sunscreen.',
-        text: 'Gain 1 level. Gain 2 threat.',
+        text: 'Gain 4 max HP. Gain 2 threat.',
         take: (run) => {
-          train(run.hero, 1)
+          grow(run, 4)
           raise(run, 2)
         },
       },
@@ -234,9 +224,9 @@ const encounters = {
     options: [
       {
         quip: 'Hold your nose. Hold everything.',
-        text: 'Lose 1 level. Gain 6 supplies.',
+        text: 'Lose 3 max HP. Gain 6 supplies.',
         take: (run) => {
-          train(run.hero, -1)
+          grow(run, -3)
           run.supplies += 6
         },
       },

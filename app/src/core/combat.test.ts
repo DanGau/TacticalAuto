@@ -1,4 +1,3 @@
-import { powerOf } from './skills'
 import { current } from './run'
 import { expect, test } from 'vitest'
 import { enterAt, begun } from './roads'
@@ -17,7 +16,6 @@ import { blocked, distance, walkingDistances } from './grid'
 
 function battle(seed: number): Battle {
   const run = begun(seed)
-  run.hero.skills = [powerOf(run.hero.cls!)]
   apply(run, { type: 'go', index: 1 })
   current(run)!.stop!.goal = 'cross'
   apply(run, { type: 'advance' })

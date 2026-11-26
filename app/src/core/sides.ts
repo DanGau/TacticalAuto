@@ -1,12 +1,12 @@
 // A side's simultaneous move: sighting aliens, walking, sentries, burrowers.
 import { alienSrc, fx } from './sources'
-import { weaponAttack } from './attack'
+import { shoot } from './attack'
 import { type Battle, ACID_DAMAGE, BURN_STACKS, isSoldier, type Unit, ENGAGE_REACH } from './battle'
 import { opening } from './landing'
 import { freeTilesNear } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { engage, immune, onTile, fireproof, foeHas, has, extractReach, BEACON_REACH, spotted } from './fighters'
+import { engage, onTile, fireproof, foeHas, has, extractReach, BEACON_REACH } from './fighters'
 import { fightPath, walk, COHESION } from './pathing'
 import { detects } from './sight'
 import { upkeep } from './upkeep'
@@ -27,11 +27,11 @@ export function moveSide(battle: Battle): GameEvent[] {
     if (unit.side === 'alien') events.push(...sentries(battle, unit, watched))
     if (unit.hp <= 0) continue
     walk(battle, unit, path, events)
-    moved(battle, unit, path, events)
+    moved(battle, unit, events)
   }
   // Acid burns each unit of the side still standing in it once the side has moved, so a unit free to move can step out.
   for (const unit of battle.units.filter((u) => u.side === battle.turn)) {
-    if (!battle.acid.some((pool) => pool.x === unit.x && pool.y === unit.y) || immune(battle, unit, 'acid')) continue
+    if (!battle.acid.some((pool) => pool.x === unit.x && pool.y === unit.y)) continue
     events.push({ type: 'hurt', id: unit.id, amount: ACID_DAMAGE, cause: 'acid' })
     wound(battle, unit, ACID_DAMAGE, events)
   }
@@ -85,7 +85,7 @@ export function sentries(battle: Battle, unit: Unit, watched: Set<number>): Game
   for (const sentry of battle.units.filter((u) => isSoldier(u) && has(u, 'sentinel') && !watched.has(u.id) && distance(u, unit) <= 1)) {
     if (unit.hp <= 0) break
     battle.actor = sentry.id
-    const shot = weaponAttack(battle, sentry, spotted(battle), 'sentinel', unit)
+    const shot = shoot(battle, sentry, 'sentinel', unit)
     battle.actor = null
     if (shot.length > 0) watched.add(sentry.id)
     events.push(...shot)

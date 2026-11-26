@@ -1,11 +1,11 @@
 // The hero's arrival: the one point the encounter chooses, the plain landing there, and what relics set off.
 import { chillUnit } from './stacks'
-import { BARRIER_ARMOR, GRID, isSoldier, type Battle, type Effect, type Tile, type Unit } from './battle'
+import { GRID, isSoldier, type Battle, type Effect, type Tile, type Unit } from './battle'
 import { CHALLENGES } from './challenges'
 import type { GameEvent } from './combat-event'
 import { engageNearest, has, nearest } from './fighters'
 import { blocked, distance, edgeDepths, freeTilesNear, NEIGHBORS, onGrid, openNear, walkingDistances, walks } from './grid'
-import { dropUnit, soldierUnit, TURRET } from './spawn'
+import { soldierUnit } from './spawn'
 import { PROP_BULK } from './terrain'
 import { TUNING } from './tuning'
 import { wound } from './wound'
@@ -44,7 +44,6 @@ export function land(battle: Battle): void {
     if (held('entryShred')) alien.armor = 0
     if (held('entryFrost')) chillUnit(battle, alien, 1, [])
   }
-  if (held('entryTurret')) dropUnit(battle, team[0], TURRET, at)
   if (held('entryWall')) for (const soldier of team) barricade(battle, soldier)
 }
 
@@ -55,11 +54,7 @@ export function deploy(battle: Battle, at: Tile): void {
   battle.reserve = []
   battle.phase = 'battle'
   battle.opening = true
-  const team = battle.units.filter(isSoldier)
   engageNearest(battle, [at])
-  // Each Shield of Faith armors its holder and every ally.
-  const shields = team.filter((u) => u.effects.includes('barrier')).length
-  for (const mate of team) mate.armor += shields * BARRIER_ARMOR
 }
 
 /** Stands a barricade on the free tile beside `soldier` nearest the nearest alien, unless it would cut ground off. */

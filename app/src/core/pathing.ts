@@ -1,17 +1,13 @@
 // Where a unit moves: candidate paths, scored by stance, goal and threat.
-import { type Battle, type Unit, type Tile, GRID, type Stance, isSoldier, STANDOFF, HASTE_MOVE, CHILL_MOVE, ENGAGE_REACH } from './battle'
-import { barred, blocked, breach, walkingDistances, stepCost, onGrid, NEIGHBORS, distance, strides, jumps } from './grid'
+import { type Battle, type Unit, type Tile, GRID, type Stance, isSoldier, STANDOFF, CHILL_MOVE, ENGAGE_REACH } from './battle'
+import { blocked, breach, walkingDistances, stepCost, distance, strides, jumps } from './grid'
 import type { GameEvent } from './combat-event'
-import { nearest, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes, leap } from './fighters'
-import { canHurlFrom } from './objects'
+import { nearest, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, fireproof, enemiesOf, besideFuel, leap } from './fighters'
 import { pushesOff } from './knockback'
 import { bite, canShoot, sees } from './sight'
-import { WEAPONS } from './weapons'
+import { MELEE_RANGE } from './weapons'
 import { pounce, turned } from './brawlers'
 import { threat } from './threat'
-import { PERK } from './perks'
-import { fx } from './sources'
-import { wound } from './wound'
 
 /**
  * The cheapest path to each tile the unit can reach with `move`, climbing costing more and jumping as its jump allows, cheapest first,
@@ -33,8 +29,8 @@ export function paths(battle: Battle, unit: Unit, move: number): Tile[][] {
       found.push(path)
       const back = path.at(-2) ?? (path.length > 0 ? unit : null)
       for (const { x, y } of strides(battle, from, ...leap(unit))) {
-        if (barred(battle, x, y, has(unit, 'hover'))) continue
-        const next = cost + stepCost(battle, from, { x, y }, has(unit, 'hover') || has(unit, 'freerunner'))
+        if (blocked(battle, x, y)) continue
+        const next = cost + stepCost(battle, from, { x, y })
         const heading = (a: Tile, b: Tile) => `${Math.sign(b.x - a.x)},${Math.sign(b.y - a.y)}`
         const bent = bends + (back && heading(back, from) !== heading(from, { x, y }) ? 1 : 0)
         const known = best.get(y * GRID + x) ?? Infinity
@@ -140,19 +136,6 @@ export const NO_SHOT: Record<Stance, (spot: Spot) => number[]> = {
   standoff: (spot) => (spot.careful ? [spot.crowded, spot.blind, spot.toGoal - spot.lure + 2 * spot.stray] : advance(spot)),
 }
 
-/**
- * How many of `enemies`, revealed and in the fight, could walk within range of each tile next turn: the danger of standing
- * there. Walls the walk goes round count; line of sight from where it ends does not.
- */
-export function threats(battle: Battle, enemies: Unit[]): (tile: Tile) => number {
-  const known = enemies.filter((e) => !e.civilian && e.revealed && e.engaged && e.stats.range > 0)
-  const fields = known.map((e) => ({ walk: walkingDistances(battle, e, e.stats.jump), reach: e.stats.move + e.stats.range }))
-  // A tile no walk ends on, such as one a unit that never moves stands on, is as near as its nearest neighbour.
-  const near = (walk: readonly number[], tile: Tile) =>
-    Math.min(walk[tile.y * GRID + tile.x], ...NEIGHBORS.map(([dx, dy]) => (onGrid(tile.x + dx, tile.y + dy) ? walk[(tile.y + dy) * GRID + tile.x + dx] + 1 : Infinity)))
-  return (tile) => fields.filter(({ walk, reach }) => near(walk, tile) <= reach).length
-}
-
 /** The most of its damage any of `enemies` lands on a tile from where it stands, in whole percent. */
 export function exposure(battle: Battle, enemies: Unit[], tile: Tile): number {
   const chances = enemies.filter((enemy) => canShoot(battle, enemy, tile, enemy.stats.range)).map((enemy) => bite(battle, enemy, tile, enemy.stats))
@@ -197,8 +180,7 @@ export function goalOf(battle: Battle, unit: Unit, enemies: Unit[]): Tile | unde
 /** How near a civilian an alien must be for the hero to go for it on a rescue. */
 export const PREY_REACH = 8
 
-/** What standing beside something to hurl makes a tile worth, in points of `mine`; each alien a knockback from it would send off a ledge or the edge; and standing where an alien could shove it off. */
-const HURL_WORTH = 25
+/** What each alien a knockback from a tile would send off a ledge or the edge makes it worth, in points of `mine`; and standing where an alien could shove it off. */
 const LEDGE_WORTH = 20
 const EDGE_RISK = 30
 
@@ -213,14 +195,14 @@ export const preyed = (target: Unit, hit: number) => (target.civilian ? PREY_WOR
 
 /**
  * The path a fighting unit takes in its move stage: to the tile its stance ranks best, preferring any tile with a
- * shot over any without; the fewest steps wins a tie. Run and Gun doubles the move when the normal move reaches no shot.
+ * shot over any without; the fewest steps wins a tie.
  * While some soldier has an alien in sight, a soldier first avoids any tile from which it would sight an alien unseen or
  * draw in one waiting its turn, so one engagement ends before the next begins.
  */
 export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const enemies = enemiesOf(battle, unit)
   // A melee hero fights only by reaching someone: it goes for the alien in the fight nearest it, and neither the hero nor what its charge might stir holds it back.
-  const melee = isSoldier(unit) && !!unit.weapon && !!WEAPONS[unit.weapon].melee
+  const melee = isSoldier(unit) && unit.stats.range <= MELEE_RANGE
   const shared = goalOf(battle, unit, enemies)
   const quarry = melee && battle.round < RESTLESS_ROUND && shared && enemies.some((e) => e === shared) ? nearest(enemies.filter((e) => e.engaged && e.revealed && walkingDistances(battle, e, ...leap(unit))[unit.y * GRID + unit.x] < Infinity), unit) : undefined
   const goal = quarry ?? shared
@@ -235,7 +217,7 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   /** The most of its damage it lands from `end`, weighed by threat, in whole percent; 0 with no shot. */
   const mine = (end: Tile) => {
     const chances = enemies
-      .filter((enemy) => shootable(battle, unit, end, enemy, seen))
+      .filter((enemy) => shootable(battle, unit, end, enemy))
       .map((enemy) => (preyed(enemy, bite(battle, end, enemy, unit.stats)) / (turned(end, enemy) ? 2 : 1)) * (menace(end, enemy) / worst))
     const best = Math.max(0, ...chances)
     return best > 0 ? Math.max(1, Math.round(100 * best)) : 0
@@ -256,16 +238,11 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const provokes = (end: Tile) => (fighting && !melee && battle.round < RESTLESS_ROUND && (unseen.some((alien) => sees(battle, end, alien)) || waiting.some((alien) => distance(alien, end) <= ENGAGE_REACH)) ? 1 : 0)
   /** Whether `end` would hurt the unit to stand on: acid, or fire unless it cannot burn; for a soldier, a fuel tank beside it, until the battle drags on, for a tank never goes away and tanks can bar the way. Caltrops only slow and hurt the way. */
   const acid = (end: Tile) => (onTile(battle.acid, end) || (unit.side === 'human' && battle.round < RESTLESS_ROUND && besideFuel(battle, end)) || (onTile(battle.fire, end) && !fireproof(battle, unit)) ? 1 : 0)
-  /**
-   * What a soldier's gear makes a tile worth, in points of `mine`: a null field over aliens with abilities, spirit
-   * guardians where aliens will come while the wearer is healthy, a bond beside an ally, something to hurl.
-   */
+  /** What a tile is worth to a soldier, in points of `mine`: each alien a knockback from it would send off a ledge or the edge, less standing where an alien could shove it off. */
   const role = (end: Tile) =>
     unit.side !== 'human'
       ? 0
-      : (has(unit, 'null') ? 15 * enemies.filter((e) => e.revealed && e.kind !== 'trooper' && distance(end, e) <= NULL_REACH).length : 0) +
-        (canHurlFrom(battle, unit, end) ? HURL_WORTH : 0) +
-        (unit.side === 'human' ? LEDGE_WORTH * enemies.filter((e) => e.revealed && distance(end, e) <= unit.stats.range && pushesOff(battle, end, e)).length : 0) -
+      : LEDGE_WORTH * enemies.filter((e) => e.revealed && distance(end, e) <= unit.stats.range && pushesOff(battle, end, e)).length -
         // A hero keeps off a ledge an alien close by could shove it from.
         (unit.side === 'human' && enemies.some((e) => e.revealed && distance(end, e) <= 2 && pushesOff(battle, e, { ...unit, ...end })) ? EDGE_RISK : 0)
   const uplink = battle.uplink
@@ -303,46 +280,24 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
       return spot.mine > 0 ? [...first, 0, wary ? spot.crowded : 0, ...WITH_SHOT[unit.stance](spot), steps] : [...first, 1, ahead(end), ...NO_SHOT[unit.stance](spot)]
     })
   }
-  // A unit whose perks pay for standing still holds a tile it can shoot from, unless the tile is acid or off the uplink.
-  const still = has(unit, 'steady') || has(unit, 'doubleTap')
-  const shotHere = enemies.some((enemy) => enemy.revealed && shootable(battle, unit, unit, enemy, seen))
-  if (still && shotHere && !leash(unit) && !acid(unit)) return []
+  const shotHere = enemies.some((enemy) => enemy.revealed && shootable(battle, unit, unit, enemy))
   // A booming charge pins a unit that can fight from where it stands; a rooted one cannot move at all.
   if ((unit.booming > 0 && shotHere) || unit.rooted > 0 || unit.frozen || (unit.kind === 'sprinter' && unit.chill > 0)) return []
   const pounced = pounce(battle, unit)
   if (pounced.length > 0) return pounced
-  const move = moveOf(battle, unit)
-  const path = choose(move)
-  if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
-  return path
+  return choose(moveOf(unit))
 }
 
-
-/** Where Heroic Leap would land: the free tile within twice the soldier's move beside the most foes, and those foes. */
-export function leapTo(battle: Battle, unit: Unit): { to: Tile; caught: Unit[] } | null {
-  if (!has(unit, 'leap') || unit.spent.includes('leap')) return null
-  const all = foes(battle, unit)
-  let best: { to: Tile; caught: Unit[] } | null = null
-  for (const foe of all.filter((f) => distance(f, unit) <= 2 * unit.stats.move)) {
-    for (const [dx, dy] of NEIGHBORS) {
-      const to = { x: foe.x + dx, y: foe.y + dy }
-      if (blocked(battle, to.x, to.y) || onTile(battle.acid, to) || onTile(battle.fire, to)) continue
-      const caught = all.filter((f) => distance(f, to) <= 1)
-      if (caught.length > (best?.caught.length ?? 0)) best = { to, caught }
-    }
-  }
-  return best
-}
 
 /** The move a path costs, climbing costing more. */
 export function costOf(battle: Battle, unit: Unit, path: Tile[]): number {
-  return path.reduce((sum, tile, i) => sum + stepCost(battle, path[i - 1] ?? unit, tile, has(unit, 'hover') || has(unit, 'freerunner')), 0)
+  return path.reduce((sum, tile, i) => sum + stepCost(battle, path[i - 1] ?? unit, tile), 0)
 }
 
-/** The move a unit has this turn: haste adds, chill takes. */
-export const moveOf = (battle: Battle, unit: Unit) => Math.max(0, unit.stats.move + (inAura(battle, unit, 'haste') ? HASTE_MOVE : 0) - (unit.chill > 0 ? CHILL_MOVE : 0))
+/** The move a unit has this turn: chill takes. */
+export const moveOf = (unit: Unit) => Math.max(0, unit.stats.move - (unit.chill > 0 ? CHILL_MOVE : 0))
 
-/** Moves `unit` along `path`, saying how many of its strides are jumps; a jump with Crash Landing hurts each alien beside where it lands. */
+/** Moves `unit` along `path`, saying how many of its strides are jumps. */
 export function walk(battle: Battle, unit: Unit, path: Tile[], events: GameEvent[]): void {
   const start = { x: unit.x, y: unit.y }
   const end = path.at(-1)
@@ -352,15 +307,7 @@ export function walk(battle: Battle, unit: Unit, path: Tile[], events: GameEvent
   unit.moved = true
   const leaps = path.filter((tile, i) => jumps(battle, path[i - 1] ?? start, tile)).length
   events.push({ type: 'move', src: { kind: 'basic', id: leaps ? 'jump' : 'move' }, id: unit.id, path, leaps: leaps || undefined })
-  if (!leaps || !has(unit, 'crashLanding')) return
-  for (const alien of foes(battle, unit).filter((a) => distance(a, unit) <= 1)) {
-    events.push(fx(alien.id, 'crashLanding', -PERK.landing))
-    wound(battle, alien, PERK.landing, events)
-  }
 }
-
-/** Tiles further a soldier may dash in the fight to reach a shot. */
-export const DASH_MOVE = 3
 
 /** Tiles a soldier can walk to, fewer than which it is walled in. */
 export const POCKET = 100

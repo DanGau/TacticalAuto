@@ -23,10 +23,10 @@ export function prey(battle: Battle, leaper: Unit): Unit | undefined {
 
 /** A leaper's one pounce, over walls and heights, onto a free tile beside its prey; [] once spent or with none in reach. */
 export function pounce(battle: Battle, leaper: Unit): Tile[] {
-  const target = leaper.kind === 'leaper' && !leaper.spent.includes('leap') ? prey(battle, leaper) : undefined
+  const target = leaper.kind === 'leaper' && !leaper.spent.includes('pounce') ? prey(battle, leaper) : undefined
   const to = target && freeTilesNear(battle, target, 1).find((t) => distance(t, target) <= 1 && !blocked(battle, t.x, t.y))
   if (!to) return []
-  leaper.spent.push('leap')
+  leaper.spent.push('pounce')
   return [to]
 }
 

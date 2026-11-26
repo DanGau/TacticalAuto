@@ -4,7 +4,6 @@ import { randomInt } from './rng'
 import { onGrid, distance, freeTilesNear, walkingDistances, spacedTile, NEIGHBORS, passable, openNear, walks } from './grid'
 import { alienUnit, civilianUnit } from './spawn'
 import { PROP_BULK, type TerrainKind, type Locale } from './terrain'
-import type { Rule } from './doctrines'
 import { flowOf, type Goal, CIVILIANS, CIVILIAN_HP } from './goals'
 import { generateTerrain } from './terrain-gen'
 import type { Twist } from './twists'
@@ -87,13 +86,12 @@ export const CIVILIAN_CLEARANCE = 4
  * of its aliens back as waves; a rescue's civilians huddle at the objective. A crossing's and an ambush's
  * objective is the extraction zone. An ambush has no deploy screen: the hero is down at once.
  */
-export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[], goal: Goal = 'cross', rules: Rule[] = [], twist: Twist | null = null, place?: Locale, challenge: ChallengeId | null = null): Battle {
+export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], reserve: Reserve[], goal: Goal = 'cross', twist: Twist | null = null, place?: Locale, challenge: ChallengeId | null = null): Battle {
   const holder = { rng: seed }
   const terrain = generateTerrain(holder, GRID, kind, twist, place)
   const battle: Battle = {
     rng: holder.rng,
     goal,
-    rules,
     twist,
     round: 0,
     flow: flowOf(goal, challenge),
@@ -118,10 +116,8 @@ export function createBattle(seed: number, kind: TerrainKind, aliens: Alien[], r
     used: [],
     challenge,
     deadline: challenge === 'scattered' ? 0 : null,
-    kills: 0,
     acid: [],
     fire: [],
-    caltrops: [],
     husks: [],
     saved: 0,
     held: 0,

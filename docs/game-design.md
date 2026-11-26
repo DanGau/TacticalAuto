@@ -13,7 +13,7 @@ Theme: superheroes on D&D-style rules; see [premise](premise.md). Test every new
 8. **Squeeze and release.** Tension must be followed by relief the player earned, and the alien advance after a win is the next squeeze. [5]
 9. **Rewards that point a build.** A reward that is strong everywhere makes runs alike; one that pays only if the player builds around it makes them differ. Offer a few at a time and make the choice permanent, so each pick matters for the whole run. Relics here are chosen one of three and kept; cards are offered three at a time, one to take or none, and a shop removes one, so the deck is the build. [6]
 10. **Heroes, not hiders.** The hero never sneaks: its move is automatic and marches on the fight from the first, so the player's choices are the cards, not the walking. With no target an Attack cannot be played, so a card that moves the hero or an alien is worth a turn. [7] [8]
-11. **One hero.** The run has one hero, so the player always knows who is doing what, and the build has room for depth: skills, perks, relics and weapon all stack on the one hero.
+11. **One hero.** The run has one hero, so the player always knows who is doing what, and the build has room for depth: deck, relics and weapon all stack on the one hero.
 12. **Ground is the choice.** Every battle is fought over a ground with its own features, after Into the Breach's tiles: rooftops with a drop on every side, an overpass, a quarry's terraces, a rift, flooded streets, a marsh, a mesa, an ice sheet, or open ground. Each feature multiplies some build quantity: Displace into a drop, Chill beside water, Burn on swamp gas, Crit and damage from high ground. Each region draws its own ground, shown on the Flight map, so picking a stop is picking ground that suits the build, and in battle the player reads the board and plays cards to it; nothing labels the answer. The goal at the objective, an extraction zone, an uplink, civilians, a commander, a Guardian, sets where the hero heads; nothing scripts the way. [3] [8] [9]
 13. **Read the intent, then answer.** Over each alien shows what it will do this turn, as in Slay the Spire: attack whom for how much, or move. Block, a move out of reach or a knockback answers it; the player plans against what is shown, not what is hidden. [10]
 
@@ -26,7 +26,7 @@ A draft event ships only if it passes every gate:
 1. **A real trade.** Every option but walking away costs something (2).
 2. **Stated odds.** The option says what it does, and how often if by chance (3).
 3. **No spiral.** No option cripples the hero for good (4).
-4. **Our levers.** It moves supplies, threat, health, levels, class, gear, relics or stops; nothing the game lacks.
+4. **Our levers.** It moves supplies, threat, health, max HP, class, gear, relics, doctrines or stops; nothing the game lacks.
 5. **Its own trade.** No other event offers the same deal.
 
 A test checks what it can: every event has a choice, ends in one always open, and repeats no option.

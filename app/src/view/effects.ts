@@ -7,7 +7,7 @@ import { srcOf, type Src } from '../core/sources'
 import { PACE } from '../core/pace'
 import { cancelOf } from '../core/quantities'
 import type { Attack } from './attacks'
-import { along, lerp } from './camera'
+import { lerp } from './camera'
 import { blast } from './blast'
 import { drawFog } from './marks'
 import { drawTerrain } from './board'
@@ -21,7 +21,6 @@ import type { Label, Sprite, Stage } from './stage'
 const CHEST = 18
 const IMPACT_MS = 140
 const CALLOUT_MS = 900
-const FINISH_LIFT = 44
 const VOLLEY_LIFT = 12
 /** How far apart a two-handed shooter's hands are. */
 const HANDS = 9
@@ -37,17 +36,16 @@ export function callout(s: Stage, text: string, color: number, over: Sprite, siz
 }
 
 /** A source as a callout tags it: its kind's glyph and its name. */
-export const tagText = (s: Stage, src: Src) => `${SOURCE[src.kind].glyph} ${sourceName(src, s.kit()).toUpperCase()}`
+export const tagText = (src: Src) => `${SOURCE[src.kind].glyph} ${sourceName(src).toUpperCase()}`
 
 /** A callout naming a source in its kind's colour, `after` its name. */
-export const sourceCallout = (s: Stage, src: Src, over: Sprite, after = '', size = 13, lift = 0) => callout(s, `${tagText(s, src)}${after}`, SOURCE[src.kind].color, over, size, lift)
+export const sourceCallout = (s: Stage, src: Src, over: Sprite, after = '', size = 13, lift = 0) => callout(s, `${tagText( src)}${after}`, SOURCE[src.kind].color, over, size, lift)
 
 /** A shot's result: a hit or crit with its damage. */
 export function shotCallout(s: Stage, e: Extract<GameEvent, { type: 'shot' }>, over: Sprite): Label {
-  // A combo's second blow reads over the first, and bigger, so both can be counted.
-  const lift = e.secondary ? FINISH_LIFT : (e.nth ?? 0) * VOLLEY_LIFT
-  if (e.deflect) return callout(s, e.damage > 0 ? `${e.deflect.toUpperCase()} -${e.damage}` : e.deflect.toUpperCase(), COLOR.deflect, over, 16, lift)
-  return e.crit ? callout(s, `CRIT -${e.damage}`, COLOR.crit, over, e.secondary ? 22 : 18, lift) : callout(s, `HIT -${e.damage}`, COLOR.hit, over, e.secondary ? 18 : 13, lift)
+  // Each hit of a card reads over the last, so all can be counted.
+  const lift = (e.nth ?? 0) * VOLLEY_LIFT
+  return e.crit ? callout(s, `CRIT -${e.damage}`, COLOR.crit, over, 18, lift) : callout(s, `HIT -${e.damage}`, COLOR.hit, over, 13, lift)
 }
 
 /** A cancellation's callout: bigger than a crit's, and lifted clear of the hit callouts. */
@@ -114,46 +112,6 @@ export function shake(s: Stage, power: number, ms = 240): Promise<void> {
   })
 }
 
-/** Something hurled, spun by `angle`. */
-function drawHurled(fx: Sketch, at: Tile, angle: number, from: Tile, gun: Attack): void {
-  const [cos, sin] = [Math.cos(angle), Math.sin(angle)]
-  if (gun.shape === 'shield') {
-    fx.ellipse(at.x, at.y, gun.width, gun.width * (0.45 + 0.55 * Math.abs(cos))).fill(gun.color).circle(at.x, at.y, gun.width / 3).fill(gun.core)
-  } else if (gun.shape === 'hammer') {
-    fx.moveTo(at.x - cos * 9, at.y - sin * 9).lineTo(at.x + cos * 7, at.y + sin * 7).stroke({ color: 0x8a6b43, width: 2 })
-    fx.moveTo(at.x + cos * 7 - sin * gun.width, at.y + sin * 7 + cos * gun.width).lineTo(at.x + cos * 7 + sin * gun.width, at.y + sin * 7 - cos * gun.width).stroke({ color: gun.color, width: 6 })
-  } else {
-    // A fist on a jet of flame, knuckles first along its way.
-    const len = Math.hypot(at.x - from.x, at.y - from.y) || 1
-    const tail = { x: at.x - ((at.x - from.x) / len) * Math.min(len, 22), y: at.y - ((at.y - from.y) / len) * Math.min(len, 22) }
-    fx.moveTo(tail.x, tail.y).lineTo(at.x, at.y).stroke({ color: gun.core, width: 4, alpha: 0.8 })
-    fx.circle(at.x, at.y, gun.width).fill(gun.color).circle(at.x, at.y, gun.width / 2).fill(0xfff0d0)
-  }
-}
-
-/** A hurled thing flies home from where it hit. */
-function flyHome(s: Stage, fx: Sketch, from: Tile, to: Sprite, gun: Attack): Promise<void> {
-  return s.tween(gun.ms, (t) => {
-    const home = chest(to)
-    const at = lerp(from, home, t)
-    at.y -= (gun.arc ?? 0) * Math.sin(Math.PI * t)
-    fx.clear()
-    drawHurled(fx, at, -t * 4 * Math.PI, from, gun)
-  })
-}
-
-/** A hero's dash: it shoots along `path` with a streak behind it. */
-export function dashTo(s: Stage, fx: Sketch, sprite: Sprite, path: Tile[]): Promise<void> {
-  const points = [sprite.tile, ...path]
-  const start = chest(sprite)
-  return s.tween(PACE.lunge, (t) => {
-    place(s, sprite, along(points, t * t))
-    squash(sprite, 0.85, 1.15)
-    const now = chest(sprite)
-    fx.clear().moveTo(lerp(start, now, t * 0.6).x, lerp(start, now, t * 0.6).y).lineTo(now.x, now.y).stroke({ color: 0xffffff, width: 7 * (1 - t) + 2, alpha: 0.65 })
-  }).then(() => squash(sprite, 1, 1))
-}
-
 /** Projectiles fly from the muzzle at `a` to each of `ends`. */
 function fire(s: Stage, fx: Sketch, a: Tile, ends: Tile[], gun: Attack): Promise<void> {
   const total = gun.ms + gun.stagger * (ends.length - 1)
@@ -165,11 +123,7 @@ function fire(s: Stage, fx: Sketch, a: Tile, ends: Tile[], gun: Attack): Promise
       // The muzzle flash: a burst at the barrel that dies as the round leaves.
       if (local < 0.3) fx.circle(a.x, a.y, gun.flash * (1 - local / 0.3)).fill({ color: gun.core, alpha: 0.9 })
       const lift = (gun.arc ?? 0) * Math.sin(Math.PI * local)
-      if (gun.style === 'hurled') {
-        const at = lerp(a, b, local)
-        at.y -= lift
-        drawHurled(fx, at, local * 4 * Math.PI, a, gun)
-      } else if (gun.style === 'bolt') {
+      if (gun.style === 'bolt') {
         const head = lerp(a, b, local)
         const tail = lerp(a, b, Math.max(0, local - 0.35))
         const glint = lerp(a, b, Math.max(0, local - 0.12))
@@ -256,8 +210,7 @@ export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e
   fx.clear()
   float(s, shotCallout(s, e, to))
   // What of the shooter's shaped the shot, named over the shooter.
-  if (e.secondary) float(s, sourceCallout(s, { kind: 'class', id: e.secondary }, from, '', 15, FINISH_LIFT))
-  if (e.with.length > 0 && !nth) float(s, callout(s, e.with.map((effect) => tagText(s, srcOf(effect))).join(' · '), SOURCE[e.src.kind].color, from))
+  if (e.with.length > 0 && !nth) float(s, callout(s, e.with.map((effect) => tagText( srcOf(effect))).join(' · '), SOURCE[e.src.kind].color, from))
   to.drawHp(...after)
   const power = crit ? 2 : 1
   const home = s.toWorld(to.tile.x, to.tile.y)
@@ -277,21 +230,14 @@ export async function playShot(s: Stage, fx: Sketch, from: Sprite, to: Sprite, e
     squash(to, 1, 1)
     fx.clear()
   }
-  // A deflected blow throws a bright spray back at the attacker.
-  const sparks = (sketch: Sketch) => (e.deflect ? burst(s, sketch, mark, { x: -dir.x, y: -dir.y }, COLOR.deflect, 14, 1.4) : burst(s, sketch, mark, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, e.secondary ? power * 1.6 : power))
-  // A shot of a rapid attack does not wait on its sparks: the next is already coming.
-  if (e.lasts && e.lasts < PACE.attack) void drawing(s, sparks).then(settle)
-  else {
-    await sparks(fx)
-    settle()
-  }
-  if (gun.back) await flyHome(s, fx, mark, from, gun)
+  await burst(s, fx, mark, dir, crit ? COLOR.crit : gun.color, gun.sparks * power, power)
+  settle()
 }
 
-/** A rocket, or napalm in flame's colour, flies from `from` to its tile and bursts, wounding every unit it caught. With no `from`, something burst where it stood. */
+/** A blast flies from `from` to its tile and bursts, wounding every unit it caught. With no `from`, something burst where it stood. */
 export async function fireRocket(s: Stage, fx: Sketch, battle: Battle, from: Sprite | undefined, e: Extract<GameEvent, { type: 'rocket' }>): Promise<void> {
   const b = s.toWorld(e.x, e.y)
-  const color = e.fire ? COLOR.fire : COLOR.crit
+  const color = COLOR.crit
   if (from) {
     const a = chest(from)
     await s.tween(PACE.rocket, (t) => {

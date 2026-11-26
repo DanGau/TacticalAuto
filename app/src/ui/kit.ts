@@ -1,19 +1,12 @@
 // A hero's kit grouped by where each part comes from, each tagged as battle callouts tag it; shown on hovering or tapping a hero.
-import { PERKS } from '../core/perks'
-import { CLASSES } from '../core/classes'
 import { DOCTRINES } from '../core/doctrines'
 import { EFFECTS } from '../core/gear'
 import { RELICS } from '../core/relics'
 import { relicIcon } from './relic-icons'
-import { bonusIcon, kitIcon } from './ability-icons'
-import { perkIcon, skillIcon } from './skill-icons'
 import { weaponIcon } from './weapon-icons'
 import type { Run, Soldier } from '../core/run-state'
-import { SECONDARIES } from '../core/secondaries'
-import { BASICS, type SrcKind } from '../core/sources'
-import { abilityOf, secondaryOf } from '../core/hero'
-import { SKILLS } from '../core/skills'
-import { CARDS, cardName, cardText } from '../core/cards'
+import type { SrcKind } from '../core/sources'
+import { CARDS, cardName, cardText, STRIKES } from '../core/cards'
 import { cardIcon } from './card-icons'
 import { WEAPONS } from '../core/weapons'
 import { css } from '../view/shapes'
@@ -23,22 +16,13 @@ import type { View } from '../view/view'
 /** A name tagged with its source's glyph and colour, `title` on hover. */
 export const tag = (kind: SrcKind, name: string, title = '') => `<span class="src" style="color:${css(SOURCE[kind].color)}"${title ? ` title="${title}"` : ''}>${SOURCE[kind].glyph} ${name}</span>`
 
-/** The basic actions a hero has: Throw only with Heave. */
-export const basicsOf = (hero: Soldier) => [BASICS.attack, BASICS.jump, ...(hero.perks.includes('heave') ? [BASICS.throw] : [])]
-
-/** What a hero has in a battle, by source: each part's name and what it does. */
+/** What a hero has in a battle, by source: each part's name and what it does. Doctrines lean card offers, so they show as relics do. */
 export function kitOf(run: Run, hero: Soldier): [SrcKind, { name: string; text: string }[]][] {
   const weapon = hero.gear ? WEAPONS[hero.gear.weapon] : null
-  const ability = abilityOf(hero)
   const groups: [SrcKind, { name: string; text: string }[]][] = [
-    ['basic', basicsOf(hero).map((name) => ({ name, text: '' }))],
-    ['perk', hero.perks.map((id) => ({ name: `${perkIcon(id)} ${PERKS[id].name}`, text: PERKS[id].text }))],
-    ['class', [...(ability ? [{ name: `${kitIcon(hero.cls!)} ${CLASSES[hero.cls!].abilityName}`, text: CLASSES[hero.cls!].abilityText }] : []), { name: `${bonusIcon(secondaryOf(hero))} ${SECONDARIES[secondaryOf(hero)].name}`, text: SECONDARIES[secondaryOf(hero)].text ?? '' }]],
-    ['skill', hero.skills.filter((id) => !SKILLS[id].teaches).map((id) => ({ name: `${skillIcon(id)} ${SKILLS[id].name}`, text: SKILLS[id].text }))],
-    ['weapon', weapon ? [{ name: `${weaponIcon(hero.gear!.weapon)} ${weapon.name}`, text: weapon.special ?? '' }] : []],
+    ['weapon', weapon ? [{ name: `${weaponIcon(hero.gear!.weapon)} ${weapon.name}`, text: `Strike: ${cardName(STRIKES[hero.gear!.weapon])}` }] : []],
     ['gear', hero.gear?.effect ? [{ name: EFFECTS[hero.gear.effect].prefix, text: EFFECTS[hero.gear.effect].text }] : []],
-    ['relic', run.relics.map((id) => ({ name: `${relicIcon(id)} ${RELICS[id].name}`, text: RELICS[id].text }))],
-    ['doctrine', run.doctrines.map((id) => DOCTRINES[id])],
+    ['relic', [...run.relics.map((id) => ({ name: `${relicIcon(id)} ${RELICS[id].name}`, text: RELICS[id].text })), ...run.doctrines.map((id) => DOCTRINES[id])]],
     ['card', (run.phase === 'battle' && run.battle ? run.battle.pile.exhaust.filter((c) => CARDS[c.id].type === 'power') : []).map((c) => ({ name: `${cardIcon(c.id)} ${cardName(c.id, c.level)}`, text: cardText(c.id, c.level) }))],
   ]
   return groups.filter(([, parts]) => parts.length > 0)

@@ -5,16 +5,12 @@ import type { SrcKind } from '../core/sources'
 
 /** How each kind of source is tagged wherever an action is named: its colour and glyph. */
 export const SOURCE: Record<SrcKind, { color: number; glyph: string }> = {
-  class: { color: 0xffc94d, glyph: '◆' },
-  skill: { color: 0x5aa9ff, glyph: '✦' },
   weapon: { color: 0xffffff, glyph: '⚔' },
   gear: { color: 0x6fdc6f, glyph: '⚙' },
   relic: { color: 0xb98cff, glyph: '❖' },
   card: { color: 0x4fe3e3, glyph: '✚' },
-  doctrine: { color: 0xff9a3d, glyph: '⚑' },
   object: { color: 0xa0a7b4, glyph: '▣' },
   basic: { color: 0xc9ced8, glyph: '•' },
-  perk: { color: 0xe6d3a3, glyph: '▴' },
   alien: { color: 0xff6b5e, glyph: '☠' },
 }
 
@@ -24,7 +20,6 @@ export const NIGHT = 0x10141c
 export const COLOR = {
   civilian: 0xe0a24a,
   vip: 0x6ec8ff,
-  mech: 0x9aa9bf,
   human: 0x4da3ff,
   alien: 0x7ddc5a,
   boss: 0xc77dff,
@@ -39,7 +34,6 @@ export const COLOR = {
   hit: 0xffd84d,
   crit: 0xff7a3d,
   /** A weapon guard saving a hit: steel catching light. */
-  deflect: 0xbfe8ff,
   /** A cancellation: opposites on one alien wasting each other. */
   cancel: 0xff9a1f,
   heal: 0x7ddc5a,
@@ -52,7 +46,6 @@ export const COLOR = {
   booming: 0xff9a3d,
   psi: 0xff6bd6,
   /** A levitating unit's shadow. */
-  hover: 0x7fd8ff,
   /** A cloaked unit's tint. */
   cloak: 0x8fe8ff,
   contact: 0xff6b5e,

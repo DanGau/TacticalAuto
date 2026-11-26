@@ -1,35 +1,19 @@
-// The names effects show under in the view, from the hero's skills and weapons.
+// The names effects show under in the view.
 import { EXAMS, type Exam } from './exams'
-import type { Ability, Effect } from './battle'
-import { CLASSES } from './classes'
-import { DOCTRINES } from './doctrines'
+import type { Effect } from './battle'
 import { EFFECTS } from './gear'
 import { RELICS } from './relics'
 import { cancelOf } from './quantities'
-import { PERKS } from './perks'
-import { SKILLS, type SkillId } from './skills'
-import { WEAPONS, type WeaponId } from './weapons'
 
-/**
- * What an effect is called where the player sees it at work: the class ability's name; else that of a skill or weapon
- * the hero has, since skills of different classes may share an effect; else the relic's or doctrine's, the word a gear
- * effect adds to a name, or any skill's.
- */
-export function effectName(effect: Effect | Ability, team: { skills: SkillId[]; weapons: WeaponId[] } = { skills: [], weapons: [] }): string {
-  if (effect === 'overwatch') return 'Overwatch'
+/** What an effect is called where the player sees it at work: a cancellation's name, a Guardian trait's, a relic's, or the word a gear effect adds to a name. */
+export function effectName(effect: Effect): string {
   if (effect === 'stun') return 'Stunned'
-  if (effect === 'surge') return 'Temp HP'
   if (effect === 'frozen') return 'Frozen'
-  if (effect === 'reckoning') return "Executioner's Oath"
   const cancel = cancelOf(effect)
   if (cancel) return cancel.name
   if (effect in EXAMS && effect !== 'thorns') return EXAMS[effect as Exam].name
-  const ability = Object.values(CLASSES).find((cls) => cls.ability === effect)
-  if (ability) return ability.abilityName
-  const own = [...team.skills.map((id) => SKILLS[id]), ...team.weapons.map((id) => WEAPONS[id]), ...Object.values(RELICS), ...Object.values(DOCTRINES)].find((source) => source.effect === effect)
-  if (own) return own.name
-  const perk = Object.values(PERKS).find((p) => p.effect === effect)
-  if (perk) return perk.name
+  const relic = Object.values(RELICS).find((source) => source.effect === effect)
+  if (relic) return relic.name
   if (effect in EFFECTS) return EFFECTS[effect as keyof typeof EFFECTS].prefix
-  return Object.values(SKILLS).find((skill) => skill.effect === effect)!.name
+  return effect
 }

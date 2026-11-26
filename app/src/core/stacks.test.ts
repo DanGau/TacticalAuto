@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { arena } from './arena'
 import { apply } from './apply'
 import { bots } from '../bots/bots'
-import { BURN_MAX,   CHILL_FREEZE, CHILL_MAX,    FRACTURE_DAMAGE, FRESH, GRID, HIGH_CRIT, isSoldier } from './battle'
+import { BURN_MAX, CHILL_FREEZE, CHRONO_EVERY, CHILL_MAX,    FRACTURE_DAMAGE, FRESH, GRID, HIGH_CRIT, isSoldier } from './battle'
 import { endBattle } from './debrief'
 import { knockback, knocksInto } from './knockback'
 import { mend, SLAM_DAMAGE } from './wound'
@@ -12,11 +12,10 @@ import { gainRelic } from './rewards'
 import { begun } from './roads'
 import { createRun } from './run'
 import { fight } from './roads'
-import { chillUnit, chrono, died,  fell, highCrit, kindle, lastingArmor } from './stacks'
+import { chillUnit, died, fell, highCrit, kindle } from './stacks'
 import { upkeep } from './upkeep'
-import { leverage } from './objects'
+import { beginTurn, ENERGY } from './turn'
 import type { GameEvent } from './combat-event'
-
 
 test('every battle of a run starts with no stacks, counts or battle bonuses', () => {
   for (const seed of [3, 4]) {
@@ -33,11 +32,9 @@ test('every battle of a run starts with no stacks, counts or battle bonuses', ()
       if (!deploying) continue
       fights++
       const battle = run.battle!
-      expect(battle.kills).toBe(0)
       for (const u of battle.units) {
         // Cryo Charges chill the aliens as the hero lands.
         expect(u).toMatchObject(run.relics.includes('cryo') ? { ...FRESH, chill: u.chill } : FRESH)
-        expect(u.twice ?? false).toBe(false)
         if (isSoldier(u)) expect(u.armor).toBeLessThanOrEqual(u.stats.armor + 2)
       }
     }
@@ -98,28 +95,14 @@ test('on-hit and on-kill healing gives a hero at most TUNING.healCap a battle by
   expect(hero.hp).toBe(1 + TUNING.healCap + 2)
 })
 
-test('Lasting Guard: armor is whole again each turn, and half of what was kept carries on top, to double', () => {
-  const { hero } = arena(['lasting'], [])
-  hero.stats = { ...hero.stats, armor: 4 }
-  hero.armor = 4
-  lastingArmor(hero)
-  expect(hero.armor).toBe(6)
-  for (let turn = 0; turn < 5; turn++) lastingArmor(hero)
-  expect(hero.armor).toBeLessThanOrEqual(8)
-  expect(hero.armor).toBeGreaterThan(6)
-  hero.armor = 0
-  lastingArmor(hero)
-  expect(hero.armor).toBe(4)
-})
-
-test('Chrono Coil: every 3rd human turn the hero doubles its attacks', () => {
-  const { battle, hero } = arena(['chrono'], [{ x: 11, y: 10 }])
-  battle.round = 1
-  chrono(battle, [])
-  expect(hero.twice).toBe(false)
-  battle.round = 2
-  chrono(battle, [])
-  expect(hero.twice).toBe(true)
+test('Chrono Coil: every CHRONO_EVERY rounds the hero gains 1 Energy more', () => {
+  const { battle } = arena(['chrono'], [{ x: 11, y: 10 }])
+  battle.round = CHRONO_EVERY - 1
+  beginTurn(battle)
+  expect(battle.energy).toBe(ENERGY)
+  battle.round = CHRONO_EVERY
+  beginTurn(battle)
+  expect(battle.energy).toBe(ENERGY + 1)
 })
 
 test('Unbroken Line: every STREAK_FIGHTS fights in a row won pay more', () => {
@@ -139,17 +122,6 @@ test('Unbroken Line: every STREAK_FIGHTS fights in a row won pay more', () => {
   expect(pays[1]).toBe(pays[0] + 3)
 })
 
-test('Living Projectile: an alien thrown onto another hits it for its own HP', () => {
-  const { battle, hero, aliens } = arena(['projectile'], [{ x: 11, y: 10 }, { x: 13, y: 10 }])
-  hero.stats = { ...hero.stats, strength: 6 }
-  Object.assign(aliens[0], { kind: 'swarmling', hp: 7 })
-  aliens[0].stats = { ...aliens[0].stats, move: 4 }
-  battle.actor = hero.id
-  const events = leverage(battle, hero)
-  expect(events.some((e) => e.type === 'throw' && e.thrown === aliens[0].id)).toBe(true)
-  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: aliens[1].id, effect: 'projectile', amount: -7 }))
-})
-
 test('Lofty gear: crit for each level above the target', () => {
   const { battle, hero, aliens } = arena(['lofty'], [{ x: 11, y: 10 }])
   battle.height[10 * GRID + 10] = 3
@@ -159,15 +131,8 @@ test('Lofty gear: crit for each level above the target', () => {
 test("Witch's Hex passes a dead alien's stacks on; Frost Fracture shatters a frozen one over those beside it", () => {
   const { battle, aliens } = arena(['hex', 'fracture'], [{ x: 11, y: 10 }, { x: 12, y: 10 }])
   Object.assign(aliens[0], { mark: 2, frozen: true, chill: 3 })
-  died(battle, aliens[0], null, [])
+  died(battle, aliens[0], [])
   expect(aliens[1].mark).toBe(2)
   expect(aliens[1].hp).toBe(40 - FRACTURE_DAMAGE * 3)
 })
 
-test("Executioner's Oath: every 3rd kill of a battle gives every hero 1 Might", () => {
-  const { battle, hero, aliens } = arena([], [{ x: 11, y: 10 }])
-  battle.rules = ['reckoning']
-  for (let i = 0; i < 3; i++) died(battle, aliens[0], hero, [])
-  expect(battle.kills).toBe(3)
-  expect(hero.might).toBe(1)
-})

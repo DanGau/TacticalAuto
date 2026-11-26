@@ -4,14 +4,14 @@ import type { Action } from '../core/apply'
 import { current, nextStop } from '../core/run'
 import { type Run } from '../core/run-state'
 import { type Report } from '../core/run-state'
-import { makes, owesPick } from '../core/hero'
+import { makes } from '../core/hero'
 import { battlePage, runSummary } from './summary'
 import { installTips } from './tip'
-import { acquired, choice, loot, modal, pickChoice, stopReport } from './aftermath'
+import { acquired, choice, loot, modal, stopReport } from './aftermath'
 import { ALIENS } from '../core/aliens'
 import { TWISTS } from '../core/twists'
 import { CHALLENGES } from '../core/challenges'
-import { type Battle } from '../core/battle'
+import { type Battle, CHRONO_EVERY } from '../core/battle'
 import { HOLD_ROUNDS } from '../core/goals'
 import { missionOrder, THREATS } from '../core/objectives'
 import { button, describe, STOP_NAMES } from './html'
@@ -21,7 +21,6 @@ import { startDeck } from './card-face'
 import { handPanel } from './hand'
 import { ARENA_KINDS } from '../core/arena-kinds'
 import { QUANTITIES } from '../core/quantities'
-import { RECKONING_KILLS } from '../core/doctrines'
 import { pickCard, type Pick } from './cards'
 import { alienBlock } from './sheet'
 import { overworld, type Tab } from './overworld'
@@ -48,12 +47,9 @@ function status(run: Run): string {
   return `${title}${rounds}${clock}${counts(run, battle)}`
 }
 
-/** The hero's counts toward its every-Nth triggers. */
+/** The hero's count toward Chrono Coil's Energy. */
 function counts(run: Run, battle: Battle): string {
-  const turn = (battle.round % 3) + 1
-  const chrono = run.relics.includes('chrono') ? ` · Chrono Coil: turn ${turn} of 3` : ''
-  const oath = battle.rules.includes('reckoning') ? ` · Oath: kill ${battle.kills % RECKONING_KILLS} of ${RECKONING_KILLS}` : ''
-  return `${chrono}${oath}`
+  return run.relics.includes('chrono') ? ` · Chrono Coil: turn ${(battle.round % CHRONO_EVERY) + 1} of ${CHRONO_EVERY}` : ''
 }
 
 /** Before the landing: the ground, what the battle tests, the twist, the aliens, and the rule of the turn. */
@@ -108,8 +104,6 @@ export function createUi(act: (action: Action) => void): Ui {
   /** Whether the story has been told, before the first choice. */
   let told = false
   let candidate: number | null = null
-  /** Whether the hero's skill or perk choice is open over the debrief. */
-  let picking = false
   /** The debrief shown, whether a pop-up has been over it, and the crate open now, by index into run.finds. */
   let opened: { report: Report | null; still: boolean } = { report: null, still: false }
   let crate: number | null = null
@@ -140,19 +134,15 @@ export function createUi(act: (action: Action) => void): Ui {
     if (run.phase === 'select') return !started ? title() : !told ? story() : candidates(run, candidate)
     if (run.phase === 'battle') return ''
     if (run.phase === 'won' || run.phase === 'lost') return runSummary(run)
-    // After a fight: the debrief, where the hero chooses any skill or perk owed, then the rewards.
+    // After a fight: the debrief, then the rewards.
     if (report && seen !== report && report.hero) {
-      if (opened.report !== report) {
-        opened = { report, still: false }
-        picking = false
-      }
-      const learner = picking && owesPick(run.hero) ? run.hero : null
+      if (opened.report !== report) opened = { report, still: false }
       const find = crate !== null && run.finds[crate] ? crate : null
       // A pop-up opened over it leaves the debrief at rest behind: nothing in it plays again.
-      if (learner || find !== null) opened.still = true
+      if (find !== null) opened.still = true
       if (statsOpen && run.log.length > 0) return stopReport(run, report, true) + modal(battlePage(run, run.log.at(-1)!))
       const debrief = stopReport(run, report, opened.still)
-      return learner ? debrief + modal(pickChoice(run, learner, armed)) : find !== null ? debrief + loot(run, find, armed) : debrief
+      return find !== null ? debrief + loot(run, find, armed) : debrief
     }
     if (run.phase === 'reward') return `${report ? `<small>${STOP_NAMES[report.stop]}${report.hero ? (report.won ? ' won' : ' lost') : ''}</small>` : ''}${choice(run, armed)}`
     if (run.phase === 'shop' || run.phase === 'event') {
@@ -364,7 +354,6 @@ export function createUi(act: (action: Action) => void): Ui {
     }
     else if (target.dataset.stats !== undefined) statsOpen = target.dataset.stats === 'open'
     else if (target.dataset.seen) seen = shown!.report
-    else if (target.dataset.ability) picking = true
     else if (target.dataset.crate) crate = Number(target.dataset.crate)
     else if (target.dataset.ware !== undefined) {
       ware = target.dataset.ware ? Number(target.dataset.ware) : null

@@ -1,9 +1,7 @@
-import { powerOf } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { beat } from './roads'
 import { fightPath, goalOf } from './pathing'
-import { skirmish } from './abilities'
 import { soldierUnit } from './spawn'
 import type { GameEvent } from './combat-event'
 import { CIVILIAN_SUPPLIES, CIVILIANS, CIVILIANS_PER_THREAT, HOLD_ROUNDS, RESCUE_QUORUM, type Goal } from './goals'
@@ -14,7 +12,6 @@ import { road, enterAt, begun } from './roads'
 import { type Run } from './run-state'
 import { endBattle } from './debrief'
 import { RISKS } from './missions'
-import { XP } from './hero'
 import { LOSS_THREAT } from './progress'
 import { STOP_THREAT } from './progress'
 import { THREAT_MAX } from './progress'
@@ -22,7 +19,6 @@ import { THREAT_MAX } from './progress'
 /** A run about to fight a battle of `goal`, with six aliens. */
 function before(goal: Goal): Run {
   const run = begun(1)
-  run.hero.skills = [powerOf(run.hero.cls!)]
   apply(run, { type: 'go', index: 1 })
   road(run, [{ kind: 'battle', risk: 'standard', goal, terrain: 'town', challenge: null, twist: null, aliens: Array.from({ length: 6 }, () => 'trooper' as const) }])
   apply(run, { type: 'advance' })
@@ -60,7 +56,7 @@ test('a crossing is won once the hero reaches the extraction zone at the objecti
   expect(battle.winner).toBe('human')
 })
 
-test('a rescue pays supplies and experience for each civilian saved or alive', () => {
+test('a rescue pays supplies for each civilian saved or alive', () => {
   const rescue = before('rescue')
   enterAt(rescue)
   expect(rescue.battle!.units.filter((u) => u.civilian)).toHaveLength(CIVILIANS)
@@ -72,7 +68,6 @@ test('a rescue pays supplies and experience for each civilian saved or alive', (
   rescue.battle!.winner = 'human'
   endBattle(rescue)
   expect(rescue.report!.rescued).toBe(alive)
-  expect(rescue.report!.hero!.earned).toContainEqual({ label: `${alive} civilians saved`, xp: alive * XP.civilian })
   expect(rescue.supplies).toBe(supplies + RISKS.standard.supplies + alive * CIVILIAN_SUPPLIES)
 
 })
@@ -209,12 +204,11 @@ test('no one shot kills a commander from full health; brought low, it blinks awa
   battle.units = battle.units.filter((u) => u.side !== 'alien' || u === commander)
   Object.assign(commander, { revealed: true, engaged: true })
   const soldier = battle.units.find(isSoldier)!
-  Object.assign(soldier, freeTilesNear(battle, commander, 2)[1], { weapon: 'sniper', spent: ['throw', 'throw', 'throw'], stats: { ...soldier.stats, damage: 99, crit: 1, move: 0 } })
+  Object.assign(soldier, freeTilesNear(battle, commander, 2)[1], { weapon: 'sniper', stats: { ...soldier.stats, damage: 99, crit: 1, move: 0 } })
   Object.assign(battle, { turn: 'human', stage: 'move' })
   const events: GameEvent[] = []
   while (battle.phase === 'battle' && !events.some((e) => e.type === 'shot' && e.target === commander.id)) events.push(...beat(battle))
   expect(commander.hp).toBe(1)
-  expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: commander.id, effect: 'lastStand', amount: 0 }))
   expect(events).toContainEqual(expect.objectContaining({ type: 'move', id: commander.id, with: 'blink' }))
 })
 
@@ -231,16 +225,14 @@ function gettingOut(goal: Goal) {
   return { battle, soldier }
 }
 
-test('getting out, a slow hero leaves what it would stand beside, and takes no step back', () => {
+test('getting out, a slow hero leaves what it would stand beside', () => {
   const { battle, soldier } = gettingOut('hold')
   const toExtract = walkingDistances(battle, battle.extract!)
   const walk = (t: { x: number; y: number }) => toExtract[t.y * GRID + t.x]
   soldier.stats = { ...soldier.stats, move: 1 }
-  soldier.effects = ['skirmish']
-  const mate = soldierUnit(battle, { soldier: 99, stats: soldier.stats, hp: 9, ability: null, charges: 0, stance: 'balanced', effects: [] }, freeTilesNear(battle, soldier, 8).reduce((a, b) => (walk(b) > walk(a) ? b : a)))
+  const mate = soldierUnit(battle, { soldier: 99, stats: soldier.stats, hp: 9, stance: 'balanced', effects: [] }, freeTilesNear(battle, soldier, 8).reduce((a, b) => (walk(b) > walk(a) ? b : a)))
   battle.units.push(mate)
   const from = walk(soldier)
   expect(walk(fightPath(battle, soldier).at(-1)!)).toBeLessThan(from)
-  expect(skirmish(battle, soldier)).toEqual([])
 })
 

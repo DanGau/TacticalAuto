@@ -1,5 +1,5 @@
 // Relics: what each does, and which may be offered.
-import { ADRENAL_FROM, ADRENAL_MAX, BRIDGE_FACTOR, THERMAL_FACTOR, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, GUARD_MAX, LODESTONE_REACH, MIGHT_MAX, PHOENIX_HEALTH, SHELL_MAX, STAGGER_DAMAGE, type RelicEffect, type Stats } from './battle'
+import { ADRENAL_FROM, CHRONO_EVERY, ADRENAL_MAX, BRIDGE_FACTOR, THERMAL_FACTOR, BURN_STACKS, CATALYST_EVERY, FRACTURE_DAMAGE, GUARD_MAX, LODESTONE_REACH, MIGHT_MAX, PHOENIX_HEALTH, SHELL_MAX, STAGGER_DAMAGE, type RelicEffect, type Stats } from './battle'
 import type { Rarity } from './base'
 import { random } from './rng'
 import { MOMENTUM_MAX } from './attack'
@@ -23,8 +23,6 @@ export interface Relic extends Flow {
   stats?: Partial<Stats>
   /** Given to the hero. */
   effect?: RelicEffect
-  /** Added to the uses of every class ability that has uses. */
-  charges?: number
   /** Added to the supplies each won battle pays. */
   supplies?: number
   /** Whether every piece of gear found is rare or better. */
@@ -39,8 +37,6 @@ export interface Relic extends Flow {
 
 /** The fights in a row a clean streak pays after. */
 export const STREAK_FIGHTS = 2
-/** The battles Zenith Chronometer's come every. */
-export const ZENITH_EVERY = 3
 
 /** What each stack a payoff spends adds, in words. */
 const SPENT = TUNING.spend.factor === 1 ? 'damage' : `${TUNING.spend.factor}× damage`
@@ -55,7 +51,6 @@ const relics = {
   plating: { name: 'Adaptive Plating', text: 'Start of turn: regain 1 Armor.', makes: ['armor'], effect: 'rearm' },
   nanites: { name: 'Hunger Nanites', text: `On kill, heal 2, up to ${TUNING.healCap} each battle.`, reads: ['kill'], effect: 'feast' },
   phoenix: { name: 'Phoenix Protocol', text: `First fall each battle: get up with ${PHOENIX_HEALTH} HP.`, effect: 'phoenix' },
-  echo: { name: 'Echo Chamber', text: 'Class abilities with limited uses gain 1 use.', charges: 1 },
   drones: { name: 'Scavenger Drones', text: 'Battles won pay 1 more supply.', supplies: 1 },
   contact: { name: 'Black Market Contact', text: 'Gear found is rare or better.', rareGear: true },
   uplink: { name: "Seer's Uplink", text: 'The flight map names the aliens at each stop.', recon: true },
@@ -71,9 +66,8 @@ const relics = {
   rite: { name: 'Blood Rite', text: `On kill, gain 1 Might, up to ${MIGHT_MAX}.`, reads: ['kill'], makes: ['overkill'], effect: 'bloodRite' },
   impetus: { name: 'Kinetic Engine', text: 'Impact: deal your damage again.', reads: ['impact'], effect: 'impetus' },
   catalyst: { name: 'Catalyst Prism', text: `Every ${CATALYST_EVERY}rd hit doubles the target's Burn, Chill and Mark.`, reads: ['burn', 'chill', 'mark', 'shots'], rarity: 'epic', effect: 'catalyst' },
-  chrono: { name: 'Chrono Coil', text: 'Every 3rd turn, double your attacks.', effect: 'chrono' },
+  chrono: { name: 'Chrono Coil', text: `Every ${CHRONO_EVERY}rd turn, gain 1 Energy.`, effect: 'chrono' },
   satchel: { name: 'Tactical Satchel', text: 'Draw 1 more card each turn.', effect: 'satchel' },
-  zenith: { name: 'Zenith Chronometer', text: `Every ${ZENITH_EVERY}rd battle, your tier 4 skill has 2 uses.`, rarity: 'epic', effect: 'zenith' },
   streak: { name: 'Unbroken Line', text: `Every ${STREAK_FIGHTS}nd battle won in a row pays 3 more supplies.`, rarity: 'common', streak: 3 },
   fracture: { name: 'Frost Fracture', text: `When a Frozen alien dies, deal ${FRACTURE_DAMAGE} damage per Chill on it to adjacent aliens.`, reads: ['chill', 'kill'], rarity: 'epic', effect: 'fracture' },
   conductor: { name: 'Cryo Conductor', text: 'On hit on a Chilled alien, apply half its Chill to adjacent aliens.', reads: ['chill'], makes: ['chill'], effect: 'conductor' },
@@ -93,7 +87,6 @@ const relics = {
   shredder: { name: 'Shredder Charges', text: `On landing, aliens within ${CHARGE_REACH} tiles lose their Armor and take ${TUNING.impactDamage} damage.`, effect: 'entryShred' },
   cryo: { name: 'Cryo Charges', text: `On landing, deal ${TUNING.impactDamage} damage to aliens within ${CHARGE_REACH} tiles. Apply 1 Chill.`, makes: ['chill'], effect: 'entryFrost' },
   bulwark: { name: 'Pop-up Barricades', text: 'On landing, raise an adjacent barricade toward the nearest alien.', effect: 'entryWall' },
-  turrets: { name: 'Turret Drop', text: 'On landing, drop an adjacent turret. It never moves and has long range.', effect: 'entryTurret' },
   // The goals.
   beacon: { name: 'Evac Beacon', text: `Rescue civilians from ${BEACON_REACH} tiles away.`, effect: 'beacon' },
   charity: { name: 'Refugee Network', text: 'Civilians saved pay 1 more supply.', civilianSupplies: 1 },
@@ -105,11 +98,11 @@ const relics = {
   ledger: { name: 'Dead Eye Ledger', text: 'Consuming Mark leaves it in place.', reads: ['mark'], rarity: 'epic', effect: 'ledger' },
   gravity: { name: 'Gravity Lens', text: 'First hit each attack: Knockback 1. A boss is Displaced instead.', makes: ['moved', 'impact'], rarity: 'epic', effect: 'gravity' },
   ironclad: { name: 'Ironclad Lattice', text: 'Double every Armor cap.', reads: ['armor'], rarity: 'epic', effect: 'ironclad' },
-  split: { name: 'Split Rounds', text: 'Fire double the shots, each at half power.', reads: ['shots'], makes: ['shots'], rarity: 'epic', effect: 'split' },
+  split: { name: 'Split Rounds', text: 'Attacks hit double the times, each for half damage.', reads: ['shots'], makes: ['shots'], rarity: 'epic', effect: 'split' },
   ram: { name: 'Ram Plating', text: 'Hits deal extra damage equal to your Armor, up to your damage.', reads: ['armor'], makes: ['overkill'], effect: 'ram' },
   overflow: { name: 'Overflow Capacitor', text: `Healing past full HP or its cap becomes Armor, up to ${GUARD_MAX} above base.`, makes: ['armor'], effect: 'overflow' },
   adrenal: { name: 'Adrenal Pump', text: `On your ${ADRENAL_FROM + 1}rd turn, gain ${ADRENAL_MAX} Might.`, makes: ['overkill'], effect: 'adrenal' },
-  hairTrigger: { name: 'Hair Trigger', text: 'Weapons with 2 or more shots fire 1 more.', makes: ['shots'], rarity: 'common', effect: 'hairTrigger' },
+  hairTrigger: { name: 'Hair Trigger', text: 'Attacks that hit 2+ times hit 1 more time.', makes: ['shots'], rarity: 'common', effect: 'hairTrigger' },
   stagger: { name: 'Stagger Sights', text: `Deal ${STAGGER_DAMAGE} more damage to aliens Displaced since their last turn.`, reads: ['moved'], effect: 'stagger' },
   lodestone: { name: 'Lodestone Harness', text: `Start of turn: Pull the nearest alien within ${LODESTONE_REACH} tiles to adjacent.`, makes: ['moved', 'hurt'], effect: 'lodestone' },
   shell: { name: 'Reactive Shell', text: `First hit taken each round: gain 1 Armor, up to ${SHELL_MAX} above base.`, reads: ['hurt'], makes: ['armor'], rarity: 'common', effect: 'shell' },

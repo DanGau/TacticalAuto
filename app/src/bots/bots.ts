@@ -2,14 +2,12 @@
 import type { Action } from '../core/apply'
 import { strategic } from './strategic'
 import { bestPlay, randomPlay } from './play'
-import { plannedPerk, plannedSkill } from '../core/plans'
 import { CARDS, type CardId } from '../core/cards'
-import { UPGRADED } from '../core/deck'
+import { STARTER, UPGRADED } from '../core/deck'
 import { CARD_PRICE } from '../core/rewards'
 import type { Flow } from '../core/quantities'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
-import { SKILLS } from '../core/skills'
 import { EFFECTS, type Gear } from '../core/gear'
 import { MEDKIT, EVENTS, RELIC_PRICE } from '../core/events'
 import { current, legOf, ways } from '../core/run'
@@ -17,7 +15,7 @@ import { type Run } from '../core/run-state'
 import { type Risk } from '../core/run-state'
 import { danger } from '../core/missions'
 import { GEAR_PRICE } from '../core/rewards'
-import { health, level, makes, minorOffers, reads, skillOffers, soldierStats, wounded } from '../core/hero'
+import { health, makes, reads, soldierStats, wounded } from '../core/hero'
 
 /** Chooses the next action whenever the run waits for the player. `rng` is the bot's own, separate from the run's. */
 export type Bot = (run: Run, rng: { rng: number }) => Action
@@ -66,9 +64,8 @@ const rarest = (ids: CardId[]) => ids.reduce((best, id, i) => (RANK[CARDS[id].ra
 const FULL = 16
 
 /**
- * The reward phase's next choice: a relic, then finds, then cards, an upgrade, then skills. A random bot equips a find
- * or sells it, takes a card or skips, at random; any other takes the rarest card, skipping commons once the deck is FULL,
- * and learns skills along its class's plan unless it picks by synergy.
+ * The reward phase's next choice: a relic, then finds, then cards, then an upgrade. A random bot equips a find or sells
+ * it, takes a card or skips, at random; any other takes the rarest card, skipping commons once the deck is FULL.
  */
 function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
   if (run.relicOffers.length > 0) return { type: 'relic', index: pick(run, rng, run.relicOffers.map((id) => RELICS[id])) }
@@ -83,10 +80,7 @@ function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
     const best = rarest(run.cardOffers)
     return { type: 'card', index: CARDS[run.cardOffers[best]].rarity === 'common' && run.deck.length >= FULL ? null : best }
   }
-  if (run.upgrading) return { type: 'upgrade', index: heroHealth(run) < HURT || open.length === 0 ? null : open[rarest(open.map((i) => run.deck[i].id))] }
-  const offers = skillOffers(run.hero)
-  if (offers.length === 0) return { type: 'perk', index: pick === PICKS.random ? randomInt(rng, minorOffers(run.hero).length) : plannedPerk(run.hero) }
-  return { type: 'skill', index: pick === PICKS.first ? plannedSkill(run.hero) : pick(run, rng, offers.map((id) => SKILLS[id])) }
+  return { type: 'upgrade', index: heroHealth(run) < HURT || open.length === 0 ? null : open[rarest(open.map((i) => run.deck[i].id))] }
 }
 
 /** Purchases the run can pay for now: gear that fits the hero, relics, cards, then a medkit while the hero is hurt. */
@@ -103,8 +97,9 @@ const affordable = (run: Run): Action[] => [
 const heroHealth = (run: Run) => health(run, run.hero) / soldierStats(run, run.hero).hp
 const HURT = 0.6
 
-/** Takes the safest stops until the hero reaches level 3, then the most dangerous. */
-const growing = (run: Run): Risk => (level(run.hero) >= 3 ? 'dangerous' : 'safe')
+/** Takes the safest stops until the deck has grown by GROWN cards, then the most dangerous. */
+const growing = (run: Run): Risk => (run.deck.length >= STARTER.strikes + STARTER.defends + 2 + GROWN ? 'dangerous' : 'safe')
+const GROWN = 3
 
 /**
  * One way to play: how much danger to take at each choice of way, how to choose offers, how to go in, whether to spend at

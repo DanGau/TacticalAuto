@@ -2,7 +2,7 @@
 import { BLAST_RADIUS, type Battle } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { srcOf } from '../core/sources'
-import { overlaps, staggerOf } from '../core/pace'
+import { overlaps, STAGGER } from '../core/pace'
 import type { Run } from '../core/run-state'
 import type { Frame } from '../ui/briefing'
 import { drawTerrain } from './board'
@@ -138,7 +138,6 @@ export async function createView(): Promise<View> {
     settle: () => attacks,
     async show(run, events, animate) {
       const { fx, sprites } = s
-      s.hero = run.hero
       keys(run.phase === 'battle' && !!run.battle)
       fx.clear()
       const battle = run.battle
@@ -154,7 +153,7 @@ export async function createView(): Promise<View> {
         // An attack lets the next start a stagger later, so a side's attacks land one after another; the beat after them settles the picture.
         const playing = play(s, battle, events)
         attacks = Promise.all([attacks, playing]).then(() => {})
-        await Promise.race([playing, s.tween(staggerOf(events), () => {})])
+        await Promise.race([playing, s.tween(STAGGER, () => {})])
         return
       }
       if (animate) {
@@ -162,7 +161,7 @@ export async function createView(): Promise<View> {
         await play(s, battle, events)
       }
       sync(s, run, battle)
-      if (events.some((e) => e.type === 'rocket' || (e.type === 'effect' && e.effect === 'demolish'))) drawTerrain(s, battle)
+      if (events.some((e) => e.type === 'rocket')) drawTerrain(s, battle)
       drawFog(s, battle, true)
       if (!animate) {
         if (battle.phase !== 'deploy') s.look(home(settled(s.camera.yaw)))
@@ -183,7 +182,7 @@ export async function createView(): Promise<View> {
           const b = chest(to)
           fx.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: e.crit ? COLOR.crit : COLOR.hit, width: 3 })
           shotCallout(s, e, to)
-          if (e.with.length > 0) callout(s, e.with.map((effect) => tagText(s, srcOf(effect))).join(' · '), SOURCE[e.src.kind].color, from)
+          if (e.with.length > 0) callout(s, e.with.map((effect) => tagText( srcOf(effect))).join(' · '), SOURCE[e.src.kind].color, from)
         }
       }
       s.render()

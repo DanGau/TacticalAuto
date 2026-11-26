@@ -7,10 +7,8 @@ import type { ArenaKind } from './arena-kinds'
 import type { Goal } from './goals'
 import type { ContinentId, LonLat, City } from './world'
 import type { ClassId } from './classes'
-import type { FeatId, Tally } from './feats'
+import type { Tally } from './battle'
 import type { Gear } from './gear'
-import type { SkillId } from './skills'
-import type { PerkId } from './perks'
 import type { Card, CardId } from './cards'
 import type { ChallengeId } from './challenges'
 import type { RelicId } from './relics'
@@ -23,7 +21,7 @@ export type Risk = 'safe' | 'standard' | 'dangerous'
 
 /**
  * A stop on the road. A battle must be fought. A supply drop gives supplies and a cache gives gear, with no fight.
- * A shop sells gear, relics and a medkit. A safehouse heals the hero fully, in place of a battle. An unknown stop is revealed on arrival as a battle, a shop or an event.
+ * A shop sells gear, relics and a medkit. A safehouse rests or upgrades a card, in place of a battle. An unknown stop is revealed on arrival as a battle, a shop or an event.
  * A key mission, at a satellite, wins an access key; the final mission strikes the alien source. Both have a boss.
  */
 export type StopKind = 'battle' | 'supply' | 'cache' | 'shop' | 'unknown' | 'safehouse' | 'key' | 'final'
@@ -94,25 +92,14 @@ export interface Mission {
 export interface Soldier {
   id: number
   name: string
-  xp: number
   /** Drawn at random when the soldier is made. */
   cls: ClassId | null
-  /** In the order learned; none at level 1. */
-  skills: SkillId[]
-  /** Feats it has pulled off, each paying experience only the first time. */
-  feats: FeatId[]
   /** Its one item, the weapon it fights with. */
   gear: Gear | null
   /** The city it waits in at the run's start, where the journey sets out. */
   home: City
   /** Health lost and not yet healed; it carries from battle to battle. */
   wounds: number
-  /** Draws the skills it is offered at each level. */
-  seed: number
-  /** Skills offered and turned down: gone for the run. */
-  lost: SkillId[]
-  /** Minor perks, in the order picked. */
-  perks: PerkId[]
 }
 
 /** What the last stop changed, for the player to review. */
@@ -126,11 +113,8 @@ export interface Report {
   supplies: number
   /** Whether an access key was won. */
   key: boolean
-  /**
-   * The hero after a battle; null for an event. `earned` is what its experience came from; `feats`, those first
-   * pulled off; `tally`, what it did in the battle.
-   */
-  hero: { xpBefore: number; xpAfter: number; earned: Earned[]; feats: FeatId[]; hp: number; maxHp: number; tally: Tally } | null
+  /** The hero after a battle, and what it did there; null for an event. */
+  hero: { hp: number; maxHp: number; tally: Tally } | null
   /** Civilians kept alive on a rescue; null on any other stop. */
   rescued: number | null
 }
@@ -145,12 +129,6 @@ export interface Fought {
   won: boolean
   rounds: number
   tally: Tally
-}
-
-/** Experience from one source. */
-export interface Earned {
-  label: string
-  xp: number
 }
 
 /** A shop's stock, each item staying in its place once sold, and whether its medkit is bought and a card removed. */
@@ -193,6 +171,8 @@ export interface Run {
   report: Report | null
   hero: Soldier
   supplies: number
+  /** Max HP the hero has gained from cards and events. */
+  maxHp: number
   /** Gear found and not yet put on the hero or sold. */
   finds: Gear[]
   nextGear: number
@@ -208,7 +188,7 @@ export interface Run {
   streak: number
   /** Cards offered after a battle: the player adds one to the deck, or skips. */
   cardOffers: CardId[]
-  /** At a safehouse: the player rests, healing fully, or upgrades a card. */
+  /** At a safehouse: the player rests, healing REST_HEAL of max HP, or upgrades a card. */
   upgrading: boolean
   /** Relics to choose from in the reward phase. */
   relicOffers: RelicId[]

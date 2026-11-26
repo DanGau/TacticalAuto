@@ -2,21 +2,17 @@
 import { starterDeck } from './deck'
 import { deal } from './turn'
 import { type Reserve } from './battle'
-import { secondaryOf } from './hero'
 import { createBattle } from './setup'
 import { CLASSES } from './classes'
-import { DOCTRINES, KILL_REWARDS, type Doctrine, type Rule } from './doctrines'
 import { EXAMS, type Exam } from './exams'
-import { RELICS, ZENITH_EVERY, type Relic } from './relics'
-import { SKILLS } from './skills'
-import { PERKS } from './perks'
+import { RELICS, type Relic } from './relics'
 import { type TerrainKind } from './terrain'
 import { random, randomInt } from './rng'
 import { TOWNS } from './towns'
 import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
 import { LEG_STOPS, OPENING, REST_COLUMNS, STOP_THREAT, THREAT_MAX } from './progress'
-import { abilityOf, charges, health, offerCandidates, soldierStats, weaponOf } from './hero'
+import { health, offerCandidates, soldierStats, weaponOf } from './hero'
 import { dropGear, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
 import { forceOf, type ChallengeId } from './challenges'
@@ -334,6 +330,7 @@ export function createRun(seed: number): Run {
     report: null,
     hero: null!,
     supplies: START_SUPPLIES,
+    maxHp: 0,
     finds: [],
     nextGear: 1,
     relics: [],
@@ -394,33 +391,22 @@ export function advance(run: Run): void {
   }
   const goal = stop === 'battle' ? here.goal : stop === 'ambush' ? 'ambush' : 'cross'
   const mission = missionAt(run, stop, here.risk, goal)
-  const rules = run.doctrines.map((id) => (DOCTRINES[id] as Doctrine).rule).filter((rule): rule is Rule => !!rule)
   run.mission = mission
   run.phase = 'battle'
   const challenge = stop === 'battle' || stop === 'key' || stop === 'final' ? here.challenge : null
-  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), [reserveOf(run, rules)], mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city, ground: here.ground } : undefined, challenge)
+  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), [reserveOf(run)], mission.goal, here.twist, here.region && here.city ? { region: here.region, city: here.city, ground: here.ground } : undefined, challenge)
   deal(run.battle, run.deck)
 }
 
-/** The hero as it goes into a battle under `rules`: its stats, health, kit and every effect it carries. */
-export function reserveOf(run: Run, rules: Rule[]): Reserve {
-  const doctrines = run.doctrines.map((id): Doctrine => DOCTRINES[id])
+/** The hero as it goes into a battle: its stats, health, way of standing and every effect its gear and relics give. */
+export function reserveOf(run: Run): Reserve {
   const s = run.hero
   return {
     soldier: s.id,
     stats: soldierStats(run, s),
+    weapon: s.gear?.weapon,
     hp: health(run, s),
-    ability: abilityOf(s),
-    charges: charges(run, s),
-    secondary: secondaryOf(s),
-    weapon: doctrines.find((d) => d.fights)?.fights ?? s.gear?.weapon,
-    stance: doctrines.find((d) => d.stance)?.stance ?? weaponOf(s)?.stance ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
-    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...s.perks.flatMap((id) => PERKS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])].filter(
-      // Zenith Chronometer works every ZENITH_EVERY battles; under Executioner's Oath a kill pays a hero nothing.
-      (effect) => (effect !== 'zenith' || (run.log.length + 1) % ZENITH_EVERY === 0) && !(rules.includes('reckoning') && KILL_REWARDS.includes(effect)),
-    ),
+    stance: weaponOf(s)?.stance ?? (s.cls ? CLASSES[s.cls].stance : 'balanced'),
+    effects: [s.gear?.effect, ...run.relics.map((id) => RELICS[id].effect)].flatMap((effect) => effect ?? []),
   }
 }
-
-
-

@@ -2,7 +2,7 @@
 import { fx, srcOf } from './sources'
 import { BURN_STACKS, CHILL_SLIDE, GRID, type Battle, type Effect, type Tile, type Unit } from './battle'
 import type { GameEvent } from './combat-event'
-import { blocked, CLIFF, distance, edgeBetween, freeTilesNear, heightAt, onGrid, openNear, unitAt, unwalled, walks } from './grid'
+import { blocked, CLIFF, distance, edgeBetween, freeTilesNear, heightAt, onGrid, unitAt, unwalled, walks } from './grid'
 import { fireproof, foeHas, has, onTile } from './fighters'
 import { SLAM_DAMAGE, wound } from './wound'
 import { displaced, fell, kindle, slammed, strikerOf } from './stacks'
@@ -38,7 +38,7 @@ export const fallDamage = (unit: Unit, levels: number) => (levels > unit.stats.j
 /** Whether `target`, driven a tile along `step`, is hurt off a ledge or lost over the edge. */
 const fellsAlong = (battle: Battle, target: Unit, step: Tile) => {
   const beyond = fallBeyond(battle, target, { x: target.x + step.x, y: target.y + step.y })
-  if (beyond === 0 || has(target, 'hover')) return false
+  if (beyond === 0) return false
   return beyond === 'drop' ? !target.boss : fallDamage(target, beyond) > 0
 }
 
@@ -79,14 +79,13 @@ function shatter(battle: Battle, from: Tile, to: Tile): void {
 
 /**
  * `unit`, standing on `from`, goes over toward `to`. Over the edge, a hero or a boss catches it and takes EDGE_DAMAGE,
- * and any other alien is lost; one that hovers stays where it is. Off a ledge it lands below, hurt by fallDamage, as
+ * and any other alien is lost. Off a ledge it lands below, hurt by fallDamage, as
  * is whoever stands there, and lands beside them. A fall ignores armor.
  */
 export function fall(battle: Battle, unit: Unit, from: Tile, to: Tile, events: GameEvent[]): void {
   const beyond = fallBeyond(battle, from, to)
   if (beyond === 0) return
   shatter(battle, from, to)
-  if (has(unit, 'hover')) return void events.push(fx(unit.id, 'hover', 0))
   if (beyond === 'drop') {
     const caught = unit.side === 'human' || unit.boss
     const event: Extract<GameEvent, { type: 'fall' }> = { type: 'fall', id: unit.id, to, drop: 'edge', damage: caught ? EDGE_DAMAGE : unit.hp }
@@ -208,11 +207,3 @@ export function pull(battle: Battle, target: Unit, to: Tile, events: GameEvent[]
 
 /** Whether the acting hero's knockbacks knock on, by Domino Rig. */
 const dominoes = (battle: Battle) => battle.units.some((u) => u.id === battle.actor && u.side === 'human' && has(u, 'domino'))
-
-/** A unit over the void that no longer levitates drifts to the nearest open ground, unhurt. */
-export function settle(battle: Battle, unit: Unit): GameEvent[] {
-  if (has(unit, 'hover') || !isDrop(battle, unit)) return []
-  const to = openNear(battle, unit)
-  Object.assign(unit, to)
-  return [{ type: 'move', src: srcOf('hover'), id: unit.id, path: [to], with: 'hover' }]
-}

@@ -7,8 +7,7 @@ import { ARENA_KINDS } from '../core/arena-kinds'
 import { CARD_PRICE, GEAR_PRICE, REMOVE_PRICE } from '../core/rewards'
 import { current, legOf, ways } from '../core/run'
 import { type Run, type Soldier, type Stop } from '../core/run-state'
-import { plannedPerk, plannedSkill } from '../core/plans'
-import { health, makes, minorOffers, reads, skillOffers, soldierStats } from '../core/hero'
+import { health, makes, reads, soldierStats } from '../core/hero'
 import { RELICS, type RelicId } from '../core/relics'
 import { CANCELS, cancelling, type Cancel, type Flow } from '../core/quantities'
 import { CARDS, type CardId } from '../core/cards'
@@ -47,7 +46,7 @@ function route(run: Run, rest?: number): Action {
 
 const RARITY = { common: 0, rare: 2, epic: 4 }
 
-/** What a weapon is worth to the hero: its rarity, what its effect adds to the combos, and a little to keep the weapon its skills were planned on. */
+/** What a weapon is worth to the hero: its rarity, what its effect adds to the combos, and a little to keep the weapon its Strikes are for. */
 function gearWorth(run: Run, gear: Gear | null): number {
   if (!gear) return -1
   const bare = { ...run, hero: { ...run.hero, gear: null } }
@@ -101,7 +100,7 @@ export function comboWorth(run: Run, flow: Flow & { bridge?: Cancel }): number {
 /** What a relic is worth to the hero: see comboWorth. */
 const relicWorth = (run: Run, id: RelicId) => comboWorth(run, RELICS[id])
 
-/** Takes the relic worth the most, the first among equals; the card offered worth the most if it lifts the deck, else skips; rests when hurt, else upgrades the card worth the most; and the skill and perk the hero plans on. */
+/** Takes the relic worth the most, the first among equals; the card offered worth the most if it lifts the deck, else skips; rests when hurt, else upgrades the card worth the most. */
 function reward(run: Run): Action {
   if (run.relicOffers.length > 0) {
     const score = (id: RelicId, i: number) => relicWorth(run, id) + (i === 0 ? 1 : 0)
@@ -112,14 +111,9 @@ function reward(run: Run): Action {
     const best = run.cardOffers.reduce((b, id, i) => (cardWorth(run, id) > cardWorth(run, run.cardOffers[b]) ? i : b), 0)
     return { type: 'card', index: lifts(run, run.cardOffers[best]) ? best : null }
   }
-  if (run.upgrading) {
-    const open = run.deck.flatMap((c, i) => (c.level < UPGRADED ? [i] : []))
-    if (heroHealth(run) < REST || open.length === 0) return { type: 'upgrade', index: null }
-    return { type: 'upgrade', index: open.reduce((b, i) => (cardWorth(run, run.deck[i].id) > cardWorth(run, run.deck[b].id) ? i : b)) }
-  }
-  if (skillOffers(run.hero).length > 0) return { type: 'skill', index: plannedSkill(run.hero) }
-  if (minorOffers(run.hero).length > 0) return { type: 'perk', index: plannedPerk(run.hero) }
-  throw new Error('nothing to choose')
+  const open = run.deck.flatMap((c, i) => (c.level < UPGRADED ? [i] : []))
+  if (heroHealth(run) < REST || open.length === 0) return { type: 'upgrade', index: null }
+  return { type: 'upgrade', index: open.reduce((b, i) => (cardWorth(run, run.deck[i].id) > cardWorth(run, run.deck[b].id) ? i : b)) }
 }
 
 /** Classes by how many runs a hero of each wins, on the same seeds. */

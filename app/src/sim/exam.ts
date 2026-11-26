@@ -1,8 +1,11 @@
-// The exam lab: a fixed hero holding each loadout fights each Guardian exam and a late elite, on many seeds, and prints rounds to fell it, health lost, and each combo's synergy.
+// The exam lab: a fixed hero holding each loadout, playing its weapon's starter deck as the strategic bot does, fights each Guardian exam and a late elite, on many seeds, and prints rounds to fell it, health lost, and each combo's synergy.
 import { parseArgs } from 'node:util'
 import { arena } from '../core/arena'
 import { BASE_STATS, isSoldier, type Battle, type Effect, type Stats, type Unit } from '../core/battle'
-import { stepBattle } from '../core/combat'
+import { awaiting, stepBattle } from '../core/combat'
+import { starterDeck } from '../core/deck'
+import { deal, endTurn } from '../core/turn'
+import { bestPlay } from '../bots/play'
 import { EXAMS, type Exam } from '../core/exams'
 import { RELICS } from '../core/relics'
 import { WEAPONS, type WeaponId } from '../core/weapons'
@@ -33,12 +36,21 @@ function fight(seed: number, foe: Exam | 'elite', { effects, stats }: Kit): { ro
   battle.rng = seed * 7919 + FIGHTS.indexOf(foe)
   const [hero, boss, ...escorts] = battle.units
   const weapon = ARMS[seed % ARMS.length]
-  const heroes: Unit[] = [{ ...structuredClone(hero), x: 10, y: 12, weapon, effects: [...effects, ...(WEAPONS[weapon].effect ? [WEAPONS[weapon].effect!] : [])], stance: WEAPONS[weapon].stance ?? 'balanced', ...withStats({ ...BASE_STATS, hp: 40, armor: 2, damage: 6, crit: 0.25, move: 4, range: 6 }, stats) }]
+  const heroes: Unit[] = [{ ...structuredClone(hero), x: 10, y: 12, effects, stance: WEAPONS[weapon].stance ?? 'balanced', ...withStats({ ...BASE_STATS, hp: 40, armor: 2, damage: 6, crit: 0.25, move: 4, range: 6 }, stats) }]
   Object.assign(boss, { boss: true, effects: foe === 'elite' ? [] : [foe], hp: BOSS.hp, stats: { ...boss.stats, hp: BOSS.hp, damage: foe === 'elite' ? BOSS.damage + 1 : BOSS.damage, move: 3, range: 5 } })
   for (const e of escorts) Object.assign(e, { hp: ESCORT.hp, stats: { ...e.stats, hp: ESCORT.hp, damage: ESCORT.damage, move: 3, range: 5 } })
   battle.units = [...heroes, boss, ...escorts]
   const most = heroes.reduce((sum, h) => sum + h.hp, 0)
-  while (battle.phase === 'battle' && boss.hp > 0 && battle.round < MOST_ROUNDS && heroes.some((h) => h.hp > 0)) stepBattle(battle)
+  deal(battle, starterDeck(null, weapon))
+  while (battle.phase === 'battle' && boss.hp > 0 && battle.round < MOST_ROUNDS && heroes.some((h) => h.hp > 0)) {
+    if (!awaiting(battle)) {
+      stepBattle(battle)
+      continue
+    }
+    const play = bestPlay(battle, true)
+    if (play.type === 'play') battle.queued = { index: play.index, target: play.target }
+    else endTurn(battle)
+  }
   const left = battle.units.filter(isSoldier).reduce((sum, h) => sum + Math.max(0, h.hp), 0)
   return { rounds: boss.hp > 0 ? MOST_ROUNDS : battle.round, lost: (most - left) / most }
 }
