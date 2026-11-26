@@ -80,7 +80,7 @@ const cards = {
   slash: strike('Slash', [6, 9]),
   shieldBash: strike('Shield Bash', [4, 5], undefined, { block: [3, 4], makes: ['armor'] }),
   jab: strike('Jab', [2, 3], undefined, { hits: 2, knock: 1, makes: ['shots', 'moved'] }),
-  defend: { name: 'Defend', type: 'skill', rarity: 'basic', cost: 1, block: [5, 8] },
+  defend: { name: 'Defend', type: 'skill', rarity: 'basic', cost: 1, block: [4, 7] },
   dash: { name: 'Dash', type: 'skill', rarity: 'basic', cost: [1, 0], move: 3, draw: 1 },
   // Each class's signature card, 1 in its starter deck.
   heroicLeap: { name: 'Heroic Leap', type: 'attack', rarity: 'basic', cls: 'assault', cost: 2, move: [4, 5], damage: [5, 7], range: 1, area: 1, makes: ['moved'] },

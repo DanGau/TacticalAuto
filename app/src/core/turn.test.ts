@@ -74,11 +74,11 @@ test('Block takes damage first and falls to 0 at the hero\'s next turn', () => {
   battle.pile.hand = [{ id: 'defend', level: 1 }]
   apply(run, { type: 'play', index: 0, target: null })
   stepBattle(battle)
-  expect(hero.block).toBe(5)
+  expect(hero.block).toBe(4)
   const hp = hero.hp
   wound(battle, hero, 3, [])
   expect(hero.hp).toBe(hp)
-  expect(hero.block).toBe(2)
+  expect(hero.block).toBe(1)
   apply(run, { type: 'endTurn' })
   while (!awaiting(battle) && battle.phase === 'battle') stepBattle(battle)
   expect(hero.block).toBe(0)
