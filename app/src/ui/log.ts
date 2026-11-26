@@ -53,9 +53,9 @@ function outcome(e: GameEvent, names: Names): string {
   }
 }
 
-/** One event's log line, or null for one not worth a line: a plain walk or standing order. */
+/** One event's log line, or null for one not worth a line: a plain walk. */
 export function logLine(run: Run, battle: Battle, names: Names, e: GameEvent): string | null {
-  if (!('src' in e) || ((e.type === 'move' || e.type === 'order') && e.src.kind === 'basic')) return null
+  if (!('src' in e) || (e.type === 'move' && e.src.kind === 'basic')) return null
   // An effect's id is the unit it acts on; its doer is unknown.
   const actor = e.type === 'effect' ? undefined : e.id
   const kit = { skills: run.hero.skills, weapons: run.hero.gear ? [run.hero.gear.weapon] : [] }

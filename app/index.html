@@ -27,6 +27,24 @@
       #dial::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #ffffff59, transparent 42%), radial-gradient(circle at 50% 50%, transparent 58%, #0007 100%); box-shadow: 0 2px 10px #0009; }
       #panel { position: fixed; inset: 0; zoom: calc(var(--ui, 1) * var(--shrink, 1)); overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px max(24px, calc(50% - 600px)) 18px; background: #171d29; }
       #panel[hidden], #drop[hidden] { display: none; }
+      #hand[hidden] { display: none; }
+      #hand { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: min(900px, 100vw); box-sizing: border-box; padding: 6px 8px 8px; background: linear-gradient(#171d2900, #171d29f0 30%); z-index: 3; }
+      #hand .bar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+      #hand .orb { display: grid; place-items: center; min-width: 54px; height: 54px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffe08f, #e09a1a); color: #10141c; font-weight: 800; font-size: 16px; box-shadow: 0 0 12px #ffd16688; }
+      #hand .piles { color: #c9d3e2; font-size: 13px; }
+      #hand .say { flex: 1; color: #ffd166; font-size: 13px; text-align: center; }
+      #hand .end { padding: 10px 16px; font-weight: bold; font-size: 16px; color: #10141c; background: #6fe08c; border: 0; border-radius: 8px; cursor: pointer; }
+      #hand .end:disabled { opacity: 0.4; cursor: default; }
+      #hand .targets { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 6px; }
+      #hand .target { padding: 8px 12px; border: 2px solid #ff5a5a; border-radius: 8px; background: #2a1518; color: #ffd0d0; font-weight: bold; cursor: pointer; }
+      #hand .cards { display: flex; gap: 6px; justify-content: center; }
+      #hand .cards .tcard { flex: 0 1 132px; aspect-ratio: auto; min-height: 150px; }
+      #hand .cards .tcard:disabled { cursor: default; }
+      #hand .cards .tcard.inert { opacity: 0.55; filter: grayscale(0.7); }
+      button.tcard .gem, div.tcard .gem { width: 18px; height: 18px; transform: none; border-radius: 50%; display: grid; place-items: center; font: bold 12px sans-serif; color: #10141c; }
+      .tcard .type { position: absolute; top: 6px; right: 8px; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--rc); }
+      @media (max-width: 600px) { #hand .cards { gap: 3px; } #hand .cards .tcard { min-height: 128px; padding: 6px 3px 4px; font-size: 11px; } #hand .cards .tcard .name { font-size: 12px; } #hand .cards .tcard .text { font-size: 10px; } #hand .cards .tcard .art { height: 26px; } #hand .orb { min-width: 44px; height: 44px; font-size: 13px; } #hand .piles { font-size: 11px; } }
+      @media (orientation: landscape) and (max-height: 500px) { #hand .cards .tcard { min-height: 0; padding: 4px 3px; } #hand .cards .tcard .art { display: none; } #hand .orb { min-width: 38px; height: 38px; } #hand .end { padding: 6px 10px; } }
       /* The briefing as a film: bars across the top and bottom, a muted grade, and the edges sunk into dark. */
       body::before, body::after { content: ''; position: fixed; left: 0; right: 0; z-index: 4; height: 0; background: #000; transition: height 0.9s ease-in-out; pointer-events: none; }
       body::before { top: 0; }
@@ -625,6 +643,7 @@
     <div id="hud"><span id="status"></span></div>
     <div id="dial" hidden><div class="spin"><div class="half ally">Hero<br />turn</div><div class="half enemy">Alien<br />turn</div></div></div>
     <div id="drop" hidden></div>
+    <div id="hand" hidden></div>
     <div id="panel"></div>
     <button id="fullscreen" title="Full screen">⛶</button>
     <script type="module" src="/src/main.ts"></script>

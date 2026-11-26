@@ -5,7 +5,6 @@ import { STOP_THREAT, LOSS_THREAT, THREAT_MAX } from './progress'
 import { type Relic, RELICS, offerable, RELIC_OFFERS, drawRelic, STREAK_FIGHTS, bridged } from './relics'
 import { feeds } from './quantities'
 import { dropGear, offerCards, settle } from './rewards'
-import { returnOut } from './deck'
 import { random, randomInt } from './rng'
 import { drawStops, passStop } from './run'
 import { type Run } from './run-state'
@@ -60,7 +59,6 @@ export function endBattle(run: Run): void {
   // An ambush stands in front of the stop it interrupted.
   if (key) {
     run.keys++
-    returnOut(run)
     run.stop = 0
     drawStops(run)
   }

@@ -12,7 +12,8 @@ import type { DoctrineEffect, Rule } from './doctrines'
 import type { Resist } from './quantities'
 import { type Flow, Goal } from './goals'
 import type { Twist } from './twists'
-import type { Card, Rider } from './cards'
+import type { Card } from './cards'
+import type { Intent } from './turn'
 import type { ChallengeId } from './challenges'
 import { type Bulk, type Edge, type Ground, type Prop, type Terrain, type TerrainKind } from './terrain'
 
@@ -20,7 +21,7 @@ export type { Bulk }
 
 export const GRID = 96
 /** A battle still running at this beat ends as a draw. */
-export const MAX_BEATS = 1000
+export const MAX_BEATS = 3000
 /** Damage a crit adds. */
 export const CRIT_BONUS = 2
 /** Tiles within which a soldier with line of sight reveals an alien. */
@@ -184,7 +185,7 @@ export type GearEffect = 'bellows' | 'frostbite' | 'tracer' | 'incendiary' | 'pi
 /** Something a skill does; skills.ts says what each does. */
 export type SkillEffect = (typeof SKILL_EFFECTS)[number]
 /** Something a relic does; relics.ts says what each does. */
-export type RelicEffect = 'domino' | 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'zenith' | 'fracture' | 'eternal' | 'frostHeart' | 'ledger' | 'gravity' | 'ironclad' | 'split' | 'ram' | 'overflow' | 'adrenal' | 'hairTrigger' | 'stagger' | 'lodestone' | 'shell' | 'lockOn'
+export type RelicEffect = 'satchel' | 'domino' | 'opener' | 'rearm' | 'feast' | 'phoenix' | 'accelerant' | 'wildfire' | 'ignite' | 'freeze' | 'shatter' | 'thermal' | 'spotter' | 'exploit' | 'momentum' | 'bloodRite' | 'armored' | 'conductor' | 'kindling' | 'overkill' | 'brittle' | 'pyre' | 'hex' | 'sentinel' | 'net' | 'glacial' | 'entryBlast' | 'entryShred' | 'entryFrost' | 'entryWall' | 'entryTurret' | 'encore' | 'beacon' | 'relay' | 'flare' | 'bounty' | 'impetus' | 'catalyst' | 'chrono' | 'zenith' | 'fracture' | 'eternal' | 'frostHeart' | 'ledger' | 'gravity' | 'ironclad' | 'split' | 'ram' | 'overflow' | 'adrenal' | 'hairTrigger' | 'stagger' | 'lodestone' | 'shell' | 'lockOn'
 /** Anything a unit's gear, skills, relics or weapon doctrine do. Combat applies them. */
 export type Effect = GearEffect | SkillEffect | PerkEffect | RelicEffect | DoctrineEffect | Exam | 'block' | 'taunt' | 'stun' | 'hover' | 'rangedShield' | 'meleeShield' | 'overwatch' | 'throw' | 'surge' | 'frozen' | 'reckoning' | 'quenched' | 'thawed' | 'unlocked' | 'glassEdge'
 
@@ -231,6 +232,10 @@ export interface Unit {
   hp: number
   /** Armor left. */
   armor: number
+  /** The damage of the card hit under way, in place of its own; payoffs that scale with damage read its own. */
+  dealing?: number
+  /** Block: takes damage before anything else, until the hero's next turn. */
+  block?: number
   /** Temp HP: takes damage before armor and health. */
   temp?: number
   stats: Stats
@@ -310,8 +315,6 @@ export interface Unit {
   mark: number
   /** Alien turns until the unit's recurring ability is ready: a psion's panic, a spawner's spawn. */
   cooldown: number
-  /** What a soldier with no shot does this turn in place of attacking, until its next turn; null otherwise. */
-  order: Order | null
   /** Own turns its cloak has left: no enemy sees or targets it. Unset or 0 when not cloaked. */
   cloaked?: number
   /** Own turns for which nothing can hurt it. */
@@ -324,11 +327,6 @@ export interface Unit {
   healed?: Partial<Record<Effect, number>>
 }
 
-/**
- * A soldier's standard actions in place of attacking. Prepare: overwatch,
- * shooting the first alien that moves where it can shoot it. Sprint: moves again.
- */
-export type Order = 'prepare' | 'sprint'
 
 
 /** The ground the fight is staged on: where the aliens hang out, and the landing by them. */
@@ -364,15 +362,14 @@ export interface Battle {
   /** Calls to stepBattle so far. */
   beat: number
   phase: 'deploy' | 'battle' | 'over'
-  /** The side whose turn it is. A turn is one move stage, then one shot per unit. */
+  /** The side whose turn it is. */
   turn: Side
-  stage: 'move' | 'shoot'
-  /** Id of the last unit to shoot this turn; 0 before the first shot. */
+  /** A round: each side moves, the aliens first; the hero plays cards; then each alien acts. */
+  stage: 'move' | 'play' | 'enemy'
+  /** Id of the last alien to act this turn; 0 before the first. */
   shooter: number
   /** Attacks that unit has made this turn. */
   attacks: number
-  /** Move each soldier has left this turn to walk between and after its attacks, by unit id. */
-  strides: Record<number, number>
   /** Set when phase is 'over'; null is a draw. */
   winner: Side | null
   units: Unit[]
@@ -396,9 +393,14 @@ export interface Battle {
   challenge: ChallengeId | null
   /** The round reinforcements start coming, one clump a round, if the aliens posted are not all down; null when they come on a flood's beat. */
   deadline: number | null
-  /** The card the hero played for this battle, at the level it plays at, and what it adds that is no stat. Combat reads `riders`, as cards import relics, which import combat. */
-  card: Card | null
-  riders: Partial<Record<Rider, number>>
+  /** The hero's cards in this battle: to draw, in hand, discarded, and exhausted or played as Powers. */
+  pile: { draw: Card[]; hand: Card[]; discard: Card[]; exhaust: Card[] }
+  /** Energy left this turn. */
+  energy: number
+  /** A card played, by its place in the hand, and its target: it resolves on the next beat. */
+  queued: { index: number; target: number | null } | null
+  /** What each alien in the fight will do on its turn, as the board stands. */
+  intents: Intent[]
   /** Set by the landing until what it sets off lands, as the battle's first beat. */
   opening: boolean
   /** Tiles of acid, each with the alien turns it has left. */

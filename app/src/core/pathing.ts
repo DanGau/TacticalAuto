@@ -1,8 +1,8 @@
 // Where a unit moves: candidate paths, scored by stance, goal and threat.
-import { type Battle, type Unit, type Tile, GRID, type Stance, isSoldier, STANDOFF, HASTE_MOVE, CHILL_MOVE, type Order, ENGAGE_REACH } from './battle'
+import { type Battle, type Unit, type Tile, GRID, type Stance, isSoldier, STANDOFF, HASTE_MOVE, CHILL_MOVE, ENGAGE_REACH } from './battle'
 import { barred, blocked, breach, walkingDistances, stepCost, onGrid, NEIGHBORS, distance, strides, jumps } from './grid'
 import type { GameEvent } from './combat-event'
-import { hasAttack, nearest, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes, leap } from './fighters'
+import { nearest, UPLINK_REACH, centreOf, uplinkReach, spotted, shootable, RESTLESS_ROUND, onTile, NULL_REACH, inAura, has, fireproof, enemiesOf, besideFuel, foes, leap } from './fighters'
 import { canHurlFrom } from './objects'
 import { pushesOff } from './knockback'
 import { bite, canShoot, sees } from './sight'
@@ -215,7 +215,7 @@ export const preyed = (target: Unit, hit: number) => (target.civilian ? PREY_WOR
  * The path a fighting unit takes in its move stage: to the tile its stance ranks best, preferring any tile with a
  * shot over any without; the fewest steps wins a tie. Run and Gun doubles the move when the normal move reaches no shot.
  * While some soldier has an alien in sight, a soldier first avoids any tile from which it would sight an alien unseen or
- * draw in one waiting its turn, so one engagement ends before the next begins. A soldier left with no shot sets its order: see orderFor.
+ * draw in one waiting its turn, so one engagement ends before the next begins.
  */
 export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const enemies = enemiesOf(battle, unit)
@@ -314,34 +314,9 @@ export function fightPath(battle: Battle, unit: Unit): Tile[] {
   const move = moveOf(battle, unit)
   const path = choose(move)
   if (unit.ability === 'runAndGun' && mine(path.at(-1) ?? unit) === 0) return choose(2 * move)
-  const end = path.at(-1) ?? unit
-  const shot = hasAttack(battle, unit, end, enemies, seen)
-  if (unit.side === 'human' && shot) battle.strides[unit.id] = move - costOf(battle, unit, path)
-  if (unit.side !== 'human' || shot) return path
-  // A soldier dashes on to a shot, if one is within a dash.
-  if (isSoldier(unit) && move > 0) {
-    const dash = choose(move + DASH_MOVE)
-    if (hasAttack(battle, unit, dash.at(-1) ?? unit, enemies, seen)) return dash
-  }
-  unit.order = orderFor(battle, unit, !unit.cloaked && threats(battle, enemies)(end) > 0)
-  if (unit.order !== 'sprint') return path
-  // Sprinting, it moves again; a sprint that gets it no nearer is no sprint.
-  const far = choose(2 * move)
-  const nearer = toGoal[(far.at(-1) ?? unit).y * GRID + (far.at(-1) ?? unit).x] < toGoal[end.y * GRID + end.x]
-  if (!nearer) unit.order = null
-  return nearer ? far : path
+  return path
 }
 
-/**
- * The standard action a soldier with no shot takes in place of attacking, or none. One with an ability that needs no
- * shot, or a leap that would reach the aliens, keeps it. One an enemy could come within range of next turn prepares; any
- * other sprints toward its goal.
- */
-export function orderFor(battle: Battle, unit: Unit, threatened: boolean): Order | null {
-  if (unit.charges > 0 && (unit.ability === 'medic' || unit.ability === 'mech')) return null
-  if (leapTo(battle, unit)) return null
-  return threatened ? 'prepare' : 'sprint'
-}
 
 /** Where Heroic Leap would land: the free tile within twice the soldier's move beside the most foes, and those foes. */
 export function leapTo(battle: Battle, unit: Unit): { to: Tile; caught: Unit[] } | null {

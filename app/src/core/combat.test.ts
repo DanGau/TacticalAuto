@@ -3,11 +3,15 @@ import { current } from './run'
 import { expect, test } from 'vitest'
 import { enterAt, begun } from './roads'
 import { apply } from './apply'
-import { GRID, HASTE_MOVE, isSoldier, SOLDIER_ATTACKS, type Battle } from './battle'
-import { stepBattle } from './combat'
+import { GRID, isSoldier, type Battle } from './battle'
+import { beat } from './roads'
 import type { GameEvent } from './combat-event'
 import { detects } from './sight'
-import { costOf, DASH_MOVE, goalOf } from './pathing'
+import { costOf, goalOf } from './pathing'
+import { CARD_IDS, amount } from './cards'
+
+/** The farthest any card moves the hero. */
+const CARD_MOVE = Math.max(...CARD_IDS.map((id) => amount(id, 2, 'move') + amount(id, 2, 'retreat')))
 import { blocked, distance, walkingDistances } from './grid'
 
 
@@ -28,47 +32,36 @@ function play(seed: number, check: (events: GameEvent[], before: Battle, after: 
   const state = battle(seed)
   while (state.phase === 'battle') {
     const before = structuredClone(state)
-    check(stepBattle(state), before, state)
+    check(beat(state), before, state)
   }
   return state
 }
 
-test('a turn is one move beat, then an attack per beat in id order, two by each soldier and one by each alien, then the other side', () => {
-  let turn = ''
-  let shooter = 0
-  let attacks = 0
-  let twice = 0
-  for (const seed of [1, 2, 3, 4, 5, 6]) {
-  const end = play(seed, (events, before, after) => {
-    const first = events.find((e) => ['move', 'shot', 'rocket', 'heal', 'spit', 'panic', 'frozen'].includes(e.type) && !(e.type === 'move' && e.with)) as Extract<GameEvent, { id: number }> | undefined
-    if (!first) return
-    // A turn spent standing still shows no event, so turns are told apart by the round as well as the side. A unit
-    // arriving this beat is only in the after.
-    const side = `${after.round}:${[...before.units, ...after.units].find((u) => u.id === first.id)!.side}`
-    if (side !== turn) {
-      turn = side
-      shooter = 0
-    }
-    if (first.type !== 'move') {
-      expect(first.id).toBeGreaterThanOrEqual(shooter)
-      attacks = first.id === shooter ? attacks + 1 : 1
-      shooter = first.id
-      const unit = [...before.units, ...after.units].find((u) => u.id === first.id)!
-      expect(attacks).toBeLessThanOrEqual(isSoldier(unit) ? SOLDIER_ATTACKS : 1)
-      if (attacks === SOLDIER_ATTACKS) twice++
-    }
-  })
-  expect(end.winner).not.toBeNull()
+test('a round: the aliens move, then the hero, the battle waits for the player, then each alien acts at most once', () => {
+  for (const seed of [1, 2, 3]) {
+    const acted = new Set<number>()
+    const end = play(seed, (events, before, after) => {
+      if (before.stage === 'enemy') {
+        const first = events.find((e) => ['shot', 'spit', 'panic', 'frozen'].includes(e.type)) as Extract<GameEvent, { id: number }> | undefined
+        if (first && before.units.some((u) => u.id === first.id && u.side === 'alien')) {
+          expect(acted.has(first.id)).toBe(false)
+          acted.add(first.id)
+        }
+      }
+      if (after.stage === 'move' && before.stage === 'enemy') acted.clear()
+      if (before.stage === 'move' && before.turn === 'human' && after.phase === 'battle') expect(after.stage).toBe('play')
+      for (const e of events) if (e.type === 'shot' && before.stage !== 'play') expect(before.units.find((u) => u.id === e.id)?.side).not.toBe('human')
+    })
+    expect(end.winner).not.toBeNull()
   }
-  expect(twice).toBeGreaterThan(0)
 })
 
-test('no unit moves farther than its move, and one on the hero side its sprint', () => {
+test('no unit moves farther than its move, and the hero no farther than a card moves it', () => {
   play(2, (events, before) => {
     for (const e of events) {
       if (e.type !== 'move') continue
       const unit = before.units.find((u) => u.id === e.id)!
-      expect(e.path.length).toBeLessThanOrEqual(unit.side === 'human' ? Math.max(2 * unit.stats.move, unit.stats.move + DASH_MOVE) : unit.stats.move)
+      expect(e.path.length).toBeLessThanOrEqual(unit.side === 'human' ? Math.max(unit.stats.move, CARD_MOVE) : unit.stats.move)
     }
   })
 })
@@ -107,24 +100,6 @@ test('before contact, soldiers walk their full move from the first turn', () => 
     })
   }
 }, 30_000)
-
-test('a soldier may walk between and after its attacks, its walks in a turn together within its move', () => {
-  let strides = 0
-  for (let seed = 1; seed <= 90; seed++) {
-    const walked = new Map<string, number>()
-    play(seed, (events, before) => {
-      for (const e of events) {
-        const unit = e.type === 'move' && !e.with ? before.units.find((u) => u.id === e.id) : undefined
-        if (e.type !== 'move' || !unit || !isSoldier(unit) || unit.ability === 'runAndGun' || before.turn !== 'human') continue
-        if (before.stage === 'shoot') strides++
-        const key = `${before.round}:${unit.id}`
-        walked.set(key, (walked.get(key) ?? 0) + e.path.length)
-        expect(walked.get(key)).toBeLessThanOrEqual(unit.stats.move + HASTE_MOVE + DASH_MOVE)
-      }
-    })
-  }
-  expect(strides).toBeGreaterThan(0)
-})
 
 test('with no alien engaged the hero heads for the nearest by the walk, so it never paces between two that take turns being nearest as the crow flies', () => {
   let tried = 0

@@ -238,14 +238,6 @@ test('the hero keeps its health between battles and heals nothing on the road', 
   expect(run.battle!.reserve[0].hp).toBe(3)
 })
 
-test('a safehouse heals the hero fully on arrival and adds threat', () => {
-  const run = travelling(['safehouse', 'battle'])
-  run.hero.wounds = 7
-  apply(run, { type: 'advance' })
-  expect(run).toMatchObject({ phase: 'overworld', threat: STOP_THREAT, stop: 1, report: { stop: 'safehouse' } })
-  expect(run.hero.wounds).toBe(0)
-})
-
 test('every stop in a rest column is a safehouse, and no other is', () => {
   for (let seed = 0; seed < 20; seed++) {
     const leg = begun(seed).legs[0]

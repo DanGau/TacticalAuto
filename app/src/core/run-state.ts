@@ -202,15 +202,13 @@ export interface Run {
   log: Fought[]
   /** What the player has yet to be told of. */
   gains: Gain[]
-  /** The hero's cards; each battle draws a hand from those not out, and the player plays one. */
+  /** The hero's cards, shuffled into each battle's draw pile. */
   deck: Card[]
-  /** The hand drawn for the battle at its deploy screen, as indexes into the deck. */
-  hand: number[]
   /** Fights won in a row, for Unbroken Line. */
   streak: number
   /** Cards offered after a battle: the player adds one to the deck, or skips. */
   cardOffers: CardId[]
-  /** At a safehouse: the player upgrades a card, or skips. */
+  /** At a safehouse: the player rests, healing fully, or upgrades a card. */
   upgrading: boolean
   /** Relics to choose from in the reward phase. */
   relicOffers: RelicId[]

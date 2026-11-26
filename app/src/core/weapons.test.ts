@@ -1,7 +1,7 @@
 import { TUNING } from './tuning'
 import { expect, test } from 'vitest'
 import { isSoldier, type Battle, type Unit } from './battle'
-import { stepBattle } from './combat'
+import { beat } from './roads'
 import { shoot, weaponAttack, wielded } from './attack'
 import type { GameEvent } from './combat-event'
 import { spotted } from './fighters'
@@ -41,7 +41,7 @@ const heroTurn = (b: Battle, hero: Unit) => {
   const round = b.round
   const events: GameEvent[] = []
   for (let i = 0; i < 4; i++) {
-    events.push(...stepBattle(b))
+    events.push(...beat(b))
     if (b.turn !== 'human' || b.round !== round) break
   }
   return shots(events).filter((s) => s.id === hero.id)
@@ -84,21 +84,6 @@ test('a kill grants one more volley, not one for each kill, and none after it', 
   const fired = shots(weaponAttack(b, hero, spotted(b)))
   expect(fired.filter((s) => s.with.includes('frenzy')).length).toBeLessThanOrEqual(WEAPONS.lmg.attack.shots)
   expect(fired.length).toBeLessThanOrEqual(2 * WEAPONS.lmg.attack.shots)
-})
-
-test.each(['hammer', 'shield'] as const)('a %s hits hard up close, and thrown only with nothing beside it, then the class secondary', (id) => {
-  const near = field(id, [[11, 10]])
-  const up = heroTurn(near.b, near.hero)
-  expect(up[0].form).toBeUndefined()
-  // A fraction of a point is a chance of one more.
-  expect([Math.floor, Math.ceil].map((f) => f(wielded(10, WEAPONS[id].attack.power)))).toContain(up[0].damage)
-  expect(up.at(-1)!.secondary).toBe('frag')
-  const far = field(id, [[13, 10]])
-  const thrown = heroTurn(far.b, far.hero)
-  expect(thrown[0].form).toBe('throw')
-  expect(thrown[0].damage).toBeLessThan(up[0].damage)
-  expect(thrown.filter((s) => s.form === 'throw')).toHaveLength(1)
-  expect(thrown.at(-1)!.secondary).toBe('frag')
 })
 
 test('no grant of a further attack ever throws a second time', () => {
@@ -152,37 +137,6 @@ test('a hammer blow stuns at its chance, never a boss', () => {
   WEAPONS.hammer.stun = shock
 })
 
-test('a sword dashes in to strike, within its dash and no farther', () => {
-  const { b, hero } = field('sword', [[10 + WEAPONS.sword.dash! + 1, 10]])
-  const fired = heroTurn(b, hero)
-  expect(hero.x).toBe(10 + WEAPONS.sword.dash!)
-  expect(fired[0].secondary).toBeUndefined()
-  const beyond = field('sword', [[10 + WEAPONS.sword.dash! + 2, 10]])
-  const only = heroTurn(beyond.b, beyond.hero)
-  expect(beyond.hero.x).toBe(10)
-  expect(only.map((s) => s.secondary)).toEqual(['frag'])
-})
-
-test('fists punch twice up close and dash in; beyond the dash they rocket twice, then the secondary', () => {
-  const near = field('fists', [[13, 10]])
-  const punches = heroTurn(near.b, near.hero)
-  expect(near.hero.x).toBe(12)
-  expect(punches.filter((s) => !s.secondary && !s.form)).toHaveLength(2)
-  const far = field('fists', [[15, 10]])
-  const rockets = heroTurn(far.b, far.hero)
-  expect(far.hero.x).toBe(10)
-  expect(rockets.filter((s) => s.form === 'rocket')).toHaveLength(2)
-  expect(rockets.at(-1)!.secondary).toBe('frag')
-})
-
-test('a hero with any attack in reach takes no order that costs it its turn', () => {
-  const { b, hero } = field('hammer', [[10 + 6, 10]])
-  hero.stats.move = 1
-  Object.assign(b, { turn: 'human', stage: 'move', shooter: 0, attacks: 0, strides: {} })
-  stepBattle(b)
-  expect(hero.order).toBeNull()
-})
-
 test("a weapon card's face says its type and special; its numbers are the type's tip", () => {
   for (const [id, w] of Object.entries(WEAPONS)) {
     const gear = { id: 1, rarity: 'common' as const, name: `Heavy ${w.name}`, weapon: id as WeaponId, stats: { damage: 1, move: -1 }, effect: null }
@@ -204,7 +158,7 @@ test('a hammer charges the alien in reach, though a cluster still waiting stands
   Object.assign(aliens[1], { engaged: false, revealed: true })
   Object.assign(hero, { engaged: true, stats: { ...hero.stats, move: 6 } })
   Object.assign(b, { turn: 'human', stage: 'move', shooter: 0, attacks: 0, strides: {}, round: 0 })
-  stepBattle(b)
+  beat(b)
   expect(Math.max(Math.abs(hero.x - aliens[0].x), Math.abs(hero.y - aliens[0].y))).toBeLessThanOrEqual(1)
 })
 

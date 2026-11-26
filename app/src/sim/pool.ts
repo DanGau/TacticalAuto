@@ -41,8 +41,6 @@ const log = (line: string) => console.error(`sim pool: ${line}`)
 interface PoolOptions {
   threads?: number
   doctrines?: DoctrineId[]
-  /** Play each deploy screen on with each card of the hand: see forks.ts. */
-  forks?: boolean
   /** Play each safehouse and medkit on offer on both ways: see rest.ts. */
   rests?: boolean
   /** With loadouts, the one bot plays each on the same seeds, and results come back by loadout name instead of bot. */
@@ -58,11 +56,11 @@ interface PoolOptions {
  * its batch retried on a fresh one.
  */
 export async function playAll(bots: string[], runs: number, start: number, options: PoolOptions = {}): Promise<Record<string, RunResult[]>> {
-  const { threads = threadsFor(availableParallelism(), freemem() / MB), doctrines = [], forks = false, rests = false, loadouts, memoryMb = (totalmem() / MB) * 0.6 } = options
+  const { threads = threadsFor(availableParallelism(), freemem() / MB), doctrines = [], rests = false, loadouts, memoryMb = (totalmem() / MB) * 0.6 } = options
   const keys = loadouts ? Object.keys(loadouts) : bots
   const jobs = keys.flatMap((key) => Array.from({ length: runs }, (_, i) => ({ key, bot: loadouts ? bots[0] : key, seed: start + i, loadout: { ...loadouts?.[key], doctrines: [...doctrines, ...(loadouts?.[key].doctrines ?? [])] } })))
-  // Fewer seeds a batch when there are too few to keep every process busy; one when each run plays on its forks, so a kill under pressure costs little.
-  const size = forks || rests ? 1 : Math.max(1, Math.min(BATCH, Math.ceil(jobs.length / Math.max(1, threads))))
+  // Fewer seeds a batch when there are too few to keep every process busy; one when each run plays on its rest forks, so a kill under pressure costs little.
+  const size = rests ? 1 : Math.max(1, Math.min(BATCH, Math.ceil(jobs.length / Math.max(1, threads))))
   const batches = Array.from({ length: Math.ceil(jobs.length / size) }, (_, id) => ({ id, jobs: jobs.slice(id * size, (id + 1) * size), tries: 0 }))
   const queue = [...batches]
   const played: { key: string; result: RunResult }[] = []
@@ -111,7 +109,7 @@ export async function playAll(bots: string[], runs: number, start: number, optio
       // Maglev can crash a CPU-starved process (nodejs/node#64841); without it the sim runs as fast.
       const proc = fork(BUNDLE(), { execArgv: [`--max-old-space-size=${HEAP_MB}`, '--no-maglev'], stdio: ['ignore', 'inherit', 'inherit', 'ipc'] })
       procs.set(proc, { rss: 0 })
-      proc.send({ forks, rests })
+      proc.send({ rests })
       proc.on('message', (m: { ready: true } | { id: number; played: typeof played; rss: number }) => {
         if (failed) return
         if ('ready' in m) return give(proc)

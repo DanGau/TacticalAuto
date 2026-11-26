@@ -1,6 +1,6 @@
 // The glossary: every keyword game text may name, capitalized, each with one fixed meaning. See docs/text-style.md.
 import { CANCELS, QUANTITIES } from './quantities'
-import { CLOAK_DAMAGE, NUMB_SOAK, SKIRMISH_MOVE, SUPPRESS_DAMAGE } from './battle'
+import { CLOAK_DAMAGE, NUMB_SOAK, SUPPRESS_DAMAGE } from './battle'
 import { WEAKEN_TURNS } from './stacks'
 import { SLAM_DAMAGE } from './wound'
 
@@ -19,7 +19,11 @@ const TERMS = {
   Knockback: `Push the target N tiles away. Impact: deal ${SLAM_DAMAGE} damage to it and any alien it hits. Off a ledge or the edge, it falls.`,
   Pull: 'Drag the target N tiles toward you.',
   Parry: 'Ignore a hit.',
-  Retreat: `After acting, move up to ${SKIRMISH_MOVE} tiles away from aliens.`,
+  Retreat: 'Move up to N tiles away from the aliens.',
+  Block: 'Absorbs damage until your next turn.',
+  Energy: 'Spent to play cards. Refills each turn.',
+  Exhaust: 'Removed from the battle once played.',
+  Retain: 'Not discarded at the end of the turn.',
   Consume: 'Remove all of a stack to pay for an effect.',
   Thorns: 'When hit: deal N damage to the attacker.',
 } as const

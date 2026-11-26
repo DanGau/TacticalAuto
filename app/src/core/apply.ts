@@ -1,9 +1,10 @@
 // The player's actions, checked and applied to the run: the only way a player changes state.
 import { land } from './landing'
-import { armCard } from './played'
 import { CARDS } from './cards'
 import { arrive, MEDKIT, depart, EVENTS, RELIC_PRICE } from './events'
-import { advance, choose, current, go, nextStop, playCard, ways } from './run'
+import { advance, choose, current, go, nextStop, ways } from './run'
+import { awaiting } from './combat'
+import { endTurn, whyNot } from './turn'
 import { type Run } from './run-state'
 import { gainRelic, takeRelic } from './rewards'
 import { sellFind } from './rewards'
@@ -37,13 +38,17 @@ export type Action =
   | { type: 'go'; index: number }
   /** Overworld: travel to the next stop. */
   | { type: 'advance' }
-  /** Deploy phase: play the card at `card` of the hand, none with null only if the hand is empty; `fuse` plays it a level higher and puts the hand's others out until the next leg. Land, and begin. */
-  | { type: 'enter'; card: number | null; fuse: boolean }
+  /** Deploy phase: land, and begin. */
+  | { type: 'enter' }
+  /** Battle, on the hero's turn: play the card at `index` of the hand, at the alien `target` if it is aimed. */
+  | { type: 'play'; index: number; target: number | null }
+  /** Battle, on the hero's turn: end it. */
+  | { type: 'endTurn' }
   /** Reward phase: take the relic at `index` of run.relicOffers. */
   | { type: 'relic'; index: number }
   /** Reward phase: add the offered card at `index` to the deck, or with null skip. */
   | { type: 'card'; index: number | null }
-  /** Reward phase, at a safehouse: upgrade the card at `index` of the deck, or with null skip. */
+  /** Reward phase, at a safehouse: upgrade the card at `index` of the deck, or with null rest, healing fully. */
   | { type: 'upgrade'; index: number | null }
   /** Reward phase: put the find at `find` of run.finds on the hero, discarding what it replaces. */
   | { type: 'equip'; find: number }
@@ -77,11 +82,18 @@ export function apply(run: Run, action: Action): Result {
   if (action.type === 'enter') {
     const battle = run.battle
     if (run.phase !== 'battle' || !battle || battle.phase !== 'deploy') return no('not entering')
-    if (action.card === null ? run.hand.length > 0 : run.hand[action.card] === undefined) return no('play a card from the hand')
-    if (action.fuse && (action.card === null || run.hand.length < 2)) return no('fuse needs another card in hand')
-    playCard(run, action.card, action.fuse)
     land(battle)
-    armCard(battle)
+    return ok
+  }
+  if (action.type === 'play' || action.type === 'endTurn') {
+    const battle = run.battle
+    if (run.phase !== 'battle' || !battle || !awaiting(battle)) return no('not the hero\'s turn')
+    if (action.type === 'endTurn') endTurn(battle)
+    else {
+      const why = whyNot(battle, action.index, action.target)
+      if (why) return no(why)
+      battle.queued = { index: action.index, target: action.target }
+    }
     return ok
   }
   if (action.type === 'relic' || action.type === 'equip' || action.type === 'sell' || action.type === 'skill' || action.type === 'perk' || action.type === 'card' || action.type === 'upgrade') {

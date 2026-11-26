@@ -1,5 +1,4 @@
 // A unit's shot, and what a hit or kill sets off: blasts, fire, knockback, leaps.
-import { rider } from './played'
 import { PLATES_UNDER } from './exams'
 import { attackSrc, fx, srcOf } from './sources'
 import { type Battle, type Unit, BASE_STATS, GUARD_MAX, SUPPRESS_DAMAGE, SLAYER_DAMAGE, SEARING_DAMAGE, RAGE_DAMAGE, isSoldier, INSPIRE_DAMAGE, HURL_TILES, HURL_DAMAGE, REPULSE_TILES, HEADSHOT_DAMAGE, FEAST_HEAL, EXECUTE_BONUS, DODGE_SOAK, CRIT_BONUS, CLEAVE_DAMAGE, CHILL_TURNS, CHILL_DAMAGE, BURN_STACKS, BULWARK_SOAK, BANE_REACH, BANE_DAMAGE, BACKSTAB_DAMAGE, type Effect, SOLDIER_ATTACKS, GRID, type Tile, BLAST_RADIUS, NAPALM_DAMAGE, BIG_BLAST_RADIUS, LEAP_DAMAGE, CLOAK_DAMAGE, SHADOW_DAMAGE, STAGGER_DAMAGE, VOLATILE_DAMAGE, NUMB_SOAK, OVERKILL_FROM } from './battle'
@@ -135,7 +134,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   const crit = !enemy.resists.includes('crit') && (sure || (blow ? (blow.crit ??= random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)) : random(battle) < unit.stats.crit + highCrit(battle, unit, enemy)))
   unit.hits++
   // A mirror hits as hard as the hardest-hitting hero; a feeder as hard as it has grown.
-  const base = unit.kind === 'mirror' ? Math.max(unit.stats.damage, ...battle.units.filter(isSoldier).map((s) => s.stats.damage)) : unit.stats.damage
+  const base = unit.kind === 'mirror' ? Math.max(unit.stats.damage, ...battle.units.filter(isSoldier).map((s) => s.stats.damage)) : (unit.dealing ?? unit.stats.damage)
   const dealt =
     base +
     (secondary?.damage ?? 0) +
@@ -170,8 +169,6 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
     events.push(fx(enemy.id, distance(unit, enemy) > 1 ? 'rangedShield' : 'meleeShield', 0))
   }
   if (has(enemy, 'fortress') || hallowed(battle, enemy) || turned(unit, enemy)) damage = Math.ceil(damage / 2)
-  // Ablative Field takes its amount off each hit on the hero, down to 1.
-  if (damage > 1) damage = Math.max(1, damage - rider(battle, enemy, 'guard'))
   if (has(enemy, 'plates') && damage > 1 && damage < PLATES_UNDER) {
     damage = Math.ceil(damage / 2)
     events.push(fx(enemy.id, 'plates', 0))
@@ -265,7 +262,7 @@ export function shoot(battle: Battle, unit: Unit, seen: Set<number>, granted?: E
   }
   if (shock) for (const other of battle.units.filter((u) => u.side === enemy.side && distance(u, enemy) <= shock.reach)) stun(other, shock.chance, battle, events)
   if (first && enemy.hp > 0 && damage > 0 && when(true, 'hurl', 1)) knockback(battle, unit, enemy, events, 1, HURL_TILES, HURL_DAMAGE, 'hurl')
-  else if (first && enemy.hp > 0 && damage > 0 && when(true, 'repulse', 1)) knockback(battle, unit, enemy, events, 1, Math.max(REPULSE_TILES, rider(battle, unit, 'push')), SLAM_DAMAGE, 'repulse')
+  else if (first && enemy.hp > 0 && damage > 0 && when(true, 'repulse', 1)) knockback(battle, unit, enemy, events, 1, REPULSE_TILES, SLAM_DAMAGE, 'repulse')
   // A thunder that would hit nothing leaves the alien where the hero can finish it.
   else if (first && enemy.hp > 0 && damage > 0 && (unit.side !== 'human' || knocksInto(battle, unit, enemy)) && when(true, 'thunder', 1)) knockback(battle, unit, enemy, events)
   else if (first && enemy.hp > 0 && damage > 0 && when(true, 'shove', 1)) knockback(battle, unit, enemy, events, 1, 1, SLAM_DAMAGE, 'shove')

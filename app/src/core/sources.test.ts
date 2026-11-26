@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { bots } from '../bots/bots'
 import { apply } from './apply'
 import { createRun } from './run'
-import { step } from './step'
+import { fight } from './roads'
 import { sourceName } from './source-names'
 
 test('every acting event of a batch of runs names its source', () => {
@@ -13,7 +13,7 @@ test('every acting event of a batch of runs names its source', () => {
     const rng = { rng: seed }
     for (let i = 0; i < 4000 && run.phase !== 'won' && run.phase !== 'lost'; i++) {
       if (run.phase === 'battle' && run.battle?.phase === 'battle') {
-        for (const e of step(run)) {
+        for (const e of fight(run)) {
           if (!('src' in e)) continue
           let name = ''
           try {

@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 import { bots } from '../bots/bots'
 import { apply } from '../core/apply'
 import { createRun } from '../core/run'
-import { step } from '../core/step'
+import { fight } from '../core/roads'
 import { scale } from './charts'
 import { battleColumns, battlePage, heroMarks, runSummary } from './summary'
 
@@ -12,7 +12,7 @@ function playedRun() {
   let battles = 0
   while (run.phase !== 'won' && run.phase !== 'lost') {
     if (run.phase === 'battle' && run.battle!.phase === 'battle') {
-      if (step(run).some((e) => e.type === 'end')) battles++
+      if (fight(run).some((e) => e.type === 'end')) battles++
     } else apply(run, bots.strategic(run, rng))
   }
   return { run, battles }

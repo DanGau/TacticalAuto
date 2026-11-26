@@ -128,7 +128,7 @@ export function bob(sprite: Sprite, now: number): void {
 /** A unit's health, armor, temp HP and badges in the battle; none once it is gone. */
 export const vitals = (battle: Battle, id: number): [number, number, number, Badge[]] => {
   const unit = battle.units.find((u) => u.id === id)
-  return [unit?.hp ?? 0, unit?.armor ?? 0, unit?.temp ?? 0, unit ? badges(unit) : []]
+  return [unit?.hp ?? 0, unit?.armor ?? 0, unit?.temp ?? 0, unit ? badges(unit, battle) : []]
 }
 
 
@@ -245,6 +245,6 @@ export function sync(s: Stage, run: Run, battle: Battle): void {
     cloakLook(sprite, !!unit.cloaked)
     hoverLook(sprite, unit.effects.includes('hover'))
     fade(sprite, 1)
-    sprite.drawHp(unit.hp, unit.armor, unit.temp, badges(unit))
+    sprite.drawHp(unit.hp, unit.armor, unit.temp, badges(unit, battle))
   }
 }

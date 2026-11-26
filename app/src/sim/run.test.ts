@@ -3,6 +3,7 @@ import { bots } from '../bots/bots'
 import { apply } from '../core/apply'
 import { createRun } from '../core/run'
 import { timedFlow } from '../core/step'
+import { awaiting } from '../core/combat'
 import { report } from './report'
 import { replay, runWith } from './run'
 
@@ -25,7 +26,11 @@ function inBattle(seed: number) {
 test('a whole battle plays in the view in well under a minute', () => {
   const run = inBattle(0)
   let clock = { next: 0, done: 0 }
-  while (run.phase === 'battle') clock = timedFlow(run, clock).clock
+  const rng = { rng: 0 }
+  while (run.phase === 'battle') {
+    if (awaiting(run.battle!)) apply(run, bots.standard(run, rng))
+    else clock = timedFlow(run, clock).clock
+  }
   expect(clock.done).toBeGreaterThan(0)
   expect(clock.done).toBeLessThan(60000)
 })

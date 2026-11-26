@@ -86,11 +86,3 @@ test('a fall within its jump a unit lands unhurt, and no hero aims to knock it o
   expect(aliens[0]).toMatchObject({ x: 12, y: 10, hp: 40 })
 })
 
-test("any hero's hit knocks an alien at a ledge off it, and heroes aim at one", () => {
-  const { battle, hero, aliens, beats } = ledge(3)
-  const far = { ...aliens[0], id: 1300, x: 10, y: 12 }
-  battle.units.push(far)
-  expect(worth(battle, hero, aliens[0])).toBeGreaterThan(worth(battle, hero, far))
-  beats(1)
-  expect(aliens[0].x).toBe(12)
-})

@@ -13,7 +13,7 @@ import { SECONDARIES } from '../core/secondaries'
 import { BASICS, type SrcKind } from '../core/sources'
 import { abilityOf, secondaryOf } from '../core/hero'
 import { SKILLS } from '../core/skills'
-import { cardName, cardText } from '../core/cards'
+import { CARDS, cardName, cardText } from '../core/cards'
 import { cardIcon } from './card-icons'
 import { WEAPONS } from '../core/weapons'
 import { css } from '../view/shapes'
@@ -39,7 +39,7 @@ export function kitOf(run: Run, hero: Soldier): [SrcKind, { name: string; text: 
     ['gear', hero.gear?.effect ? [{ name: EFFECTS[hero.gear.effect].prefix, text: EFFECTS[hero.gear.effect].text }] : []],
     ['relic', run.relics.map((id) => ({ name: `${relicIcon(id)} ${RELICS[id].name}`, text: RELICS[id].text }))],
     ['doctrine', run.doctrines.map((id) => DOCTRINES[id])],
-    ['card', (run.phase === 'battle' && run.battle?.card ? [run.battle.card] : []).map((c) => ({ name: `${cardIcon(c.id)} ${cardName(c.id, c.level)}`, text: cardText(c.id, c.level) }))],
+    ['card', (run.phase === 'battle' && run.battle ? run.battle.pile.exhaust.filter((c) => CARDS[c.id].type === 'power') : []).map((c) => ({ name: `${cardIcon(c.id)} ${cardName(c.id, c.level)}`, text: cardText(c.id, c.level) }))],
   ]
   return groups.filter(([, parts]) => parts.length > 0)
 }

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { GRID, isSoldier, type Battle } from './battle'
-import { stepBattle } from './combat'
+import { beat } from './roads'
 import { ENTRY_MARGIN } from './landing'
 import { distance, edgeDepths, freeTilesNear, nearestAlien } from './grid'
 import type { Goal } from './goals'
@@ -98,10 +98,10 @@ test('every flow ends with nothing to choose: bots play each goal to a winner, u
   for (const goal of ['cross', 'hold', 'rescue', 'assassinate'] as Goal[]) {
     for (let seed = 1; seed <= 3; seed++) {
       const run = entering(seed, goal)
-      apply(run, { type: 'enter', card: run.hand.length > 0 ? 0 : null, fuse: false })
+      apply(run, { type: 'enter' })
       // Heroes that never move, already across: rally and waves must still settle it.
       for (const u of run.battle.units.filter(isSoldier)) Object.assign(u, freeTilesNear(run.battle, run.battle.objective, 12)[11], { stats: { ...u.stats, move: 0, range: 0 } })
-      while (run.battle.phase === 'battle') stepBattle(run.battle)
+      while (run.battle.phase === 'battle') beat(run.battle)
       expect(run.battle.phase).toBe('over')
     }
   }

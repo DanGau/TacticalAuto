@@ -1,11 +1,11 @@
 // Bots: each chooses the next action whenever the run waits for the player.
 import type { Action } from '../core/apply'
-import { pull, strategic } from './strategic'
+import { strategic } from './strategic'
+import { bestPlay, randomPlay } from './play'
 import { plannedPerk, plannedSkill } from '../core/plans'
 import { CARDS, type CardId } from '../core/cards'
 import { UPGRADED } from '../core/deck'
 import { CARD_PRICE } from '../core/rewards'
-import { boardOf } from '../core/read'
 import type { Flow } from '../core/quantities'
 import { RELICS } from '../core/relics'
 import { randomInt } from '../core/rng'
@@ -63,7 +63,7 @@ const RANK = { basic: -1, common: 0, rare: 1, epic: 2 }
 const rarest = (ids: CardId[]) => ids.reduce((best, id, i) => (RANK[CARDS[id].rarity] > RANK[CARDS[ids[best]].rarity] ? i : best), 0)
 
 /** Deck size from which a typical player skips an offer of commons. */
-const FULL = 12
+const FULL = 16
 
 /**
  * The reward phase's next choice: a relic, then finds, then cards, an upgrade, then skills. A random bot equips a find
@@ -78,12 +78,12 @@ function reward(run: Run, rng: { rng: number }, pick: Pick): Action {
   if (run.finds.length > 0) return decideFind(run, pick === PICKS.synergy)
   const open = run.deck.flatMap((c, i) => (c.level < UPGRADED ? [i] : []))
   if (pick === PICKS.random && run.cardOffers.length > 0) return { type: 'card', index: randomInt(rng, run.cardOffers.length + 1) === 0 ? null : randomInt(rng, run.cardOffers.length) }
-  if (pick === PICKS.random && run.upgrading) return { type: 'upgrade', index: open[randomInt(rng, open.length)] }
+  if (pick === PICKS.random && run.upgrading) return { type: 'upgrade', index: randomInt(rng, 2) === 0 || open.length === 0 ? null : open[randomInt(rng, open.length)] }
   if (run.cardOffers.length > 0) {
     const best = rarest(run.cardOffers)
     return { type: 'card', index: CARDS[run.cardOffers[best]].rarity === 'common' && run.deck.length >= FULL ? null : best }
   }
-  if (run.upgrading) return { type: 'upgrade', index: open[rarest(open.map((i) => run.deck[i].id))] }
+  if (run.upgrading) return { type: 'upgrade', index: heroHealth(run) < HURT || open.length === 0 ? null : open[rarest(open.map((i) => run.deck[i].id))] }
   const offers = skillOffers(run.hero)
   if (offers.length === 0) return { type: 'perk', index: pick === PICKS.random ? randomInt(rng, minorOffers(run.hero).length) : plannedPerk(run.hero) }
   return { type: 'skill', index: pick === PICKS.first ? plannedSkill(run.hero) : pick(run, rng, offers.map((id) => SKILLS[id])) }
@@ -102,15 +102,6 @@ const affordable = (run: Run): Action[] => [
 /** The hero's health as a share of its most. */
 const heroHealth = (run: Run) => health(run, run.hero) / soldierStats(run, run.hero).hp
 const HURT = 0.6
-
-/** The card of the hand that looks strongest: what its line says it does here, by its level; none with an empty hand. */
-function strongest(run: Run): number | null {
-  if (run.hand.length === 0) return null
-  const battle = run.battle!
-  const board = boardOf(battle)
-  const look = (i: number) => pull(run.deck[run.hand[i]], board, battle, battle.reserve[0].stats) * run.deck[run.hand[i]].level
-  return run.hand.reduce((best, _, i) => (look(i) > look(best) ? i : best), 0)
-}
 
 /** Takes the safest stops until the hero reaches level 3, then the most dangerous. */
 const growing = (run: Run): Risk => (level(run.hero) >= 3 ? 'dangerous' : 'safe')
@@ -142,7 +133,7 @@ const play =
   (run, rng) => {
     if (run.phase === 'reward') return reward(run, rng, PICKS[pick])
     if (run.phase === 'select') return { type: 'hero', index: 0 }
-    if (run.phase === 'battle') return { type: 'enter', card: strongest(run), fuse: false }
+    if (run.phase === 'battle') return run.battle!.phase === 'deploy' ? { type: 'enter' } : bestPlay(run.battle!, false)
     if (run.phase === 'shop') return build ? shop(run) : { type: 'leave' }
     if (run.phase === 'event') return { type: 'choose', index: events === 'bold' ? takeable(run)[0] : takeable(run).at(-1)! }
     const wanted = heroHealth(run) < HURT ? 'safe' : typeof risk === 'function' ? risk(run) : risk
@@ -160,7 +151,7 @@ const play =
 const randomBot: Bot = (run, rng) => {
   if (run.phase === 'reward') return reward(run, rng, PICKS.random)
   if (run.phase === 'select') return { type: 'hero', index: randomInt(rng, run.candidates.length) }
-  if (run.phase === 'battle') return run.hand.length > 0 ? { type: 'enter', card: randomInt(rng, run.hand.length), fuse: run.hand.length > 1 && randomInt(rng, 4) === 0 } : { type: 'enter', card: null, fuse: false }
+  if (run.phase === 'battle') return run.battle!.phase === 'deploy' ? { type: 'enter' } : randomPlay(run.battle!, rng)
   if (run.phase === 'event') return { type: 'choose', index: takeable(run)[randomInt(rng, takeable(run).length)] }
   if (run.phase === 'shop') {
     const options = affordable(run)

@@ -5,6 +5,7 @@ import type { GameEvent } from './core/combat-event'
 import { createRun } from './core/run'
 import { type Run } from './core/run-state'
 import { step } from './core/step'
+import { awaiting } from './core/combat'
 import { brief } from './ui/briefing'
 import { introduce, newcomers } from './ui/intro'
 import { createUi } from './ui/ui'
@@ -95,6 +96,11 @@ function act(action: Action): Result {
 }
 
 const ui = createUi(act)
+// A tap on an alien on the board aims the card picked at it.
+view.canvas.addEventListener('click', (e) => {
+  const id = view.unitAt(e.clientX, e.clientY)
+  if (id !== null) ui.tap(id)
+})
 const log = createLog()
 installKit(view, state)
 
@@ -135,7 +141,7 @@ await show([], false)
 if (!params.has('manual')) {
   for (;;) {
     await showing
-    if (state.phase === 'battle' && state.battle?.phase === 'battle') {
+    if (state.phase === 'battle' && state.battle?.phase === 'battle' && !awaiting(state.battle)) {
       const events = await beat(player)
       // The battle waits while the player meets each new kind of alien.
       for (const kind of newcomers(state.battle, events)) await introduce(kind)

@@ -1,9 +1,7 @@
 // Turns run results into a report, and says of what is off whether the game or the bot is at fault.
 import { CHALLENGES, type ChallengeId } from '../core/challenges'
-import { ARENA_KINDS, type ArenaKind } from '../core/arena-kinds'
 import { KEYS } from '../core/run'
 import type { RunResult, Toll } from './run'
-import type { Row } from './forks'
 
 export interface Report {
   runs: number
@@ -169,28 +167,51 @@ export function formatReport(r: Report): string {
 /** Each bot's win rate on the same seeds, best first. */
 export const ranked = (rates: Record<string, number>) => Object.entries(rates).sort((a, b) => b[1] - a[1]).map(([name, rate]) => `${name.padEnd(12)}${`${Math.round(100 * rate)}%`.padStart(5)}`).join('\n')
 
-/** The name of a challenge or ground. */
-const nameOf = (test: Row['test']) => (test in CHALLENGES ? CHALLENGES[test as ChallengeId].name : ARENA_KINDS[test as ArenaKind].name)
-
-/** Screens needed before a row is read at all. */
+/** Battles needed before a row is read at all. */
 const READ_FROM = 10
-/** Wins with the best card in hand below which an encounter is too hard; the spread of wins and health lost between the best and worst card below which the card hardly matters; how far the bot's play may trail the best. */
+/** Wins below which a challenge is too hard; Energy a turn the bot may leave unspent with a card it could play before its play is at fault. */
 const HARD = 70
-const FLAT = 5
-const TRAILS = 10
+const WASTE = 0.5
+
+/** A challenge's battles on a leg: how many, won and health lost in percent, and Energy wasted a turn. */
+interface Row {
+  test: string
+  leg: number
+  battles: number
+  won: number
+  lost: number
+  waste: number
+}
+
+/** The bot's battles by challenge, or mission kind with none, and leg. */
+export function rows(results: RunResult[]): Row[] {
+  const tolls = results.flatMap((r) => r.tolls)
+  const keys = [...new Set(tolls.map((t) => `${t.challenge ?? t.kind}|${t.leg}`))]
+  return keys
+    .map((key) => {
+      const [test, leg] = key.split('|')
+      const of = tolls.filter((t) => (t.challenge ?? t.kind) === test && t.leg === Number(leg))
+      const pct = (v: (t: Toll) => number) => Math.round((100 * of.reduce((sum, t) => sum + v(t), 0)) / of.length)
+      const turns = of.reduce((sum, t) => sum + t.turns, 0)
+      return { test, leg: Number(leg), battles: of.length, won: pct((t) => (t.won ? 1 : 0)), lost: pct((t) => (t.before - t.after) / t.most), waste: Math.round((10 * of.reduce((sum, t) => sum + t.wasted, 0)) / Math.max(1, turns)) / 10 }
+    })
+    .sort((a, b) => a.leg - b.leg || a.test.localeCompare(b.test))
+}
+
+/** The name of a challenge, or a mission kind with none. */
+const nameOf = (test: string) => (test in CHALLENGES ? CHALLENGES[test as ChallengeId].name : test)
 
 /**
- * What each row says. The best card in hand still losing: the encounter is too hard, the game's fault. The best and
- * worst card alike: the card played hardly matters there, the game's fault. The bot's play trailing the best: the bot's.
+ * What each row says. A challenge lost often while the bot spends its Energy is too hard: the game's fault. One where
+ * the bot leaves Energy unspent with a card it could play: the bot's.
  */
 export function verdicts(of: Row[]): string[] {
   const found: string[] = []
   for (const row of of) {
     const name = `${nameOf(row.test)} (leg ${row.leg + 1})`
-    if (row.screens < READ_FROM) continue
-    if (row.best.won < HARD) found.push(`GAME: ${name} too hard even with the best card in hand: won ${row.best.won}% of ${row.screens}`)
-    if (row.best.won - row.worst.won < FLAT && row.worst.lost - row.best.lost < FLAT) found.push(`GAME: the card played hardly matters on ${name}: best ${row.best.won}%/${row.best.lost}% lost, worst ${row.worst.won}%/${row.worst.lost}%`)
-    if (row.bot.won <= row.best.won - TRAILS || row.bot.lost >= row.best.lost + TRAILS) found.push(`BOT: its play on ${name} trails the best card in hand: ${row.bot.won}%/${row.bot.lost}% lost against ${row.best.won}%/${row.best.lost}%`)
+    if (row.battles < READ_FROM) continue
+    if (row.waste >= WASTE) found.push(`BOT: it leaves ${row.waste} Energy a turn unspent on ${name}, with a card it could play`)
+    else if (row.won < HARD) found.push(`GAME: ${name} too hard though the bot spends its Energy: won ${row.won}% of ${row.battles}`)
   }
   return found
 }
@@ -220,10 +241,10 @@ export function byGoal(results: RunResult[]): string {
   }).join(', ')
 }
 
-export function formatDiagnosis(bot: string, of: Row[]): string {
-  const head = `${bot}: challenge or ground, leg, screens, won/health lost with the best card in hand, the worst, the bot's play`
-  const pair = (p: { won: number; lost: number }) => `${p.won}/${p.lost}`.padStart(9)
-  const lines = of.map((r) => `${nameOf(r.test).padEnd(16)}${r.leg + 1}${String(r.screens).padStart(8)}${pair(r.best)}${pair(r.worst)}${pair(r.bot)}`)
+export function formatDiagnosis(bot: string, results: RunResult[]): string {
+  const of = rows(results)
+  const head = `${bot}: challenge or mission, leg, battles, won%, health lost%, Energy wasted a turn`
+  const lines = of.map((r) => `${nameOf(r.test).padEnd(16)}${r.leg + 1}${String(r.battles).padStart(8)}${String(r.won).padStart(6)}${String(r.lost).padStart(6)}${r.waste.toFixed(1).padStart(6)}`)
   const found = verdicts(of)
   return [head, ...lines, ...(found.length > 0 ? found : ['nothing off'])].join('\n')
 }

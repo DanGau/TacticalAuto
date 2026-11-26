@@ -8,7 +8,7 @@ import { drawRelic, offerable, type RelicId } from './relics'
 import { type Run } from './run-state'
 import { type Shop } from './run-state'
 import { type Soldier } from './run-state'
-import { makes, minorOffers, owesPick, reads, skillOffers } from './hero'
+import { makes, mend, minorOffers, owesPick, reads, skillOffers } from './hero'
 import { WEAPONS, type WeaponId } from './weapons'
 
 /** The hero learns the offered skill at `index`. */
@@ -115,9 +115,10 @@ export function takeCard(run: Run, index: number | null): void {
   settle(run)
 }
 
-/** Upgrades the card at `index` of the deck, or with null skips. */
+/** At a safehouse: upgrades the card at `index` of the deck, or with null rests, healing fully. */
 export function upgradeCard(run: Run, index: number | null): void {
   if (index !== null) run.deck[index].level = UPGRADED
+  else mend(run, Infinity)
   run.upgrading = false
   settle(run)
 }

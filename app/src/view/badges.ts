@@ -1,5 +1,5 @@
 // The stacks and counts a unit's token shows over its health: burn, chill, numbness, marks, Might, kept armor, a combo, exposure, the next every-Nth.
-import { CADENCE, FAULT, type Unit } from '../core/battle'
+import { CADENCE, FAULT, type Battle, type Unit } from '../core/battle'
 import { has } from '../core/fighters'
 import { CanvasTexture, Sprite as Billboard, SpriteMaterial } from 'three'
 import { css } from './shapes'
@@ -18,9 +18,24 @@ const MARK = 0xd36bff
 const ARMOR = 0xf2c94c
 const COUNT = 0xb8c0cc
 
-/** What `unit` has built this battle, as badges; none for a unit with nothing. */
-export function badges(unit: Unit): Badge[] {
+const INTENT = 0xff5a5a
+
+/** What an alien's intent reads as over it: the damage it means to deal and to whom, a power, a move, or nothing while stunned. */
+function intentOf(battle: Battle, unit: Unit): Badge | null {
+  const intent = battle.intents.find((i) => i.id === unit.id)
+  if (!intent) return null
+  if (intent.kind === 'attack') return { text: `⚔ ${intent.damage}${battle.units.find((u) => u.id === intent.target)?.civilian ? ' civ' : ''}`, color: INTENT }
+  if (intent.kind === 'ability') return { text: '✦ power', color: MARK }
+  if (intent.kind === 'stunned') return { text: '💫', color: COUNT }
+  return { text: '➜ move', color: COUNT }
+}
+
+/** What `unit` has built this battle, as badges, its intent or Block first in `battle`; none for a unit with nothing. */
+export function badges(unit: Unit, battle?: Battle): Badge[] {
   const out: Badge[] = []
+  const intent = battle && intentOf(battle, unit)
+  if (intent) out.push(intent)
+  if (unit.block) out.push({ text: `🛡${unit.block}`, color: CHILL })
   if (unit.burn > 0) out.push({ text: `🔥${unit.burn}`, color: BURN })
   if (unit.frozen) out.push({ text: 'ICE', color: CHILL })
   else if (unit.chill > 0) out.push({ text: `❄️${unit.chill}`, color: CHILL })

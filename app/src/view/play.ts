@@ -1,6 +1,6 @@
 // Plays a beat's events on screen, in order: walks, sightings, shots, and what each did.
 import type { Object3D } from 'three'
-import { type Battle, type Order, type Tile } from '../core/battle'
+import { type Battle, type Tile } from '../core/battle'
 import type { GameEvent } from '../core/combat-event'
 import { instant, PACE, strolls, tilePace, walkMs } from '../core/pace'
 import { attackOf, finisher, opener, secondaryAttack } from './attacks'
@@ -36,8 +36,6 @@ const TRIGGERS = {
 /** How high a stack's callout floats over a hit's. */
 const STACK_LIFT = 26
 
-/** What a soldier's order says over it. */
-const ORDERS: Record<Order, string> = { prepare: '👁 READY', sprint: '» SPRINT' }
 
 /** Where the hero stands: the camera keeps to it, and never leaves it for action elsewhere. */
 export const team = (battle: Battle): Tile[] => battle.units.filter((u) => u.side === 'human' && !u.civilian)
@@ -195,9 +193,6 @@ export async function play(s: Stage, battle: Battle, events: GameEvent[]): Promi
         drawAcid(s, battle)
         float(s, callout(s, `ACID -${e.damage}`, COLOR.acid, to))
       } else float(s, callout(s, 'PANICKED', COLOR.psi, to))
-    } else if (e.type === 'order') {
-      const on = sprites.get(e.id)
-      if (on) float(s, callout(s, ORDERS[e.order], COLOR.hit, on, 16))
     } else if (e.type === 'cloak') {
       const on = sprites.get(e.id)
       if (!on) continue

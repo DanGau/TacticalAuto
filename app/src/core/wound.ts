@@ -30,7 +30,10 @@ export function land(battle: Battle, shot: ShotEvent, target: Unit, events: Game
 export function wound(battle: Battle, target: Unit, dealt: number, events: GameEvent[], pierce = false, crit = false): void {
   if (target.hp <= 0 || target.invulnerable) return
   if (!target.engaged) engage(battle, target)
-  const hit = target.kind === 'wraith' && !crit ? Math.min(dealt, 1) : dealt
+  const struck = target.kind === 'wraith' && !crit ? Math.min(dealt, 1) : dealt
+  const blocked = Math.min(target.block ?? 0, struck)
+  if (blocked > 0) target.block! -= blocked
+  const hit = struck - blocked
   const soaked = Math.min(target.temp ?? 0, hit)
   if (soaked > 0) target.temp! -= soaked
   const damage = hit - soaked

@@ -1,15 +1,11 @@
-// The deck: the starting cards, the hand drawn each battle and the card played from it, cards offered by rarity.
+// The deck: the starter deck a hero's class and weapon give, and cards offered by rarity.
 import type { Rarity } from './base'
-import { CARD_IDS, CARDS, MAX_LEVEL, type Card, type CardId } from './cards'
+import { CARD_IDS, CARDS, SIGNATURES, STRIKES, type Card, type CardId } from './cards'
+import type { ClassId } from './classes'
 import { LEG_STOPS } from './progress'
 import { random, randomInt } from './rng'
 import type { Run } from './run-state'
-
-/** The deck every run starts with. */
-export const STARTER: CardId[] = ['hotLoads', 'fieldPlating', 'medPatch', 'sprint', 'scope', 'steady']
-
-/** Cards drawn each battle; Tactical Satchel draws 1 more. */
-export const HAND = 3
+import type { WeaponId } from './weapons'
 
 /** Cards a reward or a shop offers. */
 export const OFFERS = 3
@@ -21,35 +17,13 @@ export const EPIC_CHANCE: [number, number] = [0.03, 0.2]
 /** The level an upgrade raises a card to. */
 export const UPGRADED = 2
 
-export const starterDeck = (): Card[] => STARTER.map((id) => ({ id, level: 1 }))
+/** Of each card the starter deck holds: Strikes, Defends, then 1 Dash and the class's signature card. */
+export const STARTER = { strikes: 4, defends: 4 }
 
-/** Cards drawn each battle. */
-export const handSize = (run: Run) => HAND + (run.relics.includes('satchel') ? 1 : 0)
-
-/** Draws the hand for the battle at its deploy screen: handSize cards at random from those not out. */
-export function drawHand(run: Run): void {
-  const pool = run.deck.flatMap((card, i) => (card.out ? [] : [i]))
-  run.hand = []
-  while (run.hand.length < handSize(run) && pool.length > 0) run.hand.push(pool.splice(randomInt(run, pool.length), 1)[0])
-}
-
-/** The card at `index` of the hand as it plays: at its level, or fused a level higher. */
-export function playing(run: Run, index: number, fuse: boolean): Card {
-  const { id, level } = run.deck[run.hand[index]]
-  return { id, level: Math.min(MAX_LEVEL, level + (fuse ? 1 : 0)) }
-}
-
-/** Plays the card at `index` of the hand, none with null; fused, the hand's others go out until the next leg. Empties the hand. */
-export function play(run: Run, index: number | null, fuse: boolean): Card | null {
-  const card = index === null ? null : playing(run, index, fuse)
-  if (fuse) for (const i of run.hand.filter((_, k) => k !== index)) run.deck[i].out = true
-  run.hand = []
-  return card
-}
-
-/** A leg begins: every card fused away returns. */
-export function returnOut(run: Run): void {
-  for (const card of run.deck) delete card.out
+/** The deck a hero of class `cls` wielding `weapon` starts with. */
+export function starterDeck(cls: ClassId | null, weapon: WeaponId | undefined): Card[] {
+  const ids: CardId[] = [...Array<CardId>(STARTER.strikes).fill(STRIKES[weapon ?? 'rifle']), ...Array<CardId>(STARTER.defends).fill('defend'), 'dash', ...(cls ? [SIGNATURES[cls]] : [])]
+  return ids.map((id) => ({ id, level: 1 }))
 }
 
 /** How far along the run is, from 0 at its start to 1 at the hub. */
@@ -63,14 +37,18 @@ export function rarityChances(run: Run, elite: boolean): Record<Rarity, number> 
   return { common: 1 - rare - epic, rare, epic }
 }
 
-/** `n` different cards, each of a rarity drawn by rarityChances. */
+/** Whether the hero may be offered card `id`: not basic, and of its class or none. */
+export const offerable = (run: Run, id: CardId) => CARDS[id].rarity !== 'basic' && (!CARDS[id].cls || CARDS[id].cls === run.hero.cls)
+
+/** `n` different cards the hero may be offered, each of a rarity drawn by rarityChances. */
 export function drawCards(run: Run, n: number, elite: boolean): CardId[] {
   const chances = rarityChances(run, elite)
   const drawn: CardId[] = []
   while (drawn.length < n) {
     const roll = random(run)
     const rarity: Rarity = roll < chances.epic ? 'epic' : roll < chances.epic + chances.rare ? 'rare' : 'common'
-    const pool = CARD_IDS.filter((id) => CARDS[id].rarity === rarity && !drawn.includes(id))
+    const pool = CARD_IDS.filter((id) => CARDS[id].rarity === rarity && offerable(run, id) && !drawn.includes(id))
+    if (pool.length === 0) continue
     drawn.push(pool[randomInt(run, pool.length)])
   }
   return drawn

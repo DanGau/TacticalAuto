@@ -15,10 +15,10 @@ import { type Battle } from '../core/battle'
 import { HOLD_ROUNDS } from '../core/goals'
 import { missionOrder, THREATS } from '../core/objectives'
 import { button, describe, STOP_NAMES } from './html'
-import { CARDS } from '../core/cards'
-import { playing } from '../core/deck'
-import { boardOf, inert, lineOf } from '../core/read'
-import { cardFace, startDeck } from './card-face'
+import { aimed } from '../core/cards'
+import { DRAW, ENERGY, targetsOf } from '../core/turn'
+import { startDeck } from './card-face'
+import { handPanel } from './hand'
 import { ARENA_KINDS } from '../core/arena-kinds'
 import { QUANTITIES } from '../core/quantities'
 import { RECKONING_KILLS } from '../core/doctrines'
@@ -34,6 +34,8 @@ const FLIGHT_MS = 1100
 export interface Ui {
   /** Shows `run` in the status line and the panel. */
   update(run: Run): void
+  /** The player tapped the unit `id` on the board: the target of the card picked, if it can be. */
+  tap(id: number): void
 }
 
 function status(run: Run): string {
@@ -54,26 +56,13 @@ function counts(run: Run, battle: Battle): string {
   return `${chrono}${oath}`
 }
 
-/** Before the landing: the ground, what the battle tests, the twist, the aliens, and the hand: each card with what it plays to on this board, one to play, and whether to fuse. */
-function drop(run: Run, battle: Battle, armed: string | null, active: number | null, fuse: boolean): string {
+/** Before the landing: the ground, what the battle tests, the twist, the aliens, and the rule of the turn. */
+function drop(run: Run, battle: Battle, armed: string | null): string {
   const twist = battle.twist ? `<p title="${TWISTS[battle.twist].text}">${TWISTS[battle.twist].icon} <b>${TWISTS[battle.twist].name}</b></p>` : ''
   const test = battle.challenge ? `<h2 class="challenge" title="${CHALLENGES[battle.challenge].test}">${CHALLENGES[battle.challenge].icon} ${THREATS[battle.challenge]}</h2>` : ''
   const clock = battle.deadline !== null ? `<p>⏱️ Reinforcements arrive in round ${battle.deadline}.</p>` : ''
-  const board = boardOf(battle)
-  const stats = battle.reserve[0].stats
-  const fused = fuse && active !== null
-  const card = (_: number, i: number) => {
-    const played = playing(run, i, fused && i === active)
-    const out = fused && i !== active
-    const state = [i === active ? 'on' : '', inert(battle, board, played) ? 'inert' : ''].filter(Boolean).join(' ')
-    return cardFace(run, { ...played, out }, { attrs: `data-play="${i}" aria-pressed="${i === active}"`, line: lineOf(battle, board, played, stats), state })
-  }
-  const hand = run.hand.length > 0 ? `<h2 class="hand-head">Play 1 card</h2><div class="hand">${run.hand.map(card).join('')}</div>` : ''
-  const canFuse = active !== null && run.hand.length > 1
-  const fuseButton = canFuse ? `<button class="fuse${fused ? ' on' : ''}" data-fuse aria-pressed="${fused}"><b>Fuse</b> Play it 1 level higher. The other ${run.hand.length - 1} are out until the next leg.</button>` : ''
-  const ready = active !== null || run.hand.length === 0
-  const hint = ready ? (active !== null ? `${CARDS[run.deck[run.hand[active]].id].name} works this battle. The battle plays itself.` : 'The battle plays itself.') : 'Tap a card to play.'
-  return `${groundOf(run, battle)}${test}${clock}${twist}${foes(battle, armed)}${hand}${fuseButton}<p class="auto">${hint}</p>${button({ type: 'enter', card: active, fuse: fused }, 'Deploy', 'primary', ready)}`
+  const hint = `Each turn the hero moves on its own, then draws ${DRAW} cards and gains ${ENERGY} Energy.`
+  return `${groundOf(run, battle)}${test}${clock}${twist}${foes(battle, armed)}<p class="auto">${hint}</p>${button({ type: 'enter' }, 'Deploy', 'primary', true)}`
 }
 
 /** The ground scouted: its name and what it does, and which of what the hero's build makes it multiplies. */
@@ -101,10 +90,10 @@ export function createUi(act: (action: Action) => void): Ui {
   const overlay = document.getElementById('panel')!
   installTips(overlay)
   const dropPanel = document.getElementById('drop')!
+  const handEl = document.getElementById('hand')!
   let choosing: Battle | null = null
-  /** The card of the hand the player has picked to play on the deploy screen, by index, and whether to fuse it. */
-  let active: number | null = null
-  let fuse = false
+  /** The aimed card of the hand the player picked, waiting for its target. */
+  let aiming: Battle['pile']['hand'][number] | null = null
   /** Whether the player has seen the starting deck and set out; and whether the shop's deck is open to remove a card. */
   let dealt = false
   let removing = false
@@ -124,7 +113,7 @@ export function createUi(act: (action: Action) => void): Ui {
   /** The debrief shown, whether a pop-up has been over it, and the crate open now, by index into run.finds. */
   let opened: { report: Report | null; still: boolean } = { report: null, still: false }
   let crate: number | null = null
-  /** The fixed card tapped once, whose second tap goes through; and the shop gear whose wearer is being picked. */
+  /** The fixed card tapped once, whose second tap goes through; and the shop gear whose wearer is being aiming. */
   let armed: string | null = null
   let ware: number | null = null
   /** Whether the battle's statistics page is open over the debrief. */
@@ -210,25 +199,54 @@ export function createUi(act: (action: Action) => void): Ui {
     if (battle !== choosing) {
       choosing = battle
       armed = null
-      active = null
-      fuse = false
     }
-    dropPanel.innerHTML = drop(run, battle, armed, active, fuse)
+    dropPanel.innerHTML = drop(run, battle, armed)
   }
+
+  function showHand(run: Run): void {
+    const battle = run.phase === 'battle' && run.battle?.phase === 'battle' ? run.battle : null
+    handEl.hidden = !battle
+    if (!battle) return
+    const at = aiming ? battle.pile.hand.indexOf(aiming) : -1
+    if (at < 0 || battle.stage !== 'play') aiming = null
+    handEl.innerHTML = handPanel(run, battle, aiming ? at : null)
+  }
+
+  /** Plays the aiming card at `target`. */
+  function playAt(target: number): void {
+    const battle = shown?.battle
+    if (!battle || !aiming) return
+    const index = battle.pile.hand.indexOf(aiming)
+    if (!targetsOf(battle, aiming).some((u) => u.id === target)) return
+    aiming = null
+    act({ type: 'play', index, target })
+  }
+
+  handEl.addEventListener('click', (e) => {
+    const target = (e.target as HTMLElement).closest('button')
+    const battle = shown?.battle
+    if (!target || target.disabled || !battle) return
+    if (target.dataset.end !== undefined) {
+      aiming = null
+      return act({ type: 'endTurn' })
+    }
+    if (target.dataset.target) return playAt(Number(target.dataset.target))
+    if (target.dataset.card) {
+      const index = Number(target.dataset.card)
+      const card = battle.pile.hand[index]
+      if (!aimed(card.id)) {
+        aiming = null
+        return act({ type: 'play', index, target: null })
+      }
+      // A tap picks an aimed card; a second on it takes it back.
+      aiming = aiming === card ? null : card
+      showHand(shown!)
+    }
+  })
 
   dropPanel.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('button')
     if (!target) return
-    if (target.dataset.play) {
-      // A tap picks a card to play; a second on it takes it back.
-      const i = Number(target.dataset.play)
-      active = active === i ? null : i
-      return showDrop(shown!)
-    }
-    if (target.dataset.fuse !== undefined) {
-      fuse = !fuse
-      return showDrop(shown!)
-    }
     if (target.dataset.arm && armed !== target.dataset.arm) {
       armed = target.dataset.arm
       return showDrop(shown!)
@@ -402,6 +420,8 @@ export function createUi(act: (action: Action) => void): Ui {
       turnDial(run)
       render(run)
       showDrop(run)
+      showHand(run)
     },
+    tap: (id) => playAt(id),
   }
 }

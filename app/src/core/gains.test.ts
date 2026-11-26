@@ -6,7 +6,7 @@ import { EVENTS, type EventId } from './events'
 import { RELICS } from './relics'
 import { gainRelic } from './rewards'
 import { createRun, legOf, ways, go } from './run'
-import { step } from './step'
+import { fight } from './roads'
 import type { Run } from './run-state'
 
 /** A run met at `event`, holding a relic. */
@@ -53,7 +53,7 @@ test('in whole bot runs, only a relic chosen from a card goes untold', () => {
     while (run.phase !== 'won' && run.phase !== 'lost') {
       if (run.phase === 'battle' && run.battle!.phase === 'battle') {
         const before = held(run)
-        step(run)
+        fight(run)
         found.push(...untold(before, run))
         continue
       }

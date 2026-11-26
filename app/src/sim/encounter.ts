@@ -1,4 +1,4 @@
-// The challenge lab: plays each challenge alone, for each leg and rung, with no card and with each card asked for, and prints what it costs.
+// The challenge lab: plays each challenge alone, for each leg and rung, with the starter deck and with each card asked for added, and prints what it costs.
 import { gainRelic } from '../core/rewards'
 import { parseArgs } from 'node:util'
 import { apply } from '../core/apply'
@@ -15,9 +15,11 @@ import { type Run } from '../core/run-state'
 import { minorOffers, skillOffers, soldierStats, xpFor } from '../core/hero'
 import { timedFlow } from '../core/step'
 import { CARDS, type CardId } from '../core/cards'
-import { STARTER } from '../core/deck'
+import { starterDeck } from '../core/deck'
+import { awaiting } from '../core/combat'
+import { bestPlay } from '../bots/play'
 
-const { values } = parseArgs({ options: { runs: { type: 'string', default: '30' }, challenge: { type: 'string', default: '' }, leg: { type: 'string', default: '0,1,2' }, rung: { type: 'string', default: '0,1,2' }, goal: { type: 'string', default: 'cross' }, cls: { type: 'string', default: '' }, cards: { type: 'string', default: STARTER.join(',') }, none: { type: 'boolean', default: false } } })
+const { values } = parseArgs({ options: { runs: { type: 'string', default: '30' }, challenge: { type: 'string', default: '' }, leg: { type: 'string', default: '0,1,2' }, rung: { type: 'string', default: '0,1,2' }, goal: { type: 'string', default: 'cross' }, cls: { type: 'string', default: '' }, cards: { type: 'string', default: '' }, none: { type: 'boolean', default: false } } })
 
 /** The level the hero has reached by the time it meets a rung of a leg, about what a careful run has. */
 const levelAt = (leg: number, rung: number) => leg * 3 + 2 + rung
@@ -26,7 +28,6 @@ const levelAt = (leg: number, rung: number) => leg * 3 + 2 + rung
 function battle(seed: number, leg: number, rung: number, challenge: ChallengeId, card: CardId | null, goal: Goal): { won: boolean; hurt: number; seconds: number } {
   const run = createRun(seed)
   apply(run, { type: 'hero', index: seed % run.candidates.length })
-  run.deck = card ? [{ id: card, level: 1 }] : []
   const hero = run.hero
   if (values.cls) {
     hero.cls = values.cls as ClassId
@@ -38,15 +39,19 @@ function battle(seed: number, leg: number, rung: number, challenge: ChallengeId,
   while (skillOffers(hero).length > 0) hero.skills.push(skillOffers(hero)[randomInt(run, skillOffers(hero).length)])
   while (minorOffers(hero).length > 0) hero.perks.push(minorOffers(hero)[randomInt(run, minorOffers(hero).length)])
   hero.gear = generateGear(run, run.nextGear++, leg === 0 ? 'common' : 'rare')
+  run.deck = [...starterDeck(hero.cls, hero.gear.weapon), ...(card ? [{ id: card, level: 1 }] : [])]
   for (let i = 0; i < leg; i++) gainRelic(run, offerable(run.relics)[randomInt(run, offerable(run.relics).length)], true)
   run.phase = 'overworld'
   const stop = { kind: 'battle' as const, risk: 'standard' as const, goal, terrain: 'town' as const, challenge, twist: null, aliens: forceOf(challenge, leg, rung, GOALS[goal].force) }
   legOf(run).path = Array<number>(run.stop).fill(-1)
   road(run, [stop])
   apply(run, { type: 'advance' })
-  apply(run, { type: 'enter', card: run.hand.length > 0 ? 0 : null, fuse: false })
+  apply(run, { type: 'enter' })
   let clock = { next: 0, done: 0 }
-  while ((run.phase as Run['phase']) === 'battle') clock = timedFlow(run, clock).clock
+  while ((run.phase as Run['phase']) === 'battle') {
+    if (awaiting(run.battle!)) apply(run, bestPlay(run.battle!, true))
+    else clock = timedFlow(run, clock).clock
+  }
   return { won: run.report!.won, hurt: 1 - run.report!.hero!.hp / soldierStats(run, hero).hp, seconds: clock.done / 1000 }
 }
 
@@ -57,7 +62,7 @@ console.log('challenge    leg   rung card          won  health lost  seconds')
 for (const challenge of challenges) {
   for (const leg of values.leg.split(',').map(Number)) {
     for (const rung of values.rung.split(',').map(Number)) {
-      for (const card of (values.none ? [null] : [null, ...values.cards.split(',')]) as (CardId | null)[]) {
+      for (const card of (values.none ? [null] : [null, ...(values.cards ?? '').split(',').filter(Boolean)]) as (CardId | null)[]) {
         if (card && !(card in CARDS)) throw new Error(`unknown card "${card}"`)
         const results = Array.from({ length: runs }, (_, i) => battle(1000 + i, leg, rung, challenge, card, values.goal as Goal))
         const mean = (value: (r: (typeof results)[number]) => number) => results.reduce((sum, r) => sum + value(r), 0) / runs

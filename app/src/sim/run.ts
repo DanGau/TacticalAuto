@@ -13,8 +13,8 @@ import type { GearEffect } from '../core/battle'
 import type { ChallengeId } from '../core/challenges'
 import type { Goal } from '../core/goals'
 import type { ArenaKind } from '../core/arena-kinds'
-import type { CardId } from '../core/cards'
-import { forksOf, type Fork } from './forks'
+import { awaiting } from '../core/combat'
+import { plays } from '../bots/play'
 import { restForks, type RestFork } from './rest'
 
 /** A battle's toll: which of the run it was, the leg it was on, the hero's most health, its health at the start and end, whether it fell, whether it was won, and what it tested. */
@@ -30,11 +30,11 @@ export interface Toll {
   goal: Goal
   challenge: ChallengeId | null
   ground: ArenaKind
-  /** The card played, at the level it played at, and whether it was fused; the deck's size going in. */
-  card: CardId | null
-  level: number
-  fused: boolean
+  /** The deck's size going in. */
   deck: number
+  /** Turns the hero played, and Energy it left unspent with a card it could still play. */
+  turns: number
+  wasted: number
   most: number
   before: number
   after: number
@@ -72,8 +72,6 @@ export interface RunResult {
   jumps: Partial<Record<ArenaKind, { battles: number; jumps: number }>>
   /** Each battle's toll on the hero's health. */
   tolls: Toll[]
-  /** With `forks` asked for: each deploy screen played on with each card of the hand, plain and fused. */
-  forks: Fork[]
   /** With `rests` asked for: each safehouse on offer and fresh shop's medkit, the run played on both ways. */
   restForks: RestFork[]
   /** With the seed, enough to replay the run. */
@@ -91,7 +89,7 @@ const MAX_ACTIONS = 10000
 /**
  * Plays a run to its end, taking each action from `next` when the run waits for the player.
  */
-function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, forks = false, rests = false): { run: Run; result: RunResult } {
+function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, rests = false): { run: Run; result: RunResult } {
   const run = createRun(seed)
   run.doctrines.push(...(loadout.doctrines ?? []))
   run.relics = [...run.relics, ...(loadout.relics ?? [])]
@@ -99,22 +97,23 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
     if (loadout.effect && run.hero?.gear && !run.hero.gear.effect) run.hero.gear.effect = loadout.effect
   }
   arm()
-  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], forks: [], restForks: [], actions: [], taken: Array<number>(KEYS + 1).fill(0), deck: 0, rests: { safehouses: 0, medkits: 0 } }
+  const result: RunResult = { seed, won: false, keys: 0, endedOn: 'battle', battles: 0, draws: 0, durations: [], moments: { falls: 0, fallKills: 0, throws: 0, farthest: 0 }, jumps: {}, tolls: [], restForks: [], actions: [], taken: Array<number>(KEYS + 1).fill(0), deck: 0, rests: { safehouses: 0, medkits: 0 } }
   let clock = { next: 0, done: 0 }
   let leaps = 0
   /** This battle's hardest hero hit, its boss, and the round the boss was first wounded. */
   let hits = { max: 0, boss: -1, from: -1, rounds: null as number | null }
   /** The battle under way, its leg, the hero's health as it began, and whether a boss or commander leads it. */
   let begun: [Run['battle'], number, number, boolean] = [null, 0, 0, false]
-  /** The hand of the battle under way as it was dealt: its deck's size, and whether its card was fused. */
-  let dealt = { deck: 0, fused: false }
+  /** The battle under way: the deck's size going in, turns played, and Energy left unspent with a card still playable. */
+  let dealt = { deck: 0, turns: 0, wasted: 0 }
   while (run.phase !== 'won' && run.phase !== 'lost') {
     const battle = run.battle
     if (run.phase === 'battle' && begun[0] !== battle) {
       begun = [battle, run.keys, health(run, run.hero), battle!.units.some((u) => u.boss || u.target)]
       hits = { max: 0, boss: battle!.units.find((u) => u.boss)?.id ?? -1, from: -1, rounds: null }
+      dealt = { deck: run.deck.length, turns: 0, wasted: 0 }
     }
-    if (run.phase === 'battle' && battle!.phase === 'battle') {
+    if (run.phase === 'battle' && battle!.phase === 'battle' && !awaiting(battle!)) {
       const played = timedFlow(run, clock)
       clock = played.clock
       for (const event of played.events) {
@@ -137,15 +136,17 @@ function play(seed: number, next: (run: Run) => Action, loadout: Loadout = {}, f
         if (event.winner === null) result.draws++
         result.durations.push(clock.done)
         const fought = run.report!.hero!
-        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[3], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, ground: battle!.arenaKind, card: battle!.card?.id ?? null, level: battle!.card?.level ?? 0, fused: dealt.fused, deck: dealt.deck, most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
+        result.tolls.push({ nth: result.battles, leg: begun[1], kind: run.mission!.kind, elite: begun[3], won: event.winner === 'human', goal: battle!.goal, challenge: battle!.challenge, ground: battle!.arenaKind, deck: dealt.deck, turns: dealt.turns, wasted: dealt.wasted, most: fought.maxHp, before: begun[2], after: fought.hp, downed: battle!.downed.length, maxHit: hits.max, bossRounds: hits.rounds, healed: fought.tally.healed })
         clock = { next: 0, done: 0 }
       }
       continue
     }
     if (result.actions.length >= MAX_ACTIONS) throw new Error(`seed ${seed}: no end after ${MAX_ACTIONS} actions, in phase ${run.phase}`)
     const action = next(run)
-    if (forks && action.type === 'enter') result.forks.push(...forksOf(run, action, `${seed}:${result.battles}`))
-    if (action.type === 'enter') dealt = { deck: run.deck.length, fused: action.fuse }
+    if (action.type === 'endTurn') {
+      dealt.turns++
+      if (plays(battle!).length > 0) dealt.wasted += battle!.energy
+    }
     if (action.type === 'card' && action.index !== null) result.taken[run.keys]++
     if (action.type === 'buyCard') result.taken[run.keys]++
     const rest = rests ? restForks(run, action) : null
@@ -167,7 +168,7 @@ export function replay(seed: number, actions: Action[]): Run {
 }
 
 /** Plays a run with `bot`, the hero holding `loadout` from the start. */
-export function runWith(seed: number, bot: Bot, loadout: Loadout = {}, forks = false, rests = false): RunResult {
+export function runWith(seed: number, bot: Bot, loadout: Loadout = {}, rests = false): RunResult {
   const rng = { rng: seed }
-  return play(seed, (run) => bot(run, rng), loadout, forks, rests).result
+  return play(seed, (run) => bot(run, rng), loadout, rests).result
 }

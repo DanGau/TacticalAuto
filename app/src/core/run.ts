@@ -1,7 +1,7 @@
 // A run's journey: creating it, the route and each leg's map of stops, and moving along it.
-import { cardStat, CARDS, RIDERS, type Card } from './cards'
-import { drawHand, play, starterDeck, UPGRADED } from './deck'
-import { type Reserve, type Stats } from './battle'
+import { starterDeck } from './deck'
+import { deal } from './turn'
+import { type Reserve } from './battle'
 import { secondaryOf } from './hero'
 import { createBattle } from './setup'
 import { CLASSES } from './classes'
@@ -16,7 +16,7 @@ import { TOWNS } from './towns'
 import { crosses, distance, plane, type Point } from './plane'
 import { along, arc, CONTINENT_IDS, CONTINENTS, HUB, type City, type ContinentId, type LonLat } from './world'
 import { LEG_STOPS, OPENING, REST_COLUMNS, STOP_THREAT, THREAT_MAX } from './progress'
-import { abilityOf, charges, health, mend, offerCandidates, soldierStats, weaponOf } from './hero'
+import { abilityOf, charges, health, offerCandidates, soldierStats, weaponOf } from './hero'
 import { dropGear, settle } from './rewards'
 import { drawBattle, aliensOf, missionAt, placed, RISKS } from './missions'
 import { forceOf, type ChallengeId } from './challenges'
@@ -35,6 +35,7 @@ export const DROP_SUPPLIES = 4
 export function choose(run: Run, index: number): void {
   run.hero = run.candidates[index]
   run.candidates = []
+  run.deck = starterDeck(run.hero.cls, run.hero.gear?.weapon)
   run.route = plotRoute(run, run.hero.home)
   run.route.forEach((stage, l) => placeLeg(run, run.legs[l], stage))
   drawStops(run)
@@ -338,8 +339,7 @@ export function createRun(seed: number): Run {
     relics: [],
     gains: [],
     log: [],
-    deck: starterDeck(),
-    hand: [],
+    deck: [],
     streak: 0,
     cardOffers: [],
     upgrading: false,
@@ -385,10 +385,7 @@ export function advance(run: Run): void {
     run.threat = Math.min(run.threat + STOP_THREAT, THREAT_MAX)
     const supplies = stop === 'supply' ? DROP_SUPPLIES : 0
     run.supplies += supplies
-    if (stop === 'safehouse') {
-      mend(run, Infinity)
-      run.upgrading = run.deck.some((card) => card.level < UPGRADED)
-    }
+    if (stop === 'safehouse') run.upgrading = true
     if (stop === 'cache') dropGear(run, run.relics.some((id) => (RELICS[id] as Relic).rareGear))
     run.report = { stop, won: true, threat: { before, after: run.threat }, supplies, key: false, hero: null, rescued: null }
     passStop(run)
@@ -401,38 +398,29 @@ export function advance(run: Run): void {
   run.mission = mission
   run.phase = 'battle'
   const challenge = stop === 'battle' || stop === 'key' || stop === 'final' ? here.challenge : null
-  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), [reserveOf(run, rules, null)], mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city, ground: here.ground } : undefined, challenge)
-  // An ambush has no deploy screen, so no hand: the hero is caught with no card.
-  run.hand = []
-  if (run.battle.phase === 'deploy') drawHand(run)
+  run.battle = createBattle(randomInt(run, 2 ** 31), here.terrain, aliensOf(run, mission, challenge ? here.aliens : undefined, challenge), [reserveOf(run, rules)], mission.goal, rules, here.twist, here.region && here.city ? { region: here.region, city: here.city, ground: here.ground } : undefined, challenge)
+  deal(run.battle, run.deck)
 }
 
-/** The hero as it goes into a battle under `rules` with `card` played: its stats, health, kit and every effect it carries, the card's among them. */
-export function reserveOf(run: Run, rules: Rule[], card: Card | null): Reserve {
+/** The hero as it goes into a battle under `rules`: its stats, health, kit and every effect it carries. */
+export function reserveOf(run: Run, rules: Rule[]): Reserve {
   const doctrines = run.doctrines.map((id): Doctrine => DOCTRINES[id])
   const s = run.hero
   return {
     soldier: s.id,
-    stats: Object.fromEntries(Object.entries(soldierStats(run, s)).map(([key, n]) => [key, n + cardStat(card, key as keyof Stats)])) as unknown as Stats,
-    hp: health(run, s) + cardStat(card, 'hp'),
+    stats: soldierStats(run, s),
+    hp: health(run, s),
     ability: abilityOf(s),
     charges: charges(run, s),
     secondary: secondaryOf(s),
     weapon: doctrines.find((d) => d.fights)?.fights ?? s.gear?.weapon,
     stance: doctrines.find((d) => d.stance)?.stance ?? weaponOf(s)?.stance ?? (s.cls ? CLASSES[s.cls].stance : ('balanced' as const)),
-    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...s.perks.flatMap((id) => PERKS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? []), ...(card ? CARDS[card.id].lends : [])].filter(
+    effects: [...doctrines.flatMap((d) => d.effect ?? []), ...[weaponOf(s)?.effect, s.gear?.effect].flatMap((effect) => effect ?? []), ...s.skills.flatMap((id) => SKILLS[id].effect ?? []), ...s.perks.flatMap((id) => PERKS[id].effect ?? []), ...run.relics.flatMap((id): Relic['effect'][] => [RELICS[id].effect]).flatMap((effect) => effect ?? [])].filter(
       // Zenith Chronometer works every ZENITH_EVERY battles; under Executioner's Oath a kill pays a hero nothing.
       (effect) => (effect !== 'zenith' || (run.log.length + 1) % ZENITH_EVERY === 0) && !(rules.includes('reckoning') && KILL_REWARDS.includes(effect)),
     ),
   }
 }
 
-/** Plays the card at `index` of the hand for the battle at its deploy screen, or none with null, fused or not, and fits the hero to it. */
-export function playCard(run: Run, index: number | null, fuse: boolean): void {
-  const battle = run.battle!
-  battle.card = play(run, index, fuse)
-  battle.riders = Object.fromEntries(RIDERS.map((of) => [of, cardStat(battle.card, of)]))
-  battle.reserve = [reserveOf(run, battle.rules, battle.card)]
-}
 
 

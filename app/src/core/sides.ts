@@ -1,17 +1,14 @@
-// A side's simultaneous move: sighting aliens, walking, sentries, overwatch, burrowers.
+// A side's simultaneous move: sighting aliens, walking, sentries, burrowers.
 import { alienSrc, fx } from './sources'
-import type { Secondary } from './secondaries'
-import { aiming } from './fighters'
 import { weaponAttack } from './attack'
-import { WEAPONS } from './weapons'
-import { type Battle, ACID_DAMAGE, BURN_STACKS, isSoldier, type Unit, type Tile, ENGAGE_REACH, STANDOFF } from './battle'
+import { type Battle, ACID_DAMAGE, BURN_STACKS, isSoldier, type Unit, ENGAGE_REACH } from './battle'
 import { opening } from './landing'
 import { freeTilesNear } from './grid'
 import { distance } from './grid'
 import type { GameEvent } from './combat-event'
-import { engage, immune, onTile, fireproof, foeHas, has, extractReach, BEACON_REACH, spotted, uplinkReach, shootable, enemiesOf, besideFuel } from './fighters'
-import { fightPath, walk, paths, costOf, bestPath, COHESION } from './pathing'
-import { detects, sees } from './sight'
+import { engage, immune, onTile, fireproof, foeHas, has, extractReach, BEACON_REACH, spotted } from './fighters'
+import { fightPath, walk, COHESION } from './pathing'
+import { detects } from './sight'
 import { upkeep } from './upkeep'
 import { moved, wound } from './wound'
 
@@ -22,18 +19,15 @@ import { moved, wound } from './wound'
 export function moveSide(battle: Battle): GameEvent[] {
   const events = [...(battle.opening ? opening(battle) : []), ...upkeep(battle), ...(battle.turn === 'alien' ? surface(battle) : [])]
   const watched = new Set<number>()
-  battle.strides = {}
   for (const unit of battle.units) {
     if (unit.side !== battle.turn || unit.hp <= 0) continue
     const path = unit.civilian ? [] : unit.engaged ? fightPath(battle, unit) : []
-    if (path.length === 0 && unit.order) events.push({ type: 'order', src: { kind: 'basic', id: 'order' }, id: unit.id, order: unit.order })
     if (path.length === 0) continue
     // A sentry fires as the alien turns to go.
     if (unit.side === 'alien') events.push(...sentries(battle, unit, watched))
     if (unit.hp <= 0) continue
     walk(battle, unit, path, events)
     moved(battle, unit, path, events)
-    if (unit.order) events.push({ type: 'order', src: { kind: 'basic', id: 'order' }, id: unit.id, order: unit.order })
   }
   // Acid burns each unit of the side still standing in it once the side has moved, so a unit free to move can step out.
   for (const unit of battle.units.filter((u) => u.side === battle.turn)) {
@@ -45,10 +39,7 @@ export function moveSide(battle: Battle): GameEvent[] {
     unit.burn = Math.max(unit.burn, BURN_STACKS)
     events.push(fx(unit.id, foeHas(battle, unit, 'pyre') ? 'pyre' : 'napalm', 0))
   }
-  const sighted = sight(battle)
-  // Soldiers on overwatch fire once the aliens have moved and any alien sighted has taken its place.
-  if (battle.turn === 'alien') sighted.push(...overwatch(battle, [...events, ...sighted].flatMap((e) => (e.type === 'move' ? [e.id] : []))))
-  return [...events, ...sighted]
+  return [...events, ...sight(battle)]
 }
 
 /**
@@ -102,74 +93,8 @@ export function sentries(battle: Battle, unit: Unit, watched: Set<number>): Game
   return events
 }
 
-/**
- * A soldier's walk between or after its attacks, within the move it has left: with `toShot`, to the nearest tile with a
- * shot (of `secondary`, if given), if it has none here; else a Deadeye backs out of arm's reach. Never
- * into harm, off the uplink, or into sight of an alien not yet revealed.
- */
-export function stride(battle: Battle, unit: Unit, seen: Set<number>, toShot: boolean, secondary?: Secondary): GameEvent[] {
-  const left = battle.strides[unit.id] ?? 0
-  const enemies = enemiesOf(battle, unit)
-  const shotFrom = (end: Tile) => enemies.some((e) => shootable(battle, aiming(unit, secondary), end, e, seen))
-  if (left <= 0 || unit.hp <= 0 || (toShot ? shotFrom(unit) : unit.stance !== 'standoff')) return []
-  const barred = barredFor(battle, unit)
-  const path = bestPath(paths(battle, unit, left), unit, (end, steps) =>
-    toShot ? [barred(end), shotFrom(end) ? 0 : 1, steps] : [barred(end), Math.max(0, STANDOFF - Math.min(...enemies.map((e) => distance(e, end)))), steps],
-  )
-  const end = path.at(-1)
-  if (!end || barred(end) || (toShot && !shotFrom(end))) return []
-  battle.strides[unit.id] = left - costOf(battle, unit, path)
-  const events: GameEvent[] = []
-  walk(battle, unit, path, events)
-  moved(battle, unit, path, events)
-  return [...events, ...sight(battle)]
-}
-
-/** Tiles a soldier will not walk to between attacks: into harm, off the uplink, or into sight of an alien not yet revealed; 1 for those. */
-function barredFor(battle: Battle, unit: Unit): (end: Tile) => number {
-  const unseen = battle.units.filter((u) => u.side !== unit.side && !u.revealed)
-  const reach = uplinkReach(battle)
-  return (end) => (onTile(battle.acid, end) || besideFuel(battle, end) || (onTile(battle.fire, end) && !fireproof(battle, unit)) || (battle.uplink !== null && distance(end, battle.uplink) > reach) || unseen.some((alien) => sees(battle, end, alien)) ? 1 : 0)
-}
-
-/** A hero whose weapon dashes, with nothing in arm's reach, dashes to the nearest tile that brings an enemy into it, if one is within the dash. It costs no move. */
-export function dash(battle: Battle, unit: Unit, seen: Set<number>): GameEvent[] {
-  const tiles = unit.weapon && WEAPONS[unit.weapon].dash
-  if (!tiles || unit.rooted > 0) return []
-  const enemies = enemiesOf(battle, unit)
-  const strikes = (end: Tile) => enemies.some((e) => shootable(battle, unit, end, e, seen))
-  if (strikes(unit)) return []
-  const barred = barredFor(battle, unit)
-  const path = bestPath(paths(battle, unit, tiles), unit, (end, steps) => [barred(end), strikes(end) ? 0 : 1, steps])
-  const end = path.at(-1)
-  if (!end || barred(end) || !strikes(end)) return []
-  const events: GameEvent[] = []
-  walk(battle, unit, path, events)
-  moved(battle, unit, path, events)
-  return [...events.map((e) => (e.type === 'move' ? { ...e, with: 'dash' as const, src: { kind: 'basic' as const, id: 'dash' } } : e)), ...sight(battle)]
-}
-
-/** Overwatch: each prepared soldier shoots at the first alien that moved this turn and that it can now shoot. */
-export function overwatch(battle: Battle, moved: number[]): GameEvent[] {
-  const events: GameEvent[] = []
-  for (const unit of battle.units.filter((u) => u.side === 'human' && u.order === 'prepare')) {
-    const seen = spotted(battle)
-    for (const id of moved) {
-      const alien = battle.units.find((u) => u.id === id && u.revealed)
-      battle.actor = unit.id
-      const shot = alien && unit.hp > 0 ? weaponAttack(battle, unit, seen, 'overwatch', alien) : []
-      battle.actor = null
-      if (shot.length === 0) continue
-      events.push(...shot)
-      break
-    }
-  }
-  return events
-}
-
-/** Whether the unit may act this turn: a soldier may not under an order; an alien may not until it engages, nor while it is surprised. */
+/** Whether an alien may act this turn: not until it engages, nor while it is surprised. */
 export function armed(unit: Unit): boolean {
-  if (unit.order) return false
   return unit.engaged && !unit.surprised
 }
 
@@ -183,7 +108,6 @@ export function surface(battle: Battle): GameEvent[] {
   if (rising.length === 0 || !alone) return events
   freeTilesNear(battle, alone, rising.length).forEach((tile, i) => Object.assign(rising[i], tile, { revealed: true, surprised: 0 }))
   events.push({ type: 'reveal', units: rising.map(({ id, x, y }) => ({ id, x, y })) })
-  // Surfacing is a move, so overwatch answers it.
   for (const m of rising) events.push({ type: 'move', src: alienSrc(m), id: m.id, path: [{ x: m.x, y: m.y }] })
   return events
 }

@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest'
 import { CARD_IDS } from '../core/cards'
-import { CARD_ICONS } from './card-icons'
+import { cardIcon, CARD_ICONS } from './card-icons'
 
-test('every card has an icon of its own', () => {
-  const icons = CARD_IDS.map((id) => CARD_ICONS[id])
-  expect(icons.every(Boolean)).toBe(true)
-  expect(new Set(icons).size).toBe(icons.length)
+test('every card has an icon, and those of their own are each different', () => {
+  expect(CARD_IDS.every((id) => cardIcon(id).includes('<path') || cardIcon(id).includes('<circle') || cardIcon(id).includes('<rect'))).toBe(true)
+  const own = Object.values(CARD_ICONS)
+  expect(new Set(own).size).toBe(own.length)
 })

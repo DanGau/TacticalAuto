@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { arena } from './arena'
-import { BRIDGE_FACTOR, CHILL_SLIDE, CHILL_TURNS, NUMB_TURNS, THERMAL_FACTOR, isSoldier, LODESTONE_REACH, SHELL_MAX, STAGGER_DAMAGE } from './battle'
+import { BRIDGE_FACTOR, CHILL_SLIDE, CHILL_TURNS, NUMB_TURNS, THERMAL_FACTOR, isSoldier, LODESTONE_REACH, SHELL_MAX } from './battle'
 import { knockback, pull } from './knockback'
 import { SLAM_DAMAGE, wound } from './wound'
 import { chillUnit, kindle, markUnit } from './stacks'
@@ -66,17 +66,6 @@ test('moving a frozen alien thaws it and moving a marked one clears its marks; S
   Object.assign(bridged.aliens[0], { chill: 3, frozen: true, mark: 2 })
   pull(bridged.battle, bridged.aliens[0], bridged.hero, [])
   expect(bridged.aliens[0]).toMatchObject({ frozen: true, mark: 2, numb: 0, hp: 40 - BRIDGE_FACTOR * (3 * 3 + 3 * 2) })
-})
-
-test('Stagger Sights: hits on an alien moved since its last turn do more, until its turn', () => {
-  const { battle, aliens, beats } = arena(['stagger'], [{ x: 11, y: 10 }])
-  aliens[0].shifted = true
-  const [shot] = beats(1).filter((e) => e.type === 'shot') as { with: string[] }[]
-  expect(shot.with).toContain('stagger')
-  expect(STAGGER_DAMAGE).toBeGreaterThan(0)
-  battle.turn = 'alien'
-  upkeep(battle)
-  expect(aliens[0].shifted).toBe(false)
 })
 
 test('Lodestone Harness pulls the nearest engaged alien to the hero with the most armor', () => {

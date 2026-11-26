@@ -1,6 +1,6 @@
 // The events a beat emits for the view to play.
 import type { Prop } from './terrain'
-import type { Tile, Effect, Ability, Order, Side } from './battle'
+import type { Tile, Effect, Ability, Side } from './battle'
 import type { SecondaryId } from './secondaries'
 import type { Src } from './sources'
 
@@ -35,8 +35,6 @@ export type GameEvent =
   | { type: 'escaped'; id: number }
   /** A psion panics a soldier, who loses its next action. */
   | { type: 'panic'; src: Src; id: number; target: number }
-  /** A soldier with no shot takes a standard action in place of attacking. */
-  | { type: 'order'; src: Src; id: number; order: Order }
   /** A unit cloaks, or its cloak breaks. */
   | { type: 'cloak'; id: number; on: boolean }
   /** A panicked soldier loses its action. */

@@ -33,7 +33,7 @@ test('actions outside their phase are rejected and change nothing', () => {
   expect(apply(run, { type: 'hero', index: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'skill', index: 0 }).ok).toBe(false)
   expect(apply(run, { type: 'equip', find: 0 }).ok).toBe(false)
-  expect(apply(run, { type: 'enter', card: run.hand.length > 0 ? 0 : null, fuse: false }).ok).toBe(false)
+  expect(apply(run, { type: 'enter' }).ok).toBe(false)
   expect(apply(run, { type: 'go', index: 9 }).ok).toBe(false)
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
   expect(run).toEqual(before)
@@ -42,7 +42,7 @@ test('actions outside their phase are rejected and change nothing', () => {
   apply(run, { type: 'advance' })
   expect(apply(run, { type: 'advance' }).ok).toBe(false)
   expect(apply(run, { type: 'gear', index: 0 }).ok).toBe(false)
-  apply(run, { type: 'enter', card: run.hand.length > 0 ? 0 : null, fuse: false })
-  expect(apply(run, { type: 'enter', card: run.hand.length > 0 ? 0 : null, fuse: false }).ok).toBe(false)
+  apply(run, { type: 'enter' })
+  expect(apply(run, { type: 'enter' }).ok).toBe(false)
 })
 

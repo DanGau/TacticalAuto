@@ -1,7 +1,7 @@
 import { powerOf } from './skills'
 import { expect, test } from 'vitest'
 import { apply } from './apply'
-import { stepBattle } from './combat'
+import { beat } from './roads'
 import { fightPath, goalOf } from './pathing'
 import { skirmish } from './abilities'
 import { soldierUnit } from './spawn'
@@ -42,7 +42,7 @@ test('a hold sets its uplink at the objective, the landing at the far end; held,
   expect(battle.waves.length).toBeGreaterThan(0)
   enterAt(run)
   battle.held = HOLD_ROUNDS
-  stepBattle(battle)
+  beat(battle)
   expect(battle.winner).toBe('human')
   endBattle(run)
   expect(run.relicOffers).toHaveLength(3)
@@ -55,7 +55,7 @@ test('a crossing is won once the hero reaches the extraction zone at the objecti
   enterAt(run)
   const soldier = battle.units.find(isSoldier)!
   Object.assign(soldier, freeTilesNear(battle, battle.extract!, 3)[1])
-  while (battle.phase === 'battle' && battle.beat < 20) stepBattle(battle)
+  while (battle.phase === 'battle' && battle.beat < 20) beat(battle)
   expect(battle.units.some((u) => u.side === 'alien')).toBe(true)
   expect(battle.winner).toBe('human')
 })
@@ -85,7 +85,7 @@ test('a rescue is won, and pays, only with more than RESCUE_QUORUM civilians sav
     battle.units = battle.units.filter((u) => !u.civilian)
     battle.saved = saved
     const supplies = run.supplies
-    stepBattle(battle)
+    beat(battle)
     expect(battle.winner).toBe(saved > RESCUE_QUORUM ? 'human' : 'alien')
     endBattle(run)
     expect(run.supplies > supplies).toBe(saved > RESCUE_QUORUM)
@@ -116,14 +116,14 @@ test('on a rescue aliens with no soldier to fight kill civilians', () => {
   for (const u of battle.units.filter((u) => u.side === 'alien')) u.engaged = true
   const civilians = new Set(battle.units.filter((u) => u.civilian).map((u) => u.id))
   let killed = 0
-  while (battle.phase === 'battle' && battle.round < 30) for (const e of stepBattle(battle)) if (e.type === 'death' && civilians.has(e.id)) killed++
+  while (battle.phase === 'battle' && battle.round < 30) for (const e of beat(battle)) if (e.type === 'death' && civilians.has(e.id)) killed++
   expect(killed).toBeGreaterThan(0)
 })
 
 test("a rescue's civilians stay put", () => {
   const battle = terror(3).battle!
   const civilians = battle.units.filter((u) => u.civilian)
-  for (let i = 0; i < 40 && battle.phase === 'battle'; i++) for (const e of stepBattle(battle)) expect(e.type === 'move' && civilians.some((c) => c.id === e.id)).toBe(false)
+  for (let i = 0; i < 40 && battle.phase === 'battle'; i++) for (const e of beat(battle)) expect(e.type === 'move' && civilians.some((c) => c.id === e.id)).toBe(false)
 })
 
 test('on a rescue a soldier makes for the alien nearest a civilian, and with none near one, for the nearest civilian', () => {
@@ -164,7 +164,7 @@ test('a civilian a harvester kills rises on the next alien turn as a husk', () =
   Object.assign(harvester, freeTilesNear(battle, prey, 30).find((t) => distance(t, prey) === 2))
   let died = false
   while (battle.phase === 'battle' && !battle.units.some((u) => u.kind === 'husk')) {
-    for (const e of stepBattle(battle)) if (e.type === 'death' && !battle.units.some((u) => u.id === e.id)) died = true
+    for (const e of beat(battle)) if (e.type === 'death' && !battle.units.some((u) => u.id === e.id)) died = true
     expect(battle.round).toBeLessThan(20)
   }
   expect(died).toBe(true)
@@ -182,7 +182,7 @@ test('on a rescue soldiers reach civilians to get them out', () => {
     battle.units = battle.units.filter((u) => u.side !== 'alien' || u.kind === 'harvester')
     for (const s of battle.units.filter(isSoldier)) Object.assign(s, freeTilesNear(battle, battle.objective, 9)[8])
     for (const u of battle.units) Object.assign(u, { revealed: true, engaged: true })
-    while (battle.phase === 'battle') for (const e of stepBattle(battle)) if (e.type === 'saved') saved++
+    while (battle.phase === 'battle') for (const e of beat(battle)) if (e.type === 'saved') saved++
     expect(battle.saved).toBeLessThanOrEqual(CIVILIANS)
   }
   expect(saved).toBeGreaterThan(0)
@@ -212,7 +212,7 @@ test('no one shot kills a commander from full health; brought low, it blinks awa
   Object.assign(soldier, freeTilesNear(battle, commander, 2)[1], { weapon: 'sniper', spent: ['throw', 'throw', 'throw'], stats: { ...soldier.stats, damage: 99, crit: 1, move: 0 } })
   Object.assign(battle, { turn: 'human', stage: 'move' })
   const events: GameEvent[] = []
-  while (battle.phase === 'battle' && !events.some((e) => e.type === 'shot' && e.target === commander.id)) events.push(...stepBattle(battle))
+  while (battle.phase === 'battle' && !events.some((e) => e.type === 'shot' && e.target === commander.id)) events.push(...beat(battle))
   expect(commander.hp).toBe(1)
   expect(events).toContainEqual(expect.objectContaining({ type: 'effect', id: commander.id, effect: 'lastStand', amount: 0 }))
   expect(events).toContainEqual(expect.objectContaining({ type: 'move', id: commander.id, with: 'blink' }))

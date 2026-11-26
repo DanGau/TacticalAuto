@@ -4,6 +4,13 @@ import { createRun, legOf } from './run'
 import { type Run } from './run-state'
 import { type Stop } from './run-state'
 import { powerOf } from './skills'
+import type { Battle } from './battle'
+import type { GameEvent } from './combat-event'
+import { awaiting, stepBattle } from './combat'
+import { endTurn, heroOf } from './turn'
+import { weaponAttack } from './attack'
+import { spotted } from './fighters'
+import { step } from './step'
 
 /** For tests: lays the rest of the leg as a road of `stops` one after another, the first entered, then the satellite. */
 export function road(run: Run, stops: Stop[]): void {
@@ -22,16 +29,35 @@ export function atKey(run: Run): void {
 
 /** For tests: makes the landing. */
 export function enterAt(run: Run): Result {
-  return apply(run, { type: 'enter', card: run.hand.length > 0 ? 0 : null, fuse: false })
+  return apply(run, { type: 'enter' })
 }
 
-/** For tests: a run of `seed` under way, its hero the first candidate, a Deadeye with a plain rifle, its deck empty. */
+/** For tests: a run of `seed` under way, its hero the first candidate, a Deadeye with a plain rifle and its starter deck. */
 export function begun(seed: number): Run {
   const run = createRun(seed)
   run.candidates[0].cls = 'sniper'
   run.candidates[0].skills = [powerOf('sniper')]
   run.candidates[0].gear = { id: 0, rarity: 'common', name: 'Rifle', weapon: 'rifle', stats: {}, effect: null }
   apply(run, { type: 'hero', index: 0 })
-  run.deck = []
   return run
+}
+
+/**
+ * For tests: one beat of the battle. On the hero's turn the hero makes its weapon's attack, as a plain shot with every
+ * effect it carries, and ends the turn: the tests of effects read a hit, not a card.
+ */
+export function beat(battle: Battle): GameEvent[] {
+  if (!awaiting(battle)) return stepBattle(battle)
+  const hero = heroOf(battle)
+  battle.actor = hero?.id ?? null
+  const events = hero ? weaponAttack(battle, hero, spotted(battle)) : []
+  battle.actor = null
+  endTurn(battle)
+  return events
+}
+
+/** For tests: one beat of the run's battle, played as beat plays it, settling the battle into the run when it ends. */
+export function fight(run: Run): GameEvent[] {
+  if (run.battle && awaiting(run.battle)) beat(run.battle)
+  return step(run)
 }

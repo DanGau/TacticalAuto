@@ -1,4 +1,4 @@
-// The strategic bot: reads each battle's board and builds a lean deck, and chooses route, hero and weapons for the build.
+// The strategic bot: plays cards against the aliens' intents, builds a lean deck, and chooses route, hero and weapons for the build.
 import type { Action } from '../core/apply'
 import type { ClassId } from '../core/classes'
 import { MEDKIT, EVENTS, RELIC_PRICE } from '../core/events'
@@ -11,10 +11,9 @@ import { plannedPerk, plannedSkill } from '../core/plans'
 import { health, makes, minorOffers, reads, skillOffers, soldierStats } from '../core/hero'
 import { RELICS, type RelicId } from '../core/relics'
 import { CANCELS, cancelling, type Cancel, type Flow } from '../core/quantities'
-import { CARDS, signOf, type Card, type CardId } from '../core/cards'
-import { HAND, playing, UPGRADED } from '../core/deck'
-import { boardOf, type Board } from '../core/read'
-import type { Battle, Stats } from '../core/battle'
+import { CARDS, type CardId } from '../core/cards'
+import { STARTER, UPGRADED } from '../core/deck'
+import { bestPlay } from './play'
 import type { Bot } from './bots'
 import { EXAMS } from '../core/exams'
 
@@ -102,7 +101,7 @@ export function comboWorth(run: Run, flow: Flow & { bridge?: Cancel }): number {
 /** What a relic is worth to the hero: see comboWorth. */
 const relicWorth = (run: Run, id: RelicId) => comboWorth(run, RELICS[id])
 
-/** Takes the relic worth the most, the first among equals; the card offered worth the most if it lifts the deck, else skips; upgrades the card worth the most; and the skill and perk the hero plans on. */
+/** Takes the relic worth the most, the first among equals; the card offered worth the most if it lifts the deck, else skips; rests when hurt, else upgrades the card worth the most; and the skill and perk the hero plans on. */
 function reward(run: Run): Action {
   if (run.relicOffers.length > 0) {
     const score = (id: RelicId, i: number) => relicWorth(run, id) + (i === 0 ? 1 : 0)
@@ -115,6 +114,7 @@ function reward(run: Run): Action {
   }
   if (run.upgrading) {
     const open = run.deck.flatMap((c, i) => (c.level < UPGRADED ? [i] : []))
+    if (heroHealth(run) < REST || open.length === 0) return { type: 'upgrade', index: null }
     return { type: 'upgrade', index: open.reduce((b, i) => (cardWorth(run, run.deck[i].id) > cardWorth(run, run.deck[b].id) ? i : b)) }
   }
   if (skillOffers(run.hero).length > 0) return { type: 'skill', index: plannedSkill(run.hero) }
@@ -130,6 +130,9 @@ function choose(run: Run): Action {
   return { type: 'hero', index: run.candidates.reduce((best, s, i) => (rank(s) < rank(run.candidates[best]) ? i : best), 0) }
 }
 
+/** Health below which the bot rests at a safehouse rather than upgrade. */
+const REST = 0.75
+
 const RARITY_WORTH = { basic: 0.5, common: 1, rare: 2, epic: 3 }
 
 /** What card `id` is worth in the deck, wherever it is drawn: its rarity and what it adds to the combos. */
@@ -142,68 +145,19 @@ const deckWorth = (run: Run) => run.deck.reduce((sum, c) => sum + cardWorth(run,
 const lifts = (run: Run, id: CardId) => cardWorth(run, id) > deckWorth(run) + LEAN
 const LEAN = 0.5
 
-/** The deck's weakest card, by index, if it is worth less than the mean by LEAN and the deck holds more than a hand and 2. */
+/** The deck's weakest card, by index, if it is worth less than the mean by LEAN and the deck holds more than its start. */
 function weakestCard(run: Run): number | null {
-  if (run.deck.length <= HAND + 2) return null
+  if (run.deck.length <= STARTER.strikes + STARTER.defends) return null
   const worst = run.deck.reduce((w, c, i) => (cardWorth(run, c.id) < cardWorth(run, run.deck[w].id) ? i : w), 0)
   return cardWorth(run, run.deck[worst].id) < deckWorth(run) - LEAN ? worst : null
 }
 
-/** How much the board pulls on what a card plays to, for a hero of `stats`: what its line in the hand says it does here. */
-export function pull(card: Card, board: Board, battle: Battle, stats: Stats): number {
-  const b = board
-  const n = CARDS[card.id].adds.by[card.level - 1]
-  const turns = (move: number) => Math.ceil(b.far / Math.max(1, move))
-  switch (signOf(card.id)) {
-    case 'damage': return 1 + b.hp / 60 + (b.boss ? 1 : 0)
-    case 'pierce': return b.armor / 6
-    case 'hp': case 'temp': return 0.6 + b.aliens / 10
-    case 'armor': return 0.5 + b.melee / 5
-    case 'guard': return 0.5 + b.aliens / 6
-    case 'regen': return 0.6 + (b.boss ? 0.8 : 0)
-    case 'ranged': return b.ranged / 2.5
-    case 'melee': return b.melee / 3
-    case 'move': return 0.3 * (turns(stats.move) - turns(stats.move + n)) + (battle.deadline !== null ? 1.5 : 0)
-    case 'jump': return b.high / 30
-    case 'span': return (b.water + b.voids) / 20
-    case 'hover': return (b.mire + b.water + b.voids) / 20
-    case 'range': return b.ranged / 3 + b.far / 30
-    case 'crit': return 0.8 + b.high / 40
-    case 'push': case 'moved': case 'impact': return 0.4 + b.ledges / 15 + b.ice / 25
-    case 'landing': return b.near / 2
-    case 'burn': return 0.6 + b.mire / 15 + b.aliens / 15
-    case 'chill': return 0.6 + (b.water + b.ice) / 15
-    case 'mark': case 'boss': case 'overkill': return b.boss ? 2 : 0.5 + b.toughest / 30
-    case 'rescue': return battle.goal === 'rescue' ? 3 : -5
-    case 'hold': return battle.goal === 'hold' ? 3 : -5
-    case 'extract': return battle.extract ? 1.5 : -5
-    default: return 0.4 + b.aliens / 8
-  }
-}
-
-/** What playing `card` is worth in this battle: what the board pulls on, by its level, beside its rarity and combos. */
-export function playWorth(run: Run, battle: Battle, board: Board, card: Card): number {
-  const stats = battle.reserve[0].stats
-  return pull(card, board, battle, stats) * (1 + 0.35 * (card.level - 1)) + 0.5 * (RARITY_WORTH[CARDS[card.id].rarity] - 1) + 0.25 * comboWorth(run, CARDS[card.id])
-}
-
-/** The card of the hand worth the most here; fused when the others are worth less in the deck than its mean and a hand is left. */
-function deploying(run: Run): Action {
-  if (run.hand.length === 0) return { type: 'enter', card: null, fuse: false }
-  const battle = run.battle!
-  const board = boardOf(battle)
-  const card = run.hand.reduce((best, _, i) => (playWorth(run, battle, board, playing(run, i, false)) > playWorth(run, battle, board, playing(run, best, false)) ? i : best), 0)
-  const others = run.hand.filter((_, i) => i !== card).map((d) => run.deck[d])
-  const left = run.deck.filter((c) => !c.out).length - others.length
-  const fuse = others.length > 0 && left >= HAND && others.every((c) => c.level < UPGRADED && cardWorth(run, c.id) < deckWorth(run))
-  return { type: 'enter', card, fuse }
-}
 
 /** The strategic bot; given `rest`, it rests at a safehouse on the way exactly when the hero's health is under it. */
 export const resting = (rest?: number): Bot => (run) => {
   if (run.phase === 'reward') return reward(run)
   if (run.phase === 'select') return choose(run)
-  if (run.phase === 'battle') return deploying(run)
+  if (run.phase === 'battle') return run.battle!.phase === 'deploy' ? { type: 'enter' } : bestPlay(run.battle!, true)
   if (run.phase === 'shop') return shop(run)
   if (run.phase === 'event') {
     const options = EVENTS[run.event!].options.flatMap((option, i) => (!option.can || option.can(run) ? [i] : []))

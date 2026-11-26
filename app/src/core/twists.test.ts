@@ -5,7 +5,7 @@ import { apply } from './apply'
 import { GRID, type Battle } from './battle'
 import { crumble } from './grid'
 import { bulkAt } from './grid'
-import { stepBattle } from './combat'
+import { beat } from './roads'
 import type { GameEvent } from './combat-event'
 import { powerOf } from './skills'
 import { detects, sees } from './sight'
@@ -39,8 +39,8 @@ function duel(twist: Twist | null): Battle {
 /** Steps the battle until the soldier fires, and returns that beat's events. */
 function untilShot(battle: Battle): GameEvent[] {
   const soldier = battle.units.find((u) => u.side === 'human' && !u.civilian)!
-  for (let beat = 0; beat < 100; beat++) {
-    const events = stepBattle(battle)
+  for (let n = 0; n < 100; n++) {
+    const events = beat(battle)
     if (events.some((e) => e.type === 'shot' && e.id === soldier.id)) return events
   }
   throw new Error('no shot')
