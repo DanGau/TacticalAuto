@@ -1,6 +1,6 @@
 # TacticalAuto
 
-An isometric roguelike deck-builder on a tactical board. Premise: [docs/premise.md](docs/premise.md). Card rules: [docs/cards.md](docs/cards.md). Design principles for new mechanics: [docs/game-design.md](docs/game-design.md).
+An isometric roguelike deck-builder on a tactical board. Premise: [docs/premise.md](docs/premise.md). Card rules: [docs/cards.md](docs/cards.md). Archetypes: [docs/archetypes.md](docs/archetypes.md). Design principles for new mechanics: [docs/game-design.md](docs/game-design.md).
 
 Architecture rules: [docs/architecture/CLAUDE.md](docs/architecture/CLAUDE.md). Read before designing or writing code.
 

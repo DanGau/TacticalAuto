@@ -87,8 +87,8 @@ const cards = {
   shieldBash: strike('Shield Bash', [4, 5], undefined, { block: [3, 4], makes: ['armor'] }),
   jab: strike('Jab', [2, 3], undefined, { hits: 2, knock: 1, makes: ['shots', 'moved'] }),
   defend: { name: 'Defend', type: 'skill', rarity: 'basic', cost: 1, block: [4, 7] },
-  advance: { name: 'Advance', type: 'skill', rarity: 'basic', cost: [1, 0], move: 3, draw: 1 },
-  fallBack: { name: 'Fall Back', type: 'skill', rarity: 'basic', cost: [1, 0], retreat: 3, draw: 1 },
+  advance: { name: 'Advance', type: 'skill', rarity: 'basic', cost: 0, move: [3, 4] },
+  fallBack: { name: 'Fall Back', type: 'skill', rarity: 'basic', cost: 0, retreat: [3, 4] },
   steadyAim: { name: 'Steady Aim', type: 'skill', rarity: 'basic', cost: 1, aim: [5, 8], retain: true },
   // Each class's signature card, 1 in its starter deck.
   heroicLeap: { name: 'Heroic Leap', type: 'attack', rarity: 'basic', cls: 'assault', cost: 2, move: [4, 5], damage: [5, 7], range: 1, area: 1, makes: ['moved'] },
@@ -98,7 +98,7 @@ const cards = {
   droneStrike: { name: 'Drone Strike', type: 'attack', rarity: 'basic', cls: 'engineer', cost: 1, damage: [2, 3], hits: 3, range: 8, makes: ['shots'] },
   fireball: { name: 'Fireball', type: 'attack', rarity: 'basic', cls: 'pyro', cost: 2, damage: [4, 6], range: 6, area: 1, burn: 2, makes: ['burn'] },
   frostRay: { name: 'Frost Ray', type: 'attack', rarity: 'basic', cls: 'cryo', cost: 1, damage: [4, 6], range: 5, chill: 2, makes: ['chill'] },
-  cloak: { name: 'Cloak', type: 'skill', rarity: 'basic', cls: 'phantom', cost: [1, 0], cloak: true, draw: 1 },
+  cloak: { name: 'Cloak', type: 'skill', rarity: 'basic', cls: 'phantom', cost: [1, 0], cloak: true, retain: true },
   // Attacks any hero may find.
   pointBlank: { name: 'Point Blank', weapons: ['shotgun', 'smg', 'pistols', 'fists'], type: 'attack', rarity: 'common', cost: 0, damage: [4, 6], range: 1 },
   rush: { name: 'Rush', weapons: ['shotgun', 'hammer', 'sword', 'fists'], type: 'attack', rarity: 'common', cost: 1, move: 3, damage: [5, 7], range: 1, makes: ['moved'] },
@@ -125,7 +125,7 @@ const cards = {
   riposte: { name: 'Riposte', weapons: ['sword', 'shield'], type: 'attack', rarity: 'rare', cost: 1, damage: [5, 7], range: 1, block: [5, 7] },
   // Weapon skills.
   reposition: { name: 'Reposition', weapons: ['sniper', 'lmg'], type: 'skill', rarity: 'common', cost: 0, retreat: 2, aim: [3, 5] },
-  bipod: { name: 'Bipod', weapons: ['lmg', 'sniper'], type: 'skill', rarity: 'common', cost: 1, aim: [4, 6], draw: 1 },
+  bipod: { name: 'Bipod', weapons: ['lmg', 'sniper'], type: 'skill', rarity: 'common', cost: 1, aim: [7, 10] },
   smoke: { name: 'Smoke Screen', weapons: ['rifle', 'sniper', 'shotgun', 'smg', 'lmg', 'pistols'], type: 'skill', rarity: 'rare', cost: 1, retreat: 2, cloak: true, exhaust: true },
   // Skills any hero may find.
   takeCover: { name: 'Take Cover', weapons: ['shield', 'sword'], type: 'skill', rarity: 'common', cost: 1, retreat: 3, block: [4, 6] },
@@ -164,7 +164,7 @@ const cards = {
   lockOn: { name: 'Lock-On Beacon', type: 'power', rarity: 'epic', cost: [2, 1], ...relic('lockOn') },
   // Each class's own cards.
   charge: { name: 'Charge', type: 'attack', rarity: 'common', cls: 'assault', cost: 1, move: 4, damage: [6, 8], range: 1, knock: 1, makes: ['moved', 'impact'] },
-  rally: { name: 'Rally', type: 'skill', rarity: 'rare', cls: 'assault', cost: 1, block: [6, 9], draw: 1 },
+  rally: { name: 'Rally', type: 'skill', rarity: 'rare', cls: 'assault', cost: 1, block: [9, 12] },
   groundSlam: { name: 'Ground Slam', type: 'attack', rarity: 'common', cls: 'heavy', cost: 2, damage: [5, 7], range: 1, area: 2, knock: 1, makes: ['moved', 'impact'] },
   ironHide: { name: 'Iron Hide', type: 'power', rarity: 'rare', cls: 'heavy', cost: [2, 1], ...relic('shell') },
   huntersMark: { name: "Hunter's Mark", type: 'attack', rarity: 'common', cls: 'sniper', cost: 0, damage: [1, 2], range: 10, mark: [2, 3], makes: ['mark'] },
