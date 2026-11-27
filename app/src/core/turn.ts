@@ -19,6 +19,8 @@ export const ENERGY = 3
 export const DRAW = 5
 /** The most cards a hand holds. */
 export const HAND_MAX = 10
+/** The most Aim the hero holds. */
+export const AIM_MAX = 8
 
 /** What an alien will do on its turn, as the board stands: attack `target` for `damage`, use a power, move, or nothing while stunned. */
 export interface Intent {
@@ -140,7 +142,9 @@ export function resolve(battle: Battle): GameEvent[] {
   battle.actor = hero.id
   if (target && n('damage') > 0) {
     const { hits, damage } = volley(hero, Math.max(1, n('hits')), n('damage'))
-    for (let hit = 0; hit < hits && target.hp > 0 && hero.hp > 0; hit++) events.push(...strike(battle, hero, target, damage, reachOf(card, hero), hit))
+    const first = hero.aim + (target.mark > 0 ? n('marked') : 0)
+    hero.aim = 0
+    for (let hit = 0; hit < hits && target.hp > 0 && hero.hp > 0; hit++) events.push(...strike(battle, hero, target, damage + (hit === 0 ? first : 0), reachOf(card, hero), hit))
     for (const other of caught.slice(1).filter((u) => u.hp > 0)) {
       const dealt = n('damage') + strength(hero) + odds(battle, hero, other)
       events.push({ type: 'hurt', id: other.id, amount: dealt, cause: 'impact' })
@@ -171,6 +175,7 @@ export function resolve(battle: Battle): GameEvent[] {
   battle.energy += n('energy')
   draw(battle, n('draw'))
   hero.might = Math.min(MIGHT_MAX, hero.might + n('might'))
+  hero.aim = Math.min(AIM_MAX, hero.aim + n('aim'))
   if (kind.lends && !hero.effects.includes(kind.lends)) hero.effects.push(kind.lends)
   events.push(...feed(battle, hero, events))
   battle.intents = intents(battle)
@@ -205,14 +210,27 @@ function step(battle: Battle, hero: Unit, card: Card, target: Unit | undefined, 
   go(battle, hero, path, events)
 }
 
-/** The hero steps up to `tiles` away from the aliens, to the tile farthest from the nearest. */
-function retreat(battle: Battle, hero: Unit, tiles: number, events: GameEvent[]): void {
+/** The path a Retreat of up to `tiles` takes: to the tile where the aliens' intents deal the hero least, then farthest from the nearest. */
+export function retreatPath(battle: Battle, hero: Unit, tiles: number): Tile[] {
   const aliens = battle.units.filter((u) => u.side === 'alien' && u.engaged)
-  if (aliens.length === 0) return
+  if (aliens.length === 0) return []
   const harm = (end: Tile) => (onTile(battle.acid, end) || onTile(battle.fire, end) ? 1 : 0)
-  const path = bestPath(paths(battle, hero, tiles), hero, (end, steps) => [harm(end), -Math.min(...aliens.map((a) => distance(a, end))), steps])
-  go(battle, hero, path, events)
+  return bestPath(paths(battle, hero, tiles), hero, (end, steps) => [harm(end), threatAt(battle, hero, end), -Math.min(...aliens.map((a) => distance(a, end))), steps])
 }
+
+function retreat(battle: Battle, hero: Unit, tiles: number, events: GameEvent[]): void {
+  go(battle, hero, retreatPath(battle, hero, tiles), events)
+}
+
+/** Damage the aliens' intents would deal the hero standing on `tile`, before its Block; a power aimed at it counts as PANIC_THREAT. */
+export function threatAt(battle: Battle, hero: Unit, tile: Tile): number {
+  const from = { x: hero.x, y: hero.y }
+  Object.assign(hero, { x: tile.x, y: tile.y })
+  const threat = intents(battle).reduce((sum, i) => sum + (i.target !== hero.id ? 0 : i.kind === 'attack' ? (i.damage ?? 0) : i.kind === 'ability' ? PANIC_THREAT : 0), 0)
+  Object.assign(hero, from)
+  return threat
+}
+export const PANIC_THREAT = 3
 
 function go(battle: Battle, hero: Unit, path: Tile[], events: GameEvent[]): void {
   if (path.length === 0) return

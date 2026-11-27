@@ -173,7 +173,7 @@ export interface Reserve {
 }
 
 /** What every unit starts a battle with: no stacks, no counts. */
-export const FRESH = { burn: 0, chill: 0, mark: 0, frozen: false, shifted: false, numb: 0, might: 0, combo: 0, comboOn: 0, exposed: 0, hits: 0 }
+export const FRESH = { burn: 0, chill: 0, mark: 0, frozen: false, shifted: false, numb: 0, might: 0, aim: 0, combo: 0, comboOn: 0, exposed: 0, hits: 0 }
 
 export interface Unit {
   id: number
@@ -225,6 +225,8 @@ export interface Unit {
   booming: number
   /** Damage its hits do more this battle: Might, from kills, falls and slams; a feeder's growth. */
   might: number
+  /** Damage its next card attack does more on its first hit, from Aim. */
+  aim: number
   /** Hits in a row on the alien `comboOn`, for Focus Fire. */
   combo: number
   comboOn: number

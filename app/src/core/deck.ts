@@ -1,6 +1,6 @@
 // The deck: the starter deck a hero's class and weapon give, and cards offered by rarity.
 import type { Rarity } from './base'
-import { CARD_IDS, CARDS, SIGNATURES, STRIKES, type Card, type CardId } from './cards'
+import { CARD_IDS, CARDS, SIGNATURES, STARTERS, type Card, type CardId } from './cards'
 import type { ClassId } from './classes'
 import { LEG_STOPS } from './progress'
 import { DOCTRINES, LEAN } from './doctrines'
@@ -18,14 +18,14 @@ export const EPIC_CHANCE: [number, number] = [0.03, 0.2]
 /** The level an upgrade raises a card to. */
 export const UPGRADED = 2
 
-/** Of each card the starter deck holds: Strikes, Defends, then 1 Dash and the class's signature card. */
-export const STARTER = { strikes: 4, defends: 4 }
-
-/** The deck a hero of class `cls` wielding `weapon` starts with. */
+/** The deck a hero of class `cls` wielding `weapon` starts with: its weapon's starter cards and its class's signature card. */
 export function starterDeck(cls: ClassId | null, weapon: WeaponId | undefined): Card[] {
-  const ids: CardId[] = [...Array<CardId>(STARTER.strikes).fill(STRIKES[weapon ?? 'rifle']), ...Array<CardId>(STARTER.defends).fill('defend'), 'dash', ...(cls ? [SIGNATURES[cls]] : [])]
-  return ids.map((id) => ({ id, level: 1 }))
+  const ids = (Object.entries(STARTERS[weapon ?? 'rifle']) as [CardId, number][]).flatMap(([id, n]) => Array<CardId>(n).fill(id))
+  return [...ids, ...(cls ? [SIGNATURES[cls]] : [])].map((id) => ({ id, level: 1 }))
 }
+
+/** Cards in the starter deck of a hero of class `cls` wielding `weapon`. */
+export const starterSize = (cls: ClassId | null, weapon: WeaponId | undefined) => starterDeck(cls, weapon).length
 
 /** How far along the run is, from 0 at its start to 1 at the hub. */
 const progress = (run: Run) => Math.min(1, (run.keys * LEG_STOPS + run.stop) / ((run.legs.length - 1) * LEG_STOPS))
@@ -38,8 +38,13 @@ export function rarityChances(run: Run, elite: boolean): Record<Rarity, number> 
   return { common: 1 - rare - epic, rare, epic }
 }
 
-/** Whether the hero may be offered card `id`: not basic, and of its class or none. */
-export const offerable = (run: Run, id: CardId) => CARDS[id].rarity !== 'basic' && (!CARDS[id].cls || CARDS[id].cls === run.hero.cls)
+/** Whether card `id` is in the hero's pools: not basic, and of its weapon's pool, its class's, or neither's. */
+export function offerable(run: Run, id: CardId): boolean {
+  const k = CARDS[id]
+  if (k.rarity === 'basic') return false
+  if (!k.cls && !k.weapons) return true
+  return k.cls === run.hero.cls || !!k.weapons?.includes(run.hero.gear?.weapon ?? 'rifle')
+}
 
 /** `n` different cards the hero may be offered, each of a rarity drawn by rarityChances; within it, one a held doctrine favours is LEAN times as likely. */
 export function drawCards(run: Run, n: number, elite: boolean): CardId[] {

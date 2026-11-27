@@ -13,7 +13,7 @@ import { CONTINENT_IDS, type City, CONTINENTS } from './world'
 import type { Flow, Quantity } from './quantities'
 
 /** The hero's max HP before relics and events add to it. */
-export const HERO_HP = 100
+export const HERO_HP = 105
 
 /** The sum of one lasting effect over every relic held. */
 export function total(run: Run, effect: (source: Lasting) => number | undefined): number {

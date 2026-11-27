@@ -25,12 +25,18 @@ interface Kind extends Flow {
   name: string
   type: CardType
   rarity: CardRarity
-  /** The class it belongs to; any hero's without one. */
+  /** The class whose pool it is in. */
   cls?: ClassId
+  /** The weapons whose pools it is in; with neither, any hero's. */
+  weapons?: readonly WeaponId[]
   cost: Up
   /** Damage each hit, and its hits. */
   damage?: Up
   hits?: Up
+  /** Damage the first hit does more on a target with Mark. */
+  marked?: Up
+  /** Damage the hero's next attack does more on its first hit. */
+  aim?: Up
   /** Tiles it reaches; the weapon's reach without one. */
   range?: number
   /** Aliens within this many tiles of the target take the damage too. */
@@ -69,9 +75,9 @@ const relic = (id: RelicId) => ({ relic: id })
 const strike = (name: string, damage: Up, range?: number, more: Partial<Kind> = {}): Kind => ({ name, type: 'attack', rarity: 'basic', cost: 1, damage, range, ...more })
 
 const cards = {
-  // The weapons' Strikes, 4 in every starter deck.
+  // The weapons' Strikes and the cards of their starter decks.
   burst: strike('Burst Fire', [2, 3], undefined, { hits: 2 }),
-  aimedShot: strike('Aimed Shot', [6, 9]),
+  aimedShot: strike('Aimed Shot', [12, 16], undefined, { cost: 2, marked: [4, 6] }),
   buckshot: strike('Buckshot', [5, 7], undefined, { knock: 1, makes: ['moved', 'impact'] }),
   spray: strike('Spray', 1, undefined, { hits: [4, 6], makes: ['shots'] }),
   suppress: strike('Suppressing Fire', [1, 2], undefined, { hits: 3, makes: ['shots'] }),
@@ -81,7 +87,9 @@ const cards = {
   shieldBash: strike('Shield Bash', [4, 5], undefined, { block: [3, 4], makes: ['armor'] }),
   jab: strike('Jab', [2, 3], undefined, { hits: 2, knock: 1, makes: ['shots', 'moved'] }),
   defend: { name: 'Defend', type: 'skill', rarity: 'basic', cost: 1, block: [4, 7] },
-  dash: { name: 'Dash', type: 'skill', rarity: 'basic', cost: [1, 0], move: 3, draw: 1 },
+  advance: { name: 'Advance', type: 'skill', rarity: 'basic', cost: [1, 0], move: 3, draw: 1 },
+  fallBack: { name: 'Fall Back', type: 'skill', rarity: 'basic', cost: [1, 0], retreat: 3, draw: 1 },
+  steadyAim: { name: 'Steady Aim', type: 'skill', rarity: 'basic', cost: 1, aim: [5, 8], retain: true },
   // Each class's signature card, 1 in its starter deck.
   heroicLeap: { name: 'Heroic Leap', type: 'attack', rarity: 'basic', cls: 'assault', cost: 2, move: [4, 5], damage: [5, 7], range: 1, area: 1, makes: ['moved'] },
   meteor: { name: 'Meteor Strike', type: 'attack', rarity: 'basic', cls: 'heavy', cost: 2, damage: [6, 9], range: 6, area: 1 },
@@ -92,25 +100,36 @@ const cards = {
   frostRay: { name: 'Frost Ray', type: 'attack', rarity: 'basic', cls: 'cryo', cost: 1, damage: [4, 6], range: 5, chill: 2, makes: ['chill'] },
   cloak: { name: 'Cloak', type: 'skill', rarity: 'basic', cls: 'phantom', cost: [1, 0], cloak: true, draw: 1 },
   // Attacks any hero may find.
-  pointBlank: { name: 'Point Blank', type: 'attack', rarity: 'common', cost: 0, damage: [4, 6], range: 1 },
-  rush: { name: 'Rush', type: 'attack', rarity: 'common', cost: 1, move: 3, damage: [5, 7], range: 1, makes: ['moved'] },
-  shoulder: { name: 'Shoulder Charge', type: 'attack', rarity: 'common', cost: 1, move: 2, damage: [3, 5], range: 1, knock: 2, makes: ['moved', 'impact'] },
-  grapple: { name: 'Grapple Shot', type: 'attack', rarity: 'common', cost: 1, damage: [3, 5], range: 6, pull: 3, makes: ['moved'] },
-  concussive: { name: 'Concussive Blast', type: 'attack', rarity: 'common', cost: 1, damage: [4, 6], range: 4, knock: 2, makes: ['moved', 'impact'] },
-  frag: { name: 'Frag Charge', type: 'attack', rarity: 'common', cost: 1, damage: [3, 5], range: 5, area: 1 },
-  doubleTap: { name: 'Double Tap', type: 'attack', rarity: 'common', cost: 1, damage: [3, 4], hits: 2, makes: ['shots'] },
-  calledShot: { name: 'Called Shot', type: 'attack', rarity: 'common', cost: 1, damage: [3, 5], mark: 2, makes: ['mark'] },
+  pointBlank: { name: 'Point Blank', weapons: ['shotgun', 'smg', 'pistols', 'fists'], type: 'attack', rarity: 'common', cost: 0, damage: [4, 6], range: 1 },
+  rush: { name: 'Rush', weapons: ['shotgun', 'hammer', 'sword', 'fists'], type: 'attack', rarity: 'common', cost: 1, move: 3, damage: [5, 7], range: 1, makes: ['moved'] },
+  shoulder: { name: 'Shoulder Charge', weapons: ['hammer', 'shield', 'fists'], type: 'attack', rarity: 'common', cost: 1, move: 2, damage: [3, 5], range: 1, knock: 2, makes: ['moved', 'impact'] },
+  grapple: { name: 'Grapple Shot', weapons: ['rifle', 'sniper', 'pistols'], type: 'attack', rarity: 'common', cost: 1, damage: [3, 5], range: 6, pull: 3, makes: ['moved'] },
+  concussive: { name: 'Concussive Blast', weapons: ['rifle', 'shotgun', 'lmg'], type: 'attack', rarity: 'common', cost: 1, damage: [4, 6], range: 4, knock: 2, makes: ['moved', 'impact'] },
+  frag: { name: 'Frag Charge', weapons: ['rifle', 'lmg'], type: 'attack', rarity: 'common', cost: 1, damage: [3, 5], range: 5, area: 1 },
+  doubleTap: { name: 'Double Tap', weapons: ['rifle', 'smg', 'pistols'], type: 'attack', rarity: 'common', cost: 1, damage: [3, 4], hits: 2, makes: ['shots'] },
+  calledShot: { name: 'Called Shot', weapons: ['rifle', 'sniper', 'pistols'], type: 'attack', rarity: 'common', cost: 1, damage: [3, 5], mark: 2, makes: ['mark'] },
   napalmGrenade: { name: 'Napalm Burst', type: 'attack', rarity: 'common', cost: 2, damage: [3, 4], range: 5, area: 1, burn: [3, 4], makes: ['burn'] },
   cryoGrenade: { name: 'Cryo Burst', type: 'attack', rarity: 'common', cost: 1, damage: [2, 3], range: 5, area: 1, chill: 2, makes: ['chill'] },
-  haymaker: { name: 'Haymaker', type: 'attack', rarity: 'common', cost: 2, damage: [11, 15], range: 1 },
-  overcharged: { name: 'Overcharged Shot', type: 'attack', rarity: 'rare', cost: 2, damage: [11, 15], exhaust: true, makes: ['overkill'] },
-  barrage: { name: 'Barrage', type: 'attack', rarity: 'rare', cost: 2, damage: [3, 4], hits: 4, range: 6, makes: ['shots'] },
-  uppercut: { name: 'Uppercut', type: 'attack', rarity: 'rare', cost: 1, damage: [6, 8], range: 1, knock: 3, makes: ['moved', 'impact'] },
-  seismic: { name: 'Seismic Slam', type: 'attack', rarity: 'rare', cost: 2, damage: [6, 8], range: 1, area: 2, stun: true },
-  railgun: { name: 'Railgun', type: 'attack', rarity: 'epic', cost: 3, damage: [16, 22], range: 12, exhaust: true, makes: ['overkill'] },
+  haymaker: { name: 'Haymaker', weapons: ['hammer', 'sword', 'fists'], type: 'attack', rarity: 'common', cost: 2, damage: [11, 15], range: 1 },
+  overcharged: { name: 'Overcharged Shot', weapons: ['rifle', 'sniper', 'lmg'], type: 'attack', rarity: 'rare', cost: 2, damage: [11, 15], exhaust: true, makes: ['overkill'] },
+  barrage: { name: 'Barrage', weapons: ['rifle', 'smg', 'lmg'], type: 'attack', rarity: 'rare', cost: 2, damage: [3, 4], hits: 4, range: 6, makes: ['shots'] },
+  uppercut: { name: 'Uppercut', weapons: ['hammer', 'fists'], type: 'attack', rarity: 'rare', cost: 1, damage: [6, 8], range: 1, knock: 3, makes: ['moved', 'impact'] },
+  seismic: { name: 'Seismic Slam', weapons: ['hammer', 'shield'], type: 'attack', rarity: 'rare', cost: 2, damage: [6, 8], range: 1, area: 2, stun: true },
+  railgun: { name: 'Railgun', weapons: ['sniper', 'lmg'], type: 'attack', rarity: 'epic', cost: 3, damage: [16, 22], range: 12, exhaust: true, makes: ['overkill'] },
+  hitAndRun: { name: 'Hit and Run', weapons: ['rifle', 'smg', 'pistols'], type: 'attack', rarity: 'common', cost: 1, damage: [4, 6], retreat: 2 },
+  flank: { name: 'Flank', weapons: ['rifle', 'shotgun', 'smg', 'pistols'], type: 'attack', rarity: 'common', cost: 1, move: 3, damage: [4, 6], makes: ['moved'] },
+  slug: { name: 'Slug Round', weapons: ['shotgun'], type: 'attack', rarity: 'common', cost: 1, damage: [7, 9], knock: 2, makes: ['moved', 'impact'] },
+  fanHammer: { name: 'Fan the Hammer', weapons: ['pistols', 'smg'], type: 'attack', rarity: 'rare', cost: 2, damage: 2, hits: [5, 7], makes: ['shots'] },
+  killShot: { name: 'Kill Shot', weapons: ['sniper'], type: 'attack', rarity: 'rare', cost: 3, damage: [20, 26], marked: [8, 10], makes: ['overkill'] },
+  whirlwind: { name: 'Whirlwind', weapons: ['sword'], type: 'attack', rarity: 'common', cost: 1, damage: [4, 6], range: 1, area: 1 },
+  riposte: { name: 'Riposte', weapons: ['sword', 'shield'], type: 'attack', rarity: 'rare', cost: 1, damage: [5, 7], range: 1, block: [5, 7] },
+  // Weapon skills.
+  reposition: { name: 'Reposition', weapons: ['sniper', 'lmg'], type: 'skill', rarity: 'common', cost: 0, retreat: 2, aim: [3, 5] },
+  bipod: { name: 'Bipod', weapons: ['lmg', 'sniper'], type: 'skill', rarity: 'common', cost: 1, aim: [4, 6], draw: 1 },
+  smoke: { name: 'Smoke Screen', weapons: ['rifle', 'sniper', 'shotgun', 'smg', 'lmg', 'pistols'], type: 'skill', rarity: 'rare', cost: 1, retreat: 2, cloak: true, exhaust: true },
   // Skills any hero may find.
-  takeCover: { name: 'Take Cover', type: 'skill', rarity: 'common', cost: 1, retreat: 3, block: [4, 6] },
-  shieldWall: { name: 'Shield Wall', type: 'skill', rarity: 'common', cost: 2, block: [12, 16] },
+  takeCover: { name: 'Take Cover', weapons: ['shield', 'sword'], type: 'skill', rarity: 'common', cost: 1, retreat: 3, block: [4, 6] },
+  shieldWall: { name: 'Shield Wall', weapons: ['hammer', 'sword', 'shield'], type: 'skill', rarity: 'common', cost: 2, block: [12, 16] },
   reload: { name: 'Tactical Reload', type: 'skill', rarity: 'common', cost: [1, 0], draw: 2 },
   lure: { name: 'Lure', type: 'skill', rarity: 'common', cost: 0, range: 6, pull: [2, 3], makes: ['moved'] },
   plating: { name: 'Plating', type: 'skill', rarity: 'common', cost: 1, armor: [3, 5], makes: ['armor'] },
@@ -182,6 +201,20 @@ export const CARD_IDS = Object.keys(CARDS) as CardId[]
 /** Each weapon's Strike. */
 export const STRIKES: Record<WeaponId, CardId> = { rifle: 'burst', sniper: 'aimedShot', shotgun: 'buckshot', smg: 'spray', lmg: 'suppress', pistols: 'twinShot', hammer: 'hammerBlow', sword: 'slash', shield: 'shieldBash', fists: 'jab' }
 
+/** Each weapon's starter deck, but the class's signature card: its Strikes, then guns move and melee weapons Block. */
+export const STARTERS: Record<WeaponId, Partial<Record<CardId, number>>> = {
+  rifle: { burst: 5, fallBack: 2, advance: 2 },
+  sniper: { aimedShot: 3, steadyAim: 2, fallBack: 3, advance: 1 },
+  shotgun: { buckshot: 5, advance: 3, fallBack: 1 },
+  smg: { spray: 5, advance: 2, fallBack: 2 },
+  lmg: { suppress: 5, fallBack: 2, steadyAim: 1, advance: 1 },
+  pistols: { twinShot: 4, fallBack: 3, advance: 2 },
+  hammer: { hammerBlow: 4, defend: 3, advance: 2 },
+  sword: { slash: 4, defend: 2, advance: 3 },
+  shield: { shieldBash: 4, defend: 4, advance: 1 },
+  fists: { jab: 4, defend: 2, advance: 3 },
+}
+
 /** Each class's signature card. */
 export const SIGNATURES: Record<ClassId, CardId> = { assault: 'heroicLeap', heavy: 'meteor', sniper: 'headshot', support: 'healingLight', engineer: 'droneStrike', pyro: 'fireball', cryo: 'frostRay', phantom: 'cloak' }
 
@@ -213,12 +246,14 @@ export function cardText(id: CardId, level = 1): string {
   const parts = [
     n('move') && `Move ${n('move')}.`,
     n('damage') && `Deal ${n('damage')} damage${hits > 1 ? ` ${hits} times` : ''}${k.area ? ` to the target and aliens within ${k.area}` : ''}.`,
+    n('marked') && `${n('marked')} more on a target with Mark.`,
     n('knock') && `Knockback ${n('knock')}.`,
     n('pull') && `Pull ${n('pull')}.`,
     n('burn') && `Apply ${n('burn')} Burn.`,
     n('chill') && `Apply ${n('chill')} Chill.`,
     n('mark') && `Apply ${n('mark')} Mark.`,
     k.stun && (k.area && !n('damage') ? `Stun the target and aliens within ${k.area}.` : 'Stun.'),
+    n('aim') && `Aim ${n('aim')}.`,
     n('retreat') && `Retreat ${n('retreat')}.`,
     n('block') && `Gain ${n('block')} Block.`,
     n('armor') && `Gain ${n('armor')} Armor.`,

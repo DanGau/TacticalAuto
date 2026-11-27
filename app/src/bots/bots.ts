@@ -3,7 +3,7 @@ import type { Action } from '../core/apply'
 import { strategic } from './strategic'
 import { bestPlay, randomPlay } from './play'
 import { CARDS, type CardId } from '../core/cards'
-import { STARTER, UPGRADED } from '../core/deck'
+import { starterSize, UPGRADED } from '../core/deck'
 import { CARD_PRICE } from '../core/rewards'
 import type { Flow } from '../core/quantities'
 import { RELICS } from '../core/relics'
@@ -98,7 +98,7 @@ const heroHealth = (run: Run) => health(run, run.hero) / soldierStats(run, run.h
 const HURT = 0.6
 
 /** Takes the safest stops until the deck has grown by GROWN cards, then the most dangerous. */
-const growing = (run: Run): Risk => (run.deck.length >= STARTER.strikes + STARTER.defends + 2 + GROWN ? 'dangerous' : 'safe')
+const growing = (run: Run): Risk => (run.deck.length >= starterSize(run.hero.cls, run.hero.gear?.weapon) + GROWN ? 'dangerous' : 'safe')
 const GROWN = 3
 
 /**

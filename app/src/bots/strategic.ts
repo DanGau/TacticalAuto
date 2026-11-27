@@ -11,10 +11,11 @@ import { health, makes, reads, soldierStats } from '../core/hero'
 import { RELICS, type RelicId } from '../core/relics'
 import { CANCELS, cancelling, type Cancel, type Flow } from '../core/quantities'
 import { CARDS, type CardId } from '../core/cards'
-import { STARTER, UPGRADED } from '../core/deck'
+import { starterSize, UPGRADED } from '../core/deck'
 import { bestPlay } from './play'
 import type { Bot } from './bots'
 import { EXAMS } from '../core/exams'
+import type { WeaponId } from '../core/weapons'
 
 /** The hero's health as a share of its most. */
 export const heroHealth = (run: Run) => health(run, run.hero) / soldierStats(run, run.hero).hp
@@ -46,12 +47,13 @@ function route(run: Run, rest?: number): Action {
 
 const RARITY = { common: 0, rare: 2, epic: 4 }
 
-/** What a weapon is worth to the hero: its rarity, what its effect adds to the combos, and a little to keep the weapon its Strikes are for. */
+/** What a weapon is worth to the hero: its rarity, what its effect adds to the combos, and KEEP to keep the weapon its deck and pool are for. */
 function gearWorth(run: Run, gear: Gear | null): number {
   if (!gear) return -1
   const bare = { ...run, hero: { ...run.hero, gear: null } }
-  return RARITY[gear.rarity] + (gear.effect ? comboWorth(bare, EFFECTS[gear.effect]) : 0) + (gear.weapon === run.hero.gear?.weapon ? 1 : 0)
+  return RARITY[gear.rarity] + (gear.effect ? comboWorth(bare, EFFECTS[gear.effect]) : 0) + (gear.weapon === run.hero.gear?.weapon ? KEEP : 0)
 }
+const KEEP = 3
 
 /** Whether `gear` improves on what the hero holds. */
 const improves = (run: Run, gear: Gear): boolean => gearWorth(run, gear) > gearWorth(run, run.hero.gear)
@@ -119,8 +121,12 @@ function reward(run: Run): Action {
 /** Classes by how many runs a hero of each wins, on the same seeds. */
 const CLASS_ORDER: ClassId[] = ['sniper', 'cryo', 'assault', 'engineer', 'phantom', 'support', 'heavy', 'pyro']
 
+/** Weapons by how many runs a hero wielding each wins, on the same seeds. */
+const WEAPON_ORDER: WeaponId[] = ['lmg', 'shield', 'pistols', 'rifle', 'sniper', 'smg', 'sword', 'hammer', 'shotgun', 'fists']
+
+/** The candidate whose weapon wins most, then whose class. */
 function choose(run: Run): Action {
-  const rank = (s: Soldier) => CLASS_ORDER.indexOf(s.cls!)
+  const rank = (s: Soldier) => WEAPON_ORDER.indexOf(s.gear?.weapon ?? 'rifle') * CLASS_ORDER.length + CLASS_ORDER.indexOf(s.cls!)
   return { type: 'hero', index: run.candidates.reduce((best, s, i) => (rank(s) < rank(run.candidates[best]) ? i : best), 0) }
 }
 
@@ -141,7 +147,7 @@ const LEAN = 0.5
 
 /** The deck's weakest card, by index, if it is worth less than the mean by LEAN and the deck holds more than its start. */
 function weakestCard(run: Run): number | null {
-  if (run.deck.length <= STARTER.strikes + STARTER.defends) return null
+  if (run.deck.length <= starterSize(run.hero.cls, run.hero.gear?.weapon) - 2) return null
   const worst = run.deck.reduce((w, c, i) => (cardWorth(run, c.id) < cardWorth(run, run.deck[w].id) ? i : w), 0)
   return cardWorth(run, run.deck[worst].id) < deckWorth(run) - LEAN ? worst : null
 }

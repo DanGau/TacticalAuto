@@ -30,7 +30,7 @@ Run in `app/`.
 - `npm run -s sim -- --runs=60 --loadouts=nanites,overkill+volatile` — the strategic bot holds each relic or gear effect (`+` pairs them) from the start, against none on the same seeds: win difference, synergy of pairs, healing a battle. `--power` plays every single.
 - `npm run test -- <files>`, `npm run tsx -- <script>` — run tests or a script under a deadline that kills it if it hangs. A hook blocks running `vitest` or `tsx` directly.
 - `npm run -s eye -- <command>` — play and screenshot the game in a headless browser. Commands: `app/eye/eye.ts`. One server and browser serve all worktrees; `eye -- stop` ends them.
-- `npm run -s eye -- play eye/hand.json` — fails unless the hand's cards, a target and End Turn take a click, an attack with no target is greyed and Dash brings it in reach, on phone, landscape phone and desktop.
+- `npm run -s eye -- play eye/hand.json` — fails unless the hand's cards, a target and End Turn take a click, an attack with no target is greyed, Advance brings it in reach and Fall Back plays, on phone, landscape phone and desktop.
 - `npm run -s eye -- play eye/card-reward.json` — fails unless each reward card and Skip take a click, at the same sizes.
 - `npm run -s eye -- play eye/safehouse.json` — fails unless a safehouse upgrades the card picked, or rests for 30% of max HP, at three sizes.
 - `npm run -s eye -- play eye/shop.json` — fails unless a shop's Remove a card takes the card picked out of the deck, at three sizes.

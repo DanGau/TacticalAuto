@@ -28,15 +28,16 @@ Over each engaged alien its intent shows, as in Slay the Spire: **Attack** with 
 
 - **Block** absorbs damage until the hero's next turn.
 - **Move** N: step up to N tiles. Toward the target if the card has one, else to the tile best placed for the hero's weapon.
-- **Retreat** N: step up to N tiles away from the aliens.
+- **Retreat** N: step up to N tiles away from the aliens, to the tile where their intents deal least.
+- **Aim** N: the next attack's first hit deals N more.
 - **Knockback** N, **Pull** N: drive the target away from the hero, or toward it. Into a wall, object or alien is an **Impact**; off a ledge or into a chasm is a fall.
 - **Burn**, **Chill**, **Mark**, **Crit**, **Overkill**, **Armor**: the combo quantities, as [combos](combos.md) tells, with their cancellations and bridges.
 - **Exhaust**, **Retain**: above.
 
 ## The deck
 
-- **Starter deck.** 10 cards: 4 of the weapon's Strike, 4 Defend, 1 Dash and the class's signature card. Every hero has one class and one weapon; the weapon's Strike is its way of fighting: Twin Pistols fire two cheap shots, a Hammer smashes a knot of aliens.
-- **Rewards.** Each battle won offers 3 cards: take 1 or Skip. Cards are of the hero's class or of no class, each of a rarity: common, rare or epic. Rarer cards come more often as the run goes on, and an elite's reward is never common.
+- **Starter deck.** 10 cards: the weapon's starter cards and the class's signature card. A weapon's starter is its Strikes and its second line: a gun moves, with **Advance** and **Fall Back**, which answer intents by stepping in or out of reach; a melee weapon blocks with **Defend**. A Sniper Rifle fires one heavy Aimed Shot a turn, **Steady Aim** loading it. Each weapon's mix is in `STARTERS`.
+- **Pools.** Every card but the starter cards is in a weapon's pool, a class's pool, or neither. Each battle won offers 3 cards from the hero's weapon pool, class pool and the cards of neither: take 1 or Skip. So each weapon and class pairing plays differently. Each card is of a rarity: common, rare or epic. Rarer cards come more often as the run goes on, and an elite's reward is never common.
 - **Upgrades.** A card upgraded plays as its "+": more damage, more Block, less cost. A safehouse offers one of two: rest, healing 30% of max HP, or upgrade a card.
 - **Doctrines.** Adopted at events and kept for the run, each leans reward offers to its style: within a rarity, a card a held doctrine favours is 3 times as likely. Blademasters favour close-range attacks, Brawlers Knockback and Pull, Power Armor Block and Armor, and so on.
 - **Max HP** comes only from relics and events; the hero has no levels.

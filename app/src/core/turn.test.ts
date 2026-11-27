@@ -1,13 +1,13 @@
 import { expect, test } from 'vitest'
 import { apply } from './apply'
 import { type Battle } from './battle'
-import { CARDS, SIGNATURES, STRIKES } from './cards'
+import { CARDS, STRIKES } from './cards'
 import { awaiting, stepBattle } from './combat'
 import { distance } from './grid'
 import { begun, enterAt } from './roads'
 import { current } from './run'
 import { type Run } from './run-state'
-import { DRAW, ENERGY, heroOf, targetsOf, whyNot } from './turn'
+import { DRAW, ENERGY, heroOf, intents, targetsOf, threatAt, whyNot } from './turn'
 import { wound } from './wound'
 import { REST_HEAL } from './rewards'
 import { soldierStats } from './hero'
@@ -25,16 +25,6 @@ function turn(seed: number): { run: Run; battle: Battle } {
   while (!awaiting(battle)) stepBattle(battle)
   return { run, battle }
 }
-
-test('the starter deck: 4 of the weapon\'s Strike, 4 Defend, Dash and the class\'s signature card', () => {
-  const run = begun(1)
-  const ids = run.deck.map((c) => c.id)
-  expect(ids.filter((id) => id === STRIKES.rifle)).toHaveLength(4)
-  expect(ids.filter((id) => id === 'defend')).toHaveLength(4)
-  expect(ids).toContain('dash')
-  expect(ids).toContain(SIGNATURES.sniper)
-  expect(ids).toHaveLength(10)
-})
 
 test('a turn begins with its Energy and a hand drawn; ending it discards the hand and the aliens act', () => {
   const { run, battle } = turn(1)
@@ -58,7 +48,7 @@ test('an Attack with no target in range is unplayable and says why; a move card 
     const alien = battle.units.find((u) => u.side === 'alien' && u.revealed)
     if (!alien) continue
     battle.units = [hero, alien]
-    battle.pile.hand = [{ id: STRIKES.rifle, level: 1 }, { id: 'dash', level: 1 }]
+    battle.pile.hand = [{ id: STRIKES.rifle, level: 1 }, { id: 'advance', level: 1 }]
     Object.assign(alien, { x: hero.x + hero.stats.range + 2, y: hero.y })
     if (targetsOf(battle, battle.pile.hand[0]).length > 0) continue
     expect(whyNot(battle, 0, alien.id)).toBe(`No target in range ${hero.stats.range}.`)
@@ -125,18 +115,61 @@ test('a reward: take 1 of 3 or Skip; a safehouse rests or upgrades', () => {
   expect(run.deck[0].level).toBe(2)
   run.phase = 'reward'
   run.upgrading = true
-  run.hero.wounds = 30
+  run.hero.wounds = 40
   apply(run, { type: 'upgrade', index: null })
-  expect(run.hero.wounds).toBe(30 - Math.ceil(REST_HEAL * soldierStats(run, run.hero).hp))
+  expect(run.hero.wounds).toBe(40 - Math.ceil(REST_HEAL * soldierStats(run, run.hero).hp))
   expect(run.upgrading).toBe(false)
 })
 
 test('a held doctrine leans card offers to the cards it favours', () => {
   const share = (doctrines: Run['doctrines']) => {
     const run = begun(7)
+    run.hero.gear!.weapon = 'fists'
     run.doctrines = doctrines
     const drawn = Array.from({ length: 200 }, () => drawCards(run, 3, false)).flat()
     return drawn.filter((id) => DOCTRINES.blades.favours(id)).length / drawn.length
   }
   expect(share(['blades'])).toBeGreaterThan(1.5 * share([]))
+})
+
+test('Fall Back retreats to a tile the intents cannot reach: an attack answered by moving', () => {
+  let seen = 0
+  for (let seed = 1; seed <= 10; seed++) {
+    const { run, battle } = turn(seed)
+    const hero = heroOf(battle)!
+    const alien = battle.units.find((u) => u.side === 'alien' && u.revealed && u.stats.range <= 1)
+    if (!alien) continue
+    battle.units = [hero, alien]
+    Object.assign(alien, { x: hero.x + 1, y: hero.y, engaged: true, hp: 99 })
+    battle.intents = intents(battle)
+    if (threatAt(battle, hero, hero) === 0) continue
+    battle.pile.hand = [{ id: 'fallBack', level: 1 }]
+    apply(run, { type: 'play', index: 0, target: null })
+    stepBattle(battle)
+    expect(threatAt(battle, hero, hero)).toBe(0)
+    seen++
+  }
+  expect(seen).toBeGreaterThan(0)
+})
+
+test('a sniper turn is one big shot: Steady Aim, then Aimed Shot lands its Aim on a single hit', () => {
+  const { run, battle } = turn(2)
+  const hero = heroOf(battle)!
+  const alien = battle.units.find((u) => u.side === 'alien' && u.revealed)!
+  battle.units = [hero, alien]
+  Object.assign(alien, { x: hero.x + 2, y: hero.y, hp: 99, armor: 0, mark: 0 })
+  Object.assign(alien.stats, { hp: 99, armor: 0 })
+  battle.pile.hand = [{ id: 'steadyAim', level: 1 }, { id: 'aimedShot', level: 1 }]
+  apply(run, { type: 'play', index: 0, target: null })
+  stepBattle(battle)
+  expect(hero.aim).toBe(5)
+  expect(battle.energy).toBe(ENERGY - 1)
+  const hp = alien.hp
+  const shots: number[] = []
+  apply(run, { type: 'play', index: 0, target: alien.id })
+  for (const e of stepBattle(battle)) if (e.type === 'shot') shots.push(e.damage)
+  expect(shots).toHaveLength(1)
+  expect(hp - alien.hp).toBeGreaterThanOrEqual(12 + 5)
+  expect(hero.aim).toBe(0)
+  expect(battle.energy).toBe(0)
 })

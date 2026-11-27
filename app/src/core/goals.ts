@@ -20,7 +20,7 @@ export const EXTRACT_REACH = 3
 export const WAVE_EVERY = 2
 /** Civilians on a rescue, the health of each, how far each flees in a turn, and the supplies and experience each saved pays. */
 export const CIVILIANS = 3
-export const CIVILIAN_HP = 16
+export const CIVILIAN_HP = 24
 export const CIVILIAN_MOVE = 4
 export const CIVILIAN_SUPPLIES = 6
 export const CIVILIAN_XP = 3

@@ -2,7 +2,7 @@
 import type { Action } from '../core/apply'
 import type { Battle, Unit } from '../core/battle'
 import { aimed, amount, CARDS, costOf, type Card } from '../core/cards'
-import { heroOf, targetsOf } from '../core/turn'
+import { heroOf, retreatPath, targetsOf, threatAt } from '../core/turn'
 import { randomInt } from '../core/rng'
 
 /** Every play open now: each card of the hand at each target it may take, or none if it takes none. */
@@ -48,7 +48,7 @@ function worth(battle: Battle, card: Card, target: Unit | undefined, keen: boole
   let value = 0
   if (target) {
     const hits = Math.max(1, n('hits'))
-    const dealt = (n('damage') + hero.might + Math.max(0, hero.stats.damage - 3)) * hits
+    const dealt = n('damage') > 0 ? (n('damage') + hero.might + Math.max(0, hero.stats.damage - 3)) * hits + hero.aim + (target.mark > 0 ? n('marked') : 0) : 0
     const left = target.hp + target.armor
     value += 0.5 * Math.min(dealt, left)
     if (dealt >= left) value += keen ? 1.2 * threatOf(battle, target.id) + 2 : 2
@@ -63,9 +63,15 @@ function worth(battle: Battle, card: Card, target: Unit | undefined, keen: boole
   value += 1.5 * n('energy') + 1 * n('draw')
   if (k.type === 'power') value += battle.round <= 2 ? 4 : 2
   if (n('might') > 0) value += 2 * n('might')
+  value += 0.4 * n('aim')
+  // A Retreat pays by the intents it dodges.
+  if (n('retreat') > 0 && coming > 0 && hero.rooted === 0) {
+    const end = retreatPath(battle, hero, n('retreat')).at(-1)
+    if (end) value += (keen ? 1 : 0.8) * (coming - Math.max(0, threatAt(battle, hero, end) - (hero.block ?? 0)))
+  }
   // A move pays when it brings an attack in hand into reach.
   if ((n('move') > 0 || n('retreat') > 0) && n('damage') === 0) {
-    value += stranded ? 3 : n('retreat') > 0 && coming > 0 ? 1 : 0.3
+    value += stranded && n('move') > 0 ? 3 : 0.3
   }
   return value
 }

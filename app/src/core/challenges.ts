@@ -73,13 +73,13 @@ export function forceOf(id: ChallengeId, leg: number, rung: number, more: number
 export const STIFFEN: Partial<Record<ChallengeId, { range?: number; armor?: number[] }>> = {
   slog: { range: 3 },
   firingLine: { range: 2 },
-  ironWall: { armor: [4, 7, 9] },
+  ironWall: { armor: [3, 5, 7] },
 }
 
 /** A big one's boss: its health over a hero's base, its armor and its damage, by leg and rung. */
 export function bigOneStats(leg: number, rung: number, base: Stats): Stats {
   const size = Math.min(leg, 2)
-  return { ...base, hp: [10, 30, 60][size] + [3, 6, 10][size] * rung, armor: [7, 10, 16][size] + [1, 2, 3][size] * rung, damage: base.damage + 2 + 2 * size + Math.floor(rung / 2) }
+  return { ...base, hp: [10, 30, 60][size] + [3, 6, 10][size] * rung, armor: [7, 10, 16][size] + [1, 2, 3][size] * rung, damage: base.damage + 1 + 2 * size + Math.floor(rung / 2) }
 }
 
 /** Of a Scattered's force of `count`, the sentries posted; the rest are the reinforcements. */
