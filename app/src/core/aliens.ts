@@ -305,7 +305,7 @@ export const melee = (kind: AlienKind) => (ALIENS[kind].stats.range ?? BASE_STAT
 export function alienStats(kind: AlienKind, armor: number, weapon: number): Stats {
   const stats = { ...BASE_STATS, ...ALIENS[kind].stats }
   const armed = kind === 'burster' ? 0 : weapon
-  return { ...stats, hp: Math.max(1, Math.round(BASE_STATS.hp * ALIENS[kind].hp * TUNING.alienHp)), armor: armor + (ALIENS[kind].stats.armor ?? 0), damage: stats.damage + armed + TUNING.alienDamage, crit: 0 }
+  return { ...stats, hp: Math.max(1, Math.round(BASE_STATS.hp * ALIENS[kind].hp * TUNING.alienHp)), armor: armor + (ALIENS[kind].stats.armor ?? 0), damage: Math.max(1, Math.round(stats.damage * TUNING.alienDamage)) + armed, crit: 0 }
 }
 
 /** A themed handful of aliens a mission's force buys together. */
